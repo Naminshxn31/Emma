@@ -37,14 +37,21 @@ a stage in the pipeline.
 | | **Gemini Live** (default) | **OpenAI Realtime** |
 | --- | --- | --- |
 | Cost | **Free tier available** | Paid per audio minute |
-| Model | `gemini-2.5-flash-native-audio-preview-12-2025` | `gpt-realtime-2.1` |
+| Model (default) | `gemini-2.5-flash-native-audio-preview-12-2025` | `gpt-realtime-2.1` |
 | Voices | 30 | 10 |
 | Mic audio | PCM16 **16 kHz** | PCM16 **24 kHz** |
 | Reply audio | PCM16 24 kHz | PCM16 24 kHz |
 | Session cap | 15 min | 60 min |
 | Interruption | server drops unsent audio; client just stops | client must also report how much was heard |
-| Extras | affective dialogue, proactive audio | semantic VAD |
+| Extras | affective dialogue, proactive audio (2.5 only) | semantic VAD |
 | Key | `GEMINI_API_KEY` ([free](https://aistudio.google.com/apikey)) | `OPENAI_API_KEY` |
+
+**The gallery deployment runs `gemini-3.1-flash-live-preview`, set in `.env`.**
+The table above is the *default* in `app/config.py`, which is the older 2.5
+native-audio model. The two are not interchangeable and the difference is not
+cosmetic: 3.1 does **not** support affective dialogue, proactive audio, or
+NON_BLOCKING function calling, and `GEMINI_AFFECTIVE_DIALOG=true` is ignored
+with a warning on it. Anything read here about those features applies to 2.5.
 
 `app/providers/` hides all of that from the rest of the app — the browser
 speaks one protocol and learns the sample rates at runtime from the `ready`
@@ -343,16 +350,34 @@ title and summary.
 
 ### How slide search works
 
-Thai is written without spaces, so matching is character n-gram overlap
-across titles, summaries and keywords in both languages — whole-string
-containment failed on near misses ("ทำเลที่ตั้ง" found nothing despite a
-"แผนที่ทำเล" slide existing). Slides tagged `other-project` are scored down
-so a competitor's pool doesn't answer "show me the pool".
+Hybrid: **BM25 + embeddings, fused with Reciprocal Rank Fusion.**
 
-Queries below `MIN_MATCH_SCORE` return "no match" instead of showing
-something unrelated — a wrong floor plan on a large screen is worse than a
-blank one. That threshold only filters obvious noise; n-grams can't separate
-"การเมือง" from "ในเมือง", so staying on topic remains the prompt's job.
+Thai is written without spaces, so the lexical half tokenises with pythainlp's
+`newmm` segmenter (taught this deck's vocabulary) rather than splitting on
+whitespace. An earlier version matched on character n-grams instead, and the
+failure was specific enough to be worth keeping in mind: `ราคา` matched
+`อาคาร`, because they share the run `าคา`. Overlapping letters are not
+overlapping meaning.
+
+The semantic half embeds all 144 slides once with `gemini-embedding-001`
+(768-dim, L2-normalised) and caches them to `data/slides/embeddings.npz`. This
+is what lets a question find a slide sharing none of its words — สระว่ายน้ำ
+finding "SKY POOL", or a Chinese guest's 游泳池 finding anything at all. It
+degrades rather than fails: with no cache the search is keyword-only and
+cross-language matching stops working, which is announced at startup instead
+of being left to be discovered.
+
+RRF combines the two rankings without needing their scores to be comparable,
+which they aren't — BM25 is unbounded, cosine is [-1, 1].
+
+Slides tagged `other-project` are scored down so a competitor's pool doesn't
+answer "show me the pool". Queries below `SEARCH_MIN_SIMILARITY` return
+"no match" rather than something unrelated: a wrong floor plan on a large
+screen is worse than a blank one. `SEARCH_SHOW_SIMILARITY` is the higher bar a
+match must clear before it may take over the screen.
+
+Run `python scripts/eval_search.py` to see where those thresholds fall on your
+own deck — the defaults were never measured against it.
 
 ### Adding a tool
 
@@ -560,23 +585,88 @@ Check, in order:
 pytest
 ```
 
-29 tests, no API key and no network. The OpenAI path runs against a local
-WebSocket server impersonating the Realtime API (exercising the real
+429 tests, no API key and no network (~90s). The OpenAI path runs against a
+local WebSocket server impersonating the Realtime API (exercising the real
 `websockets` client, real JSON on the wire, and both relay pumps); the Gemini
 path runs against a scripted fake live session.
 
-Covered: sample rates per provider (the easiest thing to get silently wrong),
-session caps, both voice catalogues matching the documented IDs, audio
-arriving as binary rather than base64, transcripts in both directions,
-interruption reaching the browser, OpenAI's truncate carrying the real played
-duration, unknown-voice fallback, per-provider missing-key messages, that a
-browser cannot override the system instructions, and that the prompt forbids
-inventing prices.
+**Almost every test here is a bug that happened in front of a guest.** They
+are named after the symptom rather than the function, and the docstring
+usually quotes the log or the transcript that produced them. `CLAUDE.md` is
+the companion: what broke, and why the fix is shaped the way it is.
+
+Covered, in rough order of how much they cost to learn:
+
+- **Picture vs voice.** The model generates 4–6× faster than it speaks, so
+  anything changing what the guest sees has to check the audio lead. Two code
+  paths once drove the Canva window on different clocks.
+- **The tour advancing itself.** A nudge that fed itself walked 26 slides in
+  silence; a later one arrived as a user turn and truncated the narration on
+  21 of 81 slides, one to 16% of its script.
+- **Stopping and resuming.** "Can you speak Chinese?" was heard as "stop", and
+  stopping discarded the deck, so there was no way back.
+- **The Canva window.** Kiosk flags landing on a window nobody looks at,
+  closing it and having it reopen to show a black page, long jumps reloading
+  the whole deck.
+- **Printing.** Path resolution, `PrintTo` vs `Print`, and locating a PDF
+  helper without depending on a file association.
+- **Content rules.** That a browser cannot override the system instructions,
+  and that the prompt forbids inventing prices.
+- **The transport itself.** Sample rates per provider (the easiest thing to
+  get silently wrong), session caps, voice catalogues, audio as binary rather
+  than base64, transcripts both directions, interruption reaching the browser,
+  OpenAI's truncate carrying the real played duration, unknown-voice fallback,
+  per-provider missing-key messages.
+
+Each fix was verified by reverting it and confirming the test goes red. Worth
+doing: several tests passed against reverted code the first time, usually
+because they stubbed the wrong layer, or because the CI machine lacked a
+package and the code never ran at all.
 
 ## Not implemented
 
-- **Wake word** — the session starts when someone presses the button.
-- **Robot hardware** — this is the voice layer. Driving the Astronaut
-  robot's arms/navigation would go through its Android SDK
-  (`AoboRobotManager`), triggered from function calls.
-- **Offline fallback** — both providers need network by design.
+This is the voice layer, running on a PC. It is not yet on a robot.
+
+- **Wake word** — the session starts when someone presses the button. This is
+  the one that costs money rather than convenience: a session left open all
+  day burns quota on an empty room. A wake word that opens a session only when
+  somebody is actually there is the fix, and it belongs on the robot, not here.
+- **Robot hardware** — driving the Astronaut robot's arms and navigation would
+  go through its Android SDK (`AoboRobotManager`, shipped as an `.aar`, with
+  REAL and MOCK modes), triggered from function calls like every other tool.
+  Nothing in this repo touches it yet.
+- **The robot's audio path is unverified.** Nothing here has been tested
+  against the robot's microphone array or its echo cancellation, and that —
+  not the software — is where this is most likely to disappoint. A robot's own
+  speaker feeding its own microphone reads as the guest interrupting, on every
+  single sentence. `HALF_DUPLEX=true` exists for exactly this and costs the
+  ability to talk over the robot, which is a feature people notice losing.
+- **Offline fallback** — both providers need network by design. The realistic
+  shape is not a local model but a small local command set for the things that
+  must work when the line drops: stop, cancel navigation, fetch a human, show
+  a QR code, and say that the connection is down.
+- **Robot-to-server authentication** — `/ws` is open to anything that can reach
+  the port. Fine on a wired gallery LAN, not fine the moment the robot is on
+  Wi-Fi or the server is reachable from outside.
+- **Quota, rate limiting, and a spend alert** — nothing currently stops a stuck
+  session, or a bad day, from running up the bill unobserved.
+
+### On running the model locally
+
+Worth stating plainly, because "the API key is in the code" and "we should run
+the model locally" get treated as the same problem. They are not.
+
+The key never reaches the robot. `app/providers/` is a proxy, not a
+passthrough: the browser (or an app) speaks this project's own WebSocket
+protocol, the system instructions are attached server-side, and the client is
+never told which provider is behind it. Keeping `.env` on the server — not in
+JavaScript, not in an APK — is the whole of what that requires.
+
+So the key is not a reason to go local. Real reasons would be a rule that
+audio may not leave the building, or a connection too unreliable to depend on.
+
+And the hardware argues against it anyway. The Astronaut runs Android 10 on a
+Snapdragon QCM686 with 4 GB of RAM (8 GB on the upgraded configuration). That
+is comfortable for UI, audio capture, a wake word and robot control, and is
+not a machine for running speech recognition, a language model and speech
+synthesis at once at a quality anyone would put in front of a customer.
