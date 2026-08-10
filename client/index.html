@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<title>Condo Voice Assistant</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Inline so the browser never issues a /favicon.ico request (which would
+     otherwise 404 on every page load and clutter the server log). -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='g' cx='32%25' cy='28%25'%3E%3Cstop offset='0' stop-color='%238ED0F5'/%3E%3Cstop offset='0.78' stop-color='%231B6FE0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23g)'/%3E%3C/svg%3E" />
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+         background: #fff; color: #0d0d0d; min-height: 100vh; display: flex; flex-direction: column;
+         align-items: center; justify-content: center; padding: 1.5rem 1rem; }
+  @media (prefers-color-scheme: dark) { body { background: #0d0d0d; color: #f2f2f2; } }
+
+  .screen { display: none; flex-direction: column; align-items: center; width: 100%; }
+  .screen.active { display: flex; }
+  #pickerScreen { max-width: 420px; }
+  /* Widens to two columns only once a slide is on screen, so a plain
+     conversation isn't left with an empty half. */
+  #callScreen { max-width: 560px; height: calc(100vh - 3rem);
+                transition: max-width .3s ease; }
+  #callScreen.with-slides { max-width: 1500px; }
+
+  h1 { font-size: 2rem; font-weight: 700; margin: 0 0 .5rem; text-align: center; letter-spacing: -0.02em; }
+  .sub { font-size: .8rem; color: #8e8e8e; margin: 0 0 2.5rem; text-align: center; }
+  .pill { display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+          background: rgba(30,160,90,.14); color: #1a8f52; padding: .18rem .5rem; border-radius: 99px; }
+
+  .orb { border-radius: 50%; flex-shrink: 0;
+         transition: transform .35s cubic-bezier(.2,.9,.3,1.2);
+         background: radial-gradient(circle at 32% 28%, var(--c1) 0%, var(--c2) 78%); }
+  #pickOrb { width: 210px; height: 210px; }
+  #callOrb { width: 76px; height: 76px; }
+  .carousel { display: flex; align-items: center; gap: .75rem; width: 100%; justify-content: center; }
+  .arrow { border: none; background: transparent; font-size: 1.7rem; line-height: 1; cursor: pointer;
+           color: #8e8e8e; padding: .6rem; border-radius: 50%; }
+  .arrow:hover { background: rgba(128,128,128,.14); }
+  .voice-name { font-size: 1.4rem; font-weight: 600; margin: 1.5rem 0 .3rem; text-align: center; }
+  .voice-desc { font-size: 1rem; color: #8e8e8e; margin: 0; text-align: center; }
+  .badge { display: inline-block; font-size: .65rem; font-weight: 700; letter-spacing: .05em;
+           background: rgba(27,111,224,.14); color: #1b6fe0; padding: .16rem .45rem;
+           border-radius: 99px; margin-left: .45rem; vertical-align: middle; }
+  .dots { display: flex; gap: .38rem; margin: 1.5rem 0; flex-wrap: wrap; justify-content: center; max-width: 320px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #d4d4d4; cursor: pointer; border: none; padding: 0; }
+  .dot.on { background: #0d0d0d; }
+  @media (prefers-color-scheme: dark) { .dot { background: #4a4a4a; } .dot.on { background: #f2f2f2; } }
+
+  .btn { padding: .9rem 1rem; border-radius: 99px; border: none; font-size: .95rem; font-weight: 600;
+         cursor: pointer; background: #0d0d0d; color: #fff; font-family: inherit; }
+  .btn.wide { width: 100%; padding: 1rem; font-size: 1rem; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.ghost { background: transparent; color: #8e8e8e; border: 1px solid rgba(128,128,128,.35); }
+  @media (prefers-color-scheme: dark) { .btn { background: #f2f2f2; color: #0d0d0d; } }
+
+  .orb.listening { animation: breathe 2.4s ease-in-out infinite; }
+  .orb.hearing   { animation: breathe 1.1s ease-in-out infinite; }
+  .orb.speaking  { animation: speak .7s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(1) } 50% { transform: scale(1.05) } }
+  @keyframes speak   { 0%,100% { transform: scale(1) } 50% { transform: scale(1.11) } }
+
+  /* --- call screen --- */
+  .callbar { display: flex; align-items: center; gap: 1rem; width: 100%; padding-bottom: 1rem; flex-shrink: 0; }
+  .callbar .meta { flex: 1; min-width: 0; }
+  .state { font-size: .8rem; color: #8e8e8e; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
+  .state.speaking { color: #1b6fe0; }
+  .state.hearing { color: #1a8f52; }
+  .state.error { color: #c33; }
+  .meta .note { font-size: .74rem; color: #8e8e8e; margin: .25rem 0 0; }
+  .level { height: 4px; background: rgba(128,128,128,.22); border-radius: 2px;
+           overflow: hidden; margin-top: 7px; max-width: 260px; }
+  .level > div { height: 100%; width: 0%; background: #1a8f52; transition: width .06s linear; }
+
+  /* Slides sit beside the conversation, wider than it — the picture is what
+     the guest is actually looking at, so it gets the room. */
+  .split { display: flex; gap: 1rem; width: 100%; flex: 1; min-height: 0; }
+  /* The conversation keeps its normal width on the left and does not grow —
+     letting it flex meant it swallowed the row and squeezed the slide into a
+     sliver. Extra width belongs to the picture. */
+  .col-chat { display: flex; flex-direction: column; min-width: 0;
+              flex: 0 0 480px; max-width: 100%; }
+  .stage { display: none; position: relative; border-radius: 12px;
+           overflow: hidden; background: #000; flex-direction: column; }
+  .stage.on { display: flex; flex: 1 1 auto; min-width: 0; }
+  .stage-img-wrap { flex: 1; min-height: 0; display: flex; align-items: center;
+                    justify-content: center; overflow: hidden; }
+  .stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .stage-bar { display: flex; justify-content: space-between; gap: .75rem; align-items: baseline;
+               padding: .5rem .8rem; background: rgba(0,0,0,.72); color: #fff;
+               font-size: .82rem; flex-shrink: 0; }
+  .stage-bar span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stage-bar span:last-child { opacity: .7; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .stage-open { position: absolute; top: .5rem; right: .5rem; background: rgba(0,0,0,.6);
+                color: #fff; text-decoration: none; font-size: .72rem; padding: .28rem .6rem;
+                border-radius: 99px; }
+  .stage-open:hover { background: rgba(0,0,0,.85); }
+
+  /* Not enough width for two columns — stack, with the slide on top. */
+  @media (max-width: 900px) {
+    .split { flex-direction: column; }
+    .col-chat { flex: 1 1 auto; }
+    .stage.on { flex: 0 0 auto; max-height: 38vh; }
+    #callScreen.with-slides { max-width: 560px; }
+  }
+
+  .convo { flex: 1; width: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: .7rem;
+           padding: 1rem; border: 1px solid rgba(128,128,128,.2); border-radius: 16px;
+           background: rgba(128,128,128,.035); min-height: 0; }
+  .convo:empty::after { content: 'บทสนทนาจะแสดงที่นี่ — เริ่มพูดได้เลย';
+                        color: #a0a0a0; font-size: .85rem; margin: auto; }
+
+  .turn { display: flex; flex-direction: column; max-width: 88%; }
+  .turn.user { align-self: flex-end; align-items: flex-end; }
+  .turn.bot { align-self: flex-start; align-items: flex-start; }
+  .who { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 700;
+         color: #9a9a9a; margin-bottom: .25rem; }
+  .bubble { padding: .6rem .9rem; border-radius: 16px; font-size: .93rem; line-height: 1.55;
+            white-space: pre-wrap; word-break: break-word; }
+  .turn.user .bubble { background: #1b6fe0; color: #fff; border-bottom-right-radius: 5px; }
+  .turn.bot .bubble { background: #ececec; border-bottom-left-radius: 5px; }
+  @media (prefers-color-scheme: dark) { .turn.bot .bubble { background: #262626; } }
+  .turn.live .bubble::after { content: '▍'; opacity: .5; margin-left: 1px; }
+  .cut { font-size: .68rem; color: #b8860b; margin-top: .25rem; }
+  /* Text the model generated but never got to say, because the guest cut in.
+     Dimmed and struck through so the panel can't imply it was spoken. */
+  .unheard { opacity: .42; text-decoration: line-through;
+             text-decoration-thickness: 1px; }
+
+  .controls { display: flex; gap: .5rem; width: 100%; padding-top: 1rem; flex-shrink: 0; }
+  .controls .btn { flex: 1; }
+  .controls .btn.icon { flex: 0 0 auto; padding: .9rem 1.1rem; }
+
+  .note { font-size: .76rem; color: #8e8e8e; text-align: center; margin-top: 1.1rem; line-height: 1.5; }
+  .err { background: rgba(224,60,60,.1); border: 1px solid rgba(224,60,60,.35); color: #c33;
+         padding: .8rem 1rem; border-radius: 12px; font-size: .84rem; margin-bottom: 1.4rem;
+         width: 100%; line-height: 1.55; }
+  .err code { background: rgba(0,0,0,.08); padding: .05rem .3rem; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<section class="screen active" id="pickerScreen">
+  <h1>Choose a voice</h1>
+  <p class="sub" id="providerLine">…</p>
+  <div id="setupErr"></div>
+  <div class="carousel">
+    <button class="arrow" id="prevBtn" aria-label="Previous voice">&#8249;</button>
+    <div class="orb" id="pickOrb"></div>
+    <button class="arrow" id="nextBtn" aria-label="Next voice">&#8250;</button>
+  </div>
+  <div class="voice-name" id="voiceName">…</div>
+  <p class="voice-desc" id="voiceDesc"></p>
+  <div class="dots" id="dots"></div>
+  <button class="btn wide" id="startBtn" disabled>Start conversation</button>
+  <p class="note" id="pickerNote"></p>
+</section>
+
+<section class="screen" id="callScreen">
+  <div class="callbar">
+    <div class="orb" id="callOrb"></div>
+    <div class="meta">
+      <div class="state" id="stateLabel">connecting</div>
+      <div class="level"><div id="levelBar"></div></div>
+      <p class="note" id="callNote" style="text-align:left"></p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="col-chat">
+      <div class="convo" id="convo" aria-live="polite"></div>
+      <div class="controls">
+        <button class="btn ghost" id="muteBtn">Mute</button>
+        <button class="btn ghost icon" id="copyBtn" title="Copy transcript">Copy</button>
+        <button class="btn" id="endBtn">End</button>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="stage-img-wrap"><img id="stageImg" alt="" /></div>
+      <div class="stage-bar">
+        <span id="stageTitle"></span>
+        <span id="stagePos"></span>
+      </div>
+      <a class="stage-open" id="openDisplay" href="/display" target="_blank"
+         title="Open the fullscreen display">เปิดจอเต็ม ↗</a>
+    </div>
+  </div>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let voices = [], idx = 0, selectedVoice = null, providerName = 'gemini';
+
+let ws = null, audioCtx = null, micStream = null, micSource = null, worklet = null;
+let muted = false, playHead = 0, sources = [], playing = false;
+let inputRate = 16000, outputRate = 24000;
+let sentMs = 0, halfDuplex = false;
+
+// ---------------- voice picker ----------------
+
+function renderVoice() {
+  const v = voices[idx];
+  if (!v) return;
+  const orb = $('pickOrb');
+  orb.style.setProperty('--c1', v.gradient[0]);
+  orb.style.setProperty('--c2', v.gradient[1]);
+  orb.style.transform = 'scale(.94)';
+  setTimeout(() => { orb.style.transform = 'scale(1)'; }, 20);
+  $('voiceName').innerHTML = v.name + (v.recommended ? '<span class="badge">BEST</span>' : '');
+  $('voiceDesc').textContent = v.description_en + ' · ' + v.description_th;
+  [...$('dots').children].forEach((d, i) => d.classList.toggle('on', i === idx));
+  selectedVoice = v.id;
+}
+
+const move = (d) => { idx = (idx + d + voices.length) % voices.length; renderVoice(); };
+$('prevBtn').onclick = () => move(-1);
+$('nextBtn').onclick = () => move(1);
+document.addEventListener('keydown', (e) => {
+  if (!$('pickerScreen').classList.contains('active')) return;
+  if (e.key === 'ArrowLeft') move(-1);
+  if (e.key === 'ArrowRight') move(1);
+  if (e.key === 'Enter' && !$('startBtn').disabled) startCall();
+});
+
+Promise.all([
+  fetch('/voices').then((r) => r.json()),
+  fetch('/health').then((r) => r.json()),
+]).then(([vd, health]) => {
+  voices = vd.voices;
+  providerName = health.provider;
+  idx = Math.max(0, voices.findIndex((v) => v.id === vd.default));
+  $('dots').innerHTML = voices.map((_, i) => `<button class="dot" data-i="${i}"></button>`).join('');
+  [...$('dots').children].forEach((d) => { d.onclick = () => { idx = +d.dataset.i; renderVoice(); }; });
+  renderVoice();
+
+  $('providerLine').innerHTML = health.model
+    + (health.free_tier ? ' <span class="pill">FREE TIER</span>' : '');
+
+  if (!health.api_key_configured) {
+    const key = health.provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY';
+    const where = health.provider === 'gemini'
+      ? 'Get a free key at <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a>.'
+      : 'Create one in your OpenAI dashboard.';
+    $('setupErr').innerHTML = `<div class="err">No <code>${key}</code> on the server. ${where}
+      Put it in <code>.env</code> and restart uvicorn.</div>`;
+    return;
+  }
+  $('startBtn').disabled = false;
+  $('pickerNote').textContent = 'Speech-to-speech — you can interrupt at any time.';
+}).catch(() => {
+  $('setupErr').innerHTML = '<div class="err">Could not reach the server. Is uvicorn running?</div>';
+});
+
+// ---------------- conversation panel ----------------
+// Bubbles stream in as text arrives rather than appearing only when a turn
+// ends, so the panel tracks the conversation live. `liveTurn` holds the
+// bubble currently being appended to, per role.
+
+const liveTurn = { user: null, bot: null };
+const LABEL = { user: 'คุณ · You', bot: 'ผู้ช่วย · Assistant' };
+const TOOL_LABELS = {
+  set_lights: 'ไฟ · lights',
+  set_air_conditioner: 'แอร์ · air conditioner',
+  get_room_status: 'สถานะห้อง · room status',
+  show_slide: 'สไลด์ · slide',
+  start_presentation: 'เริ่มพรีเซนต์ · presentation',
+  next_slide: 'สไลด์ถัดไป · next slide',
+  previous_slide: 'สไลด์ก่อนหน้า · previous slide',
+  hide_slide: 'ปิดภาพ · hide slide',
+  search_condo_info: 'ค้นข้อมูล · lookup',
+};
+
+// Mirror of the robot's screen, inside the conversation window. Without it,
+// running a presentation with no /display window open looked like nothing
+// had happened — the tools reported success and the screen stayed empty.
+let warnedNoDisplay = false;
+
+// The picture waits for the ear.
+//
+// The model produces a whole narration turn several times faster than it
+// takes to say it, and playChunk() queues that audio back-to-back — playHead
+// legitimately sits five to ten seconds ahead of currentTime. So when the
+// model calls next_slide, it has finished *generating* the sentences about
+// the slide it is leaving, but the guest is still near the start of hearing
+// them. Changing the picture at that moment puts every screen a paragraph
+// ahead of the conversation.
+//
+// This browser is the only thing that knows when the guest actually gets
+// there, so it decides — and tells the server, which drives the Canva window
+// and the fullscreen display from the same moment.
+let pendingSlide = null, pendingSlideTimer = null;
+
+function applyPendingSlide() {
+  if (pendingSlideTimer) { clearTimeout(pendingSlideTimer); pendingSlideTimer = null; }
+  const p = pendingSlide;
+  pendingSlide = null;
+  if (!p) return;
+  showStage(p.slide, p.displays);
+}
+
+function audioLeadMs() {
+  return audioCtx ? Math.max(0, (playHead - audioCtx.currentTime) * 1000) : 0;
+}
+
+// The fullscreen display and the Canva window are driven by the server, which
+// has no idea how much audio is sitting in this browser's queue. Tell it.
+let lastReportedLead = -1;
+function reportAudioLead() {
+  const ms = Math.round(audioLeadMs());
+  if (Math.abs(ms - lastReportedLead) < 250) return;
+  lastReportedLead = ms;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'audio_lead', ms }));
+  }
+}
+
+function scheduleSlide(slide, displays) {
+  if (pendingSlideTimer) { clearTimeout(pendingSlideTimer); pendingSlideTimer = null; }
+  pendingSlide = { slide, displays };
+  const queuedMs = audioLeadMs();
+  // Below a fifth of a second nobody perceives the difference, and waiting
+  // costs a timer for nothing.
+  if (queuedMs < 200) applyPendingSlide();
+  else pendingSlideTimer = setTimeout(applyPendingSlide, queuedMs);
+}
+
+function showStage(slide, displays) {
+  const stage = $('stage');
+  if (!slide) {
+    stage.classList.remove('on');
+    $('callScreen').classList.remove('with-slides');
+    $('stageImg').removeAttribute('src');
+    // Clear the caption too. It was only ever hidden along with the stage,
+    // so anything that leaves the stage visible leaves the previous slide's
+    // name under it — a label for a picture that is no longer there.
+    $('stageTitle').textContent = '';
+    $('stagePos').textContent = '';
+    return;
+  }
+  $('callScreen').classList.add('with-slides');
+  $('stageImg').src = slide.url;
+  $('stageTitle').textContent = slide.title_th || slide.title_en || '';
+  $('stagePos').textContent =
+    slide.position && slide.total ? `${slide.position} / ${slide.total}` : '';
+  stage.classList.add('on');
+
+  // Say it once per call rather than on every slide.
+  if (!displays && !warnedNoDisplay) {
+    warnedNoDisplay = true;
+    systemLine('ยังไม่ได้เปิดจอเต็ม — กด "เปิดจอเต็ม" มุมขวาบนของภาพ · no fullscreen display connected');
+  }
+}
+
+// The bubble of a reply that was just cut off. The transcript keeps arriving
+// for a second or two after the audio stops — the model had already generated
+// the rest — so that late text belongs to *this* bubble, marked unheard,
+// rather than opening a new one that never had any audio behind it.
+let cutBot = null;
+
+// Split an interrupted bubble at the point the audio actually stopped and
+// dim everything past it. `ratio` is heard ms / generated ms, which is the
+// best estimate available: speech rate is near enough constant within a turn
+// that character position tracks time closely.
+function markUnheard(turn, ratio) {
+  const bubble = turn.querySelector('.bubble');
+  const full = bubble.textContent;
+  if (!full) return null;
+
+  let cut = Math.round(full.length * Math.max(0, Math.min(1, ratio)));
+  // Don't slice a Latin word in half if a space is close by. Thai has no
+  // word spaces, so there is nothing to snap to and the raw cut stands.
+  for (let i = 0; i <= 6; i++) {
+    if (full[cut - i] === ' ') { cut = cut - i + 1; break; }
+    if (full[cut + i] === ' ') { cut = cut + i + 1; break; }
+  }
+
+  bubble.textContent = full.slice(0, cut);
+  const rest = document.createElement('span');
+  rest.className = 'unheard';
+  rest.textContent = full.slice(cut);
+  bubble.appendChild(rest);
+  return rest;
+}
+
+function appendText(role, text) {
+  if (!text) return;
+  // Tail of a reply the guest already talked over.
+  if (role === 'bot' && !liveTurn.bot && cutBot) {
+    cutBot.textContent += text;
+    scrollConvo();
+    return;
+  }
+  let turn = liveTurn[role];
+  if (!turn) {
+    turn = document.createElement('div');
+    turn.className = 'turn live ' + role;
+    const who = document.createElement('div');
+    who.className = 'who';
+    who.textContent = LABEL[role];
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    turn.append(who, bubble);
+    // Both APIs send input and output transcriptions independently, with no
+    // guaranteed ordering — the guest's transcript often lands *while* the
+    // reply is already streaming. Putting it above the in-progress reply
+    // keeps the visual order (asked, then answered) truthful.
+    if (role === 'user' && liveTurn.bot) {
+      $('convo').insertBefore(turn, liveTurn.bot);
+    } else {
+      $('convo').appendChild(turn);
+    }
+    liveTurn[role] = turn;
+  }
+  turn.querySelector('.bubble').textContent += text;
+  scrollConvo();
+}
+
+function finalizeTurn(role, { interrupted = false, spokenRatio = 1 } = {}) {
+  const turn = liveTurn[role];
+  liveTurn[role] = null;
+  if (!turn) return;
+  turn.classList.remove('live');
+  const bubble = turn.querySelector('.bubble');
+  if (!bubble.textContent.trim()) { turn.remove(); return; }
+  if (interrupted) {
+    const tag = document.createElement('div');
+    tag.className = 'cut';
+    if (role === 'bot' && spokenRatio < 0.98) {
+      cutBot = markUnheard(turn, spokenRatio);
+      tag.textContent = 'ถูกพูดแทรก · ข้อความจางคือส่วนที่ยังไม่ได้พูด';
+    } else {
+      tag.textContent = 'ถูกพูดแทรก · interrupted';
+    }
+    turn.appendChild(tag);
+  }
+  scrollConvo();
+}
+
+function finalizeAll(opts) { finalizeTurn('user'); finalizeTurn('bot', opts); }
+
+function scrollConvo() {
+  const el = $('convo');
+  // Don't yank the view if the user scrolled up to re-read something.
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  if (nearBottom) el.scrollTop = el.scrollHeight;
+}
+
+function systemLine(text) {
+  finalizeAll();
+  const d = document.createElement('div');
+  d.className = 'cut';
+  d.style.alignSelf = 'center';
+  d.textContent = text;
+  $('convo').appendChild(d);
+  scrollConvo();
+}
+
+$('copyBtn').onclick = async () => {
+  const lines = [...$('convo').querySelectorAll('.turn')].map((t) => {
+    const who = t.classList.contains('user') ? 'ลูกค้า' : 'ผู้ช่วย';
+    const bubble = t.querySelector('.bubble');
+    const unheard = bubble.querySelector('.unheard');
+    if (!unheard) return who + ': ' + bubble.textContent.trim();
+    // Keep the copied transcript honest: the dimmed tail was generated but
+    // never spoken, so it must not read as part of what the guest heard.
+    const spoken = bubble.textContent.slice(0, bubble.textContent.length - unheard.textContent.length);
+    return who + ': ' + spoken.trim() + ' [ไม่ได้พูด: ' + unheard.textContent.trim() + ']';
+  });
+  if (!lines.length) return;
+  try {
+    await navigator.clipboard.writeText(lines.join('\n'));
+    $('copyBtn').textContent = 'Copied';
+    setTimeout(() => { $('copyBtn').textContent = 'Copy'; }, 1400);
+  } catch {
+    $('copyBtn').textContent = 'Failed';
+    setTimeout(() => { $('copyBtn').textContent = 'Copy'; }, 1400);
+  }
+};
+
+// ---------------- UI state ----------------
+
+function setState(s) {
+  $('stateLabel').textContent = s;
+  $('stateLabel').className = 'state ' + s;
+  $('callOrb').className = 'orb ' + (['listening', 'hearing', 'speaking'].includes(s) ? s : '');
+}
+
+// ---------------- "is it hearing me?" ----------------
+// The honest answer has to come from the microphone, not the server: waiting
+// for a transcript means a round trip, and during it the UI sits on
+// LISTENING with nothing moving, which reads as "it isn't picking me up".
+// This drives the orb straight off the mic level, so feedback is immediate.
+
+const SPEECH_LEVEL = 0.02;   // RMS above this counts as speech, for display only
+const QUIET_MS = 700;        // how long to keep showing "hearing" after it drops
+let lastLoudAt = 0;
+let quietTimer = null;
+
+function onMicLevel(rms) {
+  const pct = Math.min(100, Math.round(rms * 400));
+  $('levelBar').style.width = pct + '%';
+  if (muted || playing) return;
+
+  if (rms >= SPEECH_LEVEL) {
+    lastLoudAt = Date.now();
+    if ($('stateLabel').textContent !== 'hearing') setState('hearing');
+    if (quietTimer) { clearTimeout(quietTimer); quietTimer = null; }
+  } else if (!quietTimer && $('stateLabel').textContent === 'hearing') {
+    quietTimer = setTimeout(() => {
+      quietTimer = null;
+      if (!playing && Date.now() - lastLoudAt >= QUIET_MS) setState('listening');
+    }, QUIET_MS);
+  }
+}
+
+// ---------------- mic capture ----------------
+// Resamples from the AudioContext rate to whatever the provider wants
+// (Gemini 16kHz, OpenAI 24kHz) and emits ~40ms PCM16 chunks.
+
+const WORKLET_SRC = `
+class Cap extends AudioWorkletProcessor {
+  constructor(o) {
+    super();
+    const p = (o && o.processorOptions) || {};
+    this.target = p.targetRate || 16000;
+    this.ratio = sampleRate / this.target;
+    this.acc = 0; this.pending = [];
+    // 20ms per message. Google's Live API guidance is 20-40ms and
+    // explicitly warns against buffering more before sending; 20ms is the
+    // low-latency end of that range.
+    this.chunk = Math.round(this.target * 0.02);
+  }
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (ch) {
+      for (let i = 0; i < ch.length; i++) {
+        this.acc += 1;
+        if (this.acc >= this.ratio) {
+          this.acc -= this.ratio;
+          const s = Math.max(-1, Math.min(1, ch[i]));
+          this.pending.push(s < 0 ? s * 0x8000 : s * 0x7fff);
+        }
+      }
+      // Loudness of this block, reported separately from the audio so the
+      // UI can show the guest they're being heard without waiting for a
+      // server round trip.
+      let sum = 0;
+      for (let i = 0; i < ch.length; i++) sum += ch[i] * ch[i];
+      this.port.postMessage({ level: Math.sqrt(sum / ch.length) });
+      while (this.pending.length >= this.chunk) {
+        const f = this.pending.splice(0, this.chunk);
+        const a = new Int16Array(f.length);
+        for (let i = 0; i < f.length; i++) a[i] = f[i];
+        this.port.postMessage(a.buffer, [a.buffer]);
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('cap', Cap);
+`;
+
+// ---------------- playback ----------------
+
+function playChunk(arrayBuffer) {
+  if (!audioCtx || arrayBuffer.byteLength < 2) return;
+  const i16 = new Int16Array(arrayBuffer);
+  const f32 = new Float32Array(i16.length);
+  for (let i = 0; i < i16.length; i++) f32[i] = i16[i] / (i16[i] < 0 ? 0x8000 : 0x7fff);
+
+  const buf = audioCtx.createBuffer(1, f32.length, outputRate);
+  buf.copyToChannel(f32, 0);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(audioCtx.destination);
+  // playHead being well ahead of currentTime is normal and required: the
+  // model generates a reply far faster than realtime, so chunks queue up
+  // back-to-back. Do NOT "correct" that — snapping playHead back to now
+  // makes later chunks start on top of already-scheduled ones and the reply
+  // turns into overlapping garbage. It's reset explicitly instead, in
+  // startCall() and stopPlayback().
+  const at = Math.max(audioCtx.currentTime, playHead);
+  src.start(at);
+  playHead = at + buf.duration;
+  sources.push(src);
+  reportAudioLead();
+  playing = true;
+  setState('speaking');
+  src.onended = () => {
+    sources = sources.filter((s) => s !== src);
+    if (!sources.length) { playing = false; setState('listening'); }
+  };
+}
+
+// Barge-in. Returns how many ms of the reply the guest actually heard —
+// OpenAI needs that to truncate; Gemini discards the rest server-side.
+function stopPlayback() {
+  const queuedMs = audioCtx ? Math.max(0, (playHead - audioCtx.currentTime) * 1000) : 0;
+  sources.forEach((s) => { try { s.stop(); } catch {} });
+  sources = [];
+  playing = false;
+  if (audioCtx) playHead = audioCtx.currentTime;
+  lastReportedLead = -1;
+  reportAudioLead();          // barge-in emptied the queue
+  return Math.max(0, Math.round(sentMs - queuedMs));
+}
+
+// ---------------- call ----------------
+
+function startCall() {
+  $('pickerScreen').classList.remove('active');
+  $('callScreen').classList.add('active');
+  const v = voices[idx];
+  $('callOrb').style.setProperty('--c1', v.gradient[0]);
+  $('callOrb').style.setProperty('--c2', v.gradient[1]);
+  setState('connecting');
+  $('convo').innerHTML = '';
+  liveTurn.user = liveTurn.bot = null;
+  cutBot = null;
+  if (pendingSlideTimer) clearTimeout(pendingSlideTimer);
+  pendingSlide = null; pendingSlideTimer = null;
+  sentMs = 0;
+  // A fresh AudioContext restarts currentTime near 0. Carrying the previous
+  // call's playHead over would schedule every chunk far in the future, so
+  // the next session plays nothing at all.
+  playHead = 0;
+  sources = [];
+  playing = false;
+  muted = false;
+  $('muteBtn').textContent = 'Mute';
+  showStage(null);
+  warnedNoDisplay = false;
+
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws?voice=${encodeURIComponent(selectedVoice)}`);
+  ws.binaryType = 'arraybuffer';
+  ws.onmessage = onMessage;
+  ws.onerror = () => { setState('error'); systemLine('เชื่อมต่อไม่สำเร็จ · connection error'); };
+  ws.onclose = () => { if ($('callScreen').classList.contains('active')) { finalizeAll(); setState('ended'); } };
+}
+
+async function startMic() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+  } catch (e) {
+    setState('error');
+    systemLine('ไม่ได้รับสิทธิ์ใช้ไมโครโฟน · microphone permission denied');
+    return;
+  }
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
+  await audioCtx.resume();
+  const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+  await audioCtx.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+
+  micSource = audioCtx.createMediaStreamSource(micStream);
+  worklet = new AudioWorkletNode(audioCtx, 'cap', { processorOptions: { targetRate: inputRate } });
+  worklet.port.onmessage = (e) => {
+    if (e.data && e.data.level !== undefined) {
+      onMicLevel(e.data.level);
+      return;
+    }
+    if (muted || !ws || ws.readyState !== WebSocket.OPEN) return;
+    // Half-duplex: don't feed the mic upstream while the assistant is
+    // speaking, so its own voice coming back through the speakers can't be
+    // mistaken for the guest interrupting. Costs barge-in, which is why
+    // it's opt-in.
+    if (halfDuplex && playing) return;
+    ws.send(e.data);
+  };
+  // Deliberately not connected to destination — never echo the guest's mic.
+  micSource.connect(worklet);
+  setState('listening');
+}
+
+function onMessage(msg) {
+  if (msg.data instanceof ArrayBuffer) {
+    // First chunk of a fresh reply: any late transcript from here on belongs
+    // to this new turn, not to the one the guest talked over.
+    if (sentMs === 0) cutBot = null;
+    sentMs += (msg.data.byteLength / 2 / outputRate) * 1000;
+    playChunk(msg.data);
+    return;
+  }
+
+  let evt;
+  try { evt = JSON.parse(msg.data); } catch { return; }
+
+  switch (evt.type) {
+    case 'ready':
+      inputRate = evt.input_rate;
+      outputRate = evt.output_rate;
+      providerName = evt.provider;
+      halfDuplex = !!evt.half_duplex;
+      $('callNote').textContent =
+        `${evt.provider} · ${evt.voice} · `
+        + (evt.auto_resumes
+            ? `auto-continues past ${evt.session_limit_min} min`
+            : `session ends after ${evt.session_limit_min} min`)
+        + (halfDuplex ? ' · half-duplex (no barge-in)' : '');
+      startMic();
+      break;
+
+    case 'speech_started':
+      // Only barge-in if a reply is actually playing; otherwise this is just
+      // the guest starting to talk, and the local level meter already showed
+      // that before this event crossed the network.
+      if (playing) {
+        const heard = stopPlayback();
+        const ratio = sentMs > 0 ? heard / sentMs : 1;
+        sentMs = 0;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'played', heard_ms: heard }));
+        }
+        finalizeTurn('user');
+        finalizeTurn('bot', { interrupted: true, spokenRatio: ratio });
+        // The audio it was waiting behind has just been thrown away.
+        applyPendingSlide();
+      }
+      setState('hearing');
+      break;
+
+    case 'interrupted': {
+      const heardMs = stopPlayback();
+      const ratio = sentMs > 0 ? heardMs / sentMs : 1;
+      sentMs = 0;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'played', heard_ms: heardMs }));
+      }
+      // The reply was cut off — close its bubble and label it so the
+      // transcript doesn't imply the guest heard the whole thing. The guest
+      // is starting a fresh utterance, so close theirs too.
+      finalizeTurn('user');
+      finalizeTurn('bot', { interrupted: true, spokenRatio: ratio });
+      applyPendingSlide();
+      setState('hearing');
+      break;
+    }
+
+    // Deliberately do NOT close the other side's bubble here. Transcripts
+    // arrive out of order, so treating "the guest's text arrived" as "the
+    // reply must be finished" chopped a single spoken sentence into two
+    // bubbles with a guest bubble wedged between them ("Alright, let me
+    // switch languages" / "for you.Sure!"). Only turn_complete and
+    // interrupted end a bubble.
+    case 'user_transcript':
+      appendText('user', evt.text);
+      break;
+
+    case 'assistant_transcript':
+      appendText('bot', evt.text);
+      break;
+
+    case 'tool_result': {
+      // Show what physically happened. If the IR command didn't reach the
+      // hub, the model may still say "done" — the guest needs to see that
+      // the room didn't actually change.
+      const r = evt.result || {};
+      const label = TOOL_LABELS[evt.name] || evt.name;
+      let line = label;
+      if (r.hardware === 'failed') line += ' — ส่งสัญญาณไม่สำเร็จ · hardware not reached';
+      else if (r.hardware === 'mock') line += ' — จำลอง (ยังไม่ต่ออุปกรณ์จริง) · simulated';
+      else if (r.ok === false) line += ' — ' + (r.error || 'failed');
+      else line += ' — สำเร็จ · done';
+      systemLine(line);
+
+      if ('slide' in evt) scheduleSlide(evt.slide, evt.displays);
+      break;
+    }
+
+    case 'turn_complete':
+      finalizeAll();
+      sentMs = 0;
+      cutBot = null;
+      break;
+
+    case 'error':
+      setState('error');
+      systemLine(evt.message || 'unknown error');
+      break;
+  }
+}
+
+$('muteBtn').onclick = () => {
+  muted = !muted;
+  $('muteBtn').textContent = muted ? 'Unmute' : 'Mute';
+  setState(muted ? 'muted' : (playing ? 'speaking' : 'listening'));
+};
+
+$('endBtn').onclick = () => {
+  try { ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'stop' })); } catch {}
+  try { ws && ws.close(); } catch {}
+  try { worklet && (worklet.port.onmessage = null, worklet.disconnect()); } catch {}
+  try { micSource && micSource.disconnect(); } catch {}
+  micStream && micStream.getTracks().forEach((t) => t.stop());
+  sources.forEach((s) => { try { s.stop(); } catch {} });
+  sources = []; playing = false; sentMs = 0;
+  finalizeAll();
+  audioCtx && audioCtx.close().catch(() => {});
+  audioCtx = ws = micStream = micSource = worklet = null;
+  $('callScreen').classList.remove('active');
+  $('pickerScreen').classList.add('active');
+};
+
+$('startBtn').onclick = startCall;
+</script>
+</body>
+</html>

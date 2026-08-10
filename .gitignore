@@ -1,0 +1,30 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Hub identity (MAC/IP of the Broadlink device on your network)
+data/broadlink_device.json
+
+# Cached slide embeddings — rebuilt from the deck on first run
+data/slides/embeddings.npz
+
+# Turn logs contain what visitors said out loud — never commit them.
+data/logs/
+data/documents/*.pdf
+
+# Coverage output
+.coverage
+htmlcov/
+
+# Slide images exported from the Canva deck — 123 MB of a client's sales
+# material, and rebuildable in one command, so they don't belong in history.
+#   python scripts/import_slides.py deck.pdf --prefix ew
+# index.json IS committed: the narration scripts and questions live in it and
+# are the part that took work.
+data/slides/*.jpg
+data/slides/*.jpeg
+data/slides/*.png
+data/slides/index.json.bak

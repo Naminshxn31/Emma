@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""
+Measure slide search against a list of questions, and calibrate the
+similarity thresholds against *your* deck.
+
+    python scripts/eval_search.py                  # the built-in question set
+    python scripts/eval_search.py --file mine.txt  # your own
+    python scripts/eval_search.py --lexical        # no embeddings, for comparison
+
+Why this exists
+---------------
+`SEARCH_MIN_SIMILARITY` and `SEARCH_SHOW_SIMILARITY` are cosine thresholds.
+Cosine is absolute, so a fixed number is meaningful — but where the gap falls
+between "related" and "unrelated" depends on the deck, and the shipped
+defaults were picked without ever seeing yours. This runs a set of questions
+that *should* match and a set that *shouldn't*, prints the similarity each
+one got, and tells you where the boundary actually is.
+
+Question file format — one per line, `expected` is optional:
+
+    ฟิตเนสอยู่ชั้นไหน           | ฟิตเนส
+    มีที่จอดรถไหม               | BASEMENT
+    !ราคาเริ่มต้นเท่าไหร่
+    !ใครชนะเลือกตั้ง
+
+A leading `!` means "this must find nothing". Text after `|` is a substring
+the winning slide's title should contain.
+"""
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Questions a sales gallery actually gets. The negatives matter as much as
+# the positives: a search that never says "I don't know" is not working.
+DEFAULT_QUESTIONS = [
+    ("มีฟิตเนสไหม", "ฟิตเนส"),
+    ("ฟิตเนสอยู่ชั้นไหน", "ฟิตเนส"),
+    ("สระว่ายน้ำอยู่ชั้นไหน", "POOL"),
+    ("ขอดูสระว่ายน้ำหน่อย", "POOL"),
+    ("มีซาวน่าไหม", None),   # sauna photo or the basement plan it sits on
+    ("ที่จอดรถอยู่ไหน", "ใต้ดิน"),
+    ("ขอดูห้องนอน", "ห้องนอน"),
+    ("ห้องน้ำเป็นยังไง", "ห้องน้ำ"),
+    ("ทำเลอยู่ตรงไหน", "ทำเล"),
+    ("ใครเป็นเจ้าของโครงการ", "ผู้บริหาร"),
+    # Cross-language: the point of the semantic half. None of these share a
+    # character with the Thai titles they should reach.
+    ("do you have a gym", "GYM"),
+    ("where is the swimming pool", "POOL"),
+    ("is there a sauna", "SAUNA"),
+    ("show me the parking", "ใต้ดิน"),
+    ("游泳池在哪里", "POOL"),
+    ("健身房", "GYM"),
+    ("有桑拿房吗", "SAUNA"),
+    ("бассейн", "POOL"),
+    ("где тренажерный зал", "GYM"),
+    ("プールはどこですか", "POOL"),
+    ("수영장 어디예요", "POOL"),
+    ("wo ist der Pool", "POOL"),
+    ("où est la piscine", "POOL"),
+    # Must find nothing.
+    ("!ราคาเริ่มต้นเท่าไหร่", None),
+    ("!โปรโมชั่นตอนนี้", None),
+    ("!ใครชนะเลือกตั้ง", None),
+    ("!แนะนำมือถือรุ่นไหนดี", None),
+    ("!zzzz ไม่มีอยู่จริง qqqq", None),
+    # Pricing, in the languages a Thai gallery actually gets. These must be
+    # refused in every one of them, not just the two someone tested.
+    ("!价格是多少", None),
+    ("!цена квартиры", None),
+    ("!いくらですか", None),
+    ("!얼마예요", None),
+]
+
+
+def load_questions(path: Path | None):
+    if path is None:
+        return DEFAULT_QUESTIONS
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        question, _, expected = line.partition("|")
+        out.append((question.strip(), expected.strip() or None))
+    return out
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", type=Path, help="question list")
+    parser.add_argument("--lexical", action="store_true", help="disable embeddings")
+    args = parser.parse_args()
+
+    from app.config import settings
+
+    if args.lexical:
+        settings.search_semantic = False
+
+    from app.tools import slide_search
+    from app.tools.slides import load_slides, search_slides
+
+    slides = load_slides()
+    if not slides:
+        print("No slides indexed. Run scripts/import_slides.py first.")
+        return 1
+
+    index = slide_search.get_index(slides)
+    mode = "hybrid (BM25 + embeddings)" if index.semantic_enabled else "lexical only (BM25)"
+    print("%d slides | %s\n" % (len(slides), mode))
+    if not index.semantic_enabled and not args.lexical:
+        print("  NOTE: embeddings unavailable — cross-language questions will fail.")
+        print("  Check GEMINI_API_KEY and network, or pass --lexical to silence this.\n")
+
+    positives, negatives, wrong = [], [], []
+    print("%-30s %6s %6s %-5s %s" % ("question", "cover", "sim", "found", "top slide"))
+    print("-" * 96)
+
+    for question, expected in load_questions(args.file):
+        should_miss = question.startswith("!")
+        text = question.lstrip("!")
+        hits = search_slides(text)
+        if not hits:
+            print("%-30s %6s %6s %-5s %s" % (text[:30], "-", "-", "no", "(nothing)"))
+            (negatives if should_miss else positives).append(0.0)
+            continue
+
+        top = hits[0]
+        title = top.slide.get("title_th") or top.slide.get("title_en") or ""
+        ok = " "
+        if should_miss:
+            negatives.append(top.similarity)
+            if top.found:
+                ok, _ = "!", wrong.append((text, "should have found nothing", title))
+        else:
+            positives.append(top.similarity)
+            if not top.found:
+                ok, _ = "!", wrong.append((text, "found nothing", title))
+            elif expected and expected.lower() not in title.lower():
+                ok, _ = "!", wrong.append((text, "expected %r" % expected, title))
+
+        print("%s%-29s %6.2f %6.2f %-5s %s" % (
+            ok, text[:29], top.coverage, top.similarity,
+            "yes" if top.found else "no", title[:34],
+        ))
+
+    print("\n%d correct, %d wrong" % (
+        len(positives) + len(negatives) - len(wrong), len(wrong)))
+    for text, why, got in wrong:
+        print("  %-32s %-28s got: %s" % (text[:32], why, got[:30]))
+
+    # The calibration payoff: where the two populations actually separate.
+    real = [s for s in positives if s >= 0]
+    junk = [s for s in negatives if s >= 0]
+    if real and junk:
+        print("\nCosine similarity on this deck")
+        print("  should match:    min %.3f  mean %.3f" % (min(real), sum(real) / len(real)))
+        print("  should not:      max %.3f  mean %.3f" % (max(junk), sum(junk) / len(junk)))
+        if min(real) > max(junk):
+            midpoint = (min(real) + max(junk)) / 2
+            print("\n  Clean separation. Suggested settings:")
+            print("    SEARCH_MIN_SIMILARITY=%.2f" % midpoint)
+            print("    SEARCH_SHOW_SIMILARITY=%.2f" % ((midpoint + min(real)) / 2))
+        else:
+            print("\n  The two overlap (%.3f vs %.3f), so no threshold separates them"
+                  % (max(junk), min(real)))
+            print("  cleanly. Favour the higher value: a missing picture costs less")
+            print("  than a wrong one. Adding keywords to the slides that are being")
+            print("  missed will widen the gap.")
+    elif not real:
+        print("\nNo similarities recorded — running without embeddings.")
+
+    return 1 if wrong else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<title>Embassy World — Display</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; overflow: hidden;
+               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; cursor: none; }
+
+  /* Two stacked layers so a slide change can cross-fade instead of flashing
+     black — a hard cut is jarring on a big screen next to a talking robot. */
+  .layer { position: absolute; inset: 0; display: flex; align-items: center;
+           justify-content: center; opacity: 0; transition: opacity .45s ease; }
+  .layer.on { opacity: 1; }
+  .layer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+  .caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 2.2rem 3rem 2rem;
+             background: linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,0));
+             color: #fff; opacity: 0; transition: opacity .4s ease; }
+  .caption.on { opacity: 1; }
+  .caption h1 { font-size: clamp(1.3rem, 2.6vw, 2.2rem); font-weight: 600; letter-spacing: -.01em; }
+  .caption p { font-size: clamp(.85rem, 1.4vw, 1.15rem); color: #cfcfcf; margin-top: .4rem;
+               max-width: 60ch; line-height: 1.5; }
+
+  .pos { position: absolute; top: 1.6rem; right: 2rem; color: rgba(255,255,255,.75);
+         font-size: clamp(.8rem, 1.2vw, 1rem); font-variant-numeric: tabular-nums;
+         opacity: 0; transition: opacity .4s ease; }
+  .pos.on { opacity: 1; }
+
+  .idle { color: #4a4a4a; text-align: center; padding: 2rem; }
+  .idle h2 { font-size: clamp(1.1rem, 2vw, 1.6rem); font-weight: 500; color: #6a6a6a; }
+  .idle p { font-size: .9rem; margin-top: .6rem; }
+  .idle.hide { display: none; }
+
+  .offline { position: absolute; top: 1.6rem; left: 2rem; color: #c33; font-size: .85rem;
+             opacity: 0; transition: opacity .3s; }
+  .offline.on { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="idle" id="idle">
+  <h2>พร้อมแสดงสไลด์</h2>
+  <p>Waiting for the assistant to show something</p>
+</div>
+
+<div class="layer" id="layerA"><img alt="" /></div>
+<div class="layer" id="layerB"><img alt="" /></div>
+
+<div class="pos" id="pos"></div>
+<div class="caption" id="caption"><h1 id="capTitle"></h1><p id="capSummary"></p></div>
+<div class="offline" id="offline">disconnected — reconnecting…</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const layers = [$('layerA'), $('layerB')];
+let front = 0;              // which layer is currently visible
+let currentUrl = null;
+
+function render(slide) {
+  if (!slide) {
+    layers.forEach((l) => l.classList.remove('on'));
+    $('caption').classList.remove('on');
+    $('pos').classList.remove('on');
+    $('idle').classList.remove('hide');
+    currentUrl = null;
+    return;
+  }
+  $('idle').classList.add('hide');
+
+  if (slide.url !== currentUrl) {
+    // Swap layers so the incoming image is fully decoded before it's shown.
+    const back = layers[1 - front];
+    const img = back.querySelector('img');
+    img.onload = () => {
+      back.classList.add('on');
+      layers[front].classList.remove('on');
+      front = 1 - front;
+    };
+    img.onerror = () => { $('idle').classList.remove('hide'); };
+    img.src = slide.url;
+    currentUrl = slide.url;
+  }
+
+  const title = slide.title_th || slide.title_en || '';
+  const summary = slide.summary_th || slide.summary_en || '';
+  $('capTitle').textContent = title;
+  $('capSummary').textContent = summary;
+  $('caption').classList.toggle('on', Boolean(title || summary));
+
+  if (slide.position && slide.total) {
+    $('pos').textContent = slide.position + ' / ' + slide.total;
+    $('pos').classList.add('on');
+  } else {
+    $('pos').classList.remove('on');
+  }
+}
+
+// The display is a screen that may be left running for days — reconnect
+// forever rather than needing someone to walk over and refresh it.
+let backoff = 500;
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/display`);
+
+  ws.onopen = () => {
+    backoff = 500;
+    $('offline').classList.remove('on');
+  };
+  ws.onmessage = (msg) => {
+    let evt;
+    try { evt = JSON.parse(msg.data); } catch { return; }
+    if (evt.type === 'slide') render(evt.slide);
+  };
+  ws.onclose = () => {
+    $('offline').classList.add('on');
+    setTimeout(connect, backoff);
+    backoff = Math.min(backoff * 2, 10000);
+  };
+  ws.onerror = () => { try { ws.close(); } catch {} };
+}
+connect();
+
+// Convenience for a laptop second window; the robot's screen has no keyboard.
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'f' || e.key === 'F') {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => {});
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+fastapi>=0.111
+uvicorn[standard]>=0.30
+python-dotenv>=1.0
+
+# Gemini Live provider (VOICE_PROVIDER=gemini, free tier)
+google-genai>=1.0
+
+# OpenAI Realtime provider (VOICE_PROVIDER=openai, paid)
+websockets>=14.0
+
+# Testing — the suite uses fakes, so no API key and no network are needed
+pytest>=8.0
+pytest-timeout>=2.3
+httpx>=0.27
+
+# Slide import from a PDF deck (scripts/import_slides.py)
+pymupdf>=1.24
+
+# Slide search. Thai has no spaces between words, so matching without a
+# segmenter means comparing letters — which is how a question about ราคา
+# (price) matched a slide about อาคาร (building): they share "าคา".
+# Without pythainlp the search falls back to that letter comparison and
+# still runs, just less accurately.
+pythainlp>=5.0
+# Comparing the slide embeddings. Semantic search is skipped without it.
+numpy>=1.24
+
+# Smart-home tools (IR control of the gallery lights/AC). Optional — without
+# it the tools still run, reporting hardware="mock".
+broadlink>=0.18
+
+# Optional: mirror the presentation on a real Canva window (see CANVA_URL in
+# .env.example) instead of only the exported images. Canva blocks iframe
+# embedding, so this drives an actual Chromium window instead. Only needed
+# if you set CANVA_URL — everything else runs fine without it.
+# After installing: playwright install chromium
+playwright>=1.40
+
+# Placeholder PDFs for testing the print path end to end
+# (scripts/make_test_documents.py). Not needed to run the server — the real
+# documents come from the sales team as finished PDFs.
+reportlab>=4.0
