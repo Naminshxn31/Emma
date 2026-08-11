@@ -186,6 +186,7 @@ def test_a_page_baked_into_the_link_is_ignored(monkeypatch):
     assert "utm_content=X" in base, "the query string is part of the link, keep it"
 
 
+@pytest.mark.allow_browser_launch
 def test_the_window_opens_on_page_one(monkeypatch):
     """Deterministic starting point, whatever link was pasted."""
     opened: list[str] = []
@@ -1003,6 +1004,7 @@ def test_ensure_page_leaves_a_healthy_window_alone(monkeypatch):
     assert dropped == [], "relaunched a window that was working fine"
 
 
+@pytest.mark.allow_browser_launch
 def test_kiosk_launches_a_persistent_context_not_a_detached_page(monkeypatch):
     """Why the window kept opening with tabs and an address bar despite
     CANVA_KIOSK=true.
