@@ -28,3 +28,7 @@ data/slides/*.jpg
 data/slides/*.jpeg
 data/slides/*.png
 data/slides/index.json.bak
+
+# Aggregate counts kept past the raw logs. No guest speech in them, but they
+# are this gallery's numbers, not the project's.
+data/log-summaries/

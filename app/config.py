@@ -76,6 +76,18 @@ class Settings:
     embed_provider: str = os.getenv("EMBED_PROVIDER", "auto")
     turn_log: bool = os.getenv("TURN_LOG", "true").strip().lower() not in {"false", "0", "no"}
     turn_log_dir: str = os.getenv("TURN_LOG_DIR", "data/logs")
+    #: How long the raw transcripts are kept, in days. 0 keeps them forever.
+    #:
+    #: These are recordings of what members of the public said in a sales
+    #: gallery, written down without anyone being asked, and the robot is told
+    #: to read phone numbers back to confirm them — so numbers end up in here.
+    #: A debugging tool becomes an indefinite archive of strangers the moment
+    #: nothing deletes it, which is what was happening.
+    #:
+    #: The analysis value does not need the raw text. `scripts/analyze_log.py
+    #: --save` writes counts and topics to data/log-summaries/, which survive
+    #: this deletion and contain nothing anybody said.
+    turn_log_keep_days: int = int(os.getenv("TURN_LOG_KEEP_DAYS", "30"))
 
     # Optional: mirror the presentation on the *actual* Canva design instead
     # of (alongside) the exported images. Canva's view links refuse to be

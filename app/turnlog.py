@@ -35,6 +35,38 @@ _path: Path | None = None
 _warned = False
 
 
+def _forget_old_logs(folder: Path) -> None:
+    """Delete logs past their keep-days. Never raises.
+
+    The turn log exists to answer "what actually happened", and the honest
+    version of that is "recently". Every line is something a visitor said in a
+    sales gallery, recorded without them being asked — a debugging tool that
+    quietly became an indefinite archive of members of the public.
+
+    Dates come from the filename rather than the filesystem, because a
+    mtime is changed by copying the folder, restoring a backup, or a sync
+    client touching it, and none of those should reset a retention clock.
+
+    `TURN_LOG_KEEP_DAYS=0` keeps everything, for anyone who has a reason to.
+    """
+    keep = settings.turn_log_keep_days
+    if keep <= 0:
+        return
+    cutoff = time.time() - keep * 86400
+    for old in folder.glob("*.jsonl"):
+        try:
+            when = time.mktime(time.strptime(old.stem, "%Y-%m-%d"))
+        except ValueError:
+            continue          # not one of ours; leave it alone
+        if when >= cutoff:
+            continue
+        try:
+            old.unlink()
+            logger.info("removed turn log older than %d days: %s", keep, old.name)
+        except Exception:
+            logger.warning("could not remove the old turn log %s", old, exc_info=True)
+
+
 def _handle():
     """Open the day's file lazily. Returns None when logging is off."""
     global _fh, _path, _warned
@@ -59,6 +91,11 @@ def _handle():
         want.parent.mkdir(parents=True, exist_ok=True)
         _fh = want.open("a", encoding="utf-8")
         _path = want
+        # Only here, which is once per process and once per midnight. These
+        # files hold what visitors said out loud, so keeping them forever is a
+        # decision — and it was being made by default, silently, because
+        # nothing ever deleted one.
+        _forget_old_logs(want.parent)
         return _fh
     except Exception:
         # A read-only disk must not take the robot down mid-conversation.

@@ -90,6 +90,9 @@ def main() -> int:
     ap.add_argument("files", nargs="*", help="log files (default: today's)")
     ap.add_argument("--days", type=int, default=1, help="how many days back")
     ap.add_argument("--verbose", action="store_true", help="list every problem row")
+    ap.add_argument("--save", action="store_true",
+                    help="write counts and topics to data/log-summaries/ so the "
+                         "analysis outlives TURN_LOG_KEEP_DAYS")
     args = ap.parse_args()
 
     paths = resolve(args)
@@ -215,7 +218,57 @@ def main() -> int:
         else:
             print("  (ใช้ --verbose เพื่อดู 20 ประโยคล่าสุด)")
 
+    if args.save:
+        _save_summary(rows)
     return 0
+
+
+def _save_summary(rows: list[dict]) -> None:
+    """Keep the findings, not the sentences.
+
+    The reason this exists: raw transcripts are deleted after
+    TURN_LOG_KEEP_DAYS because they are recordings of members of the public,
+    and the obvious objection is that deleting them destroys the thing they
+    were collected for. It doesn't have to. Almost every question worth asking
+    of this log — what do guests ask about, what can the robot not answer,
+    which languages turn up, which slides are missing — is answered by counts.
+
+    So counts are what gets kept. Deliberately **no free text**: no `heard`,
+    no `said`, no query strings. A summary that quietly carried the questions
+    verbatim would be the archive again under a different name, and it would
+    be the version nobody remembers to check.
+    """
+    import json
+    from collections import Counter
+
+    out_dir = ROOT / "data" / "log-summaries"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    days = sorted({r["_file"].removesuffix(".jsonl") for r in rows})
+    name = "%s_to_%s.json" % (days[0], days[-1]) if days else "empty.json"
+
+    kinds = Counter(r.get("event") for r in rows)
+    tools = Counter(r.get("name") for r in rows if r.get("event") == "tool")
+    lookups = [r for r in rows if r.get("event") == "lookup"]
+    summary = {
+        "days": days,
+        "sessions": kinds.get("session_start", 0),
+        "guest_utterances": kinds.get("heard", 0),
+        "tool_calls": dict(tools),
+        "lookups": len(lookups),
+        "lookups_that_showed_nothing": sum(1 for r in lookups if not r.get("showed")),
+        # The number that justifies filling in condo_facts.json, kept as a
+        # number rather than as the questions themselves.
+        "commercial_questions": kinds.get("commercial_question", 0),
+        "screen_changes": kinds.get("screen", 0),
+        "prints": kinds.get("print", 0),
+        "remote_presses": kinds.get("remote", 0),
+    }
+    path = out_dir / name
+    path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    print()
+    print("บันทึกสรุปไว้ที่ %s" % path)
+    print("  (เก็บเฉพาะตัวเลข ไม่มีคำพูดของลูกค้าเลย จึงเก็บไว้ได้ถาวร)")
 
 
 if __name__ == "__main__":

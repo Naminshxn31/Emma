@@ -272,3 +272,91 @@ def test_a_tool_that_changes_nothing_on_screen_is_not_logged_as_a_slide_change(l
     asyncio.run(sess._provider_to_browser())
 
     assert [r for r in read(logging_on) if r["event"] == "screen"] == []
+
+
+def test_old_logs_are_forgotten(monkeypatch, tmp_path):
+    """These are recordings of members of the public. Nothing was deleting them.
+
+    Keeping them was never decided — it was what happened when no code said
+    otherwise, which is the worst way for a retention policy to come about.
+    """
+    import time
+
+    from app import turnlog
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "turn_log", True)
+    monkeypatch.setattr(settings, "turn_log_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "turn_log_keep_days", 30)
+    monkeypatch.setattr(turnlog, "_fh", None)
+    monkeypatch.setattr(turnlog, "_path", None)
+
+    old = tmp_path / "2020-01-01.jsonl"
+    recent = tmp_path / (time.strftime("%Y-%m-%d") + ".jsonl")
+    old.write_text('{"event":"heard","text":"เบอร์ผม 081-234-5678"}\n', encoding="utf-8")
+    recent.write_text('{"event":"heard"}\n', encoding="utf-8")
+
+    turnlog.record("session_start")
+    turnlog.close()
+
+    assert not old.exists(), "a five-year-old transcript is still on disk"
+    assert recent.exists(), "deleted a log inside the retention window"
+
+
+def test_keep_days_zero_keeps_everything(monkeypatch, tmp_path):
+    """An escape hatch for anyone with a reason — but it has to be chosen."""
+    from app import turnlog
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "turn_log", True)
+    monkeypatch.setattr(settings, "turn_log_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "turn_log_keep_days", 0)
+    monkeypatch.setattr(turnlog, "_fh", None)
+    monkeypatch.setattr(turnlog, "_path", None)
+
+    old = tmp_path / "2020-01-01.jsonl"
+    old.write_text("{}\n", encoding="utf-8")
+    turnlog.record("session_start")
+    turnlog.close()
+    assert old.exists()
+
+
+def test_retention_uses_the_filename_not_the_mtime(monkeypatch, tmp_path):
+    """A copied folder, a restored backup or a sync client all rewrite mtimes.
+    None of those is a reason to start the retention clock again."""
+    import os
+    import time
+
+    from app import turnlog
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "turn_log", True)
+    monkeypatch.setattr(settings, "turn_log_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "turn_log_keep_days", 30)
+    monkeypatch.setattr(turnlog, "_fh", None)
+    monkeypatch.setattr(turnlog, "_path", None)
+
+    old = tmp_path / "2020-01-01.jsonl"
+    old.write_text("{}\n", encoding="utf-8")
+    os.utime(old, (time.time(), time.time()))   # as if just copied here
+
+    turnlog.record("session_start")
+    turnlog.close()
+    assert not old.exists(), "trusted the mtime and kept a 2020 transcript"
+
+
+def test_a_file_that_is_not_ours_is_left_alone(monkeypatch, tmp_path):
+    from app import turnlog
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "turn_log", True)
+    monkeypatch.setattr(settings, "turn_log_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "turn_log_keep_days", 1)
+    monkeypatch.setattr(turnlog, "_fh", None)
+    monkeypatch.setattr(turnlog, "_path", None)
+
+    stranger = tmp_path / "notes.jsonl"
+    stranger.write_text("{}\n", encoding="utf-8")
+    turnlog.record("session_start")
+    turnlog.close()
+    assert stranger.exists(), "deleted a file it did not create"
