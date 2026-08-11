@@ -1771,7 +1771,11 @@ def test_every_eval_expectation_names_something_in_the_deck(slides):
         for s in load_slides()
     ).lower()
 
-    for question, expected in module.DEFAULT_QUESTIONS:
+    # The file, not just the built-in list — the file is where the questions
+    # actually live now, so checking only the fallback would check the half
+    # nobody edits.
+    for question, expected in list(module.DEFAULT_QUESTIONS) + list(
+            module.load_questions(None)):
         if expected is None:
             continue
         assert expected.lower() in titles, (

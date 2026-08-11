@@ -32,7 +32,8 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 # Questions a sales gallery actually gets. The negatives matter as much as
 # the positives: a search that never says "I don't know" is not working.
@@ -89,6 +90,13 @@ DEFAULT_QUESTIONS = [
 
 
 def load_questions(path: Path | None):
+    #: The full set lives in a file rather than in this script, because it is
+    #: content — the sales team can add the questions they actually get asked
+    #: without touching Python, and the list grew past the point where it
+    #: would bury the code that measures it.
+    question_file = ROOT / "data" / "eval_questions.txt"
+    if path is None and question_file.exists():
+        path = question_file
     if path is None:
         return DEFAULT_QUESTIONS
     out = []
