@@ -634,5 +634,8 @@ def test_the_suggestion_is_the_least_restrictive_pair_that_works(capsys):
 
     line = [n for n in out.splitlines() if "SEARCH_MIN_SIMILARITY" in n][0]
     chosen = float(line.split("=")[1])
-    assert chosen == 0.90, \
-        "picked %s — a tighter threshold than the data required" % chosen
+    # Strictly between the two: above the junk, below the real match. Landing
+    # exactly on 0.90 would "work" and have no headroom at all — the next
+    # question that scores a hair lower would be rejected.
+    assert 0.50 < chosen < 0.90, \
+        "picked %s — no room on either side of it" % chosen

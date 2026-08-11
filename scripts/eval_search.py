@@ -144,9 +144,23 @@ def _best_pair(pairs: list[tuple[float, float, bool]]) -> None:
     def accepted(sim, cov, min_sim, min_cov):
         return sim >= min_sim or cov >= min_cov
 
+    def _thresholds(values: list[float]) -> list[float]:
+        """Observed values **and the gaps between them**.
+
+        Trying only the observed numbers means the suggestion always lands
+        exactly on some real question's score, so the reported margin is zero
+        by construction and the setting has no headroom at all. It also can't
+        propose anything between two observations — which is how a run that
+        needed "somewhere above 0.25" ended up recommending 0.46, tightening
+        a threshold much further than the data asked for.
+        """
+        seen = sorted({round(v, 4) for v in values})
+        midpoints = [round((a + b) / 2, 4) for a, b in zip(seen, seen[1:])]
+        return sorted(set(seen + midpoints + [1.01]))
+
     candidates = []
-    sims = sorted({round(s, 3) for s, _ in real + junk} | {1.01})
-    covs = sorted({round(c, 3) for _, c in real + junk} | {1.01})
+    sims = _thresholds([s for s, _ in real + junk])
+    covs = _thresholds([c for _, c in real + junk])
     for min_sim in sims:
         for min_cov in covs:
             if any(accepted(s, c, min_sim, min_cov) for s, c in junk):
@@ -163,21 +177,32 @@ def _best_pair(pairs: list[tuple[float, float, bool]]) -> None:
             # them positively picked the tightest setting that happened to work,
             # which is the one most likely to start rejecting real questions the
             # first time somebody adds a slide.
-            candidates.append((keeps, round(margin, 4), -min_sim, -min_cov))
+            # Whether both halves of the rule still do anything. A threshold
+            # above every observed score switches its signal off entirely —
+            # and that can score *better* on margin, because a disabled arm
+            # has no near misses to be narrow about. Left unchecked the
+            # search recommended exactly that: turn similarity off and let
+            # coverage carry everything, which quietly deletes cross-language
+            # search, the one thing embeddings are here for.
+            live = min_sim <= max(s for s, _ in real) and min_cov <= max(c for _, c in real)
+            candidates.append((live, keeps, round(margin, 4), -min_sim, -min_cov))
 
     print("\nBoth thresholds together (this is the rule the code actually uses)")
     if not candidates:
         print("  No pair rejects every bad question. The deck needs keywords,")
         print("  not a number — see the misses above.")
         return
-    keeps, margin, neg_sim, neg_cov = max(candidates)
+    live, keeps, margin, neg_sim, neg_cov = max(candidates)
     min_sim, min_cov = -neg_sim, -neg_cov
     print("  Rejects all %d bad questions and keeps %d of %d good ones."
           % (len(junk), keeps, len(real)))
+    if not live:
+        print("  ! only by switching one of the two signals off — the deck needs")
+        print("    keywords rather than a threshold.")
     print("  Narrowest margin: %.3f" % margin)
     print("\n  Suggested settings:")
-    print("    SEARCH_MIN_SIMILARITY=%.2f" % min_sim)
-    print("    (MIN_COVERAGE in app/tools/slide_search.py = %.2f)" % min_cov)
+    print("    SEARCH_MIN_SIMILARITY=%.3f" % min_sim)
+    print("    (MIN_COVERAGE in app/tools/slide_search.py = %.3f)" % min_cov)
     for sim, cov in real:
         if not accepted(sim, cov, min_sim, min_cov):
             print("  ! would now miss a good question (sim %.3f, cover %.2f)" % (sim, cov))
