@@ -246,6 +246,14 @@ def main() -> int:
         print("No slides indexed. Run scripts/import_slides.py first.")
         return 1
 
+    # Re-runs must be free and complete. See `retrieval.use_query_cache`: the
+    # first full run of 127 questions tripped the free tier's 100-embeddings-
+    # per-minute limit and finished lexically, which silently dropped most of
+    # the questions from the calibration it was printing.
+    from app.tools.retrieval import save_query_cache, use_query_cache
+
+    use_query_cache(ROOT / "data" / "eval_query_cache.npz")
+
     index = slide_search.get_index(slides)
     mode = "hybrid (BM25 + embeddings)" if index.semantic_enabled else "lexical only (BM25)"
     print("%d slides | %s\n" % (len(slides), mode))
@@ -298,6 +306,7 @@ def main() -> int:
             "yes" if top.found else "no", title[:34],
         ))
 
+    save_query_cache()
     print("\n%d correct, %d wrong" % (
         len(positives) + len(negatives) - len(wrong), len(wrong)))
     for text, why, got in wrong:
@@ -328,6 +337,8 @@ def main() -> int:
     elif not real:
         print("\nNo similarities recorded — running without embeddings.")
 
+    # Whatever was paid for this run is kept, even if the run was cut short.
+    save_query_cache()
     return 1 if wrong else 0
 
 

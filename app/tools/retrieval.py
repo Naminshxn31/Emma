@@ -459,11 +459,84 @@ def _embed_local(texts: list[str]):
     return _l2_normalise(np.asarray(vectors, dtype="float32"))
 
 
+#: Query vectors already paid for, keyed by text. Off unless a caller turns it
+#: on — see `use_query_cache`.
+#:
+#: Written for `scripts/eval_search.py`. Embedding 127 questions back to back
+#: exceeded the free tier's 100 requests per minute *for the embedding model*,
+#: and the run continued with semantic search silently switched off: every
+#: question after the 429 was scored lexically, reported a similarity of
+#: -1.00, and was quietly dropped from the calibration. The suggested
+#: threshold that came out the other side was computed on a fraction of the
+#: questions, and looked exactly as authoritative as a complete one.
+#:
+#: A cache fixes it properly rather than by sleeping: the same question asked
+#: twice costs one request ever, so re-running the eval after a change is both
+#: free and instant. Never used by the live robot, where each guest question is
+#: genuinely new and staleness would be a bug.
+_QUERY_CACHE: dict[str, Any] = {}
+_query_cache_path: Path | None = None
+
+
+def use_query_cache(path: Path | None) -> None:
+    """Turn the query-embedding cache on, backed by `path`. None turns it off."""
+    global _query_cache_path, _QUERY_CACHE
+
+    _query_cache_path = path
+    _QUERY_CACHE = {}
+    if path is None or not path.exists():
+        return
+    try:
+        import numpy as np
+
+        with np.load(path, allow_pickle=False) as data:
+            _QUERY_CACHE = {k: data[k] for k in data.files}
+        logger.info("query cache: %d questions already embedded", len(_QUERY_CACHE))
+    except Exception:
+        logger.warning("could not read the query cache at %s — starting empty", path)
+
+
+def save_query_cache() -> None:
+    if _query_cache_path is None or not _QUERY_CACHE:
+        return
+    try:
+        import numpy as np
+
+        _query_cache_path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(_query_cache_path, **_QUERY_CACHE)
+    except Exception:
+        logger.warning("could not save the query cache", exc_info=True)
+
+
 def embed(texts: list[str], task_type: str, provider: str, *, attempts: int = 1):
     """Embed with a named provider. Never mixes — see `embedding_signature`."""
+    # One query, cache on: answer from disk if this exact question has been
+    # embedded before. Only ever a single query — batches are index builds,
+    # which have their own cache and must not be short-circuited per item.
+    if _query_cache_path is not None and len(texts) == 1:
+        import numpy as np
+
+        key = "%s\x00%s\x00%s" % (provider, task_type, texts[0])
+        hit = _QUERY_CACHE.get(key)
+        if hit is not None:
+            return np.asarray([hit])
+
     if provider == "local":
-        return _embed_local(texts)
-    return _embed(texts, task_type, attempts=attempts)
+        vectors = _embed_local(texts)
+    else:
+        # attempts>1 when the cache is on: the eval asks 127 questions in a
+        # row and the free tier allows 100 embeddings a minute, so without
+        # backoff the run trips a 429 partway and finishes with semantic
+        # search silently switched off — which is how a calibration got
+        # computed on a fraction of its own question list and still printed a
+        # confident number.
+        vectors = _embed(texts, task_type,
+                         attempts=max(attempts, 5 if _query_cache_path else 1))
+
+    if _query_cache_path is not None and len(texts) == 1:
+        key = "%s\x00%s\x00%s" % (provider, task_type, texts[0])
+        _QUERY_CACHE[key] = vectors[0]
+    return vectors
 
 
 def choose_provider() -> str:
