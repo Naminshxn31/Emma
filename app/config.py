@@ -149,6 +149,17 @@ class Settings:
     # arrow key in about a tenth of a second and never approach it.
     canva_arrival_timeout_s: float = float(os.getenv("CANVA_ARRIVAL_TIMEOUT_S", "5.0"))
 
+    # --- Astronaut robot (Aobo SDK, via the app on its chest screen) ---
+    #
+    # Off by default. With this false, or with no robot app connected, the
+    # movement tools run in mock mode: they succeed logically, change nothing
+    # physically, and report `hardware: "mock"` so the model tells the guest
+    # the truth. Same contract as the IR tools — see `_worst()` in
+    # smarthome.py, which exists because "mock" was once reported as "ok" and
+    # the assistant announced it had switched off an air conditioner that
+    # never received anything.
+    robot_enabled: bool = _get_bool("ROBOT_ENABLED", False)
+
     # --- Server ---
     host: str = os.getenv("HOST", "0.0.0.0")
     port: int = int(os.getenv("PORT", "8000"))

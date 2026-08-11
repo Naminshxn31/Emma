@@ -68,6 +68,15 @@ async def _log_effective_config() -> None:
     log.info("tools: %s", ", ".join(names) if names else "(none)")
     ir = broadlink_ir.status()
     log.info("infrared: %s", ir)
+    if settings.robot_enabled:
+        # Said at boot because the movement tools fail *quietly* by design —
+        # they succeed and report `hardware: "mock"`. Without this line, a
+        # gallery would find out the robot never moves when a guest asks it to.
+        from app.tools import robot_link
+
+        log.info("robot: enabled — waiting for the app to send robot_ready; "
+                 "until then every movement runs in mock mode (%s)",
+                 robot_link.status())
     if settings.canva_url:
         # Actually open it, rather than checking that the *package* imports.
         # The old check passed while Chromium itself was missing, so the
@@ -134,6 +143,8 @@ async def serve_client() -> FileResponse:
 
 @app.get("/health")
 async def health() -> dict:
+    from app.tools import robot_link
+
     provider = settings.provider
     return {
         "ok": True,
@@ -145,6 +156,7 @@ async def health() -> dict:
         # Never return the key itself — just whether one is configured, so the
         # UI can show a setup message instead of failing mid-conversation.
         "api_key_configured": bool(settings.api_key_for(provider)),
+        "robot": robot_link.status(),
         "providers_configured": {
             "gemini": bool(settings.gemini_api_key),
             "openai": bool(settings.openai_api_key),

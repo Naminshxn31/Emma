@@ -31,6 +31,7 @@ _TOOL_MODULES = {
     "app.tools.slides": "slides",
     "app.tools.knowledge": "knowledge",
     "app.tools.documents": "documents",
+    "app.tools.robot": "robot",
 }
 
 _loaded = False

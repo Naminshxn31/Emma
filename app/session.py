@@ -146,6 +146,30 @@ class VoiceSession:
 
                         display.set_audio_lead(event.get("ms", 0))
                         continue
+                    if event.get("type") == "robot_ready":
+                        # The Android app on the robot identifying itself, and
+                        # reporting which POIs its own map actually contains.
+                        # The robot is the authority on that — the points were
+                        # made by walking it there once — so this is the only
+                        # place `KNOWN_PLACES` comes from. A browser never
+                        # sends this, which is what keeps `available()` from
+                        # meaning "some socket is open".
+                        from app.tools import robot_link
+
+                        robot_link.app_connected(event.get("places") or [])
+                        turnlog.record("robot_ready",
+                                       places=len(robot_link.KNOWN_PLACES))
+                        continue
+                    if event.get("type") == "robot_arrived":
+                        # Sent when the SDK's navigation callback fires, long
+                        # after the tool call that started the walk returned.
+                        from app.tools import robot_link
+
+                        place = event.get("place")
+                        ok = bool(event.get("ok", True))
+                        turnlog.record("robot_arrived", place=place, ok=ok)
+                        await robot_link.arrived(place, ok)
+                        continue
                     if event.get("type") == "played":
                         # Browser reporting how much reply audio it actually
                         # played before the guest cut in. Only OpenAI needs it.
