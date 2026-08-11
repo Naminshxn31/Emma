@@ -191,6 +191,18 @@ class Settings:
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-native-audio-preview-12-2025")
     gemini_voice: str = os.getenv("GEMINI_VOICE", "Kore")
+    #: Model to use if GEMINI_MODEL cannot be opened. Blank disables it.
+    #:
+    #: The gallery runs a `-preview` model, and preview means Google may
+    #: withdraw it, rename it, or tighten its limits without much notice. On
+    #: the day that happens the robot goes silent for the whole day and the
+    #: only trace is a traceback nobody is watching. A slightly older voice is
+    #: a much smaller problem than a receptionist that does not answer.
+    #:
+    #: Only used for errors that say the *model* is unavailable — see
+    #: `_model_is_unavailable`. A dropped connection still fails loudly.
+    gemini_model_fallback: str = os.getenv(
+        "GEMINI_MODEL_FALLBACK", "gemini-2.5-flash-native-audio-preview-12-2025")
     # Adapts the reply's tone to the guest's tone. Native-audio 2.5 only, and
     # needs the v1beta endpoint — ignored automatically on models without it.
     gemini_affective_dialog: bool = _get_bool("GEMINI_AFFECTIVE_DIALOG", True)

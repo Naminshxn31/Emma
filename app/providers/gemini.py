@@ -188,6 +188,42 @@ def _transcription_config():
         return types.AudioTranscriptionConfig()
 
 
+#: Substrings that mean "this model can't be used", as opposed to "the
+#: network hiccuped". Matched case-insensitively against the exception text.
+#:
+#: Deliberately narrow. Falling back on any error at all would turn a five
+#: second outage into a silent, permanent downgrade that nobody investigates,
+#: and the gallery would find out months later that it had been running the
+#: older voice the whole time.
+_UNAVAILABLE_SIGNS = (
+    "not found",
+    "not_found",
+    "404",
+    "is not supported",
+    "does not exist",
+    "not available",
+    "unsupported model",
+    "invalid model",
+    # Quota counts: per-model limits are separate, so a different model may
+    # well answer. A rate-limited robot is as silent as a missing one.
+    "resource_exhausted",
+    "429",
+    "quota",
+)
+
+
+def _model_is_unavailable(exc: Exception) -> bool:
+    """Is this the model's fault, or the network's?
+
+    The distinction is the whole safety of the fallback. `-preview` models get
+    withdrawn, renamed, and have their limits tightened with little notice, and
+    when that happens the robot goes quiet for a whole day with a traceback
+    nobody reads. That is worth switching models for. A dropped socket is not.
+    """
+    text = str(exc).lower()
+    return any(sign in text for sign in _UNAVAILABLE_SIGNS)
+
+
 class GeminiProvider(VoiceProvider):
     input_sample_rate = 16000
     output_sample_rate = 24000
@@ -196,6 +232,16 @@ class GeminiProvider(VoiceProvider):
 
     def __init__(self, voice: str, instructions: str) -> None:
         super().__init__(voice, instructions)
+        #: Which model this session actually opened with.
+        #:
+        #: An instance attribute rather than `settings.gemini_model` read at
+        #: six call sites, because the session can end up on a *different*
+        #: model than the one configured — see `__aenter__`. With the setting
+        #: read directly, a fallback would connect to one model and then
+        #: configure itself for another: the v1beta endpoint, the thinking
+        #: field and the affective-dialogue warning are all chosen by model
+        #: name, so they would all describe the model that wasn't running.
+        self.model = settings.gemini_model
         self._session = None
         self._cm = None
         # Affective dialogue mixes emotion labels into the output transcript;
@@ -274,7 +320,7 @@ class GeminiProvider(VoiceProvider):
         # Thinking costs latency before the first word is spoken, and 2.5
         # native audio turns it on by default. Gemini 3.x uses levels
         # instead of a token budget, so pick the field the model understands.
-        if settings.gemini_model.startswith("gemini-3"):
+        if self.model.startswith("gemini-3"):
             config["thinking_config"] = types.ThinkingConfig(
                 thinking_level=settings.gemini_thinking_level
             )
@@ -306,7 +352,7 @@ class GeminiProvider(VoiceProvider):
                         "it is being IGNORED. Either switch to a "
                         "*-native-audio-* model or set %s=false so the config "
                         "matches what actually runs.",
-                        name, settings.gemini_model, name,
+                        name, self.model, name,
                     )
 
         return config
@@ -316,10 +362,10 @@ class GeminiProvider(VoiceProvider):
         from google import genai
 
         # Affective dialog / proactive audio are v1beta-only features.
-        http_options = {"api_version": "v1beta"} if "native-audio" in settings.gemini_model else None
+        http_options = {"api_version": "v1beta"} if "native-audio" in self.model else None
         client = genai.Client(api_key=settings.gemini_api_key, http_options=http_options)
         self._cm = client.aio.live.connect(
-            model=settings.gemini_model, config=self._build_config()
+            model=self.model, config=self._build_config()
         )
         self._session = await self._cm.__aenter__()
 
@@ -332,6 +378,35 @@ class GeminiProvider(VoiceProvider):
         try:
             await self._connect()
         except Exception as exc:
+            fallback = (settings.gemini_model_fallback or "").strip()
+            if fallback and fallback != self.model and _model_is_unavailable(exc):
+                # The robot standing silent all day is a worse outcome than the
+                # robot sounding slightly different for an afternoon.
+                #
+                # This only fires for errors that say *this model* can't be
+                # used — not for a dropped connection. A network blip must
+                # fail loudly and be retried on the model that was chosen;
+                # falling back on it would quietly downgrade the gallery and
+                # leave nothing to notice.
+                logger.error(
+                    "MODEL FALLBACK: %s is unavailable (%s) — switching to %s "
+                    "for this session. The robot will still work; check whether "
+                    "the preview model has been withdrawn or renamed.",
+                    self.model, exc, fallback,
+                )
+                from app import turnlog
+
+                turnlog.record("model_fallback", wanted=self.model,
+                               using=fallback, reason=str(exc)[:200])
+                self.model = fallback
+                try:
+                    await self._connect()
+                    return self
+                except Exception as second:
+                    raise ProviderError(
+                        "Could not open a Gemini Live session on %s or the "
+                        "fallback %s: %s" % (settings.gemini_model, fallback, second)
+                    ) from second
             raise ProviderError(f"Could not open a Gemini Live session: {exc}") from exc
         return self
 

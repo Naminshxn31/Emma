@@ -1732,3 +1732,183 @@ def test_an_explicitly_requested_language_outranks_the_spoken_one():
     assert "ห้ามอ้างว่าเคยพูด" in rule[0], (
         "nothing stops it inventing a language history"
     )
+
+
+# ==================== when the preview model disappears ====================
+
+
+def _provider_that_fails(errors, monkeypatch):
+    """A GeminiProvider whose connect raises the given errors in turn."""
+    from app.config import settings
+    from app.providers.gemini import GeminiProvider
+
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    provider = GeminiProvider("Kore", "instructions")
+    attempts = []
+
+    async def fake_connect():
+        attempts.append(provider.model)
+        if len(attempts) <= len(errors) and errors[len(attempts) - 1]:
+            raise errors[len(attempts) - 1]
+
+    monkeypatch.setattr(provider, "_connect", fake_connect)
+    return provider, attempts
+
+
+def test_a_withdrawn_preview_model_falls_back_instead_of_going_silent(monkeypatch):
+    """The gallery runs a `-preview` model, and preview means Google can
+    withdraw or rename it with little notice. On that day the robot stands
+    silent for a whole day and the only trace is a traceback nobody watches.
+    A slightly older voice is a much smaller problem than no receptionist."""
+    import asyncio
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "gemini_model", "gemini-3.1-flash-live-preview")
+    monkeypatch.setattr(settings, "gemini_model_fallback", "gemini-2.5-flash-native-audio-preview-12-2025")
+    monkeypatch.setattr(settings, "turn_log", False)
+
+    provider, attempts = _provider_that_fails(
+        [RuntimeError("404 NOT_FOUND: model gemini-3.1-flash-live-preview not found")],
+        monkeypatch,
+    )
+    asyncio.run(provider.__aenter__())
+
+    assert attempts == ["gemini-3.1-flash-live-preview",
+                        "gemini-2.5-flash-native-audio-preview-12-2025"]
+    assert provider.model == "gemini-2.5-flash-native-audio-preview-12-2025"
+
+
+def test_a_dropped_connection_does_not_quietly_downgrade_the_gallery(monkeypatch):
+    """The dangerous version of this feature.
+
+    Falling back on *any* error turns a five-second outage into a permanent,
+    silent downgrade — the gallery keeps working, so nobody investigates, and
+    months later it turns out the robot has been on the older model the whole
+    time. Only errors that name the model qualify.
+    """
+    import asyncio
+
+    import pytest
+
+    from app.config import settings
+    from app.providers.base import ProviderError
+
+    monkeypatch.setattr(settings, "gemini_model", "gemini-3.1-flash-live-preview")
+    monkeypatch.setattr(settings, "gemini_model_fallback", "gemini-2.5-flash-native-audio-preview-12-2025")
+
+    provider, attempts = _provider_that_fails(
+        [ConnectionResetError("connection reset by peer")], monkeypatch)
+
+    with pytest.raises(ProviderError):
+        asyncio.run(provider.__aenter__())
+    assert attempts == ["gemini-3.1-flash-live-preview"], "downgraded on a network blip"
+
+
+def test_the_session_configures_the_model_it_actually_opened(monkeypatch):
+    """The subtle half. `http_options`, the thinking field and the
+    affective-dialogue warning are all chosen by model name. Reading
+    `settings.gemini_model` at those six call sites would configure the
+    session for the model that *wasn't* running — v1beta withheld from a
+    native-audio fallback, or a `gemini-3` thinking level sent to 2.5."""
+    import asyncio
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "gemini_model", "gemini-3.1-flash-live-preview")
+    monkeypatch.setattr(settings, "gemini_model_fallback", "gemini-2.5-flash-native-audio-preview-12-2025")
+    monkeypatch.setattr(settings, "turn_log", False)
+
+    provider, _ = _provider_that_fails([RuntimeError("404 not found")], monkeypatch)
+    asyncio.run(provider.__aenter__())
+
+    assert "native-audio" in provider.model
+    assert settings.gemini_model == "gemini-3.1-flash-live-preview", \
+        "the fallback rewrote the configured setting instead of this session"
+
+
+def test_no_fallback_configured_means_no_fallback(monkeypatch):
+    import asyncio
+
+    import pytest
+
+    from app.config import settings
+    from app.providers.base import ProviderError
+
+    monkeypatch.setattr(settings, "gemini_model", "gemini-3.1-flash-live-preview")
+    monkeypatch.setattr(settings, "gemini_model_fallback", "")
+
+    provider, attempts = _provider_that_fails([RuntimeError("404 not found")], monkeypatch)
+    with pytest.raises(ProviderError):
+        asyncio.run(provider.__aenter__())
+    assert attempts == ["gemini-3.1-flash-live-preview"]
+
+
+def test_a_rate_limited_model_counts_as_unavailable():
+    """Per-model quotas are separate, so a different model may well answer.
+    A rate-limited robot is exactly as silent as a missing one."""
+    from app.providers.gemini import _model_is_unavailable
+
+    assert _model_is_unavailable(RuntimeError("429 RESOURCE_EXHAUSTED: quota"))
+    assert _model_is_unavailable(RuntimeError("404 NOT_FOUND"))
+    assert not _model_is_unavailable(RuntimeError("connection reset by peer"))
+    assert not _model_is_unavailable(TimeoutError("timed out"))
+
+
+def test_connect_opens_the_session_on_this_provider_s_model(monkeypatch):
+    """Drives the real `_connect`, not a stub.
+
+    The four tests above patch `_connect` out, so they prove the *decision* to
+    fall back and nothing about the connection it makes. Reverting
+    `model=self.model` back to `model=settings.gemini_model` left every one of
+    them green — the session would have asked for the withdrawn model again
+    while believing it had switched.
+    """
+    import asyncio
+    import sys
+    import types
+
+    from app.config import settings
+    from app.providers.gemini import GeminiProvider
+
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(settings, "gemini_model", "gemini-3.1-flash-live-preview")
+
+    asked = {}
+
+    class FakeCM:
+        async def __aenter__(self):
+            return object()
+
+    class FakeLive:
+        def connect(self, model, config):
+            asked["model"] = model
+            return FakeCM()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.aio = types.SimpleNamespace(live=FakeLive())
+
+    fake_genai = types.ModuleType("google.genai")
+    fake_genai.Client = FakeClient
+    monkeypatch.setitem(sys.modules, "google.genai", fake_genai)
+    # And the attribute on the package, which is what `from google import
+    # genai` actually reads once `google.genai` has been imported anywhere in
+    # the process. Patching `sys.modules` alone passes when this file runs on
+    # its own and fails in the full suite — a trap this project has already
+    # walked into once.
+    import google
+
+    monkeypatch.setattr(google, "genai", fake_genai, raising=False)
+
+    provider = GeminiProvider("Kore", "instructions")
+    provider.model = "gemini-2.5-flash-native-audio-preview-12-2025"   # as after a fallback
+    # The config builder needs the real `google.genai.types`, which the stub
+    # above does not have. This test is about the model string on the wire.
+    monkeypatch.setattr(provider, "_build_config", lambda: object())
+    asyncio.run(provider._connect())
+
+    assert asked["model"] == "gemini-2.5-flash-native-audio-preview-12-2025", (
+        "connected to %r — the session asked for the configured model rather "
+        "than the one it had switched to" % asked["model"]
+    )
