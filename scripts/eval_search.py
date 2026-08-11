@@ -118,6 +118,71 @@ def _separation(title: str, real: list[float], junk: list[float],
               % (max(junk), min(real)))
 
 
+def _best_pair(pairs: list[tuple[float, float, bool]]) -> None:
+    """Search both thresholds together, because the code uses both together.
+
+    `Hit.found` is `similarity >= MIN_SIMILARITY or coverage >= MIN_COVERAGE`.
+    Judging either number on its own therefore answers a question the product
+    never asks — and gets a misleading answer: measured on this deck, cosine
+    alone overlaps (0.644 vs 0.649) and standout alone overlaps worse. Both
+    said "no threshold exists". Both were reporting on half a rule.
+
+    The pair does separate, and the reason is worth keeping: the real
+    questions with a *low* cosine are the Thai and English ones, which the
+    lexical side already matched perfectly. Only the cross-language questions
+    depend on the cosine at all, and those score higher than the nonsense
+    does. Neither signal is sufficient; the OR of them is.
+
+    Prefers the widest margin rather than the most matches — a threshold that
+    only just works is one that stops working when the deck changes.
+    """
+    real = [(sim, cov) for sim, cov, miss in pairs if not miss]
+    junk = [(sim, cov) for sim, cov, miss in pairs if miss]
+    if not real or not junk:
+        return
+
+    def accepted(sim, cov, min_sim, min_cov):
+        return sim >= min_sim or cov >= min_cov
+
+    candidates = []
+    sims = sorted({round(s, 3) for s, _ in real + junk} | {1.01})
+    covs = sorted({round(c, 3) for _, c in real + junk} | {1.01})
+    for min_sim in sims:
+        for min_cov in covs:
+            if any(accepted(s, c, min_sim, min_cov) for s, c in junk):
+                continue                      # lets nonsense through
+            keeps = sum(accepted(s, c, min_sim, min_cov) for s, c in real)
+            # How much room there is before a slightly different question
+            # falls the wrong side.
+            margin = min(
+                [s - min_sim for s, c in real if s >= min_sim] +
+                [c - min_cov for s, c in real if c >= min_cov] +
+                [min_sim - s for s, c in junk] + [min_cov - c for s, c in junk]
+            )
+            # Negated so that ties prefer the *least* restrictive pair. Sorting
+            # them positively picked the tightest setting that happened to work,
+            # which is the one most likely to start rejecting real questions the
+            # first time somebody adds a slide.
+            candidates.append((keeps, round(margin, 4), -min_sim, -min_cov))
+
+    print("\nBoth thresholds together (this is the rule the code actually uses)")
+    if not candidates:
+        print("  No pair rejects every bad question. The deck needs keywords,")
+        print("  not a number — see the misses above.")
+        return
+    keeps, margin, neg_sim, neg_cov = max(candidates)
+    min_sim, min_cov = -neg_sim, -neg_cov
+    print("  Rejects all %d bad questions and keeps %d of %d good ones."
+          % (len(junk), keeps, len(real)))
+    print("  Narrowest margin: %.3f" % margin)
+    print("\n  Suggested settings:")
+    print("    SEARCH_MIN_SIMILARITY=%.2f" % min_sim)
+    print("    (MIN_COVERAGE in app/tools/slide_search.py = %.2f)" % min_cov)
+    for sim, cov in real:
+        if not accepted(sim, cov, min_sim, min_cov):
+            print("  ! would now miss a good question (sim %.3f, cover %.2f)" % (sim, cov))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", type=Path, help="question list")
@@ -146,6 +211,7 @@ def main() -> int:
 
     positives, negatives, wrong = [], [], []
     pos_out, neg_out = [], []       # the same queries, judged by standout
+    pairs = []                      # (similarity, coverage, should_miss)
     print("%-30s %6s %6s %6s %-5s %s"
           % ("question", "cover", "sim", "stand", "found", "top slide"))
     print("-" * 104)
@@ -159,9 +225,11 @@ def main() -> int:
                   % (text[:30], "-", "-", "-", "no", "(nothing)"))
             (negatives if should_miss else positives).append(0.0)
             (neg_out if should_miss else pos_out).append(0.0)
+            pairs.append((-1.0, 0.0, should_miss))
             continue
 
         top = hits[0]
+        pairs.append((top.similarity, top.coverage, should_miss))
         title = top.slide.get("title_th") or top.slide.get("title_en") or ""
         ok = " "
         if should_miss:
@@ -208,6 +276,7 @@ def main() -> int:
         _separation("Standout above the deck's own mean (sigmas)",
                     [s for s in pos_out if s >= 0], [s for s in neg_out if s >= 0],
                     fmt="%.2f", setting=None)
+        _best_pair(pairs)
     elif not real:
         print("\nNo similarities recorded — running without embeddings.")
 

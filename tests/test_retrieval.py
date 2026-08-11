@@ -566,3 +566,73 @@ def test_an_identical_deck_stands_out_nowhere():
     from app.tools.slide_search import _standout
 
     assert _standout(np.array([0.7, 0.7, 0.7]), 0) == 0.0
+
+
+def test_the_pair_of_thresholds_separates_what_neither_does_alone(capsys):
+    """The finding this whole exercise produced, pinned to the real numbers.
+
+    Measured on the gallery deck: cosine alone overlaps (worst real 0.644 vs
+    best nonsense 0.649) and standout alone overlaps worse (2.32 vs 3.18).
+    Both single-signal reports concluded "no threshold exists" — and both were
+    describing half of a rule the code never applies on its own.
+
+    `Hit.found` is `similarity >= MIN_SIMILARITY or coverage >= MIN_COVERAGE`,
+    and the pair does separate, because the real questions with a low cosine
+    are exactly the Thai and English ones the lexical side already matched.
+    Only cross-language questions rest on the cosine, and those outscore the
+    nonsense.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "eval_search", "scripts/eval_search.py")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except SystemExit:
+        pass
+
+    # Straight off the eval run on the gallery machine.
+    real = [(0.72, 1.00), (0.75, 0.00), (0.71, 0.46), (0.65, 1.00),
+            (0.64, 1.00), (0.68, 0.00), (0.66, 0.00), (0.70, 0.00)]
+    junk = [(0.63, 0.00), (0.65, 0.00), (0.60, 0.00), (0.58, 0.25),
+            (0.64, 0.00), (0.62, 0.00), (0.61, 0.00)]
+
+    module._best_pair([(s, c, False) for s, c in real]
+                      + [(s, c, True) for s, c in junk])
+    out = capsys.readouterr().out
+
+    assert "Rejects all %d bad questions" % len(junk) in out
+    assert "keeps %d of %d" % (len(real), len(real)) in out, \
+        "a pair exists that loses nothing; the search failed to find it"
+
+
+def test_the_suggestion_is_the_least_restrictive_pair_that_works(capsys):
+    """Ties must break towards the loosest setting.
+
+    Picking the tightest pair that happens to work is picking the one most
+    likely to start rejecting real questions the first time a slide is added.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "eval_search", "scripts/eval_search.py")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except SystemExit:
+        pass
+
+    # Two thresholds both reject the junk: 0.90 (the real match itself) and
+    # 1.01 (the "nothing passes on similarity" sentinel). Only 0.90 leaves any
+    # room for a future question that scores slightly lower.
+    real = [(0.90, 1.00)]
+    junk = [(0.50, 0.00), (0.10, 0.00)]
+    module._best_pair([(s, c, False) for s, c in real]
+                      + [(s, c, True) for s, c in junk])
+    out = capsys.readouterr().out
+
+    line = [n for n in out.splitlines() if "SEARCH_MIN_SIMILARITY" in n][0]
+    chosen = float(line.split("=")[1])
+    assert chosen == 0.90, \
+        "picked %s — a tighter threshold than the data required" % chosen
