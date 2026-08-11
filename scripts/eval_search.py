@@ -36,9 +36,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Questions a sales gallery actually gets. The negatives matter as much as
 # the positives: a search that never says "I don't know" is not working.
+# The gym is branded BIOGENESIS in this deck, and that matters more than it
+# looks. The only slides with "GYM" in the title are "Bungee Gym & Yoga" — a
+# different facility entirely — so an expectation of "GYM" was not merely
+# strict, it was asking for the wrong answer. It reported four failures for
+# four correct results, which is the way an eval stops being read.
 DEFAULT_QUESTIONS = [
-    ("มีฟิตเนสไหม", "ฟิตเนส"),
-    ("ฟิตเนสอยู่ชั้นไหน", "ฟิตเนส"),
+    ("มีฟิตเนสไหม", "BIOGENESIS"),
+    ("ฟิตเนสอยู่ชั้นไหน", "BIOGENESIS"),
     ("สระว่ายน้ำอยู่ชั้นไหน", "POOL"),
     ("ขอดูสระว่ายน้ำหน่อย", "POOL"),
     ("มีซาวน่าไหม", None),   # sauna photo or the basement plan it sits on
@@ -49,15 +54,15 @@ DEFAULT_QUESTIONS = [
     ("ใครเป็นเจ้าของโครงการ", "ผู้บริหาร"),
     # Cross-language: the point of the semantic half. None of these share a
     # character with the Thai titles they should reach.
-    ("do you have a gym", "GYM"),
+    ("do you have a gym", "BIOGENESIS"),
     ("where is the swimming pool", "POOL"),
     ("is there a sauna", "SAUNA"),
     ("show me the parking", "ใต้ดิน"),
     ("游泳池在哪里", "POOL"),
-    ("健身房", "GYM"),
+    ("健身房", "BIOGENESIS"),
     ("有桑拿房吗", "SAUNA"),
     ("бассейн", "POOL"),
-    ("где тренажерный зал", "GYM"),
+    ("где тренажерный зал", "BIOGENESIS"),
     ("プールはどこですか", "POOL"),
     ("수영장 어디예요", "POOL"),
     ("wo ist der Pool", "POOL"),

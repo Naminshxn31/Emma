@@ -1736,3 +1736,42 @@ def test_a_page_with_a_question_still_asks_it_when_jumped_to(slides):
 
     assert out["slide"].get("ask"), "the seeded question vanished"
     assert "ask" in out["instruction"] and "รอคำตอบ" in out["instruction"]
+
+
+def test_the_eval_does_not_expect_the_wrong_gym(slides):
+    """An expectation that would have been a bug if it were met.
+
+    `scripts/eval_search.py` asked for a slide titled "GYM" when a guest says
+    "do you have a gym". The only slides carrying that word are "Bungee Gym &
+    Yoga" — a bungee fitness class, not the gym. The main gym is branded
+    BIOGENESIS, so the search returning Biogenesis was right and the eval
+    called it wrong, four times over.
+
+    That is worse than a strict test. An eval that reports four failures for
+    four correct answers is one people stop reading, and the two real problems
+    sitting in the same output go with it.
+    """
+    import importlib.util
+
+    from app.tools.slides import load_slides
+
+    spec = importlib.util.spec_from_file_location(
+        "eval_search", "scripts/eval_search.py")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except SystemExit:
+        pass
+
+    titles = " ".join(
+        (s.get("title_th") or "") + " " + (s.get("title_en") or "")
+        for s in load_slides()
+    ).lower()
+
+    for question, expected in module.DEFAULT_QUESTIONS:
+        if expected is None:
+            continue
+        assert expected.lower() in titles, (
+            "the eval expects %r for %r, and no slide in the deck has it — "
+            "the expectation is wrong, not the search" % (expected, question)
+        )
