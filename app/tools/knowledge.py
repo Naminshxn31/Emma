@@ -65,6 +65,22 @@ _COMMERCIAL_TERMS = (
     # Other common buyer languages
     "prix", "preis", "precio", "prezzo", "سعر", "السعر", "كم الثمن",
     "कीमत", "मूल्य", "giá", "harga", "berapa",
+
+    # --- Not about money, but answerable only from an approved fact ---
+    #
+    # Found by measurement, not by thinking of them: `scripts/eval_search.py`
+    # showed these reaching the slide search and coming back with a picture.
+    # "ห้องขายเปิดกี่โมง" got a rendering of Common Sphere; "โอนได้เมื่อไหร่"
+    # got an aspirational branding slide.
+    #
+    # They belong here for the same reason the prices do. Opening hours is one
+    # of the four fields still blank in condo_facts.json, and ownership and
+    # handover are commitments a developer makes — none of them is a thing to
+    # infer from a caption written by a model looking at a photograph.
+    "เปิดกี่โมง", "เวลาทำการ", "เปิดปิดกี่โมง", "opening hours", "what time",
+    "ต่างชาติ", "ชาวต่างชาติ", "foreigner", "foreign buyer", "freehold",
+    "leasehold", "กรรมสิทธิ์", "โอน", "handover", "transfer", "完工", "过户",
+    "เสร็จเมื่อไหร่", "สร้างเสร็จ", "completion",
 )
 
 

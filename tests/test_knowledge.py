@@ -313,3 +313,37 @@ def test_the_top_hit_still_brings_its_neighbours(loaded, monkeypatch):
     out = run(registry.dispatch("search_condo_info", {"query": "ขอดูสระว่ายน้ำ"}))
     assert out["found"] is True
     assert len(out["results"]) > 1, "narrowed the rule into a single-slide answer"
+
+
+def test_questions_only_an_approved_fact_can_answer_never_reach_the_slides():
+    """Found by measuring, not by thinking of them.
+
+    `scripts/eval_search.py` showed these three walking straight past the
+    commercial guard into the slide search, and coming back with a picture:
+
+        ห้องขายเปิดกี่โมง   -> ภาพจำลอง COMMON SPHERE ชั้น 3
+        โอนได้เมื่อไหร่     -> ทุกวันนี้เราไปได้ไกลกว่าที่ฝันไว้
+        ต่างชาติซื้อได้ไหม  -> ความฝันไม่เคยเปลี่ยน
+
+    None of them is about money, which is why the list missed them, but each
+    is answerable only from something a person signed off. Opening hours is
+    one of the four fields still blank in `condo_facts.json`; ownership and
+    handover are commitments a developer makes. A caption written by a model
+    looking at a photograph is not a source for any of them.
+    """
+    from app.tools.knowledge import _is_commercial
+
+    for query in ("ห้องขายเปิดกี่โมง", "ต่างชาติซื้อได้ไหม", "โอนได้เมื่อไหร่",
+                  "what time do you open", "can foreigners buy", "freehold or leasehold"):
+        assert _is_commercial(query), query
+
+
+def test_ordinary_questions_are_not_swept_up_by_that_list():
+    """The cost of widening the guard is refusing real questions, and the
+    words involved — เวลา, โอน, ต่างชาติ — turn up in innocent sentences."""
+    from app.tools.knowledge import _is_commercial
+
+    for query in ("มีฟิตเนสไหม", "สระว่ายน้ำอยู่ชั้นไหน", "ขอดูห้องนอน",
+                  "ไปสนามบินยังไง", "ชั้น 3 มีอะไร", "where is the lobby",
+                  "ขอดูผังโครงการ", "มีที่ให้เด็กเล่นไหม", "ทำเลอยู่ตรงไหน"):
+        assert not _is_commercial(query), query

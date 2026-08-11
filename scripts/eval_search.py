@@ -239,6 +239,7 @@ def main() -> int:
         settings.search_semantic = False
 
     from app.tools import slide_search
+    from app.tools.knowledge import _is_commercial
     from app.tools.slides import load_slides, search_slides
 
     slides = load_slides()
@@ -271,6 +272,22 @@ def main() -> int:
     for question, expected in load_questions(args.file):
         should_miss = question.startswith("!")
         text = question.lstrip("!")
+        # The same first gate the tool has. `search_condo_info` refuses
+        # commercial questions *before* searching, so measuring
+        # `search_slides` alone reports failures the guest can never see —
+        # "ค่าส่วนกลางเท่าไหร่" was counted as a wrong answer here while the
+        # robot has always replied "no data, ask the sales team".
+        #
+        # This is the third time in this project that a measurement was taken
+        # one layer away from the thing being judged. It reads as rigour and
+        # it produces numbers about something else.
+        if _is_commercial(text):
+            print("%-30s %6s %6s %6s %-5s %s"
+                  % (text[:30], "-", "-", "-", "no", "(commercial — refused before search)"))
+            if not should_miss:
+                wrong.append((text, "refused as commercial", "-"))
+            continue
+
         hits = search_slides(text)
         if not hits:
             print("%-30s %6s %6s %6s %-5s %s"
