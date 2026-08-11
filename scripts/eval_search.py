@@ -264,6 +264,10 @@ def main() -> int:
             pairs.append((-1.0, 0.0, should_miss))
             continue
 
+        # `hits[0]`, and `knowledge.search_condo_info` now agrees: the top
+        # hit decides. It used to scan the whole list, so the eval could
+        # report a question rejected while the tool answered it from an
+        # eighth-placed slide — RRF ranks by compromise, not by similarity.
         top = hits[0]
         pairs.append((top.similarity, top.coverage, should_miss))
         title = top.slide.get("title_th") or top.slide.get("title_en") or ""

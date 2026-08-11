@@ -257,3 +257,59 @@ def test_every_nonsense_query_the_suite_asserts_on_is_also_measured():
         "these are asserted on but never measured, so the threshold was "
         "calibrated blind to them: %s" % sorted(missing)
     )
+
+
+def test_a_slide_ranked_eighth_cannot_answer_on_its_own(loaded, monkeypatch):
+    """The gap between what the eval measured and what the tool did.
+
+    `scripts/eval_search.py` judges `hits[0]` and reported every nonsense
+    question rejected. This tool judged *every* hit, so a slide the ranking
+    put eighth could still answer — and two tests kept failing while the
+    calibration said everything was fine.
+
+    Ranking is Reciprocal Rank Fusion over BM25 and cosine, so first place is
+    the best compromise between the two, not the highest similarity. A late
+    hit carrying a high cosine is exactly the case this produces, and it is
+    only reachable on a machine where the semantic half actually runs — which
+    is why it never showed up in CI.
+    """
+    from app.tools import registry
+    from app.tools import slides as slides_mod
+    from app.tools.slide_search import Hit
+
+    deck = loaded.load_slides()[:9]
+    ranked = [
+        Hit(slide=s, score=1.0 - i / 10, coverage=0.0,
+            # Nothing is close enough until the eighth, which sneaks over the
+            # line on similarity alone.
+            similarity=0.90 if i == 8 else 0.10, standout=0.0)
+        for i, s in enumerate(deck)
+    ]
+    monkeypatch.setattr(slides_mod, "search_slides", lambda q: ranked)
+
+    out = run(registry.dispatch("search_condo_info", {"query": "อะไรก็ตามที่เด็คไม่มี"}))
+    assert out["found"] is False, (
+        "a slide the ranking put eighth answered a question the first eight "
+        "could not"
+    )
+    assert "ห้ามเดา" in out["instruction"]
+
+
+def test_the_top_hit_still_brings_its_neighbours(loaded, monkeypatch):
+    """The other half: when the closest slide *is* close enough, the other
+    qualifying ones still come along. Narrowing the rule must not turn every
+    answer into a single slide."""
+    from app.tools import registry
+    from app.tools import slides as slides_mod
+    from app.tools.slide_search import Hit
+
+    deck = loaded.load_slides()[:3]
+    ranked = [
+        Hit(slide=s, score=1.0 - i / 10, coverage=1.0, similarity=0.90, standout=3.0)
+        for i, s in enumerate(deck)
+    ]
+    monkeypatch.setattr(slides_mod, "search_slides", lambda q: ranked)
+
+    out = run(registry.dispatch("search_condo_info", {"query": "ขอดูสระว่ายน้ำ"}))
+    assert out["found"] is True
+    assert len(out["results"]) > 1, "narrowed the rule into a single-slide answer"

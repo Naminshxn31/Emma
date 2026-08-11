@@ -157,10 +157,27 @@ def search_condo_info(query: str) -> dict:
     from app.tools import slides as slides_mod
 
     ranked = slides_mod.search_slides(query)
-    # Ranked by fused rank, filtered by whether the question was answered:
-    # rank says which slide is closest, `found` says whether "closest" means
-    # anything here.
-    hits = [h.slide for h in ranked if h.found][:MAX_RESULTS]
+    # **The top hit decides whether anything is answered at all.**
+    #
+    # The line above used to read `[h.slide for h in ranked if h.found]`, which
+    # is not what the comment beside it claimed. Ranking is Reciprocal Rank
+    # Fusion of BM25 and cosine, so the first hit is the best *compromise*, not
+    # the most similar — an eighth-placed slide can carry a higher cosine than
+    # the first. Scanning the whole list therefore let a slide nobody ranked
+    # highly answer the question on its own.
+    #
+    # That is exactly the gap between `scripts/eval_search.py`, which judges
+    # `hits[0]`, and this tool, which judged all of them: the eval reported
+    # every nonsense question rejected while two tests asserting the same thing
+    # still failed. The measurement was right about the statistic it measured.
+    #
+    # So make the code match the comment. If the closest slide isn't close
+    # enough, there is no answer here — and the rest of the list, which by
+    # definition ranked worse, does not get a second vote.
+    if not ranked or not ranked[0].found:
+        hits = []
+    else:
+        hits = [h.slide for h in ranked if h.found][:MAX_RESULTS]
 
     if not hits:
         return {
