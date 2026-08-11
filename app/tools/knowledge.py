@@ -84,16 +84,56 @@ _COMMERCIAL_TERMS = (
 )
 
 
+def _is_thai(term: str) -> bool:
+    return any("\u0e00" <= ch <= "\u0e7f" for ch in term)
+
+
+#: Split once, because the two halves need different matching. See
+#: `_is_commercial`.
+_THAI_TERMS = tuple(t for t in _COMMERCIAL_TERMS if _is_thai(t))
+_NON_THAI_TERMS = tuple(t for t in _COMMERCIAL_TERMS if not _is_thai(t))
+
+
 def _is_commercial(query: str) -> bool:
     """Never answerable from slide captions, in any language.
 
-    Word matching, so it is exact and free but not exhaustive — a phrasing
-    nobody listed gets through. The prompt is the real backstop: it forbids
-    stating any number not present in the facts file. This just stops the
-    *screen* changing to an unrelated slide while that refusal is spoken.
+    **Thai terms are matched as words, not as substrings**, and that is not a
+    refinement — the substring version was refusing ordinary questions:
+
+        "ที่ออกกำลังกายเป็นยังไงบ้าง"  ->  refused, because ยังไ*งบ*้าง
+                                          contains งบ (budget)
+        "ซาวน่าช่วยผ่อนคลายไหม"        ->  refused, because *ผ่อน*คลาย
+                                          contains ผ่อน (instalment)
+
+    Thai is written without spaces, so `term in text` finds a word inside an
+    unrelated one constantly. This is the same failure that forced the whole
+    retrieval rewrite — ราคา (price) matching inside อาคาร (building) — and it
+    had quietly reappeared in this function, where the cost is higher: a
+    refused question is a guest being told "ask the sales team" when they asked
+    what the gym looks like. "เป็นยังไงบ้าง" is about as common as Thai
+    phrasing gets.
+
+    Found only after `scripts/eval_search.py` was made to walk this gate the
+    way the tool does. It had been running past it for as long as it existed.
+
+    Non-Thai terms keep substring matching: Latin scripts have spaces, and
+    there is no segmenter here for Han or kana.
     """
     q = (query or "").lower()
-    return any(term in q for term in _COMMERCIAL_TERMS)
+    if any(term in q for term in _NON_THAI_TERMS):
+        return True
+
+    from app.tools.retrieval import tokenize
+
+    words = tokenize(q)
+    if not words:
+        return False
+    haystack = " %s " % " ".join(words)
+    for term in _THAI_TERMS:
+        needle = " %s " % " ".join(tokenize(term))
+        if needle in haystack:
+            return True
+    return False
 
 
 def _entry(slide: dict) -> dict:

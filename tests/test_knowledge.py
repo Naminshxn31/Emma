@@ -347,3 +347,41 @@ def test_ordinary_questions_are_not_swept_up_by_that_list():
                   "ไปสนามบินยังไง", "ชั้น 3 มีอะไร", "where is the lobby",
                   "ขอดูผังโครงการ", "มีที่ให้เด็กเล่นไหม", "ทำเลอยู่ตรงไหน"):
         assert not _is_commercial(query), query
+
+
+def test_an_ordinary_thai_question_is_not_mistaken_for_a_price_question():
+    """The worst bug found in the search work, and the oldest one.
+
+    `_is_commercial` matched its terms as substrings. Thai is written without
+    spaces, so a word is constantly found inside an unrelated one:
+
+        ยังไ*งบ*้าง   contains งบ    (budget)
+        *ผ่อน*คลาย    contains ผ่อน  (instalment)
+
+    "เป็นยังไงบ้าง" is about as common as Thai phrasing gets, and "ผ่อนคลาย"
+    is what a guest says about a spa — which this project is full of. Both
+    were being refused with "no pricing data, please ask the sales team".
+
+    Same failure as ราคา matching inside อาคาร, which is the reason the whole
+    retrieval layer was rewritten. It had reappeared one function away, where
+    it costs more: a wrong slide is a picture, a wrong refusal is the robot
+    declining to answer a question it can answer.
+    """
+    from app.tools.knowledge import _is_commercial
+
+    for query in ("ที่ออกกำลังกายเป็นยังไงบ้าง", "ห้องเป็นยังไงบ้าง",
+                  "บรรยากาศเป็นยังไงบ้าง", "ซาวน่าช่วยผ่อนคลายไหม",
+                  "มีที่นั่งผ่อนคลายไหม"):
+        assert not _is_commercial(query), query
+
+
+def test_the_price_questions_still_get_caught_after_that_change():
+    """Tightening the match must not open the gate it was guarding."""
+    from app.tools.knowledge import _is_commercial
+
+    for query in ("ราคาเริ่มต้นเท่าไหร่", "ค่าส่วนกลางเท่าไหร่",
+                  "ผ่อนดาวน์ยังไง", "งบประมาณเท่าไหร่", "มีส่วนลดไหม",
+                  "ห้องขายเปิดกี่โมง", "ต่างชาติซื้อได้ไหม", "โอนได้เมื่อไหร่",
+                  "how much is a unit", "价格是多少", "いくらですか",
+                  "얼마예요", "цена квартиры"):
+        assert _is_commercial(query), query
