@@ -203,6 +203,14 @@ def test_the_configured_printer_is_actually_used(monkeypatch, tmp_path):
     monkeypatch.setattr(documents.sys, "platform", "win32")
     monkeypatch.setattr(settings, "print_enabled", True)
     monkeypatch.setattr(settings, "printer_name", "Brother DCP-L3560CDW series Printer")
+    # Pin the helper off, or this test asks a different question depending on
+    # whose machine it runs on. `send_to_printer` prefers SumatraPDF when one
+    # is configured *and present*, so on the gallery PC — where PDF_PRINT_EXE
+    # points at a real file — it took the helper branch and never produced a
+    # `PrintTo` at all. On CI the same path doesn't exist, `find_pdf_helper()`
+    # returns "", and the PowerShell branch ran. The test was reading the
+    # developer's filesystem, not the code. The helper branch has its own test.
+    monkeypatch.setattr(settings, "pdf_print_exe", "")
     monkeypatch.setattr(documents.subprocess, "run", fake_run)
 
     doc = tmp_path / "x.pdf"
