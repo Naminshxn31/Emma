@@ -50,11 +50,11 @@ async def go_to_place(place: str) -> dict:
     if target is None:
         # Do not guess. A wrong slide is corrected with a sentence; a robot
         # leading somebody to the wrong room is not.
-        known = ", ".join(robot_link.KNOWN_PLACES)
+        known = ", ".join(robot_link.places())
         return {
             "ok": False,
             "error": "unknown place",
-            "known_places": robot_link.KNOWN_PLACES,
+            "known_places": robot_link.places(),
             "instruction": (
                 "ไม่รู้จักจุดนี้ในแผนที่ ห้ามเดาและห้ามพาไป "
                 + ("จุดที่ไปได้คือ %s ให้ถามลูกค้าว่าหมายถึงจุดไหน" % known
@@ -145,7 +145,7 @@ async def return_to_base() -> dict:
 )
 def get_robot_status() -> dict:
     state = robot_link.snapshot()
-    state["places"] = list(robot_link.KNOWN_PLACES)
+    state["places"] = list(robot_link.places())
     state["hardware"] = "ok" if robot_link.available() else "mock"
     if not robot_link.available():
         state["instruction"] = (

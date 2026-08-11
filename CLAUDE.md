@@ -25,7 +25,7 @@
 
 ```bash
 uvicorn app.main:app --port 8000     # รันเซิร์ฟเวอร์
-python -m pytest tests/ -q            # เทสต์ (452 ตัว, ใช้เวลา ~100 วิ)
+python -m pytest tests/ -q            # เทสต์ (454 ตัว, ใช้เวลา ~100 วิ)
 python -m pytest tests/test_slides.py -q
 python scripts/eval_search.py         # วัดคุณภาพการค้นสไลด์
 python scripts/analyze_log.py --days 7  # อ่าน data/logs/ ว่าเกิดอะไรขึ้นจริง

@@ -342,6 +342,35 @@ def test_reconnecting_replaces_the_map_rather_than_adding_to_it():
     assert robot_link.KNOWN_PLACES == ["ใหม่"]
 
 
+def test_pretend_places_make_the_conversation_testable_before_the_robot(monkeypatch):
+    """Without this there is nothing to rehearse against.
+
+    `KNOWN_PLACES` is empty until a robot reports its own map, so every request
+    hits the "I don't know that place" branch and the interesting half — how it
+    offers to guide, whether it waits before claiming to have arrived — cannot
+    be reached at all until the hardware is in the room.
+    """
+    from app import session as session_module
+
+    monkeypatch.setattr(session_module, "_active", None)
+    monkeypatch.setattr(settings, "robot_mock_places", ["ห้องตัวอย่าง", "ฟิตเนส"])
+
+    out = run(registry.dispatch("go_to_place", {"place": "พาไปห้องตัวอย่างหน่อย"}))
+    assert out["ok"] is True, "the guiding path is still unreachable"
+    assert out["place"] == "ห้องตัวอย่าง"
+    assert out["hardware"] == "mock"
+    assert out["moving"] is False, "a pretend place must not become a real journey"
+
+
+def test_a_real_map_overrides_the_pretend_one(robot, monkeypatch):
+    """The moment a robot reports in, its own map is the only one that counts —
+    otherwise a leftover ROBOT_MOCK_PLACES in .env sends it somewhere that
+    doesn't exist."""
+    monkeypatch.setattr(settings, "robot_mock_places", ["ที่ไม่มีจริง"])
+    assert robot_link.find_place("พาไปที่ไม่มีจริง") is None
+    assert robot_link.find_place("พาไปห้องตัวอย่าง") == "ห้องตัวอย่าง"
+
+
 def test_arrival_with_nobody_listening_does_not_raise():
     """The guest left, the socket closed, and the robot arrives anyway."""
     from app import session as session_module

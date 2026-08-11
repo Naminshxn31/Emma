@@ -50,6 +50,28 @@ STATE: dict[str, Any] = {
 }
 
 
+def places() -> list[str]:
+    """Where the robot can go — real ones if it has reported in, else the
+    pretend ones from `ROBOT_MOCK_PLACES`.
+
+    The fallback exists because without it the movement tools cannot be tried
+    by voice at all before the robot arrives: `KNOWN_PLACES` is empty, every
+    request is "I don't know that place", and the only reachable branch is the
+    refusal. That makes the interesting half — how it phrases guiding someone,
+    whether it waits before saying it has arrived — untestable until the
+    hardware is in the room.
+
+    It never makes the robot claim to move. `available()` still returns False,
+    so `send()` still answers "mock" and the result still tells the model to
+    say the robot cannot go anywhere yet.
+    """
+    if KNOWN_PLACES:
+        return KNOWN_PLACES
+    from app.config import settings
+
+    return settings.robot_mock_places
+
+
 def snapshot() -> dict:
     return dict(STATE)
 
@@ -89,11 +111,16 @@ def reset_state() -> None:
     KNOWN_PLACES.clear()
 
 
-def app_connected(places: list[str] | None = None) -> None:
-    """The robot app reported in, with the POIs its map actually contains."""
+def app_connected(names: list[str] | None = None) -> None:
+    """The robot app reported in, with the POIs its map actually contains.
+
+    The parameter is `names`, not `places`, because `places()` is a function in
+    this module and a parameter of that name shadows it — harmless today, a
+    confusing bug the first time somebody adds a line here that needs it.
+    """
     STATE["connected"] = True
     KNOWN_PLACES.clear()
-    KNOWN_PLACES.extend(places or [])
+    KNOWN_PLACES.extend(names or [])
     logger.info("robot app connected — %d places on its map: %s",
                 len(KNOWN_PLACES), ", ".join(KNOWN_PLACES) or "(none)")
 
@@ -135,7 +162,7 @@ def find_place(request: str) -> str | None:
         return None
 
     matches = [
-        place for place in KNOWN_PLACES
+        place for place in places()
         if (words := set(tokenize(place))) and words <= wanted
     ]
     if not matches:

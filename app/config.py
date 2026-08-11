@@ -159,6 +159,11 @@ class Settings:
     # the assistant announced it had switched off an air conditioner that
     # never received anything.
     robot_enabled: bool = _get_bool("ROBOT_ENABLED", False)
+    #: Pretend destinations, so the guiding conversation can be rehearsed
+    #: before the robot exists. Ignored the moment a real robot reports its
+    #: own map. Never makes anything move — see `robot_link.places`.
+    robot_mock_places: list[str] = field(default_factory=lambda: _get_list(
+        "ROBOT_MOCK_PLACES", []))
 
     # --- Server ---
     host: str = os.getenv("HOST", "0.0.0.0")
