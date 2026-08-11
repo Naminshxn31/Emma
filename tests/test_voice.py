@@ -1139,7 +1139,11 @@ def _run_mark_unheard(text: str, ratio: float):
     if node is None:
         import pytest
 
-        pytest.skip("node not available")
+        # Worth knowing that this happened. These two tests were the only
+        # thing checking the transcript's Thai handling, and on a machine
+        # without node they skip — which reads as a pass in the summary line.
+        # That is how a real Windows failure sat unnoticed while CI was green.
+        pytest.skip("node not available — the transcript's Thai splitting is UNTESTED here")
 
     js = _client_js()
     start = js.index("function markUnheard(")
@@ -1157,8 +1161,19 @@ console.log(JSON.stringify({ heard: bubble.textContent,
                              unheard: rest ? rest.textContent : null }));
 """ % (json.dumps(text), ratio)
     )
+    # UTF-8 explicitly, both ways.
+    #
+    # `JSON.stringify` does not escape non-ASCII, so node writes the Thai
+    # reply to stdout as UTF-8 bytes. `text=True` alone decodes with the
+    # machine's preferred encoding, which on a Thai Windows install is cp874:
+    # those bytes are not valid cp874 and the decode raises, and where it
+    # doesn't raise (cp1252) it silently produces "à¸ªà¸§à¸±à¸ª" and the
+    # comparison fails for a reason that has nothing to do with the code.
+    # On Linux the default is already UTF-8, which is why this only ever
+    # failed on the machine the robot actually runs on.
     out = subprocess.run(
-        [node, "-e", harness], capture_output=True, text=True, timeout=20
+        [node, "-e", harness], capture_output=True, text=True, timeout=20,
+        encoding="utf-8", errors="replace",
     )
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)

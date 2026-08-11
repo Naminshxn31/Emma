@@ -280,7 +280,7 @@ class Settings:
     # a fixed number means something. Defaults are conservative starting
     # points — run scripts/eval_search.py against your own deck to see where
     # the gap between related and unrelated actually falls, then set these.
-    search_min_similarity: float = float(os.getenv("SEARCH_MIN_SIMILARITY", "0.655"))
+    search_min_similarity: float = float(os.getenv("SEARCH_MIN_SIMILARITY", "0.653"))
     search_show_similarity: float = float(os.getenv("SEARCH_SHOW_SIMILARITY", "0.68"))
 
     def api_key_for(self, provider: str | None = None) -> str | None:
