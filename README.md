@@ -53,6 +53,14 @@ cosmetic: 3.1 does **not** support affective dialogue, proactive audio, or
 NON_BLOCKING function calling, and `GEMINI_AFFECTIVE_DIALOG=true` is ignored
 with a warning on it. Anything read here about those features applies to 2.5.
 
+`GEMINI_MODEL_FALLBACK` switches models by itself if the configured one
+cannot be opened — a preview model can be withdrawn, renamed or rate-limited
+with little notice, and on that day the robot goes silent for a whole day with
+a traceback nobody is watching. It fires **only** for errors that name the
+model (404, not found, quota). A dropped connection still fails loudly:
+falling back on any error turns a five-second outage into a permanent silent
+downgrade that nobody investigates, because the gallery keeps working.
+
 `app/providers/` hides all of that from the rest of the app — the browser
 speaks one protocol and learns the sample rates at runtime from the `ready`
 event.
@@ -81,9 +89,12 @@ about a third fewer bytes and no encode/decode per chunk.
 | `app/providers/base.py` | Provider interface + the protocol spec |
 | `app/providers/gemini.py` | Gemini Live |
 | `app/providers/openai_realtime.py` | OpenAI Realtime |
-| `app/prompts.py` | System instructions + condo facts (**fill these in**) |
+| `app/prompts.py` | System instructions; facts loaded from `data/condo_facts.json` |
 | `app/voices.py` | Voice catalogues per provider |
+| `app/tools/` | The 19 callable tools, the search, and the Canva window |
+| `app/turnlog.py` | One JSON line per turn to `data/logs/`, deleted after 30 days |
 | `client/index.html` | Voice picker, live call UI, mic capture, playback, barge-in |
+| `CLAUDE.md` | Every bug that reached a guest, and why each fix is shaped the way it is |
 
 ## Setup
 
@@ -228,13 +239,24 @@ The assistant controls the gallery lights and air conditioner by calling
 functions, not by describing them. Say "ปิดไฟหน่อย" or "ร้อนจัง" and it
 invokes the tool and confirms in whatever language you're speaking.
 
-Built in (`app/tools/smarthome.py`, IR codes ported from `emma`):
+Nineteen of them, in five groups. Every result carries what actually
+happened — `hardware: "ok" / "mock" / "failed"` — so the robot can say a
+command didn't get through instead of cheerfully claiming success. That field
+exists because an earlier version reported "mock" as "ok" and the assistant
+announced it had switched off an air conditioner that never received anything.
 
-| Tool | Does |
+| Group | Tools |
 | --- | --- |
-| `set_lights` | on / off |
-| `set_air_conditioner` | on / off, temperature 16–30, fan, mode |
-| `get_room_status` | what was last commanded |
+| Room (`smarthome.py`, IR via Broadlink) | `set_lights`, `set_air_conditioner`, `get_room_status` |
+| Slides (`slides.py`) | `show_slide`, `start_presentation`, `next_slide`, `previous_slide`, `go_to_page`, `hide_slide`, `stop_presentation`, `resume_presentation`, `close_presentation` |
+| Knowledge (`knowledge.py`) | `search_condo_info` |
+| Printing (`documents.py`) | `print_document`, `list_documents` |
+| Robot (`robot.py`, Aobo SDK) | `go_to_place`, `stop_moving`, `return_to_base`, `get_robot_status` |
+
+The robot group talks to an Android app on the robot down the WebSocket that
+is already open for voice — the SDK is Android-only and reaches the robot's
+navigation board on its own internal network, so this server can't call it.
+Mock until that app reports in. See `docs/ต่อกับหุ่นยนต์ Astronaut.md`.
 
 ## Presenting slides
 
@@ -376,8 +398,27 @@ answer "show me the pool". Queries below `SEARCH_MIN_SIMILARITY` return
 screen is worse than a blank one. `SEARCH_SHOW_SIMILARITY` is the higher bar a
 match must clear before it may take over the screen.
 
-Run `python scripts/eval_search.py` to see where those thresholds fall on your
-own deck — the defaults were never measured against it.
+`python scripts/eval_search.py` measures both against
+`data/eval_questions.txt` — 126 questions in eight languages, each one taken
+from something the deck actually contains, plus 36 that must find *nothing*.
+
+**Measured on this deck, no threshold separates them.** Real questions score
+as low as 0.622; off-topic ones reach 0.700. The pair that rejects every bad
+question also throws away 47 of the 90 good ones, and only manages it by
+switching one of the two signals off entirely. The eval says so in those
+words rather than printing a confident number.
+
+So the thresholds shipped here are a chosen trade-off, not a solution: they
+favour refusing over guessing, and they do reject a handful of real
+cross-language questions. **The fix is content, not arithmetic.** All 59 deck
+slides currently carry fewer than three keywords and average 127 characters of
+searchable text; that is what makes the distributions overlap. Adding the
+words guests actually use will separate them.
+
+The question file is deliberately outside the script: the sales team can add
+what they get asked without touching Python, and a threshold calibrated on one
+list and asserted against another is not calibrated at all — which happened
+here, twice.
 
 ### Adding a tool
 
@@ -449,7 +490,7 @@ The prompt states the project name twice and explicitly forbids renaming,
 abbreviating, translating or guessing it. That rule exists because the model
 was answering as "Ambassador World": the name appeared once, so when the
 audio was unclear it treated it as something to guess at rather than a fixed
-fact. If it still drifts, put the name in `CONDO_FACTS` as well.
+fact. If it still drifts, add the name to `data/condo_facts.json` as well.
 
 It's also told to refuse unrelated work. Without that it drifted into
 offering English lessons and translation, which is what a general assistant
@@ -461,7 +502,7 @@ Three separate sources, and the difference matters:
 
 | Source | Reaches the model | Use for |
 | --- | --- | --- |
-| `CONDO_FACTS` in `app/prompts.py` | **Always** — in every turn's instructions | Prices, promotions, unit sizes. Authored and approved. |
+| `data/condo_facts.json` | **Always** — in every turn's instructions | Prices, promotions, unit sizes. Authored, with `approved_by` and `effective_from`. Blank fields render as an explicit "no data" line rather than being dropped: a *missing* line reads to the model like a fact nobody mentioned. |
 | Slide summaries (144 of them) | **Only when it looks them up** via `search_condo_info` or `show_slide` | Facilities, floors, what the project contains |
 | Narration scripts | With the slide being presented | Approved wording for a specific slide |
 
@@ -476,18 +517,56 @@ never mention the project.
 
 **Prices and promotions never come from slides.** Slide text is descriptive,
 so it's returned with a note telling the model not to quote it as pricing,
-and `search_condo_info` returns nothing for "ราคาเท่าไหร่". That has to be
-filled into `CONDO_FACTS` — see below.
+and `search_condo_info` refuses commercial questions **before** searching, in
+every language it has been given words for. Those answers come from
+`data/condo_facts.json` — see below.
+
+That guard matches Thai terms as *words*, not substrings. Thai is written
+without spaces, so `term in text` finds a word inside an unrelated one
+constantly: `งบ` (budget) sits inside `ยังไงบ้าง` and `ผ่อน` (instalment)
+inside `ผ่อนคลาย` (to relax), so "ที่ออกกำลังกายเป็นยังไงบ้าง" and "ซาวน่าช่วย
+ผ่อนคลายไหม" were both being answered with "I have no pricing information".
+Same failure as `ราคา` matching inside `อาคาร`, which is why the whole
+retrieval layer was rewritten — it had quietly reappeared one function away,
+where a wrong refusal costs more than a wrong picture.
 
 ## Before using this with real customers
 
-`app/prompts.py` ships with **placeholder condo facts**. Fill in
-`CONDO_FACTS` with real prices, unit types, facilities, and promotions. Until
-you do, the assistant is instructed to say it doesn't have that information
-and refer the guest to sales staff rather than inventing numbers — but verify
-that behaviour yourself before a live demo.
+**Four fields in `data/condo_facts.json` are still blank** — starting price,
+unit types and sizes, promotions, and the sales office's opening hours. They
+are blank on purpose. The project owner's instruction was *"it isn't in the
+presentation, I'm not comfortable making it up"*, and the assistant is
+instructed to say it has no data and refer the guest to sales rather than
+invent a number. Fill them in, set `approved_by`, and verify the behaviour
+yourself before a live demo.
+
+**All 59 narration scripts are drafts.** `script_approved` is false for every
+one; they were written by a model looking at the slide images and nobody has
+checked them. `python scripts/approve_narration.py --all --by "name"` marks
+them, and reading them first is the point of the flag existing.
+
+**The documents in `data/documents/` are placeholders** with a large "ไฟล์
+ทดสอบ" watermark, so that a test page handed to a customer is obvious. Replace
+them with the real files, keeping the filenames in `catalogue.json`.
+
+**Guest transcripts are deleted after 30 days** (`TURN_LOG_KEEP_DAYS`). They
+record what members of the public said without being asked, and the assistant
+is told to read phone numbers back to confirm them, so numbers end up in there.
+The analysis value does not need the raw text: `python scripts/analyze_log.py
+--days 30 --save` writes counts to `data/log-summaries/`, which outlive the
+deletion and contain nothing anybody said.
 
 ## Costs
+
+**The free tier's price is the content.** Google's pricing page lists, for
+every model, `Used to improve our products: Free = Yes / Paid = No`. It is a
+property of the account tier, not of the model, so switching models does not
+change it — only enabling billing does. For a sales gallery recording members
+of the public, that is worth deciding deliberately rather than by default.
+
+Paid is not expensive for this shape of use: `gemini-3.1-flash-live-preview`
+is $0.005/minute of audio in and $0.018/minute out, so a ten-minute
+conversation costs a few baht.
 
 Gemini Live has a free tier, which is why it's the default — good for
 development and demos. Check the current
@@ -585,7 +664,7 @@ Check, in order:
 pytest
 ```
 
-429 tests, no API key and no network (~90s). The OpenAI path runs against a
+479 tests, no API key and no network (~90s). The OpenAI path runs against a
 local WebSocket server impersonating the Realtime API (exercising the real
 `websockets` client, real JSON on the wire, and both relay pumps); the Gemini
 path runs against a scripted fake live session.
@@ -631,10 +710,19 @@ This is the voice layer, running on a PC. It is not yet on a robot.
   the one that costs money rather than convenience: a session left open all
   day burns quota on an empty room. A wake word that opens a session only when
   somebody is actually there is the fix, and it belongs on the robot, not here.
-- **Robot hardware** — driving the Astronaut robot's arms and navigation would
-  go through its Android SDK (`AoboRobotManager`, shipped as an `.aar`, with
-  REAL and MOCK modes), triggered from function calls like every other tool.
-  Nothing in this repo touches it yet.
+- **The app on the robot.** The server side is done and tested — four tools,
+  a protocol, and a mock that lets the whole thing be exercised without
+  hardware (`ROBOT_MOCK_PLACES`). What is missing is the Android app that
+  receives `{"type": "robot", ...}` and calls `AoboRobotManager`. The spec it
+  needs is `docs/ต่อกับหุ่นยนต์ Astronaut.md`, including four questions for the
+  vendor that should be asked before anything is built — the riskiest being
+  whether the robot's own built-in voice assistant can be turned off. If it
+  can't, it will fight this one for the microphone, and that is an
+  architecture problem rather than a code one.
+- **Guiding a guest, heard end to end.** `go_to_place` returns immediately and
+  reports arrival as a separate turn, which is tested; but with no robot the
+  mock always answers "can't go anywhere", so the *successful* half of that
+  conversation — "this way" ... "we're here" — has never been listened to.
 - **The robot's audio path is unverified.** Nothing here has been tested
   against the robot's microphone array or its echo cancellation, and that —
   not the software — is where this is most likely to disappoint. A robot's own
@@ -648,8 +736,17 @@ This is the voice layer, running on a PC. It is not yet on a robot.
 - **Robot-to-server authentication** — `/ws` is open to anything that can reach
   the port. Fine on a wired gallery LAN, not fine the moment the robot is on
   Wi-Fi or the server is reachable from outside.
-- **Quota, rate limiting, and a spend alert** — nothing currently stops a stuck
-  session, or a bad day, from running up the bill unobserved.
+- **Idle timeout and a spend alert** — a session left open in an empty room
+  keeps the connection and the quota running, and nothing reports the day's
+  usage. Measured on the gallery's own project the headroom is large (peak
+  7K tokens/minute against a 65K limit) because one robot means one
+  conversation at a time, so this is about tidiness rather than risk.
+- **Keywords on the slides.** The one that would actually improve search. All
+  59 deck slides carry fewer than three, and the measured overlap between real
+  and off-topic questions is a direct consequence. Left undone deliberately:
+  the words that matter are the ones guests really use, which are in the sales
+  team's heads and will appear in `data/logs/` once this runs in front of
+  people. Inventing them here would be a third layer of guessing.
 
 ### On running the model locally
 
