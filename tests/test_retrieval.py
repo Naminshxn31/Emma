@@ -523,3 +523,46 @@ def test_availability_is_checked_without_importing(monkeypatch):
     source = inspect.getsource(retrieval.local_embeddings_installed)
     assert "find_spec" in source
     assert "import sentence_transformers" not in source
+
+
+def test_standout_measures_against_the_deck_not_an_absolute_floor():
+    """Why a second number exists at all.
+
+    Measured on this deck with `gemini-embedding-001`: the worst real match
+    scores 0.644 and the best nonsense 0.649. The populations overlap, so no
+    cosine threshold separates them — the model simply never uses the bottom
+    of its range, and "unrelated" lands near 0.6 instead of near 0.
+
+    Standout asks a question that doesn't depend on where that floor sits: is
+    one slide unusual *for this query*, compared with the other 143.
+    """
+    import numpy as np
+
+    from app.tools.slide_search import _standout
+
+    # Nonsense: everything mediocre and alike. High cosine, low standout.
+    flat = np.array([0.63, 0.64, 0.62, 0.64, 0.63])
+    assert _standout(flat, 1) < 1.5
+
+    # A real match: one slide clearly above its own deck.
+    peaked = np.array([0.60, 0.75, 0.61, 0.59, 0.60])
+    assert _standout(peaked, 1) > 1.5
+
+    # And the point: the flat case has the *higher* floor, so a cosine
+    # threshold that admits the real match admits the nonsense too.
+    assert flat.max() > 0.60
+
+
+def test_standout_is_absent_rather_than_wrong_without_embeddings():
+    from app.tools.slide_search import _standout
+
+    assert _standout(None, 0) == -1.0
+
+
+def test_an_identical_deck_stands_out_nowhere():
+    """Guard against dividing by a zero spread."""
+    import numpy as np
+
+    from app.tools.slide_search import _standout
+
+    assert _standout(np.array([0.7, 0.7, 0.7]), 0) == 0.0

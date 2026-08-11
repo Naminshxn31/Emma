@@ -90,6 +90,34 @@ def load_questions(path: Path | None):
     return out
 
 
+def _separation(title: str, real: list[float], junk: list[float],
+                fmt: str = "%.3f", setting: str | None = None) -> None:
+    """Print where two populations sit, and whether a line exists between them.
+
+    Reported for both the raw cosine and the standout score, because the
+    cosine was measured on this deck and *cannot* separate them: the worst
+    real match scores 0.644 and the best nonsense 0.649. That is the embedding
+    model's floor showing, not a property of the questions, so the honest next
+    step is to measure a quantity that doesn't depend on where the floor is —
+    not to pick a threshold that splits an overlap.
+    """
+    if not real or not junk:
+        return
+    print("\n%s" % title)
+    print(("  should match:    min " + fmt + "  mean " + fmt)
+          % (min(real), sum(real) / len(real)))
+    print(("  should not:      max " + fmt + "  mean " + fmt)
+          % (max(junk), sum(junk) / len(junk)))
+    if min(real) > max(junk):
+        midpoint = (min(real) + max(junk)) / 2
+        print(("  Clean separation — a threshold at " + fmt + " splits them.") % midpoint)
+        if setting:
+            print("    %s=%.2f" % (setting, midpoint))
+    else:
+        print(("  Overlap (" + fmt + " vs " + fmt + ") — no threshold separates these.")
+              % (max(junk), min(real)))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", type=Path, help="question list")
@@ -117,16 +145,20 @@ def main() -> int:
         print("  Check GEMINI_API_KEY and network, or pass --lexical to silence this.\n")
 
     positives, negatives, wrong = [], [], []
-    print("%-30s %6s %6s %-5s %s" % ("question", "cover", "sim", "found", "top slide"))
-    print("-" * 96)
+    pos_out, neg_out = [], []       # the same queries, judged by standout
+    print("%-30s %6s %6s %6s %-5s %s"
+          % ("question", "cover", "sim", "stand", "found", "top slide"))
+    print("-" * 104)
 
     for question, expected in load_questions(args.file):
         should_miss = question.startswith("!")
         text = question.lstrip("!")
         hits = search_slides(text)
         if not hits:
-            print("%-30s %6s %6s %-5s %s" % (text[:30], "-", "-", "no", "(nothing)"))
+            print("%-30s %6s %6s %6s %-5s %s"
+                  % (text[:30], "-", "-", "-", "no", "(nothing)"))
             (negatives if should_miss else positives).append(0.0)
+            (neg_out if should_miss else pos_out).append(0.0)
             continue
 
         top = hits[0]
@@ -134,17 +166,19 @@ def main() -> int:
         ok = " "
         if should_miss:
             negatives.append(top.similarity)
+            neg_out.append(top.standout)
             if top.found:
                 ok, _ = "!", wrong.append((text, "should have found nothing", title))
         else:
             positives.append(top.similarity)
+            pos_out.append(top.standout)
             if not top.found:
                 ok, _ = "!", wrong.append((text, "found nothing", title))
             elif expected and expected.lower() not in title.lower():
                 ok, _ = "!", wrong.append((text, "expected %r" % expected, title))
 
-        print("%s%-29s %6.2f %6.2f %-5s %s" % (
-            ok, text[:29], top.coverage, top.similarity,
+        print("%s%-29s %6.2f %6.2f %6.2f %-5s %s" % (
+            ok, text[:29], top.coverage, top.similarity, top.standout,
             "yes" if top.found else "no", title[:34],
         ))
 
@@ -171,6 +205,9 @@ def main() -> int:
             print("  cleanly. Favour the higher value: a missing picture costs less")
             print("  than a wrong one. Adding keywords to the slides that are being")
             print("  missed will widen the gap.")
+        _separation("Standout above the deck's own mean (sigmas)",
+                    [s for s in pos_out if s >= 0], [s for s in neg_out if s >= 0],
+                    fmt="%.2f", setting=None)
     elif not real:
         print("\nNo similarities recorded — running without embeddings.")
 

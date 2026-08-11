@@ -71,12 +71,47 @@ MIN_SIMILARITY = float(settings.search_min_similarity)
 SHOW_SIMILARITY = float(settings.search_show_similarity)
 
 
+def _standout(similarities, index: int) -> float:
+    """How far slide `index` sits above the deck's own average, in sigmas.
+
+    Deliberately relative. The absolute cosine cannot be thresholded on this
+    deck — measured, not assumed — because the embedding model's floor is
+    around 0.6 rather than 0. Asking "is this slide unusual *for this query*"
+    sidesteps where the floor happens to be.
+
+    Returns -1.0 when there is nothing to measure, matching `similarity`.
+    """
+    if similarities is None or len(similarities) < 2:
+        return -1.0
+    mean = float(similarities.mean())
+    spread = float(similarities.std())
+    if spread < 1e-9:          # every slide identical; nothing stands out
+        return 0.0
+    return (float(similarities[index]) - mean) / spread
+
+
 @dataclass
 class Hit:
     slide: dict
     score: float          # fused rank score, for ordering only
     coverage: float       # share of the question's lexical mass present
     similarity: float     # cosine, or -1.0 when embeddings are unavailable
+    #: How far this slide's similarity stands above the rest of the deck's,
+    #: in standard deviations. -1.0 when embeddings are unavailable.
+    #:
+    #: Measured because the raw cosine turned out not to separate anything.
+    #: On this deck, `gemini-embedding-001` scores 0.644 for the *worst real
+    #: match* and 0.649 for the *best piece of nonsense* — the distributions
+    #: overlap, so no threshold exists. That is a property of the model, not
+    #: of the deck: it never uses the bottom of its range, so "unrelated"
+    #: lands around 0.6 rather than near zero.
+    #:
+    #: A quantity that doesn't care where the floor sits: for a real question
+    #: one slide should stand out *from its own deck*, while nonsense is
+    #: uniformly mediocre against all 144. Reported by scripts/eval_search.py
+    #: alongside the cosine so the two can be compared on real numbers before
+    #: anything starts depending on it.
+    standout: float = -1.0
 
     @property
     def found(self) -> bool:
@@ -232,6 +267,7 @@ class SlideSearch:
                 score=fused[i],
                 coverage=self.bm25.coverage(words, i),
                 similarity=float(similarities[i]) if similarities is not None else -1.0,
+                standout=_standout(similarities, i),
             )
             for i in order
         ]
