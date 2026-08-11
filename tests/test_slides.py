@@ -1738,18 +1738,21 @@ def test_a_page_with_a_question_still_asks_it_when_jumped_to(slides):
     assert "ask" in out["instruction"] and "รอคำตอบ" in out["instruction"]
 
 
-def test_the_eval_does_not_expect_the_wrong_gym(slides):
-    """An expectation that would have been a bug if it were met.
+def test_every_eval_expectation_names_something_in_the_deck(slides):
+    """Catches an expectation naming a slide that does not exist.
 
-    `scripts/eval_search.py` asked for a slide titled "GYM" when a guest says
-    "do you have a gym". The only slides carrying that word are "Bungee Gym &
-    Yoga" — a bungee fitness class, not the gym. The main gym is branded
-    BIOGENESIS, so the search returning Biogenesis was right and the eval
-    called it wrong, four times over.
+    **It would not have caught the bug it was written after**, and that is
+    worth stating rather than implying. `scripts/eval_search.py` expected a
+    slide titled "GYM" for "do you have a gym"; the only slides with that word
+    are "Bungee Gym & Yoga", a bungee fitness class rather than the gym, which
+    is branded BIOGENESIS. So the search was right and the eval called it
+    wrong four times — but "GYM" *is* in the deck, so this check passes either
+    way. Reverting the fix left it green.
 
-    That is worse than a strict test. An eval that reports four failures for
-    four correct answers is one people stop reading, and the two real problems
-    sitting in the same output go with it.
+    What it does cover is the next failure along: a slide renamed or a typo in
+    an expectation, which turns into a phantom failure nobody can explain.
+    Telling the two apart — a word on the wrong slide — needs the eval run
+    itself, which needs the API.
     """
     import importlib.util
 
