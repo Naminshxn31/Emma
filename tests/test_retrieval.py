@@ -484,3 +484,42 @@ def test_the_fallback_rebuilds_the_whole_index_not_half_of_it(monkeypatch):
     index.build(["a", "b", "c"], fingerprint="x")
     assert index.provider == "local"
     assert seen[-1] == ("local", 3), "rebuilt only part of the deck locally"
+
+
+def test_choosing_a_provider_never_loads_the_local_model(monkeypatch):
+    """Startup must not pay to answer "is the offline backend installed?".
+
+    `choose_provider()` runs in the startup banner. With no API key it used to
+    call `_local_encoder()`, which imports `sentence_transformers` — which
+    pulls in `transformers`, which walks its own models/ directory opening
+    every file to build an import map. On Windows that took longer than
+    pytest's twenty-second timeout, and the stack trace looked exactly like a
+    deadlock. It was a library loading.
+
+    `find_spec` answers the same question without executing anything.
+    """
+    from app.config import settings
+    from app.tools import retrieval
+
+    monkeypatch.setattr(settings, "embed_provider", "auto")
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+
+    def explode():
+        raise AssertionError("loaded the local model just to pick a provider")
+
+    monkeypatch.setattr(retrieval, "_local_encoder", explode)
+    monkeypatch.setattr(retrieval, "local_embeddings_installed", lambda: True)
+
+    assert retrieval.choose_provider() == "local"
+
+
+def test_availability_is_checked_without_importing(monkeypatch):
+    """The check has to be `find_spec`, not a try/import — otherwise the cost
+    moves back in the moment somebody 'simplifies' it."""
+    import inspect
+
+    from app.tools import retrieval
+
+    source = inspect.getsource(retrieval.local_embeddings_installed)
+    assert "find_spec" in source
+    assert "import sentence_transformers" not in source

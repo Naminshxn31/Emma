@@ -369,6 +369,29 @@ LOCAL_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 _local = None
 
 
+def local_embeddings_installed() -> bool:
+    """Is the offline backend *available*, without paying to find out.
+
+    `find_spec` locates the package without executing it. That distinction is
+    the whole point: importing `sentence_transformers` pulls in `transformers`,
+    which walks its own `models/` directory opening every file to build an
+    import map, and on Windows that took long enough to blow a twenty-second
+    test timeout. The stack looked like a hang. It was a library loading.
+
+    `choose_provider()` only ever wanted to know whether the option exists —
+    and it asks that question at *startup*, to print one line in the banner. On
+    a machine with the package installed and no API key, answering it by
+    loading a whole transformer model is a cost paid by everyone, forever, for
+    a log message.
+
+    Actually loading the model stays in `_local_encoder`, where it is paid by
+    whoever genuinely embeds something.
+    """
+    import importlib.util
+
+    return importlib.util.find_spec("sentence_transformers") is not None
+
+
 def _local_encoder():
     """Load the offline model once, or None if it isn't installed."""
     global _local
@@ -463,7 +486,10 @@ def choose_provider() -> str:
     # auto
     if settings.gemini_api_key:
         return "gemini"
-    if _local_encoder() is not None:
+    # `local_embeddings_installed`, not `_local_encoder`: this runs in the
+    # startup banner, and loading the model here would make every boot pay for
+    # a question that only needed to know whether the package exists.
+    if local_embeddings_installed():
         logger.info("no GEMINI_API_KEY — using local embeddings")
         return "local"
     return "off"
