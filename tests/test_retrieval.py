@@ -228,6 +228,11 @@ def test_a_ranking_with_no_signal_gets_no_vote(index):
     query in an unsupported script produced — the resulting "ranking" is just
     the order the slides sit in the file. Fusing that in handed slide #1 a
     40% endorsement for no reason at all."""
+    # Its own docstring says "and no embeddings" — so switch them off rather
+    # than hoping the machine has no API key. On the gallery PC, where the
+    # semantic half genuinely works, this found the pool slide (correctly) and
+    # the test failed for describing a situation it never created.
+    index.semantic = None
     assert index.search("бассейн") == [], (
         "with no lexical signal and no embeddings there is nothing to rank on, "
         "so the honest answer is no results — not whatever sorted first"

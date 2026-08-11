@@ -230,3 +230,30 @@ def test_lookup_is_tagged_so_displays_are_updated(loaded):
     """Without the slides tag the registry wouldn't push to /display."""
     entry = registry.get("search_condo_info")
     assert "slides" in entry.tags
+
+
+def test_every_nonsense_query_the_suite_asserts_on_is_also_measured():
+    """Calibrate against the same questions you assert against.
+
+    `scripts/eval_search.py` reported "rejects all 9 bad questions" and the
+    suite still had two red tests, because the tests use nonsense strings the
+    eval list had never seen. A threshold measured on one set and asserted on
+    another is not measured at all.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "eval_search", "scripts/eval_search.py")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except SystemExit:
+        pass
+
+    measured = {q.lstrip("!") for q, _ in module.DEFAULT_QUESTIONS}
+    asserted = {"zzzz ไม่มีอยู่จริง qqqq", "ราคาหุ้นวันนี้", "zzzz qqqq ไม่มีจริง"}
+    missing = asserted - measured
+    assert not missing, (
+        "these are asserted on but never measured, so the threshold was "
+        "calibrated blind to them: %s" % sorted(missing)
+    )
