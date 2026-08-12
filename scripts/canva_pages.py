@@ -240,7 +240,7 @@ def side_by_side(shot, slide_id: str, number: int, score: float, folder: Path):
     sheet.save(folder / ("page_%03d.png" % number))
 
 
-def verify(rows, existing: dict, total: int) -> None:
+def verify(rows, existing: dict, total: int) -> bool:
     """Compare what was just seen against the mapping already on disk.
 
     Once the deck has been rebuilt from an export, page and id agree by
@@ -259,6 +259,8 @@ def verify(rows, existing: dict, total: int) -> None:
       A video page is not evidence about anything.
     - **disagrees** — a confident match onto a different page. This is the
       one worth waking up for, and it is what a drifted deck looks like.
+
+    Returns whether the table survived, so the exit code says so too.
     """
     agree, unsure, differ = [], [], []
     for number, best, score, _second, _sd, ok in rows:
@@ -276,8 +278,9 @@ def verify(rows, existing: dict, total: int) -> None:
           % (len(agree), len(unsure), len(differ), total))
     if unsure:
         print("  สรุปไม่ได้: %s" % ", ".join(str(n) for n in unsure))
-        print("    ส่วนใหญ่เป็นหน้าวิดีโอหรือหน้าที่คล้ายหน้าข้างเคียงมาก")
+        print("    หน้าวิดีโอ หรือหน้า animation ที่คล้ายหน้าข้างเคียงมาก")
         print("    ไม่ใช่หลักฐานว่าผิด และไม่ใช่หลักฐานว่าถูก")
+        print("    หน้าพวกนี้ยังอยู่ในการพรีเซนต์ตามปกติ ไม่ได้ถูกตัดออก")
     if differ:
         print("  ** ไม่ตรง — ดูตรงนี้ก่อน **")
         for number, best, expected, score in differ:
@@ -289,9 +292,13 @@ def verify(rows, existing: dict, total: int) -> None:
             print("    ทุกหน้าที่ไม่ตรงเลื่อนเท่ากันหมด (%+d) — เด็คสดมีหน้า"
                   % offsets[0])
             print("    เกินหรือขาดไปหนึ่งหน้า ไม่ใช่ภาพสลับกันมั่ว")
-    else:
-        print("  ไม่มีหน้าไหนขัดกับตาราง — ตารางที่มีอยู่ใช้ได้")
-        print("  ไม่ต้อง --write")
+        print()
+        print("  ถ้าเด็คใน canva เปลี่ยนจริง ทางที่ถูกคือ download pdf ใหม่")
+        print("  แล้วรัน scripts/import_canva_export.py ไม่ใช่เขียนตารางทับ")
+        return False
+
+    print("  ไม่มีหน้าไหนขัดกับตาราง — ตารางที่มีอยู่ใช้ได้ ไม่ต้อง --write")
+    return True
 
 
 async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
@@ -370,7 +377,15 @@ async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
                           .read_text(encoding="utf-8"))["pages"] \
         if (Path(settings.slides_dir) / "canva_pages.json").exists() else {}
     if existing:
-        verify(rows, existing, total)
+        # Verdict, then stop. Everything below this line describes building
+        # a *new* table, and printing it after a clean verification made the
+        # script argue with itself: "ไม่มีหน้าไหนขัดกับตาราง — ไม่ต้อง
+        # --write", and then three lines later "ภาพที่ไม่มีหน้าใน canva (5)"
+        # and an invitation to --write, which would have deleted five
+        # working slides. A report that contradicts its own conclusion is
+        # worse than no report; the reader has to guess which half to trust.
+        agreed = verify(rows, existing, total)
+        return 0 if agreed else 1
 
     unplaced = [sid for sid, _ in frames if sid not in mapping]
     blank = [n for n, _sid, score, _s2, _d2, ok in rows if not ok]
