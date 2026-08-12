@@ -365,7 +365,11 @@ def test_going_to_a_page_hands_over_that_page_s_script(slides):
 def test_a_page_that_does_not_exist_says_so(slides):
     out = run(registry.dispatch("go_to_page", {"page": 999}))
     assert out["ok"] is False
-    assert "59" in out["instruction"], "tell the guest how many there are"
+    # Not the literal "59": that was a fact about one export of one deck,
+    # and it went stale the day the deck was re-imported. The number the
+    # robot quotes has to come from the deck it is actually presenting.
+    total = len(slides._build_deck("deck"))
+    assert str(total) in out["instruction"], "tell the guest how many there are"
 
 
 def test_starting_a_tour_also_says_to_keep_going(slides):
@@ -1729,10 +1733,19 @@ def test_an_explicit_advance_puts_the_tour_back_in_charge(slides):
 
 
 def test_a_page_with_a_question_still_asks_it_when_jumped_to(slides):
-    """Dropping KEEP_GOING must not drop the question with it — page 55 asks
-    the guest something, and it should still do that when reached directly."""
+    """Dropping KEEP_GOING must not drop the question with it.
+
+    Finds a page that carries a question rather than naming one. Page 55 was
+    hard-coded, and re-importing the deck moved the questions to different
+    page numbers — the test then failed for a reason that had nothing to do
+    with what it tests."""
+    deck = slides._build_deck("deck")
+    page = next((n for n, sid in enumerate(deck, 1)
+                 if slides._by_id(sid).get("ask_th")), None)
+    assert page, "no slide in the deck carries a question"
+
     run(registry.dispatch("start_presentation", {"tour": "deck"}))
-    out = run(registry.dispatch("go_to_page", {"page": 55}))
+    out = run(registry.dispatch("go_to_page", {"page": page}))
 
     assert out["slide"].get("ask"), "the seeded question vanished"
     assert "ask" in out["instruction"] and "รอคำตอบ" in out["instruction"]
@@ -1844,7 +1857,10 @@ def test_an_unmeasured_deck_still_presents(slides, tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
     canva_display.load_page_map(force=True)
-    assert len(slides._build_deck("deck")) == 59
+    # However many frames the export happens to hold — the point is that it
+    # presents them all, not that there are 59 of them.
+    expected = sum(1 for s in slides.load_slides() if s.get("type") == "deck")
+    assert len(slides._build_deck("deck")) == expected
 
 
 def test_a_canva_page_click_lands_on_the_slide_that_page_shows(
@@ -1857,3 +1873,42 @@ def test_a_canva_page_click_lands_on_the_slide_that_page_shows(
     shown = slides.move_to_deck_page(3)
     assert shown is not None and shown["id"] == "ew-031"
     assert shown["position"] == 3 and shown["total"] == 3
+
+
+# ============ animation frames are not slides ============
+
+
+def test_a_silent_frame_is_told_to_say_nothing(slides):
+    """Canva builds animations by duplicating a page. "ONE PLACE. MANY
+    WORLDS." is seven pages with one more circle lit each time, and the
+    export sees seven slides. Narrating each one reads the same line seven
+    times at a guest watching one picture move."""
+    frame = {"id": "ew-017", "silent": True}
+    assert slides._narration_instruction(frame) == slides.PASS_THROUGH
+    assert "ห้ามพูด" in slides.PASS_THROUGH
+
+
+def test_a_silent_frame_never_asks_a_question(slides):
+    """`ask_th` and `silent` on the same slide would stop the deck dead
+    waiting for an answer to a question nobody heard asked."""
+    frame = {"id": "ew-017", "silent": True, "ask_th": "เคยไปพัทยาไหมคะ"}
+    assert slides._narration_instruction(frame) == slides.PASS_THROUGH
+
+
+def test_the_shipped_deck_has_no_silent_slide_carrying_a_script(slides):
+    """The two must never both be set: one says speak these exact words, the
+    other says say nothing. Enforced against the real index because that is
+    where the mistake would actually live."""
+    for slide in slides.load_slides():
+        if slide.get("silent"):
+            assert not slide.get("script_th"), slide["id"]
+            assert not slide.get("ask_th"), slide["id"]
+
+
+def test_every_deck_slide_can_be_narrated_or_is_deliberately_silent(slides):
+    """A slide with neither a script nor a summary makes the model improvise
+    in a sales gallery, which is the one thing it must not do."""
+    for slide in slides.load_slides():
+        if slide.get("type") != "deck" or slide.get("silent"):
+            continue
+        assert slide.get("script_th") or slide.get("summary_th"), slide["id"]

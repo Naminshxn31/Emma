@@ -2647,6 +2647,18 @@
       "id": "ew-007",
       "file": "ew_007.jpg",
       "type": "deck",
+      "title_th": "ภาพต่อเนื่องจากโลโก้ Embassy World",
+      "title_en": "Embassy World logo transition",
+      "summary_th": "",
+      "summary_en": "",
+      "keywords_th": [],
+      "keywords_en": [],
+      "silent": true
+    },
+    {
+      "id": "ew-008",
+      "file": "ew_008.jpg",
+      "type": "deck",
       "title_th": "ความฝันไม่เคยเปลี่ยน",
       "title_en": "The Dream Never Changed",
       "summary_th": "มนุษย์ตามหาความฝันเดียวกันมาหลายพันปี ความต้องการพื้นฐานไม่เคยเปลี่ยน: ที่ปลอดภัย ชุมชนที่แข็งแรง อาหารและน้ำ ใกล้ชิดธรรมชาติ ชีวิตที่ดีกว่า",
@@ -2668,8 +2680,8 @@
       "script_th": "มนุษย์เราตามหาความฝันเดียวกันมาหลายพันปีแล้วค่ะ ความต้องการพื้นฐานไม่เคยเปลี่ยน ไม่ว่าจะเป็นที่ปลอดภัย ชุมชนที่แข็งแรง อาหารและน้ำ ความใกล้ชิดธรรมชาติ และชีวิตที่ดีกว่า"
     },
     {
-      "id": "ew-008",
-      "file": "ew_008.jpg",
+      "id": "ew-009",
+      "file": "ew_009.jpg",
       "type": "deck",
       "title_th": "ทุกวันนี้เราไปได้ไกลกว่าที่ฝันไว้",
       "title_en": "Today We've Achieved What Was Once Only a Dream",
@@ -2690,8 +2702,8 @@
       "script_th": "ทุกวันนี้หลายคนมีสิ่งที่คนรุ่นก่อนได้แต่ฝันถึง ทั้งบ้านที่ใหญ่ขึ้น การเดินทางที่ดีขึ้น ข้อมูลที่ไม่มีวันหมด และการเชื่อมต่อกับทั้งโลกค่ะ"
     },
     {
-      "id": "ew-009",
-      "file": "ew_009.jpg",
+      "id": "ew-010",
+      "file": "ew_010.jpg",
       "type": "deck",
       "title_th": "แต่บางอย่างยังขาดหายไป",
       "title_en": "Yet Something Is Still Missing",
@@ -2714,8 +2726,8 @@
       "script_th": "แต่ถึงอย่างนั้น บางอย่างก็ยังขาดหายไปค่ะ คนเมืองเครียดมากขึ้น ห่างไกลธรรมชาติมากขึ้น ถูกล้อมรอบด้วยคอนกรีต และติดอยู่ในจราจร เสียง มลพิษ และกิจวัตรที่ไม่รู้จบ"
     },
     {
-      "id": "ew-010",
-      "file": "ew_010.jpg",
+      "id": "ew-011",
+      "file": "ew_011.jpg",
       "type": "deck",
       "title_th": "คำถามคือ...",
       "title_en": "The Question Is",
@@ -2732,8 +2744,8 @@
       "script_th": "คำถามของเราจึงไม่ใช่ว่าจะสร้างตึกเพิ่มได้อย่างไรอีกต่อไป แต่คือจะสร้างชีวิตที่ดีกว่าได้อย่างไรค่ะ"
     },
     {
-      "id": "ew-011",
-      "file": "ew_011.jpg",
+      "id": "ew-012",
+      "file": "ew_012.jpg",
       "type": "deck",
       "title_th": "สามองค์ประกอบสำคัญของชีวิตที่ดี",
       "title_en": "Three Essential Elements",
@@ -2756,8 +2768,8 @@
       "script_th": "ตอนที่เริ่มสร้าง Embassy World เราถามตัวเองว่า ถ้าจะสร้างที่อยู่ในอุดมคติสำหรับคนรุ่นต่อไป มันจะเป็นแบบไหน คำตอบง่ายมากค่ะ ชีวิตที่ดีต้องพึ่งพาสามองค์ประกอบสำคัญ คือ อากาศ น้ำ และธรรมชาติ"
     },
     {
-      "id": "ew-012",
-      "file": "ew_012.jpg",
+      "id": "ew-013",
+      "file": "ew_013.jpg",
       "type": "deck",
       "title_th": "ทำเลที่ตั้งโครงการ — หาดจอมเทียน",
       "title_en": "Project Location — Jomtien Beach",
@@ -2780,8 +2792,8 @@
       "script_th": "โครงการตั้งอยู่ริมหาดจอมเทียน ติดถนนจอมเทียนสาย 2 ใกล้ถนนสุขุมวิท ใกล้วัดบุญกัญจนาราม และอยู่ใกล้โครงการพี่น้องของ Empire Group คือ Empire Tower และ Embassy Life ค่ะ"
     },
     {
-      "id": "ew-013",
-      "file": "ew_013.jpg",
+      "id": "ew-014",
+      "file": "ew_014.jpg",
       "type": "deck",
       "title_th": "ไลฟ์สไตล์ที่มากกว่าห้องพัก",
       "title_en": "A Lifestyle, Not Just a Room",
@@ -2804,8 +2816,8 @@
       "script_th": "ที่นี่ความมั่งคั่งไม่ใช่แค่ห้องพัก แต่คือไลฟ์สไตล์ค่ะ เป็นที่ที่ฟิตเนสได้แรงบันดาลใจจากอนาคต ความผ่อนคลายกลายเป็นศิลปะ ออกแบบมาเพื่อทุกคน ทั้งครอบครัว เด็ก คนทำงาน และผู้เกษียณ"
     },
     {
-      "id": "ew-014",
-      "file": "ew_014.jpg",
+      "id": "ew-015",
+      "file": "ew_015.jpg",
       "type": "deck",
       "title_th": "หนึ่งสถานที่ หลากหลายโลก",
       "title_en": "One Place, Many Worlds",
@@ -2832,8 +2844,176 @@
       "script_th": "แนวคิดหลักของเราคือ หนึ่งสถานที่ หลากหลายโลกค่ะ มีโลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ"
     },
     {
-      "id": "ew-015",
-      "file": "ew_015.jpg",
+      "id": "ew-016",
+      "file": "ew_016.jpg",
+      "type": "deck",
+      "title_th": "One Place Many Worlds — A World of MOVEMENT",
+      "title_en": "One Place Many Worlds — a world of movement",
+      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
+      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "keywords_th": [
+        "หกโลก",
+        "การเคลื่อนไหว",
+        "แรงบันดาลใจ",
+        "ความผ่อนคลาย",
+        "การเชื่อมต่อ",
+        "การค้นพบ",
+        "อนาคต"
+      ],
+      "keywords_en": [
+        "six worlds",
+        "movement",
+        "inspiration",
+        "wellness",
+        "connection",
+        "discovery",
+        "tomorrow"
+      ],
+      "silent": true
+    },
+    {
+      "id": "ew-017",
+      "file": "ew_017.jpg",
+      "type": "deck",
+      "title_th": "One Place Many Worlds — A World of DISCOVERY",
+      "title_en": "One Place Many Worlds — a world of discovery",
+      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
+      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "keywords_th": [
+        "หกโลก",
+        "การเคลื่อนไหว",
+        "แรงบันดาลใจ",
+        "ความผ่อนคลาย",
+        "การเชื่อมต่อ",
+        "การค้นพบ",
+        "อนาคต"
+      ],
+      "keywords_en": [
+        "six worlds",
+        "movement",
+        "inspiration",
+        "wellness",
+        "connection",
+        "discovery",
+        "tomorrow"
+      ],
+      "silent": true
+    },
+    {
+      "id": "ew-018",
+      "file": "ew_018.jpg",
+      "type": "deck",
+      "title_th": "One Place Many Worlds — A World of INSPIRATION",
+      "title_en": "One Place Many Worlds — a world of inspiration",
+      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
+      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "keywords_th": [
+        "หกโลก",
+        "การเคลื่อนไหว",
+        "แรงบันดาลใจ",
+        "ความผ่อนคลาย",
+        "การเชื่อมต่อ",
+        "การค้นพบ",
+        "อนาคต"
+      ],
+      "keywords_en": [
+        "six worlds",
+        "movement",
+        "inspiration",
+        "wellness",
+        "connection",
+        "discovery",
+        "tomorrow"
+      ],
+      "silent": true
+    },
+    {
+      "id": "ew-019",
+      "file": "ew_019.jpg",
+      "type": "deck",
+      "title_th": "One Place Many Worlds — A World of WELLNESS",
+      "title_en": "One Place Many Worlds — a world of wellness",
+      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
+      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "keywords_th": [
+        "หกโลก",
+        "การเคลื่อนไหว",
+        "แรงบันดาลใจ",
+        "ความผ่อนคลาย",
+        "การเชื่อมต่อ",
+        "การค้นพบ",
+        "อนาคต"
+      ],
+      "keywords_en": [
+        "six worlds",
+        "movement",
+        "inspiration",
+        "wellness",
+        "connection",
+        "discovery",
+        "tomorrow"
+      ],
+      "silent": true
+    },
+    {
+      "id": "ew-020",
+      "file": "ew_020.jpg",
+      "type": "deck",
+      "title_th": "One Place Many Worlds — A World of CONNECTION",
+      "title_en": "One Place Many Worlds — a world of connection",
+      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
+      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "keywords_th": [
+        "หกโลก",
+        "การเคลื่อนไหว",
+        "แรงบันดาลใจ",
+        "ความผ่อนคลาย",
+        "การเชื่อมต่อ",
+        "การค้นพบ",
+        "อนาคต"
+      ],
+      "keywords_en": [
+        "six worlds",
+        "movement",
+        "inspiration",
+        "wellness",
+        "connection",
+        "discovery",
+        "tomorrow"
+      ],
+      "silent": true
+    },
+    {
+      "id": "ew-021",
+      "file": "ew_021.jpg",
+      "type": "deck",
+      "title_th": "One Place Many Worlds — A World of INDULGENCE",
+      "title_en": "One Place Many Worlds — a world of indulgence",
+      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
+      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "keywords_th": [
+        "หกโลก",
+        "การเคลื่อนไหว",
+        "แรงบันดาลใจ",
+        "ความผ่อนคลาย",
+        "การเชื่อมต่อ",
+        "การค้นพบ",
+        "อนาคต"
+      ],
+      "keywords_en": [
+        "six worlds",
+        "movement",
+        "inspiration",
+        "wellness",
+        "connection",
+        "discovery",
+        "tomorrow"
+      ],
+      "silent": true
+    },
+    {
+      "id": "ew-022",
+      "file": "ew_022.jpg",
       "type": "deck",
       "title_th": "ภาพรวมอาคาร Embassy World",
       "title_en": "Embassy World Building Overview",
@@ -2852,8 +3032,8 @@
       "script_th": "นี่คือภาพรวมอาคาร Embassy World พร้อมสระว่ายน้ำและฟิตเนสกระจกโค้งใจกลางโครงการค่ะ"
     },
     {
-      "id": "ew-016",
-      "file": "ew_016.jpg",
+      "id": "ew-023",
+      "file": "ew_023.jpg",
       "type": "deck",
       "title_th": "The Park — สวนน้ำกลางโครงการ",
       "title_en": "The Park",
@@ -2872,8 +3052,8 @@
       "script_th": "ตรงนี้คือ The Park พื้นที่สวนและทะเลสาบกลางโครงการ เหมาะสำหรับพักผ่อนและเดินเล่นค่ะ"
     },
     {
-      "id": "ew-017",
-      "file": "ew_017.jpg",
+      "id": "ew-024",
+      "file": "ew_024.jpg",
       "type": "deck",
       "title_th": "Future Nature — สิ่งแวดล้อมอัจฉริยะ",
       "title_en": "Future Nature",
@@ -2895,8 +3075,8 @@
       "script_th": "จุดเด่นด้านสิ่งแวดล้อมของเราเรียกว่า Future Nature ค่ะ มีสระน้ำลากูนยาว 155 เมตร ภูมิทัศน์เกาะกลางน้ำ เชื่อมสวนสาธารณะโดยตรง ที่จอดรถใต้ดิน พร้อมระบบเซนเซอร์ตรวจคุณภาพอากาศและน้ำ ระบบรดน้ำอัจฉริยะ และจุดชาร์จรถไฟฟ้า"
     },
     {
-      "id": "ew-018",
-      "file": "ew_018.jpg",
+      "id": "ew-025",
+      "file": "ew_025.jpg",
       "type": "deck",
       "title_th": "ผังสามชั้นไฮไลต์",
       "title_en": "Three Highlight Floors Overview",
@@ -2915,8 +3095,8 @@
       "script_th": "นอกจากชั้นทางเข้าแล้ว โครงการยังมีชั้นใต้ดินและชั้นสามที่เต็มไปด้วยสิ่งอำนวยความสะดวกสุดพิเศษค่ะ"
     },
     {
-      "id": "ew-019",
-      "file": "ew_019.jpg",
+      "id": "ew-026",
+      "file": "ew_026.jpg",
       "type": "deck",
       "title_th": "ผังชั้นทางเข้า — อาคาร",
       "title_en": "Entrance Floor — Building Layout",
@@ -2935,8 +3115,8 @@
       "script_th": "นี่คือผังชั้นทางเข้า ประกอบด้วยอาคาร A ถึง F ล้อมรอบสระน้ำกลางโครงการค่ะ"
     },
     {
-      "id": "ew-020",
-      "file": "ew_020.jpg",
+      "id": "ew-027",
+      "file": "ew_027.jpg",
       "type": "deck",
       "title_th": "ผังชั้นทางเข้า — รายละเอียด",
       "title_en": "Entrance Floor — Detail Plan",
@@ -2953,8 +3133,8 @@
       "script_th": "รายละเอียดผังชั้นทางเข้าค่ะ"
     },
     {
-      "id": "ew-021",
-      "file": "ew_021.jpg",
+      "id": "ew-028",
+      "file": "ew_028.jpg",
       "type": "deck",
       "title_th": "ล็อบบี้",
       "title_en": "Lobby",
@@ -2970,8 +3150,8 @@
       "script_th": "นี่คือล็อบบี้ต้อนรับของโครงการค่ะ"
     },
     {
-      "id": "ew-022",
-      "file": "ew_022.jpg",
+      "id": "ew-029",
+      "file": "ew_029.jpg",
       "type": "deck",
       "title_th": "ผังชั้นทางเข้า — โซน Biogenesis",
       "title_en": "Entrance Floor — Biogenesis Zone",
@@ -2990,8 +3170,8 @@
       "script_th": "ในชั้นทางเข้ายังมีโซนฟิตเนส Biogenesis อยู่ตรงนี้ค่ะ"
     },
     {
-      "id": "ew-023",
-      "file": "ew_023.jpg",
+      "id": "ew-030",
+      "file": "ew_030.jpg",
       "type": "deck",
       "title_th": "ผังชั้นทางเข้า — โซน Biogenesis (2)",
       "title_en": "Entrance Floor — Biogenesis Zone (2)",
@@ -3010,8 +3190,8 @@
       "script_th": "รายละเอียดตำแหน่งโซน Biogenesis ค่ะ"
     },
     {
-      "id": "ew-024",
-      "file": "ew_024.jpg",
+      "id": "ew-031",
+      "file": "ew_031.jpg",
       "type": "deck",
       "title_th": "Biogenesis — ฟิตเนส",
       "title_en": "Biogenesis Fitness",
@@ -3030,8 +3210,8 @@
       "script_th": "Biogenesis คือฟิตเนสของเรา วิวสระว่ายน้ำแบบพาโนรามาเลยค่ะ"
     },
     {
-      "id": "ew-025",
-      "file": "ew_025.jpg",
+      "id": "ew-032",
+      "file": "ew_032.jpg",
       "type": "deck",
       "title_th": "Biogenesis — เทคโนโลยีสแกนร่างกาย",
       "title_en": "Biogenesis — Body Scan Technology",
@@ -3050,8 +3230,8 @@
       "script_th": "ฟิตเนสของเรามีเทคโนโลยีสแกนวิเคราะห์องค์ประกอบร่างกายด้วยนะคะ"
     },
     {
-      "id": "ew-026",
-      "file": "ew_026.jpg",
+      "id": "ew-033",
+      "file": "ew_033.jpg",
       "type": "deck",
       "title_th": "Biogenesis — โซนย่อย",
       "title_en": "Biogenesis — Sub-zones",
@@ -3073,8 +3253,8 @@
       "ask_th": "ปกติชอบออกกำลังกายแบบไหนคะ"
     },
     {
-      "id": "ew-027",
-      "file": "ew_027.jpg",
+      "id": "ew-034",
+      "file": "ew_034.jpg",
       "type": "deck",
       "title_th": "Spinning Class",
       "title_en": "Spinning Class",
@@ -3091,8 +3271,8 @@
       "script_th": "นี่คือห้อง Spinning Class สำหรับปั่นจักรยานค่ะ"
     },
     {
-      "id": "ew-028",
-      "file": "ew_028.jpg",
+      "id": "ew-035",
+      "file": "ew_035.jpg",
       "type": "deck",
       "title_th": "Pilates Studio",
       "title_en": "Pilates Studio",
@@ -3107,8 +3287,8 @@
       "script_th": "และนี่คือ Pilates Studio ค่ะ"
     },
     {
-      "id": "ew-029",
-      "file": "ew_029.jpg",
+      "id": "ew-036",
+      "file": "ew_036.jpg",
       "type": "deck",
       "title_th": "Bungee Gym & Yoga",
       "title_en": "Bungee Gym & Yoga",
@@ -3125,8 +3305,8 @@
       "script_th": "ส่วนนี้คือ Bungee Gym & Yoga ค่ะ"
     },
     {
-      "id": "ew-030",
-      "file": "ew_030.jpg",
+      "id": "ew-037",
+      "file": "ew_037.jpg",
       "type": "deck",
       "title_th": "ผังชั้นทางเข้า — Junior World",
       "title_en": "Entrance Floor — Junior World",
@@ -3145,8 +3325,8 @@
       "script_th": "ในชั้นทางเข้ายังมีโซนเด็กเล่น Junior World อยู่ตรงนี้ค่ะ"
     },
     {
-      "id": "ew-031",
-      "file": "ew_031.jpg",
+      "id": "ew-038",
+      "file": "ew_038.jpg",
       "type": "deck",
       "title_th": "Junior World",
       "title_en": "Junior World",
@@ -3163,8 +3343,8 @@
       "script_th": "Junior World คือโซนเด็กเล่นธีมอวกาศและใต้ทะเลของเราค่ะ"
     },
     {
-      "id": "ew-032",
-      "file": "ew_032.jpg",
+      "id": "ew-039",
+      "file": "ew_039.jpg",
       "type": "deck",
       "title_th": "ผังสามชั้นไฮไลต์ (2)",
       "title_en": "Three Highlight Floors Overview (2)",
@@ -3183,8 +3363,8 @@
       "script_th": "ต่อไปเราจะพาไปชมชั้นใต้ดินกันค่ะ"
     },
     {
-      "id": "ew-033",
-      "file": "ew_033.jpg",
+      "id": "ew-040",
+      "file": "ew_040.jpg",
       "type": "deck",
       "title_th": "ชั้นใต้ดิน — ภาพรวม",
       "title_en": "Underground Floor — Overview",
@@ -3201,8 +3381,8 @@
       "script_th": "นี่คือภาพรวมชั้นใต้ดินค่ะ"
     },
     {
-      "id": "ew-034",
-      "file": "ew_034.jpg",
+      "id": "ew-041",
+      "file": "ew_041.jpg",
       "type": "deck",
       "title_th": "ชั้นใต้ดิน — ผัง",
       "title_en": "Underground Floor — Site Plan",
@@ -3223,8 +3403,8 @@
       "script_th": "ชั้นใต้ดินมีที่จอดรถขนาดใหญ่พร้อมจุดชาร์จรถไฟฟ้า และมีโซน Aqua Cinema ด้วยค่ะ"
     },
     {
-      "id": "ew-035",
-      "file": "ew_035.jpg",
+      "id": "ew-042",
+      "file": "ew_042.jpg",
       "type": "deck",
       "title_th": "Aqua Cinema — ผัง",
       "title_en": "Aqua Cinema — Plan",
@@ -3243,8 +3423,8 @@
       "script_th": "Aqua Cinema อยู่ตรงนี้ในผังชั้นใต้ดินค่ะ"
     },
     {
-      "id": "ew-036",
-      "file": "ew_036.jpg",
+      "id": "ew-043",
+      "file": "ew_043.jpg",
       "type": "deck",
       "title_th": "Aqua Cinema",
       "title_en": "Aqua Cinema",
@@ -3261,8 +3441,8 @@
       "script_th": "Aqua Cinema คือสระว่ายน้ำยาวพิเศษพร้อมจอฉายภาพยนตร์ใต้แสงไฟ ให้บรรยากาศเหมือนดูหนังกลางสระเลยค่ะ"
     },
     {
-      "id": "ew-037",
-      "file": "ew_037.jpg",
+      "id": "ew-044",
+      "file": "ew_044.jpg",
       "type": "deck",
       "title_th": "ชั้นใต้ดิน — ไปสู่ Journey to Mars",
       "title_en": "Underground — Toward Journey to Mars",
@@ -3279,8 +3459,8 @@
       "script_th": "ต่อไปคือโซน Journey to the Mars ค่ะ"
     },
     {
-      "id": "ew-038",
-      "file": "ew_038.jpg",
+      "id": "ew-045",
+      "file": "ew_045.jpg",
       "type": "deck",
       "title_th": "Journey to the Mars",
       "title_en": "Journey to the Mars",
@@ -3297,8 +3477,8 @@
       "script_th": "Journey to the Mars เป็นสระธีมอวกาศ มีทางเดินแสงคล้ายพอร์ทัลสู่ดาวอังคารค่ะ"
     },
     {
-      "id": "ew-039",
-      "file": "ew_039.jpg",
+      "id": "ew-046",
+      "file": "ew_046.jpg",
       "type": "deck",
       "title_th": "ชั้นใต้ดิน — ไปสู่ Thermal Galaxy",
       "title_en": "Underground — Toward Thermal Galaxy",
@@ -3317,8 +3497,8 @@
       "script_th": "และนี่คือโซนสปา Thermal Galaxy ของเราค่ะ"
     },
     {
-      "id": "ew-040",
-      "file": "ew_040.jpg",
+      "id": "ew-047",
+      "file": "ew_047.jpg",
       "type": "deck",
       "title_th": "Thermal Galaxy — สปาครบวงจร",
       "title_en": "Thermal Galaxy — Full Spa Zone",
@@ -3340,8 +3520,8 @@
       "ask_th": "เคยลองซาวน่าหรือแช่น้ำเย็นไหมคะ รู้สึกเป็นยังไงบ้าง"
     },
     {
-      "id": "ew-041",
-      "file": "ew_041.jpg",
+      "id": "ew-048",
+      "file": "ew_048.jpg",
       "type": "deck",
       "title_th": "Himalayan Salt Sauna",
       "title_en": "Himalayan Salt Sauna",
@@ -3356,8 +3536,8 @@
       "script_th": "นี่คือ Himalayan Salt Sauna ค่ะ"
     },
     {
-      "id": "ew-042",
-      "file": "ew_042.jpg",
+      "id": "ew-049",
+      "file": "ew_049.jpg",
       "type": "deck",
       "title_th": "Ice Bath",
       "title_en": "Ice Bath",
@@ -3374,8 +3554,8 @@
       "script_th": "ห้อง Ice Bath ตกแต่งสไตล์ถ้ำคริสตัลค่ะ"
     },
     {
-      "id": "ew-043",
-      "file": "ew_043.jpg",
+      "id": "ew-050",
+      "file": "ew_050.jpg",
       "type": "deck",
       "title_th": "Floating Swing Sauna",
       "title_en": "Floating Swing Sauna",
@@ -3390,8 +3570,8 @@
       "script_th": "นี่คือ Floating Swing Sauna ค่ะ"
     },
     {
-      "id": "ew-044",
-      "file": "ew_044.jpg",
+      "id": "ew-051",
+      "file": "ew_051.jpg",
       "type": "deck",
       "title_th": "Crystal Stone Sauna",
       "title_en": "Crystal Stone Sauna",
@@ -3406,8 +3586,8 @@
       "script_th": "Crystal Stone Sauna ผนังกรุหินธรรมชาติ ให้บรรยากาศอบอุ่นสบายค่ะ"
     },
     {
-      "id": "ew-045",
-      "file": "ew_045.jpg",
+      "id": "ew-052",
+      "file": "ew_052.jpg",
       "type": "deck",
       "title_th": "Hydro Therapy Capsule",
       "title_en": "Hydro Therapy Capsule",
@@ -3422,8 +3602,8 @@
       "script_th": "และนี่คือ Hydro Therapy Capsule ดีไซน์ล้ำอนาคตค่ะ"
     },
     {
-      "id": "ew-046",
-      "file": "ew_046.jpg",
+      "id": "ew-053",
+      "file": "ew_053.jpg",
       "type": "deck",
       "title_th": "ผังสามชั้นไฮไลต์ (3)",
       "title_en": "Three Highlight Floors Overview (3)",
@@ -3442,8 +3622,8 @@
       "script_th": "ต่อไปเราจะพาไปชมชั้น 3 กันค่ะ"
     },
     {
-      "id": "ew-047",
-      "file": "ew_047.jpg",
+      "id": "ew-054",
+      "file": "ew_054.jpg",
       "type": "deck",
       "title_th": "ชั้น 3 — ภาพรวม",
       "title_en": "3rd Floor — Overview",
@@ -3458,8 +3638,8 @@
       "script_th": "นี่คือภาพรวมชั้น 3 ค่ะ"
     },
     {
-      "id": "ew-048",
-      "file": "ew_048.jpg",
+      "id": "ew-055",
+      "file": "ew_055.jpg",
       "type": "deck",
       "title_th": "ชั้น 3 — ผัง Sky Pool",
       "title_en": "3rd Floor — Sky Pool Plan",
@@ -3476,8 +3656,8 @@
       "script_th": "ชั้น 3 มี Sky Pool, Social Lounge, Co-working Lounge และ Common Sphere ค่ะ"
     },
     {
-      "id": "ew-049",
-      "file": "ew_049.jpg",
+      "id": "ew-056",
+      "file": "ew_056.jpg",
       "type": "deck",
       "title_th": "Sky Pool",
       "title_en": "Sky Pool",
@@ -3494,8 +3674,8 @@
       "script_th": "Sky Pool คือสระว่ายน้ำลอยฟ้าพร้อมอ่างจากุซซี่วงกลม ชมวิวเมืองแบบพาโนรามาเลยค่ะ"
     },
     {
-      "id": "ew-050",
-      "file": "ew_050.jpg",
+      "id": "ew-057",
+      "file": "ew_057.jpg",
       "type": "deck",
       "title_th": "Social Club",
       "title_en": "Social Club",
@@ -3514,8 +3694,8 @@
       "script_th": "นี่คือ Social Club ของเรา มีบาร์เทนเดอร์หุ่นยนต์คอยให้บริการตลอดเวลาด้วยนะคะ"
     },
     {
-      "id": "ew-051",
-      "file": "ew_051.jpg",
+      "id": "ew-058",
+      "file": "ew_058.jpg",
       "type": "deck",
       "title_th": "Co-working Lounge",
       "title_en": "Co-working Lounge",
@@ -3530,8 +3710,8 @@
       "script_th": "Co-working Lounge พื้นที่ทำงานร่วมกันหรูหรา วิวสระและวิวเมืองค่ะ"
     },
     {
-      "id": "ew-052",
-      "file": "ew_052.jpg",
+      "id": "ew-059",
+      "file": "ew_059.jpg",
       "type": "deck",
       "title_th": "Common Sphere",
       "title_en": "Common Sphere",
@@ -3546,8 +3726,8 @@
       "script_th": "และนี่คือ Common Sphere พื้นที่ส่วนกลางของชั้น 3 ค่ะ"
     },
     {
-      "id": "ew-053",
-      "file": "ew_053.jpg",
+      "id": "ew-060",
+      "file": "ew_060.jpg",
       "type": "deck",
       "title_th": "Future Home — บ้านอัจฉริยะ",
       "title_en": "Future Home — Smart Home",
@@ -3568,8 +3748,8 @@
       "script_th": "ทุกยูนิตของเรามาพร้อมระบบบ้านอัจฉริยะ Future Home ค่ะ ควบคุมผ่านมือถือ กลอนประตูดิจิทัล กล้องหน้าประตู เครื่องฟอกอากาศ ควบคุมอุณหภูมิ และฝักบัวอัจฉริยะ ภายใต้แนวคิด Connected, Secure, Intelligent, Sustainable"
     },
     {
-      "id": "ew-054",
-      "file": "ew_054.jpg",
+      "id": "ew-061",
+      "file": "ew_061.jpg",
       "type": "deck",
       "title_th": "Embassy AI Application",
       "title_en": "Embassy AI Application",
@@ -3588,8 +3768,8 @@
       "script_th": "นอกจากนี้ยังมีแอปพลิเคชัน Embassy AI เป็นผู้ช่วยส่วนตัวของผู้พักอาศัยค่ะ ให้บริการต้อนรับด้วย AI ตลอด 24 ชั่วโมง จองพื้นที่ส่วนกลาง เรียกบริการเดินทาง แม่บ้าน แจ้งซ่อมบำรุง แนะนำไลฟ์สไตล์ และซัพพอร์ตทันทีที่ต้องการ"
     },
     {
-      "id": "ew-055",
-      "file": "ew_055.jpg",
+      "id": "ew-062",
+      "file": "ew_062.jpg",
       "type": "deck",
       "title_th": "The Units — ตัวอย่างห้องพัก (1)",
       "title_en": "The Units — Sample Unit (1)",
@@ -3607,8 +3787,8 @@
       "ask_th": "แล้วมองหาห้องประมาณกี่คนอยู่ด้วยกันคะ"
     },
     {
-      "id": "ew-056",
-      "file": "ew_056.jpg",
+      "id": "ew-063",
+      "file": "ew_063.jpg",
       "type": "deck",
       "title_th": "The Units — ตัวอย่างห้องพัก (2)",
       "title_en": "The Units — Sample Unit (2)",
@@ -3625,8 +3805,8 @@
       "script_th": "นี่คือตัวอย่างห้องนั่งเล่นและครัวค่ะ"
     },
     {
-      "id": "ew-057",
-      "file": "ew_057.jpg",
+      "id": "ew-064",
+      "file": "ew_064.jpg",
       "type": "deck",
       "title_th": "The Units — ตัวอย่างห้องพัก (3)",
       "title_en": "The Units — Sample Unit (3)",
@@ -3643,8 +3823,8 @@
       "script_th": "และนี่คือตัวอย่างห้องนอนค่ะ"
     },
     {
-      "id": "ew-058",
-      "file": "ew_058.jpg",
+      "id": "ew-065",
+      "file": "ew_065.jpg",
       "type": "deck",
       "title_th": "The Units — ห้องน้ำ",
       "title_en": "The Units — Bathroom",
@@ -3661,8 +3841,8 @@
       "script_th": "ห้องน้ำตกแต่งด้วยหินอ่อนพรีเมียมค่ะ"
     },
     {
-      "id": "ew-059",
-      "file": "ew_059.jpg",
+      "id": "ew-066",
+      "file": "ew_066.jpg",
       "type": "deck",
       "title_th": "ทุกคนมีความฝัน",
       "title_en": "Everybody Has a Dream",

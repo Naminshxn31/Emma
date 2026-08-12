@@ -34,3 +34,11 @@ data/slides/index.json.bak
 data/log-summaries/
 
 data/eval_query_cache.npz
+
+# Working folders from scripts/import_canva_export.py. Both are copies of
+# the client's sales deck — hundreds of megabytes of it — and the backup is
+# the *previous* deck, which is exactly the thing that must not end up in a
+# repo shared with anyone.
+data/slides-backup/
+data/canva-render/
+data/canva-shots/

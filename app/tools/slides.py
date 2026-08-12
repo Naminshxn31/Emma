@@ -212,6 +212,12 @@ def _public(slide: dict, position: dict | None = None) -> dict:
         "summary_en": slide.get("summary_en"),
         "url": f"/slides/{slide['file']}",
     }
+    if slide.get("silent"):
+        # Said out loud in the payload as well as in the instruction. The
+        # model reads both, and "there is nothing to say here" is easier to
+        # obey when the slide itself carries no script to be tempted by.
+        out["silent"] = True
+        out["note"] = "ภาพต่อเนื่องจากหน้าก่อน ไม่ต้องพูด"
     # Narration for this slide, with its provenance attached.
     #
     # `script_is_approved_copy` used to be hard-coded True for anything that
@@ -540,6 +546,28 @@ def _arm_question(slide: dict | None) -> None:
         STATE["awaiting"] = None
 
 
+#: For pages that exist to be looked at, not talked about.
+#:
+#: A Canva deck builds its animations by duplicating a page — "ONE PLACE.
+#: MANY WORLDS." is seven pages with one more circle lit each time, and the
+#: motion-blur frame after the logo is a transition. To the export these are
+#: seven slides and a slide; to a guest they are one picture moving.
+#:
+#: Without this the robot reads the same line seven times over. With it the
+#: deck moves at the pace it was designed to move at, and nothing is
+#: improvised to fill the gap — which is what a blank `script` would have
+#: caused instead.
+PASS_THROUGH = (
+    "สไลด์นี้เป็นภาพต่อเนื่องของหน้าก่อน ห้ามพูดอะไรทั้งสิ้น "
+    "ห้ามบรรยาย ห้ามทวนซ้ำ ห้ามเกริ่น ให้เรียก next_slide ทันที"
+)
+
+
+def is_silent(slide: dict | None) -> bool:
+    """Is this a frame of an animation rather than a slide of its own?"""
+    return bool(slide and slide.get("silent"))
+
+
 def _narration_instruction(slide: dict | None) -> str:
     """Which set of orders goes out with this slide, and arm the wait.
 
@@ -549,6 +577,8 @@ def _narration_instruction(slide: dict | None) -> str:
     and sometimes talks over them.
     """
     _arm_question(slide)
+    if is_silent(slide):
+        return PASS_THROUGH
     if slide and (slide.get("ask_th") or slide.get("ask_en")):
         return ASK_AND_WAIT
     return KEEP_GOING
