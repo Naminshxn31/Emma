@@ -960,6 +960,21 @@ async def close_presentation() -> dict:
     thing at the end of the day.
     """
     from app.tools import canva_display
+    from app import heard
+
+    # Was anybody actually asking? Emma's own voice comes back through the
+    # speakers, the VAD reads it as a guest starting to talk, and whatever it
+    # transcribes arrives here as a request. In one recorded run "bit like"
+    # closed the deck at the end of a full presentation. Nobody said it.
+    #
+    # The guard is on the consequence, not on the audio: we cannot tell echo
+    # from speech, but we can tell whether the words that would justify
+    # closing the screen are present. Asking costs one sentence; closing
+    # wrongly ends the demo in front of a guest.
+    if not heard.asks_to_stop():
+        logger.info("refusing to close the deck — last heard %r", heard.last())
+        return {"ok": False, "closed": False, "needs_confirmation": True,
+                "heard": heard.last(), "instruction": heard.CONFIRM_FIRST}
 
     reset_state()
     _set_current(None)

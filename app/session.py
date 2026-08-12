@@ -24,7 +24,7 @@ import logging
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app import turnlog, voices
+from app import heard, turnlog, voices
 from app.config import settings
 from app.prompts import GREETING, build_instructions
 from app.providers import ProviderError, default_voice_for, get_provider
@@ -238,6 +238,10 @@ class VoiceSession:
                     # "ไอ้บ้า" for "ice bath". Without it, a wrong answer is
                     # indistinguishable from a wrong question.
                     turnlog.record("heard", text=event.text or "")
+                    # Kept so the destructive slide tools can check whether
+                    # anybody asked for what they are about to do. See
+                    # `app/heard.py` — this is the field that decides.
+                    heard.record(event.text or "")
                     await self._send_json({"type": "user_transcript", "text": event.text or ""})
 
                 elif event.kind == "assistant_transcript":

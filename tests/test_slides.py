@@ -1402,6 +1402,13 @@ def test_closing_the_presentation_shuts_the_canva_window(slides, monkeypatch):
     `stop_presentation` leaves the picture up and `hide_slide` leaves the
     browser parked — neither gets a fullscreen window off the wall, and a
     sales gallery has no keyboard."""
+    # `close_presentation` now refuses unless somebody asked for it — echo
+    # from the speakers was transcribed as "bit like" and closed the deck in
+    # a live run. Saying so out loud here is part of the test: closing is a
+    # thing a guest requests, not a thing that happens.
+    from app import heard
+    heard.record("ปิดสไลด์ด้วยค่ะ")
+
     closed = []
 
     async def fake_shutdown():
@@ -1423,6 +1430,9 @@ def test_closing_still_clears_the_screen_if_the_window_will_not_close(slides, mo
     """A browser that refuses to die must not leave the tour running. The
     screen is logically off either way, and the next launch already copes
     with a dead handle."""
+    from app import heard
+    heard.record("ปิดสไลด์ด้วยค่ะ")
+
     async def refuses():
         raise RuntimeError("browser is wedged")
 

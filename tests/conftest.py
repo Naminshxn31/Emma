@@ -119,3 +119,12 @@ def _no_real_browser(monkeypatch, request):
         )
 
     monkeypatch.setattr(canva_display, "_launch_browser", refuse)
+
+@pytest.fixture(autouse=True)
+def _forget_what_was_heard():
+    """"What the guest last said" is module state, and it now decides whether
+    a tool acts. A test that leaves "ปิดสไลด์" behind arms the next one."""
+    from app import heard
+    heard.forget()
+    yield
+    heard.forget()
