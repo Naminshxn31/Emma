@@ -1782,3 +1782,78 @@ def test_every_eval_expectation_names_something_in_the_deck(slides):
             "the eval expects %r for %r, and no slide in the deck has it — "
             "the expectation is wrong, not the search" % (expected, question)
         )
+
+
+# ==================== the deck belongs to canva ====================
+
+
+def _measured(tmp_path, monkeypatch, pages: dict, total: int = 50):
+    """Point the slides dir at a copy of the real one, plus a page map."""
+    import shutil
+    from app.tools import canva_display
+
+    src = __import__("pathlib").Path(settings.slides_dir)
+    shutil.copy(src / "index.json", tmp_path / "index.json")
+    (tmp_path / "canva_pages.json").write_text(
+        json.dumps({"total": total, "pages": pages}), encoding="utf-8")
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
+    monkeypatch.setattr(canva_display, "_PAGE_MAP_TOTAL", None)
+    canva_display.load_page_map(force=True)
+
+
+def test_the_deck_is_presented_in_canva_page_order(slides, tmp_path, monkeypatch):
+    """Not filename order.
+
+    `data/slides/` is our own export and it disagrees with the live design —
+    59 frames against a shorter deck, some of them caught mid-transition. The
+    guest is looking at Canva, so Canva decides what comes after what.
+    """
+    _measured(tmp_path, monkeypatch, {"ew-031": 3, "ew-001": 1, "ew-024": 2})
+    assert slides._build_deck("deck") == ["ew-001", "ew-024", "ew-031"]
+
+
+def test_frames_with_no_canva_page_are_not_presented(slides, tmp_path, monkeypatch):
+    """The transitions, and anything deleted from the design after export.
+
+    This is the fix for the screenshot: our side said "Junior World 31/59"
+    while the Canva window showed the Journey to Mars tunnel. A frame that
+    isn't a page of the deck can't be a stop on a tour of the deck.
+    """
+    _measured(tmp_path, monkeypatch, {"ew-001": 1, "ew-024": 2})
+    deck = slides._build_deck("deck")
+    assert "ew-018" not in deck and "ew-059" not in deck
+    assert deck == ["ew-001", "ew-024"]
+
+
+def test_the_deck_follows_however_many_pages_canva_has(slides, tmp_path, monkeypatch):
+    """"ไม่ว่าหน้าจะมีเท่าไหร่" — the length is whatever was measured, and
+    `total` is not allowed to become a second hard-coded 59."""
+    _measured(tmp_path, monkeypatch,
+              {"ew-%03d" % n: n for n in range(1, 13)}, total=12)
+    assert len(slides._build_deck("deck")) == 12
+
+
+def test_an_unmeasured_deck_still_presents(slides, tmp_path, monkeypatch):
+    """No measurement, no regression: the export presents in its own order."""
+    import shutil
+    from app.tools import canva_display
+
+    src = __import__("pathlib").Path(settings.slides_dir)
+    shutil.copy(src / "index.json", tmp_path / "index.json")
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
+    canva_display.load_page_map(force=True)
+    assert len(slides._build_deck("deck")) == 59
+
+
+def test_a_canva_page_click_lands_on_the_slide_that_page_shows(
+        slides, tmp_path, monkeypatch):
+    """A salesperson clicking to page 3 must move the tour to whatever is
+    *on* page 3 — not to `ew-003`, which is the arithmetic that started all
+    of this."""
+    _measured(tmp_path, monkeypatch, {"ew-001": 1, "ew-024": 2, "ew-031": 3})
+    slides.reload_slides()
+    shown = slides.move_to_deck_page(3)
+    assert shown is not None and shown["id"] == "ew-031"
+    assert shown["position"] == 3 and shown["total"] == 3

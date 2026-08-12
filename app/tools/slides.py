@@ -384,10 +384,13 @@ FOLLOW_PAGE = (
 
 
 def _page_number_of(slide_id: str) -> int | None:
-    """`ew-042` -> 42. The deck's own numbering, not the tour position."""
-    prefix = "%s-" % settings.canva_deck_prefix
-    tail = slide_id[len(prefix):] if slide_id.startswith(prefix) else ""
-    return int(tail) if tail.isdigit() else None
+    """Which live Canva page shows this slide? Not the tour position.
+
+    Delegates, because this used to be `ew-042` -> 42 in two files and they
+    were both wrong in the same way. One place to be wrong is enough.
+    """
+    from app.tools import canva_display
+    return canva_display._page_number(slide_id)
 
 
 def move_to_deck_page(page_number: int) -> dict | None:
@@ -398,12 +401,19 @@ def move_to_deck_page(page_number: int) -> dict | None:
     loud. Both mean the same thing — the deck is now here — so both move the
     position rather than treating it as a detour to come back from.
     """
-    slide_id = "%s-%03d" % (settings.canva_deck_prefix, page_number)
+    from app.tools import canva_display
+
+    # Which image is on that page is a measured fact about the live deck,
+    # not a sum done on our own filenames. Falls back to the old arithmetic
+    # only where nothing has been measured, which is also the only case
+    # where the two numbers agree.
+    slide_id = (canva_display.slide_on_page(page_number)
+                or "%s-%03d" % (settings.canva_deck_prefix, page_number))
     slide = _by_id(slide_id)
     if slide is None:
         return None
 
-    deck = STATE["deck"] or [s["id"] for s in load_slides() if s.get("type") == "deck"]
+    deck = STATE["deck"] or _build_deck(DEFAULT_TOUR)
     if slide_id not in deck:
         return None
 
@@ -574,6 +584,25 @@ def _by_id(slide_id: str) -> dict | None:
 
 
 def _build_deck(tour: str) -> list[str]:
+    """The slides of a tour, in the order they will be presented.
+
+    For the sales deck that order comes from Canva, because Canva is what
+    the sales team edits and what the guest is looking at. Filename order is
+    a fact about a folder; page order is a fact about the presentation.
+    Pages the measurement couldn't place are left out rather than guessed
+    at — see `scripts/canva_pages.py`.
+
+    Every other tour is still assembled from slide types here: those are
+    ours, they have no Canva pages, and they are answers to questions rather
+    than a document.
+    """
+    if tour == "deck":
+        from app.tools import canva_display
+        known = set(s["id"] for s in load_slides())
+        ordered = [sid for sid in canva_display.deck_order() if sid in known]
+        if ordered:
+            return ordered
+        # Never measured. Present the export in its own order, as before.
     wanted = TOURS.get(tour, [])
     deck: list[str] = []
     for slide_type in wanted:

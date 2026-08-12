@@ -530,6 +530,42 @@ Same failure as `ราคา` matching inside `อาคาร`, which is why t
 retrieval layer was rewritten — it had quietly reappeared one function away,
 where a wrong refusal costs more than a wrong picture.
 
+## The Canva window is the deck
+
+The presentation the sales team maintains lives in Canva. `data/slides/` is
+an *export* of it, and the two drifted: 59 exported frames against a shorter
+live deck, several of the frames caught mid-transition between two pages.
+
+`canva_display` used to work out the Canva page from our own filename —
+`ew-047` meant page 47. That is arithmetic on our side of the fence, not a
+measurement of the other document, and it failed in two visible ways: from
+the first divergence onward the window showed a different room from the one
+being narrated, and the ids past the end of the deck asked for pages that do
+not exist, which is why a guest saw a blank gradient with nothing on it.
+
+So the mapping is measured, and Canva decides the running order:
+
+```
+python scripts/canva_pages.py --keep-shots data/canva-shots   # look first
+python scripts/canva_pages.py --write                          # then commit to it
+```
+
+It opens the real deck, walks every page, screenshots each one and matches
+it against the exported images, then writes `data/slides/canva_pages.json`.
+`--keep-shots` saves each page beside its matched image so the mapping can
+be checked by eye — the similarity scores can say two pictures are alike,
+they cannot say the matching is *right*, and fifty side-by-side pictures can.
+
+After that the deck is Canva's, however many pages it has. Frames that
+aren't pages of the live deck are not presented at all, and they never move
+the window; they remain searchable and can still be put on our own screen by
+name. **A slide with no known Canva page leaves the window where it is** — a
+mirror that lags is a nuisance, a mirror showing the wrong room while the
+robot describes this one is a lie told to a customer.
+
+Re-run it whenever the deck is edited in Canva. Nothing detects that
+automatically yet.
+
 ## Before using this with real customers
 
 **Four fields in `data/condo_facts.json` are still blank** — starting price,

@@ -11,6 +11,7 @@ never make the robot wait. These run without Playwright installed.
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 
@@ -33,6 +34,12 @@ def _reset(monkeypatch):
     # poll returns nothing.
     monkeypatch.setattr(canva_display, "_ours_at", 0.0)
     monkeypatch.setattr(canva_display, "_seen_page", None)
+    # The measured page map is read once and cached in a module global. A
+    # test that loads a temporary one leaves it loaded, and the next test
+    # asks the real deck's mapping about slide ids that only exist in the
+    # fixture — same class of leak as `_ours_at` above, found the same way.
+    monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
+    monkeypatch.setattr(canva_display, "_PAGE_MAP_TOTAL", None)
     monkeypatch.setattr(settings, "canva_url", "https://canva.test/design/x/view")
     monkeypatch.setattr(settings, "canva_deck_prefix", "ew")
 
@@ -166,10 +173,60 @@ def test_slides_outside_the_deck_are_ignored(monkeypatch, slide_id):
     run(canva_display.goto(slide_id))
 
 
-def test_the_page_number_comes_from_the_slide_id():
+def test_the_page_number_falls_back_to_the_id_when_nothing_was_measured(
+        monkeypatch, tmp_path):
+    """An install that has never run `scripts/canva_pages.py` behaves as
+    before: id 42 means page 42. That is a guess, but it is the guess the
+    deck was imported under, and it is right for a deck that was never
+    edited after export."""
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    canva_display.load_page_map(force=True)
     assert canva_display._page_number("ew-042") == 42
     assert canva_display._page_number("ew-001") == 1
     assert canva_display._page_number("picture-42") is None
+
+
+def test_a_measured_mapping_beats_the_arithmetic(monkeypatch, tmp_path):
+    """The whole point. Our export has 59 frames, the live deck has fewer
+    pages, so `ew-047` is not page 47 — and only a measurement can say what
+    it is."""
+    (tmp_path / "canva_pages.json").write_text(json.dumps(
+        {"total": 50, "pages": {"ew-001": 1, "ew-047": 40}}), encoding="utf-8")
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    canva_display.load_page_map(force=True)
+    assert canva_display._page_number("ew-047") == 40
+    assert canva_display._page_number("ew-001") == 1
+
+
+def test_a_slide_missing_from_the_measured_mapping_moves_nothing(
+        monkeypatch, tmp_path):
+    """Frames that exist in our export but not in the live deck — the
+    transitions, and anything the client deleted after exporting.
+
+    Returning the id number here is what put the window on somebody else's
+    slide, and past page 50 on nothing at all: the blank screen. Not moving
+    is worse than lagging and better than lying."""
+    (tmp_path / "canva_pages.json").write_text(json.dumps(
+        {"total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    canva_display.load_page_map(force=True)
+    assert canva_display._page_number("ew-059") is None
+    assert canva_display._page_number("ew-018") is None
+
+
+def test_a_slide_with_no_canva_page_never_opens_the_window(monkeypatch, tmp_path):
+    """`goto` has to act on that None, not just receive it."""
+    (tmp_path / "canva_pages.json").write_text(json.dumps(
+        {"total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "canva_url", "https://canva.test/deck/view")
+    canva_display.load_page_map(force=True)
+
+    def explode(**_kw):
+        raise AssertionError("must not launch for an unmapped slide")
+
+    monkeypatch.setattr(canva_display, "_ensure_page", explode)
+    run(canva_display.goto("ew-059"))
 
 
 def test_a_page_baked_into_the_link_is_ignored(monkeypatch):

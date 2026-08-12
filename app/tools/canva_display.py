@@ -60,11 +60,108 @@ def _base_url() -> str:
     return settings.canva_url.split("#", 1)[0]
 
 
+#: Measured `slide id -> Canva page`, loaded from `data/slides/canva_pages.json`.
+#: `None` means "never measured", which is the only reason the arithmetic
+#: below is still reachable. See `_page_number`.
+_PAGE_MAP: dict[str, int] | None = None
+_PAGE_MAP_TOTAL: int | None = None
+
+
+def _page_map_path():
+    from pathlib import Path
+    return Path(settings.slides_dir) / "canva_pages.json"
+
+
+def load_page_map(force: bool = False) -> dict[str, int]:
+    """Read the measured mapping, once. Missing file = empty mapping."""
+    global _PAGE_MAP, _PAGE_MAP_TOTAL
+    if _PAGE_MAP is not None and not force:
+        return _PAGE_MAP
+    import json
+    path = _page_map_path()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        _PAGE_MAP, _PAGE_MAP_TOTAL = {}, None
+        return _PAGE_MAP
+    except (OSError, ValueError):
+        logger.warning("could not read %s — falling back to id arithmetic", path)
+        _PAGE_MAP, _PAGE_MAP_TOTAL = {}, None
+        return _PAGE_MAP
+    _PAGE_MAP = {str(k): int(v) for k, v in (raw.get("pages") or {}).items()}
+    _PAGE_MAP_TOTAL = raw.get("total")
+    logger.info("canva page map: %d slides -> a deck of %s pages",
+                len(_PAGE_MAP), _PAGE_MAP_TOTAL)
+    return _PAGE_MAP
+
+
 def _page_number(slide_id: str) -> int | None:
-    """`ew-042` -> 42, using whatever prefix the deck was imported under.
-    Anything else (a different deck, or no id) doesn't map to a Canva page."""
+    """Which page of the live Canva deck shows this slide? None if unknown.
+
+    This used to be `ew-042` -> page 42, and that is only right while the
+    images and the Canva design are the same sequence. They stopped being:
+    the export in `data/slides/` has 59 frames, the design has fewer pages,
+    so every id past the first divergence pointed at somebody else's slide —
+    and the tail pointed past the end of the deck, which is the page that
+    came up blank. Arithmetic on an id is not a measurement of another
+    document.
+
+    So the mapping is now measured (`scripts/canva_pages.py`) and read from
+    disk. A slide that isn't in the measured mapping returns None and the
+    window simply doesn't move: a mirror that lags is a nuisance, a mirror
+    showing the wrong room while the robot describes this one is a lie told
+    to a customer.
+
+    The old arithmetic survives only for a deck that has never been
+    measured, so an unconfigured install behaves as before.
+    """
     match = re.match(rf"^{re.escape(settings.canva_deck_prefix)}-(\d+)$", slide_id)
-    return int(match.group(1)) if match else None
+    if not match:
+        return None
+    mapping = load_page_map()
+    if not mapping:
+        return int(match.group(1))
+    page = mapping.get(slide_id)
+    if page is None:
+        logger.info("slide %s is not in the canva page map — not moving the "
+                    "window", slide_id)
+    return page
+
+
+def deck_order() -> list[str]:
+    """The deck as Canva has it: slide ids in live page order.
+
+    This is the deck now. It used to be "every image of type `deck`, in
+    filename order", which is our own export talking about itself — 59
+    frames, some of them mid-transition, in an order nobody has looked at
+    since. The presentation the sales team maintains is the Canva one, so
+    that is the one the robot walks, however many pages it happens to have
+    today.
+
+    Empty when nothing has been measured, and the caller falls back to the
+    old ordering — an unmeasured install still presents.
+    """
+    mapping = load_page_map()
+    return [sid for sid, _ in sorted(mapping.items(), key=lambda kv: kv[1])]
+
+
+def slide_on_page(number: int) -> str | None:
+    """Which of our images is on that Canva page? None if we don't know.
+
+    The inverse of `_page_number`, and needed for the same reason: a person
+    clicking the Canva window reports a page number, and turning that back
+    into `ew-0NN` by arithmetic is the same mistake in the other direction.
+    """
+    for slide_id, page in load_page_map().items():
+        if page == number:
+            return slide_id
+    return None
+
+
+def deck_total() -> int | None:
+    """Pages in the live deck, as measured. None if never measured."""
+    load_page_map()
+    return _PAGE_MAP_TOTAL
 
 
 async def _launch_browser(args: list[str]):
