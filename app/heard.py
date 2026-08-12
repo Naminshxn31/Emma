@@ -57,6 +57,24 @@ _STOP_OTHER = (
 )
 
 
+#: Things in the room that get switched off, which is not the same request.
+#:
+#: From the real logs: `ไฟ` 27x, `เปิด` 19x, `ปิด` 15x — switching the lights
+#: is the commonest thing anybody says to this robot, by a wide margin.
+#:
+#: `ปิดไฟ` happens to survive on its own because the tokenizer keeps it as
+#: one word, so `ปิด` never appears standalone. `ปิดแอร์` does not: it splits
+#: into `ปิด` + `แอร์`, and without this the guard would have read "turn the
+#: air conditioning off" as permission to close the presentation. Relying on
+#: which compounds a dictionary happens to contain is not a design.
+_ROOM_THINGS = ("ไฟ", "แอร์", "เครื่องปรับอากาศ", "ดวงไฟ", "ไฟห้อง",
+                "light", "lights", "aircon", "air conditioner", "ac")
+
+#: Words that make it about the screen rather than the room.
+_SCREEN_THINGS = ("สไลด์", "พรีเซนต์", "จอ", "นำเสนอ", "หน้าต่าง",
+                  "slide", "presentation", "screen", "deck")
+
+
 def _is_thai(word: str) -> bool:
     return any("฀" <= ch <= "๿" for ch in word)
 
@@ -73,21 +91,29 @@ def asks_to_stop(text: str | None = None) -> bool:
     haystack = (text if text is not None else _LAST).lower().strip()
     if not haystack:
         return False
-    if any(word in haystack for word in _STOP_OTHER):
-        return True
 
     from app.tools.retrieval import tokenize
 
     words = tokenize(haystack)
-    if not words:
+    padded = " %s " % " ".join(words) if words else " "
+
+    def _has(terms) -> bool:
+        for term in terms:
+            if not _is_thai(term):
+                if term in haystack:
+                    return True
+            elif (" %s " % " ".join(tokenize(term))) in padded:
+                return True
         return False
-    padded = " %s " % " ".join(words)
-    for term in _STOP_TH:
-        if not _is_thai(term):
-            continue
-        if (" %s " % " ".join(tokenize(term))) in padded:
-            return True
-    return False
+
+    # "ปิดแอร์" is an instruction about the room, not about the screen, and
+    # it contains the same verb. Only defer to that reading when nothing in
+    # the sentence is about the presentation — "ปิดไฟกับปิดสไลด์ด้วย" asks
+    # for both.
+    if _has(_ROOM_THINGS) and not _has(_SCREEN_THINGS):
+        return False
+
+    return _has(_STOP_OTHER) or _has(_STOP_TH)
 
 
 #: What to tell the model when it tried to close the deck without being asked.

@@ -121,3 +121,54 @@ def test_close_presentation_still_closes_when_asked(monkeypatch):
 
     assert out["ok"] is True and out["closed"] is True
     assert closed == [True]
+
+
+# ============ คำถามที่หาไม่เจอ ต้องถูกบันทึก ============
+
+
+def test_a_question_that_found_nothing_is_written_to_the_log(monkeypatch, tmp_path):
+    """The one line in the log that says what the robot *couldn't* do.
+
+    Keywords on the slides are the only change that would measurably improve
+    search, and the words worth adding are the ones real guests missed with.
+    They exist for the length of one sentence unless something writes them
+    down. `scripts/what_guests_ask.py` reads exactly this event.
+    """
+    from app import turnlog
+    from app.tools import knowledge
+
+    written = []
+    monkeypatch.setattr(turnlog, "record",
+                        lambda event, **f: written.append((event, f)))
+    monkeypatch.setattr(knowledge, "turnlog", turnlog, raising=False)
+
+    out = knowledge.search_condo_info("มีสนามกอล์ฟไหม")
+    assert out["found"] is False
+
+    misses = [f for event, f in written if event == "lookup" and not f.get("showed")]
+    assert misses, "a question nobody could answer left no trace"
+    assert misses[0]["query"] == "มีสนามกอล์ฟไหม"
+    assert misses[0]["found"] is False
+
+
+@pytest.mark.parametrize("said", [
+    "ปิดไฟหน่อย", "ปิดไฟ", "ปิดแอร์", "ปิดเครื่องปรับอากาศ", "turn off the lights",
+])
+def test_switching_the_room_off_is_not_closing_the_deck(said):
+    """From the real logs: ไฟ 27x, เปิด 19x, ปิด 15x. Switching the lights is
+    the commonest thing anybody says to this robot, and it uses the same verb.
+
+    `ปิดไฟ` survives on its own only because the tokenizer keeps it as one
+    word. `ปิดแอร์` splits into `ปิด` + `แอร์`, and without the room-word
+    check the guard read "turn the air conditioning off" as permission to
+    close the presentation. Depending on which compounds a dictionary
+    happens to contain is not a design.
+    """
+    from app import heard
+    assert heard.asks_to_stop(said) is False
+
+
+def test_asking_for_both_still_closes_the_deck():
+    """The room check must not swallow a real request that mentions both."""
+    from app import heard
+    assert heard.asks_to_stop("ปิดไฟกับปิดสไลด์ด้วยค่ะ") is True

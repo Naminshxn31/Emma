@@ -236,6 +236,24 @@ def search_condo_info(query: str) -> dict:
         hits = [h.slide for h in ranked if h.found][:MAX_RESULTS]
 
     if not hits:
+        # The single most useful line in the log.
+        #
+        # Every other event says what the robot did; this one says what it
+        # *couldn't* do, in the guest's own words. The one improvement that
+        # would actually make search better is keywords on the slides, and
+        # the words worth adding are the ones real guests used and missed
+        # with — not ones invented at a desk. Without this they are lost the
+        # moment the sentence ends.
+        #
+        # `best` is kept even though nothing was shown: "asked about the gym,
+        # closest match was the yoga slide, still not close enough" is a
+        # different fix from "asked about a golf course we don't have".
+        turnlog.record(
+            "lookup", query=query, showed=None, found=False,
+            best=(ranked[0].slide.get("id") if ranked else None),
+            best_title=(ranked[0].slide.get("title_th") if ranked else None),
+            reason="nothing matched",
+        )
         return {
             "ok": True,
             "found": False,
