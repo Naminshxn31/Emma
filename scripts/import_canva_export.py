@@ -65,6 +65,35 @@ def distance(a, b) -> float:
     return sum(abs(x - y) for x, y in zip(a, b)) / len(a)
 
 
+def pdf_pages(pdf: Path, out: Path, first: int, last: int) -> list[Path]:
+    """Render a PDF export to page images.
+
+    Canva's "Download as PDF" is one file instead of a folder of images, and
+    it is what actually gets shared, so accept it directly rather than
+    making somebody export twice.
+
+    Rendered at the deck's own 1920x1080 so the pictures match what the
+    screen shows and what `canva_pages.py` photographs.
+    """
+    import fitz
+    doc = fitz.open(pdf)
+    last = min(last or doc.page_count, doc.page_count)
+    if first < 1 or first > last:
+        raise SystemExit("ช่วงหน้าไม่ถูกต้อง: %d-%d จากทั้งหมด %d"
+                         % (first, last, doc.page_count))
+    out.mkdir(parents=True, exist_ok=True)
+    made = []
+    for number, index in enumerate(range(first - 1, last), 1):
+        page = doc[index]
+        scale = 1920 / page.rect.width
+        target = out / ("page - %d.png" % number)
+        page.get_pixmap(matrix=fitz.Matrix(scale, scale)).save(target)
+        made.append(target)
+    print("อ่าน %s หน้า %d-%d (%d หน้า จากทั้งไฟล์ %d หน้า)"
+          % (pdf.name, first, last, len(made), doc.page_count))
+    return made
+
+
 def exported_pages(folder: Path) -> list[Path]:
     """The export, in page order.
 
@@ -91,14 +120,25 @@ def exported_pages(folder: Path) -> list[Path]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("folder", help="folder of images exported from Canva")
+    ap.add_argument("source", help="a PDF exported from Canva, or a folder of images")
+    ap.add_argument("--pages", metavar="A-B",
+                    help="only this range of the PDF, e.g. 67-107. Canva files "
+                         "often hold two versions of a deck back to back")
     ap.add_argument("--apply", action="store_true",
                     help="actually replace data/slides (keeps a backup)")
     args = ap.parse_args()
 
-    folder = Path(args.folder).expanduser()
-    if not folder.is_dir():
-        raise SystemExit("ไม่พบโฟลเดอร์: %s" % folder)
+    source = Path(args.source).expanduser()
+    if not source.exists():
+        raise SystemExit("ไม่พบไฟล์หรือโฟลเดอร์: %s" % source)
+
+    first, last = 1, 0
+    if args.pages:
+        try:
+            head, _, tail = args.pages.partition("-")
+            first, last = int(head), int(tail or head)
+        except ValueError:
+            raise SystemExit("--pages ต้องเป็นรูปแบบ 67-107")
 
     slides_dir = Path(settings.slides_dir)
     index_path = slides_dir / "index.json"
@@ -107,7 +147,12 @@ def main() -> int:
 
     old = [item for item in index["images"] if item["type"] == "deck"]
     old_thumbs = [(item, thumb(slides_dir / item["file"])) for item in old]
-    pages = exported_pages(folder)
+    if source.is_dir():
+        if args.pages:
+            raise SystemExit("--pages ใช้ได้กับไฟล์ PDF เท่านั้น")
+        pages = exported_pages(source)
+    else:
+        pages = pdf_pages(source, slides_dir.parent / "canva-render", first, last)
 
     print("เด็คเดิม %d เฟรม  ->  export ใหม่ %d หน้า" % (len(old), len(pages)))
     print()
