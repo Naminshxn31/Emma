@@ -188,8 +188,16 @@ async def capture(page, number: int):
     got right was a simple one.
 
     So watch instead of hope: screenshot until two readings in a row agree,
-    then take that. Returns `(image, thumbnail, settled, seconds)` — a page
-    that never stopped changing is reported rather than quietly used.
+    then take that. Returns `(image, thumbnail, settled, seconds)`.
+
+    "Settled" is not the same as "usable", and conflating them threw away
+    good measurements. Some pages in this deck are video — the logo reveal
+    for one — and a playing video never stops changing, so it always hit the
+    cap and was discarded. Page 44 was discarded that way while matching its
+    frame at a distance of 0.9, which is as certain as this gets. Stillness
+    is only ever a device for not photographing the loading state; whether
+    the match is trustworthy is what `SAME` and `MARGIN` are for. So the
+    caller scores an unsettled page anyway and just says so.
     """
     await step_to(page, number)
     await asyncio.sleep(0.8)
@@ -286,18 +294,17 @@ async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
             image, shot, settled, waited = await capture(page, number)
             scored = sorted(((distance(shot, t), sid) for sid, t in frames))
             best, second = scored[0], scored[1] if len(scored) > 1 else (999.0, "-")
-            # An unsettled page is not evidence about the deck, whatever it
-            # happens to resemble. Refusing to score it is the difference
-            # between measuring the deck and measuring the loading spinner.
-            ok = settled and best[0] <= SAME and best[0] * MARGIN <= second[0]
+            # Confidence decides, not stillness. A video page never settles
+            # and is no less identifiable for it.
+            ok = best[0] <= SAME and best[0] * MARGIN <= second[0]
             if not settled:
                 stalled.append(number)
             if ok:
                 mapping[best[1]] = number
             rows.append((number, best[1], best[0], second[1], second[0], ok))
-            why = ("" if ok else
-                   "<-- โหลดไม่เสร็จใน %.0f วิ ข้าม" % waited if not settled else
-                   "<-- ไม่มั่นใจ ข้าม")
+            why = "<-- ไม่มั่นใจ ข้าม" if not ok else ""
+            if not settled:
+                why += "  (ภาพยังขยับ น่าจะเป็นวิดีโอ)"
             print("  หน้า %2d -> %-8s (%.1f)   รองลงมา %-8s (%.1f)  %4.1fวิ %s"
                   % (number, best[1], best[0], second[1], second[0], waited, why))
             if keep:
@@ -316,10 +323,16 @@ async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
         print("หน้า canva ที่ยังจับคู่ไม่ได้: %s" % ", ".join(str(n) for n in blank))
         print("  เปิดรูปเทียบใน --keep-shots ดูว่าเป็นหน้าใหม่ที่ยังไม่ได้ export จริง")
     if stalled:
-        print("หน้าที่วาดไม่เสร็จใน %.0f วินาที: %s"
+        print("หน้าที่ภาพไม่หยุดขยับใน %.0f วินาที: %s"
               % (SETTLE_CAP_S, ", ".join(str(n) for n in stalled)))
-        print("  ยังไม่เขียนหน้าพวกนี้ลงตาราง เพราะสิ่งที่แคปได้คือพื้นหลังเปล่า")
-        print("  ไม่ใช่หน้าสไลด์ — ลองรันซ้ำ หรือเพิ่ม SETTLE_CAP_S")
+        print("  ส่วนใหญ่คือหน้าวิดีโอ ซึ่งไม่มีวันหยุดขยับ ยังจับคู่ได้ตามปกติ")
+        print("  ถ้าคะแนนดีพอ")
+    if len(blank) > total * 0.2:
+        print("\nหน้าที่จับคู่ไม่ได้มีลักษณะเดียวกันหมด: คะแนนที่ดีที่สุดก็ยังแย่")
+        print("  (30 ขึ้นไป) แปลว่าหน้าพวกนี้ 'ไม่เหมือนภาพไหนเลยที่เรามี'")
+        print("  ไม่ใช่ 'เหมือนหลายภาพจนเลือกไม่ถูก' — ต่างกันคนละเรื่อง")
+        print("  อย่างหลังคือปัญหาการวัด อย่างแรกคือเด็คถูกแก้ไปแล้ว")
+        print("  ทางแก้คือ export ภาพจาก canva ใหม่ ไม่ใช่ปรับเลขในสคริปต์นี้")
     if len(mapping) < total * 0.9:
         print("\n** จับคู่ได้ไม่ถึง 90%% — อย่าเพิ่ง --write **")
         print("   ตารางที่ไม่ครบทำให้สไลด์ที่หายไปไม่ถูกพรีเซนต์เลย")
