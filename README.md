@@ -643,6 +643,52 @@ The analysis value does not need the raw text: `python scripts/analyze_log.py
 --days 30 --save` writes counts to `data/log-summaries/`, which outlive the
 deletion and contain nothing anybody said.
 
+**Read the logs before touching the slide keywords.**
+
+```
+python scripts/what_guests_ask.py --days 7
+```
+
+Three questions, in the guest's own words: what was asked and not found,
+what was asked about pricing, and which slides anyone ever requests. The
+first list is the input to keyword work — the words worth adding are the
+ones real guests missed with, not ones invented at a desk, and they exist
+only until the log is deleted.
+
+It repaid itself immediately. The first run said `ไฟ` 27x, `เปิด` 19x,
+`ปิด` 15x — switching the lights is by a wide margin the commonest thing
+anybody says to this robot — which exposed a hole in a guard written an hour
+earlier. See below.
+
+## Nobody said that
+
+Emma's own voice returns through the speakers, the VAD reads it as a guest
+starting to talk, and whatever it transcribes arrives as a request. A
+recorded run:
+
+```
+ผู้ช่วย: ...Embassy World พร้อมเป็นส่วนหนึ่งของความฝันนั้นค่ะ
+ลูกค้า: bit like
+ผู้ช่วย: ได้ค่ะ ปิดสไลด์เรียบร้อยแล้วค่ะ
+```
+
+Nobody said "bit like". The same run had ten sentences chopped mid-word.
+`HALF_DUPLEX=true` cures the cause and costs the ability to talk over the
+robot; the gallery has not decided to give that up yet.
+
+So there is a second line: **an action needs a word that asked for it.**
+`close_presentation` consults `app/heard.py` and, when nothing in what was
+heard asks for the screen to stop, asks the guest instead of acting.
+Answering a question wrongly is a conversation; closing the deck wrongly
+ends the demo.
+
+Thai is matched as *words*, never substrings — `ปิด` sits inside `เปิด`,
+which is the opposite instruction. And "turn the lights off" is not "close
+the presentation": `ปิดไฟ` survives only because the tokenizer keeps it as
+one word, while `ปิดแอร์` splits into `ปิด` + `แอร์` and would have counted.
+Depending on which compounds a dictionary happens to contain is not a
+design, so room words are checked separately.
+
 ## Costs
 
 **The free tier's price is the content.** Google's pricing page lists, for
@@ -823,9 +869,9 @@ This is the voice layer, running on a PC. It is not yet on a robot.
 - **Robot-to-server authentication** — `/ws` is open to anything that can reach
   the port. Fine on a wired gallery LAN, not fine the moment the robot is on
   Wi-Fi or the server is reachable from outside.
-- **Idle timeout and a spend alert** — a session left open in an empty room
-  keeps the connection and the quota running, and nothing reports the day's
-  usage. Measured on the gallery's own project the headroom is large (peak
+- **A spend alert** — `IDLE_TIMEOUT_S` now ends a session with no guest
+  speech, and `what_guests_ask.py` reports minutes per day, but nothing
+  watches the number for you. Measured on the gallery's own project the headroom is large (peak
   7K tokens/minute against a 65K limit) because one robot means one
   conversation at a time, so this is about tidiness rather than risk.
 - **Keywords on the slides.** The one that would actually improve search. All
