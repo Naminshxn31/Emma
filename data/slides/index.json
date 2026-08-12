@@ -2841,175 +2841,127 @@
         "discovery",
         "tomorrow"
       ],
-      "script_th": "แนวคิดหลักของเราคือ หนึ่งสถานที่ หลากหลายโลกค่ะ มีโลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ"
+      "script_th": "แนวคิดหลักของเราคือ หนึ่งสถานที่ หลากหลายโลกค่ะ บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ"
     },
     {
       "id": "ew-016",
       "file": "ew_016.jpg",
       "type": "deck",
-      "title_th": "One Place Many Worlds — A World of MOVEMENT",
+      "title_th": "One Place Many Worlds — โลกแห่งการเคลื่อนไหว",
       "title_en": "One Place Many Worlds — a world of movement",
-      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
-      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "summary_th": "หน้า One Place Many Worlds ที่เน้นโลกแห่งการเคลื่อนไหว",
+      "summary_en": "The One Place Many Worlds page highlighting a world of movement.",
       "keywords_th": [
-        "หกโลก",
-        "การเคลื่อนไหว",
-        "แรงบันดาลใจ",
-        "ความผ่อนคลาย",
-        "การเชื่อมต่อ",
-        "การค้นพบ",
-        "อนาคต"
+        "one place",
+        "many worlds",
+        "การเคลื่อนไหว"
       ],
       "keywords_en": [
-        "six worlds",
-        "movement",
-        "inspiration",
-        "wellness",
-        "connection",
-        "discovery",
-        "tomorrow"
+        "one place",
+        "many worlds",
+        "movement"
       ],
-      "silent": true
+      "script_th": "เริ่มจากโลกแห่งการเคลื่อนไหวค่ะ"
     },
     {
       "id": "ew-017",
       "file": "ew_017.jpg",
       "type": "deck",
-      "title_th": "One Place Many Worlds — A World of DISCOVERY",
-      "title_en": "One Place Many Worlds — a world of discovery",
-      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
-      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "title_th": "One Place Many Worlds — โลกแห่งความผ่อนคลาย",
+      "title_en": "One Place Many Worlds — a world of wellness",
+      "summary_th": "หน้า One Place Many Worlds ที่เน้นโลกแห่งความผ่อนคลาย",
+      "summary_en": "The One Place Many Worlds page highlighting a world of wellness.",
       "keywords_th": [
-        "หกโลก",
-        "การเคลื่อนไหว",
-        "แรงบันดาลใจ",
-        "ความผ่อนคลาย",
-        "การเชื่อมต่อ",
-        "การค้นพบ",
-        "อนาคต"
+        "one place",
+        "many worlds",
+        "ความผ่อนคลาย"
       ],
       "keywords_en": [
-        "six worlds",
-        "movement",
-        "inspiration",
-        "wellness",
-        "connection",
-        "discovery",
-        "tomorrow"
+        "one place",
+        "many worlds",
+        "wellness"
       ],
-      "silent": true
+      "script_th": "โลกแห่งความผ่อนคลายค่ะ"
     },
     {
       "id": "ew-018",
       "file": "ew_018.jpg",
       "type": "deck",
-      "title_th": "One Place Many Worlds — A World of INSPIRATION",
-      "title_en": "One Place Many Worlds — a world of inspiration",
-      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
-      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "title_th": "One Place Many Worlds — โลกแห่งการค้นพบ",
+      "title_en": "One Place Many Worlds — a world of discovery",
+      "summary_th": "หน้า One Place Many Worlds ที่เน้นโลกแห่งการค้นพบ",
+      "summary_en": "The One Place Many Worlds page highlighting a world of discovery.",
       "keywords_th": [
-        "หกโลก",
-        "การเคลื่อนไหว",
-        "แรงบันดาลใจ",
-        "ความผ่อนคลาย",
-        "การเชื่อมต่อ",
-        "การค้นพบ",
-        "อนาคต"
+        "one place",
+        "many worlds",
+        "การค้นพบ"
       ],
       "keywords_en": [
-        "six worlds",
-        "movement",
-        "inspiration",
-        "wellness",
-        "connection",
-        "discovery",
-        "tomorrow"
+        "one place",
+        "many worlds",
+        "discovery"
       ],
-      "silent": true
+      "script_th": "โลกแห่งการค้นพบค่ะ"
     },
     {
       "id": "ew-019",
       "file": "ew_019.jpg",
       "type": "deck",
-      "title_th": "One Place Many Worlds — A World of WELLNESS",
-      "title_en": "One Place Many Worlds — a world of wellness",
-      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
-      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "title_th": "One Place Many Worlds — โลกแห่งอนาคต",
+      "title_en": "One Place Many Worlds — a world of tomorrow",
+      "summary_th": "หน้า One Place Many Worlds ที่เน้นโลกแห่งอนาคต",
+      "summary_en": "The One Place Many Worlds page highlighting a world of tomorrow.",
       "keywords_th": [
-        "หกโลก",
-        "การเคลื่อนไหว",
-        "แรงบันดาลใจ",
-        "ความผ่อนคลาย",
-        "การเชื่อมต่อ",
-        "การค้นพบ",
+        "one place",
+        "many worlds",
         "อนาคต"
       ],
       "keywords_en": [
-        "six worlds",
-        "movement",
-        "inspiration",
-        "wellness",
-        "connection",
-        "discovery",
+        "one place",
+        "many worlds",
         "tomorrow"
       ],
-      "silent": true
+      "script_th": "โลกแห่งอนาคตค่ะ"
     },
     {
       "id": "ew-020",
       "file": "ew_020.jpg",
       "type": "deck",
-      "title_th": "One Place Many Worlds — A World of CONNECTION",
+      "title_th": "One Place Many Worlds — โลกแห่งการเชื่อมต่อ",
       "title_en": "One Place Many Worlds — a world of connection",
-      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
-      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "summary_th": "หน้า One Place Many Worlds ที่เน้นโลกแห่งการเชื่อมต่อ",
+      "summary_en": "The One Place Many Worlds page highlighting a world of connection.",
       "keywords_th": [
-        "หกโลก",
-        "การเคลื่อนไหว",
-        "แรงบันดาลใจ",
-        "ความผ่อนคลาย",
-        "การเชื่อมต่อ",
-        "การค้นพบ",
-        "อนาคต"
+        "one place",
+        "many worlds",
+        "การเชื่อมต่อ"
       ],
       "keywords_en": [
-        "six worlds",
-        "movement",
-        "inspiration",
-        "wellness",
-        "connection",
-        "discovery",
-        "tomorrow"
+        "one place",
+        "many worlds",
+        "connection"
       ],
-      "silent": true
+      "script_th": "โลกแห่งการเชื่อมต่อค่ะ"
     },
     {
       "id": "ew-021",
       "file": "ew_021.jpg",
       "type": "deck",
-      "title_th": "One Place Many Worlds — A World of INDULGENCE",
-      "title_en": "One Place Many Worlds — a world of indulgence",
-      "summary_th": "แนวคิดหลัก One Place, Many Worlds: โลกแห่งการเคลื่อนไหว แรงบันดาลใจ ความผ่อนคลาย การเชื่อมต่อ การค้นพบ และโลกแห่งอนาคต บนพื้นฐานความยั่งยืน เทคโนโลยี และชุมชนที่ใส่ใจ — Futuristic Living, Limitless Possibilities",
-      "summary_en": "Core concept: One Place, Many Worlds — a world of movement, inspiration, wellness, connection, discovery, and tomorrow, built on sustainability, technology, and community. Futuristic Living. Limitless Possibilities.",
+      "title_th": "One Place Many Worlds — โลกแห่งแรงบันดาลใจ",
+      "title_en": "One Place Many Worlds — a world of inspiration",
+      "summary_th": "หน้า One Place Many Worlds ที่เน้นโลกแห่งแรงบันดาลใจ",
+      "summary_en": "The One Place Many Worlds page highlighting a world of inspiration.",
       "keywords_th": [
-        "หกโลก",
-        "การเคลื่อนไหว",
-        "แรงบันดาลใจ",
-        "ความผ่อนคลาย",
-        "การเชื่อมต่อ",
-        "การค้นพบ",
-        "อนาคต"
+        "one place",
+        "many worlds",
+        "แรงบันดาลใจ"
       ],
       "keywords_en": [
-        "six worlds",
-        "movement",
-        "inspiration",
-        "wellness",
-        "connection",
-        "discovery",
-        "tomorrow"
+        "one place",
+        "many worlds",
+        "inspiration"
       ],
-      "silent": true
+      "script_th": "และโลกแห่งแรงบันดาลใจค่ะ"
     },
     {
       "id": "ew-022",
