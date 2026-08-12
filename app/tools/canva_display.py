@@ -470,6 +470,14 @@ async def _ensure_page(*, launch: bool = True, why: str = "slide"):
     except Exception:
         logger.exception("could not put the canva window fullscreen — carrying on")
         _record_fullscreen(None)
+
+    # Same reasoning as fullscreen: outside its own try, and never fatal.
+    # A cold deck shows blanks; no deck shows nothing at all.
+    if settings.canva_warm_deck and not _warmed:
+        try:
+            await warm_deck(_page)
+        except Exception:
+            logger.exception("could not warm the canva deck — carrying on")
     return _page
 
 
@@ -623,6 +631,54 @@ async def _resync(page) -> None:
     if _at_page is not None and actual != _at_page:
         logger.info("canva was on page %d, not %d — corrected", actual, _at_page)
     _at_page = actual
+
+
+#: Pause between pages while warming the deck. Long enough for the viewer to
+#: ask for the next page's artwork, short enough that fifty pages is under a
+#: minute of startup.
+WARM_STEP_S = 0.55
+
+_warmed = False
+
+
+async def warm_deck(page, total: int | None = None) -> int:
+    """Walk the whole deck once so every page is drawn before a guest arrives.
+
+    Canva's viewer loads pages as you reach them. Opening the deck and then
+    jumping to page 35 doesn't show page 35 — it shows the page template,
+    a pale empty gradient, while the artwork is still being fetched. The
+    viewer says so itself: the progress bar under the page counter lights up
+    only as far as you have walked.
+
+    That is the blank screen a guest saw, and no amount of waiting on our
+    side fixes it, because nothing had been asked for. The tour jumps around
+    — a question pulls the screen onto a facility twenty pages away and back
+    — so "only ever move one page" isn't available either.
+
+    Walking the deck once at startup is. Afterwards the pages are in the
+    viewer and a jump lands on a picture. Costs about half a minute, once,
+    before anybody is standing there.
+    """
+    global _at_page, _warmed
+    if total is None:
+        total = deck_total()
+    if not total:
+        return 0
+    try:
+        await page.evaluate("location.hash = '#1'")
+        await asyncio.sleep(1.0)
+        for _ in range(total - 1):
+            await page.keyboard.press("ArrowRight")
+            await asyncio.sleep(WARM_STEP_S)
+        await page.evaluate("location.hash = '#1'")
+        await asyncio.sleep(0.5)
+    except Exception:
+        logger.warning("could not warm the canva deck", exc_info=True)
+        return 0
+    _at_page = 1
+    _warmed = True
+    logger.info("warmed %d canva pages", total)
+    return total
 
 
 async def _step_to(page, target: int) -> bool:

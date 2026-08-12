@@ -152,8 +152,25 @@ async def shoot(page):
     return image, thumb(image)
 
 
+async def step_to(page, number: int) -> None:
+    """Move one page forward, or deep-link if we're not where we thought.
+
+    Sequential, because Canva loads the deck as you walk it. The viewer's
+    progress bar shows this plainly: after opening on page 1 only the first
+    handful of ticks are lit, and jumping to page 35 shows a page that has
+    not been drawn yet — a pale empty gradient, which is exactly what a
+    guest reported seeing on the gallery screen. Walking is not politeness
+    towards Canva, it is the only way the pages exist to be photographed.
+    """
+    here = (await page.evaluate("location.hash") or "").lstrip("#")
+    if here.isdigit() and int(here) == number - 1:
+        await page.keyboard.press("ArrowRight")
+        return
+    await page.evaluate("location.hash = '#%d'" % number)
+
+
 async def capture(page, number: int):
-    """Go to a page and wait for it to actually finish drawing.
+    """Wait for the current page to actually finish drawing.
 
     The first version slept 2.5 s and moved on. That produced a mapping of
     22 pages out of 50, with ten consecutive pages all "matching" the same
@@ -166,8 +183,8 @@ async def capture(page, number: int):
     then take that. Returns `(image, thumbnail, settled, seconds)` — a page
     that never stopped changing is reported rather than quietly used.
     """
-    await page.evaluate("location.hash = '#%d'" % number)
-    await asyncio.sleep(1.0)
+    await step_to(page, number)
+    await asyncio.sleep(0.8)
 
     started = asyncio.get_event_loop().time()
     image, previous = await shoot(page)

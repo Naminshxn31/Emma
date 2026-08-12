@@ -40,6 +40,13 @@ def _reset(monkeypatch):
     # fixture — same class of leak as `_ours_at` above, found the same way.
     monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
     monkeypatch.setattr(canva_display, "_PAGE_MAP_TOTAL", None)
+    # Where the window is believed to be, and whether the deck has been
+    # walked. Both survive a test and both change what the next one does —
+    # the warm-up test left `_at_page` at 1 and
+    # `test_a_failed_move_forgets_where_it_was` then asserted None against a
+    # number it never set. Third leak of this shape in this fixture.
+    monkeypatch.setattr(canva_display, "_at_page", None)
+    monkeypatch.setattr(canva_display, "_warmed", False)
     monkeypatch.setattr(settings, "canva_url", "https://canva.test/design/x/view")
     monkeypatch.setattr(settings, "canva_deck_prefix", "ew")
 
@@ -1345,3 +1352,62 @@ def test_a_fullscreen_failure_does_not_cost_us_the_window(monkeypatch):
 
     got = asyncio.run(canva_display._ensure_page())
     assert got is page, "the window was thrown away because fullscreen failed"
+
+
+# ==================== canva loads pages as you walk them ====================
+
+
+class WalkPage(KeyPage):
+    """`KeyPage` plus the hash writes. Deliberately a subclass and not a
+    second `KeyPage`: defining that name twice silently replaced the one
+    above, and `test_a_failed_move_forgets_where_it_was` — whose whole point
+    is a `press` that raises — quietly stopped raising and passed for no
+    reason. Caught because it then failed on a leaked `_at_page`."""
+
+    def __init__(self):
+        super().__init__()
+        self.hashes: list[str] = []
+
+    async def evaluate(self, js):
+        if "location.hash =" in js:
+            self.hashes.append(js.split("'")[1])
+        return ""
+
+
+def test_warming_walks_every_page_and_comes_back(monkeypatch):
+    """The fix for the blank page.
+
+    Canva fetches a page when you reach it; jump to 35 in a cold deck and it
+    paints the template and nothing else. Walking the deck once means a
+    later jump lands on a picture.
+    """
+    monkeypatch.setattr(canva_display, "WARM_STEP_S", 0.0)
+    monkeypatch.setattr(canva_display, "_warmed", False)
+    page = WalkPage()
+
+    assert run(canva_display.warm_deck(page, total=50)) == 50
+    assert page.keys == ["ArrowRight"] * 49, "one step per page after the first"
+    assert page.hashes == ["#1", "#1"], "starts at 1 and ends back at 1"
+    assert canva_display._at_page == 1
+
+
+def test_warming_does_nothing_when_the_deck_was_never_measured(monkeypatch, tmp_path):
+    """No measured total, no idea how far to walk. Guessing a length here
+    would press ArrowRight into whatever is on screen."""
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    canva_display.load_page_map(force=True)
+    page = WalkPage()
+    assert run(canva_display.warm_deck(page)) == 0
+    assert page.keys == []
+
+
+def test_a_broken_warm_up_never_costs_us_the_window(monkeypatch):
+    """Same rule as fullscreen: a cold deck shows blanks, no deck shows
+    nothing. The cosmetic step must not be able to fail the launch."""
+    monkeypatch.setattr(canva_display, "WARM_STEP_S", 0.0)
+
+    class Hostile(WalkPage):
+        async def evaluate(self, js):
+            raise RuntimeError("viewer went away")
+
+    assert run(canva_display.warm_deck(Hostile(), total=10)) == 0

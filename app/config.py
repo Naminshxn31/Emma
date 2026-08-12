@@ -122,6 +122,18 @@ class Settings:
     # is reported immediately either way.
     canva_open_at_start: bool = _get_bool("CANVA_OPEN_AT_START", False)
 
+    # Walk the whole deck once when the window opens, so every page is drawn
+    # before a guest is standing in front of it.
+    #
+    # Canva's viewer fetches pages as you reach them, and its own progress bar
+    # shows how far it has got. Open the deck and jump to page 35 and you get
+    # the page template — a pale empty gradient with nothing on it. That is
+    # the "หน้าหาย" a guest reported, and it is not a timing bug on our side:
+    # nothing had asked for that page. A tour that answers questions cannot
+    # promise to only ever move one page at a time, so the deck gets walked
+    # up front instead. About half a minute, once. See `warm_deck`.
+    canva_warm_deck: bool = _get_bool("CANVA_WARM_DECK", True)
+
     # How often to check whether somebody moved the Canva deck by hand, so
     # the robot can narrate the page they went to. One `location.hash` read
     # per interval — cheap, but it is polling, so don't drop it far below a

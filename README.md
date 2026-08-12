@@ -566,6 +566,28 @@ robot describes this one is a lie told to a customer.
 Re-run it whenever the deck is edited in Canva. Nothing detects that
 automatically yet.
 
+### Why the deck gets walked at startup
+
+Canva's viewer fetches a page when you reach it. Open the deck and jump
+straight to page 35 and you do not get page 35 — you get the page template,
+a pale empty gradient with nothing on it, while the artwork is still being
+requested. The viewer admits this: the progress bar under the page counter
+lights up only as far as you have actually walked.
+
+That is the blank screen a guest saw, and no amount of waiting on our side
+fixes it, because nothing had asked for the page. A tour that answers
+questions can't promise to only ever move one page at a time either — one
+"ขอดูฟิตเนสหน่อย" is a jump of twenty pages.
+
+So `warm_deck` walks the whole deck once when the window opens, then returns
+to page 1. About half a minute, before anybody is standing there, after
+which a jump lands on a picture. `CANVA_WARM_DECK=false` turns it off.
+
+It needs a measured total to know how far to walk, so it does nothing until
+`canva_pages.py` has been run — pressing ArrowRight a guessed number of
+times into a deck of unknown length is how the first version of all this
+went wrong.
+
 ## Before using this with real customers
 
 **Four fields in `data/condo_facts.json` are still blank** — starting price,
