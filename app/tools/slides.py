@@ -609,6 +609,27 @@ def pause_for_barge_in() -> bool:
     return True
 
 
+async def shutdown_display() -> None:
+    """Stop the tour and close the window. No questions asked.
+
+    Split out of `close_presentation` because two callers want the same
+    effect for opposite reasons: a guest asking for the screen to go away,
+    and nobody being in the room at all. The guest-facing tool checks that
+    somebody actually asked (`app/heard.py`); the idle timer must not, since
+    the whole point is that nobody said anything.
+    """
+    from app.tools import canva_display
+
+    reset_state()
+    _set_current(None)
+    try:
+        await canva_display.shutdown()
+    except Exception:
+        # The screen is already logically off; a browser that won't close is
+        # a problem for the next launch, which handles a dead handle anyway.
+        logger.exception("could not close the canva window")
+
+
 def _by_id(slide_id: str) -> dict | None:
     return next((s for s in load_slides() if s["id"] == slide_id), None)
 
@@ -976,14 +997,7 @@ async def close_presentation() -> dict:
         return {"ok": False, "closed": False, "needs_confirmation": True,
                 "heard": heard.last(), "instruction": heard.CONFIRM_FIRST}
 
-    reset_state()
-    _set_current(None)
-    try:
-        await canva_display.shutdown()
-    except Exception:
-        # The screen is already logically off; a browser that won't close is
-        # a problem for the next launch, which handles a dead handle anyway.
-        logger.exception("could not close the canva window")
+    await shutdown_display()
     return {
         "ok": True, "cleared": True, "closed": True,
         "instruction": "ปิดหน้าต่างพรีเซนต์แล้ว ตอบรับสั้นๆ ห้ามเรียกเครื่องมือสไลด์อีกจนกว่าลูกค้าจะขอ",

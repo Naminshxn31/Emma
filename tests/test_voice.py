@@ -1912,3 +1912,56 @@ def test_connect_opens_the_session_on_this_provider_s_model(monkeypatch):
         "connected to %r — the session asked for the configured model rather "
         "than the one it had switched to" % asked["model"]
     )
+
+
+# ============ hanging up on an empty room ============
+
+
+def test_the_idle_watcher_is_not_even_started_when_switched_off(monkeypatch):
+    """The bug this test exists for, found by the suite hanging.
+
+    The session's tasks race under `FIRST_COMPLETED`, so a task that returns
+    straight away ends the session straight away. `_close_when_nobody_is_there`
+    returns immediately when `IDLE_TIMEOUT_S` is unset — which is the default
+    — so an "off" watcher hung up on every guest the moment they connected.
+
+    A disabled feature must not be present as a task at all. Asserted on the
+    source rather than by running a session, because the failure is a task
+    that *exists*, and a session test would have to reproduce the whole race
+    to see it.
+    """
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "app" / "session.py").read_text(
+        encoding="utf-8")
+    guarded = source.split("jobs = {up, down, watch, unanswered}", 1)[1]
+    creation = guarded.split("asyncio.wait", 1)[0]
+    assert "if settings.idle_timeout_s:" in creation, (
+        "the idle watcher must be created only when it is switched on")
+
+
+def test_idle_timeout_defaults_to_off():
+    """A demo that hangs up mid-sentence because somebody set thirty seconds
+    is worse than the bill it saves."""
+    from app.config import Settings
+
+    assert Settings().idle_timeout_s == 0
+
+
+def test_only_guest_speech_resets_the_idle_clock(monkeypatch):
+    """Not any activity.
+
+    A robot narrating 65 slides to an empty room is the exact case the timer
+    exists to end, and it is busy the whole time. If assistant audio reset
+    the clock, the one session that costs money for nothing would be the one
+    session that never times out.
+    """
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "app" / "session.py").read_text(
+        encoding="utf-8")
+    resets = [line for line in source.splitlines() if "_last_heard_at = " in line]
+    # One in __init__, one on the heard event. Any third is suspicious.
+    assert len(resets) == 2, resets
+    heard_block = source.split('elif event.kind == "user_transcript":', 1)[1]
+    assert "_last_heard_at" in heard_block.split("elif event.kind", 1)[0]

@@ -51,12 +51,54 @@ def load(days: int) -> list[dict]:
         path = folder / ("%s.jsonl" % (today - dt.timedelta(days=back)))
         if not path.exists():
             continue
+        day = path.stem
         for line in path.read_text(encoding="utf-8").splitlines():
             try:
-                rows.append(json.loads(line))
+                row = json.loads(line)
             except ValueError:
                 continue          # a half-written last line is normal
+            # The date lives in the filename, not in the rows. Carrying it
+            # here is what lets everything below group by day without each
+            # section re-deriving it from a path it no longer has.
+            row["day"] = day
+            rows.append(row)
     return rows
+
+
+def _session_seconds(rows: list[dict]) -> dict[str, float]:
+    """How long each day's sessions ran, from the log's own timestamps.
+
+    `session_start` and `session_end` carry `t` as HH:MM:SS. A session that
+    crashed has no end; it is credited up to the last line seen that day
+    rather than dropped, because an unfinished session is exactly the shape
+    of the problem this section is looking for.
+    """
+    out: dict[str, float] = {}
+    open_at: dict[str, float] = {}
+    last_at: dict[str, float] = {}
+
+    def seconds(stamp: str) -> float | None:
+        parts = (stamp or "").split(":")
+        if len(parts) != 3:
+            return None
+        try:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+        except ValueError:
+            return None
+
+    for row in rows:
+        day = row.get("day") or ""
+        now = seconds(row.get("t", ""))
+        if now is None:
+            continue
+        last_at[day] = now
+        if row.get("event") == "session_start":
+            open_at[day] = now
+        elif row.get("event") == "session_end" and day in open_at:
+            out[day] = out.get(day, 0.0) + max(0.0, now - open_at.pop(day))
+    for day, started in open_at.items():
+        out[day] = out.get(day, 0.0) + max(0.0, last_at.get(day, started) - started)
+    return out
 
 
 def head(title: str) -> None:
@@ -119,7 +161,33 @@ def main() -> int:
                       if r.get("showed") == slide and r.get("title")), "")
         print("  %3dx  %-10s %s" % (n, slide, title or ""))
 
-    head("4. คำที่ลูกค้าพูดบ่อย (ดิบ ไม่ตัดคำ)")
+    head("4. การใช้งานต่อวัน — ดูว่าโควตาพอไหม")
+    per_day = collections.Counter()
+    minutes = collections.Counter()
+    for r in rows:
+        day = r.get("day") or ""
+        if r.get("event") == "session_start":
+            per_day[day] += 1
+    # Session length from the log's own clock. Not a bill — the provider is
+    # the only thing that can say what was actually charged — but it is the
+    # number that moves, and a day that jumps from twenty minutes to four
+    # hours is visible here before it is visible anywhere else.
+    for path_day, seconds in _session_seconds(rows).items():
+        minutes[path_day] = seconds / 60.0
+    if not per_day and not minutes:
+        print("  log ไม่ได้บันทึกวันที่ไว้ในแต่ละบรรทัด — ดูรวมทั้งช่วงแทน")
+        print("  เปิดคุย %d ครั้ง | รวม %.0f นาที" % (sessions, sum(minutes.values())))
+    for day in sorted(set(per_day) | set(minutes), reverse=True)[:14]:
+        print("  %-12s %2d ครั้ง  %6.1f นาที" % (day or "(ไม่ทราบวัน)",
+                                                 per_day.get(day, 0),
+                                                 minutes.get(day, 0.0)))
+    print("  รวม %.0f นาทีในช่วงนี้" % sum(minutes.values()))
+    print("  ประมาณค่าใช้จ่ายถ้าเป็นแบบเสียเงิน: ~%.0f บาท"
+          % (sum(minutes.values()) * 0.023 * 33))
+    print("  (in $0.005 + out $0.018 ต่อนาที ที่ 33 บาท/ดอลลาร์ — ประมาณคร่าวๆ")
+    print("   ตัวเลขจริงดูที่ ai.google.dev เท่านั้น)")
+
+    head("5. คำที่ลูกค้าพูดบ่อย (ดิบ ไม่ตัดคำ)")
     words = collections.Counter()
     for line in heard:
         for w in line.split():

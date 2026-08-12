@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -58,6 +59,9 @@ class VoiceSession:
         #: The pending deferred nudge, if any. One at a time: a second would
         #: land on top of the first and push the deck two slides.
         self._nudge_task: asyncio.Task | None = None
+        #: When a guest was last heard. Starts now rather than at zero, or a
+        #: session would time out before anybody had a chance to speak.
+        self._last_heard_at = time.monotonic()
 
     async def run(self) -> None:
         await self.ws.accept()
@@ -99,8 +103,17 @@ class VoiceSession:
                 down = asyncio.create_task(self._provider_to_browser())
                 watch = asyncio.create_task(self._follow_canva())
                 unanswered = asyncio.create_task(self._resume_after_silence())
+                jobs = {up, down, watch, unanswered}
+                # Only when it is switched on. These tasks race under
+                # FIRST_COMPLETED, so a task that returns immediately ends
+                # the session immediately — with IDLE_TIMEOUT_S unset (the
+                # default) an "off" watcher hung up on every guest the
+                # instant they connected. A disabled feature must not be
+                # present as a task at all.
+                if settings.idle_timeout_s:
+                    jobs.add(asyncio.create_task(self._close_when_nobody_is_there()))
                 _done, pending = await asyncio.wait(
-                    {up, down, watch, unanswered}, return_when=asyncio.FIRST_COMPLETED
+                    jobs, return_when=asyncio.FIRST_COMPLETED,
                 )
                 for task in pending:
                     task.cancel()
@@ -242,6 +255,10 @@ class VoiceSession:
                     # anybody asked for what they are about to do. See
                     # `app/heard.py` — this is the field that decides.
                     heard.record(event.text or "")
+                    # Somebody is in the room. Only guest speech resets the
+                    # idle clock — the robot narrating to nobody is the case
+                    # the timer exists to end, and it is busy throughout.
+                    self._last_heard_at = time.monotonic()
                     await self._send_json({"type": "user_transcript", "text": event.text or ""})
 
                 elif event.kind == "assistant_transcript":
@@ -384,6 +401,47 @@ class VoiceSession:
                     await self.provider.send_text(slides.CONTINUE_NUDGE)
                 except Exception:
                     logger.exception("could not resume the tour after silence")
+        except asyncio.CancelledError:
+            raise
+
+    async def _close_when_nobody_is_there(self) -> None:
+        """Hang up on an empty room.
+
+        A gallery session ends when a guest walks away, which produces no
+        event at all: the socket stays open, the Live API connection stays
+        billed, and the browser goes on holding a fullscreen window. On a
+        free tier that is quota; on a paid one it is money, at $0.005 a
+        minute of audio in, for a room with nobody in it.
+
+        "Nobody is there" is the absence of *guest* speech. Deliberately not
+        the absence of all activity — the robot narrating a 65-page deck to
+        an empty room is the exact case this exists to end, and it is busy
+        the whole time.
+
+        The timer resets on `heard`, so a guest who listens quietly through
+        a long slide and then speaks is fine; the window is minutes, not
+        seconds. Off by default, because a demo that hangs up mid-sentence
+        because somebody set it to thirty seconds is worse than the bill.
+        """
+        limit = settings.idle_timeout_s
+        if not limit:                     # never started; see `run`
+            return
+        try:
+            while True:
+                await asyncio.sleep(5.0)
+                quiet = time.monotonic() - self._last_heard_at
+                if quiet < limit:
+                    continue
+                logger.info("no guest speech for %.0fs — ending the session", quiet)
+                turnlog.record("idle_timeout", quiet_s=round(quiet))
+                await self._send_json({"type": "idle_timeout",
+                                       "quiet_s": round(quiet)})
+                from app.tools import slides
+                try:
+                    await slides.shutdown_display()
+                except Exception:
+                    logger.exception("could not close the display on idle")
+                return
         except asyncio.CancelledError:
             raise
 

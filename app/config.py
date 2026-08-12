@@ -134,6 +134,18 @@ class Settings:
     # up front instead. About half a minute, once. See `warm_deck`.
     canva_warm_deck: bool = _get_bool("CANVA_WARM_DECK", True)
 
+    # End a session after this many seconds with no guest speech. 0 = never.
+    #
+    # A gallery session ends when somebody walks away, which produces no
+    # event: the socket stays open, the Live API connection stays billed,
+    # and a fullscreen window stays on the wall. Measured against guest
+    # speech only, not activity — a robot narrating 65 slides to an empty
+    # room is exactly what this ends, and it is busy the whole time.
+    #
+    # Off by default. A demo that hangs up mid-sentence because somebody set
+    # this to thirty seconds is worse than the bill it saves.
+    idle_timeout_s: int = int(os.getenv("IDLE_TIMEOUT_S", "0") or 0)
+
     # How often to check whether somebody moved the Canva deck by hand, so
     # the robot can narrate the page they went to. One `location.hash` read
     # per interval — cheap, but it is polling, so don't drop it far below a
