@@ -751,7 +751,7 @@ Check, in order:
 pytest
 ```
 
-479 tests, no API key and no network (~90s). The OpenAI path runs against a
+495 tests, no API key and no network (~90s). The OpenAI path runs against a
 local WebSocket server impersonating the Realtime API (exercising the real
 `websockets` client, real JSON on the wire, and both relay pumps); the Gemini
 path runs against a scripted fake live session.
@@ -829,7 +829,7 @@ This is the voice layer, running on a PC. It is not yet on a robot.
   7K tokens/minute against a 65K limit) because one robot means one
   conversation at a time, so this is about tidiness rather than risk.
 - **Keywords on the slides.** The one that would actually improve search. All
-  59 deck slides carry fewer than three, and the measured overlap between real
+  65 deck slides carry fewer than three, and the measured overlap between real
   and off-topic questions is a direct consequence. Left undone deliberately:
   the words that matter are the ones guests really use, which are in the sales
   team's heads and will appear in `data/logs/` once this runs in front of
