@@ -566,6 +566,35 @@ robot describes this one is a lie told to a customer.
 Re-run it whenever the deck is edited in Canva. Nothing detects that
 automatically yet.
 
+### When the deck has actually changed
+
+Measuring it on 2026-08-12 found the design had been edited down from 59
+pages to 50, and the offsets say where: they hold at 0 through page 20, step
+to +5 at page 27, +8 at page 38 and +9 at page 44. Three sections were
+condensed — the entrance floor and Biogenesis, the underground facilities,
+and the third floor — and 18 live pages had no picture and no script on this
+side at all.
+
+A mapping table can only point at pictures that exist. When the pages
+themselves are new, re-export from Canva and rebuild:
+
+```
+python scripts/import_canva_export.py ~/Downloads/EmbassyWorld
+python scripts/import_canva_export.py ~/Downloads/EmbassyWorld --apply
+```
+
+It matches each exported page against the old images and **carries over the
+approved title, summary, keywords and narration script for every page that
+didn't change** — without that, re-exporting silently discards every script
+ever written. Pages that are genuinely new get a blank entry and are listed
+at the end together with the old slides that used to sit in that stretch of
+the deck, so their wording can be reused by someone entitled to decide what
+the project claims. It writes no content of its own.
+
+Afterwards the images *are* the deck: page number and slide id agree by
+construction and `canva_pages.json` is an identity, so there is nothing left
+to drift. `--apply` backs up `data/slides/` first.
+
 ### Why the deck gets walked at startup
 
 Canva's viewer fetches a page when you reach it. Open the deck and jump
