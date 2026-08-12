@@ -27,8 +27,16 @@ so a bad match is visible rather than silently written. Anything it is not
 confident about it leaves out, and a slide left out simply doesn't move the
 window.
 
+It opens the deck through `canva_display` — the same launcher the gallery
+uses, meaning the real Chrome channel and fullscreen. That is not tidiness:
+Canva withholds some slide images from Playwright's bundled Chromium because
+it recognises it as automated, and a run using a plain `chromium.launch()`
+photographed pages with their artwork missing and then "matched" them,
+at a distance of about eleven, to whichever of our frames was emptiest.
+
 Needs `CANVA_URL` in `.env`, `playwright install chromium`, and Pillow.
-Opens a normal window so you can watch. Takes a couple of minutes.
+Takes a few minutes; the window is fullscreen, so leave it alone while it
+runs.
 """
 from __future__ import annotations
 
@@ -224,8 +232,8 @@ def side_by_side(shot, slide_id: str, number: int, score: float, folder: Path):
     sheet.save(folder / ("page_%03d.png" % number))
 
 
-async def run(write: bool, keep: Path | None) -> int:
-    from playwright.async_api import async_playwright
+async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
+    from app.tools import canva_display
 
     if not settings.canva_url:
         print("CANVA_URL is not set in .env — nothing to measure.")
@@ -234,16 +242,37 @@ async def run(write: bool, keep: Path | None) -> int:
     frames = local_frames()
     print("ภาพในเครื่อง: %d เฟรม (%s-001 ... )" % (len(frames), settings.canva_deck_prefix))
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
-        page = await browser.new_page(viewport={"width": 1600, "height": 900})
-        await page.goto(settings.canva_url.split("#", 1)[0], wait_until="load")
-        await asyncio.sleep(6)
+    # Open the window the *product* opens, not a browser of this script's
+    # own. `canva_display._launch_browser` drives the real Chrome channel and
+    # hides the automation flag, and its docstring says why: "Canva serves
+    # some slide images to a normal browser but not to Playwright's bundled
+    # Chromium, which it recognises as automated." This script had its own
+    # plain `chromium.launch()`, so Canva withheld exactly those images and
+    # the run photographed pages with the artwork missing — which then
+    # matched, at a distance of about eleven, whichever of our frames was
+    # emptiest. Twenty-eight pages "unmatched" for a reason that was written
+    # down in this repo already.
+    #
+    # It is also fullscreen, so there is no Canva header or page counter in
+    # the frame and the screenshot is the page, framed exactly like the
+    # export it is being compared against.
+    #
+    # The lesson is the one this project keeps relearning: a measurement
+    # taken one layer away from the thing being judged reads as rigour and
+    # produces numbers about something else. Measure through the same code
+    # the gallery runs.
+    canva_display.settings.canva_warm_deck = False   # this walk is the warm-up
+    page = await canva_display._ensure_page(why="measure the page mapping")
+    if page is None:
+        print("เปิดหน้าต่าง canva ไม่ได้ — ดูข้อความข้างบน")
+        return 1
+    print("เปิดด้วยหน้าต่างเดียวกับตอนพรีเซนต์จริง (chrome จริง + เต็มจอ)")
 
-        total = await total_pages(page)
+    try:
+        total = forced_total or await total_pages(page)
         if total is None:
             print("อ่านจำนวนหน้าของ canva ไม่ได้ — หยุดไว้ก่อน ดีกว่าเดา")
-            await browser.close()
+            print("  ใส่ --total ถ้ารู้จำนวนหน้าอยู่แล้ว")
             return 1
         print("หน้าใน canva จริง: %d" % total)
         if total != len(frames):
@@ -273,8 +302,8 @@ async def run(write: bool, keep: Path | None) -> int:
                   % (number, best[1], best[0], second[1], second[0], waited, why))
             if keep:
                 side_by_side(image, best[1] if ok else "", number, best[0], keep)
-
-        await browser.close()
+    finally:
+        await canva_display.shutdown()
 
     unplaced = [sid for sid, _ in frames if sid not in mapping]
     blank = [n for n, _sid, score, _s2, _d2, ok in rows if not ok]
@@ -312,12 +341,15 @@ def main() -> int:
     ap.add_argument("--write", action="store_true",
                     help="save data/slides/canva_pages.json")
     ap.add_argument("--keep-shots", metavar="DIR",
-                    help="save every canva page as a png, to check by eye")
+                    help="save every canva page beside its match, to check by eye")
+    ap.add_argument("--total", type=int,
+                    help="pages in the deck, if canva won't say (fullscreen "
+                         "hides its own counter)")
     args = ap.parse_args()
     keep = Path(args.keep_shots) if args.keep_shots else None
     if keep:
         keep.mkdir(parents=True, exist_ok=True)
-    return asyncio.run(run(args.write, keep))
+    return asyncio.run(run(args.write, keep, args.total))
 
 
 if __name__ == "__main__":
