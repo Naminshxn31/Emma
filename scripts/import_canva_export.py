@@ -175,8 +175,17 @@ def main() -> int:
         }
         if carried:
             carried_from.add(best["id"])
+            # Everything a human decided about this picture. `silent` and
+            # the approval flags were missing here, and both fail silently
+            # in the worst direction: a re-import would have un-marked the
+            # seven animation frames, so the robot reads the same line
+            # seven times again, and it would have quietly withdrawn every
+            # signature from every approved script. The picture is the
+            # same picture — that is the whole basis for carrying the
+            # script — so it is the basis for carrying the sign-off too.
             for key in ("title_th", "title_en", "summary_th", "summary_en",
-                        "keywords_th", "keywords_en", "script_th", "ask_th"):
+                        "keywords_th", "keywords_en", "script_th", "ask_th",
+                        "silent", "script_approved", "script_approved_by"):
                 if key in best:
                     entry[key] = best[key]
             print("  หน้า %2d  <- %s  (%.1f)  %s"
@@ -195,6 +204,9 @@ def main() -> int:
     print()
     print("นำข้อมูลเดิมมาใช้ได้ %d หน้า / ต้องเขียนใหม่ %d หน้า"
           % (len(pages) - len(fresh), len(fresh)))
+    print("  ในนั้นเป็นหน้าเงียบ %d | บทที่อนุมัติแล้ว %d"
+          % (sum(1 for e in entries if e.get("silent")),
+             sum(1 for e in entries if e.get("script_approved"))))
 
     if fresh:
         print()

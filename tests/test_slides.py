@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -1912,3 +1913,23 @@ def test_every_deck_slide_can_be_narrated_or_is_deliberately_silent(slides):
         if slide.get("type") != "deck" or slide.get("silent"):
             continue
         assert slide.get("script_th") or slide.get("summary_th"), slide["id"]
+
+
+def test_reimporting_keeps_what_a_human_decided(tmp_path):
+    """`silent` and the approval flags have to survive a re-import.
+
+    Both fail silently and in the worst direction. Losing `silent` puts the
+    seven "ONE PLACE" animation frames back into the narration, so the robot
+    reads the same line seven times at a guest. Losing `script_approved`
+    withdraws every signature without telling anyone — and the flag exists
+    precisely to tell the model "a human read these exact words".
+
+    Checks the carry list itself, because the failure is a *missing* key and
+    no amount of running the script on unchanged data would reveal it.
+    """
+    source = Path(__file__).resolve().parent.parent / "scripts" / "import_canva_export.py"
+    text = source.read_text(encoding="utf-8")
+    carried = text.split('for key in (', 1)[1].split('):', 1)[0]
+    for key in ("silent", "script_approved", "script_approved_by",
+                "script_th", "ask_th", "keywords_th"):
+        assert '"%s"' % key in carried, "re-import would drop %r" % key
