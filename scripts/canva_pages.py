@@ -60,11 +60,40 @@ MARGIN = 1.35
 
 def thumb(image):
     from PIL import Image
-    return list(image.convert("L").resize(THUMB, Image.BILINEAR).getdata())
+    return list(image.convert("L").resize(THUMB, Image.BILINEAR).tobytes())
 
 
 def distance(a, b) -> float:
     return sum(abs(x - y) for x, y in zip(a, b)) / len(a)
+
+
+def spread(t) -> float:
+    """Standard deviation of a thumbnail — how much is *on* the page.
+
+    Canva's page template is a pale gradient and the artwork arrives on top
+    of it, so a page that hasn't finished loading is a smooth wash. That is
+    exactly what a guest saw on the gallery screen, and photographing it
+    would write "this page is blank" into the mapping as though it were a
+    fact about the deck.
+    """
+    mean = sum(t) / len(t)
+    return (sum((v - mean) ** 2 for v in t) / len(t)) ** 0.5
+
+
+#: Below this, the screenshot is a background with nothing on it yet.
+#:
+#: Measured, not picked. Across all 59 exported frames at this thumbnail
+#: size the *faintest* real page reads 20.9 (`ew_001`, the near-black cover)
+#: and the palest floor plans sit in the high twenties; a bare gradient of
+#: the kind Canva paints before the artwork arrives reads 7.2. Fourteen is
+#: the middle of that gap with room on both sides.
+#:
+#: The evidence this matters: the first run of this script slept a fixed
+#: 2.5 s and matched ten consecutive pages to the same near-empty frame
+#: with scores identical to one decimal place. Pages do not resemble each
+#: other that exactly. It was photographing the loading state — the same
+#: blank screen a guest had already reported seeing.
+MIN_SPREAD = 14.0
 
 
 def local_frames() -> list[tuple[str, list[int]]]:
@@ -107,18 +136,52 @@ async def total_pages(page) -> int | None:
     return None
 
 
-async def capture(page, number: int):
-    """Go to a page, let it settle, return (image, thumbnail)."""
+#: Longest we will wait for one page to finish drawing. Generous: this runs
+#: once, by hand, and a slow page costs seconds — a wrong mapping costs a
+#: guest being shown the wrong room.
+SETTLE_CAP_S = 20.0
+
+#: Two consecutive readings this close mean the page has stopped changing.
+STILL = 0.8
+
+
+async def shoot(page):
     from PIL import Image
     import io
-    await page.evaluate("location.hash = '#%d'" % number)
-    # Canva animates in, and the artwork arrives after the background. Too
-    # short a wait here photographs the empty gradient — which is exactly
-    # what the gallery screen was showing, and would quietly poison the
-    # mapping with "this page is blank".
-    await asyncio.sleep(2.5)
     image = Image.open(io.BytesIO(await page.screenshot()))
     return image, thumb(image)
+
+
+async def capture(page, number: int):
+    """Go to a page and wait for it to actually finish drawing.
+
+    The first version slept 2.5 s and moved on. That produced a mapping of
+    22 pages out of 50, with ten consecutive pages all "matching" the same
+    near-empty frame — because a fixed sleep doesn't wait for anything, it
+    just hopes. The heavy pages, the floor plans and the room photographs,
+    are precisely the ones that lose that race, which is why every page it
+    got right was a simple one.
+
+    So watch instead of hope: screenshot until two readings in a row agree,
+    then take that. Returns `(image, thumbnail, settled, seconds)` — a page
+    that never stopped changing is reported rather than quietly used.
+    """
+    await page.evaluate("location.hash = '#%d'" % number)
+    await asyncio.sleep(1.0)
+
+    started = asyncio.get_event_loop().time()
+    image, previous = await shoot(page)
+    while True:
+        await asyncio.sleep(0.6)
+        image, current = await shoot(page)
+        waited = asyncio.get_event_loop().time() - started
+        # Still on the background? That is not "settled", that is not loaded
+        # yet — a blank page is perfectly stable.
+        if distance(current, previous) <= STILL and spread(current) >= MIN_SPREAD:
+            return image, current, True, waited
+        if waited >= SETTLE_CAP_S:
+            return image, current, False, waited
+        previous = current
 
 
 def side_by_side(shot, slide_id: str, number: int, score: float, folder: Path):
@@ -172,17 +235,25 @@ async def run(write: bool, keep: Path | None) -> int:
 
         mapping: dict[str, int] = {}
         rows = []
+        stalled = []
         for number in range(1, total + 1):
-            image, shot = await capture(page, number)
+            image, shot, settled, waited = await capture(page, number)
             scored = sorted(((distance(shot, t), sid) for sid, t in frames))
             best, second = scored[0], scored[1] if len(scored) > 1 else (999.0, "-")
-            ok = best[0] <= SAME and best[0] * MARGIN <= second[0]
+            # An unsettled page is not evidence about the deck, whatever it
+            # happens to resemble. Refusing to score it is the difference
+            # between measuring the deck and measuring the loading spinner.
+            ok = settled and best[0] <= SAME and best[0] * MARGIN <= second[0]
+            if not settled:
+                stalled.append(number)
             if ok:
                 mapping[best[1]] = number
             rows.append((number, best[1], best[0], second[1], second[0], ok))
-            print("  หน้า %2d -> %-8s (%.1f)   รองลงมา %-8s (%.1f) %s"
-                  % (number, best[1], best[0], second[1], second[0],
-                     "" if ok else "<-- ไม่มั่นใจ ข้าม"))
+            why = ("" if ok else
+                   "<-- โหลดไม่เสร็จใน %.0f วิ ข้าม" % waited if not settled else
+                   "<-- ไม่มั่นใจ ข้าม")
+            print("  หน้า %2d -> %-8s (%.1f)   รองลงมา %-8s (%.1f)  %4.1fวิ %s"
+                  % (number, best[1], best[0], second[1], second[0], waited, why))
             if keep:
                 side_by_side(image, best[1] if ok else "", number, best[0], keep)
 
@@ -196,9 +267,16 @@ async def run(write: bool, keep: Path | None) -> int:
         print("  ภาพพวกนี้จะไม่อยู่ในการพรีเซนต์ และจะไม่สั่งให้หน้าต่าง canva ขยับ")
         print("  แต่ยังค้นหาเจอและขึ้นบนจอของเราได้ตามปกติ")
     if blank:
-        print("หน้า canva ที่หาภาพคู่ไม่ได้: %s" % ", ".join(str(n) for n in blank))
-        print("  เปิดรูปเทียบใน --keep-shots ดูก่อนว่าเป็นหน้าใหม่ที่ยังไม่ได้ export")
-        print("  หรือแค่ตอนแคปหน้ายังโหลดไม่เสร็จ")
+        print("หน้า canva ที่ยังจับคู่ไม่ได้: %s" % ", ".join(str(n) for n in blank))
+        print("  เปิดรูปเทียบใน --keep-shots ดูว่าเป็นหน้าใหม่ที่ยังไม่ได้ export จริง")
+    if stalled:
+        print("หน้าที่วาดไม่เสร็จใน %.0f วินาที: %s"
+              % (SETTLE_CAP_S, ", ".join(str(n) for n in stalled)))
+        print("  ยังไม่เขียนหน้าพวกนี้ลงตาราง เพราะสิ่งที่แคปได้คือพื้นหลังเปล่า")
+        print("  ไม่ใช่หน้าสไลด์ — ลองรันซ้ำ หรือเพิ่ม SETTLE_CAP_S")
+    if len(mapping) < total * 0.9:
+        print("\n** จับคู่ได้ไม่ถึง 90%% — อย่าเพิ่ง --write **")
+        print("   ตารางที่ไม่ครบทำให้สไลด์ที่หายไปไม่ถูกพรีเซนต์เลย")
     print("\nลำดับพรีเซนต์หลังจากนี้จะเป็นลำดับหน้าของ canva %d หน้า" % len(mapping))
 
     if write:
