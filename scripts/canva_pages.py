@@ -240,6 +240,60 @@ def side_by_side(shot, slide_id: str, number: int, score: float, folder: Path):
     sheet.save(folder / ("page_%03d.png" % number))
 
 
+def verify(rows, existing: dict, total: int) -> None:
+    """Compare what was just seen against the mapping already on disk.
+
+    Once the deck has been rebuilt from an export, page and id agree by
+    construction and there is nothing left to measure. Re-measuring can then
+    only *lose*: this run matched 60 of 66 pages and would have written a
+    table that quietly dropped six real slides, four of which failed on
+    nothing worse than a thin margin between two pages of the same
+    animation. Overwriting a correct table with a lossy one is not a
+    measurement, it is damage.
+
+    So when a mapping exists, this run becomes a check on it. Three
+    outcomes per page, and only one of them is a problem:
+
+    - **agrees** — the picture on that page is the one the table says.
+    - **inconclusive** — nothing matched well, or the page was still moving.
+      A video page is not evidence about anything.
+    - **disagrees** — a confident match onto a different page. This is the
+      one worth waking up for, and it is what a drifted deck looks like.
+    """
+    agree, unsure, differ = [], [], []
+    for number, best, score, _second, _sd, ok in rows:
+        expected = existing.get(best)
+        if not ok:
+            unsure.append(number)
+        elif expected == number:
+            agree.append(number)
+        else:
+            differ.append((number, best, expected, score))
+
+    print()
+    print("== เทียบกับตารางที่มีอยู่ ==")
+    print("  ตรงกัน %d | สรุปไม่ได้ %d | ไม่ตรง %d  (จาก %d หน้า)"
+          % (len(agree), len(unsure), len(differ), total))
+    if unsure:
+        print("  สรุปไม่ได้: %s" % ", ".join(str(n) for n in unsure))
+        print("    ส่วนใหญ่เป็นหน้าวิดีโอหรือหน้าที่คล้ายหน้าข้างเคียงมาก")
+        print("    ไม่ใช่หลักฐานว่าผิด และไม่ใช่หลักฐานว่าถูก")
+    if differ:
+        print("  ** ไม่ตรง — ดูตรงนี้ก่อน **")
+        for number, best, expected, score in differ:
+            print("    canva หน้า %d เป็นภาพ %s (%.1f) แต่ตารางบอกว่า %s อยู่หน้า %s"
+                  % (number, best, score, best, expected))
+        offsets = [number - expected for number, _b, expected, _s in differ
+                   if expected]
+        if offsets and len(set(offsets)) == 1:
+            print("    ทุกหน้าที่ไม่ตรงเลื่อนเท่ากันหมด (%+d) — เด็คสดมีหน้า"
+                  % offsets[0])
+            print("    เกินหรือขาดไปหนึ่งหน้า ไม่ใช่ภาพสลับกันมั่ว")
+    else:
+        print("  ไม่มีหน้าไหนขัดกับตาราง — ตารางที่มีอยู่ใช้ได้")
+        print("  ไม่ต้อง --write")
+
+
 async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
     from app.tools import canva_display
 
@@ -312,6 +366,12 @@ async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
     finally:
         await canva_display.shutdown()
 
+    existing = json.loads((Path(settings.slides_dir) / "canva_pages.json")
+                          .read_text(encoding="utf-8"))["pages"] \
+        if (Path(settings.slides_dir) / "canva_pages.json").exists() else {}
+    if existing:
+        verify(rows, existing, total)
+
     unplaced = [sid for sid, _ in frames if sid not in mapping]
     blank = [n for n, _sid, score, _s2, _d2, ok in rows if not ok]
     print("\nจับคู่ได้ %d หน้า จาก %d" % (len(mapping), total))
@@ -337,6 +397,18 @@ async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
         print("\n** จับคู่ได้ไม่ถึง 90%% — อย่าเพิ่ง --write **")
         print("   ตารางที่ไม่ครบทำให้สไลด์ที่หายไปไม่ถูกพรีเซนต์เลย")
     print("\nลำดับพรีเซนต์หลังจากนี้จะเป็นลำดับหน้าของ canva %d หน้า" % len(mapping))
+
+    if write and existing and len(mapping) < len(existing):
+        # A run that saw less than the table already knows is a worse
+        # measurement, not a newer truth. The 66-page run matched 60 and
+        # would have deleted six working slides from the presentation.
+        print()
+        print("** ไม่เขียนทับ **  ตารางเดิมมี %d หน้า รอบนี้จับคู่ได้ %d"
+              % (len(existing), len(mapping)))
+        print("   การเขียนทับจะตัด %d หน้าออกจากการพรีเซนต์"
+              % (len(existing) - len(mapping)))
+        print("   ถ้าเด็คเปลี่ยนจริง ให้ลบ canva_pages.json แล้วรันใหม่")
+        return 1
 
     if write:
         path = Path(settings.slides_dir) / "canva_pages.json"
