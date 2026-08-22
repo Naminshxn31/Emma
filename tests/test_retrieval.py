@@ -338,6 +338,14 @@ def test_building_the_index_waits_out_a_rate_limit(monkeypatch):
     # `google` package, so patching sys.modules alone leaves the real client
     # in place — the test then passed alone and failed whenever something
     # else had imported the SDK first.
+    #
+    # And `sys.modules["google"]` only exists once something has imported it.
+    # Nothing in this file does, so the lookup below raised KeyError and this
+    # test failed for a reason with nothing to do with rate limits — green or
+    # red depending on which test ran first. Import it here instead of
+    # inheriting that from the run order.
+    import google  # noqa: F401  -- populates sys.modules["google"]
+
     monkeypatch.setitem(sys.modules, "google.genai", fake)
     monkeypatch.setattr(sys.modules["google"], "genai", fake, raising=False)
     monkeypatch.setattr(__import__("time"), "sleep", lambda s: slept.append(s))
@@ -405,6 +413,12 @@ def test_the_build_path_is_the_one_that_asks_for_patience(monkeypatch):
         return np.zeros((len(texts), 2), dtype="float32")
 
     monkeypatch.setattr(retrieval, "_embed", fake_embed)
+    # `build()` only reaches `_embed` through the gemini branch of `embed()`.
+    # With EMBED_PROVIDER=local -- which is what the gallery machine is set to
+    # -- it goes to the local encoder, `_embed` is never called at all, and
+    # this asserted against a dict nothing had written to. Pin the provider
+    # rather than letting whatever .env happens to say decide what is tested.
+    monkeypatch.setattr(retrieval, "choose_provider", lambda: "gemini")
     index = retrieval.SemanticIndex.__new__(retrieval.SemanticIndex)
     index.path = None
     monkeypatch.setattr(index, "save", lambda: None, raising=False)
