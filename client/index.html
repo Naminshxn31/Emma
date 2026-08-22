@@ -136,6 +136,18 @@
          padding: .8rem 1rem; border-radius: 12px; font-size: .84rem; margin-bottom: 1.4rem;
          width: 100%; line-height: 1.55; }
   .err code { background: rgba(0,0,0,.08); padding: .05rem .3rem; border-radius: 4px; }
+  /* Standby: the ears are armed, so the page is a presence, not a form.
+     Everything that says "configure me, press me" goes; the orb stays as
+     the face, the note says the one thing that matters. Dropping the class
+     restores the full picker, so losing wake mode never strands the page. */
+  #pickerScreen.standby h1, #pickerScreen.standby .sub,
+  #pickerScreen.standby .voice-name, #pickerScreen.standby .voice-desc,
+  #pickerScreen.standby .dots, #pickerScreen.standby .arrow,
+  #pickerScreen.standby .btn { display: none; }
+  #pickerScreen.standby .note { font-size: 1.05rem; }
+  #pickerScreen.standby .orb { animation: breathe 4s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(1); opacity: .85; }
+                       50% { transform: scale(1.06); opacity: 1; } }
 </style>
 </head>
 <body>
@@ -859,11 +871,11 @@ async function startWakeMode() {
       stopWakeMode();
       startCall();
     } else if (evt.type === 'wake_listening') {
-      // The ears are armed, so the button is clutter — hide it. It comes
-      // back the moment wake mode stops for any reason (stopWakeMode), so
-      // a dead standby socket can never leave the page with no way in.
-      $('startBtn').style.display = 'none';
-      $('pickerNote').textContent = `พูดว่า "${evt.word}" ได้เลย · just say "${evt.word}"`;
+      // The ears are armed: swap the whole picker for the standby face.
+      // It comes back the moment wake mode stops for any reason
+      // (stopWakeMode), so a dead standby socket never strands the page.
+      $('pickerScreen').classList.add('standby');
+      $('pickerNote').textContent = `แค่เรียก "${evt.word}" ก็คุยได้เลยค่ะ`;
     } else if (evt.type === 'wake_unavailable') {
       wakeAvailable = false;
       stopWakeMode();
@@ -908,8 +920,8 @@ async function startWakeMode() {
 
 function stopWakeMode() {
   wakeStopping = true;
-  // The button is the fallback; whenever the ears close, it returns.
-  $('startBtn').style.display = '';
+  // The picker is the fallback; whenever the ears close, it returns whole.
+  $('pickerScreen').classList.remove('standby');
   try { wakeWorklet && (wakeWorklet.port.onmessage = null, wakeWorklet.disconnect()); } catch {}
   wakeMicStream && wakeMicStream.getTracks().forEach((t) => t.stop());
   try { wakeWs && wakeWs.close(); } catch {}
