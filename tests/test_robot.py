@@ -377,3 +377,33 @@ def test_arrival_with_nobody_listening_does_not_raise():
 
     session_module._active = None
     run(robot_link.arrived("ห้องตัวอย่าง", ok=True))   # must not raise
+
+
+def test_arriving_mid_sentence_does_not_cut_the_sentence_off(robot):
+    """`arrived()` went straight into `send_text`, and a walk finishes
+    whenever it finishes — routinely while the robot is still describing the
+    walk. Text arriving during playback is a barge-in, so the arrival
+    cancelled the model's own generation and dropped the rest of the audio:
+    the robot interrupted itself to announce that it had arrived.
+
+    Exactly the bug the tour nudge already had and had already fixed. It was
+    fixed there and nowhere else, which is what `app/events.py` is for.
+    """
+    from app import display
+
+    run(registry.dispatch("go_to_place", {"place": "ห้องตัวอย่าง"}))
+
+    async def body():
+        display.set_audio_lead(20_000)      # still talking about the walk
+        pending = asyncio.create_task(robot_link.arrived("ห้องตัวอย่าง", ok=True))
+        await asyncio.sleep(0.05)
+        assert robot.provider.said == [], (
+            "reported arrival over the sentence that was still being spoken"
+        )
+
+        display.set_audio_lead(0)
+        await pending
+        assert len(robot.provider.said) == 1
+        assert "ถึง" in robot.provider.said[0], "the arrival was lost, not delayed"
+
+    asyncio.run(body())

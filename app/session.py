@@ -353,7 +353,12 @@ class VoiceSession:
                     "slide": order["slide"],
                     "displays": display.client_count(),
                 })
-                await self.provider.send_text(order["text"])
+                # Somebody moved the Canva window by hand, which they can do
+                # at any moment — including while the robot is still talking
+                # about the page they just left.
+                from app import events
+
+                await events.announce(order["text"], source="follow_canva")
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -397,10 +402,16 @@ class VoiceSession:
                 if not slides.should_continue_tour():
                     continue
                 logger.info("question went unanswered — resuming the tour")
-                try:
-                    await self.provider.send_text(slides.CONTINUE_NUDGE)
-                except Exception:
-                    logger.exception("could not resume the tour after silence")
+                from app import events
+
+                # The queue is usually empty by now — the grace period has
+                # just run out — but "usually" is what the other three
+                # callers assumed too, and it is free to be sure.
+                await events.announce(
+                    slides.CONTINUE_NUDGE,
+                    source="tour_resume",
+                    still_relevant=slides.should_continue_tour,
+                )
         except asyncio.CancelledError:
             raise
 
@@ -545,29 +556,31 @@ class VoiceSession:
         self._nudge_task = asyncio.create_task(self._nudge_once_heard(index))
 
     async def _nudge_once_heard(self, index: int) -> None:
-        """Push the tour on, but only after the guest has caught up."""
-        from app import display
+        """Push the tour on, but only after the guest has caught up.
+
+        The waiting, the re-check afterwards and the delivery now live in
+        `events.announce`. That sequence is the same for every event that
+        makes the robot speak unprompted, and this was the only one of four
+        callers that had all three parts. What stays here is the piece only
+        the tour can answer: whether nudging is still the right thing by the
+        time the guest has finished listening.
+        """
+        from app import events
         from app.tools import slides
 
-        waited = await display.wait_until_heard(max_wait=45.0, then_pause=0.4)
+        def still_worth_nudging() -> bool:
+            # The model usually calls next_slide on its own, and nudging a
+            # tour that already moved would skip a slide nobody heard.
+            if not slides.should_continue_tour() or slides.STATE["index"] != index:
+                return False
+            # A question is open. That silence belongs to the guest.
+            return not slides.awaiting_answer()
 
-        # It may have sorted itself out while we waited — the model usually
-        # calls next_slide on its own, and nudging a tour that already moved
-        # would skip a slide nobody heard.
-        if not slides.should_continue_tour() or slides.STATE["index"] != index:
-            logger.info("tour moved on by itself after %.1fs — no nudge needed", waited)
-            return
-        if slides.awaiting_answer():
-            return          # a question is open; that silence is the guest's
-
-        logger.info(
-            "nudging model to advance the tour from slide %d (waited %.1fs for audio)",
-            index + 1, waited,
+        await events.announce(
+            slides.CONTINUE_NUDGE,
+            source="tour_nudge",
+            still_relevant=still_worth_nudging,
         )
-        try:
-            await self.provider.send_text(slides.CONTINUE_NUDGE)
-        except Exception:
-            logger.exception("could not nudge the tour forward")
 
     async def _send_json(self, payload: dict) -> None:
         try:

@@ -56,11 +56,21 @@ def _fresh_async_state():
     """
     import asyncio
 
-    from app import display
+    from app import display, events
     from app.tools import canva_display
 
     display._lock = asyncio.Lock()
     canva_display._lock = asyncio.Lock()
+    events._lock = asyncio.Lock()
+
+    # A session left registered by an earlier test is the same class of leak
+    # as the locks, and it fails in the more embarrassing direction: the next
+    # test's announcements are delivered to a provider belonging to a session
+    # that no longer exists, and the assertions read as if they had gone
+    # nowhere. Cleared on both sides so neither order can carry it.
+    from app import session as session_module
+
+    session_module._active = None
     display._reveal_task = None
     canva_display._task = None
     display._audio_lead_ms = 0.0
@@ -71,6 +81,7 @@ def _fresh_async_state():
     # what would carry a dead task into the next loop.
     display._reveal_task = None
     canva_display._task = None
+    session_module._active = None
 
 
 @pytest.fixture(autouse=True)

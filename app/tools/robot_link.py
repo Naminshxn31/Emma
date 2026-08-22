@@ -221,11 +221,7 @@ async def arrived(place: str | None, ok: bool = True) -> None:
     STATE["moving"] = False
     STATE["destination"] = None
 
-    from app import session as session_module
-
-    live = session_module._active
-    if live is None or live.provider is None:
-        return
+    from app import events
 
     if ok:
         text = ("ถึง%s แล้ว ให้บอกลูกค้าสั้นๆ ว่าถึงแล้ว "
@@ -236,7 +232,11 @@ async def arrived(place: str | None, ok: bool = True) -> None:
         text = ("ไป%s ไม่สำเร็จ อาจมีสิ่งกีดขวางหรือหาทางไม่เจอ "
                 "ให้บอกลูกค้าตรงๆ แล้วเสนอให้เดินไปเองหรือเรียกเจ้าหน้าที่"
                 % (place or "ที่หมาย"))
-    try:
-        await live.provider.send_text(text)
-    except Exception:
-        logger.exception("could not report arrival to the model")
+
+    # Through `events.announce`, not straight into `send_text`. A walk takes
+    # half a minute and finishes whenever it finishes — routinely in the
+    # middle of the sentence that was explaining the walk. Sent right then,
+    # the arrival cancelled the model's own generation and threw away the
+    # rest of what it was saying, so the robot interrupted itself to report
+    # that it had arrived. Same shape as the tour nudge, one path further out.
+    await events.announce(text, source="robot_arrived")

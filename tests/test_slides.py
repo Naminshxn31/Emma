@@ -1129,6 +1129,24 @@ def _lone_session():
     # was added — the same drift `reset_state()` was written to end.
     sess = VoiceSession(ws=None)
     sess.provider = FakeProvider()
+    return _as_the_live_session(sess)
+
+
+def _as_the_live_session(sess):
+    """Register the session the way `handle_connection` does.
+
+    `events.announce` looks the live session up instead of being handed one —
+    that is what lets the robot, and later a camera, announce something
+    without holding a reference to the conversation. The catch is what an
+    unregistered session does to a test: the announcement is dropped, and
+    every assertion of the form `sent == []` then passes without testing
+    anything at all. That is most of the assertions on this path.
+
+    `conftest.py::_fresh_async_state` clears `_active` again afterwards.
+    """
+    from app import session as session_module
+
+    session_module._active = sess
     return sess
 
 
@@ -1501,6 +1519,7 @@ def test_the_nudge_waits_until_the_guest_has_heard_the_slide(slides):
     sess._spoke_this_turn = True
     sess._nudge_task = None
     sess.provider = FakeProvider()
+    _as_the_live_session(sess)
 
     slides.STATE.update({"deck": ["a", "b", "c"], "index": 0, "detour": False})
 
@@ -1642,6 +1661,7 @@ def test_the_tour_survives_a_session_resume(slides):
     sess._nudge_index = None
     sess._nudge_count = 0
     sess._nudge_task = None
+    _as_the_live_session(sess)
 
     slides.STATE.update({"deck": ["a", "b", "c"], "index": 0, "detour": False})
     display.set_audio_lead(0)
