@@ -139,3 +139,18 @@ def test_the_condo_profile_still_gets_everything(monkeypatch):
     monkeypatch.setattr(settings, "assistant_profile", "condo")
     monkeypatch.setattr(settings, "tool_groups", "")
     assert settings.enabled_tool_groups() is None
+
+
+def test_emma_refuses_instead_of_pretending():
+    """From the first real session, 2026-08-22 14:09: asked to แนะนำโครงการ,
+    Emma narrated a sales pitch from world knowledge; told "ปิดสไลด์", she
+    answered "ปิดหน้าต่างพรีเซนต์เรียบร้อยค่ะ" — with no slide tool loaded —
+    and the misheard follow-ups became four real set_lights calls in nine
+    seconds. The turn log has the receipts: zero slide tools in that session.
+
+    A capability she doesn't have must be declined by name, never claimed
+    done, and never rerouted onto the nearest tool that does exist."""
+    text = build_instructions("X", profile="emma")
+    assert "ไม่มีเครื่องมือ" in text
+    assert "ห้ามตอบว่าทำแล้ว" in text
+    assert "ปิดสไลด์ไม่ใช่ปิดไฟ" in text

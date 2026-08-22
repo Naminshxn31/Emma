@@ -137,9 +137,16 @@ async def _close_canva_display() -> None:
     await canva_display.shutdown()
 
 
+#: The kiosk problem: a tab that loaded yesterday's HTML keeps yesterday's
+#: JS, and "reload the page" quietly serves it from cache. The pages are a
+#: few KB; re-fetching them every load costs nothing and ends the class of
+#: bug where a feature exists on the server and not in the open tab.
+_NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
+
+
 @app.get("/")
 async def serve_client() -> FileResponse:
-    return FileResponse(CLIENT_INDEX)
+    return FileResponse(CLIENT_INDEX, headers=_NO_CACHE)
 
 
 def _wake_ready() -> bool:
@@ -188,7 +195,7 @@ async def list_voices(provider: str | None = None) -> dict:
 @app.get("/display")
 async def serve_display() -> FileResponse:
     """Fullscreen slide view — the robot's chest screen, or a second window."""
-    return FileResponse(DISPLAY_INDEX)
+    return FileResponse(DISPLAY_INDEX, headers=_NO_CACHE)
 
 
 @app.websocket("/ws/wake")
