@@ -32,12 +32,22 @@ from app.config import settings
 
 logger = logging.getLogger("condo_voice.wake")
 
-#: "emma" encoded with the gigaspeech BPE, kept as a fallback so the wake
-#: word works even without sentencepiece installed. Any *other* WAKE_WORD
-#: needs sentencepiece to encode it; this one is precomputed because it is
-#: the name the product actually uses.
+#: Spelling variants per wake word, all reported under one label. The KWS
+#: model maps *text* to sound through English training data, and the owner
+#: says the name with a Thai mouth — "เอ็มม่า" lands somewhere between EMMA,
+#: AMMA and EMA depending on distance and emphasis. One spelling misses real
+#: calls; the variants catch the neighbourhood. (First real-mic session:
+#: TTS-tested EMMA alone did not fire on a live "เอ็มม่า".)
+_VARIANTS = {
+    "emma": ["EMMA", "AMMA", "EMA"],
+}
+
+#: Precomputed BPE for the variants, so the default name works even without
+#: sentencepiece installed. Any *other* WAKE_WORD needs sentencepiece.
 _KNOWN_ENCODINGS = {
-    "emma": "▁E M MA",
+    "EMMA": "▁E M MA",
+    "AMMA": "▁A M MA",
+    "EMA": "▁E MA",
 }
 
 _spotter = None
@@ -49,32 +59,43 @@ def _model_dir() -> Path:
 
 
 def _encode_keyword(word: str) -> str | None:
-    """The KWS model wants BPE pieces, not letters.
+    """The KWS model wants BPE pieces, not letters. One line per spelling
+    variant, every variant reporting the same @LABEL.
 
     `:boost` raises the score of the keyword path while it is being matched,
     `#threshold` is the score it must clear — both straight from the
     sherpa-onnx keywords-file format. `@LABEL` is what get_result returns.
     """
     word = word.strip().lower()
-    pieces = None
+    spellings = _VARIANTS.get(word, [word.upper()])
+    label = word.upper()
+
+    encoded: list[str] = []
     try:
         import sentencepiece as spm
 
         sp = spm.SentencePieceProcessor()
         sp.load(str(_model_dir() / "bpe.model"))
-        pieces = " ".join(sp.encode(word.upper(), out_type=str))
+        for spelling in spellings:
+            encoded.append(" ".join(sp.encode(spelling, out_type=str)))
     except Exception:
-        pieces = _KNOWN_ENCODINGS.get(word)
-        if pieces is None:
+        for spelling in spellings:
+            pieces = _KNOWN_ENCODINGS.get(spelling)
+            if pieces is not None:
+                encoded.append(pieces)
+        if not encoded:
             logger.warning(
                 "cannot encode wake word %r: sentencepiece is not available "
                 "and there is no precomputed encoding for it — only %s work "
                 "without sentencepiece",
-                word, sorted(_KNOWN_ENCODINGS),
+                word, sorted(_VARIANTS),
             )
             return None
-    return "%s :%.1f #%.2f @%s" % (
-        pieces, settings.wake_boost, settings.wake_threshold, word.upper()
+    return "\n".join(
+        "%s :%.1f #%.2f @%s" % (
+            pieces, settings.wake_boost, settings.wake_threshold, label
+        )
+        for pieces in encoded
     )
 
 

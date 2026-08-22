@@ -859,8 +859,11 @@ async function startWakeMode() {
       stopWakeMode();
       startCall();
     } else if (evt.type === 'wake_listening') {
-      $('pickerNote').textContent =
-        `พูดว่า "${evt.word}" เพื่อเริ่มคุย · say "${evt.word}" — or press Start`;
+      // The ears are armed, so the button is clutter — hide it. It comes
+      // back the moment wake mode stops for any reason (stopWakeMode), so
+      // a dead standby socket can never leave the page with no way in.
+      $('startBtn').style.display = 'none';
+      $('pickerNote').textContent = `พูดว่า "${evt.word}" ได้เลย · just say "${evt.word}"`;
     } else if (evt.type === 'wake_unavailable') {
       wakeAvailable = false;
       stopWakeMode();
@@ -905,6 +908,8 @@ async function startWakeMode() {
 
 function stopWakeMode() {
   wakeStopping = true;
+  // The button is the fallback; whenever the ears close, it returns.
+  $('startBtn').style.display = '';
   try { wakeWorklet && (wakeWorklet.port.onmessage = null, wakeWorklet.disconnect()); } catch {}
   wakeMicStream && wakeMicStream.getTracks().forEach((t) => t.stop());
   try { wakeWs && wakeWs.close(); } catch {}
