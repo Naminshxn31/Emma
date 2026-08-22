@@ -330,6 +330,25 @@ class Settings:
     # the gap between related and unrelated actually falls, then set these.
     search_min_similarity: float = float(os.getenv("SEARCH_MIN_SIMILARITY", "0.653"))
     search_show_similarity: float = float(os.getenv("SEARCH_SHOW_SIMILARITY", "0.68"))
+    # Local sentence-transformer cosine scores live on a different scale from
+    # Gemini embeddings.  Keeping separate defaults prevents switching to the
+    # offline backend from silently rejecting otherwise good multilingual hits.
+    search_local_min_similarity: float = float(
+        os.getenv("SEARCH_LOCAL_MIN_SIMILARITY", "0.389")
+    )
+    search_local_show_similarity: float = float(
+        os.getenv("SEARCH_LOCAL_SHOW_SIMILARITY", "0.46")
+    )
+    search_local_min_coverage: float = float(
+        os.getenv("SEARCH_LOCAL_MIN_COVERAGE", "0.34")
+    )
+    project_knowledge_file: str = os.getenv(
+        "PROJECT_KNOWLEDGE_FILE", "data/project_knowledge.json"
+    )
+    # Optional cross-encoder second stage. Empty keeps startup light; set this
+    # after benchmarking the target robot's CPU/RAM.
+    search_reranker_model: str = os.getenv("SEARCH_RERANKER_MODEL", "")
+    search_reranker_candidates: int = int(os.getenv("SEARCH_RERANKER_CANDIDATES", "8"))
 
     def api_key_for(self, provider: str | None = None) -> str | None:
         return self.gemini_api_key if (provider or self.provider) == "gemini" else self.openai_api_key

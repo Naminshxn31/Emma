@@ -233,10 +233,10 @@ def test_a_ranking_with_no_signal_gets_no_vote(index):
     # semantic half genuinely works, this found the pool slide (correctly) and
     # the test failed for describing a situation it never created.
     index.semantic = None
-    assert index.search("бассейн") == [], (
-        "with no lexical signal and no embeddings there is nothing to rank on, "
-        "so the honest answer is no results — not whatever sorted first"
-    )
+    hits = index.search("бассейн")
+    assert hits and "pool" in (
+        "%s %s" % (hits[0].slide.get("title_th", ""), hits[0].slide.get("title_en", ""))
+    ).lower(), "a configured project alias is real lexical evidence"
 
 
 def test_competitor_slides_do_not_win(index):
@@ -244,6 +244,33 @@ def test_competitor_slides_do_not_win(index):
     "show me the pool"."""
     top = index.search("ทำเลที่ตั้ง")[0]
     assert top.slide.get("type") != "other-project"
+
+
+@pytest.mark.parametrize("query,title", [
+    ("มีสระว่ายน้ำไหม", "pool"),
+    ("游泳池在哪里", "pool"),
+    ("где тренажерный зал", "biogenesis"),
+    # "basement" is what the guest says and what the alias file carries;
+    # the deck calls the same floor "Underground Floor". Assert against
+    # the slide as it is actually titled, or this passes for the wrong
+    # reason the day someone renames it.
+    ("주차장 어디예요", "underground"),
+])
+def test_domain_vocabulary_routes_to_the_named_project_area(index, query, title):
+    top = index.search(query)[0]
+    names = "%s %s" % (top.slide.get("title_th", ""), top.slide.get("title_en", ""))
+    assert title in names.lower()
+    assert top.found
+
+
+@pytest.mark.parametrize("query", [
+    "มีสนามกอล์ฟไหม",
+    "is there a golf course",
+    "มีร้านสะดวกซื้อไหม",
+    "มีที่จอดรถจักรยานยนต์ไหม",
+])
+def test_explicitly_unavailable_facilities_are_not_inferred(index, query):
+    assert index.search(query) == []
 
 
 def test_a_hit_without_embeddings_is_judged_lexically():

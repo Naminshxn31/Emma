@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import settings
+from app.tools import project_knowledge
 from app.tools.retrieval import (
     BM25,
     SemanticIndex,
@@ -25,6 +26,9 @@ from app.tools.retrieval import (
 )
 
 logger = logging.getLogger("condo_voice.slide_search")
+
+_reranker = None
+_reranker_failed = False
 
 #: Title and keywords are written *for* retrieval, so they count for more
 #: than prose. Repetition is how you weight a field in single-field BM25.
@@ -70,7 +74,6 @@ OTHER_PROJECT_PENALTY = 0.35
 MIN_SIMILARITY = float(settings.search_min_similarity)
 SHOW_SIMILARITY = float(settings.search_show_similarity)
 
-
 def _standout(similarities, index: int) -> float:
     """How far slide `index` sits above the deck's own average, in sigmas.
 
@@ -112,21 +115,27 @@ class Hit:
     #: alongside the cosine so the two can be compared on real numbers before
     #: anything starts depending on it.
     standout: float = -1.0
+    min_similarity: float = MIN_SIMILARITY
+    show_similarity: float = SHOW_SIMILARITY
+    min_coverage: float = MIN_COVERAGE
+    domain_match: bool = False
 
     @property
     def found(self) -> bool:
         """Worth answering from."""
         if self.similarity >= 0:
-            return self.similarity >= MIN_SIMILARITY or self.coverage >= MIN_COVERAGE
-        return self.coverage >= MIN_COVERAGE
+            return self.similarity >= self.min_similarity or self.coverage >= self.min_coverage
+        return self.coverage >= self.min_coverage
 
     @property
     def confident(self) -> bool:
         """Worth *showing*. Higher bar: the guest is looking at the screen,
         and a picture that contradicts the words costs more than no picture.
         """
+        if self.domain_match:
+            return True
         if self.similarity >= 0:
-            return self.similarity >= SHOW_SIMILARITY
+            return self.similarity >= self.show_similarity
         # Lexical-only fallback: demand most of the question be present.
         return self.coverage >= 0.6
 
@@ -140,6 +149,26 @@ def _document_text(slide: dict) -> str:
         if value:
             parts.extend([str(value)] * repeats)
     return " ".join(parts)
+
+
+def _rerank(query: str, indices: list[int], slides: list[dict]) -> list[int]:
+    """Optional local cross-encoder pass over an already-small candidate set."""
+    global _reranker, _reranker_failed
+    model_name = settings.search_reranker_model.strip()
+    if not model_name or _reranker_failed or len(indices) < 2:
+        return indices
+    try:
+        if _reranker is None:
+            from sentence_transformers import CrossEncoder
+            _reranker = CrossEncoder(model_name)
+            logger.info("local reranker ready: %s", model_name)
+        pairs = [(query, _document_text(slides[i])) for i in indices]
+        scores = _reranker.predict(pairs, show_progress_bar=False)
+        return [i for _, i in sorted(zip(scores, indices), reverse=True)]
+    except Exception:
+        _reranker_failed = True
+        logger.warning("local reranker unavailable — keeping hybrid ranking", exc_info=True)
+        return indices
 
 
 class SlideSearch:
@@ -208,6 +237,8 @@ class SlideSearch:
     def search(self, query: str, limit: int = 8) -> list[Hit]:
         if not self.bm25 or not self.slides:
             return []
+        if project_knowledge.unavailable(query):
+            return []
 
         # Two token sets, for the two decisions. Ranking gets n-grams too, so
         # a bad segmentation still finds the slide; judging the match gets
@@ -215,7 +246,14 @@ class SlideSearch:
         # particles are dropped from both — a slide deck contains none, so
         # scoring them buries the one word that mattered.
         words = content_tokens(tokenize(query))
-        lexical = self.bm25.scores(content_tokens(robust_tokens(query)))
+        lexical = self.bm25.scores(content_tokens(robust_tokens(project_knowledge.expand(query))))
+        preferred_ids = project_knowledge.preferred_slide_ids(query)
+        preferred_rank = {slide_id: rank for rank, slide_id in enumerate(preferred_ids)}
+        if preferred_ids:
+            peak = max(lexical, default=0.0) + 1.0
+            for i, slide in enumerate(self.slides):
+                if slide.get("id") in preferred_rank:
+                    lexical[i] += peak / (preferred_rank[slide["id"]] + 1)
         by_lexical = sorted(range(len(self.slides)), key=lambda i: -lexical[i])
 
         similarities = None
@@ -250,6 +288,16 @@ class SlideSearch:
         if not rankings:
             return []
 
+        provider = self.semantic.provider if self.semantic is not None else None
+        if provider == "local":
+            min_similarity = settings.search_local_min_similarity
+            show_similarity = settings.search_local_show_similarity
+            min_coverage = settings.search_local_min_coverage
+        else:
+            min_similarity = MIN_SIMILARITY
+            show_similarity = SHOW_SIMILARITY
+            min_coverage = MIN_COVERAGE
+
         fused = reciprocal_rank_fusion(rankings, weights)
 
         # The library carries competitors' decks for comparison. They answer
@@ -259,15 +307,50 @@ class SlideSearch:
             if slide.get("type") == "other-project" and i in fused:
                 fused[i] *= OTHER_PROJECT_PENALTY
 
-        order = sorted(fused, key=lambda i: -fused[i])[:limit]
+        # A strong literal match is more precise than a semantic compromise.
+        # RRF remains useful when wording differs or scripts differ, but it
+        # must not move "สระว่ายน้ำ" from the pool slide to Aqua Cinema merely
+        # because both are about water.  Route high-coverage queries through
+        # BM25 first; semantic search still owns cross-language/synonym cases.
+        lexical_coverages = {
+            i: self.bm25.coverage(words, i) for i in fused
+        }
+        if preferred_ids:
+            # A matched multilingual/domain alias is lexical evidence too.
+            # Without this, the right Chinese/Russian slide ranks first and is
+            # then rejected because the Thai deck shares no literal glyphs.
+            for i, slide in enumerate(self.slides):
+                if i in lexical_coverages and slide.get("id") in preferred_rank:
+                    lexical_coverages[i] = 1.0
+        strong_lexical = lexical_has_signal and any(
+            coverage >= min_coverage for coverage in lexical_coverages.values()
+        )
+        candidate_count = max(limit, settings.search_reranker_candidates)
+        if strong_lexical:
+            order = sorted(
+                fused,
+                key=lambda i: (-lexical[i], -lexical_coverages[i], -fused[i]),
+            )[:candidate_count]
+        else:
+            order = sorted(fused, key=lambda i: -fused[i])[:candidate_count]
+
+        candidates = order[:candidate_count]
+        if settings.search_reranker_model.strip() and not preferred_ids:
+            order = _rerank(query, candidates, self.slides)[:limit]
+        else:
+            order = order[:limit]
 
         return [
             Hit(
                 slide=self.slides[i],
                 score=fused[i],
-                coverage=self.bm25.coverage(words, i),
+                coverage=lexical_coverages[i],
                 similarity=float(similarities[i]) if similarities is not None else -1.0,
                 standout=_standout(similarities, i),
+                min_similarity=min_similarity,
+                show_similarity=show_similarity,
+                min_coverage=min_coverage,
+                domain_match=self.slides[i].get("id") in preferred_rank,
             )
             for i in order
         ]
@@ -289,5 +372,8 @@ def get_index(slides: list[dict]) -> SlideSearch:
 
 
 def reset() -> None:
-    global _index
+    global _index, _reranker, _reranker_failed
     _index = None
+    _reranker = None
+    _reranker_failed = False
+    project_knowledge.reset()
