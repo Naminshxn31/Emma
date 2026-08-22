@@ -15,6 +15,8 @@ instead of cheerfully claiming success.
 """
 from __future__ import annotations
 
+import asyncio
+
 from app.tools import broadlink_ir
 from app.tools.registry import tool
 
@@ -64,12 +66,22 @@ def _worst(results: list[str]) -> str:
     confirm=False,
     tags=["smarthome"],
 )
-def set_lights(on: bool) -> dict:
+async def set_lights(on: bool) -> dict:
     # The learned remote has separate on/off frames, and the link drops
     # packets, so send explicitly every time rather than trusting STATE.
-    hardware = broadlink_ir.send("light_on" if on else "light_off", repeat=2, delay=0.6)
+    # Broadlink performs blocking UDP auth/retries. Run it off the event loop;
+    # otherwise one unreachable hub freezes Gemini's WebSocket and the UI.
+    hardware = await asyncio.to_thread(
+        broadlink_ir.send, "light_on" if on else "light_off", 2, 0.6
+    )
     STATE["lights"] = bool(on)
-    return {"ok": True, "lights": STATE["lights"], "hardware": hardware}
+    out = {"ok": hardware != "failed", "lights": STATE["lights"], "hardware": hardware}
+    if hardware == "failed":
+        out["instruction"] = (
+            "ส่งคำสั่งไปที่ตัวควบคุมไฟไม่สำเร็จ ให้บอกผู้ใช้ตรงๆ ว่าไฟยังไม่ได้ปิดหรือเปิด "
+            "ห้ามยืนยันว่าทำสำเร็จ"
+        )
+    return out
 
 
 @tool(

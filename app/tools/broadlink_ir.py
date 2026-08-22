@@ -30,10 +30,12 @@ from app.config import settings
 
 logger = logging.getLogger("condo_voice.ir")
 
-_CONNECT_ATTEMPTS = 4
-_CONNECT_RETRY_DELAY = 1.0
-_SEND_ATTEMPTS = 3
+_CONNECT_ATTEMPTS = 3
+_CONNECT_RETRY_DELAY = 0.5
+_SEND_ATTEMPTS = 2
 _SEND_RETRY_DELAY = 0.4
+_SOCKET_TIMEOUT = 1
+_DISCOVERY_TIMEOUT = 3
 
 
 def _codes_path() -> Path:
@@ -84,7 +86,7 @@ def _rediscover(cfg: dict):
     import broadlink
 
     try:
-        for found in broadlink.discover(timeout=8):
+        for found in broadlink.discover(timeout=_DISCOVERY_TIMEOUT):
             if found.mac.hex() == cfg.get("mac"):
                 found.auth()
                 cfg["host"] = found.host[0]
@@ -108,11 +110,18 @@ def _get_device():
             device = broadlink.gendevice(
                 cfg["devtype"], (cfg["host"], 80), bytes.fromhex(cfg["mac"])
             )
+            # broadlink defaults to ten seconds per UDP attempt. Combined with
+            # auth/send retries that can freeze a voice turn for over a minute.
+            device.timeout = _SOCKET_TIMEOUT
             device.auth()
             return device
         except Exception:
             if attempt < _CONNECT_ATTEMPTS - 1:
                 time.sleep(_CONNECT_RETRY_DELAY)
+    logger.error(
+        "Broadlink at %s did not answer UDP auth; trying discovery by MAC",
+        cfg.get("host"),
+    )
     return _rediscover(cfg)
 
 

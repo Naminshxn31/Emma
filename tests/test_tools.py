@@ -122,6 +122,29 @@ def test_dispatch_all_runs_every_call(clean_registry):
     assert [r[2]["n"] for r in results] == [1, 2]
 
 
+def test_dispatch_all_preserves_model_call_order(clean_registry):
+    """State-changing calls must not race and overwrite the screen."""
+    events = []
+
+    @clean_registry.tool("first", "first")
+    async def first():
+        events.append("first-start")
+        await asyncio.sleep(0.01)
+        events.append("first-end")
+        return {}
+
+    @clean_registry.tool("second", "second")
+    async def second():
+        events.append("second")
+        return {}
+
+    run(clean_registry.dispatch_all([
+        ("c1", "first", {}),
+        ("c2", "second", {}),
+    ]))
+    assert events == ["first-start", "first-end", "second"]
+
+
 def test_non_dict_return_is_wrapped(clean_registry):
     @clean_registry.tool("plain", "returns a string")
     def plain():
@@ -300,6 +323,36 @@ def test_a_hanging_tool_cannot_silence_the_robot(clean_registry, monkeypatch):
         assert out["error"] == "timeout"
         # And the model is told to keep talking rather than stall.
         assert "ห้ามเงียบ" in out["instruction"]
+
+    asyncio.run(body())
+
+
+def test_a_blocking_ir_send_does_not_block_the_event_loop(smarthome, monkeypatch):
+    """Broadlink auth is synchronous; Gemini must remain responsive while it runs."""
+    import time
+
+    from app.tools import broadlink_ir
+
+    def blocking_send(*args, **kwargs):
+        time.sleep(0.15)
+        return "ok"
+
+    monkeypatch.setattr(broadlink_ir, "send", blocking_send)
+
+    async def body():
+        ticks = 0
+
+        async def heartbeat():
+            nonlocal ticks
+            for _ in range(5):
+                await asyncio.sleep(0.02)
+                ticks += 1
+
+        result, _ = await asyncio.gather(
+            registry.dispatch("set_lights", {"on": False}), heartbeat()
+        )
+        assert result["hardware"] == "ok"
+        assert ticks == 5
 
     asyncio.run(body())
 

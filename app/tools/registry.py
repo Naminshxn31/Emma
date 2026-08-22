@@ -215,10 +215,17 @@ async def _push_to_displays() -> None:
 
 
 async def dispatch_all(calls: list[tuple[str, str, dict]]) -> list[tuple[str, str, dict]]:
-    """Run several calls concurrently. Items are (call_id, name, args)."""
-    results = await asyncio.gather(
-        *(dispatch(name, args) for _cid, name, args in calls)
-    )
+    """Run calls in the order the model emitted them.
+
+    Tool calls are not independent computations.  Several of them mutate
+    shared presentation state (and the physical gallery), so running a batch
+    with ``gather`` let a late ``search_condo_info`` overwrite the slide chosen
+    by ``start_presentation``.  The model's call order is the only meaningful
+    order here; preserve it for deterministic state and screen updates.
+    """
+    results = []
+    for _cid, name, args in calls:
+        results.append(await dispatch(name, args))
     return [
         (cid, name, result)
         for (cid, name, _args), result in zip(calls, results)
