@@ -27,7 +27,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from app import heard, turnlog, voices
 from app.config import settings
-from app.prompts import GREETING, build_instructions
+from app.prompts import build_instructions, greeting_for
 from app.providers import ProviderError, default_voice_for, get_provider
 
 logger = logging.getLogger("condo_voice.session")
@@ -80,8 +80,12 @@ class VoiceSession:
             settings.project_name,
             languages=settings.reply_languages,
             robot_name=settings.robot_name,
+            profile=settings.assistant_profile,
         )
-        provider = get_provider(self.provider_name, self.voice, instructions, greeting=GREETING)
+        provider = get_provider(
+            self.provider_name, self.voice, instructions,
+            greeting=greeting_for(settings.assistant_profile),
+        )
 
         try:
             async with provider:

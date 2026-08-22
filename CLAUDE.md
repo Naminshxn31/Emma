@@ -7,6 +7,17 @@
 
 ---
 
+## สองบุคลิกในรีโปเดียว
+
+`ASSISTANT_PROFILE` ใน `.env`: `condo` (default — พนักงานต้อนรับห้องขาย) หรือ
+`emma` (ผู้ช่วยส่วนตัวของเจ้าของ ตาม `docs/jarvis-roadmap.md`) จงใจไม่ fork
+เพราะบั๊กที่แก้แล้วยี่สิบกว่าตัวต้องไม่ถูกแก้สองรอบ กติกาของรอยต่อ:
+**default ต้องเป็น condo เสมอ** (เครื่องห้องขาย pull แล้วห้ามเปลี่ยนพฤติกรรม),
+profile สะกดผิดได้ condo ไม่ใช่ error, emma ไม่ได้ facts/สไลด์/เครื่องมือของ
+ห้องขาย (TOOL_GROUPS ว่าง = smarthome อย่างเดียว) แต่**เก็บกฎที่จ่ายด้วยบั๊กจริง
+ทุกข้อ** — ฟังไม่ชัดห้ามเดา, ทวนตัวเลข, อ่านผล hardware ก่อนยืนยัน, ห้ามอ่าน
+markdown เทสต์คุมอยู่ใน `tests/test_profiles.py`
+
 ## กฎเนื้อหาที่ห้ามละเมิด
 
 **ห้ามแต่งข้อมูลโครงการเองเด็ดขาด** โดยเฉพาะราคา โปรโมชั่น แบบห้อง ขนาด เวลาทำการ
@@ -25,7 +36,7 @@
 
 ```bash
 uvicorn app.main:app --port 8000     # รันเซิร์ฟเวอร์
-python -m pytest tests/ -q            # เทสต์ (544 ตัว, ใช้เวลา ~3 นาที)
+python -m pytest tests/ -q            # เทสต์ (557 ตัว, ใช้เวลา ~3 นาที)
 python -m pytest tests/test_slides.py -q
 python scripts/eval_search.py         # วัดคุณภาพการค้นสไลด์
 python scripts/analyze_log.py --days 7  # อ่าน data/logs/ ว่าเกิดอะไรขึ้นจริง

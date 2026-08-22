@@ -51,6 +51,48 @@ BASE_INSTRUCTIONS = """[คำแนะนำตัว]
 - ห้ามอ่าน markdown หรือสัญลักษณ์พิเศษออกเสียง
 """
 
+# The same engine, wearing its other hat.
+#
+# Same name (Emma), different job: the condo profile is a receptionist
+# talking to strangers in a sales gallery; this one is a personal assistant
+# talking to its owner. Nearly every difference follows from that one fact —
+# the topic ban exists because a receptionist recommending Xiaomi phones to
+# customers was a real incident, and it comes out here because refusing your
+# own owner an answer you know is the opposite failure.
+#
+# What deliberately survives from the condo profile, because the lessons were
+# paid for with real bugs and none of them were about condos:
+#   - unclear audio is asked about, never guessed (the gallery is noisy;
+#     a house with a TV on is too)
+#   - numbers, names and phone numbers are read back
+#   - tool results are read before being reported: `failed` and `mock` are
+#     not success, and claiming an AC was switched off when nothing was sent
+#     has already happened once in this project's history
+#   - no markdown read aloud
+EMMA_INSTRUCTIONS = """[คำแนะนำตัว]
+
+บุคลิก: เป็นกันเอง ฉลาด ตรงไปตรงมา พูดจังหวะธรรมชาติ ไม่ต้องทางการแบบพนักงาน
+
+กฎการสนทนา:
+1. ตอบสั้นตรงคำถาม ไม่เกิน 2-3 ประโยค เว้นแต่ถูกขอรายละเอียดเพิ่ม
+2. [กฎภาษา]
+3. ถ้าฟังไม่ชัด ให้ถามกลับสั้นๆ ห้ามเดา ตัวเลข ชื่อ เบอร์โทร ให้ทวนยืนยันเสมอ
+4. จำสิ่งที่คุยกันแล้วในเซสชันนี้ ห้ามถามซ้ำ
+5. คุยได้ทุกเรื่อง ตอบจากความรู้ของคุณได้เต็มที่ แต่แยกให้ชัดว่าอะไรคือข้อเท็จจริง อะไรคือความเห็น ไม่แน่ใจให้บอกว่าไม่แน่ใจ ห้ามแต่งข้อมูล
+6. คุณควบคุมไฟและแอร์ในห้องได้ ถูกสั่งให้เรียกเครื่องมือทันทีโดยไม่ต้องถามซ้ำ แล้วบอกผลสั้นๆ
+7. หลังเรียกเครื่องมือ ให้ดูผลลัพธ์ก่อนตอบ failed=สั่งอุปกรณ์ไม่สำเร็จ mock=ยังไม่ได้ต่ออุปกรณ์จริง ห้ามบอกว่าสำเร็จถ้าผลไม่ได้บอก
+8. คุณยังไม่มีความจำข้ามเซสชัน ถ้าถูกขอให้จำอะไรระยะยาว ให้บอกตรงๆ ว่ารอบนี้ยังจำข้ามครั้งไม่ได้
+
+ข้อห้าม:
+- ห้ามอ่าน markdown หรือสัญลักษณ์พิเศษออกเสียง
+"""
+
+#: Profiles this file knows how to build. Anything else falls back to
+#: `condo`, because the machine that must never change behaviour by accident
+#: is the one in the sales gallery.
+PROFILES = ("condo", "emma")
+
+
 # Facts the assistant is allowed to state, loaded from data/condo_facts.json.
 #
 # These used to be a string literal here, which put the highest-risk content
@@ -129,6 +171,21 @@ GREETING = (
     "แล้วถามว่ามีอะไรให้ช่วยไหม ไม่เกิน 2 ประโยค"
 )
 
+EMMA_GREETING = (
+    "ทักทายสั้นๆ เป็นกันเอง บอกว่าพร้อมช่วยแล้ว ประโยคเดียวพอ "
+    "ไม่ต้องแนะนำตัวยาว คนที่คุยรู้จักคุณอยู่แล้ว"
+)
+
+
+def greeting_for(profile: str) -> str:
+    """The first-turn instruction, per profile.
+
+    A receptionist introduces itself and the project to a stranger; a
+    personal assistant greeting its owner with a sales pitch would be the
+    profile system visibly failing on the first sentence of every session.
+    """
+    return EMMA_GREETING if profile == "emma" else GREETING
+
 # Human-readable names for the codes people are most likely to restrict to.
 _LANG_NAMES = {
     "th": "ไทย", "en": "อังกฤษ", "zh": "จีน", "ja": "ญี่ปุ่น", "ko": "เกาหลี",
@@ -189,13 +246,51 @@ def _self_introduction(project_name: str, robot_name: str) -> str:
     )
 
 
+def _emma_introduction(assistant_name: str) -> str:
+    """Emma's opening line: same name, the other job.
+
+    "คนที่คุยกับคุณคือเจ้าของ" is the sentence the whole profile hangs on —
+    every guardrail in the condo prompt was written for talking to strangers,
+    and the ones Emma keeps are the ones that were never about strangers.
+    """
+    name = assistant_name or "Emma"
+    return (
+        f'คุณคือ "{name}" ผู้ช่วยส่วนตัวสั่งงานด้วยเสียง '
+        f"คนที่คุยกับคุณคือเจ้าของของคุณ ไม่ใช่ลูกค้า"
+    )
+
+
 def build_instructions(
     project_name: str,
     extra_facts: str | None = None,
     languages: str = "auto",
     robot_name: str = "",
+    profile: str = "condo",
 ) -> str:
-    """Full instruction string sent in session.update."""
+    """Full instruction string sent in session.update.
+
+    `profile` defaults to condo on purpose: every existing caller and test
+    predates profiles, and the machine that must never change behaviour by
+    surprise is the one in the sales gallery. An unknown profile also lands
+    on condo — a typo in .env should get you the receptionist, not a
+    half-built persona.
+    """
+    if profile not in PROFILES:
+        logger.warning("unknown ASSISTANT_PROFILE %r — using the condo profile", profile)
+        profile = "condo"
+
+    if profile == "emma":
+        # No condo facts appended, and that is a decision rather than an
+        # omission: the facts block is draft sales copy with empty prices,
+        # written for a receptionist to recite to customers. The owner's
+        # personal assistant has no business reciting it, and rule 5 already
+        # tells Emma to say so when she doesn't know something.
+        return (
+            EMMA_INSTRUCTIONS
+            .replace("[คำแนะนำตัว]", _emma_introduction(robot_name))
+            .replace("[กฎภาษา]", _language_rule(languages))
+        )
+
     facts = extra_facts if extra_facts is not None else load_facts()
     base = (
         BASE_INSTRUCTIONS

@@ -37,6 +37,12 @@ def _get_bool(name: str, default: bool) -> bool:
 
 @dataclass
 class Settings:
+    # Which persona this server runs: "condo" (the gallery receptionist,
+    # default) or "emma" (the owner's personal assistant). One repo, two
+    # hats — forking was rejected on purpose, because twenty-plus fixed bugs
+    # (Thai tokenisation, audio lead, mishearings) would need fixing twice.
+    assistant_profile: str = os.getenv("ASSISTANT_PROFILE", "condo").strip().lower()
+
     # --- Tools (things the assistant can actually do) ---
     tools_enabled: bool = _get_bool("TOOLS_ENABLED", True)
     #: Blank = every group. Otherwise a comma list, e.g. "smarthome".
@@ -354,11 +360,24 @@ class Settings:
         return self.gemini_api_key if (provider or self.provider) == "gemini" else self.openai_api_key
 
     def enabled_tool_groups(self) -> set[str] | None:
-        """None means "all groups"; a set restricts to those named."""
+        """None means "all groups"; a set restricts to those named.
+
+        With TOOL_GROUPS blank, the profile decides the default. Emma gets
+        `smarthome` only: slides, documents, knowledge and the Astronaut
+        robot are gallery equipment, and a tool the model can see is a tool
+        it will eventually call — Emma with `start_presentation` would
+        narrate a condo deck in the owner's living room. An explicit
+        TOOL_GROUPS still wins, so trying tools out on either profile stays
+        a one-line .env change.
+        """
         if not self.tools_enabled:
             return set()
         groups = {g.strip() for g in self.tool_groups.split(",") if g.strip()}
-        return groups or None
+        if groups:
+            return groups
+        if self.assistant_profile == "emma":
+            return {"smarthome"}
+        return None
 
 
 settings = Settings()
