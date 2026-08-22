@@ -105,15 +105,24 @@ class VoiceSession:
 
                 up = asyncio.create_task(self._browser_to_provider())
                 down = asyncio.create_task(self._provider_to_browser())
-                watch = asyncio.create_task(self._follow_canva())
                 unanswered = asyncio.create_task(self._resume_after_silence())
-                jobs = {up, down, watch, unanswered}
+                jobs = {up, down, unanswered}
                 # Only when it is switched on. These tasks race under
                 # FIRST_COMPLETED, so a task that returns immediately ends
                 # the session immediately — with IDLE_TIMEOUT_S unset (the
                 # default) an "off" watcher hung up on every guest the
                 # instant they connected. A disabled feature must not be
                 # present as a task at all.
+                #
+                # The canva follower had this exact bug five lines below the
+                # comment describing it: `_follow_canva` returns immediately
+                # when CANVA_URL is blank, and it sat in the race
+                # unconditionally. The gallery machine never saw it — its
+                # CANVA_URL is always set — so it waited for the first
+                # profile with no presentation screen, where every session
+                # died at "ready". Found by simulating exactly that.
+                if settings.canva_url and settings.canva_poll_s > 0:
+                    jobs.add(asyncio.create_task(self._follow_canva()))
                 if settings.idle_timeout_s:
                     jobs.add(asyncio.create_task(self._close_when_nobody_is_there()))
                 _done, pending = await asyncio.wait(

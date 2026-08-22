@@ -1934,10 +1934,33 @@ def test_the_idle_watcher_is_not_even_started_when_switched_off(monkeypatch):
 
     source = (Path(__file__).resolve().parent.parent / "app" / "session.py").read_text(
         encoding="utf-8")
-    guarded = source.split("jobs = {up, down, watch, unanswered}", 1)[1]
+    guarded = source.split("jobs = {up, down, unanswered}", 1)[1]
     creation = guarded.split("asyncio.wait", 1)[0]
     assert "if settings.idle_timeout_s:" in creation, (
         "the idle watcher must be created only when it is switched on")
+
+
+def test_the_canva_follower_is_not_even_started_without_a_canva_url(monkeypatch):
+    """The idle-watcher bug, five lines below the comment that documents it.
+
+    `_follow_canva` returns immediately when CANVA_URL is blank, and it sat
+    in the FIRST_COMPLETED race unconditionally — so on any machine without
+    a Canva window, every session died the moment it sent "ready". The
+    gallery never saw it because its CANVA_URL is always set; the first
+    emma-profile machine (no presentation screen, on purpose) saw it on
+    every single call. Same assertion style as the idle watcher above, for
+    the same reason: the failure is a task that exists.
+    """
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "app" / "session.py").read_text(
+        encoding="utf-8")
+    guarded = source.split("jobs = {up, down, unanswered}", 1)[1]
+    creation = guarded.split("asyncio.wait", 1)[0]
+    assert "if settings.canva_url" in creation, (
+        "the canva follower must join the race only when there is a canva "
+        "window to follow")
+    assert "_follow_canva" in creation
 
 
 def test_idle_timeout_defaults_to_off():

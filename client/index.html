@@ -626,7 +626,8 @@ function stopPlayback() {
 // ---------------- call ----------------
 
 function startCall() {
-  stopWakeMode();               // the call owns the mic from here
+  if (!wakeHandover) stopWakeMode();   // in a handover the standby mic is
+                                       // still buffering the command tail
   $('pickerScreen').classList.remove('active');
   $('callScreen').classList.add('active');
   const v = voices[idx];
@@ -704,6 +705,17 @@ async function startMic() {
   };
   // Deliberately not connected to destination — never echo the guest's mic.
   micSource.connect(worklet);
+
+  if (wakeHandover) {
+    // Everything said since the name, oldest first, then release the
+    // standby mic for real. Only at 16kHz — the buffer was captured for the
+    // wake model's rate, and flushing it into a 24kHz (OpenAI) session
+    // would play the owner's voice at the wrong speed.
+    if (inputRate === 16000 && ws && ws.readyState === WebSocket.OPEN) {
+      for (const chunk of wakeTail) ws.send(chunk);
+    }
+    stopWakeMode();
+  }
   setState('listening');
 }
 
@@ -852,9 +864,22 @@ $('startBtn').onclick = startCall;
 
 let wakeWs = null, wakeCtx = null, wakeMicStream = null, wakeWorklet = null;
 let wakeAvailable = false, wakeStopping = false;
+// The seconds between "Emma" and the session being ready are exactly when
+// the owner says the actual command — "Emma เปิดไฟ" is one breath. Dropping
+// that audio forces them to wait for the greeting and say it again, which
+// is the whole perceived slowness of wake mode. So after the name fires,
+// the standby mic keeps capturing into this buffer, and startMic() flushes
+// it into the session the moment the socket is up. Gemini reads flushed
+// speech as a barge-in of its own greeting, which is precisely right: name
+// alone -> greeting plays; name+command -> greeting yields to the answer.
+let wakeTail = [], wakeHandover = false;
+const WAKE_TAIL_MAX = 300;    // 20ms chunks -> ~6s cap
 
 async function startWakeMode() {
   if (!wakeAvailable || wakeWs) return;
+  // A handover whose session died before ready leaves the old standby mic
+  // buffering into nowhere. Rearming is the moment to reclaim it.
+  if (wakeHandover) stopWakeMode();
   wakeStopping = false;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const sock = new WebSocket(`${proto}://${location.host}/ws/wake`);
@@ -865,10 +890,18 @@ async function startWakeMode() {
     let evt;
     try { evt = JSON.parse(msg.data); } catch { return; }
     if (evt.type === 'wake') {
-      // The name was heard. Release the standby mic completely before the
-      // call grabs it — two AudioContexts on one device is how you get a
-      // silent session with no error anywhere.
-      stopWakeMode();
+      // The name was heard. Keep the standby mic alive but redirect it into
+      // the tail buffer; the wake socket itself closes now — the ears' job
+      // is done, and a detector listening through the whole conversation
+      // would be a hot mic with no purpose.
+      wakeHandover = true;
+      wakeTail = [];
+      if (wakeWorklet) wakeWorklet.port.onmessage = (e) => {
+        if (e.data && e.data.level !== undefined) return;
+        wakeTail.push(e.data);
+        if (wakeTail.length > WAKE_TAIL_MAX) wakeTail.shift();
+      };
+      try { sock.close(); } catch {}
       startCall();
     } else if (evt.type === 'wake_listening') {
       // The ears are armed: swap the whole picker for the standby face.
@@ -920,6 +953,8 @@ async function startWakeMode() {
 
 function stopWakeMode() {
   wakeStopping = true;
+  wakeHandover = false;
+  wakeTail = [];
   // The picker is the fallback; whenever the ears close, it returns whole.
   $('pickerScreen').classList.remove('standby');
   try { wakeWorklet && (wakeWorklet.port.onmessage = null, wakeWorklet.disconnect()); } catch {}
