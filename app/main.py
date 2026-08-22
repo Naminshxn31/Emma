@@ -1,6 +1,7 @@
 """FastAPI entry point: serves the voice UI and bridges it to the chosen provider."""
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import display, voices
+from app import display, turnlog, voices
 from app.config import settings
 from app.providers import default_voice_for
 from app.session import handle_connection
@@ -141,6 +142,12 @@ async def serve_client() -> FileResponse:
     return FileResponse(CLIENT_INDEX)
 
 
+def _wake_ready() -> bool:
+    from app import wake
+
+    return settings.wake_enabled and wake.available()
+
+
 @app.get("/health")
 async def health() -> dict:
     from app.tools import robot_link
@@ -156,6 +163,10 @@ async def health() -> dict:
         # Never return the key itself — just whether one is configured, so the
         # UI can show a setup message instead of failing mid-conversation.
         "api_key_configured": bool(settings.api_key_for(provider)),
+        # Whether the page should open standby ears instead of waiting for
+        # the Start button. `ready` is the honest half: enabled-but-missing-
+        # model must not put the UI in a mode the server cannot serve.
+        "wake": {"enabled": settings.wake_enabled, "ready": _wake_ready()},
         "robot": robot_link.status(),
         "providers_configured": {
             "gemini": bool(settings.gemini_api_key),
@@ -178,6 +189,55 @@ async def list_voices(provider: str | None = None) -> dict:
 async def serve_display() -> FileResponse:
     """Fullscreen slide view — the robot's chest screen, or a second window."""
     return FileResponse(DISPLAY_INDEX)
+
+
+@app.websocket("/ws/wake")
+async def ws_wake(websocket: WebSocket) -> None:
+    """Standby ears. The browser streams PCM16 mono 16kHz here while no
+    conversation is running; on hearing the name, the server answers with a
+    single {"type": "wake"} and the browser opens the real session on /ws.
+
+    Detection runs server-side rather than in the page because the models
+    are Python-only — and the audio still never leaves this machine: this
+    process *is* the machine, and nothing upstream is connected until the
+    name has been heard. That ordering is the whole point.
+    """
+    from app import wake
+
+    await websocket.accept()
+    if not settings.wake_enabled or not wake.available():
+        # Tell the browser why, then hang up. The Start button still works;
+        # wake mode is an upgrade, never a gate.
+        await websocket.send_text(json.dumps({
+            "type": "wake_unavailable",
+            "reason": ("disabled" if not settings.wake_enabled else "no model"),
+        }))
+        await websocket.close()
+        return
+
+    stream = wake.WakeStream()
+    await websocket.send_text(json.dumps(
+        {"type": "wake_listening", "word": settings.wake_word}
+    ))
+    try:
+        while True:
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                return
+            data = message.get("bytes")
+            if not data:
+                continue
+            hit = stream.feed(data)
+            if hit:
+                turnlog.record("wake", word=hit)
+                await websocket.send_text(json.dumps({"type": "wake", "word": hit}))
+                # One detection, one session. The browser drops this socket
+                # and takes the mic to /ws; a lingering detector here would
+                # hear the whole conversation for no reason.
+                await websocket.close()
+                return
+    except WebSocketDisconnect:
+        return
 
 
 @app.websocket("/ws")

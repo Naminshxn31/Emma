@@ -249,6 +249,10 @@ Promise.all([
   }
   $('startBtn').disabled = false;
   $('pickerNote').textContent = 'Speech-to-speech — you can interrupt at any time.';
+  if (health.wake && health.wake.ready) {
+    wakeAvailable = true;
+    startWakeMode();
+  }
 }).catch(() => {
   $('setupErr').innerHTML = '<div class="err">Could not reach the server. Is uvicorn running?</div>';
 });
@@ -610,6 +614,7 @@ function stopPlayback() {
 // ---------------- call ----------------
 
 function startCall() {
+  stopWakeMode();               // the call owns the mic from here
   $('pickerScreen').classList.remove('active');
   $('callScreen').classList.add('active');
   const v = voices[idx];
@@ -638,7 +643,19 @@ function startCall() {
   ws.binaryType = 'arraybuffer';
   ws.onmessage = onMessage;
   ws.onerror = () => { setState('error'); systemLine('เชื่อมต่อไม่สำเร็จ · connection error'); };
-  ws.onclose = () => { if ($('callScreen').classList.contains('active')) { finalizeAll(); setState('ended'); } };
+  ws.onclose = () => {
+    if ($('callScreen').classList.contains('active')) { finalizeAll(); setState('ended'); }
+    // The session is gone (idle timeout, go_away, network). Rearm the name
+    // after a beat — immediately would race the tail of Emma's last audio
+    // still leaving the speaker, and she would answer herself.
+    if (wakeAvailable) setTimeout(() => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        $('callScreen').classList.remove('active');
+        $('pickerScreen').classList.add('active');
+        startWakeMode();
+      }
+    }, 1500);
+  };
 }
 
 async function startMic() {
@@ -805,9 +822,95 @@ $('endBtn').onclick = () => {
   audioCtx = ws = micStream = micSource = worklet = null;
   $('callScreen').classList.remove('active');
   $('pickerScreen').classList.add('active');
+  if (wakeAvailable) setTimeout(startWakeMode, 500);
 };
 
 $('startBtn').onclick = startCall;
+
+// ---------------- wake mode: "Emma" instead of the Start button ----------------
+// Standby ears. While no conversation is running, the mic streams to
+// /ws/wake, where the server listens for the assistant's name — locally,
+// nothing upstream is connected until the name is heard. On {"type":"wake"}
+// this releases the mic and starts the ordinary call.
+//
+// Strictly an upgrade over the button: any failure (endpoint disabled,
+// model missing, mic denied, socket error) drops back to exactly the UI
+// that exists today. The button must never stop working because wake mode
+// half-loaded.
+
+let wakeWs = null, wakeCtx = null, wakeMicStream = null, wakeWorklet = null;
+let wakeAvailable = false, wakeStopping = false;
+
+async function startWakeMode() {
+  if (!wakeAvailable || wakeWs) return;
+  wakeStopping = false;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const sock = new WebSocket(`${proto}://${location.host}/ws/wake`);
+  sock.binaryType = 'arraybuffer';
+  wakeWs = sock;
+
+  sock.onmessage = (msg) => {
+    let evt;
+    try { evt = JSON.parse(msg.data); } catch { return; }
+    if (evt.type === 'wake') {
+      // The name was heard. Release the standby mic completely before the
+      // call grabs it — two AudioContexts on one device is how you get a
+      // silent session with no error anywhere.
+      stopWakeMode();
+      startCall();
+    } else if (evt.type === 'wake_listening') {
+      $('pickerNote').textContent =
+        `พูดว่า "${evt.word}" เพื่อเริ่มคุย · say "${evt.word}" — or press Start`;
+    } else if (evt.type === 'wake_unavailable') {
+      wakeAvailable = false;
+      stopWakeMode();
+    }
+  };
+  sock.onclose = () => {
+    if (wakeWs === sock) wakeWs = null;
+    // A dropped standby socket (server restart, sleep/resume) rearms
+    // itself; deliberate teardown does not.
+    if (!wakeStopping && wakeAvailable &&
+        $('pickerScreen').classList.contains('active')) {
+      setTimeout(startWakeMode, 2000);
+    }
+  };
+  sock.onerror = () => { try { sock.close(); } catch {} };
+
+  try {
+    wakeMicStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+  } catch (e) {
+    // No permission — the button path stays. Say which mode was lost.
+    wakeAvailable = false;
+    stopWakeMode();
+    $('pickerNote').textContent = 'กดปุ่มเพื่อเริ่มคุย (ไมค์สำหรับเรียกชื่อไม่ได้รับสิทธิ์)';
+    return;
+  }
+  wakeCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await wakeCtx.resume();
+  const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+  await wakeCtx.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+  const src = wakeCtx.createMediaStreamSource(wakeMicStream);
+  // The KWS model is 16kHz regardless of which voice provider is active.
+  wakeWorklet = new AudioWorkletNode(wakeCtx, 'cap', { processorOptions: { targetRate: 16000 } });
+  wakeWorklet.port.onmessage = (e) => {
+    if (e.data && e.data.level !== undefined) return;   // no level meter in standby
+    if (wakeWs && wakeWs.readyState === WebSocket.OPEN) wakeWs.send(e.data);
+  };
+  src.connect(wakeWorklet);
+}
+
+function stopWakeMode() {
+  wakeStopping = true;
+  try { wakeWorklet && (wakeWorklet.port.onmessage = null, wakeWorklet.disconnect()); } catch {}
+  wakeMicStream && wakeMicStream.getTracks().forEach((t) => t.stop());
+  try { wakeWs && wakeWs.close(); } catch {}
+  wakeCtx && wakeCtx.close().catch(() => {});
+  wakeWs = wakeCtx = wakeMicStream = wakeWorklet = null;
+}
 </script>
 </body>
 </html>

@@ -18,6 +18,17 @@ profile สะกดผิดได้ condo ไม่ใช่ error, emma ไ�
 ทุกข้อ** — ฟังไม่ชัดห้ามเดา, ทวนตัวเลข, อ่านผล hardware ก่อนยืนยัน, ห้ามอ่าน
 markdown เทสต์คุมอยู่ใน `tests/test_profiles.py`
 
+**Wake word "Emma"** (`WAKE_ENABLED`, ปิดเป็น default): sherpa-onnx KWS ใน
+`app/wake.py` + `/ws/wake` ใน main.py ฟังในเครื่องล้วนๆ Gemini เปิดหลังได้ยินชื่อ
+เท่านั้น — นี่คือกลไกที่ทำให้เปิดหน้าเว็บทิ้งไว้ทั้งวันไม่เผา quota
+เลือก sherpa-onnx แทน openwakeword เพราะรับคำปลุกเป็น*ข้อความ* (เปลี่ยนชื่อ =
+แก้ .env) ส่วน openwakeword มีแต่โมเดลสำเร็จรูป (hey_jarvis) ไม่มี emma ต้องเทรนเอง
+ข้อจริงที่วัดแล้วและห้ามเขียนสวนทาง: `reset_stream` หลัง hit **ไม่ใช่**ตัวกัน
+ยิงซ้ำ (`get_result` เคลียร์ตัวเองต่อ utterance — วัดแล้วทั้งสองแบบเหมือนกัน)
+เก็บไว้ตามตัวอย่าง upstream เฉยๆ / เทสต์ detection ใช้ wav สังเคราะห์จาก TTS
+ที่ commit ไว้ใน tests/data/wake/ — เครื่องไหนก็รันได้ ไม่ติดกับดัก "ผ่านเพราะ
+เครื่องขาดของ" / โมเดลอยู่ data/wake/ (gitignore, คืนได้ด้วยคำสั่งเดียว)
+
 ## กฎเนื้อหาที่ห้ามละเมิด
 
 **ห้ามแต่งข้อมูลโครงการเองเด็ดขาด** โดยเฉพาะราคา โปรโมชั่น แบบห้อง ขนาด เวลาทำการ
@@ -36,12 +47,13 @@ markdown เทสต์คุมอยู่ใน `tests/test_profiles.py`
 
 ```bash
 uvicorn app.main:app --port 8000     # รันเซิร์ฟเวอร์
-python -m pytest tests/ -q            # เทสต์ (557 ตัว, ใช้เวลา ~3 นาที)
+python -m pytest tests/ -q            # เทสต์ (566 ตัว, ใช้เวลา ~3 นาที)
 python -m pytest tests/test_slides.py -q
 python scripts/eval_search.py         # วัดคุณภาพการค้นสไลด์
 python scripts/analyze_log.py --days 7  # อ่าน data/logs/ ว่าเกิดอะไรขึ้นจริง
 python scripts/approve_narration.py --all --by "ชื่อ"
 python scripts/build_embeddings.py    # สร้าง embeddings ครั้งเดียว (อดทนกับ rate limit)
+python scripts/fetch_wake_model.py    # โหลดโมเดล wake word ครั้งเดียว (~15MB)
 python scripts/make_test_documents.py # สร้าง PDF ทดสอบระบบพิมพ์ (ต้องรันบนเครื่องที่มีฟอนต์ไทย)
 ```
 

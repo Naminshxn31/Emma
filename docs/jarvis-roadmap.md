@@ -92,6 +92,16 @@ pip install openwakeword
 ทางเลือกอื่น: Picovoice Porcupine มี keyword `jarvis` ในตัวเช่นกันและแม่นมาก
 แต่ tier ฟรีจำกัดจำนวนผู้ใช้ ส่วน openWakeWord เป็น Apache-2.0 ไม่มีเงื่อนไข
 
+✅ **เฟสนี้เสร็จแล้ว 2026-08-22 — และไม่ได้ใช้ openwakeword** เหตุผลอยู่ที่ชื่อ:
+openwakeword มีโมเดลสำเร็จรูปแค่ hey_jarvis ฯลฯ ไม่มี "emma" ต้องเข้า pipeline
+เทรนเสียงสังเคราะห์เอง ส่วน **sherpa-onnx keyword spotting รับคำปลุกเป็นข้อความ**
+(encode ด้วย BPE ของโมเดลตอน start) เปลี่ยนชื่อ = แก้ WAKE_WORD ใน .env
+วัดบนเครื่องจริงก่อนตัดสิน: ~15ms ต่อเสียง 1 วินาที, "Emma" เดี่ยวและกลางประโยค
+จับได้ทั้งคู่, ประโยคอื่นไม่ปลุก
+เปิดใช้: `python scripts/fetch_wake_model.py` แล้ว `WAKE_ENABLED=true`
+สถาปัตยกรรมตามแผนเป๊ะ: ไมค์ → /ws/wake (ในเครื่อง) → ได้ยินชื่อ → เปิด /ws ปกติ
+ปุ่ม Start ยังอยู่และต้องอยู่ — wake คือ upgrade ไม่ใช่ประตู
+
 ---
 
 ## เฟส 2 — สั่งของได้จริง (1–2 สัปดาห์ ทำทีละอัน)

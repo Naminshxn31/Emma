@@ -43,6 +43,24 @@ class Settings:
     # (Thai tokenisation, audio lead, mishearings) would need fixing twice.
     assistant_profile: str = os.getenv("ASSISTANT_PROFILE", "condo").strip().lower()
 
+    # --- Wake word ("Emma") ---
+    # Off by default: the gallery robot is started by staff each morning and
+    # must not grow a hot mic by surprise. The owner's machine turns it on.
+    wake_enabled: bool = _get_bool("WAKE_ENABLED", False)
+    # The name, as text. Encoded against the KWS model's BPE at startup, so
+    # changing it is an .env edit — but test any new name out loud before
+    # trusting it: short names collide with more of ordinary speech.
+    wake_word: str = os.getenv("WAKE_WORD", "emma")
+    wake_model_dir: str = os.getenv(
+        "WAKE_MODEL_DIR",
+        "data/wake/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
+    )
+    # Score shaping for the keyword path. Raise the threshold if the name
+    # fires on speech that merely resembles it; raise the boost if a clear
+    # call of the name is being missed.
+    wake_boost: float = float(os.getenv("WAKE_BOOST", "2.0"))
+    wake_threshold: float = float(os.getenv("WAKE_THRESHOLD", "0.25"))
+
     # --- Tools (things the assistant can actually do) ---
     tools_enabled: bool = _get_bool("TOOLS_ENABLED", True)
     #: Blank = every group. Otherwise a comma list, e.g. "smarthome".

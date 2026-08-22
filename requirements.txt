@@ -40,3 +40,11 @@ playwright>=1.40
 # (scripts/make_test_documents.py). Not needed to run the server — the real
 # documents come from the sales team as finished PDFs.
 reportlab>=4.0
+
+# Wake word ("Emma") — keyword spotting that runs entirely on this machine.
+# Optional: without these the Start button still works; WAKE_ENABLED=true
+# just logs that it can't. sentencepiece encodes a custom WAKE_WORD against
+# the model's BPE; the default "emma" has a precomputed encoding and works
+# without it. Model download: python scripts/fetch_wake_model.py
+sherpa-onnx>=1.13
+sentencepiece>=0.2
