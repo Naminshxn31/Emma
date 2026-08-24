@@ -28,7 +28,7 @@ from app.providers.base import ProviderError, ProviderEvent, VoiceProvider
 logger = logging.getLogger("condo_voice.openai")
 
 
-def build_session_config(voice: str, instructions: str) -> dict[str, Any]:
+def build_session_config(voice: str, instructions: str, use_tools: bool = True) -> dict[str, Any]:
     """The session.update payload that configures the whole conversation."""
     if settings.openai_turn_detection == "semantic_vad":
         turn_detection: dict[str, Any] = {
@@ -49,8 +49,11 @@ def build_session_config(voice: str, instructions: str) -> dict[str, Any]:
 
     from app import tools
 
-    tools.load_tools()
-    declared = tools.as_openai_tools()
+    if use_tools:
+        tools.load_tools()
+        declared = tools.as_openai_tools()
+    else:
+        declared = []
 
     return {
         "type": "session.update",
@@ -85,8 +88,10 @@ class OpenAIProvider(VoiceProvider):
     output_sample_rate = 24000
     session_limit_minutes = 60
 
-    def __init__(self, voice: str, instructions: str, greeting: str | None = None) -> None:
+    def __init__(self, voice: str, instructions: str, greeting: str | None = None,
+                 use_tools: bool = True) -> None:
         super().__init__(voice, instructions)
+        self.use_tools = use_tools
         self.greeting = greeting
         self._ws: websockets.WebSocketClientProtocol | None = None
         #: Item id of the reply currently playing — needed to truncate it.
@@ -107,7 +112,7 @@ class OpenAIProvider(VoiceProvider):
         except Exception as exc:
             raise ProviderError(f"Could not reach OpenAI Realtime: {exc}") from exc
 
-        await self._ws.send(json.dumps(build_session_config(self.voice, self.instructions)))
+        await self._ws.send(json.dumps(build_session_config(self.voice, self.instructions, use_tools=self.use_tools)))
         if self.greeting:
             await self._ws.send(json.dumps({
                 "type": "response.create",

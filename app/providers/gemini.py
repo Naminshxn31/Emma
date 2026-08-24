@@ -230,8 +230,13 @@ class GeminiProvider(VoiceProvider):
     session_limit_minutes = 15  # audio-only cap for Live API sessions
     auto_resumes = True          # ...but we rejoin with a handle past it
 
-    def __init__(self, voice: str, instructions: str) -> None:
+    def __init__(self, voice: str, instructions: str, use_tools: bool = True) -> None:
         super().__init__(voice, instructions)
+        #: The translator profile runs toolless BY CONFIG, not by asking the
+        #: prompt nicely — a declared tool is a callable tool, whatever the
+        #: instructions say, and an interpreter calling set_lights
+        #: mid-sentence is not a theoretical failure in this codebase.
+        self.use_tools = use_tools
         #: Which model this session actually opened with.
         #:
         #: An instance attribute rather than `settings.gemini_model` read at
@@ -312,10 +317,18 @@ class GeminiProvider(VoiceProvider):
 
         from app import tools
 
-        tools.load_tools()
-        gemini_tool = tools.as_gemini_tool()
-        if gemini_tool is not None:
-            config["tools"] = [gemini_tool]
+        if self.use_tools:
+            tools.load_tools()
+            gemini_tool = tools.as_gemini_tool()
+            if gemini_tool is not None:
+                config["tools"] = [gemini_tool]
+        if settings.web_search:
+            # Native grounding: Google runs the search, the model reads the
+            # results. Behind a default-off flag because it has never been
+            # verified against this live model — see WEB_SEARCH in config.
+            config.setdefault("tools", []).append(
+                types.Tool(google_search=types.GoogleSearch())
+            )
 
         # Thinking costs latency before the first word is spoken, and 2.5
         # native audio turns it on by default. Gemini 3.x uses levels

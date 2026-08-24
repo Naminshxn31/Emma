@@ -89,11 +89,15 @@ def test_the_paid_for_lessons_survive_the_profile_switch():
     assert "ห้ามแต่งข้อมูล" in text                # no invented facts
 
 
-def test_emma_admits_she_has_no_long_term_memory_yet():
-    """Phase 3 is not built. Until it is, 'จำไว้หน่อย' answered with a
-    confident 'จำแล้วค่ะ' would be the assistant inventing a capability —
-    the exact class of lie the hardware rules exist to prevent."""
-    assert "ยังไม่มีความจำข้ามเซสชัน" in build_instructions("X", profile="emma")
+def test_emma_has_real_memory_rules_now():
+    """Phase 3 is built, so the old "ยังไม่มีความจำข้ามเซสชัน" honesty line
+    is retired — but the honesty itself is not: the rule that replaced it
+    must still forbid invented memories, which is the same lie one layer
+    deeper. tests/test_memory.py owns the storage behaviour."""
+    text = build_instructions("X", profile="emma")
+    assert "ยังไม่มีความจำข้ามเซสชัน" not in text
+    assert "remember" in text
+    assert "ห้ามแต่งความทรงจำ" in text
 
 
 # ==================== greeting ====================
@@ -113,14 +117,17 @@ def test_each_profile_greets_its_own_audience():
 # ==================== tools ====================
 
 
-def test_emma_defaults_to_smarthome_tools_only(monkeypatch):
+def test_emma_defaults_to_home_tools_only(monkeypatch):
     """A tool the model can see is a tool it will eventually call. Emma with
-    `start_presentation` would narrate the condo deck in a living room."""
+    `start_presentation` would narrate the condo deck in a living room.
+    Smarthome and reminders are hers; everything else is gallery equipment."""
     from app.config import settings
 
     monkeypatch.setattr(settings, "assistant_profile", "emma")
     monkeypatch.setattr(settings, "tool_groups", "")
-    assert settings.enabled_tool_groups() == {"smarthome"}
+    assert settings.enabled_tool_groups() == {
+        "smarthome", "reminders", "memory", "mydocs", "websearch", "computer",
+    }
 
 
 def test_an_explicit_tool_list_beats_the_profile_default(monkeypatch):
@@ -154,3 +161,82 @@ def test_emma_refuses_instead_of_pretending():
     assert "ไม่มีเครื่องมือ" in text
     assert "ห้ามตอบว่าทำแล้ว" in text
     assert "ปิดสไลด์ไม่ใช่ปิดไฟ" in text
+
+
+def test_speaking_a_language_is_never_a_tool_call():
+    """Real session, 2026-08-22: "พูดอะไรก็ได้เป็นภาษาญี่ปุ่นยาวๆ" sent Emma
+    to search_web — which happened to be failing — so she announced she
+    "couldn't find a Japanese example" and apologised, for a thing she can
+    do natively in ~97 languages. The docs-first rule needed the boundary
+    stated: language ability is hers, not a lookup."""
+    text = build_instructions("X", profile="emma")
+    assert "ความสามารถของตัวคุณเอง" in text
+    assert "ห้ามไปค้นเว็บหา" in text
+
+
+# ==================== the translator ====================
+
+
+def test_the_translator_translates_and_does_nothing_else():
+    """The discipline of the profile is what it does NOT do: no answering
+    (it translates the question instead), no opinions, no tools, no gallery
+    facts, no owner's memory — an interpreter carrying private context into
+    a room of strangers is a leak wearing headphones."""
+    text = build_instructions("Embassy World", profile="translator")
+    assert "ล่าม" in text
+    assert "ภาษาไทย ให้พูดคำแปลเป็นภาษาอังกฤษ" in text
+    assert "ภาษาอื่นที่ไม่ใช่ไทย ให้พูดคำแปลเป็นภาษาไทย" in text
+    assert "ห้ามเรียกใช้เครื่องมือ" in text
+    assert "ไม่ใช่ตอบมัน" in text                 # translate the question, don't answer it
+    # Each of these quotes a sentence from the first real interpreter
+    # session, 2026-08-24 — the house technique, because the generic rule
+    # alone let all three happen:
+    assert "ห้ามแปลเป็น \"I love you\"" in text   # 我爱你 went to English, twice
+    assert "ไม่ใช่ \"ฉันชื่อโชกุนค่ะ\"" in text   # ค่ะ added to a male speaker's words
+    assert "ห้ามตอบว่า \"สบายดีค่ะ\"" in text     # answered a greeting instead of translating
+    assert "Embassy World" not in text            # no gallery facts
+    assert "ความจำ" not in text                   # no owner memory block
+
+
+def test_the_translator_has_zero_tool_groups(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "assistant_profile", "translator")
+    monkeypatch.setattr(settings, "tool_groups", "")
+    assert settings.enabled_tool_groups() == set()
+
+
+def test_the_translator_session_is_toolless_by_config(monkeypatch):
+    """Not by prompt: a declared tool is a callable tool whatever the
+    instructions say, and an interpreter calling set_lights mid-sentence is
+    not a theoretical failure in this codebase."""
+    from app.providers.openai_realtime import build_session_config
+
+    session = build_session_config("marin", "x", use_tools=False)["session"]
+    assert "tools" not in session
+
+    from app.providers.gemini import GeminiProvider
+
+    provider = GeminiProvider("Kore", "x", use_tools=False)
+    config = provider._build_config()
+    assert "tools" not in config
+
+
+def test_the_translator_greeting_is_bilingual_and_nothing_more():
+    g = greeting_for("translator")
+    assert "Interpreter" in g and "ล่าม" in g
+
+
+def test_mic_shaping_defaults_keep_the_gallery_audio_untouched():
+    """MIC_BOOST=1.0 skips the compressor chain entirely — the gallery's
+    audio path must stay byte-identical to what shipped before this knob
+    existed. Asserted on source defaults, not Settings() (which bakes the
+    developer's .env at import — the documented trap)."""
+    import inspect
+    import re
+
+    from app import config
+
+    src = inspect.getsource(config)
+    assert re.search(r'os\.getenv\("MIC_BOOST",\s*"1\.0"\)', src)
+    assert re.search(r'_get_bool\("MIC_NOISE_SUPPRESSION",\s*True\)', src)

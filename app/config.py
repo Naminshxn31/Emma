@@ -43,6 +43,48 @@ class Settings:
     # (Thai tokenisation, audio lead, mishearings) would need fixing twice.
     assistant_profile: str = os.getenv("ASSISTANT_PROFILE", "condo").strip().lower()
 
+    # Open the voice session the moment the page loads, no button and no
+    # wake word first. The owner asked for this twice, knowing the trade:
+    # an open session meters quota the whole time the tab is up, which is
+    # exactly what the wake word was built to avoid — their machine, their
+    # call. Default off so the gallery keeps its staff-starts-it morning
+    # routine.
+    auto_connect: bool = _get_bool("AUTO_CONNECT", False)
+
+    # Where Emma's timers and reminders live. Deliberately not the condo
+    # data tree's log area: this is the owner's own data, kept until done,
+    # while data/logs/ is strangers' speech on a 30-day clock. The two must
+    # never share a deletion policy.
+    reminders_file: str = os.getenv("REMINDERS_FILE", "data/reminders.json")
+    # Permanent facts about the owner, told to Emma on purpose. Same rule as
+    # reminders: the owner's data, never the gallery's, never on the log's
+    # 30-day clock.
+    memory_file: str = os.getenv("MEMORY_FILE", "data/memory.json")
+    # Folder of the owner's own files (.txt .md .pdf) that Emma may search.
+    personal_docs_dir: str = os.getenv("PERSONAL_DOCS_DIR", "data/personal-docs")
+    # Gemini's native google_search grounding for the live session.
+    # Measured 2026-08-22: a bare session connects fine while the same
+    # session with this tool gets 1011 — grounding has its own quota and
+    # the free tier has none of it. So this is a billing-tier feature:
+    # flipping it on a free key turns every session into an instant 1011,
+    # which the browser then redials — a robot that dies the moment it
+    # answers. Turn on only after billing is enabled AND
+    # scripts/probe_web_search.py prints OK for both probes.
+    web_search: bool = _get_bool("WEB_SEARCH", False)
+
+    # --- Microphone shaping (browser-side) ---
+    # Far-field help in software: the page runs mic -> compressor -> gain
+    # before anything hears it. The compressor squeezes loud-near and
+    # quiet-far speech closer together, then the gain lifts the result —
+    # the standard recipe for pulling distant speech up without clipping.
+    # 1.0 = chain off (gallery default). 1.5-2.5 is the useful range;
+    # beyond that the noise floor comes up with the voice.
+    mic_boost: float = float(os.getenv("MIC_BOOST", "1.0"))
+    # Browser noise suppression eats quiet distant voices along with the
+    # noise. Turn it off when chasing range in a quiet room; keep it on in
+    # a noisy one. Measure by ear, not by theory.
+    mic_noise_suppression: bool = _get_bool("MIC_NOISE_SUPPRESSION", True)
+
     # --- Wake word ("Emma") ---
     # Off by default: the gallery robot is started by staff each morning and
     # must not grow a hot mic by surprise. The owner's machine turns it on.
@@ -230,6 +272,8 @@ class Settings:
     port: int = int(os.getenv("PORT", "8000"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     cors_origins: list[str] = field(default_factory=lambda: _get_list("CORS_ORIGINS", ["*"]))
+    ssl_certfile: str = os.getenv("SSL_CERTFILE", "")
+    ssl_keyfile: str = os.getenv("SSL_KEYFILE", "")
 
 
     # --- Provider selection ---
@@ -394,7 +438,12 @@ class Settings:
         if groups:
             return groups
         if self.assistant_profile == "emma":
-            return {"smarthome"}
+            return {"smarthome", "reminders", "memory", "mydocs",
+                    "websearch", "computer"}
+        if self.assistant_profile == "translator":
+            # An interpreter has one job. A tool the model can see is a tool
+            # it will eventually call — mid-translation.
+            return set()
         return None
 
 
