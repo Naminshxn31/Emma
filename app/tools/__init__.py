@@ -32,7 +32,31 @@ _TOOL_MODULES = {
     "app.tools.knowledge": "knowledge",
     "app.tools.documents": "documents",
     "app.tools.robot": "robot",
+    "app.tools.reminders": "reminders",
+    "app.tools.memory": "memory",
+    "app.tools.mydocs": "mydocs",
+    "app.tools.websearch": "websearch",
+    "app.tools.computer": "computer",
 }
+
+#: Groups that load only when *named* in the enabled set. "Everything"
+#: (TOOL_GROUPS blank on the condo profile) predates these groups, and the
+#: gallery must not sprout new tools on a git pull — a guest setting the
+#: showroom an alarm is nobody's feature. Emma names them in her default.
+_OPT_IN = {"reminders", "memory", "mydocs", "websearch", "computer"}
+
+
+def _modules_to_load(enabled: set[str] | None) -> list[str]:
+    """Pure so it can be tested without touching the import machinery."""
+    chosen = []
+    for module_path, group in _TOOL_MODULES.items():
+        if enabled is None:
+            if group in _OPT_IN:
+                continue
+            chosen.append(module_path)
+        elif group in enabled:
+            chosen.append(module_path)
+    return chosen
 
 _loaded = False
 
@@ -43,10 +67,7 @@ def load_tools() -> list[Tool]:
     if _loaded:
         return all_tools()
 
-    enabled = settings.enabled_tool_groups()
-    for module_path, group in _TOOL_MODULES.items():
-        if enabled is not None and group not in enabled:
-            continue
+    for module_path in _modules_to_load(settings.enabled_tool_groups()):
         try:
             importlib.import_module(module_path)
         except Exception:

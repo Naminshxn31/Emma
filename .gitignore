@@ -46,3 +46,8 @@ data/canva-shots/
 # Wake-word model — 30MB of ONNX weights, restored with one command:
 #   python scripts/fetch_wake_model.py
 data/wake/
+
+# Emma's timers, reminders and memory — the owner's own data, not the repo's
+data/reminders.json
+data/memory.json
+data/personal-docs/

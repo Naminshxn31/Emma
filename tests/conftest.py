@@ -88,6 +88,25 @@ def _fresh_async_state():
     canva_display._task = None
     display._audio_lead_ms = 0.0
     display._audio_until = 0.0
+
+    # Reminder state is module-level too: a watcher task belongs to a dead
+    # loop the moment its test ends, and a cached item list from one test's
+    # tmp_path poisons the next. Only touched if something imported it —
+    # importing here would register its tools into every test's registry.
+    import sys as _sys
+
+    _rem = _sys.modules.get("app.tools.reminders")
+    if _rem is not None:
+        _rem.reset()
+    _mem = _sys.modules.get("app.memory_store")
+    if _mem is not None:
+        _mem.reset()
+    _docs = _sys.modules.get("app.tools.mydocs")
+    if _docs is not None:
+        _docs.reset()
+    _wake = _sys.modules.get("app.wake")
+    if _wake is not None:
+        _wake._STANDBY.clear()
     yield
     # Drop, don't cancel: by now the loop these belong to is already closed,
     # so there is nothing left to cancel them with. Holding the reference is
