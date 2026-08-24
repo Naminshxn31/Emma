@@ -53,7 +53,7 @@ def _worst(results: list[str]) -> str:
 @tool(
     name="set_lights",
     description=(
-        "เปิดหรือปิดไฟในห้องขาย ใช้เมื่อลูกค้าขอให้เปิดไฟ ปิดไฟ "
+        "เปิดหรือปิดไฟในห้อง ใช้เมื่อถูกขอให้เปิดไฟ ปิดไฟ "
         "หรือบอกว่าห้องมืดหรือสว่างเกินไป"
     ),
     parameters={
@@ -87,7 +87,7 @@ async def set_lights(on: bool) -> dict:
 @tool(
     name="set_air_conditioner",
     description=(
-        "ควบคุมเครื่องปรับอากาศในห้องขาย เปิด ปิด ตั้งอุณหภูมิ ความแรงลม หรือโหมด "
+        "ควบคุมเครื่องปรับอากาศในห้อง เปิด ปิด ตั้งอุณหภูมิ ความแรงลม หรือโหมด "
         "ใช้เมื่อลูกค้าบอกว่าร้อน หนาว หรือขอปรับแอร์ "
         "ระบุเฉพาะพารามิเตอร์ที่ลูกค้าต้องการเปลี่ยนเท่านั้น"
     ),
@@ -115,7 +115,7 @@ async def set_lights(on: bool) -> dict:
     },
     tags=["smarthome"],
 )
-def set_air_conditioner(
+async def set_air_conditioner(
     on: bool | None = None,
     temp: int | None = None,
     fan: str | None = None,
@@ -124,38 +124,53 @@ def set_air_conditioner(
     if on is None and temp is None and fan is None and mode is None:
         return {"ok": False, "error": "no change requested", "ac": dict(STATE["ac"])}
 
-    results: list[str] = []
-    clamped = False
+    # Everything below runs off the event loop, like set_lights and for the
+    # same measured reason — worse here, because one AC request can be up to
+    # FOUR sends, and with the hub unreachable each one walks the full
+    # auth-retry-then-discovery path. Seen live: "สั่งปิดแอร์" with the hub
+    # absent froze the whole voice session for the duration.
+    def _apply() -> tuple[list[str], bool]:
+        results: list[str] = []
+        clamped = False
 
-    if on is not None and bool(on) != STATE["ac"]["on"]:
-        results.append(broadlink_ir.send("ac_on" if on else "ac_off"))
-        STATE["ac"]["on"] = bool(on)
-    elif on is not None:
-        STATE["ac"]["on"] = bool(on)
+        if on is not None and bool(on) != STATE["ac"]["on"]:
+            results.append(broadlink_ir.send("ac_on" if on else "ac_off"))
+            STATE["ac"]["on"] = bool(on)
+        elif on is not None:
+            STATE["ac"]["on"] = bool(on)
 
-    if temp is not None:
-        requested = int(temp)
-        bounded = max(AC_TEMP_MIN, min(AC_TEMP_MAX, requested))
-        clamped = bounded != requested
-        STATE["ac"]["temp"] = bounded
-        if STATE["ac"]["on"]:
-            results.append(broadlink_ir.send(f"ac_temp_{bounded}"))
+        if temp is not None:
+            requested = int(temp)
+            bounded = max(AC_TEMP_MIN, min(AC_TEMP_MAX, requested))
+            clamped = bounded != requested
+            STATE["ac"]["temp"] = bounded
+            if STATE["ac"]["on"]:
+                results.append(broadlink_ir.send(f"ac_temp_{bounded}"))
 
-    if fan is not None:
-        speed = fan if fan in FAN_SPEEDS else "auto"
-        STATE["ac"]["fan"] = speed
-        if STATE["ac"]["on"]:
-            results.append(broadlink_ir.send(f"ac_fan_{speed}"))
+        if fan is not None:
+            speed = fan if fan in FAN_SPEEDS else "auto"
+            STATE["ac"]["fan"] = speed
+            if STATE["ac"]["on"]:
+                results.append(broadlink_ir.send(f"ac_fan_{speed}"))
 
-    if mode is not None:
-        chosen = mode if mode in AC_MODES else "cool"
-        STATE["ac"]["mode"] = chosen
-        if STATE["ac"]["on"]:
-            results.append(broadlink_ir.send(f"ac_mode_{chosen}"))
+        if mode is not None:
+            chosen = mode if mode in AC_MODES else "cool"
+            STATE["ac"]["mode"] = chosen
+            if STATE["ac"]["on"]:
+                results.append(broadlink_ir.send(f"ac_mode_{chosen}"))
+        return results, clamped
 
+    results, clamped = await asyncio.to_thread(_apply)
     hardware = _worst(results)
 
-    out = {"ok": True, "ac": dict(STATE["ac"]), "hardware": hardware}
+    out = {"ok": hardware != "failed", "ac": dict(STATE["ac"]), "hardware": hardware}
+    if hardware == "failed":
+        # Same contract as set_lights: a command that never reached the
+        # hardware must not come back looking like success.
+        out["instruction"] = (
+            "ส่งคำสั่งไปที่แอร์ไม่สำเร็จ (ตัวส่งสัญญาณไม่ตอบ) ให้บอกผู้ใช้ตรงๆ "
+            "ห้ามยืนยันว่าทำสำเร็จ"
+        )
     if clamped:
         # Tell the model, so it can mention the limit rather than silently
         # confirming a temperature the unit never got.
@@ -165,7 +180,7 @@ def set_air_conditioner(
 
 @tool(
     name="get_room_status",
-    description="ดูสถานะไฟและแอร์ในห้องขายตอนนี้ ใช้เมื่อลูกค้าถามว่าตอนนี้เปิดอยู่ไหม หรือกี่องศา",
+    description="ดูสถานะไฟและแอร์ในห้องตอนนี้ ใช้เมื่อถูกถามว่าตอนนี้เปิดอยู่ไหม หรือกี่องศา",
     parameters={"type": "object", "properties": {}},
     tags=["smarthome"],
 )

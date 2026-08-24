@@ -80,13 +80,39 @@ def load_codes() -> dict:
         return {}
 
 
+def _local_ipv4s() -> list[str]:
+    """Every IPv4 this machine has. Multi-homed PCs (WiFi + Ethernet + WSL)
+    broadcast discovery from ONE interface by default — measured on the
+    owner's machine: the hub sat on the Ethernet segment while discovery
+    went out the WiFi, and eight seconds of scanning found nothing that a
+    direct auth then reached instantly."""
+    import socket
+
+    ips: list[str] = []
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith("127.") and ip not in ips:
+                ips.append(ip)
+    except OSError:
+        pass
+    return ips
+
+
 def _rediscover(cfg: dict):
     # The router may hand the hub a new IP after a reboot; find it again by
     # its fixed MAC and heal the saved config in place.
     import broadlink
 
     try:
-        for found in broadlink.discover(timeout=_DISCOVERY_TIMEOUT):
+        candidates = []
+        for local_ip in _local_ipv4s() or [None]:
+            try:
+                candidates.extend(broadlink.discover(
+                    timeout=_DISCOVERY_TIMEOUT, local_ip_address=local_ip))
+            except OSError:
+                continue
+        for found in candidates:
             if found.mac.hex() == cfg.get("mac"):
                 found.auth()
                 cfg["host"] = found.host[0]

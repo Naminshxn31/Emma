@@ -585,3 +585,49 @@ def test_prompt_tells_the_model_not_to_claim_success_on_failure():
 
     text = build_instructions("X")
     assert "failed" in text and "ห้ามบอกว่าสำเร็จ" in text
+
+
+def test_a_blocking_ac_send_does_not_block_the_event_loop(smarthome, monkeypatch):
+    """The set_lights fix, finally applied to the worse case: one AC request
+    is up to FOUR sends, and with the hub unreachable each walks the full
+    retry-then-discovery path. Seen live 2026-08-22: "สั่งปิดแอร์" with no
+    hub on the network froze the whole voice session."""
+    import time
+
+    from app.tools import broadlink_ir
+
+    def slow_send(*args, **kwargs):
+        time.sleep(0.1)
+        return "ok"
+
+    monkeypatch.setattr(broadlink_ir, "send", slow_send)
+
+    async def body():
+        ticks = 0
+
+        async def heartbeat():
+            nonlocal ticks
+            for _ in range(5):
+                await asyncio.sleep(0.02)
+                ticks += 1
+
+        result, _ = await asyncio.gather(
+            registry.dispatch("set_air_conditioner", {"on": False}), heartbeat()
+        )
+        assert result["hardware"] == "ok"
+        assert ticks == 5, "the loop starved while the AC command ran"
+
+    asyncio.run(body())
+
+
+def test_an_unreachable_hub_makes_the_ac_result_honest(smarthome, monkeypatch):
+    from app.tools import broadlink_ir
+
+    monkeypatch.setattr(broadlink_ir, "send", lambda *a, **k: "failed")
+
+    async def body():
+        out = await registry.dispatch("set_air_conditioner", {"on": False})
+        assert out["ok"] is False
+        assert "ห้ามยืนยันว่าทำสำเร็จ" in out["instruction"]
+
+    asyncio.run(body())
