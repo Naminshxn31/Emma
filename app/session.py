@@ -34,9 +34,16 @@ logger = logging.getLogger("condo_voice.session")
 
 
 class VoiceSession:
-    def __init__(self, ws: WebSocket, provider_name: str | None = None, voice: str | None = None) -> None:
+    def __init__(self, ws: WebSocket, provider_name: str | None = None, voice: str | None = None,
+                 profile: str | None = None) -> None:
         self.ws = ws
         self.provider_name = provider_name or settings.provider
+        #: Per-connection persona. The URL can ask for one (?profile=
+        #: translator) so the sales room flips into interpreter mode with a
+        #: bookmark instead of an .env edit and a restart. Falls back to the
+        #: machine's configured profile, and unknown names land on condo
+        #: inside build_instructions — same safety as everywhere else.
+        self.profile = (profile or settings.assistant_profile).strip().lower()
         chosen = voice or default_voice_for(self.provider_name)
         if not voices.is_valid(self.provider_name, chosen):
             chosen = default_voice_for(self.provider_name)
@@ -80,11 +87,14 @@ class VoiceSession:
             settings.project_name,
             languages=settings.reply_languages,
             robot_name=settings.robot_name,
-            profile=settings.assistant_profile,
+            profile=self.profile,
         )
         provider = get_provider(
             self.provider_name, self.voice, instructions,
-            greeting=greeting_for(settings.assistant_profile),
+            greeting=greeting_for(self.profile),
+            # Toolless by config for the translator, not by prompt: a
+            # declared tool is a callable tool whatever the prompt says.
+            use_tools=(self.profile != "translator"),
         )
 
         try:
@@ -93,6 +103,11 @@ class VoiceSession:
                 await self._send_json({
                     "type": "ready",
                     "provider": self.provider_name,
+                    # Which persona this session actually opened with — shown
+                    # in the header, because "ไม่เห็นแปลภาษาเลย" turned out to
+                    # mean a translator URL served by a pre-translator server,
+                    # and nothing on screen said which mode was really running.
+                    "profile": self.profile,
                     "voice": self.voice,
                     "input_rate": provider.input_sample_rate,
                     "output_rate": provider.output_sample_rate,
@@ -617,7 +632,8 @@ class VoiceSession:
 _active: VoiceSession | None = None
 
 
-async def handle_connection(ws: WebSocket, provider: str | None = None, voice: str | None = None) -> None:
+async def handle_connection(ws: WebSocket, provider: str | None = None, voice: str | None = None,
+                            profile: str | None = None) -> None:
     """Run a voice session, taking the robot over from any previous one.
 
     Newest wins rather than newest rejected. A stale tab must not be able to
@@ -649,7 +665,7 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
 
         slides.reset_state()
 
-    session = VoiceSession(ws, provider_name=provider, voice=voice)
+    session = VoiceSession(ws, provider_name=provider, voice=voice, profile=profile)
     _active = session
     turnlog.record("session_start", provider=session.provider_name, voice=session.voice)
     try:

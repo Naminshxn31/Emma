@@ -188,8 +188,46 @@ class WakeStream:
         return hit
 
 
+#: Standby browsers currently holding a /ws/wake socket. Normally the wake
+#: flow is one-directional — audio in, "wake" out on detection — but a
+#: reminder falling due while the line is parked needs the *server* to be
+#: able to ring the room: summon() pushes the same {"type": "wake"} the
+#: keyword would have produced, and the browser dials exactly as if the
+#: owner had said the name.
+_STANDBY: set = set()
+
+
+def register(ws) -> None:
+    _STANDBY.add(ws)
+
+
+def unregister(ws) -> None:
+    _STANDBY.discard(ws)
+
+
+async def summon(reason: str = "server") -> int:
+    """Ask every standby browser to open a session. Returns how many heard.
+
+    Dead sockets are dropped rather than raised on — a tab that vanished
+    without closing is the normal case, not the exceptional one.
+    """
+    import json
+
+    delivered = 0
+    for ws in list(_STANDBY):
+        try:
+            await ws.send_text(json.dumps(
+                {"type": "wake", "word": settings.wake_word, "reason": reason}
+            ))
+            delivered += 1
+        except Exception:
+            _STANDBY.discard(ws)
+    return delivered
+
+
 def reset() -> None:
     """Tests swap models and settings; the singleton must not outlive them."""
     global _spotter, _load_failed
     _spotter = None
     _load_failed = False
+    _STANDBY.clear()

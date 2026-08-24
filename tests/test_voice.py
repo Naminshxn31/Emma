@@ -1032,7 +1032,12 @@ def test_playhead_is_reset_when_a_call_starts():
     so the next session played nothing at all."""
     js = _client_js()
     start = js.index("function startCall()")
-    body = js[start:start + 900]
+    # To the next top-level function, not a fixed byte count — a fixed
+    # window silently stops covering the reset the moment anyone adds a
+    # line above it, which is exactly how this assertion once went red for
+    # an unrelated edit.
+    end = js.index("\nfunction ", start + 1)
+    body = js[start:end]
     assert "playHead = 0" in body, "startCall() must reset playHead"
 
 
@@ -1965,10 +1970,22 @@ def test_the_canva_follower_is_not_even_started_without_a_canva_url(monkeypatch)
 
 def test_idle_timeout_defaults_to_off():
     """A demo that hangs up mid-sentence because somebody set thirty seconds
-    is worse than the bill it saves."""
-    from app.config import Settings
+    is worse than the bill it saves.
 
-    assert Settings().idle_timeout_s == 0
+    Asserted on the source, not on `Settings()`: dataclass defaults are
+    baked at import from whatever .env this machine has, so instantiating
+    can only ever measure the developer's configuration — the day
+    IDLE_TIMEOUT_S was genuinely set here, the old version went red while
+    saying nothing about the default. (Scrubbing the env var doesn't help;
+    the value was captured long before the test ran.)"""
+    import inspect
+    import re
+
+    from app import config
+
+    src = inspect.getsource(config)
+    assert re.search(r'os\.getenv\("IDLE_TIMEOUT_S",\s*"0"\)', src), (
+        "the shipped default for IDLE_TIMEOUT_S must be 0 (off)")
 
 
 def test_only_guest_speech_resets_the_idle_clock(monkeypatch):

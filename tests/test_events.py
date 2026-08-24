@@ -172,3 +172,71 @@ def test_a_provider_that_fails_does_not_take_the_caller_down(live):
         ) is False
 
     asyncio.run(body())
+
+
+def test_a_summoning_announcement_rings_the_standby_browser(monkeypatch):
+    """Hybrid mode means an alarm usually rings into a *parked* line: no
+    session, but a standby browser listening for its name. The server can
+    say the name — summon pushes the same "wake" the keyword would, the
+    browser dials, and the announcement lands on the fresh line."""
+    from app import session as session_module
+    from app import wake
+
+    monkeypatch.setattr(session_module, "_active", None)
+    rang = {"n": 0}
+
+    async def fake_summon(reason="server"):
+        rang["n"] += 1
+        # The browser "dials": a session appears while announce is polling.
+        session_module._active = Session()
+        return 1
+
+    monkeypatch.setattr(wake, "summon", fake_summon)
+
+    async def body():
+        display.set_audio_lead(0)
+        ok = await events.announce(
+            "ถึงเวลาที่ตั้งไว้", source="reminder",
+            summon=True, max_wait=5, then_pause=0,
+        )
+        assert ok is True
+        assert rang["n"] == 1
+        assert session_module._active.provider.said == ["ถึงเวลาที่ตั้งไว้"]
+
+    asyncio.run(body())
+
+
+def test_summoning_an_empty_house_fails_honestly(monkeypatch):
+    """No standby browser at all (page closed): summon reaches nobody and
+    the announcement reports undelivered — which is what lets the reminder
+    watcher retry instead of marking the alarm done unheard."""
+    from app import session as session_module
+    from app import wake
+
+    monkeypatch.setattr(session_module, "_active", None)
+
+    async def nobody(reason="server"):
+        return 0
+
+    monkeypatch.setattr(wake, "summon", nobody)
+    assert asyncio.run(events.announce(
+        "หายไปเฉยๆ", source="reminder", summon=True, max_wait=5, then_pause=0,
+    )) is False
+
+
+def test_events_that_only_matter_mid_conversation_do_not_summon(monkeypatch):
+    """A tour nudge with nobody in the room must die quietly, not ring the
+    house to announce that a slideshow would like to continue."""
+    from app import session as session_module
+    from app import wake
+
+    monkeypatch.setattr(session_module, "_active", None)
+    rang = {"n": 0}
+
+    async def count(reason="server"):
+        rang["n"] += 1
+        return 1
+
+    monkeypatch.setattr(wake, "summon", count)
+    assert asyncio.run(events.announce("ไปต่อ", source="tour_nudge")) is False
+    assert rang["n"] == 0

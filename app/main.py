@@ -129,6 +129,28 @@ async def _log_effective_config() -> None:
                         "the assistant may never respond. Use HIGH unless you know why.")
 
 
+@app.on_event("startup")
+async def _rearm_reminders() -> None:
+    """A reminder must survive a restart, so the clock must too.
+
+    Guarded by the enabled groups: importing the module registers its tools,
+    and the condo profile must not gain reminder tools because the server
+    happened to restart with something pending in the file.
+    """
+    from app import tools as tools_pkg
+
+    if "app.tools.reminders" not in tools_pkg._modules_to_load(
+        settings.enabled_tool_groups()
+    ):
+        return
+    from app.tools import reminders
+
+    if reminders.pending():
+        reminders.ensure_watcher()
+        logging.getLogger("condo_voice").info(
+            "reminders: %d pending — watcher armed", len(reminders.pending()))
+
+
 @app.on_event("shutdown")
 async def _close_canva_display() -> None:
     """No-op if the window was never opened (CANVA_URL unset)."""
@@ -174,6 +196,9 @@ async def health() -> dict:
         # the Start button. `ready` is the honest half: enabled-but-missing-
         # model must not put the UI in a mode the server cannot serve.
         "wake": {"enabled": settings.wake_enabled, "ready": _wake_ready()},
+        "auto_connect": settings.auto_connect,
+        "mic": {"boost": settings.mic_boost,
+                "noise_suppression": settings.mic_noise_suppression},
         "robot": robot_link.status(),
         "providers_configured": {
             "gemini": bool(settings.gemini_api_key),
@@ -226,6 +251,9 @@ async def ws_wake(websocket: WebSocket) -> None:
     await websocket.send_text(json.dumps(
         {"type": "wake_listening", "word": settings.wake_word}
     ))
+    # Registered so the server can ring the room itself — a reminder falling
+    # due while the line is parked summons a session through this socket.
+    wake.register(websocket)
     try:
         while True:
             message = await websocket.receive()
@@ -245,11 +273,14 @@ async def ws_wake(websocket: WebSocket) -> None:
                 return
     except WebSocketDisconnect:
         return
+    finally:
+        wake.unregister(websocket)
 
 
 @app.websocket("/ws")
-async def ws_endpoint(websocket: WebSocket, voice: str | None = None, provider: str | None = None) -> None:
-    await handle_connection(websocket, provider=provider, voice=voice)
+async def ws_endpoint(websocket: WebSocket, voice: str | None = None, provider: str | None = None,
+                      profile: str | None = None) -> None:
+    await handle_connection(websocket, provider=provider, voice=voice, profile=profile)
 
 
 @app.websocket("/ws/display")

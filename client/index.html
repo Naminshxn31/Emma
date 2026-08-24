@@ -261,8 +261,12 @@ Promise.all([
   }
   $('startBtn').disabled = false;
   $('pickerNote').textContent = 'Speech-to-speech — you can interrupt at any time.';
-  if (health.wake && health.wake.ready) {
-    wakeAvailable = true;
+  autoConnect = !!health.auto_connect;
+  if (health.mic) { micBoost = health.mic.boost || 1; micNS = !!health.mic.noise_suppression; }
+  wakeAvailable = !!(health.wake && health.wake.ready);
+  if (autoConnect) {
+    startCall();              // no button, no name — straight in
+  } else if (wakeAvailable) {
     startWakeMode();
   }
 }).catch(() => {
@@ -625,7 +629,22 @@ function stopPlayback() {
 
 // ---------------- call ----------------
 
+function releaseCallHardware() {
+  try { worklet && (worklet.port.onmessage = null, worklet.disconnect()); } catch {}
+  try { micSource && micSource.disconnect(); } catch {}
+  micStream && micStream.getTracks().forEach((t) => t.stop());
+  sources.forEach((s) => { try { s.stop(); } catch {} });
+  sources = []; playing = false;
+  audioCtx && audioCtx.close().catch(() => {});
+  audioCtx = micStream = micSource = worklet = null;
+}
+
 function startCall() {
+  manualEnd = false;
+  idleParked = false;
+  superseded = false;
+  try { ws && ws.close(); } catch {}
+  releaseCallHardware();
   if (!wakeHandover) stopWakeMode();   // in a handover the standby mic is
                                        // still buffering the command tail
   $('pickerScreen').classList.remove('active');
@@ -652,17 +671,48 @@ function startCall() {
   warnedNoDisplay = false;
 
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/ws?voice=${encodeURIComponent(selectedVoice)}`);
+  // ?profile=translator on the page URL flips this connection's persona —
+  // a bookmark per mode, no .env edit, no restart.
+  const urlProfile = new URLSearchParams(location.search).get('profile');
+  ws = new WebSocket(`${proto}://${location.host}/ws?voice=${encodeURIComponent(selectedVoice)}`
+    + (urlProfile ? `&profile=${encodeURIComponent(urlProfile)}` : ''));
   ws.binaryType = 'arraybuffer';
   ws.onmessage = onMessage;
   ws.onerror = () => { setState('error'); systemLine('เชื่อมต่อไม่สำเร็จ · connection error'); };
   ws.onclose = () => {
     if ($('callScreen').classList.contains('active')) { finalizeAll(); setState('ended'); }
+    if (superseded) {
+      // Fully passive: no redial (that steals the session back) and no wake
+      // standby (two standby tabs both dial on one "Emma" — same war,
+      // slower). Back to the picker — with the Start button visible — so a
+      // human can reclaim this tab on purpose; nothing reclaims it for them.
+      superseded = false;
+      $('callScreen').classList.remove('active');
+      $('pickerScreen').classList.add('active');
+      $('pickerScreen').classList.remove('standby');
+      $('pickerNote').textContent =
+        'แท็บอื่นกำลังใช้งานอยู่ — ปิดแท็บนั้น หรือกด Start เพื่อใช้แท็บนี้แทน';
+      return;
+    }
+    if (autoConnect && !manualEnd && !idleParked) {
+      // Redial with backoff: 2s doubling to 30s, reset on 'ready'. The cap
+      // matters — a server that is down must not be hammered twice a
+      // second, and a key that stopped working must not melt the quota the
+      // moment it comes back.
+      const wait = redialDelay;
+      redialDelay = Math.min(redialDelay * 2, 30000);
+      setTimeout(() => {
+        if (!ws || (ws.readyState !== WebSocket.OPEN &&
+                    ws.readyState !== WebSocket.CONNECTING)) startCall();
+      }, wait);
+      return;
+    }
     // The session is gone (idle timeout, go_away, network). Rearm the name
     // after a beat — immediately would race the tail of Emma's last audio
     // still leaving the speaker, and she would answer herself.
     if (wakeAvailable) setTimeout(() => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
+      if (!ws || (ws.readyState !== WebSocket.OPEN &&
+                  ws.readyState !== WebSocket.CONNECTING)) {
         $('callScreen').classList.remove('active');
         $('pickerScreen').classList.add('active');
         startWakeMode();
@@ -674,7 +724,7 @@ function startCall() {
 async function startMic() {
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: true },
     });
   } catch (e) {
     setState('error');
@@ -684,11 +734,18 @@ async function startMic() {
 
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
   await audioCtx.resume();
+  // Auto-connect means this can all happen before the person has ever
+  // touched the page — and Chrome keeps an AudioContext suspended until the
+  // first gesture, so Emma "speaks" into a muted context: transcript moves,
+  // speakers stay silent, mic hears nothing. Detect it, say it on screen,
+  // and let the first tap anywhere unlock both directions.
+  armAudioUnlock(audioCtx);
   const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
   await audioCtx.audioWorklet.addModule(url);
   URL.revokeObjectURL(url);
 
   micSource = audioCtx.createMediaStreamSource(micStream);
+  const shaped = buildMicChain(audioCtx, micSource);
   worklet = new AudioWorkletNode(audioCtx, 'cap', { processorOptions: { targetRate: inputRate } });
   worklet.port.onmessage = (e) => {
     if (e.data && e.data.level !== undefined) {
@@ -704,7 +761,7 @@ async function startMic() {
     ws.send(e.data);
   };
   // Deliberately not connected to destination — never echo the guest's mic.
-  micSource.connect(worklet);
+  shaped.connect(worklet);
 
   if (wakeHandover) {
     // Everything said since the name, oldest first, then release the
@@ -734,12 +791,14 @@ function onMessage(msg) {
 
   switch (evt.type) {
     case 'ready':
+      redialDelay = 2000;
       inputRate = evt.input_rate;
       outputRate = evt.output_rate;
       providerName = evt.provider;
       halfDuplex = !!evt.half_duplex;
       $('callNote').textContent =
-        `${evt.provider} · ${evt.voice} · `
+        (evt.profile && evt.profile !== 'condo' ? `โหมด ${evt.profile} · ` : '')
+        + `${evt.provider} · ${evt.voice} · `
         + (evt.auto_resumes
             ? `auto-continues past ${evt.session_limit_min} min`
             : `session ends after ${evt.session_limit_min} min`)
@@ -820,7 +879,27 @@ function onMessage(msg) {
       cutBot = null;
       break;
 
+    case 'idle_timeout':
+      // The room went quiet and the server hung up to stop the meter.
+      idleParked = true;
+      systemLine('เงียบไปพักหนึ่ง เลยวางสายให้ก่อน — เรียก "emma" เมื่อไหร่ก็กลับมาค่ะ');
+      break;
+
+    case 'farewell':
+      // The owner said goodbye and Emma hung up herself. Same parking as
+      // idle — redialing a call the owner just ended would be the robot
+      // refusing to be dismissed.
+      idleParked = true;
+      systemLine('วางสายแล้วค่ะ — เรียก "emma" เมื่อไหร่ก็กลับมา');
+      break;
+
     case 'error':
+      if (evt.code === 'superseded') {
+        superseded = true;
+        setState('ended');
+        systemLine('แท็บอื่นกำลังใช้งานอยู่ — ปิดแท็บนั้น หรือกด Start เพื่อใช้แท็บนี้แทน');
+        break;
+      }
       setState('error');
       systemLine(evt.message || 'unknown error');
       break;
@@ -834,6 +913,7 @@ $('muteBtn').onclick = () => {
 };
 
 $('endBtn').onclick = () => {
+  manualEnd = true;
   try { ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'stop' })); } catch {}
   try { ws && ws.close(); } catch {}
   try { worklet && (worklet.port.onmessage = null, worklet.disconnect()); } catch {}
@@ -850,6 +930,23 @@ $('endBtn').onclick = () => {
 };
 
 $('startBtn').onclick = startCall;
+
+// Tap the orb to change the voice. A voice is chosen at session start, so
+// switching means redialing — the conversation so far doesn't carry over,
+// which is the price of the shortcut and worth saying in the panel.
+$('callOrb').style.cursor = 'pointer';
+$('callOrb').title = 'กดเพื่อเปลี่ยนเสียง · tap to change voice';
+$('callOrb').onclick = () => {
+  if (!voices.length) return;
+  idx = (idx + 1) % voices.length;
+  selectedVoice = voices[idx].id;
+  manualEnd = true;              // this close is ours, not a line drop
+  try { ws && ws.close(); } catch {}
+  setTimeout(() => {
+    startCall();
+    systemLine(`เปลี่ยนเสียงเป็น ${voices[idx].name} — เริ่มบทสนทนาใหม่`);
+  }, 250);
+};
 
 // ---------------- wake mode: "Emma" instead of the Start button ----------------
 // Standby ears. While no conversation is running, the mic streams to
@@ -874,6 +971,24 @@ let wakeAvailable = false, wakeStopping = false;
 // alone -> greeting plays; name+command -> greeting yields to the answer.
 let wakeTail = [], wakeHandover = false;
 const WAKE_TAIL_MAX = 300;    // 20ms chunks -> ~6s cap
+
+// Always-connected mode (AUTO_CONNECT in .env): the page opens straight
+// into a live session, and a dropped session redials itself. The owner
+// chose this over the wake word's quota saving — deliberately, twice.
+let autoConnect = false, manualEnd = false, redialDelay = 2000;
+// Set when the server hung up because the room went quiet. That close is a
+// decision, not a failure — redialing it would turn IDLE_TIMEOUT_S into a
+// quota-burning loop, so it parks in standby and the name brings it back.
+let idleParked = false;
+// Another tab took the robot (the server's newest-wins handover). A
+// superseded tab must STAND DOWN — redialing steals the session straight
+// back, the other tab redials in turn, and the two burn quota killing each
+// other forever. Observed live, 2026-08-24: a translator tab and a normal
+// tab ping-ponging takeovers, both showing LISTENING.
+let superseded = false;
+// Mic shaping (MIC_BOOST / MIC_NOISE_SUPPRESSION in .env): compressor+gain
+// between the mic and everything that listens. See buildMicChain().
+let micBoost = 1, micNS = true;
 
 async function startWakeMode() {
   if (!wakeAvailable || wakeWs) return;
@@ -927,7 +1042,7 @@ async function startWakeMode() {
 
   try {
     wakeMicStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: true },
     });
   } catch (e) {
     // No permission — the button path stays. Say which mode was lost.
@@ -938,10 +1053,11 @@ async function startWakeMode() {
   }
   wakeCtx = new (window.AudioContext || window.webkitAudioContext)();
   await wakeCtx.resume();
+  armAudioUnlock(wakeCtx);
   const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
   await wakeCtx.audioWorklet.addModule(url);
   URL.revokeObjectURL(url);
-  const src = wakeCtx.createMediaStreamSource(wakeMicStream);
+  const src = buildMicChain(wakeCtx, wakeCtx.createMediaStreamSource(wakeMicStream));
   // The KWS model is 16kHz regardless of which voice provider is active.
   wakeWorklet = new AudioWorkletNode(wakeCtx, 'cap', { processorOptions: { targetRate: 16000 } });
   wakeWorklet.port.onmessage = (e) => {
@@ -949,6 +1065,39 @@ async function startWakeMode() {
     if (wakeWs && wakeWs.readyState === WebSocket.OPEN) wakeWs.send(e.data);
   };
   src.connect(wakeWorklet);
+}
+
+function buildMicChain(ctx, source) {
+  // Far-field recipe: squeeze the dynamic range (so far/quiet speech and
+  // near/loud speech land closer together), then lift the result. With
+  // MIC_BOOST=1.0 the chain is skipped entirely — the gallery's audio path
+  // stays byte-identical to what it always was.
+  if (micBoost === 1) return source;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -45;   // start squeezing well below speech peaks
+  comp.knee.value = 30;
+  comp.ratio.value = 8;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.25;
+  const gain = ctx.createGain();
+  gain.gain.value = micBoost;
+  source.connect(comp);
+  comp.connect(gain);
+  return gain;
+}
+
+function armAudioUnlock(ctx) {
+  if (!ctx || ctx.state !== 'suspended') return;
+  const note = $('pickerScreen').classList.contains('active') ? 'pickerNote' : 'callNote';
+  const prev = $(note).textContent;
+  $(note).textContent = 'แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียง · tap once to enable audio';
+  const unlock = () => {
+    ctx.resume().then(() => { if ($(note).textContent.includes('แตะหน้าจอ')) $(note).textContent = prev; });
+    document.removeEventListener('pointerdown', unlock);
+    document.removeEventListener('keydown', unlock);
+  };
+  document.addEventListener('pointerdown', unlock);
+  document.addEventListener('keydown', unlock);
 }
 
 function stopWakeMode() {

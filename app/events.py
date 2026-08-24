@@ -66,6 +66,12 @@ DEFAULT_MAX_WAIT = 45.0
 DEFAULT_PAUSE = 0.4
 
 
+#: How long a summoned browser gets to dial before the announcement gives
+#: up this round. Covers mic acquisition + the Gemini connect (~2-3s
+#: measured) with margin; the reminder watcher retries the next tick anyway.
+SUMMON_WAIT_S = 12.0
+
+
 async def announce(
     text: str,
     *,
@@ -73,6 +79,7 @@ async def announce(
     still_relevant: Callable[[], bool] | None = None,
     max_wait: float = DEFAULT_MAX_WAIT,
     then_pause: float = DEFAULT_PAUSE,
+    summon: bool = False,
 ) -> bool:
     """Say something the guest didn't ask for, once they can hear it.
 
@@ -81,8 +88,18 @@ async def announce(
     talking" is a question someone will ask about a recording, and without
     this the log shows a guest turn that no guest took.
 
+    `summon=True` is for events that must not die with the silence: in
+    hybrid mode the line is usually *parked* when an alarm rings, so there
+    is no session to speak into — but there is a standby browser listening
+    for its name, and the server can say it: `wake.summon()` pushes the same
+    "wake" the keyword would have, the browser dials, and the announcement
+    is delivered on the fresh line. Events that only matter mid-conversation
+    (a tour nudge) keep the default and drop.
+
     Returns whether the text actually reached the model.
     """
+    import asyncio
+
     from app import display
     from app import session as session_module
 
@@ -91,6 +108,20 @@ async def announce(
     # is handed over while we wait, the right move is to drop it, not to
     # deliver it to whoever is standing there now.
     session = session_module._active
+    if (session is None or session.provider is None) and summon:
+        from app import wake
+
+        rang = await wake.summon(reason=source)
+        if rang:
+            logger.info("no session for %s — summoned %d standby browser(s)",
+                        source, rang)
+            deadline = SUMMON_WAIT_S
+            while deadline > 0:
+                await asyncio.sleep(0.25)
+                deadline -= 0.25
+                session = session_module._active
+                if session is not None and session.provider is not None:
+                    break
     if session is None or session.provider is None:
         logger.info("no live session — dropping the %s announcement", source)
         turnlog.record("announce", source=source, sent=False, reason="no session")
