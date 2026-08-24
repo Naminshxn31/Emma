@@ -47,13 +47,15 @@ markdown เทสต์คุมอยู่ใน `tests/test_profiles.py`
 
 ```bash
 uvicorn app.main:app --port 8000     # รันเซิร์ฟเวอร์
-python -m pytest tests/ -q            # เทสต์ (566 ตัว, ใช้เวลา ~3 นาที)
+python -m pytest tests/ -q            # เทสต์ (613 ตัว, ใช้เวลา ~3 นาที)
 python -m pytest tests/test_slides.py -q
 python scripts/eval_search.py         # วัดคุณภาพการค้นสไลด์
 python scripts/analyze_log.py --days 7  # อ่าน data/logs/ ว่าเกิดอะไรขึ้นจริง
 python scripts/approve_narration.py --all --by "ชื่อ"
 python scripts/build_embeddings.py    # สร้าง embeddings ครั้งเดียว (อดทนกับ rate limit)
 python scripts/fetch_wake_model.py    # โหลดโมเดล wake word ครั้งเดียว (~15MB)
+python scripts/import_website.py <url> # ดูดเว็บลง data/personal-docs/ ให้ emma ค้น
+python scripts/probe_web_search.py    # เช็คว่า google_search grounding ใช้ได้ยัง (ต้อง billing)
 python scripts/make_test_documents.py # สร้าง PDF ทดสอบระบบพิมพ์ (ต้องรันบนเครื่องที่มีฟอนต์ไทย)
 ```
 
