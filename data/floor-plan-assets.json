@@ -1,0 +1,112 @@
+{
+  "schema": "embassy-floor-plan-assets/v1",
+  "updated_at": "2026-08-21",
+  "coordinate_system": "native canvas normalized to 0-100",
+  "private_source_directory": "data/private/floor-plan-sources",
+  "floors": [
+    {
+      "floor": 1,
+      "status": "review-ready",
+      "width": 4956,
+      "height": 2747,
+      "detector_source": "1.png",
+      "detector_sha256": "df276a2eb6d73a067380d1dcf5a0c575cf7ef4238a5eceef2b11e155c94a6cb9",
+      "display_source": "Ground.png",
+      "display_source_sha256": "11dfcdb73647993a43734fb56677bd4cea62be353549d08272ba394b939c5d97",
+      "display_path": "/fpg1.webp",
+      "display_derivative_sha256": "8ba3b84b7d83dcbe910fe9f6ac33b8fbe6e33c6801748a5b0da4fb2a903c9eee",
+      "measured_max_corner_drift_px": 0.0011
+    },
+    {
+      "floor": 2,
+      "status": "review-ready",
+      "width": 4953,
+      "height": 2747,
+      "detector_source": "2.png",
+      "detector_sha256": "eaf82963812116afb0b9cb2380924fd72b4e669e46732b54a55e71b0317278ad",
+      "display_source": "FLOOR 2.png",
+      "display_source_sha256": "801c2311181dd97b7b22af48ca16d35618dda6ec70c34a6471d26cb414ab3c66",
+      "display_path": "/fp2.webp",
+      "display_derivative_sha256": "5f4358441a189ffdb795cd0e23eb12539265b2a7bf77988ac863f5af5539f954",
+      "measured_max_corner_drift_px": 0.05
+    },
+    {
+      "floor": 3,
+      "status": "review-ready",
+      "width": 4956,
+      "height": 2747,
+      "detector_source": "3.png",
+      "detector_sha256": "1602dfe1db99d42972dda5b9b6ab1ba496f0c3320c2884e41619779a23e39205",
+      "display_source": "FLOOR 3.png",
+      "display_source_sha256": "3eb632d9a6989a44feb9822c26c7d9fdd58d9aee3cd1f08da257341fea73cf21",
+      "display_path": "/fp3.webp",
+      "display_derivative_sha256": "dd2f804e9930676fb6887afdb7fe1d504ff56bf814b081429dd41f19b525b5c4",
+      "measured_max_corner_drift_px": 0.03
+    },
+    {
+      "floor": 4,
+      "status": "review-ready",
+      "width": 4953,
+      "height": 2747,
+      "detector_source": "4.png",
+      "detector_sha256": "e0c183edc850cfd3f1f3b986d321b6b2837c29eae134c67fbc66f376587a6b8c",
+      "display_source": "FLOOR 4.png",
+      "display_source_sha256": "9eacb35326604d722e76ac05ee7621746da525d6914b9ecd6e17a31bf70e1f5b",
+      "display_path": "/fp4.webp",
+      "display_derivative_sha256": "913ed3d0837db3cd2ca0f0e82b634e391c3533e1300e4316b5480e2702701137",
+      "measured_max_corner_drift_px": 0.07
+    },
+    {
+      "floor": 5,
+      "status": "review-ready",
+      "width": 4953,
+      "height": 2747,
+      "detector_source": "5.png",
+      "detector_sha256": "271dac0d58bebb4a9cc211b71bb4de1112cc6cc39344f0d911213c82fda21a87",
+      "display_source": "FLOOR 5.png",
+      "display_source_sha256": "e02c2a9d83e7d9e1a6b4ec54d7307d0f16f7c5bf6d8c1ed53e1bd2a6ee557ff2",
+      "display_path": "/fp5.webp",
+      "display_derivative_sha256": "d7b68ccae9f134214fae9231aff1746a4cb1f3d1420f2b1d1dc9d07b57d2a0a4",
+      "measured_max_corner_drift_px": 0.08
+    },
+    {
+      "floor": 6,
+      "status": "review-ready",
+      "width": 4953,
+      "height": 2747,
+      "detector_source": "6.png",
+      "detector_sha256": "513ccc1f3aa8f1b550c1f5372f9eeef4cc01f429f93f8a69f8973c6366ce2878",
+      "display_source": "FLOOR 6.png",
+      "display_source_sha256": "426f0a0f3f8af0ff0ae202d5739635795801685fed452b4a2f357302ff2a1d6d",
+      "display_path": "/fp6.webp",
+      "display_derivative_sha256": "718685b757fbf9dff0b01f0554ac58f66949af5ad7a776867e19ac7432757d39",
+      "measured_max_corner_drift_px": 0.36
+    },
+    {
+      "floor": 7,
+      "status": "review-required",
+      "width": 4953,
+      "height": 2747,
+      "detector_source": "7.png",
+      "detector_sha256": "d1ebe28f35bacaaa85b344cfb2fd557f05dfadcb1d869c71d58f31b389321306",
+      "display_source": "FLOOR 7.png",
+      "display_source_sha256": "7781bfa164b90a65d245bef479eab989c24efbf4ccaf08649586c8b997369f38",
+      "display_path": "/fp7.webp",
+      "display_derivative_sha256": "5ca2f3b76a1d2c96da995ac2155071e6b66cbf058e6a0730d23d96e95c0eb834",
+      "measured_max_corner_drift_px": 2.72
+    },
+    {
+      "floor": 8,
+      "status": "review-required",
+      "width": 4953,
+      "height": 2747,
+      "detector_source": "8.png",
+      "detector_sha256": "301a9be1ea9e9208ee7c87be2e9c254c0d8b951adc595a197435ffa10191030b",
+      "display_source": "FLOOR 8.png",
+      "display_source_sha256": "635a791b07cbba956ca4cae86524f7a5d8efb48a0f067c3f1894095bc51851f5",
+      "display_path": "/fp8.webp",
+      "display_derivative_sha256": "110bc5dc604328082baf4404b6fea03d28d37cf51c64e2edc3220f1d610f3257",
+      "measured_max_corner_drift_px": 3.4
+    }
+  ]
+}

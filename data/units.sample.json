@@ -1,0 +1,49 @@
+{
+  "_readme": "ตัวอย่างเท่านั้น — ตัวเลขทุกตัวในไฟล์นี้สมมติขึ้นเพื่อให้เห็นหน้าตาการ์ด ห้ามใช้กับลูกค้า ไฟล์จริงคือ data/units.json ซึ่งต้องมี approved_by และ effective_from",
+  "sample": true,
+  "approved_by": "",
+  "effective_from": "",
+  "fields_needed_from_sales": [
+    "เลขห้อง", "ตึก/ชั้น", "แบบ (1BR/2BR)", "ขนาด ตร.ม.", "ทิศ/วิว",
+    "ราคา THB", "สถานะ (ว่าง/จอง/ขายแล้ว)", "ภาพห้อง", "ภาพแปลนรายยูนิต",
+    "ผู้อนุมัติราคา", "ใช้ได้ถึงวันที่"
+  ],
+  "units": [
+    {
+      "room": "A801",
+      "building": "A",
+      "floor": 8,
+      "type": "1BR",
+      "sqm": 35,
+      "aspect": "วิวทะเล",
+      "price_thb": 3290000,
+      "status": "available",
+      "photo": "",
+      "floorplan": ""
+    },
+    {
+      "room": "A1204",
+      "building": "A",
+      "floor": 12,
+      "type": "2BR",
+      "sqm": 58,
+      "aspect": "วิวเมือง",
+      "price_thb": 5490000,
+      "status": "reserved",
+      "photo": "",
+      "floorplan": ""
+    },
+    {
+      "room": "B305",
+      "building": "B",
+      "floor": 3,
+      "type": "1BR",
+      "sqm": 32,
+      "aspect": "วิวสระว่ายน้ำ",
+      "price_thb": 2890000,
+      "status": "sold",
+      "photo": "",
+      "floorplan": ""
+    }
+  ]
+}
