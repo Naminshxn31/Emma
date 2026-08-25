@@ -1411,3 +1411,114 @@ def test_a_broken_warm_up_never_costs_us_the_window(monkeypatch):
             raise RuntimeError("viewer went away")
 
     assert run(canva_display.warm_deck(Hostile(), total=10)) == 0
+
+
+# ============ warming belongs to boot, not to a guest's first slide ============
+
+
+def test_ensure_page_does_not_warm_the_deck(monkeypatch):
+    """`_ensure_page` is first reached when a guest asks for slide one, and
+    `start_presentation` waits on that call with CANVA_ARRIVAL_TIMEOUT_S —
+    five seconds, against a walk that takes about thirty-three. Warming
+    there meant the `hold=True` wait timed out every time and the robot
+    narrated the cover over a blank window: the newer mechanism silently
+    switching off the older one that was written for exactly that bug."""
+    from app.config import settings
+
+    page = TalkingPage(page=1)
+    walked = []
+
+    async def fake_launch(args):
+        return None, page
+
+    async def fake_warm(_page, total=None):
+        walked.append(True)
+        return 0
+
+    async def no_fullscreen(_page):
+        return None
+
+    _pretend_playwright_is_installed(monkeypatch)
+    # Warming *enabled* — the point is that this path skips it anyway.
+    monkeypatch.setattr(settings, "canva_warm_deck", True)
+    monkeypatch.setattr(canva_display, "_warmed", False)
+    monkeypatch.setattr(canva_display, "_page", None)
+    monkeypatch.setattr(canva_display, "_playwright", None)
+    monkeypatch.setattr(canva_display, "_launch_browser", fake_launch)
+    monkeypatch.setattr(canva_display, "_go_fullscreen", no_fullscreen)
+    monkeypatch.setattr(canva_display, "warm_deck", fake_warm)
+
+    assert asyncio.run(canva_display._ensure_page()) is page
+    assert walked == [], "opening the window must not walk the deck"
+
+
+def test_the_startup_warm_up_opens_the_window_and_walks_it(monkeypatch):
+    """The other half: something still has to warm the deck, and boot is the
+    only moment when half a minute of walking is free."""
+    from app.config import settings
+
+    page = TalkingPage(page=1)
+    walked = []
+
+    async def fake_ensure(*, launch=True, why="slide"):
+        return page
+
+    async def fake_warm(_page, total=None):
+        walked.append(_page)
+        return 59
+
+    monkeypatch.setattr(settings, "canva_url", "https://canva.test/deck")
+    monkeypatch.setattr(settings, "canva_warm_deck", True)
+    # Warming needs a window at boot, so it needs this too — see
+    # test_warming_never_overrides_the_no_window_at_boot_switch.
+    monkeypatch.setattr(settings, "canva_open_at_start", True)
+    monkeypatch.setattr(canva_display, "_warmed", False)
+    monkeypatch.setattr(canva_display, "_ensure_page", fake_ensure)
+    monkeypatch.setattr(canva_display, "warm_deck", fake_warm)
+
+    asyncio.run(canva_display.open_and_warm())
+    assert walked == [page]
+
+    # Off switch, and "already warmed" — neither may walk it a second time.
+    walked.clear()
+    monkeypatch.setattr(settings, "canva_warm_deck", False)
+    asyncio.run(canva_display.open_and_warm())
+    monkeypatch.setattr(settings, "canva_warm_deck", True)
+    monkeypatch.setattr(canva_display, "_warmed", True)
+    asyncio.run(canva_display.open_and_warm())
+    assert walked == []
+
+
+def test_warming_never_overrides_the_no_window_at_boot_switch(monkeypatch, caplog):
+    """`CANVA_OPEN_AT_START` exists precisely to keep a fullscreen browser off
+    the desktop at boot. Moving the warm-up to startup without checking it
+    made that switch stop working — a new mechanism walking straight into an
+    old one, which is this file's most repeated lesson. Seen live: the owner
+    started the server and a fullscreen Chrome took over the screen.
+
+    Warming genuinely needs a window, so it is skipped and says which switch
+    buys it rather than opening one anyway."""
+    import logging
+
+    from app.config import settings
+
+    walked = []
+
+    async def fake_warm(_page, total=None):
+        walked.append(True)
+        return 0
+
+    async def fake_ensure(*, launch=True, why="slide"):
+        raise AssertionError("must not open a window when open_at_start is off")
+
+    monkeypatch.setattr(settings, "canva_url", "https://canva.test/deck")
+    monkeypatch.setattr(settings, "canva_warm_deck", True)
+    monkeypatch.setattr(settings, "canva_open_at_start", False)
+    monkeypatch.setattr(canva_display, "_warmed", False)
+    monkeypatch.setattr(canva_display, "_ensure_page", fake_ensure)
+    monkeypatch.setattr(canva_display, "warm_deck", fake_warm)
+
+    with caplog.at_level(logging.WARNING, logger="condo_voice.canva_display"):
+        asyncio.run(canva_display.open_and_warm())
+    assert walked == []
+    assert "CANVA_OPEN_AT_START" in caplog.text, "say which switch buys it"

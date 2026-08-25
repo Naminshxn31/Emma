@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8" />
-<title>Embassy World — Display</title>
+<title>Embassy World — Guest Display</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" href="data:," />
 <style>
@@ -39,6 +39,169 @@
   .offline { position: absolute; top: 1.6rem; left: 2rem; color: #c33; font-size: .85rem;
              opacity: 0; transition: opacity .3s; }
   .offline.on { opacity: 1; }
+
+  /* ---------------- robot chest screen (?chat=1) ----------------
+     18.5" ten-point touch panel, mounted portrait: a 16:9 panel turned on
+     its side, so the design target is 1080x1920. Everything below is driven
+     by the *aspect ratio* rather than the user agent — the Android shell may
+     report orientation differently once the real robot arrives, and a
+     layout that asks "who are you" instead of "what shape are you" gets
+     that wrong in a way nobody can fix from here.
+
+     This is a reception robot, not a chat client. Idle it shows Emma and the
+     project name; her words run along the bottom like subtitles. What the
+     guest said is never on this screen — see app/display.py for why. */
+  /* Same rule as the kiosk skin: hidden once the mouse stops, not banned.
+     A touch panel never moves one; the desk this is built on does. */
+  body.idlecursor, body.idlecursor * { cursor: none; }
+  body.chat .idle { display: none; }
+
+  .stagewrap { position: absolute; inset: 0; display: none; flex-direction: column; }
+  body.chat .stagewrap { display: flex; }
+  /* The picture takes the top; the subtitle band owns the bottom and never
+     moves, so a guest's eyes are not hunting for the words. */
+  .stagewrap .pic { flex: 1 1 auto; position: relative; min-height: 0; }
+  .stagewrap .band { flex: 0 0 auto; }
+
+  .hero { position: absolute; inset: 0; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 4vmin;
+          transition: opacity .5s ease; }
+  .hero.hide { opacity: 0; pointer-events: none; }
+  .hero .emma { width: 34vmin; height: 34vmin; border-radius: 50%;
+                background: radial-gradient(circle at 32% 28%, #8ED0F5 0%, #1B6FE0 78%);
+                animation: float 5s ease-in-out infinite; }
+  .hero .who { color: #fff; font-size: clamp(1.4rem, 4.2vmin, 3rem); font-weight: 600;
+               letter-spacing: .01em; text-align: center; padding: 0 6vmin; }
+  .hero .who small { display: block; margin-top: 1.4vmin; font-weight: 400;
+                     font-size: .52em; color: #9fb6d6; letter-spacing: .06em; }
+  @keyframes float { 0%,100% { transform: scale(1) } 50% { transform: scale(1.045) } }
+
+  /* Subtitles. Sized for a person standing one to two metres away, reading
+     a screen at chest height — several times a laptop's comfortable size.
+     vmin so it survives the panel arriving in the other orientation. */
+  .band { position: relative; padding: 4vmin 6vmin calc(5vmin + env(safe-area-inset-bottom, 0px));
+          background: linear-gradient(to top, rgba(0,0,0,.92) 55%, rgba(0,0,0,0));
+          min-height: 26vh; display: flex; flex-direction: column; justify-content: flex-end;
+          gap: 2.4vmin; }
+  .said { color: #fff; font-size: clamp(1.6rem, 4.6vmin, 4rem); line-height: 1.42;
+          font-weight: 500; max-height: 4.3em; overflow: hidden;
+          display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+  .said:empty { display: none; }
+
+  /* The guest's half of the conversation, said without quoting them. */
+  .ear { display: none; align-items: center; gap: 2vmin; color: #7fd6a2;
+         font-size: clamp(.95rem, 2.4vmin, 1.7rem); letter-spacing: .04em; }
+  body.listening .ear { display: flex; }
+  .ear i { width: 1.5vmin; height: 1.5vmin; border-radius: 50%; background: currentColor;
+           animation: pip 1.1s ease-in-out infinite; font-style: normal; }
+  .ear i:nth-child(2) { animation-delay: .18s; }
+  .ear i:nth-child(3) { animation-delay: .36s; }
+  @keyframes pip { 0%,100% { opacity: .25; transform: scale(.8) } 50% { opacity: 1; transform: scale(1.25) } }
+
+  /* Landscape (a desk monitor, or the panel mounted the usual way round):
+     the picture keeps the room and the band gets shallower. */
+  @media (min-aspect-ratio: 1/1) {
+    .band { min-height: 0; padding: 3vmin 5vmin calc(3.5vmin + env(safe-area-inset-bottom, 0px)); }
+    .said { font-size: clamp(1.4rem, 3.4vmin, 3rem); -webkit-line-clamp: 2; max-height: 2.9em; }
+    .hero .emma { width: 26vmin; height: 26vmin; }
+  }
+  /* Embassy guest-display identity. The slide-only monitor remains a quiet
+     black canvas; the robot screen gets a premium architectural palette. */
+  :root { --night:#09111f; --night-2:#111d32; --ivory:#f3ead8;
+          --champagne:#c7aa70; --champagne-dim:#8c7854; --mist:#aeb8c7; }
+  body.chat {
+    color: var(--ivory);
+    background: radial-gradient(circle at 50% 30%, rgba(48,83,126,.30), transparent 31%),
+                radial-gradient(circle at 8% 92%, rgba(199,170,112,.09), transparent 32%),
+                linear-gradient(150deg, var(--night-2), var(--night) 54%, #060b14);
+  }
+  body.chat::before { content:''; position:fixed; inset:0; pointer-events:none; z-index:20;
+    border:clamp(10px,1.5vmin,24px) solid rgba(199,170,112,.11);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.025); }
+  .displayBrand { display:none; }
+  body.chat .displayBrand { display:flex; position:absolute; z-index:8;
+    left:5vmin; right:5vmin; top:calc(4vmin + env(safe-area-inset-top,0px));
+    align-items:baseline; justify-content:space-between; pointer-events:none; }
+  .displayBrand span { color:var(--ivory); font-family:Georgia,'Times New Roman',serif;
+    font-size:clamp(1.1rem,3.1vmin,2.5rem); letter-spacing:.18em; }
+  .displayBrand small { color:var(--champagne-dim); font-size:clamp(.58rem,1.25vmin,1rem);
+    font-weight:700; letter-spacing:.19em; }
+  body.chat .stagewrap { z-index:2; }
+  body.chat .stagewrap .pic { margin:0; overflow:hidden; }
+  body.chat .layer { inset:clamp(5.5rem,11vmin,9rem) 3vmin 1vmin; }
+  body.chat .layer::after { content:''; position:absolute; inset:0; pointer-events:none;
+    box-shadow:inset 0 0 0 1px rgba(199,170,112,.20); border-radius:1.5vmin; }
+  body.chat .layer img { width:100%; height:100%; object-fit:contain; border-radius:1.5vmin; }
+  body.chat .caption { left:4vmin; right:4vmin; bottom:2vmin; padding:7vmin 2vmin 2vmin;
+    background:linear-gradient(to top,rgba(5,10,18,.94),transparent); }
+  body.chat .caption h1 { color:var(--ivory); font-family:Georgia,'Times New Roman',serif;
+    font-size:clamp(1.25rem,3.4vmin,2.8rem); font-weight:500; }
+  body.chat .caption p { color:#c5cbd3; font-size:clamp(.82rem,1.8vmin,1.35rem); }
+  body.chat .pos { top:calc(5vmin + env(safe-area-inset-top,0px)); right:5vmin;
+    padding:.55em .9em; border:1px solid rgba(199,170,112,.28); border-radius:999px;
+    background:rgba(7,13,24,.70); color:var(--ivory); backdrop-filter:blur(10px); }
+  body.chat .hero { gap:2.4vmin; padding:15vmin 7vmin 4vmin;
+    background:linear-gradient(180deg,rgba(255,255,255,.018),transparent 36%); }
+  .hero .eyebrow { color:var(--champagne); font-size:clamp(.64rem,1.65vmin,1.15rem);
+    font-weight:700; letter-spacing:.24em; text-transform:uppercase; }
+  .hero .emma { position:relative; width:min(34vmin,300px); height:min(34vmin,300px);
+    background:radial-gradient(circle at 34% 27%,rgba(255,255,255,.95) 0 2%,transparent 12%),
+               radial-gradient(circle at 37% 31%,#cbe7fa 0%,#5ca4df 30%,#1765b8 72%,#0e376f 100%);
+    box-shadow:0 0 0 1px rgba(255,255,255,.12),0 0 0 2.2vmin rgba(81,137,191,.045),
+               0 0 11vmin rgba(51,118,181,.32); }
+  .hero .emma::after { content:''; position:absolute; inset:-5vmin; border-radius:50%;
+    border:1px solid rgba(199,170,112,.16); animation:ring 5s ease-in-out infinite; }
+  body.speaking .hero .emma { animation:speakOrb 1.15s ease-in-out infinite; }
+  body.listening .hero .emma { animation:listenOrb 2.8s ease-in-out infinite; }
+  @keyframes ring { 50% { transform:scale(1.06); opacity:.42; } }
+  @keyframes speakOrb { 50% { transform:scale(1.045); box-shadow:0 0 12vmin rgba(74,142,207,.48); } }
+  @keyframes listenOrb { 50% { transform:scale(1.025); } }
+  .hero .who { color:var(--ivory); font-family:Georgia,'Times New Roman',serif;
+    font-size:clamp(2rem,6.2vmin,5rem); font-weight:500; letter-spacing:.08em; line-height:1.05; }
+  .hero .who small { color:var(--champagne-dim);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    font-size:.28em; font-weight:700; letter-spacing:.2em; text-transform:uppercase; }
+  .hero .invitation { max-width:34ch; color:var(--mist); font-size:clamp(.92rem,2.2vmin,1.6rem);
+    line-height:1.55; text-align:center; }
+  body.chat .band { min-height:27vh;
+    padding:3.2vmin 5.5vmin calc(5vmin + env(safe-area-inset-bottom,0px)); gap:1.5vmin;
+    border-top:1px solid rgba(199,170,112,.17);
+    background:linear-gradient(180deg,rgba(13,24,42,.96),rgba(6,12,22,.99)); }
+  body.chat .band:has(.said:empty) { min-height:14vh; }
+  .bandHead { display:none; }
+  body.chat .bandHead { display:flex; align-items:center; justify-content:space-between;
+    color:var(--champagne); font-size:clamp(.66rem,1.45vmin,1rem); font-weight:700;
+    letter-spacing:.16em; text-transform:uppercase; }
+  .phasePill { display:inline-flex; align-items:center; gap:.7em; color:var(--mist);
+    letter-spacing:.08em; font-weight:600; }
+  .phasePill::before { content:''; width:.65em; height:.65em; border-radius:50%; background:#667083; }
+  body.listening .phasePill::before { background:#69c98c; box-shadow:0 0 1em rgba(105,201,140,.55); }
+  body.speaking .phasePill::before { background:#6faee7; box-shadow:0 0 1em rgba(111,174,231,.55); }
+  body.chat .said { color:#fffaf0; font-family:Georgia,'Times New Roman',serif;
+    font-size:clamp(1.7rem,4.7vmin,4rem); line-height:1.43; font-weight:400; }
+  body.chat .ear { color:#8dcda4; }
+  body.chat .offline { z-index:30; top:auto; left:50%; bottom:2vmin; transform:translateX(-50%);
+    color:#f1d7d4; background:rgba(104,34,37,.88); border:1px solid rgba(255,255,255,.16);
+    border-radius:999px; padding:.7em 1.2em; backdrop-filter:blur(12px); }
+  body:not(.chat) .idle { color:#8e97a4; padding:3rem; border:1px solid rgba(255,255,255,.08);
+    border-radius:20px; background:rgba(255,255,255,.025); }
+  body:not(.chat) .idle h2 { color:#d5d9df; font-weight:500; }
+  @media (min-aspect-ratio:1/1) {
+    body.chat .hero { padding-top:10vmin; }
+    body.chat .band { min-height:22vh; padding:2.4vmin 5vmin calc(3vmin + env(safe-area-inset-bottom,0px)); }
+    body.chat .said { font-size:clamp(1.35rem,3.2vmin,2.8rem); -webkit-line-clamp:2; }
+    body.chat .layer { inset:9vmin 3vmin 1vmin; }
+    .hero .emma { width:23vmin; height:23vmin; }
+    .hero .invitation { font-size:clamp(.8rem,1.7vmin,1.25rem); }
+  }
+  @media (max-width:520px) {
+    body.chat .displayBrand small { display:none; }
+    body.chat .band { padding-inline:1.4rem; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important;
+                           transition-duration:.01ms!important; }
+  }
 </style>
 </head>
 <body>
@@ -53,6 +216,23 @@
 
 <div class="pos" id="pos"></div>
 <div class="caption" id="caption"><h1 id="capTitle"></h1><p id="capSummary"></p></div>
+<div class="stagewrap" id="stagewrap">
+  <div class="pic">
+    <div class="displayBrand"><span>EMBASSY</span><small>CONDOMINIUM · PATTAYA</small></div>
+    <div class="hero" id="hero">
+      <div class="eyebrow">Welcome to Embassy World</div>
+      <div class="emma"></div>
+      <div class="who" id="heroName">Emma<small>AI Concierge</small></div>
+      <div class="invitation">เรียก “Emma” เพื่อเริ่มพูดคุย หรือสอบถามข้อมูลโครงการได้เลยค่ะ</div>
+    </div>
+  </div>
+  <div class="band">
+    <div class="bandHead"><span>Emma is here to assist</span><span class="phasePill" id="phaseLabel">พร้อมให้บริการ</span></div>
+    <div class="ear"><i></i><i></i><i></i><span>กำลังฟังอยู่ค่ะ</span></div>
+    <div class="said" id="said"></div>
+  </div>
+</div>
+
 <div class="offline" id="offline">disconnected — reconnecting…</div>
 
 <script>
@@ -61,16 +241,54 @@ const layers = [$('layerA'), $('layerB')];
 let front = 0;              // which layer is currently visible
 let currentUrl = null;
 
+// ?chat=1 turns this page into the robot's own screen: Emma above, her words
+// along the bottom. Without it the page stays exactly what it was — the
+// second monitor showing slides — because that screen is still in use and
+// must not grow a subtitle band it never asked for.
+const chatMode = new URLSearchParams(location.search).get('chat') === '1';
+(function armIdleCursor() {
+  let t = null;
+  const wake = () => {
+    document.body.classList.remove('idlecursor');
+    if (t) clearTimeout(t);
+    t = setTimeout(() => document.body.classList.add('idlecursor'), 2500);
+  };
+  document.addEventListener('mousemove', wake);
+  document.addEventListener('pointerdown', wake);
+  wake();
+})();
+if (chatMode) {
+  document.body.classList.add('chat');
+  // The slide layers are absolutely positioned over the whole page, which is
+  // right for a bare slide screen and wrong here: the subtitle band owns the
+  // bottom, so the picture has to live inside the area above it.
+  const pic = document.querySelector('.stagewrap .pic');
+  layers.forEach((l) => pic.appendChild(l));
+  pic.appendChild($('caption'));
+  pic.appendChild($('pos'));
+  // The project's own name under the orb, so an idle screen reads as a
+  // receptionist standing there rather than a display that lost its feed.
+  fetch('/health').then((r) => r.json()).then((h) => {
+    if (h.project) $('heroName').innerHTML =
+      'Emma<small>' + h.project + '</small>';
+  }).catch(() => {});
+}
+
 function render(slide) {
   if (!slide) {
     layers.forEach((l) => l.classList.remove('on'));
     $('caption').classList.remove('on');
     $('pos').classList.remove('on');
     $('idle').classList.remove('hide');
+    $('hero').classList.remove('hide');
     currentUrl = null;
     return;
   }
   $('idle').classList.add('hide');
+  // A slide is up, so the orb steps aside. It comes back the moment the
+  // deck is cleared — an empty picture area with nothing in it would look
+  // like the screen had died.
+  $('hero').classList.add('hide');
 
   if (slide.url !== currentUrl) {
     // Swap layers so the incoming image is fully decoded before it's shown.
@@ -103,9 +321,13 @@ function render(slide) {
 // The display is a screen that may be left running for days — reconnect
 // forever rather than needing someone to walk over and refresh it.
 let backoff = 500;
+//: Set once the server says the token is wrong — the one reason not to redial.
+let giveUp = false;
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws/display`);
+  const t = new URLSearchParams(location.search).get('token');
+  const ws = new WebSocket(`${proto}://${location.host}/ws/display`
+    + (t ? `?token=${encodeURIComponent(t)}` : ''));
 
   ws.onopen = () => {
     backoff = 500;
@@ -115,9 +337,40 @@ function connect() {
     let evt;
     try { evt = JSON.parse(msg.data); } catch { return; }
     if (evt.type === 'slide') render(evt.slide);
+    else if (evt.type === 'subtitle') {
+      // Already paced by the server against the audio clock — this end just
+      // paints it. Doing any timing here would be the second clock the
+      // slide path already learned not to have.
+      $('said').textContent = evt.text || '';
+    }
+    else if (evt.type === 'phase') {
+      // An indicator, never the guest's words. Their transcript is wrong
+      // often enough to be embarrassing in public, and Emma reads phone
+      // numbers back out loud to confirm them.
+      document.body.classList.remove('listening', 'speaking');
+      if (evt.phase === 'listening') document.body.classList.add('listening');
+      if (evt.phase === 'speaking') document.body.classList.add('speaking');
+      const labels = { listening: 'กำลังฟัง', speaking: 'กำลังพูด',
+                       idle: 'พร้อมให้บริการ', ended: 'พักการสนทนา' };
+      $('phaseLabel').textContent = labels[evt.phase] || 'พร้อมให้บริการ';
+    }
+    else if (evt.type === 'error' && evt.code === 'unauthorized') {
+      // Stop for good, and say why on the screen itself.
+      //
+      // "Reconnect forever" is right for a dropped cable and wrong for a
+      // wrong token — nobody is coming to fix it by the next attempt. It is
+      // also worse than it looks: the server *accepts* the socket before
+      // refusing it (so the page can be told what happened), which fires
+      // onopen, which resets the backoff to 500ms. The growth that was
+      // supposed to protect the server can never kick in, so a display left
+      // on a mistyped URL dials twice a second until someone walks over.
+      giveUp = true;
+      $('offline').textContent = evt.message || 'ต้องใส่ token';
+    }
   };
   ws.onclose = () => {
     $('offline').classList.add('on');
+    if (giveUp) return;
     setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, 10000);
   };

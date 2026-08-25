@@ -471,13 +471,10 @@ async def _ensure_page(*, launch: bool = True, why: str = "slide"):
         logger.exception("could not put the canva window fullscreen — carrying on")
         _record_fullscreen(None)
 
-    # Same reasoning as fullscreen: outside its own try, and never fatal.
-    # A cold deck shows blanks; no deck shows nothing at all.
-    if settings.canva_warm_deck and not _warmed:
-        try:
-            await warm_deck(_page)
-        except Exception:
-            logger.exception("could not warm the canva deck — carrying on")
+    # The deck warm-up used to run here, and it does not belong here. See
+    # `open_and_warm()` for what that cost: this function is first reached on
+    # a *guest's* first slide, holding a tool call that is allowed five
+    # seconds, and the walk takes about thirty-three.
     return _page
 
 
@@ -679,6 +676,72 @@ async def warm_deck(page, total: int | None = None) -> int:
     _warmed = True
     logger.info("warmed %d canva pages", total)
     return total
+
+
+async def open_and_warm() -> None:
+    """Open the window and walk the deck once, at boot — off anyone's clock.
+
+    Warming used to happen at the end of `_ensure_page`, which sounds like
+    the same thing and is not. `_ensure_page` is first reached when a *guest*
+    asks for the first slide: `start_presentation` calls
+    `_point_canva_at(hold=True)`, whose whole reason for existing is to hold
+    the narration until the cover is actually on screen, and it is bounded by
+    `CANVA_ARRIVAL_TIMEOUT_S` — five seconds, against a walk that takes about
+    thirty-three. So with `CANVA_WARM_DECK` on (the default) that wait timed
+    out *every time*, the robot narrated the cover over a blank window — the
+    exact bug `hold=True` was written to fix — and the walk was cancelled
+    part-done, leaving the far pages unwarmed anyway. Two mechanisms, each
+    one correct, and the newer one quietly disabled the older one; neither
+    had a symptom that pointed at the other.
+
+    Half a minute of walking is only free while nobody is watching, which is
+    what `warm_deck`'s own docstring already assumed ("before anybody is
+    standing there"). So it runs from the startup hook, in the background,
+    and never from a path a conversation is waiting on.
+
+    Note this opens the Canva window at boot rather than on the first slide.
+    That is the point — the pages have to be fetched before a guest arrives —
+    and `CANVA_WARM_DECK=false` turns the whole thing off.
+    """
+    if not settings.canva_url or not settings.canva_warm_deck:
+        return
+    if not settings.canva_open_at_start:
+        # `CANVA_OPEN_AT_START` already existed, and its entire reason for
+        # defaulting to off is "a fullscreen browser sitting over the desktop
+        # from boot is in the way while you're working". Warming needs a
+        # window; moving the warm-up to startup without checking this setting
+        # meant the flag that exists to prevent exactly that stopped working,
+        # silently — observed on the owner's machine the first time it ran.
+        #
+        # New mechanism, old mechanism, straight into each other: the thing
+        # this file's notes warn about every time. So it loses, loudly. The
+        # feature genuinely requires a window at boot — that is a property of
+        # walking a deck, not a config bug — and the operator gets told which
+        # switch buys it instead of finding a browser over their desktop.
+        logger.warning(
+            "CANVA_WARM_DECK is on but CANVA_OPEN_AT_START is off, so the "
+            "deck will NOT be warmed: walking it needs the window open "
+            "before anyone is watching. Set CANVA_OPEN_AT_START=true to warm "
+            "at boot, or CANVA_WARM_DECK=false to stop saying this. Until "
+            "then a jump to a far page can land on a blank while Canva "
+            "fetches it."
+        )
+        return
+    try:
+        # Under the lock for the same reason `_sync` takes it: a guest who
+        # starts a tour during the walk must queue behind it rather than
+        # drive the same window with the same arrow keys at the same time.
+        async with _lock:
+            if _warmed:
+                return
+            page = await _ensure_page(why="warm the deck before opening")
+            if page is None:
+                return
+            await warm_deck(page)
+    except Exception:
+        # Never fatal, and never noisy enough to look like a failed boot: a
+        # cold deck shows blanks, no deck shows nothing at all.
+        logger.exception("could not warm the canva deck — carrying on")
 
 
 async def _step_to(page, target: int) -> bool:
@@ -903,7 +966,14 @@ async def self_check() -> tuple[bool, str]:
         page = await _ensure_page()
         if page is None:
             return False, _CHROMIUM_HELP
-        return True, "window open at %s" % _base_url().split("?", 1)[0]
+        where = _base_url().split("?", 1)[0]
+        if settings.canva_warm_deck:
+            # Said here because the walk takes about half a minute and looks
+            # like a possessed browser to anyone who does not know it is
+            # deliberate — arrow keys firing across the whole deck with
+            # nobody touching the machine.
+            return True, f"window open at {where} — warming the deck now"
+        return True, "window open at %s" % where
 
     # Prove Chromium is really installed without putting anything on screen.
     try:

@@ -163,3 +163,134 @@ async def _reveal(slide: dict | None) -> None:
     from app.tools import canva_display
 
     await canva_display.goto(slide.get("id") if slide else None)
+
+
+# ==================== the robot's own screen ====================
+#
+# The chest screen is not a monitor. A laptop showing the transcript is a
+# staff tool and may run as far ahead of the voice as it likes; this one is
+# at chest height in front of the guest, so text arriving early means they
+# read the answer before Emma says it — and read the end of a sentence she
+# has not started.
+#
+# That is the same bug the rest of this module exists for, wearing text
+# instead of pictures, so it uses the same clock. Nothing here consults
+# `time` about anything except `_audio_until`.
+#
+# Only Emma's side is ever sent. What the guest said stays off this screen
+# on purpose: transcription is wrong often enough to be embarrassing in
+# public ("bit fire" for "ปิดไฟ" is in the README), and the prompt has her
+# read phone numbers back to confirm them — which would put a stranger's
+# number on a screen in a public room. The guest gets an indicator instead.
+
+#: Chunks of Emma's speech waiting for their audio to be reached, as
+#: (monotonic time to show it, text).
+_sub_queue: list[tuple[float, str]] = []
+#: What is on the screen right now.
+_sub_shown: str = ""
+#: `_audio_until` as it stood before the newest chunk arrived — which is when
+#: the audio queued ahead of that chunk runs out, and therefore when that
+#: chunk starts being spoken. Each chunk is released at the previous chunk's
+#: finishing line, so the subtitle walks the voice instead of the generator.
+_sub_prev_until: float = 0.0
+_sub_task: asyncio.Task | None = None
+#: Set at the end of a turn; the next chunk starts a fresh line rather than
+#: growing one paragraph for the whole conversation.
+_sub_restart: bool = True
+
+
+async def say(text: str) -> None:
+    """One chunk of Emma's speech arrived. Show it when she reaches it."""
+    global _sub_prev_until, _sub_task
+
+    if not text or not text.strip():
+        return
+    show_at = max(_sub_prev_until, time.monotonic())
+    _sub_queue.append((show_at, text))
+    _sub_prev_until = max(_audio_until, show_at)
+    if _sub_task is None or _sub_task.done():
+        _sub_task = asyncio.create_task(_drain_subtitle())
+
+
+async def _drain_subtitle() -> None:
+    """Release queued text as its audio comes due."""
+    global _sub_shown, _sub_restart
+
+    while _sub_queue:
+        show_at, _ = _sub_queue[0]
+        wait = show_at - time.monotonic()
+        if wait > 0:
+            try:
+                await asyncio.sleep(min(wait, 0.2))
+            except asyncio.CancelledError:
+                return
+            continue
+        _, text = _sub_queue.pop(0)
+        if _sub_restart:
+            _sub_shown = ""
+            _sub_restart = False
+        _sub_shown = (_sub_shown + text)[-400:]
+        await broadcast({"type": "subtitle", "text": _sub_shown})
+
+
+def drop_unheard() -> int:
+    """Barge-in: throw away everything not yet spoken. Returns chunks dropped.
+
+    The queue *is* the unheard part — that is the whole definition of it —
+    so a barge-in is exactly this one line. Without it the screen finishes
+    reciting a sentence the guest cut off, which is the text version of the
+    bug `STATE["unheard"]` was added for on the slide side.
+
+    What is already on screen stays: it was said, and blanking it mid-answer
+    would look like a crash rather than an interruption.
+    """
+    global _sub_prev_until, _sub_restart
+
+    dropped = len(_sub_queue)
+    _sub_queue.clear()
+    _sub_prev_until = 0.0
+    _sub_restart = True
+    return dropped
+
+
+def end_turn() -> None:
+    """Emma stopped generating. Whatever comes next begins a new line."""
+    global _sub_restart
+    _sub_restart = True
+
+
+async def clear_subtitle() -> None:
+    """Wipe the screen — the call is over.
+
+    Immediately, not on the page's keep-timer. The conversation screen keeps
+    its transcript for a few minutes because one person is sitting at it;
+    this screen is the most public surface in the building and nobody is
+    watching it when a visitor walks away.
+    """
+    global _sub_shown, _sub_prev_until, _sub_restart
+
+    drop_unheard()
+    _sub_shown = ""
+    _sub_prev_until = 0.0
+    _sub_restart = True
+    await broadcast({"type": "subtitle", "text": ""})
+
+
+async def set_phase(phase: str) -> None:
+    """Tell the screen whether Emma is listening, speaking, or idle."""
+    await broadcast({"type": "phase", "phase": phase})
+
+
+def subtitle_state() -> dict:
+    """For a screen that connects mid-conversation, and for tests."""
+    return {"shown": _sub_shown, "pending": len(_sub_queue)}
+
+
+def reset_subtitle() -> None:
+    """Drop every bit of subtitle state. Tests, and session handover."""
+    global _sub_shown, _sub_prev_until, _sub_restart, _sub_task
+    _sub_queue.clear()
+    _sub_shown = ""
+    _sub_prev_until = 0.0
+    _sub_restart = True
+    _sub_task = None
