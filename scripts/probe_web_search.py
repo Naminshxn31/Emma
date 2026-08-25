@@ -46,6 +46,13 @@ async def main() -> int:
     from google import genai
     from google.genai import types
 
+    import sys
+    from pathlib import Path
+
+    # Runnable as `python scripts/probe_web_search.py`, the way CLAUDE.md
+    # says to — without this the import fails unless the caller happens to
+    # know about PYTHONPATH=. (found the day the probe was actually needed).
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from app.config import settings
 
     if not settings.gemini_api_key:

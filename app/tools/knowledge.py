@@ -46,94 +46,13 @@ MAX_RESULTS = 4
 #: and the first thing any of them asks is the price. Listing only Thai and
 #: English words meant 价格是多少 and "цена" walked straight past the
 #: guardrail — the reported bug, in a language nobody had tested.
-_COMMERCIAL_TERMS = (
-    # Thai
-    "ราคา", "โปรโมชั่น", "โปรโมชัน", "ส่วนลด", "ผ่อน", "ดาวน์", "กี่บาท",
-    "เท่าไหร่", "เท่าไร", "งบ", "ค่าส่วนกลาง", "ดอกเบี้ย", "สินเชื่อ",
-    # English
-    "price", "pricing", "cost", "promotion", "discount", "installment",
-    "down payment", "how much", "afford", "budget", "mortgage", "payment",
-    # Chinese (simplified and traditional)
-    "价格", "價格", "多少钱", "多少錢", "费用", "費用", "优惠", "優惠",
-    "折扣", "首付", "分期", "贷款", "貸款", "预算", "預算",
-    # Japanese
-    "価格", "値段", "いくら", "費用", "割引", "ローン", "予算",
-    # Korean
-    "가격", "얼마", "비용", "할인", "분양가", "예산", "대출",
-    # Russian
-    "цена", "цены", "стоимость", "сколько стоит", "скидка", "рассрочка",
-    # Other common buyer languages
-    "prix", "preis", "precio", "prezzo", "سعر", "السعر", "كم الثمن",
-    "कीमत", "मूल्य", "giá", "harga", "berapa",
-
-    # --- Not about money, but answerable only from an approved fact ---
-    #
-    # Found by measurement, not by thinking of them: `scripts/eval_search.py`
-    # showed these reaching the slide search and coming back with a picture.
-    # "ห้องขายเปิดกี่โมง" got a rendering of Common Sphere; "โอนได้เมื่อไหร่"
-    # got an aspirational branding slide.
-    #
-    # They belong here for the same reason the prices do. Opening hours is one
-    # of the four fields still blank in condo_facts.json, and ownership and
-    # handover are commitments a developer makes — none of them is a thing to
-    # infer from a caption written by a model looking at a photograph.
-    "เปิดกี่โมง", "เวลาทำการ", "เปิดปิดกี่โมง", "opening hours", "what time",
-    "ต่างชาติ", "ชาวต่างชาติ", "foreigner", "foreign buyer", "freehold",
-    "leasehold", "กรรมสิทธิ์", "โอน", "handover", "transfer", "完工", "过户",
-    "เสร็จเมื่อไหร่", "สร้างเสร็จ", "completion",
-)
-
-
-def _is_thai(term: str) -> bool:
-    return any("\u0e00" <= ch <= "\u0e7f" for ch in term)
-
-
-#: Split once, because the two halves need different matching. See
-#: `_is_commercial`.
-_THAI_TERMS = tuple(t for t in _COMMERCIAL_TERMS if _is_thai(t))
-_NON_THAI_TERMS = tuple(t for t in _COMMERCIAL_TERMS if not _is_thai(t))
-
-
-def _is_commercial(query: str) -> bool:
-    """Never answerable from slide captions, in any language.
-
-    **Thai terms are matched as words, not as substrings**, and that is not a
-    refinement — the substring version was refusing ordinary questions:
-
-        "ที่ออกกำลังกายเป็นยังไงบ้าง"  ->  refused, because ยังไ*งบ*้าง
-                                          contains งบ (budget)
-        "ซาวน่าช่วยผ่อนคลายไหม"        ->  refused, because *ผ่อน*คลาย
-                                          contains ผ่อน (instalment)
-
-    Thai is written without spaces, so `term in text` finds a word inside an
-    unrelated one constantly. This is the same failure that forced the whole
-    retrieval rewrite — ราคา (price) matching inside อาคาร (building) — and it
-    had quietly reappeared in this function, where the cost is higher: a
-    refused question is a guest being told "ask the sales team" when they asked
-    what the gym looks like. "เป็นยังไงบ้าง" is about as common as Thai
-    phrasing gets.
-
-    Found only after `scripts/eval_search.py` was made to walk this gate the
-    way the tool does. It had been running past it for as long as it existed.
-
-    Non-Thai terms keep substring matching: Latin scripts have spaces, and
-    there is no segmenter here for Han or kana.
-    """
-    q = (query or "").lower()
-    if any(term in q for term in _NON_THAI_TERMS):
-        return True
-
-    from app.tools.retrieval import tokenize
-
-    words = tokenize(q)
-    if not words:
-        return False
-    haystack = " %s " % " ".join(words)
-    for term in _THAI_TERMS:
-        needle = " %s " % " ".join(tokenize(term))
-        if needle in haystack:
-            return True
-    return False
+# The commercial-question guard lives in `app.tools.retrieval` now — it has
+# to protect *every* retrieval surface, and `search_my_documents` could not
+# import it from here: importing this module registers the knowledge tools
+# as a side effect, so a machine whose TOOL_GROUPS excludes `knowledge`
+# would have sprouted `search_condo_info` just by using the web library.
+# retrieval is the one shared module with no @tool in it.
+from app.tools.retrieval import is_commercial as _is_commercial  # noqa: E402
 
 
 def _entry(slide: dict) -> dict:

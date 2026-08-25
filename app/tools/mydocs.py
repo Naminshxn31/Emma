@@ -166,6 +166,29 @@ def _get_index() -> dict:
     tags=["mydocs"],
 )
 def search_my_documents(query: str) -> dict:
+    from app.tools.retrieval import is_commercial
+
+    if is_commercial(query):
+        # The library is marketing copy, and marketing copy contains numbers
+        # nobody signed: "yields 7-10%" sits in the pre-sale articles today.
+        # A money question answered from it is an unapproved figure spoken to
+        # a customer with the robot's confidence — the failure the whole
+        # approved-facts system exists to prevent. Same gate as
+        # search_condo_info, same module, so it cannot drift.
+        from app import turnlog
+
+        turnlog.record("mydocs_lookup", query=query, found=False,
+                       commercial_question=True)
+        return {
+            "ok": True, "found": False, "results": [],
+            "commercial_question": True,
+            "instruction": (
+                "คำถามเรื่องราคา/การเงิน/เงื่อนไข ตัวเลขในคลังบทความไม่มีผู้อนุมัติ "
+                "ห้ามหยิบตัวเลขจากบทความมาตอบ ให้บอกตรงๆ ว่าตัวเลขจริง "
+                "ต้องสอบถามหรือยืนยันกับฝ่ายขาย"
+            ),
+        }
+
     index = _get_index()
     if not index["chunks"]:
         return {

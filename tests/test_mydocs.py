@@ -131,3 +131,38 @@ def test_emma_is_told_to_search_our_docs_before_answering(_own_folder):
     entry = registry.get("search_my_documents")
     assert "ห้ามตอบจากความรู้ทั่วไปก่อนค้น" in entry.description
     assert "ไม่มีจริง" in entry.description   # the quoted real incident
+
+
+# ============ the pricing gate reaches the web library ============
+
+
+def test_a_money_question_never_gets_a_marketing_number(_own_folder):
+    """The library is marketing copy, and marketing copy carries numbers
+    nobody signed — "yields 7-10%" sits in the pre-sale articles today. The
+    guard was on search_condo_info only; opened to the gallery as-is, a
+    guest asking about returns would have been quoted an unsigned figure
+    with the robot's confidence. Same gate, same module, so the two search
+    surfaces cannot drift apart."""
+    _write(_own_folder, "presale.txt",
+           "Condo pre-sale gives higher long-term ROI, typical yields 7-10% "
+           "และการลงทุนคอนโดพัทยาให้ผลตอบแทนดี ราคาเริ่มต้นน่าสนใจ")
+
+    for q in ("ผลตอบแทนเท่าไหร่", "ราคาเท่าไหร่", "ผ่อนเดือนละเท่าไร",
+              "how much does it cost", "价格是多少"):
+        out = mydocs.search_my_documents(q)
+        assert out["found"] is False, q
+        assert out.get("commercial_question") is True, q
+        assert "ฝ่ายขาย" in out["instruction"], q
+        assert not out["results"], "no article text may ride along"
+
+    # And the questions the library exists for still work.
+    ok = mydocs.search_my_documents("ทำไมควรซื้อช่วง pre-sale")
+    assert ok["found"] is True
+
+
+def test_ordinary_questions_are_not_caught_by_the_gate(_own_folder):
+    """The guard's own history: the substring version refused "เป็นยังไงบ้าง"
+    because of งบ. Moving it must not resurrect that."""
+    _write(_own_folder, "gym.txt", "ฟิตเนสของโครงการเปิดตลอดและผ่อนคลายด้วยซาวน่า")
+    out = mydocs.search_my_documents("ฟิตเนสเป็นยังไงบ้าง")
+    assert out.get("commercial_question") is not True

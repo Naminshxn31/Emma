@@ -13,8 +13,15 @@ the difference is worth stating precisely:
   scheme check is a hard wall, not a convention. `file://` would silently
   become "open any file with its default app" and `ms-settings:` and
   friends reach OS surfaces; both are refused before anything runs.
-- **Local-only exposure.** The server binds 127.0.0.1, so the only thing
-  that can ask for this is the machine's own browser.
+- **Only an authenticated caller.** This argument used to read "the server
+  binds 127.0.0.1, so the only thing that can ask for this is the machine's
+  own browser" — and it stopped being true the day `HOST=0.0.0.0` became the
+  default and the machines were opened to the LAN. Two of the three reasons
+  above survive that move untouched; this one did not, and a stale safety
+  argument is worse than none, because the next person reads it as a check
+  that is still being made. What holds the line now is `WS_TOKEN`
+  (`_reject_unauthorized` in app/main.py), which every socket passes through
+  — so keep it set on any machine that is not bound to loopback.
 
 YouTube needs no special case: the model composes ordinary URLs
 (`youtube.com/results?search_query=...`), and the description says so —
@@ -32,13 +39,96 @@ from app.tools.registry import tool
 logger = logging.getLogger("condo_voice.computer")
 
 
+#: Sites with a documented embed form. Everything else sets X-Frame-Options
+#: and renders inside a page as a white rectangle with no error anywhere —
+#: which is why this is a short allow-list rather than "try it and see".
+def embeddable(url: str) -> str | None:
+    """The URL to put in a frame, or None if this one cannot be framed.
+
+    The point of the whole feature is that the answer appears in the page
+    the owner is already looking at, instead of a second window arriving on
+    top of it. That works for exactly as much of the web as agrees to be
+    framed, so the honest shape is a list of what does, plus a fallback that
+    says out loud when something did not.
+    """
+    from urllib.parse import parse_qs, quote, urlparse
+
+    u = urlparse((url or "").strip())
+    host = u.netloc.lower().removeprefix("www.")
+
+    if host in ("youtube.com", "m.youtube.com"):
+        if u.path == "/watch":
+            vid = (parse_qs(u.query).get("v") or [""])[0]
+            # `playsinline` matters on the robot's Android panel: without it
+            # the video takes over the whole screen and the rest of the page
+            # — including the way back — is gone.
+            return f"https://www.youtube.com/embed/{vid}?autoplay=1&playsinline=1" if vid else None
+        if u.path.startswith("/embed/"):
+            return url
+        return None
+    if host == "youtu.be" and len(u.path) > 1:
+        return f"https://www.youtube.com/embed/{u.path[1:]}?autoplay=1&playsinline=1"
+    if host in ("google.com", "maps.google.com") and u.path.startswith("/maps"):
+        # Rewritten, not just suffixed. `?api=1` is Google's documented form
+        # for *opening* Maps and it refuses to be framed — a grey rectangle
+        # with a broken-page icon and nothing in the console that names the
+        # cause. The old `maps?q=...&output=embed` form still frames without
+        # an API key, so anything /maps-shaped is normalised onto it rather
+        # than trusting whatever the model happened to compose.
+        query = parse_qs(u.query)
+        place = (query.get("query") or query.get("q") or [""])[0]
+        if not place:
+            # A place inside the path, e.g. /maps/place/Pattaya
+            parts = [p for p in u.path.split("/") if p and p not in ("maps", "place", "search")]
+            place = parts[0] if parts else ""
+        if not place:
+            return None
+        return "https://maps.google.com/maps?q=" + quote(place) + "&output=embed"
+    return None
+
+
+def _put_on_screen(url: str) -> str | None:
+    """Show `url` on the assistant's own window, if it has one.
+
+    Returns the place it went ("screen"), or None when the caller should fall
+    back to `os.startfile`. Which one happened has to reach the model, not
+    just the log: "เปิดให้แล้วค่ะ" is a different sentence depending on which
+    screen it landed on, and the owner is looking at one of them. Same rule
+    as the mock/hardware split on the IR and robot tools — the reply must
+    never describe something that did not happen.
+    """
+    from app.tools import webstage
+
+    if not webstage.enabled():
+        return None
+    webstage.request(url)
+    return "screen"
+
+
 @tool(
     name="open_in_browser",
     description=(
-        "เปิดหน้าเว็บบนจอคอมพิวเตอร์ของเจ้าของ ใช้เมื่อเขาขอให้เปิดเว็บ เปิดยูทูบ "
-        "หรืออยากดูอะไรเต็มๆ บนจอ เปิดยูทูบพร้อมค้นได้ด้วย URL รูปแบบ "
-        "https://www.youtube.com/results?search_query=คำค้น "
-        "รับเฉพาะลิงก์ http/https เท่านั้น"
+        "เปิดหน้าเว็บบนจอ ใช้เมื่อเจ้าของบอก URL หรือชื่อเว็บที่ต้องการชัดเจน "
+        "รับเฉพาะลิงก์ http/https เท่านั้น "
+        # The rule below is here rather than in the prompt because a rule at
+        # the end of a system prompt gets ignored and one attached to a tool
+        # gets followed — the same finding that put KEEP_GOING on the slide
+        # tool results. And it names the case that actually happened: "เปิด
+        # YouTube" opened youtube.com, which cannot be embedded (Google sets
+        # X-Frame-Options), so it arrived as a separate window the owner did
+        # not want — on a robot panel, a front page with no keyboard to
+        # search from is worse than useless.
+        "ห้ามเปิดหน้าแรกของเว็บวิดีโอ เช่น youtube.com เปล่าๆ เด็ดขาด — "
+        "ถ้าเจ้าของบอกแค่ว่า 'เปิดยูทูบ' โดยไม่บอกว่าจะดูอะไร ให้ถามกลับสั้นๆ "
+        "ว่าอยากดูอะไร แล้วใช้ play_youtube แทน เพราะ play_youtube เล่นบนจอ "
+        "ในหน้าเดิมได้ ส่วนหน้าแรกยูทูบต้องเปิดหน้าต่างแยกและกดอะไรไม่ได้ "
+        # Maps was already handled by `embeddable()` and unreachable by
+        # voice, because nothing told the model the capability existed. A
+        # tool that can do something the model is never told about is the
+        # same as one that cannot.
+        "แผนที่ขึ้นบนจอในหน้าเดิมได้ ใช้ URL รูปแบบ "
+        "https://maps.google.com/maps?q=ชื่อสถานที่ "
+        "เมื่อเจ้าของถามว่าที่ไหน ไปยังไง หรือขอดูแผนที่"
     ),
     parameters={
         "type": "object",
@@ -57,6 +147,18 @@ def open_in_browser(url: str) -> dict:
         # webpage", so none of it gets to ride on this tool.
         return {"ok": False, "error": "not a web url",
                 "instruction": "เปิดได้เฉพาะลิงก์เว็บ http/https ให้บอกเจ้าของตรงๆ"}
+    frame = embeddable(url)
+    if frame:
+        # In the page the owner is already looking at. A second window
+        # arriving on top of it is the thing this exists to avoid.
+        turnlog.record("open_browser", url=url, ok=True, where="stage")
+        return {"ok": True, "opened": url, "where": "stage", "embed": frame,
+                "instruction": "ขึ้นบนจอในหน้าเดิมแล้ว บอกเจ้าของสั้นๆ ห้ามบอกว่าเปิดหน้าต่างใหม่"}
+    if _put_on_screen(url):
+        turnlog.record("open_browser", url=url, ok=True, where="screen")
+        return {"ok": True, "opened": url, "where": "screen",
+                "instruction": ("เว็บนี้ฝังในหน้าไม่ได้ เลยเปิดเป็นหน้าต่างแยกให้ "
+                                "บอกเจ้าของตรงๆ ว่าเปิดหน้าต่างใหม่ให้")}
     try:
         import os
 
@@ -66,8 +168,48 @@ def open_in_browser(url: str) -> dict:
         turnlog.record("open_browser", url=url, ok=False)
         return {"ok": False, "error": "could not open",
                 "instruction": "เปิดเบราว์เซอร์ไม่สำเร็จ ให้บอกเจ้าของตรงๆ ห้ามบอกว่าเปิดแล้ว"}
-    turnlog.record("open_browser", url=url, ok=True)
-    return {"ok": True, "opened": url}
+    turnlog.record("open_browser", url=url, ok=True, where="browser")
+    return {"ok": True, "opened": url, "where": "browser"}
+
+
+@tool(
+    name="close_web_page",
+    description=(
+        "ปิดทุกอย่างที่กำลังแสดงบนจอ ทั้งการ์ดข้อมูลห้อง วิดีโอ แผนที่ สไลด์ "
+        "และหน้าต่างเว็บที่เปิดแยก ใช้เมื่อเจ้าของบอกว่าพอแล้ว ปิดได้ ปิดจอ "
+        "ปิดวิดีโอ เอาออก หรือไม่อยากดูแล้ว "
+        "ห้ามเรียกเมื่อเขาแค่ถามคำถามอื่นหรือขอเปลี่ยนเรื่อง — ถามอย่างอื่นไม่ได้แปลว่าให้ปิด"
+    ),
+    parameters={"type": "object", "properties": {}},
+    tags=["computer"],
+)
+async def close_web_page() -> dict:
+    """Closing has to be sayable, or it cannot be asked for.
+
+    `stop_presentation` exists because it once did not: a guest said "หยุด
+    พรีเซนต์", the model answered "ได้ค่ะ หยุดแล้ว" and carried straight on,
+    because talking was the only thing it could do. A window the assistant
+    can open and cannot close is that same hole.
+
+    The description's last line is the other half of that lesson: a *question*
+    is not an instruction to stop. Code cannot enforce it — the model picks
+    the tool — so the guard lives in the words it reads, naming the case that
+    actually happened.
+    """
+    from app.tools import webstage
+
+    # Two screens, one instruction. This tool used to know only about the
+    # separate Chromium window, so "ปิดจอให้หน่อย" with a unit card up
+    # answered "ตอนนี้ไม่มีหน้าเว็บเปิดอยู่บนจอค่ะ" — technically about the
+    # window it was looking at, and plainly wrong to the person looking at
+    # the card. Whatever is on screen is what "the screen" means.
+    if webstage.enabled() and webstage.is_open():
+        await webstage.close()
+    # `screen: clear` reaches the page through the same tool-result channel
+    # that puts things on the stage, so closing travels the route opening
+    # already uses rather than growing a second one.
+    return {"ok": True, "closed": True, "screen": "clear",
+            "instruction": "ปิดจอให้แล้ว บอกสั้นๆ"}
 
 
 #: Windows virtual-key codes for the media keys. These are the same events
@@ -298,8 +440,21 @@ def close_program(name: str) -> dict:
 @tool(
     name="play_youtube",
     description=(
-        "เปิดวิดีโอ/เพลงจากยูทูบให้เล่นเลย โดยหาอันดับแรกของผลค้นให้อัตโนมัติ "
+        "เปิดวิดีโอ/เพลงจากยูทูบให้เล่นบนจอเลย โดยหาอันดับแรกของผลค้นให้อัตโนมัติ "
         "ใช้เมื่อเจ้าของขอเพลงหรือวิดีโอ เช่น 'เปิดเพลงรัก' 'ขอ lofi' "
+        # Seen live: "สุ่มเพลง" produced no tool call at all, and the reply
+        # was "จัดไปค่ะ! เอ็มม่าเปิดเพลงฮิตยุค 2000s แบบสุ่มให้ฟังบนจอแล้วนะคะ"
+        # over a screen with nothing on it. The model had no *query* to pass,
+        # so it narrated the outcome instead of producing one. Saying "invent
+        # the search term yourself" is what turns that into a call.
+        "ถ้าเจ้าของไม่ได้ระบุเพลง เช่นบอกว่า 'สุ่มเพลง' 'เปิดเพลงอะไรก็ได้' "
+        "ให้คุณคิดคำค้นเองแล้วเรียกเครื่องมือนี้ทันที ห้ามถามกลับ ห้ามข้ามการเรียก "
+        # The exact sentence it said, quoted back at it. Documented in this
+        # project as the only phrasing that works: "ห้ามเกริ่นล่วงหน้า" did
+        # nothing; quoting the words about to be typed does.
+        "ห้ามพูดว่า 'เปิดให้ฟังแล้ว' หรือ 'จัดไปค่ะ เปิดให้แล้ว' ถ้ายังไม่ได้เรียก "
+        "เครื่องมือนี้และยังไม่ได้ผลลัพธ์กลับมา — เพลงจะไม่ขึ้นบนจอ แล้วเจ้าของจะบอกว่า "
+        "ไม่เห็นขึ้นเลย "
         "ถ้าอยากเห็นหน้าผลค้นทั้งหมดค่อยใช้ open_in_browser"
     ),
     parameters={
@@ -344,6 +499,16 @@ def play_youtube(query: str) -> dict:
 
     if video_id:
         url = "https://www.youtube.com/watch?v=" + video_id
+        frame = embeddable(url)
+        if frame:
+            turnlog.record("play_youtube", query=q, video=video_id, where="stage")
+            return {"ok": True, "playing": title or q, "url": url,
+                    "where": "stage", "embed": frame,
+                    "note": "เล่นบนจอในหน้าเดิมแล้ว บอกชื่อคลิปให้เจ้าของฟังสั้นๆ"}
+        if _put_on_screen(url):
+            turnlog.record("play_youtube", query=q, video=video_id, where="screen")
+            return {"ok": True, "playing": title or q, "url": url, "where": "screen",
+                    "note": "เล่นบนจอแล้ว บอกชื่อคลิปให้เจ้าของฟังสั้นๆ"}
         try:
             os.startfile(url)
         except Exception:
@@ -357,6 +522,13 @@ def play_youtube(query: str) -> dict:
     # Couldn't resolve a video (network, layout change): fall back to the
     # search page and SAY it is the search page — never claim a video plays.
     fallback = "https://www.youtube.com/results?search_query=" + q.replace(" ", "+")
+    if _put_on_screen(fallback):
+        turnlog.record("play_youtube", query=q, video=None, where="screen")
+        return {"ok": True, "playing": None, "opened_search_page": True,
+                "where": "screen",
+                "instruction": ("หาอันแรกให้อัตโนมัติไม่ได้ เลยขึ้นหน้าผลค้นบนจอแทน "
+                                "บอกเจ้าของตรงๆ ว่าขึ้นหน้าค้นให้ ให้เขาเลือกเอง "
+                                "ห้ามบอกว่าเล่นวิดีโอแล้ว")}
     try:
         os.startfile(fallback)
     except Exception:
@@ -389,8 +561,21 @@ async def end_conversation() -> dict:
     """
     import asyncio
 
-    from app import display
+    from app import display, heard
     from app import session as session_module
+
+    # A guard on the consequence, not a guess about the audio. Measured on
+    # 2026-08-24: four of the day's seven hangups followed `我们走吧。` — the
+    # same canned sentence, byte-identical, that a recogniser produces from
+    # silence when zh-CN is in its hint list. Nobody said it, and the line
+    # went anyway, mid-conversation, with nothing to correct afterwards.
+    #
+    # Dropping the language hint removes today's phrase; this removes the
+    # class. The destructive slide tools already work this way — "we cannot
+    # tell echo from speech, but we can tell ปิดสไลด์ from bit like".
+    if not heard.asks_to_end():
+        return {"ok": False, "error": "no goodbye heard",
+                "heard": heard.last(), "instruction": heard.ASK_BEFORE_ENDING}
 
     live = session_module._active
     if live is None:
