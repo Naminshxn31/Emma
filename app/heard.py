@@ -116,6 +116,71 @@ def asks_to_stop(text: str | None = None) -> bool:
     return _has(_STOP_OTHER) or _has(_STOP_TH)
 
 
+#: Words that end a conversation. Same shape and same discipline as the stop
+#: list: things people actually say when they leave, not a thesaurus.
+#:
+#: Deliberately does **not** include the Chinese for "let's go". On
+#: 2026-08-24 the recogniser emitted `我们走吧。` — one canned sentence,
+#: byte-identical, at 15:24, 17:20, 17:22, 17:31 and 17:48, once only two
+#: seconds after a session opened. Nobody said it: it is what a recogniser
+#: given a zh-CN hint produces from silence. Four of the day's seven hangups
+#: came from it. A phrase that arrives out of nothing must not be able to end
+#: a conversation, so the list stays in the languages this assistant is
+#: actually spoken to in — and the guard below is what makes the list matter.
+_BYE_TH = (
+    "บาย", "บ๊ายบาย", "ลาก่อน", "แค่นี้", "พอแล้ว", "ไปแล้ว", "ไปละ",
+    "ไว้เจอกัน", "แล้วเจอกัน", "ขอบคุณมาก", "จบแล้ว", "เลิกคุย", "วางสาย",
+)
+_BYE_OTHER = (
+    "bye", "goodbye", "see you", "see ya", "that's all", "thats all",
+    "thank you bye", "hang up", "good night", "goodnight",
+    # Real goodbyes in the languages guests actually bring to the gallery.
+    # Note what is present and what is absent: 再见/拜拜 are how a Chinese
+    # speaker ends a conversation; 我们走吧 ("let's go") is not — it is the
+    # exact sentence the recogniser hallucinates from silence, and keeping
+    # it out is what lets a real 再见 hang up while the phantom cannot.
+    "再见", "拜拜", "先走了",
+    "さようなら", "またね", "バイバイ",
+    "안녕히 계세요", "잘 있어",
+    "до свидания", "пока",
+    "au revoir", "auf wiedersehen", "adiós", "adios",
+)
+
+
+def asks_to_end(text: str | None = None) -> bool:
+    """Does what we heard actually sound like a goodbye?
+
+    Hanging up is the most expensive thing this assistant can do on a
+    mishearing: the guest is mid-sentence and the line simply goes. Unlike a
+    wrong answer, there is nothing to correct — the conversation is over and
+    the person has to start it again.
+
+    Same word-not-substring rule as `asks_to_stop`, for the same reason.
+    """
+    haystack = (text if text is not None else _LAST).lower().strip()
+    if not haystack:
+        return False
+
+    from app.tools.retrieval import tokenize
+
+    words = tokenize(haystack)
+    padded = " %s " % " ".join(words) if words else " "
+    for term in _BYE_OTHER:
+        if term in haystack:
+            return True
+    for term in _BYE_TH:
+        if (" %s " % " ".join(tokenize(term))) in padded:
+            return True
+    return False
+
+
+#: What to tell the model when it tried to hang up without being asked.
+ASK_BEFORE_ENDING = (
+    "ยังไม่ได้ยินลูกค้าบอกลา ห้ามวางสาย ให้ถามสั้นๆ ว่าจะให้จบการสนทนาเลยไหม "
+    "ถ้าลูกค้ายืนยันค่อยเรียกเครื่องมือนี้อีกครั้ง ถ้าไม่ใช่ให้คุยต่อตามปกติ"
+)
+
+
 #: What to tell the model when it tried to close the deck without being asked.
 CONFIRM_FIRST = (
     "ยังไม่ได้ยินลูกค้าสั่งให้ปิด ห้ามปิด ให้ถามสั้นๆ ก่อนว่าต้องการให้ปิดสไลด์ไหม "

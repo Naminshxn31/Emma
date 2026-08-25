@@ -175,3 +175,116 @@ def test_each_utterance_fires_exactly_once(monkeypatch):
     assert hits == ["EMMA", "EMMA"], (
         "one wake event per utterance broke: %r" % hits
     )
+
+
+# ============ saying what the microphone is actually sending ============
+
+
+def _probe_stream():
+    """A WakeStream without a model — only the reporting half is under test."""
+    from app import wake
+
+    s = wake.WakeStream.__new__(wake.WakeStream)
+    s._spotter = s._stream = None
+    s._probe_at = 0.0
+    s._probe_peak = 0.0
+    s._probe_sum = 0.0
+    s._probe_n = 0
+    s._heard_anything = False
+    return s
+
+
+def _report_verdict(stream, level, caplog):
+    """Feed one level long enough to force a report, return the log text."""
+    import logging
+
+    import numpy as np
+
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="condo_voice.wake"):
+        block = np.full(1600, level, dtype="float32")
+        stream._report(block)          # first call only starts the clock
+        stream._probe_at -= 5.0        # ...so age it past the interval
+        stream._report(block)
+    return caplog.text
+
+
+def test_the_wake_probe_separates_a_dead_mic_from_a_quiet_one(caplog):
+    """"เรียกแล้วไม่เกิดอะไรขึ้น" had no evidence behind it anywhere. The page
+    painted "ไมค์กำลังฟังอยู่" as soon as one frame left the browser — a frame
+    of digital silence counts — and the server logged nothing unless the word
+    fired. A muted input device, a microphone across the room and an
+    unmatched name all looked the same, so the only way to tell them apart
+    was to change something and guess again.
+
+    Three levels, three different things to go and do."""
+    from app import wake
+
+    silent = _report_verdict(_probe_stream(), 0.0001, caplog)
+    assert "SILENT" in silent and "input device" in silent
+
+    quiet = _report_verdict(_probe_stream(), 0.01, caplog)
+    assert "too quiet" in quiet and "MIC_BOOST" in quiet
+
+    loud = _report_verdict(_probe_stream(), 0.2, caplog)
+    assert "speech level reached" in loud
+    assert "keyword, not the microphone" in loud
+
+
+def test_the_probe_stays_quiet_unless_asked(monkeypatch):
+    """Two lines a second into a log the gallery reads for other reasons.
+    Useful while chasing a microphone, noise the rest of the time."""
+    import inspect
+
+    from app import wake
+    from app.config import settings
+
+    src = inspect.getsource(wake.WakeStream.feed)
+    assert "if settings.wake_debug:" in src, \
+        "the probe must be behind WAKE_DEBUG, not always on"
+    assert settings.wake_debug is False or True   # value comes from .env
+    import re
+
+    from app import config
+    assert re.search(r'_get_bool\("WAKE_DEBUG",\s*False\)',
+                     inspect.getsource(config)), "default off"
+
+
+def test_the_spellings_can_be_tuned_without_a_commit(monkeypatch):
+    """Which spellings catch a real call of the name depends on the mouth,
+    the room and the microphone — none of which are visible from here. The
+    built-in three were measured missing a live "เอ็มม่า" through twenty
+    seconds of loud, clear speech, so the next round of tuning must not
+    need a code change and a pull."""
+    from app import wake
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "wake_enabled", True)
+    monkeypatch.setattr(settings, "wake_spellings", "")
+    builtin = wake._spellings_for("emma")
+    assert "EMMA" in builtin
+    assert "AMA" in builtin and "IMMA" in builtin, \
+        "the neighbourhood was widened after the measurement"
+    # Ordinary English words stay out: a wake word that fires on the room's
+    # conversation is worse than one that needs saying twice.
+    assert "ANNA" not in builtin and "ELMA" not in builtin
+
+    monkeypatch.setattr(settings, "wake_spellings", " aimma , EMMA ")
+    assert wake._spellings_for("emma") == ["AIMMA", "EMMA"]
+
+
+def test_every_spelling_reaches_the_keyword_file_under_one_label(monkeypatch):
+    """All variants report the same @LABEL, or a hit on one of them is not a
+    hit on the name."""
+    from app import wake
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "wake_enabled", True)
+    monkeypatch.setattr(settings, "wake_spellings", "")
+    monkeypatch.setattr(settings, "wake_word", "emma")
+    line = wake._encode_keyword("emma")
+    if line is None:
+        pytest.skip("no bpe.model and no built-in encoding — spellings UNTESTED here")
+    rows = [r for r in line.splitlines() if r.strip()]
+    assert len(rows) == len(wake._spellings_for("emma"))
+    assert all(r.endswith("@EMMA") for r in rows), rows

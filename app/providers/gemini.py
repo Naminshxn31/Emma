@@ -112,6 +112,13 @@ def adaptation_phrases() -> list[str]:
         "ราคา", "โปรโมชั่น", "ผังห้อง", "แบบห้อง",
         "สิ่งอำนวยความสะดวก", "ทำเลที่ตั้ง", "พาชม", "นัดหมาย",
         "ห้องนอน", "ตารางเมตร", "ชั้น",
+        # Unit-conversation phrases, added after a measured mishearing:
+        # "แต่ละห้องต่างกันยังไง" came back as "เตารีดผ้ากันยังไง" and the
+        # robot went off researching how to iron. Biasing the recogniser
+        # toward the sentences people actually say at this desk is the same
+        # fix that turned "bit fire" back into ปิดไฟ.
+        "แต่ละห้อง", "ต่างกันยังไง", "ห้องว่าง", "ผังโครงการ", "ผังชั้น",
+        "ตึกไหน", "ห้องมุม", "วิวทะเล", "วิวสระ", "งบเท่าไหร่", "กี่ล้าน",
     ]
     return [p for p in phrases if p and not p.startswith("[")]
 
@@ -252,6 +259,16 @@ class GeminiProvider(VoiceProvider):
         # Affective dialogue mixes emotion labels into the output transcript;
         # they're internal signals, not speech, so keep them off the screen.
         self._out_filter = TranscriptFilter()
+        #: Local VAD gate, or None for Gemini-side detection. Created here —
+        #: before _build_config runs — because the config's
+        #: automatic_activity_detection block has to describe the arrangement
+        #: this session actually uses. Deciding it in two places is how the
+        #: two ends would drift: a gate sending activity signals into a
+        #: session whose server-side detection is still on double-detects
+        #: every utterance.
+        from app import vad_gate
+
+        self._vad_gate = vad_gate.for_session()
         # The recogniser word-spaces Thai; undo that for display. Separate
         # instances because the two transcript streams interleave and each
         # needs its own held-back character.
@@ -284,20 +301,31 @@ class GeminiProvider(VoiceProvider):
             "input_audio_transcription": _transcription_config(),
             "output_audio_transcription": types.AudioTranscriptionConfig(),
             "realtime_input_config": types.RealtimeInputConfig(
-                automatic_activity_detection=types.AutomaticActivityDetection(
-                    disabled=False,
-                    prefix_padding_ms=settings.vad_prefix_padding_ms,
-                    silence_duration_ms=settings.vad_silence_ms,
-                    # HIGH = detect start of speech more often (the API's own
-                    # default). LOW detects it *less* often, which in practice
-                    # means quiet or short utterances are never picked up at
-                    # all — see config.py.
-                    start_of_speech_sensitivity=_sensitivity(
-                        types.StartSensitivity, "START", settings.vad_start_sensitivity
-                    ),
-                    end_of_speech_sensitivity=_sensitivity(
-                        types.EndSensitivity, "END", settings.vad_end_sensitivity
-                    ),
+                # Two shapes, chosen by who is detecting speech, and they must
+                # not mix: with `disabled=True` the Live API *rejects the
+                # session* (1007) if any tuning field rides along —
+                # "disabled is true, but the following fields were also set".
+                # Seen live the first time local VAD ran. When the local gate
+                # detects, the .env knobs drive the gate instead (vad_gate
+                # reuses VAD_SILENCE_MS / PREFIX_PADDING_MS), so the robot's
+                # patience survives the mode switch.
+                automatic_activity_detection=(
+                    types.AutomaticActivityDetection(disabled=True)
+                    if self._vad_gate is not None
+                    else types.AutomaticActivityDetection(
+                        disabled=False,
+                        prefix_padding_ms=settings.vad_prefix_padding_ms,
+                        silence_duration_ms=settings.vad_silence_ms,
+                        # HIGH = detect start of speech more often (the API's
+                        # own default). LOW detects it *less* often — quiet or
+                        # short utterances never picked up. See config.py.
+                        start_of_speech_sensitivity=_sensitivity(
+                            types.StartSensitivity, "START", settings.vad_start_sensitivity
+                        ),
+                        end_of_speech_sensitivity=_sensitivity(
+                            types.EndSensitivity, "END", settings.vad_end_sensitivity
+                        ),
+                    )
                 )
             ),
             # Keeps a long conversation inside the context window instead of
@@ -459,9 +487,27 @@ class GeminiProvider(VoiceProvider):
 
         if self._session is None:
             return
-        await self._session.send_realtime_input(
-            audio=types.Blob(data=pcm16, mime_type=f"audio/pcm;rate={self.input_sample_rate}")
-        )
+        if self._vad_gate is None:
+            await self._session.send_realtime_input(
+                audio=types.Blob(data=pcm16, mime_type=f"audio/pcm;rate={self.input_sample_rate}")
+            )
+            return
+        # Local mode: the gate decides what upstream ever hears. Silence
+        # produces no actions at all — no bytes, no signals — which is the
+        # entire point: what is never sent cannot be hallucinated into
+        # `我们走吧` or metered.
+        for kind, data in self._vad_gate.feed(pcm16):
+            if kind == "start":
+                await self._session.send_realtime_input(
+                    activity_start=types.ActivityStart())
+            elif kind == "end":
+                await self._session.send_realtime_input(
+                    activity_end=types.ActivityEnd())
+            else:
+                await self._session.send_realtime_input(
+                    audio=types.Blob(data=data,
+                                     mime_type=f"audio/pcm;rate={self.input_sample_rate}")
+                )
 
     async def send_text(self, text: str) -> None:
         """Push a server-side instruction in as its own turn.

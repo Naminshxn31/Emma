@@ -39,7 +39,17 @@ logger = logging.getLogger("condo_voice.wake")
 #: calls; the variants catch the neighbourhood. (First real-mic session:
 #: TTS-tested EMMA alone did not fire on a live "เอ็มม่า".)
 _VARIANTS = {
-    "emma": ["EMMA", "AMMA", "EMA"],
+    # Measured 2026-08-24 with WAKE_DEBUG on: twenty seconds of speech at
+    # peak 0.24-0.33 — unambiguously loud, unambiguously the name — passed
+    # through these three without a single hit, then fired once later. So
+    # the neighbourhood was too small, in the direction the docstring above
+    # already guessed. AMA drops the doubled M (Thai says "อะ-หม่า" more
+    # openly than English "EMMA"); IMMA raises the first vowel.
+    #
+    # Deliberately not widened past that. ANNA and ELMA encode cleanly too
+    # and are ordinary English words — a wake word that fires on the room's
+    # conversation is worse than one that needs saying twice.
+    "emma": ["EMMA", "AMMA", "EMA", "AMA", "IMMA"],
 }
 
 #: Precomputed BPE for the variants, so the default name works even without
@@ -58,6 +68,26 @@ def _model_dir() -> Path:
     return Path(settings.wake_model_dir).expanduser()
 
 
+def _spellings_for(word: str) -> list[str]:
+    """Which spellings of the name to listen for.
+
+    `WAKE_SPELLINGS` overrides the built-in list, because tuning this is the
+    one part of the wake word that cannot be done from here: it depends on a
+    particular mouth, a particular room and a particular microphone. The
+    built-ins were still missing a live "เอ็มม่า" after a first round of
+    guessing, and the next round should not need a code change and a pull.
+
+    Turn on `WAKE_DEBUG` while tuning — it says whether the microphone is
+    even reaching the detector, which is the question that has to be settled
+    before any spelling can be judged.
+    """
+    override = [s.strip().upper() for s in
+                (settings.wake_spellings or "").split(",") if s.strip()]
+    if override:
+        return override
+    return _VARIANTS.get(word, [word.upper()])
+
+
 def _encode_keyword(word: str) -> str | None:
     """The KWS model wants BPE pieces, not letters. One line per spelling
     variant, every variant reporting the same @LABEL.
@@ -67,7 +97,7 @@ def _encode_keyword(word: str) -> str | None:
     sherpa-onnx keywords-file format. `@LABEL` is what get_result returns.
     """
     word = word.strip().lower()
-    spellings = _VARIANTS.get(word, [word.upper()])
+    spellings = _spellings_for(word)
     label = word.upper()
 
     encoded: list[str] = []
@@ -152,9 +182,21 @@ class WakeStream:
     """One browser's ears. Feed it PCM16 mono 16kHz; it says the name back
     when it hears it."""
 
+    #: Speech, measured on this project's own microphone chain, sits around
+    #: 0.05-0.2 RMS. The page's own meter calls anything above 0.02 speech.
+    #: Below ~0.005 is a room with nobody in it — or an input that is not
+    #: the one being spoken into.
+    QUIET = 0.005
+    SPEECH = 0.02
+
     def __init__(self) -> None:
         self._spotter = _get_spotter()
         self._stream = self._spotter.create_stream() if self._spotter else None
+        self._probe_at = 0.0
+        self._probe_peak = 0.0
+        self._probe_sum = 0.0
+        self._probe_n = 0
+        self._heard_anything = False
 
     @property
     def ok(self) -> bool:
@@ -177,6 +219,8 @@ class WakeStream:
         samples = (
             np.frombuffer(pcm16, dtype="<i2").astype("float32") / 32768.0
         )
+        if settings.wake_debug:
+            self._report(samples)
         self._stream.accept_waveform(16000, samples)
         hit = None
         while self._spotter.is_ready(self._stream):
@@ -185,7 +229,54 @@ class WakeStream:
             if result:
                 hit = result
                 self._spotter.reset_stream(self._stream)
+        if hit:
+            logger.info("wake word heard: %r", hit)
         return hit
+
+    def _report(self, samples) -> None:
+        """Say what the microphone is sending, roughly twice a minute.
+
+        Deliberately reports the *audio*, not the detector's confidence.
+        Confidence answers "was that the name", and the question that could
+        not be answered was the one underneath it: is there a voice in here
+        at all. A near-miss score and a silent room are different problems
+        with different fixes, and only one of them is about the wake word.
+        """
+        import math
+        import time
+
+        n = len(samples)
+        if not n:
+            return
+        rms = math.sqrt(float((samples * samples).sum()) / n)
+        self._probe_peak = max(self._probe_peak, rms)
+        self._probe_sum += rms
+        self._probe_n += 1
+        if rms >= self.SPEECH:
+            self._heard_anything = True
+
+        now = time.monotonic()
+        if not self._probe_at:
+            self._probe_at = now
+            return
+        if now - self._probe_at < 2.0:
+            return
+        avg = self._probe_sum / self._probe_n
+        if self._probe_peak < self.QUIET:
+            verdict = ("SILENT — nothing is reaching this socket. Check which "
+                       "input device the browser picked (the mic icon in the "
+                       "address bar), and that it is not muted in Windows")
+        elif self._probe_peak < self.SPEECH:
+            verdict = ("too quiet to be speech — room noise only. Move closer, "
+                       "or raise MIC_BOOST in .env")
+        else:
+            verdict = "speech level reached — if the name still misses, it is the keyword, not the microphone"
+        logger.info("wake audio: avg=%.4f peak=%.4f (speech >= %.2f) — %s",
+                    avg, self._probe_peak, self.SPEECH, verdict)
+        self._probe_at = now
+        self._probe_peak = 0.0
+        self._probe_sum = 0.0
+        self._probe_n = 0
 
 
 #: Standby browsers currently holding a /ws/wake socket. Normally the wake
