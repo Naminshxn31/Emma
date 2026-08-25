@@ -1,9 +1,14 @@
 .env
+# Local HTTPS private key and certificate (regenerate with mkcert per machine)
+certs/
 __pycache__/
 *.pyc
 .venv/
 venv/
 .pytest_cache/
+# Scratch run directories from `pytest --basetemp=...`. Seven of them had
+# collected at the repo root; none are worth a line in anyone's diff.
+.pytest_*/
 
 # Hub identity (MAC/IP of the Broadlink device on your network)
 data/broadlink_device.json

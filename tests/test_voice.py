@@ -479,11 +479,20 @@ def test_system_instruction_stays_short():
     that tells it to apologise for going off topic: it would ask a friendly
     question and then refuse the answer. That is not a length problem worth
     saving 180 characters on.
+
+    Raised a sixth time (3400 -> 3600) for the live-inventory line. The
+    gallery's default now loads show_unit/find_units/show_plan, and a tool
+    the prompt never mentions is one the model refuses to have — measured
+    with show_plan: registered, asked for, and answered with "ไม่มีเครื่องมือ
+    สำหรับแสดงผังโครงการค่ะ". The block was trimmed to one line first (the
+    examples live in the tools' own descriptions, which are not re-billed
+    per turn); what remains is the minimum that prevents the observed
+    refusal.
     """
     from app.prompts import build_instructions
 
     text = build_instructions("Test Condo")
-    assert len(text) < 3400, "system instruction grew to %d chars" % len(text)
+    assert len(text) < 3600, "system instruction grew to %d chars" % len(text)
 
 
 def test_vad_sensitivity_defaults_are_high():
@@ -2005,3 +2014,586 @@ def test_only_guest_speech_resets_the_idle_clock(monkeypatch):
     assert len(resets) == 2, resets
     heard_block = source.split('elif event.kind == "user_transcript":', 1)[1]
     assert "_last_heard_at" in heard_block.split("elif event.kind", 1)[0]
+
+
+# ============ the LAN gate ============
+
+
+def test_every_socket_refuses_a_missing_or_wrong_token(monkeypatch):
+    """WS_TOKEN set = every WebSocket demands it. The machines crossed the
+    LAN line (HOST=0.0.0.0) carrying tools that open programs and press
+    keys; "some socket on the LAN" must never be enough to reach those.
+    The roadmap gated LAN exposure on exactly this check."""
+    from fastapi.testclient import TestClient
+
+    from app.config import settings
+    from app.main import app
+
+    monkeypatch.setattr(settings, "ws_token", "secret123")
+    client = TestClient(app)
+
+    for path in ("/ws/wake", "/ws/display", "/ws"):
+        with client.websocket_connect(path) as ws:
+            evt = ws.receive_json()
+        assert evt["code"] == "unauthorized", path
+        with client.websocket_connect(path + "?token=wrong") as ws:
+            evt = ws.receive_json()
+        assert evt["code"] == "unauthorized", path
+
+    # The right token gets past the gate (display is the cheapest to prove).
+    with client.websocket_connect("/ws/display?token=secret123") as ws:
+        evt = ws.receive_json()
+    assert evt["type"] == "slide"
+
+
+def test_no_token_configured_means_no_gate(monkeypatch):
+    """Localhost development stays friction-free: empty WS_TOKEN is the
+    explicit off switch, not an accident."""
+    from fastapi.testclient import TestClient
+
+    from app.config import settings
+    from app.main import app
+
+    monkeypatch.setattr(settings, "ws_token", "")
+    client = TestClient(app)
+    with client.websocket_connect("/ws/display") as ws:
+        assert ws.receive_json()["type"] == "slide"
+
+
+def test_a_non_ascii_token_is_compared_without_blowing_up(monkeypatch):
+    """`secrets.compare_digest` refuses to compare non-ASCII `str`. A token
+    pasted out of a password manager can be anything, and a TypeError inside
+    the gate reads to everyone as "the gate is broken", not "wrong token"."""
+    from fastapi.testclient import TestClient
+
+    from app.config import settings
+    from app.main import app
+
+    monkeypatch.setattr(settings, "ws_token", "ทางเข้า-ผ่านได้")
+    client = TestClient(app)
+    with client.websocket_connect("/ws/display?token=wrong") as ws:
+        assert ws.receive_json()["code"] == "unauthorized"
+    with client.websocket_connect("/ws/display?token=ทางเข้า-ผ่านได้") as ws:
+        assert ws.receive_json()["type"] == "slide"
+
+
+def test_being_open_to_the_network_without_a_token_is_said_out_loud(caplog, monkeypatch):
+    """The gate defaults to off (WS_TOKEN="") while the exposure defaults to
+    on (HOST=0.0.0.0) — the shipped configuration is the unprotected one, the
+    same inverted-default shape as the `script_approved` bug. Nothing about
+    that is visible while it is happening, so boot has to say it."""
+    import logging
+
+    from app.config import settings
+    from app.main import warn_if_open_to_the_network
+
+    log = logging.getLogger("condo_voice.test_gate")
+
+    # monkeypatch, not assignment: `host` is not one of the values conftest
+    # resets, so a leaked "0.0.0.0" would ride into every later test.
+    monkeypatch.setattr(settings, "host", "0.0.0.0")
+    monkeypatch.setattr(settings, "ws_token", "")
+    with caplog.at_level(logging.WARNING, logger=log.name):
+        assert warn_if_open_to_the_network(log) == "open"
+    assert "WS_TOKEN" in caplog.text and "SECURITY" in caplog.text
+
+    # The two quiet cases: bound to this machine only, or gated.
+    caplog.clear()
+    monkeypatch.setattr(settings, "host", "127.0.0.1")
+    assert warn_if_open_to_the_network(log) == "localhost"
+    monkeypatch.setattr(settings, "host", "0.0.0.0")
+    monkeypatch.setattr(settings, "ws_token", "a-long-random-value")
+    assert warn_if_open_to_the_network(log) == "protected"
+    assert caplog.text == ""
+
+
+def test_the_vad_warning_is_not_trapped_inside_the_infrared_block():
+    """It was indented one step too far, so the warning about the assistant
+    possibly never responding printed only on machines whose *infrared hub*
+    was also broken. Read the source: the condition is what went wrong, and
+    a test that drove the startup banner would prove nothing about where
+    the line sits."""
+    import inspect
+
+    from app import main
+
+    src = inspect.getsource(main._log_effective_config)
+    line = next(ln for ln in src.splitlines()
+                if "vad_start_sensitivity.upper()" in ln)
+    indent = len(line) - len(line.lstrip())
+    assert indent == 4, (
+        f"the VAD warning is nested {indent // 4} levels deep — it belongs at "
+        "the function's own level, not inside another setting's failure branch"
+    )
+
+
+def test_the_standby_ears_stand_down_on_a_bad_token():
+    """The call socket already refuses to redial an auth failure. The wake
+    socket's onclose rearms every two seconds and reopens the microphone
+    each time, so the guard had to be repeated there — one entrance closed
+    is not the same as closed."""
+    js = _client_js()
+    start = js.index("async function startWakeMode()")
+    end = js.index("\nfunction ", start + 1)
+    body = js[start:end]
+    assert "'unauthorized'" in body, \
+        "startWakeMode() must recognise the unauthorized error"
+    handler = body[body.index("'unauthorized'"):]
+    assert "stopWakeMode()" in handler.split("};", 1)[0], \
+        "an unauthorized wake socket must stop, not rearm two seconds later"
+
+
+def test_the_display_screen_stops_dialling_on_a_bad_token():
+    """The server accepts the socket before refusing it, which fires onopen,
+    which resets the backoff — so an unauthorized display page redials twice
+    a second for ever unless something latches."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    js = (root / "client" / "display.html").read_text(encoding="utf-8")
+    assert "'unauthorized'" in js
+    onclose = js[js.index("ws.onclose = ()"):]
+    onclose = onclose[:onclose.index("};")]
+    assert "giveUp" in onclose, \
+        "onclose must not schedule another connect after an auth failure"
+
+
+# ============ one screen ============
+
+
+def test_the_page_never_falls_back_to_the_picker_screen():
+    """Two screens meant every path that ended a call had to decide which one
+    to return to — the End button, the superseded close, the wake rearm, the
+    idle park. Four decisions in four places, each already the subject of a
+    bug. `goToSleep()` is the one path now, and nothing may re-activate the
+    picker except the deliberate ?picker=1 escape hatch."""
+    js = _client_js()
+    activations = [ln.strip() for ln in js.splitlines()
+                   if "$('pickerScreen').classList.add('active')" in ln]
+    assert activations == [], activations
+    assert "function goToSleep(" in js
+
+
+def test_a_machine_with_no_wake_word_and_no_autoconnect_can_still_start():
+    """The gallery's defaults are AUTO_CONNECT=false and WAKE_ENABLED=false
+    (config.py). Deleting the picker without moving its Start button onto the
+    remaining screen would leave that machine on a page with nothing to press
+    — a pull that changes showroom behaviour, which is the one thing the
+    profile seam exists to prevent."""
+    js = _client_js()
+    start = js.index("$('endBtn').onclick")
+    body = js[start:js.index("\n};", start)]
+    assert "startCall()" in body, \
+        "the one button must start a call when there is no call to end"
+    # And the label has to follow the state, or it says End over a dead line.
+    state = js[js.index("function setState(s)"):js.index("\n}\n", js.index("function setState(s)"))]
+    assert "endBtn" in state and "เริ่มคุย" in state
+
+
+def test_the_standby_microphone_drives_the_level_bar():
+    """The reason for merging the screens. The picker was the only screen
+    with no level bar, and the wake word lived there — so "พูด emma แล้ว
+    เหมือนไม่ได้ยิน" was undiagnosable from the page: a muted microphone and
+    a mispronounced name looked identical. The standby path used to discard
+    the level and now feeds the same bar a call uses."""
+    js = _client_js()
+    start = js.index("async function startWakeMode()")
+    body = js[start:js.index("\nfunction ", start + 1)]
+    assert "onMicLevel(e.data.level)" in body, \
+        "the standby mic must report its level, not throw it away"
+    assert "no level meter in standby" not in body
+
+
+def test_the_transcript_is_kept_for_a_while_and_then_wiped():
+    """Both halves are deliberate. Wiping at once throws away what was just
+    said, which is what someone reaches for the moment a call ends. Never
+    wiping leaves one visitor's conversation on the screen the next visitor
+    walks up to — the mistake data/logs/ made by keeping everything until
+    somebody decided otherwise."""
+    js = _client_js()
+    assert "scheduleTranscriptWipe" in js
+    fn = js[js.index("function scheduleTranscriptWipe()"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "transcriptKeepMin" in fn
+    assert "if (!transcriptKeepMin) return" in fn, "0 must mean never wipe"
+    # Wiping must not fire into a conversation that resumed while it waited.
+    assert "!== 'sleep'" in fn
+
+
+def test_the_keep_window_is_a_server_setting():
+    """The showroom and the owner's desk hold different answers to "who else
+    can walk up to this screen", so the number cannot live in the page."""
+    from fastapi.testclient import TestClient
+
+    from app.config import settings
+    from app.main import app
+
+    body = TestClient(app).get("/health").json()
+    assert body["transcript_keep_min"] == settings.transcript_keep_min
+    assert "transcriptKeepMin = health.transcript_keep_min" in _client_js()
+
+
+# ============ the robot's own screen ============
+
+
+def _display_js() -> str:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    return (root / "client" / "display.html").read_text(encoding="utf-8")
+
+
+def test_emmas_words_reach_the_robot_screen_on_the_audio_clock():
+    """The chest screen is not a monitor. Text is generated four to six times
+    faster than it is spoken, so pushing it as it arrives means the guest
+    reads the answer before Emma says it — the bug the whole of display.py
+    exists for, wearing text instead of pictures.
+
+    Each chunk is released at the previous chunk's finishing line, which is
+    when its own audio starts."""
+    import asyncio
+    import time
+
+    from app import display
+
+    sent = []
+
+    async def scenario():
+        async def fake_broadcast(payload):
+            sent.append(payload)
+
+        display.broadcast = fake_broadcast
+        try:
+            display.reset_subtitle()
+            display.set_audio_lead(600)          # 0.6s of speech queued
+            await display.say("สวัสดีค่ะ ")
+            await display.say("ยินดีต้อนรับนะคะ")
+            # Long enough for the drain task to have run — the point is that
+            # it ran and still held the second chunk back. Checking without
+            # this sleep passes even with the pacing removed, because the
+            # task has simply not been scheduled yet: a test that measures
+            # the event loop instead of the code.
+            await asyncio.sleep(0.15)
+            early = display.subtitle_state()
+            await asyncio.sleep(1.2)             # let the rest come due
+            return early
+        finally:
+            display.broadcast = real
+
+    real = display.broadcast
+    early = asyncio.run(scenario())
+    assert early["shown"] == "สวัสดีค่ะ ",         "the first chunk starts now; the second must wait for its audio"
+    assert early["pending"] == 1, "the unspoken chunk must still be queued"
+    assert [p["text"] for p in sent][-1] == "สวัสดีค่ะ ยินดีต้อนรับนะคะ"
+
+
+def test_an_interrupted_sentence_is_never_finished_on_screen():
+    """A barge-in empties the audio queue, so the words still waiting were
+    never heard. Painting them anyway is the text version of the bug
+    `STATE["unheard"]` was added for on the slide side — the screen calmly
+    finishing a sentence the guest cut off."""
+    import asyncio
+
+    from app import display
+
+    async def scenario():
+        display.reset_subtitle()
+        display.set_audio_lead(5000)
+        await display.say("ราคาเริ่มต้นอยู่ที่ ")
+        await display.say("ห้าล้านแปดแสนบาทค่ะ")
+        dropped = display.drop_unheard()
+        return dropped, display.subtitle_state()
+
+    dropped, state = asyncio.run(scenario())
+    assert dropped == 2, "everything unspoken must go"
+    assert state["pending"] == 0
+
+    # And the session has to actually call it. Testing the function alone
+    # passes with the wiring deleted — which it did, the first time.
+    import inspect
+
+    from app import session
+
+    src = inspect.getsource(session.VoiceSession._provider_to_browser)
+    barge = src.split('elif event.kind == "interrupted":', 1)[1]
+    barge = barge.split("elif event.kind", 1)[0]
+    assert "display.drop_unheard()" in barge
+
+
+def test_the_guest_is_never_quoted_on_the_public_screen():
+    """Transcription is wrong often enough to be embarrassing at chest height
+    in a public room ("bit fire" for "ปิดไฟ" is in the README), and the prompt
+    has Emma read phone numbers back to confirm them. The guest's half of the
+    conversation gets an indicator, not words."""
+    import inspect
+
+    from app import session
+
+    src = inspect.getsource(session.VoiceSession._provider_to_browser)
+    heard_block = src.split('elif event.kind == "user_transcript":', 1)[1]
+    heard_block = heard_block.split("elif event.kind", 1)[0]
+    assert "display.say" not in heard_block, \
+        "what the guest said must never be pushed to the robot's screen"
+    # The indicator is what they get instead.
+    assert 'display.set_phase("listening")' in src
+
+    js = _display_js()
+    assert "'user_transcript'" not in js, "the display must not render guest text"
+    assert "evt.type === 'phase'" in js
+
+
+def test_the_robot_screen_is_wiped_the_moment_the_call_ends():
+    """No keep-timer here. The conversation tab holds its transcript for a few
+    minutes because one person is sitting at it; this is the most public
+    surface in the building and nobody is watching when a visitor leaves."""
+    import inspect
+
+    from app import session
+
+    src = inspect.getsource(session.handle_connection)
+    finally_block = src.split("finally:", 1)[1]
+    assert "display.clear_subtitle()" in finally_block
+
+
+def test_the_chest_screen_layout_asks_the_shape_not_the_user_agent():
+    """The Android shell may report orientation differently once the real
+    robot arrives, and a layout that branches on who you are gets that wrong
+    in a way nobody can fix from the showroom."""
+    js = _display_js()
+    assert "min-aspect-ratio" in js
+    for probe in ("userAgent", "platform", "isAndroid"):
+        assert probe not in js, f"layout must not branch on {probe}"
+    # And the plain slide monitor keeps its old page untouched.
+    assert "chat') === '1'" in js
+    assert "body.chat .stagewrap { display: flex; }" in js
+
+
+def test_going_to_sleep_hands_the_microphone_back():
+    """Measured 2026-08-24: sixteen seconds of peak=0.0000 on the standby
+    socket, then real audio. Exactly zero is not a quiet room — a live
+    microphone never reads that — it is a second capture opened on a device
+    the first one still holds.
+
+    `releaseCallHardware()` was called only from startCall(), on the way in.
+    Every way out (idle timeout, go_away, a dropped network) left the call's
+    stream, worklet and AudioContext alive, and then the ears asked Windows
+    for the same microphone. The symptom read as "the wake word doesn't
+    work" and was nothing to do with the wake word."""
+    js = _client_js()
+    body = js[js.index("function goToSleep("):js.index("\nfunction scheduleTranscriptWipe")]
+    # Statements, not substrings. The first version of this assertion matched
+    # the *comment* above the call explaining why the call is there, so
+    # deleting the call left it green — a test passing on its own rationale.
+    stmts = [ln.strip() for ln in body.splitlines()
+             if ln.strip() and not ln.strip().startswith("//")]
+    assert "releaseCallHardware();" in stmts,         "sleeping must release the call's microphone before the ears open one"
+    # And it must happen before the ears are rearmed, not after.
+    assert stmts.index("releaseCallHardware();") < next(
+        i for i, ln in enumerate(stmts) if "startWakeMode" in ln)
+
+    # The End button used to hand-roll the same teardown, which is how the
+    # other exits ended up with none: the copy looked like the owner.
+    end = js[js.index("$('endBtn').onclick"):]
+    end = end[:end.index("\n};")]
+    assert "micStream.getTracks()" not in end, \
+        "one owner for the teardown, or the copies drift apart again"
+
+
+def test_a_missing_token_is_not_reported_as_another_tab():
+    """Seen on screen: a page opened without a token showed SUPERSEDED and
+    two lines that contradicted each other — "you need a token" (true) above
+    "another tab is using it" (invented, there was no other tab).
+
+    One flag was carrying two meanings. "Do not redial" is the shared
+    decision; *why* is not, and the close handler was answering it with the
+    only reason it knew."""
+    js = _client_js()
+    # The unauthorized branch must not claim the superseded one's identity.
+    err = js[js.index("if (evt.code === 'unauthorized')"):]
+    err = err[:err.index("if (evt.code === 'superseded')")]
+    assert "standDown = true" in err
+    assert "superseded = true" not in err, \
+        "an auth failure is not another tab taking over"
+
+    # And the close handler decides what to say from the reason, not from
+    # the one message it happens to have.
+    close = js[js.index("if (standDown) {"):]
+    close = close[:close.index("\n    }")]
+    assert "why === 'superseded'" in close
+    assert "แท็บอื่นกำลังใช้งานอยู่" not in close, \
+        "the close handler must not invent a second, different explanation"
+
+
+# ============ the kiosk skin ============
+
+
+def test_the_kiosk_is_the_same_page_not_a_second_client():
+    """The mock has a microphone button, and that settles where this lives:
+    a screen that listens is not a display. `/display` is receive-only on
+    purpose ("keeps a screen in the lobby from being able to drive the
+    robot"), so the robot's own panel has to be the conversation page
+    wearing a different skin — one client, one state machine."""
+    js = _client_js()
+    assert "kiosk') === '1'" in js
+    # The big button must not be a second implementation of hang-up/start.
+    mic = js[js.index("$('kMic').onclick"):]
+    mic = mic[:mic.index(";") + 1]
+    assert "$('endBtn').click()" in mic, \
+        "one implementation of the call decision, not two that drift"
+
+
+def test_the_kiosk_orb_reads_the_same_state_word_as_everything_else():
+    """Two clocks for one thing is this project's most repeated bug. An orb
+    with its own copy of the rules is that bug in miniature — it would sit
+    calm while the line above it said SPEAKING."""
+    js = _client_js()
+    body = js[js.index("function setState(s)"):]
+    body = body[:body.index("\n}\n")]
+    assert "$('kOrb')" in body, "the kiosk orb belongs inside setState"
+
+
+def test_the_public_screen_shows_finished_actions_not_what_it_heard():
+    """The chip in the mock reads "เปิดห้อง A801". Sourced from the tool
+    result, never from the transcript: a mishearing quoted in public makes a
+    working robot look broken, and Emma reads phone numbers back aloud to
+    confirm them. Failures stay off it too — a guest reading "ส่งสัญญาณไม่
+    สำเร็จ" learns only that the machine is broken."""
+    js = _client_js()
+    chip = js[js.index("if (r.ok !== false"):]
+    chip = chip[:chip.index("\n")]
+    assert "kioskAction(label)" in chip
+    assert "r.hardware !== 'failed'" in chip
+
+    # And the guest's own words never reach it.
+    append = js[js.index("function appendText(role, text)"):]
+    append = append[:append.index("\nfunction finalizeTurn")]
+    assert "role === 'bot'" in append.split("kioskSay", 1)[0][-40:], \
+        "only Emma's side goes on the public line"
+
+
+def test_the_kiosk_clears_itself_when_the_visit_ends():
+    """A finished visit must not leave its last instruction on a screen the
+    next person walks up to — the same rule the robot screen and the
+    transcript keep, on the one surface where nobody is watching."""
+    js = _client_js()
+    body = js[js.index("function setState(s)"):]
+    body = body[:body.index("\n}\n")]
+    assert "s === 'sleep'" in body and "kioskAction('')" in body
+
+
+def test_the_home_button_cannot_touch_the_conversation():
+    """It is reachable by anyone walking past a robot in a sales gallery.
+    Clearing the stage is a local act; ending someone's conversation is not,
+    and a screen in a public room must not be able to do the second."""
+    js = _client_js()
+    home = js[js.index("$('kHome').onclick"):]
+    home = home[:home.index("\n};")]
+    for forbidden in ("ws.send", "ws.close", "startCall", "endBtn"):
+        assert forbidden not in home, f"the home button must not {forbidden}"
+
+
+def test_the_kiosk_cursor_is_hidden_by_idling_not_by_banning_it():
+    """`cursor: none` on a kiosk buys nothing on the panel it was written
+    for — a touch screen has no pointer — and costs everything on the desk
+    it is developed on: the mouse vanished and the mic button could not be
+    aimed at. Hidden after the mouse stops, back the moment it moves."""
+    for js in (_client_js(), _display_js()):
+        assert "body.idlecursor" in js
+        assert "body.kiosk { background" not in js or "cursor: none;\n               overflow" not in js
+        assert "mousemove" in js, "the cursor has to be able to come back"
+
+
+def test_the_stage_stands_in_for_the_transcript_not_beside_it():
+    """The owner, looking at the chat page: "อยากให้มีจอแทนกล่องข้อความนี้".
+    When something is on screen that is what the person is looking at, and a
+    message box competing for the same eyes is noise."""
+    js = _client_js()
+    assert "stage-only" in js
+    # The transcript goes; the three buttons stay. Hiding the whole column
+    # would take Mute/Copy/End with it, and a call you cannot end without
+    # first closing a video is worse than the screen this replaced.
+    assert "#callScreen.stage-only .convo { display: none; }" in js
+    assert ".stage-only .col-chat { display: none" not in js
+
+    # Layout rules alone pass with the wiring deleted — checked, it did. The
+    # tool result is what actually puts something on the stage.
+    res = js[js.index("case 'tool_result': {"):]
+    res = res[:res.index(chr(10) + "    }")]
+    assert "showFrame(r.embed)" in res, "the result must reach the stage"
+    assert "function showFrame(url)" in js
+
+
+def test_a_hidden_frame_is_emptied_not_just_hidden():
+    """An iframe left loaded keeps playing. A video still talking behind a
+    hidden panel is this project's oldest bug — sound with no visible cause
+    — with the added insult that nothing on screen explains it."""
+    js = _client_js()
+    clear = js[js.index("function clearFrame()"):]
+    clear = clear[:clear.index("\n}")]
+    assert "removeAttribute('src')" in clear
+
+    # And a slide arriving over a video has to stop it, not cover it.
+    show = js[js.index("function showStage(slide, displays)"):]
+    show = show[:show.index("\n  // Say it once per call")]
+    assert "removeAttribute('src')" in show
+
+
+def test_the_microphone_is_released_before_any_close_branch():
+    """Three times now the fix has been put somewhere a branch could return
+    before reaching it.
+
+    First it lived only in startCall(), so every *exit* leaked. Then it moved
+    into goToSleep(), which covered the idle and go_away exits and missed the
+    two that `return` early — superseded and unauthorized. A tab that lost
+    the robot to another tab kept holding the microphone for ever, and the
+    tab that won got digital silence from Windows: peak=0.0000 on the
+    standby socket and "no guest speech for 123s" on the call, at the same
+    time, on a desktop with several tabs open.
+
+    So it goes ahead of every branch, and this test says so structurally
+    rather than trusting the next branch to remember."""
+    js = _client_js()
+    body = js[js.index("ws.onclose = () => {"):]
+    body = body[:body.index("\n  };")]
+    stmts = [ln.strip() for ln in body.splitlines()
+             if ln.strip() and not ln.strip().startswith("//")]
+    release = next(i for i, ln in enumerate(stmts) if "releaseCallHardware()" in ln)
+    first_return = next((i for i, ln in enumerate(stmts) if ln.startswith("return")), len(stmts))
+    assert release < first_return, \
+        "a branch can return before the microphone is handed back"
+    first_branch = next((i for i, ln in enumerate(stmts) if ln.startswith("if (")), len(stmts))
+    assert release < first_branch, \
+        "release belongs ahead of the branches, not inside one of them"
+
+
+def test_a_closed_stage_can_be_reopened_from_the_line_that_announced_it():
+    """Closing the stage used to be one-way: the video was gone and the only
+    route back was asking again, which spends a whole turn and an API call to
+    reach something the page already knows the address of."""
+    js = _client_js()
+    body = js[js.index("function systemLine(text, reopen)"):]
+    body = body[:body.index("\n}")]
+    assert "แตะเพื่อเปิดบนจอ" in body, "say that it is tappable"
+    assert "showFrame(reopen.embed)" in body and "showUnit(reopen.unit)" in body
+
+    # And the tool result has to hand it the address.
+    res = js[js.index("case 'tool_result': {"):]
+    res = res[:res.index(chr(10) + "    }")]
+    assert "systemLine(line, r.embed" in res
+
+
+def test_sleeping_clears_the_stage_not_just_the_transcript():
+    """The server wipes its own state between guests (slides on handover,
+    the ROI sheet on session start) — and the screen kept showing the last
+    guest's unit card, plan or ROI numbers to whoever walked up next. The
+    transcript already had this rule; a picture of what you asked about is
+    the same disclosure without the words."""
+    js = _client_js()
+    body = js[js.index("function goToSleep("):js.index(chr(10) + "function scheduleTranscriptWipe")]
+    stmts = [ln.strip() for ln in body.splitlines()
+             if ln.strip() and not ln.strip().startswith("//")]
+    assert "clearFrame();" in stmts, "sleep must clear the stage"
+
+    down = js[js.index("if (standDown) {"):]
+    down = down[:down.index(chr(10) + "    }")]
+    assert "clearFrame()" in down, "a dormant (superseded) tab too"

@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8" />
-<title>Condo Voice Assistant</title>
+<title>Emma — Embassy AI Concierge</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <!-- Inline so the browser never issues a /favicon.ico request (which would
      otherwise 404 on every page load and clutter the server log). -->
@@ -146,8 +146,453 @@
   #pickerScreen.standby .btn { display: none; }
   #pickerScreen.standby .note { font-size: 1.05rem; }
   #pickerScreen.standby .orb { animation: breathe 4s ease-in-out infinite; }
+  /* Sleeping is a state of the conversation screen, not a screen of its
+     own. The orb keeps breathing so "waiting for the name" never reads as
+     "switched off", and the level bar under it keeps moving — that bar is
+     the only honest answer to "is the microphone hearing me at all", and
+     the old standby screen was the one place in the app that hid it. */
+  .orb.sleep { animation: breathe 4s ease-in-out infinite; }
+  /* Faded, not hidden: the conversation that just happened is still worth
+     reading, and the fade is what says it is over. */
+  .convo.slept { opacity: .5; }
+  .convo-divider { text-align: center; font-size: .75rem; color: #999;
+                   margin: .9rem 0 .4rem; letter-spacing: .04em; }
   @keyframes breathe { 0%,100% { transform: scale(1); opacity: .85; }
                        50% { transform: scale(1.06); opacity: 1; } }
+
+  /* ==================== kiosk skin (?kiosk=1) ====================
+     The robot's own screen: 18.5" portrait, read standing, one to two
+     metres away, by someone who has never seen it before. Everything is
+     bigger, darker and calmer than the laptop page it shares markup with.
+
+     Scoped entirely under `body.kiosk`, and the laptop page keeps the exact
+     rules it had — the two live in one file because they are one client
+     (the screen has the microphone, so it cannot be a passive display), not
+     because their styling is similar.
+
+     Sized in vmin/vh rather than px so the panel arriving in the other
+     orientation, or at some other resolution, does not need a code change.
+     Colours are a first pass at the mock: dark ground, gold accent. */
+  body.kiosk { background: #0a0e17; color: #f3ede1; padding: 0;
+               overflow: hidden; }
+  /* Hidden only once the mouse has stopped, never outright. A touch panel
+     has no cursor to begin with, so `cursor: none` bought nothing there and
+     cost everything on the desk it is developed on: the pointer vanished
+     and the mic button could not be aimed at. */
+  body.idlecursor, body.idlecursor * { cursor: none; }
+  body.kiosk #callScreen { max-width: none; width: 100vw; height: 100vh;
+                           display: grid; gap: 0; padding: 0;
+                           grid-template-rows: auto auto 1fr auto; }
+  body.kiosk #pickerScreen { display: none !important; }
+  /* The laptop furniture has no place here: the state word, the level bar,
+     the transcript column and the three buttons are all operator tools. */
+  body.kiosk .callbar, body.kiosk .col-chat { display: none; }
+  body.kiosk .split { display: block; min-height: 0; }
+
+  .kHead, .kHero, .kFoot { display: none; }
+  body.kiosk .kHead, body.kiosk .kHero, body.kiosk .kFoot { display: flex; }
+
+  .kHead { align-items: flex-start; justify-content: space-between;
+           padding: 3.5vmin 4vmin 0; }
+  .kBrand { font-size: 3.4vmin; font-weight: 600; letter-spacing: .18em;
+            color: #e8d9b5; line-height: 1.1; }
+  .kBrand small { display: block; font-size: .34em; letter-spacing: .28em;
+                  color: #8a8069; margin-top: .7vmin; font-weight: 400; }
+  .kStatus { display: flex; align-items: center; gap: 1.6vmin;
+             font-size: 2.4vmin; color: #cfc4ab; }
+  .kStatus i { width: 1.4vmin; height: 1.4vmin; border-radius: 50%;
+               background: #3f4756; transition: background .3s; }
+  body.kiosk.live .kStatus i { background: #35c46a; box-shadow: 0 0 1.6vmin #35c46a88; }
+  .kStatus b { font-variant-numeric: tabular-nums; font-weight: 600;
+               color: #f3ede1; margin-left: .8vmin; }
+
+  .kHero { flex-direction: column; align-items: center; gap: 1.4vmin;
+           padding: 2vmin 5vmin 0; text-align: center; }
+  .kOrbWrap { position: relative; display: flex; align-items: center;
+              justify-content: center; }
+  #kOrb { width: 22vmin; height: 22vmin;
+          --c1: #fdfbf4; --c2: #c9a96a;
+          box-shadow: 0 0 9vmin rgba(201,169,106,.42),
+                      0 0 22vmin rgba(201,169,106,.16); }
+  .kName { font-size: 5.2vmin; font-weight: 600; letter-spacing: .16em;
+           color: #f0e4c8; line-height: 1.15; }
+  .kName small { display: block; font-size: .34em; letter-spacing: .06em;
+                 color: #9a8f77; }
+  .kChip { min-height: 0; font-size: 2.7vmin; color: #f0e4c8;
+           border: 1px solid rgba(201,169,106,.55); border-radius: 99px;
+           padding: 1.3vmin 4vmin; margin-top: 1vmin;
+           background: rgba(201,169,106,.09); opacity: 0;
+           transition: opacity .35s ease; }
+  .kChip.on { opacity: 1; }
+  .kChip:empty { display: none; }
+  /* Emma's own words, already paced against the audio clock by the server
+     for the robot screen — here they are paced by the browser that is doing
+     the speaking, which knows even better. */
+  .kSay { font-size: 2.9vmin; line-height: 1.5; color: #d8cdb4;
+          max-width: 84vw; min-height: 4.4em; margin-top: 1vmin;
+          display: -webkit-box; -webkit-box-orient: vertical;
+          -webkit-line-clamp: 3; overflow: hidden; }
+
+  /* The stage is the card in the middle of the mock. Empty it collapses,
+     rather than leaving a grey rectangle where a room ought to be. */
+  body.kiosk .stage { display: none; margin: 2vmin 4vmin;
+                      border-radius: 3vmin; background: #10151f;
+                      border: 1px solid rgba(201,169,106,.22); }
+  body.kiosk .stage.on { display: flex; }
+  body.kiosk .stage-bar { background: rgba(0,0,0,.55); font-size: 2.4vmin;
+                          padding: 1.6vmin 2.6vmin; }
+  body.kiosk .stage-open { display: none; }
+
+  .kFoot { align-items: center; justify-content: center; position: relative;
+           padding: 3vmin 6vmin calc(7vmin + env(safe-area-inset-bottom, 0px)); }
+  .kBtn { position: absolute; left: 7vmin; width: 11vmin; height: 11vmin;
+          border-radius: 50%; border: 1px solid rgba(201,169,106,.35);
+          background: rgba(255,255,255,.03); color: #e8d9b5;
+          font-size: 5vmin; line-height: 1; cursor: pointer; }
+  .kMic { width: 17vmin; height: 17vmin; border-radius: 50%; border: none;
+          cursor: pointer; background: radial-gradient(circle at 34% 30%,
+          #f6ecd2 0%, #c9a96a 72%); box-shadow: 0 0 6vmin rgba(201,169,106,.4);
+          display: flex; align-items: center; justify-content: center; }
+  /* A microphone drawn in CSS: no icon font to load, no image to 404. */
+  .kMic span { display: block; width: 4vmin; height: 7vmin; border-radius: 2vmin;
+               background: #2a2113; position: relative; }
+  .kMic span::after { content: ''; position: absolute; left: 50%; bottom: -3.2vmin;
+                      transform: translateX(-50%); width: 7vmin; height: 3.4vmin;
+                      border: .8vmin solid #2a2113; border-top: none;
+                      border-radius: 0 0 4vmin 4vmin; }
+  body.kiosk.live .kMic { animation: micpulse 2.6s ease-in-out infinite; }
+  @keyframes micpulse { 0%,100% { box-shadow: 0 0 6vmin rgba(201,169,106,.40) }
+                        50%     { box-shadow: 0 0 11vmin rgba(201,169,106,.72) } }
+  .kHint { position: absolute; bottom: calc(2vmin + env(safe-area-inset-bottom, 0px));
+           font-size: 2.2vmin; color: #8a8069; letter-spacing: .06em; }
+
+  /* Landscape: the same screen on a desk monitor or a panel mounted the
+     usual way round. Decided by shape, never by user agent — the Android
+     shell may report orientation differently once the robot arrives. */
+  @media (min-aspect-ratio: 1/1) {
+    body.kiosk #callScreen { grid-template-rows: auto auto 1fr auto; }
+    #kOrb { width: 13vmin; height: 13vmin; }
+    .kName { font-size: 3.6vmin; }
+    .kSay { font-size: 2.2vmin; min-height: 3.2em; -webkit-line-clamp: 2; }
+    .kMic { width: 11vmin; height: 11vmin; }
+    .kMic span { width: 2.6vmin; height: 4.6vmin; }
+    .kMic span::after { width: 4.6vmin; height: 2.2vmin; bottom: -2.1vmin;
+                        border-width: .55vmin; }
+  }
+
+  /* The stage stands in for the transcript rather than sitting beside it:
+     when something is on screen, that is what the person is looking at, and
+     a message box next to it is just noise competing for the same eyes. The
+     conversation is still there — it comes back the moment the stage
+     clears, and nothing in it is lost meanwhile. */
+  #stageFrame { display: none; width: 100%; height: 100%; border: 0; }
+  .stage.framed .stage-img-wrap { display: none; }
+  .stage.framed #stageFrame { display: block; }
+  .stage-close { position: absolute; top: .5rem; left: .5rem; z-index: 2;
+                 width: 2rem; height: 2rem; border-radius: 50%; border: none;
+                 background: rgba(0,0,0,.6); color: #fff; font-size: 1.2rem;
+                 line-height: 1; cursor: pointer; }
+  .stage-close:hover { background: rgba(0,0,0,.85); }
+  /* Stack, don't hide the column: the transcript goes, the three buttons
+     stay. Hiding the whole column would take Mute/Copy/End with it, and a
+     call you cannot end without first closing a video is a worse screen
+     than the one this replaced. */
+  body:not(.kiosk) #callScreen.stage-only .split { flex-direction: column; }
+  body:not(.kiosk) #callScreen.stage-only .col-chat { flex: 0 0 auto; order: 2; }
+  body:not(.kiosk) #callScreen.stage-only .convo { display: none; }
+  body:not(.kiosk) #callScreen.stage-only .stage.on { order: 1; flex: 1 1 auto;
+                                                      max-height: none; }
+
+  /* ---------------- the unit card ----------------
+     Our own HTML in the stage, instead of somebody else's website: same
+     origin so it always renders, our design so it reads standing two metres
+     away, and no keyboard needed to use it.
+
+     Every empty slot is labelled with what is missing rather than hidden.
+     The card is going in front of the sales team, and a blank that says
+     "ภาพห้อง — รอจากฝ่ายขาย" asks for the spreadsheet more clearly than any
+     email has. */
+  #unitCard { display: none; position: absolute; inset: 0; overflow-y: auto;
+              background: #0a0e17; color: #f3ede1; padding: 2.4vmin; }
+  .stage.unit #unitCard { display: block; }
+  .stage.unit .stage-img-wrap, .stage.unit #stageFrame,
+  .stage.unit .stage-bar { display: none; }
+
+  /* Impossible to mistake for the real thing, and it travels with the card
+     rather than being said once at the start of the conversation. */
+  .uSample { background: #6d4b12; color: #ffe9b8; border: 1px solid #b98c2e;
+             border-radius: .6rem; padding: .55rem .9rem; font-size: .82rem;
+             line-height: 1.45; margin-bottom: 1rem; }
+  .uSample b { color: #fff3d4; }
+
+  .uTop { display: flex; gap: 1rem; align-items: stretch; }
+  .uShot, .uPlan { flex: 1 1 0; min-height: 26vh; border-radius: 1rem;
+                   border: 1px dashed rgba(201,169,106,.42);
+                   background: rgba(255,255,255,.03); display: flex;
+                   align-items: center; justify-content: center; text-align: center;
+                   color: #8a8069; font-size: .82rem; padding: 1rem; }
+  .uPlan { flex: 0 0 34%; }
+  .uShot img, .uPlan img { max-width: 100%; max-height: 100%; object-fit: contain;
+                           border-radius: .8rem; }
+
+  .uBadge { display: inline-flex; align-items: center; gap: .45rem;
+            font-size: .82rem; padding: .3rem .8rem; border-radius: 99px;
+            background: rgba(255,255,255,.07); margin-bottom: .8rem; }
+  .uBadge i { width: .55rem; height: .55rem; border-radius: 50%;
+              background: #6b7280; font-style: normal; }
+  .uBadge.available i { background: #35c46a; }
+  .uBadge.reserved i { background: #e0a33a; }
+  .uBadge.sold i { background: #c0555a; }
+
+  .uRoom { font-size: 2.6rem; font-weight: 700; letter-spacing: .02em;
+           color: #f0e4c8; line-height: 1.1; margin-top: 1.1rem; }
+  .uMeta { color: #a99f89; font-size: .95rem; margin-top: .35rem; }
+  .uRule { border: none; border-top: 1px solid rgba(201,169,106,.22);
+           margin: 1rem 0; }
+  .uPrice { font-size: 1.15rem; color: #cfc4ab; }
+  .uPrice b { font-size: 2.1rem; color: #e8c87a; font-weight: 700;
+              margin: 0 .35rem; }
+  .uPrice .missing { font-size: 1rem; color: #b98c2e; font-weight: 600; }
+  .uWho { margin-top: .8rem; font-size: .78rem; color: #7c7364; }
+
+  @media (min-aspect-ratio: 3/2) {
+    .uRoom { font-size: 2rem; }
+    .uPrice b { font-size: 1.6rem; }
+    .uShot, .uPlan { min-height: 20vh; }
+  }
+
+  /* ================= operator display refresh =================
+     The laptop is a working console, not the robot's face. Keep every
+     existing control and event target, but give the content the width and
+     hierarchy of a presentation desk instead of a narrow mobile mockup. */
+  :root {
+    --ink: #172033;
+    --muted: #6f7682;
+    --paper: #f7f4ed;
+    --panel: rgba(255,255,255,.88);
+    --line: rgba(23,32,51,.12);
+    --navy: #101b31;
+    --gold: #b5975f;
+    --gold-soft: #e9ddc3;
+    --shadow: 0 24px 70px rgba(28,35,49,.10);
+  }
+  body:not(.kiosk) {
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 9% 8%, rgba(181,151,95,.10), transparent 29rem),
+      linear-gradient(135deg, #fbfaf7 0%, var(--paper) 58%, #f0ede6 100%);
+    padding: clamp(1rem, 2.5vw, 2.5rem);
+  }
+  body:not(.kiosk)::before {
+    content: 'EMBASSY  /  AI CONCIERGE';
+    position: fixed; top: 1.3rem; left: clamp(1.3rem, 3vw, 3.5rem);
+    color: #8f7951; font-size: .69rem; font-weight: 700;
+    letter-spacing: .2em; z-index: 0;
+  }
+  body:not(.kiosk) .screen { position: relative; z-index: 1; }
+  body:not(.kiosk) #pickerScreen {
+    max-width: 540px; padding: clamp(2rem, 5vw, 4rem);
+    border: 1px solid rgba(181,151,95,.20); border-radius: 32px;
+    background: var(--panel); box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+  }
+  body:not(.kiosk) #pickerScreen h1 {
+    font-family: Georgia, 'Times New Roman', serif; font-weight: 500;
+    font-size: clamp(2rem, 4vw, 3.2rem); color: var(--navy);
+  }
+  body:not(.kiosk) #pickOrb {
+    width: clamp(150px, 28vw, 210px); height: clamp(150px, 28vw, 210px);
+    box-shadow: 0 24px 55px color-mix(in srgb, var(--c2) 24%, transparent),
+                inset 0 1px 1px rgba(255,255,255,.75);
+  }
+  body:not(.kiosk) .btn {
+    min-height: 48px; border-radius: 12px; background: var(--navy);
+    letter-spacing: .02em; transition: transform .2s ease, background .2s ease,
+                                 border-color .2s ease;
+  }
+  body:not(.kiosk) .btn:hover:not(:disabled) { transform: translateY(-1px); background: #1b2945; }
+  body:not(.kiosk) .btn:focus-visible,
+  body:not(.kiosk) .arrow:focus-visible { outline: 3px solid rgba(181,151,95,.45); outline-offset: 3px; }
+  body:not(.kiosk) .btn.ghost {
+    color: var(--ink); background: rgba(255,255,255,.72); border-color: var(--line);
+  }
+  body:not(.kiosk) #callScreen {
+    width: min(100%, 920px); max-width: 920px;
+    height: min(880px, calc(100vh - clamp(3rem, 7vw, 6rem)));
+    min-height: 580px; padding: clamp(1rem, 2vw, 1.5rem);
+    border: 1px solid rgba(181,151,95,.20); border-radius: 28px;
+    background: var(--panel); box-shadow: var(--shadow);
+    backdrop-filter: blur(18px); transition: max-width .35s ease, width .35s ease;
+  }
+  body:not(.kiosk) #callScreen.with-slides { width: min(100%, 1580px); max-width: 1580px; }
+  body:not(.kiosk) .callbar {
+    min-height: 88px; gap: 1.15rem; padding: .25rem .35rem 1.2rem;
+    border-bottom: 1px solid var(--line); margin-bottom: 1rem;
+  }
+  body:not(.kiosk) #callOrb {
+    width: 64px; height: 64px;
+    box-shadow: 0 12px 28px rgba(27,111,224,.20), inset 0 1px 1px rgba(255,255,255,.7);
+  }
+  body:not(.kiosk) .state {
+    color: var(--navy); font-size: .76rem; letter-spacing: .17em;
+  }
+  body:not(.kiosk) .state::before {
+    content: ''; display: inline-block; width: 8px; height: 8px;
+    margin-right: .65rem; border-radius: 50%; background: #a4a9b1;
+    box-shadow: 0 0 0 5px rgba(164,169,177,.12);
+  }
+  body:not(.kiosk) .state.speaking::before { background: #326fcb; box-shadow: 0 0 0 5px rgba(50,111,203,.12); }
+  body:not(.kiosk) .state.hearing::before { background: #31885a; box-shadow: 0 0 0 5px rgba(49,136,90,.12); }
+  body:not(.kiosk) .level { height: 3px; max-width: 340px; background: rgba(23,32,51,.09); }
+  body:not(.kiosk) .level > div { background: linear-gradient(90deg, var(--gold), #6eac82); }
+  body:not(.kiosk) .split { gap: 1.25rem; }
+  body:not(.kiosk) .col-chat { flex-basis: 560px; }
+  body:not(.kiosk) #callScreen:not(.with-slides) .col-chat { flex: 1 1 auto; }
+  body:not(.kiosk) .convo {
+    gap: 1rem; padding: clamp(1.1rem, 2vw, 1.65rem);
+    border-color: var(--line); border-radius: 18px;
+    background: rgba(249,248,244,.75); scrollbar-color: #c9bea9 transparent;
+  }
+  body:not(.kiosk) .convo:empty::after {
+    content: 'พร้อมรับฟัง  ·  เริ่มพูดได้เลย'; color: #9a958b;
+    font-family: Georgia, 'Times New Roman', serif; font-size: 1rem;
+    letter-spacing: .03em;
+  }
+  body:not(.kiosk) .turn { max-width: min(86%, 44rem); }
+  body:not(.kiosk) .who { color: #96886d; font-size: .64rem; letter-spacing: .16em; }
+  body:not(.kiosk) .bubble {
+    padding: .78rem 1rem; border-radius: 15px; font-size: .96rem;
+    line-height: 1.65; box-shadow: 0 5px 18px rgba(22,29,43,.045);
+  }
+  body:not(.kiosk) .turn.bot .bubble {
+    color: var(--ink); background: #fff; border: 1px solid rgba(181,151,95,.18);
+  }
+  body:not(.kiosk) .turn.user .bubble {
+    background: var(--navy); color: #fff; box-shadow: 0 8px 24px rgba(16,27,49,.13);
+  }
+  body:not(.kiosk) .controls { padding-top: .85rem; }
+  body:not(.kiosk) .stage {
+    border-radius: 18px; border: 1px solid rgba(181,151,95,.24);
+    background: #0b101a; box-shadow: 0 14px 38px rgba(12,18,29,.14);
+  }
+  body:not(.kiosk) .stage-bar {
+    padding: .7rem 1rem; background: rgba(10,15,25,.94); color: #f3ecdc;
+  }
+  body:not(.kiosk) .stage-open,
+  body:not(.kiosk) .stage-close { backdrop-filter: blur(8px); }
+  @media (max-width: 900px) {
+    body:not(.kiosk) { padding: 3rem .75rem .75rem; }
+    body:not(.kiosk) #callScreen { width: 100%; min-height: 0; height: calc(100dvh - 3.75rem); border-radius: 20px; }
+    body:not(.kiosk) .col-chat { flex-basis: auto; }
+    body:not(.kiosk) .callbar { min-height: 76px; }
+    body:not(.kiosk) #callOrb { width: 54px; height: 54px; }
+  }
+  @media (max-width: 520px) {
+    body:not(.kiosk)::before { top: .8rem; left: 1rem; font-size: .58rem; }
+    body:not(.kiosk) #callScreen { padding: .75rem; }
+    body:not(.kiosk) .bubble { font-size: .92rem; }
+    body:not(.kiosk) .controls .btn { padding-inline: .7rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important;
+                            animation-iteration-count: 1 !important;
+                            transition-duration: .01ms !important; }
+  }
+
+  /* Unit detail is a sales sheet, not a dark developer canvas. On a wide
+     operator screen the imagery and facts sit side-by-side, using the full
+     stage height; on a narrow screen they return to one readable column. */
+  body:not(.kiosk) #unitCard.unit-detail {
+    display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(330px, .65fr);
+    grid-template-rows: auto auto auto auto 1px auto 1fr;
+    column-gap: clamp(1.5rem, 3vw, 3.25rem); row-gap: .65rem;
+    padding: clamp(1.4rem, 2.8vw, 2.8rem);
+    background: linear-gradient(135deg, #faf8f3, #f1ede4);
+    color: var(--ink);
+  }
+  body:not(.kiosk) .unit-detail .uSample {
+    grid-column: 1 / -1; margin: 0 0 .45rem; padding: .62rem .9rem;
+    border: 0; border-left: 3px solid #b8862f; border-radius: 4px;
+    color: #74581f; background: #f4ead3; font-size: .75rem;
+  }
+  body:not(.kiosk) .unit-detail .uSample b { color: #584214; }
+  body:not(.kiosk) .unit-detail .uTop {
+    grid-column: 1; grid-row: 2 / 8; min-height: 0; height: 100%;
+    flex-direction: column; gap: .85rem;
+  }
+  body:not(.kiosk) .unit-detail .uShot,
+  body:not(.kiosk) .unit-detail .uPlan {
+    position: relative; min-height: 0; overflow: hidden; padding: 1.25rem;
+    border: 1px solid rgba(23,32,51,.10); border-radius: 14px;
+    background: linear-gradient(145deg, #eae6dd, #f7f4ed);
+    color: #887c68; font-size: .8rem; letter-spacing: .04em;
+  }
+  body:not(.kiosk) .unit-detail .uShot { flex: 1 1 auto; }
+  body:not(.kiosk) .unit-detail .uPlan { flex: 0 0 34%; }
+  body:not(.kiosk) .unit-detail .uShot:has(> div)::before,
+  body:not(.kiosk) .unit-detail .uPlan:has(> div)::before {
+    content: ''; position: absolute; inset: 16%; opacity: .28;
+    background: linear-gradient(90deg, transparent 49.5%, #9f8d6d 50%, transparent 50.5%),
+                linear-gradient(transparent 49.5%, #9f8d6d 50%, transparent 50.5%);
+    border: 1px solid #9f8d6d; border-radius: 3px;
+  }
+  body:not(.kiosk) .unit-detail .uShot > div,
+  body:not(.kiosk) .unit-detail .uPlan > div {
+    position: relative; z-index: 1; padding: .5rem .75rem; border-radius: 999px;
+    background: rgba(250,248,243,.88); box-shadow: 0 4px 18px rgba(23,32,51,.07);
+  }
+  body:not(.kiosk) .unit-detail .uShot img,
+  body:not(.kiosk) .unit-detail .uPlan img {
+    width: 100%; height: 100%; object-fit: contain; border-radius: 8px;
+  }
+  body:not(.kiosk) .unit-detail .uBadge {
+    grid-column: 2; grid-row: 2; justify-self: start; margin: 0 !important;
+    color: #8f343a; background: #f5e5e5; border: 1px solid #e8c8ca;
+    font-size: .74rem; font-weight: 700; letter-spacing: .06em;
+  }
+  body:not(.kiosk) .unit-detail .uBadge.available { color: #276542; background: #e6f1e9; border-color: #c6ddcd; }
+  body:not(.kiosk) .unit-detail .uBadge.reserved { color: #80601f; background: #f6edda; border-color: #ead8b4; }
+  body:not(.kiosk) .unit-detail .uRoom {
+    grid-column: 2; grid-row: 3; margin: .7rem 0 0;
+    color: var(--navy); font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(2.3rem, 4vw, 4.2rem); font-weight: 500; letter-spacing: -.025em;
+  }
+  body:not(.kiosk) .unit-detail .uMeta {
+    grid-column: 2; grid-row: 4; color: #6e706f; font-size: .95rem; line-height: 1.65;
+  }
+  body:not(.kiosk) .unit-detail .uRule {
+    grid-column: 2; grid-row: 5; width: 100%; margin: .65rem 0;
+    border-color: rgba(23,32,51,.12);
+  }
+  body:not(.kiosk) .unit-detail .uPrice {
+    grid-column: 2; grid-row: 6; align-self: start;
+    color: #6b6458; font-size: .9rem; line-height: 1.35;
+  }
+  body:not(.kiosk) .unit-detail .uPrice::before {
+    content: 'PRICE'; display: block; margin-bottom: .55rem; color: #9b8255;
+    font-size: .65rem; font-weight: 700; letter-spacing: .18em;
+  }
+  body:not(.kiosk) .unit-detail .uPrice b {
+    display: block !important; margin: .15rem 0; color: #a77d31;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(2rem, 3.4vw, 3.35rem); font-weight: 500;
+  }
+  body:not(.kiosk) .unit-detail .uPrice .missing {
+    color: #9b762e; font-size: 1rem; font-weight: 600;
+  }
+  body:not(.kiosk) .unit-detail .uWho {
+    grid-column: 2; grid-row: 7; align-self: end; padding-top: 1rem;
+    color: #8a877f; border-top: 1px solid rgba(23,32,51,.10);
+    font-size: .72rem; line-height: 1.55;
+  }
+  @media (max-width: 900px) {
+    body:not(.kiosk) #unitCard.unit-detail { display: block; overflow-y: auto; }
+    body:not(.kiosk) .unit-detail .uTop { height: auto; margin: 1rem 0 1.25rem; }
+    body:not(.kiosk) .unit-detail .uShot { min-height: 30vh; }
+    body:not(.kiosk) .unit-detail .uPlan { min-height: 22vh; }
+    body:not(.kiosk) .unit-detail .uRoom { margin-top: 1rem; }
+    body:not(.kiosk) .unit-detail .uWho { margin-top: 1.5rem; }
+  }
 </style>
 </head>
 <body>
@@ -169,6 +614,25 @@
 </section>
 
 <section class="screen" id="callScreen">
+  <!-- Kiosk chrome. Present in the DOM always, shown only under body.kiosk,
+       so the laptop page it grew out of keeps exactly the markup it had. -->
+  <div class="kHead">
+    <div class="kBrand">EMBASSY<small>CONDOMINIUM · PATTAYA</small></div>
+    <div class="kStatus"><i id="kDot"></i><span id="kOnline">ออนไลน์</span>
+      <b id="kClock">--:--</b></div>
+  </div>
+
+  <div class="kHero">
+    <div class="kOrbWrap"><div class="orb" id="kOrb"></div></div>
+    <div class="kName">EMMA<small id="kRole">Embassy AI Concierge</small></div>
+    <!-- What Emma just *did*, taken from the tool result rather than from
+         what the microphone thought it heard. A public screen quoting a
+         mishearing makes a working robot look broken; a public screen
+         naming a completed action cannot. -->
+    <div class="kChip" id="kChip"></div>
+    <div class="kSay" id="kSay"></div>
+  </div>
+
   <div class="callbar">
     <div class="orb" id="callOrb"></div>
     <div class="meta">
@@ -190,6 +654,14 @@
 
     <div class="stage" id="stage">
       <div class="stage-img-wrap"><img id="stageImg" alt="" /></div>
+      <!-- Framed content lives in its own layer rather than replacing the
+           image: a slide and a video are different things and swapping the
+           element each time loses whichever one was already loaded. -->
+      <iframe id="stageFrame" allow="autoplay; encrypted-media; picture-in-picture"
+              referrerpolicy="strict-origin-when-cross-origin"
+              sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+      <button class="stage-close" id="stageClose" title="ปิดจอ">&times;</button>
+      <div id="unitCard"></div>
       <div class="stage-bar">
         <span id="stageTitle"></span>
         <span id="stagePos"></span>
@@ -197,6 +669,12 @@
       <a class="stage-open" id="openDisplay" href="/display" target="_blank"
          title="Open the fullscreen display">เปิดจอเต็ม ↗</a>
     </div>
+  </div>
+
+  <div class="kFoot">
+    <button class="kBtn" id="kHome" title="กลับหน้าหลัก">&#8962;</button>
+    <button class="kMic" id="kMic"><span></span></button>
+    <div class="kHint" id="kHint">แตะเพื่อพูด</div>
   </div>
 </section>
 
@@ -236,6 +714,63 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !$('startBtn').disabled) startCall();
 });
 
+// The voice carousel is no longer a step anyone walks through — a kiosk
+// picks its voice from .env (or ?voice=) and never asks. The screen is kept
+// behind ?picker=1 rather than deleted, because "let me hear the other
+// voices" is a real thing to want once, on a laptop, before deciding.
+const wantsPicker = new URLSearchParams(location.search).get('picker') === '1';
+
+// ---------------- kiosk skin ----------------
+// ?kiosk=1 dresses this same page as the robot's screen. Explicit rather
+// than guessed from the window shape: a laptop window dragged tall is not a
+// robot, and a page that redecorates itself while someone is working in it
+// is worse than one that needs a flag. Inside kiosk mode the *layout* then
+// does follow the shape (see the aspect-ratio block in the stylesheet),
+// because that part really is about the panel.
+const kioskMode = new URLSearchParams(location.search).get('kiosk') === '1';
+if (kioskMode) {
+  document.body.classList.add('kiosk');
+  setInterval(kioskClock, 10000);
+  kioskClock();
+  armIdleCursor();
+}
+
+//: Kiosk screens should not show a pointer, but "should not show" is not
+//: "must never exist": on the machine this is built on, hiding it outright
+//: means the mic button cannot be aimed at. Hide it when the mouse stops,
+//: bring it back the moment it moves. A touch panel simply never moves one.
+function armIdleCursor() {
+  let t = null;
+  const hide = () => document.body.classList.add('idlecursor');
+  const wake = () => {
+    document.body.classList.remove('idlecursor');
+    if (t) clearTimeout(t);
+    t = setTimeout(hide, 2500);
+  };
+  document.addEventListener('mousemove', wake);
+  document.addEventListener('pointerdown', wake);
+  wake();
+}
+
+function kioskClock() {
+  const d = new Date();
+  $('kClock').textContent =
+    String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+//: The action chip: what Emma just *did*. Cleared when the line sleeps so a
+//: finished visit does not leave its last instruction on a public screen.
+function kioskAction(text) {
+  if (!kioskMode) return;
+  $('kChip').textContent = text || '';
+  $('kChip').classList.toggle('on', Boolean(text));
+}
+
+function kioskSay(text) {
+  if (!kioskMode) return;
+  $('kSay').textContent = text || '';
+}
+
 Promise.all([
   fetch('/voices').then((r) => r.json()),
   fetch('/health').then((r) => r.json()),
@@ -262,12 +797,21 @@ Promise.all([
   $('startBtn').disabled = false;
   $('pickerNote').textContent = 'Speech-to-speech — you can interrupt at any time.';
   autoConnect = !!health.auto_connect;
+  if (typeof health.transcript_keep_min === 'number') {
+    transcriptKeepMin = health.transcript_keep_min;
+  }
   if (health.mic) { micBoost = health.mic.boost || 1; micNS = !!health.mic.noise_suppression; }
   wakeAvailable = !!(health.wake && health.wake.ready);
+  if (wantsPicker) return;    // ?picker=1 — stay on the voice carousel
   if (autoConnect) {
     startCall();              // no button, no name — straight in
-  } else if (wakeAvailable) {
-    startWakeMode();
+  } else {
+    // Everything else lands on the one screen, asleep. With a wake word it
+    // waits for the name; without one the same button that says End during
+    // a call says "เริ่มคุย" here, which is what the gallery's defaults
+    // (AUTO_CONNECT and WAKE_ENABLED both off) rely on to be usable at all.
+    goToSleep();
+    if (!wakeAvailable) sleepNote('กดปุ่ม "เริ่มคุย" ด้านล่างเพื่อเริ่มสนทนา');
   }
 }).catch(() => {
   $('setupErr').innerHTML = '<div class="err">Could not reach the server. Is uvicorn running?</div>';
@@ -346,11 +890,337 @@ function scheduleSlide(slide, displays) {
   else pendingSlideTimer = setTimeout(applyPendingSlide, queuedMs);
 }
 
+//: Render the unit card — our own HTML, built from data the server looked
+//: up. The model never sends values here; it sends a room number and the
+//: server answers from the sales team's own table (or, until that arrives,
+//: from a sample that says so on its face).
+function showUnit(u) {
+  const baht = (n) => Number(n).toLocaleString('th-TH');
+  const el = (t) => { const d = document.createElement('div'); d.textContent = t; return d; };
+  const card = $('unitCard');
+  card.textContent = '';
+  card.className = 'unit-detail';
+
+  if (u.sample) {
+    const warn = document.createElement('div');
+    warn.className = 'uSample';
+    warn.innerHTML = '<b>ตัวอย่างเท่านั้น — ยังไม่ใช่ข้อมูลจริง</b><br>' +
+      'ตัวเลขทุกตัวบนการ์ดนี้สมมติขึ้นเพื่อให้เห็นหน้าตาระบบ ' +
+      'รอตารางยูนิตจากฝ่ายขาย (พร้อมผู้อนุมัติราคาและวันที่ใช้ได้ถึง)';
+    card.appendChild(warn);
+  }
+
+  const top = document.createElement('div');
+  top.className = 'uTop';
+  const shot = document.createElement('div');
+  shot.className = 'uShot';
+  // A labelled blank, not a hidden one. This card is going in front of the
+  // sales team, and an empty slot that names what belongs in it asks for
+  // the spreadsheet more clearly than an email has managed to.
+  if (u.photo) { const i = new Image(); i.src = u.photo; shot.appendChild(i); }
+  else shot.appendChild(el('ภาพห้อง — รอจากฝ่ายขาย'));
+  const plan = document.createElement('div');
+  plan.className = 'uPlan';
+  if (u.floorplan) { const i = new Image(); i.src = u.floorplan; plan.appendChild(i); }
+  else plan.appendChild(el('แปลนรายยูนิต — รอจากฝ่ายขาย'));
+  top.append(shot, plan);
+  card.appendChild(top);
+
+  if (u.status_th) {
+    const b = document.createElement('div');
+    b.className = 'uBadge ' + (u.status || '');
+    b.innerHTML = '<i></i>';
+    b.appendChild(el(u.status_th));
+    b.style.marginTop = '1rem';
+    card.appendChild(b);
+  }
+
+  const room = el('ห้อง ' + (u.room || '—'));
+  room.className = 'uRoom';
+  const bits = [];
+  if (u.floor) bits.push('ชั้น ' + u.floor);
+  if (u.type) bits.push(u.type);
+  if (u.sqm) bits.push(u.sqm + ' ตร.ม.');
+  if (u.aspect) bits.push(u.aspect);
+  const meta = el(bits.join('  ·  '));
+  meta.className = 'uMeta';
+  card.append(room, meta);
+
+  const rule = document.createElement('hr');
+  rule.className = 'uRule';
+  card.appendChild(rule);
+
+  const price = document.createElement('div');
+  price.className = 'uPrice';
+  if (u.price_thb) {
+    // The pricelist's own structure: base_price is the list price,
+    // promo_price the selling price. Showing the gap is the sales pitch
+    // the spreadsheet already makes.
+    if (u.base_price_thb && u.base_price_thb > u.price_thb) {
+      const was = el('ราคาตั้ง ' + baht(u.base_price_thb) + ' บาท');
+      was.style.textDecoration = 'line-through';
+      was.style.opacity = '.55';
+      was.style.fontSize = '.85rem';
+      price.appendChild(was);
+    }
+    price.append(el('เริ่มต้น'), (() => {
+      const b = document.createElement('b'); b.textContent = baht(u.price_thb); return b;
+    })(), el('บาท'));
+    [...price.children].forEach((c) => (c.style.display = 'inline'));
+  } else {
+    // Two different absences. A sample table missing its column is a gap
+    // waiting for the spreadsheet; a live card without a price is the
+    // showroom's own policy — the number exists, and the sales desk is
+    // where it gets said.
+    const m = el(u.sample ? 'ราคา — รอจากฝ่ายขาย' : 'ราคา — สอบถามฝ่ายขาย');
+    m.className = 'missing';
+    price.appendChild(m);
+  }
+  card.appendChild(price);
+
+  const who = el(u.source === 'live'
+    ? ('ข้อมูลสดจากระบบผังขาย · อัปเดต ' + (u.updated_at || '—'))
+    : u.sample
+    ? 'ผู้อนุมัติราคา: — · ใช้ได้ถึง: —   (ช่องที่ต้องกรอกในตารางจริง)'
+    : ('ผู้อนุมัติราคา: ' + (u.approved_by || '—') +
+       ' · ใช้ได้ถึง: ' + (u.effective_from || '—')));
+  who.className = 'uWho';
+  card.appendChild(who);
+
+  const stage = $('stage');
+  if (stage.classList.contains('framed')) {
+    $('stageFrame').removeAttribute('src');
+    stage.classList.remove('framed');
+  }
+  stage.classList.add('on', 'unit');
+  $('callScreen').classList.add('with-slides', 'stage-only');
+}
+
+//: The ROI sheet — same container and same rule as the unit card: the
+//: server computed every figure, this end only paints them. The inputs are
+//: shown as prominently as the results on purpose: they are the guest's own
+//: spoken numbers, and seeing "50" appear when you said 15 is how a
+//: mishearing gets caught by the one person who can correct it.
+function showCalc(r) {
+  const baht = (n) => Number(n).toLocaleString('th-TH',
+    { maximumFractionDigits: Number.isInteger(n) ? 0 : 2 });
+  const card = $('unitCard');
+  card.textContent = '';
+  card.className = '';
+
+  const warn = document.createElement('div');
+  warn.className = 'uSample';
+  warn.innerHTML = '<b>คำนวณจากตัวเลขสมมติของลูกค้า</b><br>' +
+    'ไม่ใช่ตัวเลขหรือการรับประกันของโครงการ — ราคาและผลตอบแทนจริงสอบถามฝ่ายขาย';
+  card.appendChild(warn);
+
+  const title = document.createElement('div');
+  title.className = 'uRoom';
+  title.textContent = 'คำนวณผลตอบแทน';
+  card.appendChild(title);
+
+  const row = (label, value, big) => {
+    const d = document.createElement('div');
+    d.className = big ? 'uPrice' : 'uMeta';
+    d.style.display = 'flex';
+    d.style.justifyContent = 'space-between';
+    d.style.gap = '1rem';
+    const l = document.createElement('span'); l.textContent = label;
+    const v = document.createElement(big ? 'b' : 'span'); v.textContent = value;
+    d.append(l, v);
+    return d;
+  };
+
+  const inputs = r.inputs || {}, inLabels = r.input_labels || {};
+  for (const k of Object.keys(inLabels)) {
+    card.appendChild(row(inLabels[k], baht(inputs[k])));
+  }
+  card.appendChild(Object.assign(document.createElement('hr'), { className: 'uRule' }));
+  const results = r.results || {}, resLabels = r.result_labels || {};
+  for (const k of Object.keys(resLabels)) {
+    const pct = k.endsWith('_pct');
+    card.appendChild(row(resLabels[k], baht(results[k]) + (pct ? ' %' : ' บาท'),
+                         k === 'roi_pct' || k === 'annualized_pct'));
+  }
+
+  const stage = $('stage');
+  if (stage.classList.contains('framed')) {
+    $('stageFrame').removeAttribute('src');
+    stage.classList.remove('framed');
+  }
+  stage.classList.add('on', 'unit');
+  $('callScreen').classList.add('with-slides', 'stage-only');
+}
+
+//: The live floor plan: the sales system's own composite image with an SVG
+//: overlay colored by status. Coordinates are percent-of-image (the DB
+//: stores them that way), so one viewBox 0-100 with
+//: preserveAspectRatio="none" maps every unit without knowing the image's
+//: pixel size. Rotated rooms carry a `poly`; everything else is a rect.
+//: No prices anywhere on it — policy — and available stays transparent so
+//: the plan's own artwork shows through, same as the sales app.
+function showPlan(r) {
+  const card = $('unitCard');
+  card.textContent = '';
+  card.className = '';
+
+  const head = document.createElement('div');
+  head.className = 'uMeta';
+  head.style.display = 'flex';
+  head.style.justifyContent = 'space-between';
+  head.style.marginBottom = '.5rem';
+  const title = document.createElement('b');
+  title.style.color = '#f0e4c8';
+  title.textContent = 'ผังชั้น ' + r.floor + (r.building ? ' · ตึก ' + r.building : '');
+  const legend = document.createElement('span');
+  const c = r.counts || {};
+  legend.textContent = 'ว่าง ' + (c.available || 0) + ' · จอง ' + (c.reserved || 0)
+    + ' · ขายแล้ว ' + (c.sold || 0);
+  head.append(title, legend);
+  card.appendChild(head);
+
+  const wrap = document.createElement('div');
+  wrap.style.position = 'relative';
+  const img = new Image();
+  img.src = r.image;
+  img.style.width = '100%';
+  img.style.display = 'block';
+  img.style.borderRadius = '.6rem';
+  wrap.appendChild(img);
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+  const FILL = { sold: 'rgba(192,85,90,.72)', reserved: 'rgba(224,163,58,.72)',
+                 available: 'rgba(53,196,106,.16)' };
+  for (const u of (r.units || [])) {
+    let shape;
+    if (u.poly && u.poly.length >= 3) {
+      shape = document.createElementNS(NS, 'polygon');
+      shape.setAttribute('points', u.poly.map((p) => p[0] + ',' + p[1]).join(' '));
+    } else {
+      shape = document.createElementNS(NS, 'rect');
+      shape.setAttribute('x', u.x); shape.setAttribute('y', u.y);
+      shape.setAttribute('width', u.w); shape.setAttribute('height', u.h);
+    }
+    shape.setAttribute('fill', FILL[u.status] || 'transparent');
+    shape.setAttribute('stroke', 'rgba(255,255,255,.35)');
+    shape.setAttribute('stroke-width', '.08');
+    if (u.dim) shape.setAttribute('opacity', '.18');
+    svg.appendChild(shape);
+  }
+  wrap.appendChild(svg);
+  card.appendChild(wrap);
+
+  const foot = document.createElement('div');
+  foot.className = 'uWho';
+  foot.textContent = 'สถานะสดจากระบบผังขาย ณ ตอนนี้ · แดง=ขายแล้ว เหลือง=จอง โปร่ง=ว่าง';
+  card.appendChild(foot);
+
+  const stage = $('stage');
+  if (stage.classList.contains('framed')) {
+    $('stageFrame').removeAttribute('src');
+    stage.classList.remove('framed');
+  }
+  stage.classList.add('on', 'unit');
+  $('callScreen').classList.add('with-slides', 'stage-only');
+}
+
+//: The available-units list — find_units' answer, on the same card
+//: container. Rows only, no invention: everything shown came from the
+//: sales system this second.
+function showUnitList(r) {
+  const baht = (n) => Number(n).toLocaleString('th-TH', { maximumFractionDigits: 0 });
+  const card = $('unitCard');
+  card.textContent = '';
+  card.className = '';
+  const title = document.createElement('div');
+  title.className = 'uRoom';
+  title.textContent = 'ห้องว่าง ' + (r.count || 0) + ' ห้อง';
+  card.appendChild(title);
+  const note = document.createElement('div');
+  note.className = 'uWho';
+  note.textContent = 'สถานะสดจากระบบผังขาย ณ ตอนนี้';
+  card.appendChild(note);
+  card.appendChild(Object.assign(document.createElement('hr'), { className: 'uRule' }));
+  for (const u of (r.units || [])) {
+    const row = document.createElement('div');
+    row.className = 'uMeta';
+    row.style.display = 'flex';
+    row.style.justifyContent = 'space-between';
+    row.style.padding = '.35rem 0';
+    const left = document.createElement('span');
+    left.textContent = 'ห้อง ' + u.room + '  ·  ' + (u.sqm || '—') + ' ตร.ม.' +
+      (u.aspect ? '  ·  ' + u.aspect : '');
+    const right = document.createElement('b');
+    right.style.color = '#e8c87a';
+    // No price in the payload means policy, not absence — the rooms listed
+    // already fit the asked budget, which is the answer the guest wanted.
+    right.textContent = u.price_thb ? baht(u.price_thb) + ' บาท' : '';
+    row.append(left, right);
+    card.appendChild(row);
+  }
+  const stage = $('stage');
+  if (stage.classList.contains('framed')) {
+    $('stageFrame').removeAttribute('src');
+    stage.classList.remove('framed');
+  }
+  stage.classList.add('on', 'unit');
+  $('callScreen').classList.add('with-slides', 'stage-only');
+}
+
+//: Put a framed page on the stage — a video, a map, anything that agrees
+//: to be embedded. The server decides what qualifies (`embeddable()` in
+//: app/tools/computer.py); anything that does not never reaches here, so
+//: this end never has to render a blank white rectangle and guess why.
+let frameWatch = null;
+function showFrame(url) {
+  const stage = $('stage');
+  const f = $('stageFrame');
+  // A frame that is refused renders as a grey rectangle with a broken-page
+  // icon and puts nothing actionable in the console — the owner's exact
+  // experience, twice. There is no event for "the site said no", so the
+  // page waits for a load that should have happened and says so when it
+  // does not, with the one thing it can still offer.
+  let loaded = false;
+  f.onload = () => { loaded = true; };
+  if (frameWatch) clearTimeout(frameWatch);
+  frameWatch = setTimeout(() => {
+    if (loaded || !stage.classList.contains('framed')) return;
+    systemLine('เว็บนี้ไม่ยอมให้แสดงในหน้านี้ · the site refused to be embedded');
+    clearFrame();
+  }, 6000);
+  f.src = url;
+  stage.classList.add('on', 'framed');
+  $('callScreen').classList.add('with-slides', 'stage-only');
+  $('stageTitle').textContent = '';
+  $('stagePos').textContent = '';
+}
+
+function clearFrame() {
+  if (frameWatch) { clearTimeout(frameWatch); frameWatch = null; }
+  $('stageFrame').onload = null;
+  $('stage').classList.remove('unit');
+  $('unitCard').textContent = '';
+  $('unitCard').className = '';
+  // src='' rather than hiding it: an iframe left loaded keeps playing, and
+  // a video still talking behind a hidden panel is the audio-lead bug with
+  // no way to see what is doing it.
+  $('stageFrame').removeAttribute('src');
+  $('stage').classList.remove('framed');
+  showStage(null);
+}
+
 function showStage(slide, displays) {
   const stage = $('stage');
   if (!slide) {
     stage.classList.remove('on');
-    $('callScreen').classList.remove('with-slides');
+    $('callScreen').classList.remove('with-slides', 'stage-only');
+    stage.classList.remove('unit');
+    $('unitCard').textContent = '';
+    $('unitCard').className = '';
     $('stageImg').removeAttribute('src');
     // Clear the caption too. It was only ever hidden along with the stage,
     // so anything that leaves the stage visible leaves the previous slide's
@@ -358,6 +1228,12 @@ function showStage(slide, displays) {
     $('stageTitle').textContent = '';
     $('stagePos').textContent = '';
     return;
+  }
+  // A slide arriving over a video wins, and the video has to actually stop
+  // rather than keep playing out of sight.
+  if (stage.classList.contains('framed')) {
+    $('stageFrame').removeAttribute('src');
+    stage.classList.remove('framed');
   }
   $('callScreen').classList.add('with-slides');
   $('stageImg').src = slide.url;
@@ -433,7 +1309,13 @@ function appendText(role, text) {
     }
     liveTurn[role] = turn;
   }
-  turn.querySelector('.bubble').textContent += text;
+  const bubble = turn.querySelector('.bubble');
+  bubble.textContent += text;
+  // The kiosk line shows only Emma, and only the turn in progress. The
+  // guest's own transcript stays off it for the same two reasons the robot
+  // screen keeps it off: a mishearing shown in public makes a working robot
+  // look broken, and the prompt has her read phone numbers back to confirm.
+  if (role === 'bot') kioskSay(bubble.textContent);
   scrollConvo();
 }
 
@@ -467,12 +1349,22 @@ function scrollConvo() {
   if (nearBottom) el.scrollTop = el.scrollHeight;
 }
 
-function systemLine(text) {
+function systemLine(text, reopen) {
   finalizeAll();
   const d = document.createElement('div');
   d.className = 'cut';
   d.style.alignSelf = 'center';
   d.textContent = text;
+  if (reopen) {
+    // A line that says something was opened, with the thing itself one tap
+    // away. Closing the stage used to be one-way — the video was gone and
+    // the only route back was asking again, which spends a whole turn and
+    // an API call to reach something the page already knows the address of.
+    d.textContent = text + '  ·  แตะเพื่อเปิดบนจอ';
+    d.style.cursor = 'pointer';
+    d.style.textDecoration = 'underline';
+    d.onclick = () => (reopen.embed ? showFrame(reopen.embed) : showUnit(reopen.unit));
+  }
   $('convo').appendChild(d);
   scrollConvo();
 }
@@ -504,7 +1396,34 @@ $('copyBtn').onclick = async () => {
 function setState(s) {
   $('stateLabel').textContent = s;
   $('stateLabel').className = 'state ' + s;
-  $('callOrb').className = 'orb ' + (['listening', 'hearing', 'speaking'].includes(s) ? s : '');
+  $('callOrb').className = 'orb '
+    + (['listening', 'hearing', 'speaking', 'sleep'].includes(s) ? s : '');
+  // The right-hand button is the same button in both worlds: it ends a
+  // conversation, or it starts one. Two buttons in two screens is what the
+  // page used to have, and every "which screen do we go back to" bug came
+  // out of keeping them in sync.
+  // "Is there a call right now", not "is the state literally sleep" — every
+  // other way out (ended, error, superseded) leaves the same page with the
+  // same person in front of it and nothing to end. A superseded tab getting
+  // this button back is on purpose: pressing it is the deliberate takeover
+  // the old picker offered as "กด Start เพื่อใช้แท็บนี้แทน".
+  // The kiosk orb runs off the same state word rather than a second copy of
+  // the rules — two clocks for one thing is this project's most repeated
+  // bug, and an orb that disagrees with the line above it is that bug in
+  // miniature.
+  $('kOrb').className = 'orb ' + (['listening', 'hearing', 'speaking'].includes(s) ? s : '');
+  document.body.classList.toggle('live',
+    ['listening', 'hearing', 'speaking', 'muted'].includes(s));
+  const inCall = ['connecting', 'listening', 'hearing', 'speaking', 'muted'].includes(s);
+  $('endBtn').textContent = inCall ? 'End' : 'เริ่มคุย';
+  $('muteBtn').style.visibility = inCall ? '' : 'hidden';
+  if (kioskMode) {
+    $('kHint').textContent = inCall ? 'แตะเพื่อวางสาย' : 'แตะเพื่อพูด';
+    $('kOnline').textContent = inCall ? 'ออนไลน์' : 'พร้อมใช้งาน';
+    // A finished visit must not leave its last instruction on a screen the
+    // next person walks up to.
+    if (s === 'sleep') { kioskAction(''); kioskSay(''); }
+  }
 }
 
 // ---------------- "is it hearing me?" ----------------
@@ -521,6 +1440,11 @@ let quietTimer = null;
 function onMicLevel(rms) {
   const pct = Math.min(100, Math.round(rms * 400));
   $('levelBar').style.width = pct + '%';
+  // Asleep the bar moves and nothing else does. Driving the state off the
+  // standby microphone would make the line look like it was listening to a
+  // conversation it is not in — and the point of showing the bar here is to
+  // prove the microphone works, not to pretend a call is running.
+  if ($('stateLabel').textContent === 'sleep') return;
   if (muted || playing) return;
 
   if (rms >= SPEECH_LEVEL) {
@@ -639,10 +1563,85 @@ function releaseCallHardware() {
   audioCtx = micStream = micSource = worklet = null;
 }
 
+// ---------------- sleeping ----------------
+// One screen, one state machine. There used to be two screens, and every
+// path that ended a call had to decide which one to go back to — the end
+// button, the superseded close, the idle park, the wake rearm. Four
+// decisions, made in four places, each one already the subject of a bug.
+// Now they all call this.
+
+//: Minutes the finished conversation stays on screen (server: /health).
+let transcriptKeepMin = 5;
+let wipeTimer = null;
+//: When the line last went to sleep, so a reconnect can tell "same visit,
+//: carry on" from "a stranger walked up an hour later".
+let sleptAt = 0;
+
+function goToSleep(note) {
+  // Belt and braces: ws.onclose already released it before any branch, but
+  // goToSleep is also reached from the End button and from boot, where no
+  // socket closed at all.
+  //
+  // `releaseCallHardware()` used to be called only on the way *in*, from
+  // startCall(). Every way *out* — idle timeout, go_away, a dropped
+  // network — left the call's getUserMedia stream, its worklet and its
+  // AudioContext alive, and then startWakeMode() opened a second capture on
+  // the same device while the first still held it. Windows hands the second
+  // one digital silence: peak=0.0000 for sixteen seconds in the log, which
+  // is not a quiet room — a live microphone never reads exactly zero — and
+  // then real audio the moment the abandoned stream was finally collected.
+  //
+  // The symptom was "เรียก emma แล้วไม่ได้ยิน", and it was not the wake word
+  // at all: the ears were listening to a microphone nobody was holding.
+  releaseCallHardware();
+  // Never bounce to the picker: this page has one screen now.
+  $('pickerScreen').classList.remove('active', 'standby');
+  $('callScreen').classList.add('active');
+  finalizeAll();
+  setState('sleep');
+  // The stage goes with the call. The server already wipes its own state on
+  // handover (slides, the ROI sheet), but the *screen* kept showing the
+  // last guest's unit card, plan, or ROI numbers to whoever walked up next
+  // — the transcript-privacy rule with a picture instead of words. Found in
+  // review, not in a report, which is the cheap way to find it.
+  clearFrame();
+  // Zero the bar on the way in. The call that just ended left its last
+  // reading there, and a bar showing 5% from a minute ago is worse than no
+  // bar: it is the standby microphone's answer to "can you hear me" given
+  // by a microphone that is already closed.
+  $('levelBar').style.width = '0%';
+  $('convo').classList.add('slept');
+  if (note) systemLine(note);
+  sleptAt = Date.now();
+  scheduleTranscriptWipe();
+  // Rearm the ears last: startWakeMode paints its own note, and painting it
+  // before the state is set would be overwritten by the line above.
+  if (wakeAvailable) setTimeout(startWakeMode, 500);
+}
+
+function scheduleTranscriptWipe() {
+  if (wipeTimer) clearTimeout(wipeTimer);
+  wipeTimer = null;
+  // Zero means "this screen is somewhere only one person reaches" — the
+  // owner's desk. The showroom must not use it.
+  if (!transcriptKeepMin) return;
+  wipeTimer = setTimeout(() => {
+    wipeTimer = null;
+    // Only wipe if still asleep. A conversation that resumed while the
+    // timer was running is not stale, and clearing it mid-sentence would
+    // be the rudest possible moment.
+    if ($('stateLabel').textContent !== 'sleep') return;
+    $('convo').innerHTML = '';
+    liveTurn.user = liveTurn.bot = null;
+    cutBot = null;
+  }, transcriptKeepMin * 60000);
+}
+
 function startCall() {
   manualEnd = false;
   idleParked = false;
   superseded = false;
+  standDown = false; standDownReason = '';
   try { ws && ws.close(); } catch {}
   releaseCallHardware();
   if (!wakeHandover) stopWakeMode();   // in a handover the standby mic is
@@ -653,7 +1652,27 @@ function startCall() {
   $('callOrb').style.setProperty('--c1', v.gradient[0]);
   $('callOrb').style.setProperty('--c2', v.gradient[1]);
   setState('connecting');
-  $('convo').innerHTML = '';
+  // Wiping unconditionally was right when a call always began from the
+  // picker. It isn't now: someone who says the name again a minute later is
+  // continuing the same visit, and having their own last question vanish as
+  // they ask the follow-up reads as the machine forgetting them. Inside the
+  // keep window the thread stays and gets a divider; past it — or with the
+  // window disabled — a new call starts clean, because by then the person
+  // in front of the screen may well be someone else.
+  const sameVisit = sleptAt && transcriptKeepMin
+    && (Date.now() - sleptAt) < transcriptKeepMin * 60000
+    && $('convo').children.length;
+  if (wipeTimer) { clearTimeout(wipeTimer); wipeTimer = null; }
+  $('convo').classList.remove('slept');
+  if (sameVisit) {
+    const rule = document.createElement('div');
+    rule.className = 'convo-divider';
+    rule.textContent = '— คุยต่อ —';
+    $('convo').appendChild(rule);
+  } else {
+    $('convo').innerHTML = '';
+  }
+  sleptAt = 0;
   liveTurn.user = liveTurn.bot = null;
   cutBot = null;
   if (pendingSlideTimer) clearTimeout(pendingSlideTimer);
@@ -673,25 +1692,54 @@ function startCall() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   // ?profile=translator on the page URL flips this connection's persona —
   // a bookmark per mode, no .env edit, no restart.
-  const urlProfile = new URLSearchParams(location.search).get('profile');
+  const urlq = new URLSearchParams(location.search);
+  const urlProfile = urlq.get('profile'), urlLang = urlq.get('lang'), urlToken = urlq.get('token');
   ws = new WebSocket(`${proto}://${location.host}/ws?voice=${encodeURIComponent(selectedVoice)}`
-    + (urlProfile ? `&profile=${encodeURIComponent(urlProfile)}` : ''));
+    + (urlProfile ? `&profile=${encodeURIComponent(urlProfile)}` : '')
+    + (urlLang ? `&lang=${encodeURIComponent(urlLang)}` : '')
+    + (urlToken ? `&token=${encodeURIComponent(urlToken)}` : ''));
   ws.binaryType = 'arraybuffer';
   ws.onmessage = onMessage;
   ws.onerror = () => { setState('error'); systemLine('เชื่อมต่อไม่สำเร็จ · connection error'); };
   ws.onclose = () => {
+    // Before any branch, because the branches are where this keeps getting
+    // lost. The socket closing *is* the call ending, whatever the reason,
+    // and a call that has ended has no business still holding the machine's
+    // microphone.
+    //
+    // Put in goToSleep() first, which covered the idle and go_away exits and
+    // missed the two that return early — superseded and unauthorized. A tab
+    // that lost the robot to another tab went on holding the microphone for
+    // ever, so the tab that *won* got digital silence from Windows:
+    // peak=0.0000 on the standby socket and "no guest speech for 123s" on
+    // the call, both at once, on a desktop with several tabs open.
+    //
+    // One owner, one place, ahead of every branch — the same shape the End
+    // button's hand-rolled copy of this teardown had to be collapsed into.
+    releaseCallHardware();
     if ($('callScreen').classList.contains('active')) { finalizeAll(); setState('ended'); }
-    if (superseded) {
+    if (standDown) {
       // Fully passive: no redial (that steals the session back) and no wake
       // standby (two standby tabs both dial on one "Emma" — same war,
-      // slower). Back to the picker — with the Start button visible — so a
-      // human can reclaim this tab on purpose; nothing reclaims it for them.
-      superseded = false;
-      $('callScreen').classList.remove('active');
-      $('pickerScreen').classList.add('active');
-      $('pickerScreen').classList.remove('standby');
-      $('pickerNote').textContent =
-        'แท็บอื่นกำลังใช้งานอยู่ — ปิดแท็บนั้น หรือกด Start เพื่อใช้แท็บนี้แทน';
+      // slower). Stay on the one screen and let a deliberate press of the
+      // button be the takeover.
+      const why = standDownReason;
+      standDown = false; standDownReason = ''; superseded = false;
+      clearFrame();          // a dormant tab must not keep a guest's screen up
+      $('convo').classList.add('slept');
+      finalizeAll();
+      // The reason decides both the state word and whether anything more is
+      // worth saying. onMessage has already written the real explanation;
+      // adding a second, different one here is what produced "you need a
+      // token" above "another tab is using it" on a page with neither.
+      if (why === 'superseded') {
+        setState('superseded');
+        systemLine('ปิดแท็บนั้นแล้วรีโหลดหน้านี้เพื่อใช้งานต่อ');
+      } else {
+        setState('error');
+      }
+      sleptAt = Date.now();
+      scheduleTranscriptWipe();
       return;
     }
     if (autoConnect && !manualEnd && !idleParked) {
@@ -710,13 +1758,9 @@ function startCall() {
     // The session is gone (idle timeout, go_away, network). Rearm the name
     // after a beat — immediately would race the tail of Emma's last audio
     // still leaving the speaker, and she would answer herself.
-    if (wakeAvailable) setTimeout(() => {
+    setTimeout(() => {
       if (!ws || (ws.readyState !== WebSocket.OPEN &&
-                  ws.readyState !== WebSocket.CONNECTING)) {
-        $('callScreen').classList.remove('active');
-        $('pickerScreen').classList.add('active');
-        startWakeMode();
-      }
+                  ws.readyState !== WebSocket.CONNECTING)) goToSleep();
     }, 1500);
   };
 }
@@ -867,7 +1911,23 @@ function onMessage(msg) {
       else if (r.hardware === 'mock') line += ' — จำลอง (ยังไม่ต่ออุปกรณ์จริง) · simulated';
       else if (r.ok === false) line += ' — ' + (r.error || 'failed');
       else line += ' — สำเร็จ · done';
-      systemLine(line);
+      systemLine(line, r.embed ? { embed: r.embed }
+                     : (r.screen === 'unit' && r.unit ? { unit: r.unit } : null));
+      // Only successes reach the public screen. "ค้นข้อมูล — ส่งสัญญาณไม่
+      // สำเร็จ" is a line for the operator; a guest reading it learns only
+      // that the robot is broken, which is the opposite of what the chip is
+      // there to say.
+      if (r.ok !== false && r.hardware !== 'failed') kioskAction(label);
+      // "เปิดยูทูบ..." lands here as a URL the server has already decided is
+      // frameable. Showing it in this page is the whole point — a second
+      // window opening on top of the one being used is what the owner asked
+      // not to happen.
+      if (r.embed) showFrame(r.embed);
+      if (r.screen === 'unit' && r.unit) showUnit(r.unit);
+      if (r.screen === 'calc') showCalc(r);
+      if (r.screen === 'unitlist') showUnitList(r);
+      if (r.screen === 'plan') showPlan(r);
+      if (r.screen === 'clear') clearFrame();
 
       if ('slide' in evt) scheduleSlide(evt.slide, evt.displays);
       break;
@@ -894,7 +1954,16 @@ function onMessage(msg) {
       break;
 
     case 'error':
+      if (evt.code === 'unauthorized') {
+        // Wrong/missing token: stand down completely. Redialing an auth
+        // failure every two seconds is a polite little brute-force loop.
+        standDown = true; standDownReason = 'unauthorized';
+        setState('error');
+        systemLine(evt.message || 'ต้องใส่ token');
+        break;
+      }
       if (evt.code === 'superseded') {
+        standDown = true; standDownReason = 'superseded';
         superseded = true;
         setState('ended');
         systemLine('แท็บอื่นกำลังใช้งานอยู่ — ปิดแท็บนั้น หรือกด Start เพื่อใช้แท็บนี้แทน');
@@ -913,23 +1982,41 @@ $('muteBtn').onclick = () => {
 };
 
 $('endBtn').onclick = () => {
+  // One button, two jobs — see setState(). Asleep it is the Start button
+  // the picker screen used to own, which is what keeps a machine with no
+  // wake word and no auto-connect (the gallery's defaults) usable at all.
+  if (['connecting', 'listening', 'hearing', 'speaking', 'muted']
+      .includes($('stateLabel').textContent) === false) {
+    startCall();
+    return;
+  }
   manualEnd = true;
   try { ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'stop' })); } catch {}
   try { ws && ws.close(); } catch {}
-  try { worklet && (worklet.port.onmessage = null, worklet.disconnect()); } catch {}
-  try { micSource && micSource.disconnect(); } catch {}
-  micStream && micStream.getTracks().forEach((t) => t.stop());
-  sources.forEach((s) => { try { s.stop(); } catch {} });
-  sources = []; playing = false; sentMs = 0;
+  // The same teardown, from the one function that owns it. This used to be
+  // copied out by hand here — which is how the other exits came to have no
+  // teardown at all: nobody noticed the copy was the only one.
+  sentMs = 0;
   finalizeAll();
-  audioCtx && audioCtx.close().catch(() => {});
-  audioCtx = ws = micStream = micSource = worklet = null;
-  $('callScreen').classList.remove('active');
-  $('pickerScreen').classList.add('active');
-  if (wakeAvailable) setTimeout(startWakeMode, 500);
+  ws = null;
+  goToSleep();
 };
 
 $('startBtn').onclick = startCall;
+
+// The kiosk's one big button is the same decision the End/เริ่มคุย button
+// makes, in a shape a stranger can use without reading anything: in a call
+// it hangs up, out of one it starts. Routed through the existing handler so
+// there is one implementation, not a second that drifts.
+$('kMic').onclick = () => $('endBtn').click();
+$('stageClose').onclick = clearFrame;
+$('kHome').onclick = () => {
+  // Clear the screen back to the idle face. Local only — it puts nothing on
+  // the wire, so a guest tapping it can never interrupt or end the
+  // conversation, only stop looking at what is on the stage.
+  clearFrame();
+  kioskAction('');
+};
 
 // Tap the orb to change the voice. A voice is chosen at session start, so
 // switching means redialing — the conversation so far doesn't carry over,
@@ -961,6 +2048,7 @@ $('callOrb').onclick = () => {
 
 let wakeWs = null, wakeCtx = null, wakeMicStream = null, wakeWorklet = null;
 let wakeAvailable = false, wakeStopping = false;
+let wakeServerReady = false, wakeAudioFlowing = false, wakeListeningWord = 'emma';
 // The seconds between "Emma" and the session being ready are exactly when
 // the owner says the actual command — "Emma เปิดไฟ" is one breath. Dropping
 // that audio forces them to wait for the greeting and say it again, which
@@ -985,19 +2073,36 @@ let idleParked = false;
 // back, the other tab redials in turn, and the two burn quota killing each
 // other forever. Observed live, 2026-08-24: a translator tab and a normal
 // tab ping-ponging takeovers, both showing LISTENING.
+// Two different reasons to stand down, and they were sharing one flag —
+// which is why an unauthorized page showed SUPERSEDED and two contradicting
+// lines: "you need a token" (true) followed by "another tab is using it"
+// (invented). `standDown` is the shared decision — do not redial — and
+// `standDownReason` is what to say about it.
 let superseded = false;
+let standDown = false, standDownReason = '';
 // Mic shaping (MIC_BOOST / MIC_NOISE_SUPPRESSION in .env): compressor+gain
 // between the mic and everything that listens. See buildMicChain().
 let micBoost = 1, micNS = true;
 
 async function startWakeMode() {
   if (!wakeAvailable || wakeWs) return;
+  // Chrome only exposes getUserMedia on localhost or a trusted HTTPS
+  // origin.  Do not open a standby socket and paint "listening" when this
+  // page can never produce audio (the old behaviour looked healthy but sent
+  // the detector complete silence).
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    wakeAvailable = false;
+    sleepNote('ไมโครโฟนใช้ไม่ได้บน HTTP — เปิดหน้านี้ด้วย https:// หรือ localhost');
+    return;
+  }
   // A handover whose session died before ready leaves the old standby mic
   // buffering into nowhere. Rearming is the moment to reclaim it.
   if (wakeHandover) stopWakeMode();
   wakeStopping = false;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const sock = new WebSocket(`${proto}://${location.host}/ws/wake`);
+  const wakeToken = new URLSearchParams(location.search).get('token');
+  const sock = new WebSocket(`${proto}://${location.host}/ws/wake`
+    + (wakeToken ? `?token=${encodeURIComponent(wakeToken)}` : ''));
   sock.binaryType = 'arraybuffer';
   wakeWs = sock;
 
@@ -1019,14 +2124,24 @@ async function startWakeMode() {
       try { sock.close(); } catch {}
       startCall();
     } else if (evt.type === 'wake_listening') {
-      // The ears are armed: swap the whole picker for the standby face.
-      // It comes back the moment wake mode stops for any reason
-      // (stopWakeMode), so a dead standby socket never strands the page.
-      $('pickerScreen').classList.add('standby');
-      $('pickerNote').textContent = `แค่เรียก "${evt.word}" ก็คุยได้เลยค่ะ`;
+      // Server readiness alone is not enough: getUserMedia/AudioWorklet may
+      // still fail.  The standby face is shown only after a real PCM frame
+      // has also left the microphone below.
+      wakeServerReady = true;
+      wakeListeningWord = evt.word || 'emma';
+      showWakeStandby(evt.word);
     } else if (evt.type === 'wake_unavailable') {
       wakeAvailable = false;
       stopWakeMode();
+    } else if (evt.type === 'error' && evt.code === 'unauthorized') {
+      // The same stand-down the call socket does, and it has to be repeated
+      // here because the guard there only ever protected /ws. Without it the
+      // onclose handler below rearms two seconds later — for ever, with the
+      // standby microphone reopened on every pass. An auth failure retried
+      // every two seconds is a brute-force loop with a mic attached.
+      wakeAvailable = false;
+      stopWakeMode();
+      sleepNote(evt.message || 'ต้องใส่ token');
     }
   };
   sock.onclose = () => {
@@ -1048,7 +2163,7 @@ async function startWakeMode() {
     // No permission — the button path stays. Say which mode was lost.
     wakeAvailable = false;
     stopWakeMode();
-    $('pickerNote').textContent = 'กดปุ่มเพื่อเริ่มคุย (ไมค์สำหรับเรียกชื่อไม่ได้รับสิทธิ์)';
+    sleepNote('กดปุ่ม "เริ่มคุย" ด้านล่าง (ไมค์สำหรับเรียกชื่อไม่ได้รับสิทธิ์)');
     return;
   }
   wakeCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1061,10 +2176,46 @@ async function startWakeMode() {
   // The KWS model is 16kHz regardless of which voice provider is active.
   wakeWorklet = new AudioWorkletNode(wakeCtx, 'cap', { processorOptions: { targetRate: 16000 } });
   wakeWorklet.port.onmessage = (e) => {
-    if (e.data && e.data.level !== undefined) return;   // no level meter in standby
+    if (e.data && e.data.level !== undefined) {
+      // The standby mic used to throw this away, and the standby *screen*
+      // had no bar to put it in. That is why "พูด emma แล้วเหมือนไม่ได้ยิน"
+      // was undiagnosable from the page: a muted microphone and a
+      // mispronounced name looked exactly alike. Now the same bar that
+      // proves the mic works during a call proves it while asleep.
+      onMicLevel(e.data.level);
+      return;
+    }
+    if (!wakeAudioFlowing) {
+      wakeAudioFlowing = true;
+      showWakeStandby();
+    }
     if (wakeWs && wakeWs.readyState === WebSocket.OPEN) wakeWs.send(e.data);
   };
   src.connect(wakeWorklet);
+  // Keep the worklet in Chrome's render graph. Some builds suspend a node
+  // with no route to destination even though we consume its MessagePort.
+  // Zero gain keeps it scheduled without ever echoing the microphone.
+  const silent = wakeCtx.createGain();
+  silent.gain.value = 0;
+  wakeWorklet.connect(silent);
+  silent.connect(wakeCtx.destination);
+}
+
+function showWakeStandby(word = null) {
+  // Both halves still required: the server saying it is listening does not
+  // mean this page ever produced a sample. Only now the claim is checkable
+  // by the person reading it — the level bar is right underneath.
+  if (!wakeServerReady || !wakeAudioFlowing) return;
+  const name = word || wakeListeningWord;
+  sleepNote(`ไมค์กำลังฟังอยู่ — เรียก "${name}" ได้เลยค่ะ`);
+}
+
+function sleepNote(text) {
+  // The status line of the one screen. Written straight rather than through
+  // systemLine() because this is the line's own condition, not something
+  // that was said in the conversation — it must not end up in the
+  // transcript the Copy button hands over.
+  $('callNote').textContent = text;
 }
 
 function buildMicChain(ctx, source) {
@@ -1088,7 +2239,7 @@ function buildMicChain(ctx, source) {
 
 function armAudioUnlock(ctx) {
   if (!ctx || ctx.state !== 'suspended') return;
-  const note = $('pickerScreen').classList.contains('active') ? 'pickerNote' : 'callNote';
+  const note = 'callNote';   // one screen, one status line
   const prev = $(note).textContent;
   $(note).textContent = 'แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียง · tap once to enable audio';
   const unlock = () => {
@@ -1102,6 +2253,11 @@ function armAudioUnlock(ctx) {
 
 function stopWakeMode() {
   wakeStopping = true;
+  // A bar frozen at its last value is a lie about a microphone that is no
+  // longer open, and this bar's whole job is to be believed.
+  $('levelBar').style.width = '0%';
+  wakeServerReady = false;
+  wakeAudioFlowing = false;
   wakeHandover = false;
   wakeTail = [];
   // The picker is the fallback; whenever the ears close, it returns whole.

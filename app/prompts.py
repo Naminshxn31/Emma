@@ -102,7 +102,7 @@ EMMA_INSTRUCTIONS = """[คำแนะนำตัว]
 TRANSLATOR_INSTRUCTIONS = """คุณคือล่ามแปลภาษาแบบเรียลไทม์ หน้าที่เดียวคือแปลสิ่งที่ได้ยิน
 
 กฎการแปล:
-1. ได้ยินภาษาไทย ให้พูดคำแปลเป็นภาษาอังกฤษ
+1. ได้ยินภาษาไทย ให้พูดคำแปลเป็น[ภาษาปลายทาง]
 2. ได้ยินภาษาอื่นที่ไม่ใช่ไทย ให้พูดคำแปลเป็นภาษาไทยเสมอ ไม่ว่าจะจีน ญี่ปุ่น เกาหลี รัสเซีย — เช่น 我爱你 ต้องแปลว่า "ฉันรักคุณ" ห้ามแปลเป็น "I love you"
 3. แปลให้ครบและตรงความหมาย รักษาน้ำเสียงของผู้พูด (ถาม=ถาม ขอร้อง=ขอร้อง) ห้ามตัด ห้ามเติม ห้ามสรุป
 3.1 คุณพูดแทนผู้พูด ไม่ใช่พูดเอง ห้ามเติมคำลงท้าย ค่ะ/ครับ/นะคะ ที่ต้นฉบับไม่มี — "My name is Shogun" แปลว่า "ฉันชื่อโชกุน" ไม่ใช่ "ฉันชื่อโชกุนค่ะ"
@@ -326,12 +326,54 @@ def _emma_introduction(assistant_name: str) -> str:
     )
 
 
+# Trimmed hard: the condo prompt has a length budget it is billed against
+# every turn (test_system_instruction_stays_short). One line that names the
+# three tools and forbids the observed refusal is what the failure needed;
+# the examples live in each tool's own description, which the model also
+# reads and which is not re-billed per turn.
+UNITS_TOOLS_BLOCK = ("ขอดูผัง/ห้อง/ห้องว่าง: เรียก show_unit (การ์ดห้อง) find_units "
+                     "(ห้องว่างตามงบ) show_plan (ผังชั้นสถานะจริง) ทันที "
+                     "ห้ามตอบว่าไม่มีเครื่องมือ ข้อมูลสดจากระบบผังขาย ไม่ใช่สไลด์")
+
+
+GALLERY_LIBRARY_BLOCK = """คลังบทความของบริษัท: มีบทความจากเว็บบริษัทให้ค้นด้วย search_my_documents
+ใช้เมื่อลูกค้าถามเรื่องผู้พัฒนา ความน่าเชื่อถือของบริษัท ทำเลและย่านนี้ เหตุผลการลงทุน
+หรือข้อดีของการซื้อช่วง pre-sale แล้ว search_condo_info ไม่พบคำตอบ — ค้นก่อนตอบ
+ห้ามตอบเรื่องพวกนี้จากความรู้ทั่วไปโดยไม่ค้น
+ห้ามอ้างตัวเลขการเงินจากบทความ (yield เปอร์เซ็นต์ผลตอบแทน ราคา ดอกเบี้ย) เป็นข้อเท็จจริง
+บทความเป็นเนื้อหาการตลาดที่ไม่มีผู้อนุมัติตัวเลข ให้อธิบายเหตุผลได้ แต่ตัวเลขจริง
+ต้องบอกให้สอบถามฝ่ายขาย"""
+
+
+def _units_tools_suffix() -> str:
+    """The unit-card/plan tools' paragraph, present exactly when they are.
+
+    The mydocs lesson, third verse: show_plan was registered, the owner
+    asked for the plan, and Emma answered "ไม่มีเครื่องมือสำหรับแสดง
+    ผังโครงการค่ะ" — her prompt's capability list never mentioned it, and
+    rule 8 explicitly denies having presentation-shaped things. A tool the
+    prompt disowns is worse than one it merely omits: the model has been
+    told the honest answer is no.
+
+    Gated on the loaded groups (None = the gallery's everything-default,
+    which does include `units`), so the paragraph and the tools appear and
+    disappear together.
+    """
+    from app.config import settings as _settings
+
+    groups = _settings.enabled_tool_groups()
+    if groups is None or "units" in groups:
+        return "\n" + UNITS_TOOLS_BLOCK
+    return ""
+
+
 def build_instructions(
     project_name: str,
     extra_facts: str | None = None,
     languages: str = "auto",
     robot_name: str = "",
     profile: str = "condo",
+    translator_target: str = "en",
 ) -> str:
     """Full instruction string sent in session.update.
 
@@ -349,7 +391,17 @@ def build_instructions(
         # Nothing appended — no facts, no memory, no document list. An
         # interpreter carrying the owner's memory or the gallery's prices
         # into a room full of strangers is a privacy leak wearing headphones.
-        return TRANSLATOR_INSTRUCTIONS
+        #
+        # The Thai side's target is a parameter (the sales list names
+        # Spanish, French, German, Chinese and Arabic customers): staff
+        # speech goes out in the customer's language, and everything the
+        # customer says still comes back as Thai.
+        target = _LANG_NAMES.get((translator_target or "en").strip().lower(), None)
+        if target is None:
+            logger.warning("unknown translator target %r — using English",
+                           translator_target)
+            target = _LANG_NAMES["en"]
+        return TRANSLATOR_INSTRUCTIONS.replace("[ภาษาปลายทาง]", "ภาษา" + target)
 
     if profile == "emma":
         # No condo facts appended, and that is a decision rather than an
@@ -372,7 +424,7 @@ def build_instructions(
         # must never change which functions the model can call.
         from app import memory_store
 
-        return (
+        out = (
             EMMA_INSTRUCTIONS
             .replace("[คำแนะนำตัว]", _emma_introduction(robot_name))
             .replace("[เวลาปัจจุบัน]", stamp)
@@ -380,6 +432,7 @@ def build_instructions(
             .replace("[เอกสาร]", _personal_docs_line())
             .replace("[ความจำ]", memory_store.prompt_block())
         )
+        return out + _units_tools_suffix()
 
     facts = extra_facts if extra_facts is not None else load_facts()
     base = (
@@ -388,4 +441,18 @@ def build_instructions(
         .replace("[ชื่อโครงการ]", project_name)
         .replace("[กฎภาษา]", _language_rule(languages))
     )
-    return base + "\n" + facts
+    out = base + "\n" + facts
+    # The company web library, mentioned only when this machine loads it.
+    # Turning the mydocs group on in .env was found to be *not enough*: the
+    # tool registered, and the robot never called it — rule 14 routes every
+    # unknown to search_condo_info and nothing in the prompt said the
+    # library existed. A tool the model has no reason to reach for is the
+    # same as no tool. Gated on the group so the gallery default (blank
+    # TOOL_GROUPS, mydocs opt-in and absent) keeps its prompt byte-identical
+    # on a pull.
+    from app.config import settings as _settings
+
+    groups = _settings.enabled_tool_groups()
+    if groups is not None and "mydocs" in groups:
+        out += "\n" + GALLERY_LIBRARY_BLOCK
+    return out + _units_tools_suffix()

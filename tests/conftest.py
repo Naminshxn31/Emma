@@ -81,13 +81,66 @@ def _fresh_async_state():
     from app.config import settings as _settings
 
     _settings.assistant_profile = "condo"
+    _settings.ws_token = ""          # the LAN gate; tests opt in explicitly
     _settings.wake_enabled = False
     _settings.wake_threshold = 0.25
     _settings.wake_boost = 2.0
+    # Two more knobs whose *default* is right for the gallery and wrong for a
+    # 20-second test timeout. Both were the documented trap — "green on a
+    # machine that is missing something" — reaching its payday: they only
+    # ever hung on a machine that had everything.
+    #
+    # embed_provider: with EMBED_PROVIDER=local in .env, one
+    # `search_condo_info` call imports sentence-transformers and encodes the
+    # whole deck. CI has no such package, so `choose_provider()` returned
+    # "off" there and the tests were quick and green;
+    # `test_answers_spoken_questions_not_just_keywords` hung here instead.
+    # Pinning "off" makes every machine run the search CI actually verified.
+    # Tests that mean to exercise semantic search patch `choose_provider`.
+    #
+    # canva_warm_deck: `_ensure_page()` finishes by walking the whole deck
+    # once (WARM_STEP_S 0.55s per page, ~33s for 59 pages) so a later jump
+    # lands on a drawn page instead of a blank. Fine at 08:00 in a showroom,
+    # fatal inside a test that drives `_ensure_page` for real — which
+    # `test_a_fullscreen_failure_does_not_cost_us_the_window` does.
+    _settings.embed_provider = "off"
+    _settings.canva_warm_deck = False
+    # And the biggest one of the family, found the hard way: the owner added
+    # TOOL_GROUPS to .env to switch on the unit card, and nineteen robot and
+    # slide tests went red on a machine where nothing had been edited. The
+    # tools those tests exercise simply stopped being registered.
+    #
+    # Blank = "every group", which is the gallery's own default and the
+    # configuration the tests were written against. Tests that mean a subset
+    # set it themselves.
+    _settings.tool_groups = ""
+    # VAD_MODE=local on the owner's machine would make every provider test
+    # construct a real Silero detector (and change what send_audio emits).
+    # Pin to the mode the tests were written against; VAD tests set "local"
+    # themselves with a scripted detector.
+    _settings.vad_mode = "gemini"
+    # The live inventory link would send every unit test's show_unit call to
+    # the real Supabase — network in unit tests, and results that change
+    # when the sales team sells a room. Same family as every pin above.
+    _settings.inventory_url = ""
+    _settings.inventory_key = ""
+    _settings.units_show_price = False
+    _settings.searxng_url = ""       # เครื่องที่มี SearXNG ต้องไม่เปลี่ยนสี suite   # นโยบายราคา: default ปิด
+    # The web stage turns `open_in_browser` and `play_youtube` into "put it
+    # on the screen" instead of `os.startfile`. A test that leaves it on
+    # rewires four other tests that never mentioned it — and because
+    # monkeypatch restores whatever it found at setup, one leak is enough to
+    # make the failure depend on test order. Pinned here, like the profile
+    # and the LAN gate, for the same reason: the suite must not change
+    # colour because of a value some other test set.
+    _settings.web_stage = False
     display._reveal_task = None
     canva_display._task = None
     display._audio_lead_ms = 0.0
     display._audio_until = 0.0
+    # Subtitle state is module-level too, and its queue holds a *task* plus
+    # monotonic deadlines — both of the leak shapes this fixture exists for.
+    display.reset_subtitle()
 
     # Reminder state is module-level too: a watcher task belongs to a dead
     # loop the moment its test ends, and a cached item list from one test's
@@ -104,6 +157,31 @@ def _fresh_async_state():
     _docs = _sys.modules.get("app.tools.mydocs")
     if _docs is not None:
         _docs.reset()
+    # The embed_provider="off" pin above closes the front door, and a
+    # back door stayed open: a SemanticIndex loaded from this machine's
+    # embeddings.npz embeds queries with the provider recorded in the cache
+    # (deliberately — vectors from two spaces must never be compared), so
+    # `similarities()` reaches `_local_encoder()` regardless of the setting.
+    # On a machine with sentence-transformers installed that import can take
+    # longer than the 20s test timeout, and with random test ordering it
+    # only sometimes does — the worst kind of red. Stub the encoder to fail
+    # fast; slide_search already catches that and finishes lexical-only,
+    # which is the configuration the tests were written against. Tests that
+    # mean to exercise the encoder patch it themselves (test_retrieval).
+    _ret = _sys.modules.get("app.tools.retrieval")
+    if _ret is not None:
+        _ret._local_encoder = lambda: None
+    _slide_search = _sys.modules.get("app.tools.slide_search")
+    if _slide_search is not None:
+        # One failed embed latches semantic off "for the rest of this run" —
+        # right in production, but a latch that survives into the next test
+        # makes results depend on ordering. Fresh per test.
+        if getattr(_slide_search, "_index", None) is not None:
+            _slide_search._index._embedding_failed = False
+
+    _calc = _sys.modules.get("app.tools.calc")
+    if _calc is not None:
+        _calc.reset()
     _wake = _sys.modules.get("app.wake")
     if _wake is not None:
         _wake._STANDBY.clear()
@@ -153,7 +231,7 @@ def _no_real_browser(monkeypatch, request):
     if request.node.get_closest_marker("allow_browser_launch"):
         return
 
-    from app.tools import canva_display
+    from app.tools import canva_display, webstage
 
     async def refuse(_args):
         raise AssertionError(
@@ -161,7 +239,16 @@ def _no_real_browser(monkeypatch, request):
             "the test if that is intended — see tests/conftest.py"
         )
 
-    monkeypatch.setattr(canva_display, "_launch_browser", refuse)
+    # Every module that can open a window, by name. The guard is per-module
+    # on purpose (a shared launcher would be one patch point, but then the
+    # module the guard did not name is the one that gets away — the exact
+    # shape of the bug this fixture exists for). A test below asserts the
+    # list is complete, so a third window cannot be added quietly.
+    for module in (canva_display, webstage):
+        monkeypatch.setattr(module, "_launch_browser", refuse)
+    monkeypatch.setattr(webstage, "_page", None)
+    monkeypatch.setattr(webstage, "_task", None)
+    monkeypatch.setattr(webstage, "_wanted", None)
 
 @pytest.fixture(autouse=True)
 def _forget_what_was_heard():

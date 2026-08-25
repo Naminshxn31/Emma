@@ -28,6 +28,18 @@ def _get_list(name: str, default: list[str]) -> list[str]:
     return [item.strip() for item in val.split(",") if item.strip()]
 
 
+def _get_token(name: str) -> str:
+    """One whitespace-free value: everything from the first space on is junk.
+
+    Neither a URL nor a key may contain whitespace, and the first live outage
+    of the inventory link was a hand-paste that carried the setup note's
+    annotation arrow into .env. Secrets are pasted by hand on purpose, so
+    paste accidents are part of the design and get tolerated here.
+    """
+    parts = os.getenv(name, "").split()
+    return parts[0] if parts else ""
+
+
 def _get_bool(name: str, default: bool) -> bool:
     val = os.getenv(name)
     if val is None:
@@ -51,6 +63,22 @@ class Settings:
     # routine.
     auto_connect: bool = _get_bool("AUTO_CONNECT", False)
 
+    #: Minutes the finished conversation stays readable on screen after the
+    #: line goes to sleep, before the page wipes it.
+    #:
+    #: Two opposite mistakes to avoid, which is why this is a number and not
+    #: a boolean. Wiping the instant the call ends throws away the thing the
+    #: owner most often wants right afterwards — what was just said, the
+    #: number he asked her to repeat, the Copy button. Never wiping leaves
+    #: one visitor's conversation on a screen the next visitor walks up to,
+    #: which is the same mistake `data/logs/` made by keeping everything
+    #: forever: a retention policy that was never actually decided.
+    #:
+    #: Zero disables the wipe (kiosk on a desk nobody else reaches). The
+    #: countdown starts when the line sleeps, not when the call ends, so a
+    #: reconnect inside the window keeps the thread on screen.
+    transcript_keep_min: float = float(os.getenv("TRANSCRIPT_KEEP_MIN", "5"))
+
     # Where Emma's timers and reminders live. Deliberately not the condo
     # data tree's log area: this is the owner's own data, kept until done,
     # while data/logs/ is strangers' speech on a 30-day clock. The two must
@@ -71,6 +99,16 @@ class Settings:
     # answers. Turn on only after billing is enabled AND
     # scripts/probe_web_search.py prints OK for both probes.
     web_search: bool = _get_bool("WEB_SEARCH", False)
+    #: A self-hosted SearXNG instance for `search_web`. When set, queries go
+    #: there first and only fall back to the ddgs scraper if it fails.
+    #:
+    #: Why it earns a slot: ddgs is a scraper pretending to be a browser,
+    #: and on 2026-08-25 it was measured failing outright on DuckDuckGo and
+    #: hanging 15.5s in its Yahoo fallback. SearXNG runs on this machine,
+    #: fans out to several engines, and answers JSON built for exactly this
+    #: use. Still a fallback tier, not the fast path — Gemini's native
+    #: grounding (WEB_SEARCH, needs billing) stays the real answer.
+    searxng_url: str = _get_token("SEARXNG_URL").rstrip("/")
 
     # --- Microphone shaping (browser-side) ---
     # Far-field help in software: the page runs mic -> compressor -> gain
@@ -102,6 +140,25 @@ class Settings:
     # call of the name is being missed.
     wake_boost: float = float(os.getenv("WAKE_BOOST", "2.0"))
     wake_threshold: float = float(os.getenv("WAKE_THRESHOLD", "0.25"))
+    #: Log what the standby microphone is actually sending, every couple of
+    #: seconds, while waiting for the name.
+    #:
+    #: Written because "I said Emma and nothing happened" had no evidence
+    #: behind it anywhere. The page showed "ไมค์กำลังฟังอยู่" the moment one
+    #: frame left the browser — a frame of digital silence counts — and the
+    #: server logged nothing at all unless the word actually fired. So a
+    #: muted input device, a microphone across the room, and a name the model
+    #: cannot match all looked identical, and the only way to tell them apart
+    #: was to guess and change something.
+    #:
+    #: Off by default: it is two lines a second in a log the gallery reads
+    #: for other reasons. Turn it on while chasing the microphone, off after.
+    wake_debug: bool = _get_bool("WAKE_DEBUG", False)
+    #: Comma list of spellings to listen for, overriding the built-ins.
+    #: Which spellings catch a real call of the name depends on the mouth,
+    #: the room and the microphone, so it has to be tunable where those are
+    #: — not in a commit. Blank uses the list in app/wake.py.
+    wake_spellings: str = os.getenv("WAKE_SPELLINGS", "")
 
     # --- Tools (things the assistant can actually do) ---
     tools_enabled: bool = _get_bool("TOOLS_ENABLED", True)
@@ -120,6 +177,55 @@ class Settings:
     # Slide deck shown on the robot's screen. `index.json` alongside the
     # images maps each file to titles/summaries/keywords in both languages.
     slides_dir: str = os.getenv("SLIDES_DIR", "data/slides")
+    #: The unit table the sales team owns: room, size, view, price, status,
+    #: plus approved_by and effective_from. Item 8 on their list, and the
+    #: one that unblocks five others.
+    units_file: str = os.getenv("UNITS_FILE", "data/units.json")
+    #: Show the sample table when the real one is missing.
+    #:
+    #: Off by default and it must stay that way on any machine a customer can
+    #: see. The sample exists so the card can be designed and shown to the
+    #: sales team before their spreadsheet arrives; a showroom quoting made-up
+    #: prices because nobody remembered a setting is the exact failure
+    #: "ห้ามแต่งข้อมูลโครงการเองเด็ดขาด" was written to prevent. The card
+    #: watermarks itself and the model is told to say so out loud, but the
+    #: default is the real defence.
+    units_sample: bool = _get_bool("UNITS_SAMPLE", False)
+    # Live link to the sales team's own inventory system (condo-inventory:
+    # Supabase/PostgreSQL, ~1,082 units, statuses flipped by the sales admin
+    # UI with every change logged to a person). When set, show_unit answers
+    # from here instead of any file — which retires the biggest worry item 8
+    # carried: a static "available" that stopped being true yesterday.
+    #
+    # The key is the service-role secret: it bypasses RLS, so it stays in
+    # this server's .env, is used for reads only, and is copied in by a
+    # person — not by tooling. Blank = the file/sample chain as before.
+    # `.split()[0]`: neither a URL nor a key may contain whitespace, and the
+    # first live outage of this link was exactly that — the setup note's
+    # annotation arrow ("← ค่าจาก ...") pasted into .env along with the
+    # value, and show_unit reported the sales system unreachable while it
+    # was fine. Values are copied by hand on purpose (secrets stay out of
+    # tooling), so hand-paste accidents are part of the design and get
+    # tolerated here rather than diagnosed at the first customer question.
+    inventory_url: str = _get_token("INVENTORY_SUPABASE_URL").rstrip("/")
+    inventory_key: str = _get_token("INVENTORY_SUPABASE_KEY")
+    #: Seconds a fetched unit stays fresh. Short on purpose: the whole point
+    #: of the live link is that "ว่าง" means now, not yesterday.
+    inventory_cache_s: float = float(os.getenv("INVENTORY_CACHE_S", "30"))
+    #: Whether exact prices may appear on screen / in the model's hands.
+    #:
+    #: Off by default at the owner's instruction: the pricelist is the sales
+    #: team's negotiation material, and a robot putting exact baht on a
+    #: screen a customer can photograph gives that control away. Budget
+    #: questions still work — the price stays a *filter* on the server —
+    #: but the number itself never leaves: it is stripped from the tool
+    #: result, so neither the card nor Emma ever has it to show or say.
+    units_show_price: bool = _get_bool("UNITS_SHOW_PRICE", False)
+    #: Where the floor-plan images live. The sales app serves them as public
+    #: static files on its Vercel deployment; floor->path comes from
+    #: data/floor-plan-assets.json (copied from condo-inventory — recopy when
+    #: their plans change). Not a secret, just an address.
+    inventory_plan_base: str = _get_token("INVENTORY_PLAN_BASE") or "https://condo-inventory.vercel.app"
     #: One JSON line per turn — see app/turnlog.py. Records what guests say,
     #: so it is a privacy decision as much as a debugging one; off with
     #: TURN_LOG=false. No audio is ever written, only text.
@@ -186,7 +292,32 @@ class Settings:
     # the desktop from boot is in the way while you're working. Startup still
     # verifies Chromium can run (headlessly, invisibly), so a broken install
     # is reported immediately either way.
+    #
+    # Also the switch CANVA_WARM_DECK depends on. Walking the deck needs a
+    # window and is only free while nobody is watching, so "warm at boot"
+    # and "no window at boot" cannot both be true; with this off the warm-up
+    # is skipped and says so in the log rather than opening a window anyway.
     canva_open_at_start: bool = _get_bool("CANVA_OPEN_AT_START", False)
+
+    # --- Web stage: "put that on the screen" ---
+    # Open pages in a Chromium window this server drives, instead of firing
+    # `os.startfile` at whatever browser the desktop happens to own.
+    #
+    # A window rather than a panel in /display because most of the web
+    # refuses to be embedded — Canva's own view links do, which is why
+    # canva_display exists at all — and a blocked frame renders as a white
+    # rectangle with no error anywhere. See app/tools/webstage.py.
+    #
+    # Off by default: the gallery's `open_in_browser` opens the staff's own
+    # browser, and a receptionist that puts visitor-requested web pages on
+    # the presentation screen is a different product.
+    web_stage: bool = _get_bool("WEB_STAGE", False)
+    web_stage_kiosk: bool = _get_bool("WEB_STAGE_KIOSK", True)
+    #: "chrome"/"msedge" drive the installed browser; blank uses bundled
+    #: Chromium. Real Chrome plays more video formats — bundled Chromium
+    #: ships without the proprietary codecs, so some YouTube videos are
+    #: audio-only or refuse outright on it.
+    web_stage_channel: str = os.getenv("WEB_STAGE_CHANNEL", "chrome")
 
     # Walk the whole deck once when the window opens, so every page is drawn
     # before a guest is standing in front of it.
@@ -274,6 +405,12 @@ class Settings:
     cors_origins: list[str] = field(default_factory=lambda: _get_list("CORS_ORIGINS", ["*"]))
     ssl_certfile: str = os.getenv("SSL_CERTFILE", "")
     ssl_keyfile: str = os.getenv("SSL_KEYFILE", "")
+    # Shared secret for every WebSocket, required the moment HOST leaves
+    # 127.0.0.1: this server carries tools that open programs and press keys
+    # on the machine, and an open LAN socket is an invitation. Empty = no
+    # check (localhost-only development). The roadmap gated LAN exposure on
+    # exactly this, and the gallery/home machines crossed that line today.
+    ws_token: str = os.getenv("WS_TOKEN", "")
 
 
     # --- Provider selection ---
@@ -339,6 +476,20 @@ class Settings:
     # hardware echo cancellation). Prefer headphones or a robot with
     # hardware AEC and leave this off.
     half_duplex: bool = _get_bool("HALF_DUPLEX", False)
+
+    # Who decides when speech starts and ends.
+    #   gemini (default) — Google's server-side detection; the mic streams
+    #                      upstream continuously, silence included.
+    #   local            — Silero VAD on this machine (sherpa-onnx, the wake
+    #                      word's own runtime). Gemini's detection is turned
+    #                      off and only speech is forwarded, wrapped in
+    #                      explicit activity signals. Kills the silence-
+    #                      hallucination class (我们走吧 from a quiet room)
+    #                      at the source and stops metering silence.
+    # Default stays gemini: the gallery must not change hearing behaviour on
+    # a pull, and local needs a one-time model fetch.
+    vad_mode: str = os.getenv("VAD_MODE", "gemini").strip().lower()
+    vad_model: str = os.getenv("VAD_MODEL", "data/wake/silero_vad.onnx")
     # OpenAI only: semantic_vad waits on whether the sentence sounds finished.
     openai_turn_detection: str = os.getenv("OPENAI_TURN_DETECTION", "semantic_vad")
     openai_vad_eagerness: str = os.getenv("OPENAI_VAD_EAGERNESS", "medium")

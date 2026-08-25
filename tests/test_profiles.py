@@ -240,3 +240,44 @@ def test_mic_shaping_defaults_keep_the_gallery_audio_untouched():
     src = inspect.getsource(config)
     assert re.search(r'os\.getenv\("MIC_BOOST",\s*"1\.0"\)', src)
     assert re.search(r'_get_bool\("MIC_NOISE_SUPPRESSION",\s*True\)', src)
+
+
+def test_the_translator_target_language_is_a_parameter():
+    """Item 7 on the sales boss's list names Spanish, French, German,
+    Chinese and Arabic customers. Staff Thai goes out in the customer's
+    language; whatever the customer speaks still comes back as Thai."""
+    es = build_instructions("X", profile="translator", translator_target="es")
+    assert "ภาษาสเปน" in es
+    ar = build_instructions("X", profile="translator", translator_target="ar")
+    assert "ภาษาอาหรับ" in ar
+    # The return direction never moves: customer speech -> Thai, always.
+    assert "ภาษาไทยเสมอ" in es
+    # Unknown code lands on English, not an exception mid-greeting.
+    assert "ภาษาอังกฤษ" in build_instructions("X", profile="translator",
+                                              translator_target="xx")
+
+
+def test_the_gallery_prompt_learns_the_library_only_when_it_is_loaded(monkeypatch):
+    """Adding mydocs to TOOL_GROUPS was measured to be not enough: the tool
+    registered and the robot never called it, because rule 14 routes every
+    unknown to search_condo_info and nothing in the prompt said a library
+    existed. A tool the model has no reason to reach for is the same as no
+    tool.
+
+    Gated on the group: the gallery default (blank TOOL_GROUPS, mydocs
+    opt-in and absent) keeps its prompt byte-identical on a pull."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "assistant_profile", "condo")
+    monkeypatch.setattr(settings, "tool_groups", "")
+    plain = build_instructions("X", extra_facts="")
+    assert "search_my_documents" not in plain, \
+        "the default gallery prompt must not mention a tool it does not have"
+
+    monkeypatch.setattr(settings, "tool_groups", "smarthome,slides,knowledge,mydocs")
+    withlib = build_instructions("X", extra_facts="")
+    assert "search_my_documents" in withlib
+    # The half that keeps the numbers honest: articles are marketing copy,
+    # and their figures ("yields 7-10%") have no approver.
+    assert "ห้ามอ้างตัวเลขการเงินจากบทความ" in withlib
+    assert "ฝ่ายขาย" in withlib.split("ห้ามอ้างตัวเลขการเงินจากบทความ", 1)[1]

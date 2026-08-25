@@ -138,7 +138,7 @@ PROJECT_NAME=ชื่อโครงการของคุณ
 Run it:
 
 ```
-uvicorn app.main:app --port 8000
+python run_server.py
 ```
 
 Open `http://localhost:8000/` in Chrome or Edge, pick a voice, press **Start
@@ -147,6 +147,39 @@ hold, and you can cut it off mid-sentence.
 
 Use `localhost`, not a `file://` path or a LAN IP — browsers only grant
 microphone access on `localhost` or HTTPS.
+
+### Use from another device on the same network
+
+Set `HOST=0.0.0.0` and `PORT=8000` in `.env` (these are the defaults), then
+run `python run_server.py`. The startup output prints the LAN URL, for example
+`http://192.168.0.30:8000`. The display page and an Android robot app can use
+that address immediately; WebSocket URLs follow the page host automatically.
+
+Browser microphone access is different: browsers treat a plain LAN HTTP URL
+as an insecure context. Use a certificate trusted by the client device and set
+both `SSL_CERTFILE` and `SSL_KEYFILE`; the same entrypoint then serves HTTPS
+and the client automatically changes its sockets from `ws://` to `wss://`.
+
+**Set `WS_TOKEN` before doing any of this.** The assistant's tools open
+programs, press media keys and drive the screen of the machine it runs on, and
+a WebSocket is not protected by the browser's cross-origin rules — so with no
+token, anything on the network (and any web page open on that machine) can
+hold a session with it. Put a long random value in `.env`:
+
+```
+WS_TOKEN=paste-something-long-and-random-here
+```
+
+Then open every page with it attached, and bookmark that URL:
+
+```
+http://192.168.0.30:8000/?token=paste-something-long-and-random-here
+http://192.168.0.30:8000/display?token=paste-something-long-and-random-here
+```
+
+Wrong or missing token: the page says so and stops trying, rather than
+retrying every two seconds. Leaving `WS_TOKEN` empty is only safe with
+`HOST=127.0.0.1`; the server prints a warning at startup if it is not.
 
 ### When the transcript doesn't match what was said
 

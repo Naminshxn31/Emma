@@ -25,7 +25,7 @@ import time
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app import heard, turnlog, voices
+from app import display, heard, turnlog, voices
 from app.config import settings
 from app.prompts import build_instructions, greeting_for
 from app.providers import ProviderError, default_voice_for, get_provider
@@ -35,7 +35,7 @@ logger = logging.getLogger("condo_voice.session")
 
 class VoiceSession:
     def __init__(self, ws: WebSocket, provider_name: str | None = None, voice: str | None = None,
-                 profile: str | None = None) -> None:
+                 profile: str | None = None, lang: str | None = None) -> None:
         self.ws = ws
         self.provider_name = provider_name or settings.provider
         #: Per-connection persona. The URL can ask for one (?profile=
@@ -44,6 +44,8 @@ class VoiceSession:
         #: machine's configured profile, and unknown names land on condo
         #: inside build_instructions — same safety as everywhere else.
         self.profile = (profile or settings.assistant_profile).strip().lower()
+        #: Translator mode's Thai->X target (?lang=es on the page URL).
+        self.lang = (lang or "en").strip().lower()
         chosen = voice or default_voice_for(self.provider_name)
         if not voices.is_valid(self.provider_name, chosen):
             chosen = default_voice_for(self.provider_name)
@@ -88,6 +90,7 @@ class VoiceSession:
             languages=settings.reply_languages,
             robot_name=settings.robot_name,
             profile=self.profile,
+            translator_target=self.lang,
         )
         provider = get_provider(
             self.provider_name, self.voice, instructions,
@@ -183,8 +186,6 @@ class VoiceSession:
                         # guest's ear. The other screens wait that long before
                         # switching, or they show the next slide while the
                         # robot is still talking about the last one.
-                        from app import display
-
                         display.set_audio_lead(event.get("ms", 0))
                         continue
                     if event.get("type") == "robot_ready":
@@ -243,6 +244,11 @@ class VoiceSession:
 
                     slides.answer_received()
                     await self._send_json({"type": "speech_started"})
+                    # The guest's own words never reach the robot's screen —
+                    # a public misreading of "ปิดไฟ" as "bit fire" makes a
+                    # working robot look broken, and Emma reads phone numbers
+                    # back out loud. An indicator says the same thing safely.
+                    await display.set_phase("listening")
 
                 elif event.kind == "interrupted":
                     self._sent_audio_ms = 0.0
@@ -253,7 +259,12 @@ class VoiceSession:
                     from app.tools import slides
 
                     slides.pause_for_barge_in()
+                    # Same reason `pause_for_barge_in` exists, one screen
+                    # over: the queue holds words nobody heard, and the
+                    # chest screen must not finish the sentence for her.
+                    display.drop_unheard()
                     await self._send_json({"type": "interrupted"})
+                    await display.set_phase("listening")
 
                 elif event.kind == "resumed":
                     # Picked the session back up past the duration cap. The
@@ -269,6 +280,7 @@ class VoiceSession:
 
                 elif event.kind == "turn_complete":
                     self._sent_audio_ms = 0.0
+                    display.end_turn()
                     await self._send_json({"type": "turn_complete"})
                     await self._nudge_tour_if_stalled()
                     self._spoke_this_turn = False
@@ -294,6 +306,11 @@ class VoiceSession:
                         self._spoke_this_turn = True
                         turnlog.record("said", text=event.text or "")
                     await self._send_json({"type": "assistant_transcript", "text": event.text or ""})
+                    # ...and to the robot's own screen, which unlike this tab
+                    # is being read by the guest — so it goes through the
+                    # audio clock instead of straight out. See app/display.py.
+                    await display.say(event.text or "")
+                    await display.set_phase("speaking")
 
                 elif event.kind == "tool_call":
                     turnlog.record("tool", name=event.text or "")
@@ -313,7 +330,6 @@ class VoiceSession:
                         "slide" in data or "now_showing" in data or data.get("cleared")
                     )
                     if changed_screen:
-                        from app import display
                         from app.tools import slides
 
                         payload["slide"] = slides.current_slide()
@@ -371,8 +387,6 @@ class VoiceSession:
                 if order is None:
                     continue
                 logger.info("following canva to page %d", page)
-                from app import display
-
                 await display.show(order["slide"])
                 await self._send_json({
                     "type": "tool_result",
@@ -633,7 +647,7 @@ _active: VoiceSession | None = None
 
 
 async def handle_connection(ws: WebSocket, provider: str | None = None, voice: str | None = None,
-                            profile: str | None = None) -> None:
+                            profile: str | None = None, lang: str | None = None) -> None:
     """Run a voice session, taking the robot over from any previous one.
 
     Newest wins rather than newest rejected. A stale tab must not be able to
@@ -664,8 +678,18 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
         from app.tools import slides
 
         slides.reset_state()
+        # The ROI sheet holds the previous guest's budget and assumptions —
+        # numbers, which are more personal than slides. Same rule as the
+        # transcript wipe: one visitor's figures are not the next one's
+        # business. sys.modules, not an import: importing would register the
+        # calc tools on machines whose TOOL_GROUPS excludes them.
+        import sys as _sys
 
-    session = VoiceSession(ws, provider_name=provider, voice=voice, profile=profile)
+        _calc = _sys.modules.get("app.tools.calc")
+        if _calc is not None:
+            _calc.reset()
+
+    session = VoiceSession(ws, provider_name=provider, voice=voice, profile=profile, lang=lang)
     _active = session
     turnlog.record("session_start", provider=session.provider_name, voice=session.voice)
     try:
@@ -673,4 +697,10 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
     finally:
         if _active is session:
             _active = None
+        # Wipe the robot's screen now, not on a timer. Nobody is watching it
+        # when a visitor walks away, and it is the most public surface in the
+        # building — the conversation tab's TRANSCRIPT_KEEP_MIN grace exists
+        # because one person is sitting in front of that one.
+        await display.clear_subtitle()
+        await display.set_phase("idle")
         turnlog.record("session_end")

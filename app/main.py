@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -41,6 +42,43 @@ if _slides_path.is_dir():
 
 _MODEL_FOR = {"gemini": lambda: settings.gemini_model, "openai": lambda: settings.openai_model}
 
+#: Hosts that mean "this machine only". Anything else is reachable from the
+#: network the machine is on.
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+#: The startup deck warm-up, held so it isn't garbage-collected mid-walk.
+_warm_task = None
+
+
+def warn_if_open_to_the_network(log: logging.Logger) -> str:
+    """Say out loud when the server is on the network with no WS_TOKEN.
+
+    The gate defaults to off (`WS_TOKEN=""`) while the exposure defaults to
+    **on** (`HOST=0.0.0.0`, in config.py and in .env.example both), so the
+    shipped configuration is the unprotected one. That is the same shape as
+    the `script_approved` bug — a safety mechanism whose default is the
+    unsafe side — and it matters more here, because the tools on this server
+    open programs and press keys on the machine running it.
+
+    A warning rather than a refusal to start: a showroom that will not boot
+    twenty minutes before opening is a worse outcome than one that boots
+    loudly. Returned as a string so a test can read the decision instead of
+    the log handler.
+    """
+    host = (settings.host or "").strip()
+    if host in _LOOPBACK_HOSTS:
+        return "localhost"
+    if settings.ws_token:
+        return "protected"
+    log.warning(
+        "SECURITY: HOST=%s makes this server reachable from the network and "
+        "WS_TOKEN is empty, so anything on it can open a session — and the "
+        "session can open programs, press keys and drive the screen on this "
+        "machine. Set WS_TOKEN in .env to a long random value and open every "
+        "page as ...?token=<value>, or set HOST=127.0.0.1.", host,
+    )
+    return "open"
+
 
 @app.on_event("startup")
 async def _log_effective_config() -> None:
@@ -51,12 +89,26 @@ async def _log_effective_config() -> None:
     effective values on boot turns that into a five-second diagnosis.
     """
     log = logging.getLogger("condo_voice")
+    # First line of the banner on purpose: everything below is about whether
+    # the assistant works, and this one is about who gets to use it.
+    warn_if_open_to_the_network(log)
     provider = settings.provider
     log.info("provider=%s model=%s voice=%s key=%s",
              provider, _MODEL_FOR.get(provider, lambda: "?")(),
              settings.gemini_voice if provider == "gemini" else settings.openai_voice,
              "set" if settings.api_key_for(provider) else "MISSING")
     if provider == "gemini":
+        if settings.vad_mode == "local":
+            # Exercise the factory now rather than on the first call: a
+            # missing model must be one line at boot, not a surprise at the
+            # first hello. for_session() logs its own fallback warning.
+            from app import vad_gate
+
+            probe = vad_gate.for_session()
+            log.info("vad: LOCAL (silero) silence=%dms prefix=%dms — silence "
+                     "is not streamed upstream%s",
+                     settings.vad_silence_ms, settings.vad_prefix_padding_ms,
+                     "" if probe else " [FELL BACK TO GEMINI — see warning]")
         log.info("vad: start=%s end=%s silence=%dms prefix=%dms | thinking_budget=%s | half_duplex=%s",
                  settings.vad_start_sensitivity, settings.vad_end_sensitivity,
                  settings.vad_silence_ms, settings.vad_prefix_padding_ms,
@@ -67,6 +119,23 @@ async def _log_effective_config() -> None:
 
     names = [t.name for t in tools.load_tools()]
     log.info("tools: %s", ", ".join(names) if names else "(none)")
+    # Two ways to end up without a tool you thought you had, both of which
+    # look identical from the conversation ("เอมม่าทำสิ่งนั้นไม่ได้ค่ะ") and
+    # neither of which said anything at boot until now.
+    stray = tools.unknown_groups(settings.enabled_tool_groups())
+    if stray:
+        log.warning(
+            "TOOL_GROUPS names %s, which are not tool groups — check the "
+            "spelling. Valid: %s", ", ".join(sorted(stray)),
+            ", ".join(sorted(set(tools._TOOL_MODULES.values()))),
+        )
+    if settings.units_sample and "show_unit" not in names:
+        log.warning(
+            "UNITS_SAMPLE is on but the `units` group is not loaded, so "
+            "show_unit does not exist and asking for a room will be refused. "
+            "Add `units` to TOOL_GROUPS in .env, e.g. TOOL_GROUPS=%s",
+            ",".join(sorted((settings.enabled_tool_groups() or set()) | {"units"})),
+        )
     ir = broadlink_ir.status()
     log.info("infrared: %s", ir)
     if settings.robot_enabled:
@@ -87,6 +156,22 @@ async def _log_effective_config() -> None:
 
         ok, detail = await canva_display.self_check()
         (log.info if ok else log.error)("canva display: %s", detail)
+        if ok and settings.canva_warm_deck:
+            # A background task, not an await: walking the deck takes about
+            # half a minute and boot must not wait for it. `open_and_warm`
+            # explains why it happens here instead of on the first slide.
+            # Reference kept — a bare create_task can be collected mid-walk.
+            import asyncio
+
+            global _warm_task
+            _warm_task = asyncio.create_task(canva_display.open_and_warm())
+
+    # The live inventory link: same rule as everything below that fails
+    # quietly — one line of truth at boot.
+    from app.tools import units as _units
+
+    ok_inv, detail_inv = _units.live_probe()
+    (log.info if ok_inv else log.warning)("%s", detail_inv)
 
     # Semantic search: on or off, said out loud at boot.
     #
@@ -124,9 +209,14 @@ async def _log_effective_config() -> None:
             "Smart-home tools will run in MOCK mode — nothing will physically "
             "switch. Missing: %s", "; ".join(missing),
         )
-        if settings.vad_start_sensitivity.upper() == "LOW":
-            log.warning("VAD_START_SENSITIVITY=LOW detects speech LESS often — "
-                        "the assistant may never respond. Use HIGH unless you know why.")
+    # Deliberately at function level, not inside the infrared block above.
+    # It was indented one step too far, so the warning about "the assistant
+    # may never respond" only ever printed on machines whose *infrared hub*
+    # was also broken — the one setting whose symptom is total silence, hidden
+    # behind a condition that has nothing to do with it.
+    if settings.vad_start_sensitivity.upper() == "LOW":
+        log.warning("VAD_START_SENSITIVITY=LOW detects speech LESS often — "
+                    "the assistant may never respond. Use HIGH unless you know why.")
 
 
 @app.on_event("startup")
@@ -152,6 +242,15 @@ async def _rearm_reminders() -> None:
 
 
 @app.on_event("shutdown")
+async def _close_web_stage() -> None:
+    """A kiosk window outliving the server it was driven by is a fullscreen
+    page with no address bar and nothing left to close it."""
+    from app.tools import webstage
+
+    await webstage.shutdown()
+
+
+@app.on_event("shutdown")
 async def _close_canva_display() -> None:
     """No-op if the window was never opened (CANVA_URL unset)."""
     from app.tools import canva_display
@@ -169,6 +268,32 @@ _NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
 @app.get("/")
 async def serve_client() -> FileResponse:
     return FileResponse(CLIENT_INDEX, headers=_NO_CACHE)
+
+
+async def _reject_unauthorized(websocket: WebSocket, token: str | None) -> bool:
+    """True = this socket was rejected and closed.
+
+    Applied to every WebSocket the moment WS_TOKEN is set: the same server
+    that answers questions also opens programs and presses keys, so "some
+    socket on the LAN" must never be enough to reach it. Accept-then-close
+    because a handshake-level refusal shows browsers nothing actionable —
+    this way the page can display *why* and stand down instead of redialing.
+    """
+    if not settings.ws_token:
+        return False
+    # Encoded, not compared as str: `compare_digest` refuses non-ASCII text,
+    # and a token someone pastes out of a password manager can contain
+    # anything at all — a TypeError here would read as "the gate is broken".
+    if token is not None and secrets.compare_digest(
+            token.encode("utf-8"), settings.ws_token.encode("utf-8")):
+        return False
+    await websocket.accept()
+    await websocket.send_text(json.dumps({
+        "type": "error", "code": "unauthorized",
+        "message": "ต้องใส่ token — เปิดหน้าด้วย ?token=... ให้ตรงกับ WS_TOKEN ใน .env",
+    }))
+    await websocket.close()
+    return True
 
 
 def _wake_ready() -> bool:
@@ -197,6 +322,11 @@ async def health() -> dict:
         # model must not put the UI in a mode the server cannot serve.
         "wake": {"enabled": settings.wake_enabled, "ready": _wake_ready()},
         "auto_connect": settings.auto_connect,
+        # How long the page keeps the finished conversation readable after
+        # the line sleeps. Served rather than hard-coded in the page so the
+        # showroom and the owner's desk can hold different answers to "who
+        # else can walk up to this screen".
+        "transcript_keep_min": settings.transcript_keep_min,
         "mic": {"boost": settings.mic_boost,
                 "noise_suppression": settings.mic_noise_suppression},
         "robot": robot_link.status(),
@@ -224,7 +354,7 @@ async def serve_display() -> FileResponse:
 
 
 @app.websocket("/ws/wake")
-async def ws_wake(websocket: WebSocket) -> None:
+async def ws_wake(websocket: WebSocket, token: str | None = None) -> None:
     """Standby ears. The browser streams PCM16 mono 16kHz here while no
     conversation is running; on hearing the name, the server answers with a
     single {"type": "wake"} and the browser opens the real session on /ws.
@@ -236,6 +366,8 @@ async def ws_wake(websocket: WebSocket) -> None:
     """
     from app import wake
 
+    if await _reject_unauthorized(websocket, token):
+        return
     await websocket.accept()
     if not settings.wake_enabled or not wake.available():
         # Tell the browser why, then hang up. The Start button still works;
@@ -279,13 +411,18 @@ async def ws_wake(websocket: WebSocket) -> None:
 
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket, voice: str | None = None, provider: str | None = None,
-                      profile: str | None = None) -> None:
-    await handle_connection(websocket, provider=provider, voice=voice, profile=profile)
+                      profile: str | None = None, lang: str | None = None,
+                      token: str | None = None) -> None:
+    if await _reject_unauthorized(websocket, token):
+        return
+    await handle_connection(websocket, provider=provider, voice=voice, profile=profile, lang=lang)
 
 
 @app.websocket("/ws/display")
-async def ws_display(websocket: WebSocket) -> None:
+async def ws_display(websocket: WebSocket, token: str | None = None) -> None:
     """Passive feed for slide displays — receives only, never sends."""
+    if await _reject_unauthorized(websocket, token):
+        return
     from app.tools import slides
 
     await websocket.accept()
