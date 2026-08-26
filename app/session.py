@@ -139,7 +139,10 @@ class VoiceSession:
                 # CANVA_URL is always set — so it waited for the first
                 # profile with no presentation screen, where every session
                 # died at "ready". Found by simulating exactly that.
-                if settings.canva_url and settings.canva_poll_s > 0:
+                # ...and never under MULTI_SESSION: the Canva window is the
+                # machine's, and N testers' sessions each polling and
+                # narrating one shared window is the two-clocks bug times N.
+                if settings.canva_url and settings.canva_poll_s > 0 and not settings.multi_session:
                     jobs.add(asyncio.create_task(self._follow_canva()))
                 if settings.idle_timeout_s:
                     jobs.add(asyncio.create_task(self._close_when_nobody_is_there()))
@@ -658,7 +661,15 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
     """
     global _active
 
-    previous = _active
+    # MULTI_SESSION: a shared test server has no robot to take over — many
+    # browsers, no machine. Nobody supersedes anybody, and nobody becomes
+    # `_active`: leaving the slot empty is what keeps `events.announce`
+    # structurally unable to deliver one tester's event into another
+    # tester's conversation, rather than relying on those events never
+    # firing. The machine-bound tool groups are already stripped in
+    # `enabled_tool_groups`, so the shared state the takeover exists to
+    # clear (slides.STATE, the calc sheet) can never be written here.
+    previous = _active if not settings.multi_session else None
     if previous is not None:
         logger.info("a new voice session took over — closing the previous one")
         turnlog.record("session_takeover")
@@ -690,7 +701,8 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
             _calc.reset()
 
     session = VoiceSession(ws, provider_name=provider, voice=voice, profile=profile, lang=lang)
-    _active = session
+    if not settings.multi_session:
+        _active = session
     turnlog.record("session_start", provider=session.provider_name, voice=session.voice)
     try:
         await session.run()
@@ -700,7 +712,9 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
         # Wipe the robot's screen now, not on a timer. Nobody is watching it
         # when a visitor walks away, and it is the most public surface in the
         # building — the conversation tab's TRANSCRIPT_KEEP_MIN grace exists
-        # because one person is sitting in front of that one.
+        # because one person is sitting in front of that one. (The display
+        # writers no-op under MULTI_SESSION, so this is safe to leave
+        # unconditional — see display._machine_owned.)
         await display.clear_subtitle()
         await display.set_phase("idle")
         turnlog.record("session_end")

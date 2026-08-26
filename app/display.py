@@ -88,9 +88,28 @@ _reveal_task: asyncio.Task | None = None
 _audio_until: float = 0.0
 
 
+def _machine_owned() -> bool:
+    """Whether some session owns this machine's screens and audio clock.
+
+    Everything in this module is state for *one* physical surface: one
+    subtitle queue, one `_audio_until`. Under MULTI_SESSION there are N
+    concurrent conversations and no robot — N sessions feeding one subtitle
+    queue would interleave strangers' conversations on whatever /display
+    happens to be open (the transcript-privacy rule, broken structurally),
+    and N browsers overwriting one audio clock makes `remaining_lead()`
+    garbage. So while nobody owns the machine, the writers accept nothing.
+    Decided here, once, instead of at the eight call sites in session.py.
+    """
+    from app.config import settings
+
+    return not settings.multi_session
+
+
 def set_audio_lead(ms: float) -> None:
     """Told by the browser holding the audio queue."""
     global _audio_lead_ms, _audio_until
+    if not _machine_owned():
+        return
     _audio_lead_ms = max(0.0, min(float(ms or 0.0), 30_000.0))
     _audio_until = time.monotonic() + _audio_lead_ms / 1000
 
@@ -205,6 +224,8 @@ async def say(text: str) -> None:
 
     if not text or not text.strip():
         return
+    if not _machine_owned():
+        return
     show_at = max(_sub_prev_until, time.monotonic())
     _sub_queue.append((show_at, text))
     _sub_prev_until = max(_audio_until, show_at)
@@ -278,6 +299,8 @@ async def clear_subtitle() -> None:
 
 async def set_phase(phase: str) -> None:
     """Tell the screen whether Emma is listening, speaking, or idle."""
+    if not _machine_owned():
+        return
     await broadcast({"type": "phase", "phase": phase})
 
 
