@@ -314,6 +314,68 @@ def test_play_youtube_opens_the_video_not_the_search_page(monkeypatch):
     assert opened == [], "a frameable video must not also launch a browser"
 
 
+_TWO_HITS = (
+    '"videoId":"forbidden01","title":{"runs":[{"text":"MV ค่ายห้ามฝัง"}]}'
+    ' filler "videoId":"allowed0002","title":{"runs":[{"text":"MV ฝังได้"}]}'
+)
+
+
+def _routed_httpx(monkeypatch, allowed_ids):
+    """A fake httpx that serves the results page and answers oEmbed per id."""
+    import sys
+    import types as t
+
+    class R:
+        def __init__(self, text="", status_code=200):
+            self.text = text
+            self.status_code = status_code
+
+    def get(url, *a, **k):
+        if "results" in url:
+            return R(text=_TWO_HITS)
+        vid = k["params"]["url"].rsplit("v=", 1)[1]
+        return R(status_code=200 if vid in allowed_ids else 403)
+
+    fake = t.ModuleType("httpx")
+    fake.get = get
+    monkeypatch.setitem(sys.modules, "httpx", fake)
+
+
+def test_play_youtube_skips_a_video_that_forbids_embedding(monkeypatch):
+    """The screenshot bug (2026-08-26): first hit was a label video with
+    embedding forbidden, and the guest got "Video unavailable" over a black
+    frame. The first *playable* hit is the answer, not the first hit —
+    YouTube's own oEmbed says which is which before anything reaches the
+    screen."""
+    import os
+
+    _routed_httpx(monkeypatch, allowed_ids={"allowed0002"})
+    opened = []
+    monkeypatch.setattr(os, "startfile", lambda u: opened.append(u), raising=False)
+
+    out = computer.play_youtube("เพลงรัก")
+    assert out["ok"] is True and out["playing"] == "MV ฝังได้"
+    assert "allowed0002" in out["embed"], \
+        "the embed must be the video that allows embedding"
+    assert opened == []
+
+
+def test_play_youtube_with_no_embeddable_hit_still_plays_in_a_window(monkeypatch):
+    """All three candidates real but embed-forbidden: a normal browser page
+    plays anything, so the video opens there — never an iframe that will
+    render "Video unavailable", and never a claim that nothing was found."""
+    import os
+
+    _routed_httpx(monkeypatch, allowed_ids=set())
+    opened = []
+    monkeypatch.setattr(os, "startfile", lambda u: opened.append(u), raising=False)
+
+    out = computer.play_youtube("เพลงรัก")
+    assert out["ok"] is True and out["playing"] == "MV ค่ายห้ามฝัง"
+    assert "embed" not in out, "an embed here is the black frame again"
+    assert opened == ["https://www.youtube.com/watch?v=forbidden01"]
+
+
 def test_play_youtube_falls_back_to_search_and_says_so(monkeypatch):
     """Network down or YouTube's HTML changed: open the results page and
     ORDER the model to say it's the results page — the "เปิดอันแรกให้แล้ว"
@@ -373,7 +435,12 @@ def test_ending_the_conversation_waits_for_the_goodbye(monkeypatch):
     monkeypatch.setattr(session_module, "_active", live)
 
     async def fake_wait(max_wait=0, then_pause=0):
-        waited.append(max_wait)
+        # Record how much audio was actually flowing when the wait began.
+        # The old fixed sleep(1.0) checked before the model had started
+        # speaking: the queue read empty, the wait returned instantly, and
+        # the line closed under the farewell ("ตอนไล่จะพูดไม่จบแล้วตัดไป",
+        # 2026-08-26). The close must wait for the goodbye to *begin*.
+        waited.append(display.remaining_lead())
         return 0.0
 
     monkeypatch.setattr(display, "wait_until_heard", fake_wait)
@@ -381,8 +448,14 @@ def test_ending_the_conversation_waits_for_the_goodbye(monkeypatch):
     async def body():
         out = await computer.end_conversation()
         assert out["ok"] is True and "กล่าวลา" in out["instruction"]
-        await asyncio.sleep(1.3)          # past the goodbye-start delay
+        # The goodbye starts flowing only after a beat — like the real
+        # model, which needs a moment to begin speaking.
+        await asyncio.sleep(0.3)
+        display.set_audio_lead(400)
+        await asyncio.sleep(0.6)
         assert waited, "hung up without waiting for the goodbye audio"
+        assert waited[0] > 0, \
+            "the wait began before the goodbye had started flowing"
         assert sent == [{"type": "farewell"}]
         assert closed == [True]
 

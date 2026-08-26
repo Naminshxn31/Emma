@@ -255,6 +255,20 @@ def _language_rule(languages: str) -> str:
             # again?" — inventing its own history rather than doing as asked.
             "ถ้าลูกค้าระบุภาษาที่ต้องการ ให้ใช้ภาษานั้นทันที แม้จะขอด้วยอีกภาษา "
             "ห้ามอ้างว่าเคยพูดภาษานั้นแล้ว ห้ามถามย้ำ "
+            # Two more, both from one live session (2026-08-26). The guest
+            # asked *in Thai* how to apologise in Japanese, got the word —
+            # and the very next utterance (English, likely misheard) was
+            # answered entirely in Japanese: the model confused the language
+            # being *discussed* with the language being *spoken*. And single
+            # stray utterances ("it's fine" misheard from "เปิดไฟ", the guest
+            # echoing 好的 they were just taught) must not flip the whole
+            # conversation — transcription mishears read as foreign words
+            # constantly, and a robot that changes language on every blip
+            # feels broken, not multilingual.
+            "ยึดภาษาที่ลูกค้าใช้พูด ไม่ใช่ภาษาที่ถูกพูดถึง — ถามเป็นไทยว่า "
+            "คำญี่ปุ่นพูดยังไง ให้ตอบเป็นไทยแล้วยกคำญี่ปุ่นมา "
+            "คำต่างภาษาโผล่ประโยคเดียวมักเป็นเสียงที่ถอดผิด ห้ามเปลี่ยนภาษาตาม "
+            "เปลี่ยนเมื่อลูกค้าพูดภาษานั้นต่อเนื่องหรือสั่งเท่านั้น "
             "เริ่มต้นด้วยภาษาไทยจนกว่าลูกค้าจะพูดภาษาอื่น"
         )
 

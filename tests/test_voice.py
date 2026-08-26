@@ -491,8 +491,140 @@ def test_system_instruction_stays_short():
     """
     from app.prompts import build_instructions
 
+    # Raised a seventh time (3600 -> 3800) for the spoken-vs-mentioned
+    # language clause. Rule 2 followed whatever language appeared, and a
+    # live session (2026-08-26) showed both halves of the failure: a guest
+    # asked in Thai how to apologise in Japanese, and the next utterance —
+    # English, likely misheard — was answered entirely in Japanese; earlier,
+    # "เปิดไฟ" misheard as "il fai" read as a language change. The clause
+    # pins replies to the language being SPOKEN, and forbids switching on a
+    # single stray utterance — mishears look like foreign words constantly,
+    # and a robot that flips language on every blip feels broken, not
+    # multilingual.
     text = build_instructions("Test Condo")
-    assert len(text) < 3600, "system instruction grew to %d chars" % len(text)
+    assert len(text) < 3800, "system instruction grew to %d chars" % len(text)
+
+
+def test_every_tool_is_registered_under_its_own_handler():
+    """The decorator registers whichever `def` follows it — and twice in two
+    days a helper was inserted between `@tool(...)` and the function it was
+    written for. search_web spent a full day dispatching to `_searxng`
+    (every live web search hit an empty URL: "Request URL is missing an
+    'http://' protocol", seen on the owner's screen 2026-08-26), and
+    play_youtube dispatched to the oEmbed prober ("missing 1 required
+    positional argument: 'video_id'"). Direct-call tests stayed green both
+    times because the module attribute still pointed at the real function —
+    only the registry was wrong, and nothing looked at the registry."""
+    import app.tools.registry as reg
+    from app import tools
+
+    # Importing every tool module widens the registry; snapshot and restore
+    # so tests that expect a restricted tool set keep the world they set up.
+    before = dict(reg._REGISTRY)
+    try:
+        for mod in list(tools._TOOL_MODULES):
+            __import__(mod)
+        mismatches = [(name, entry.handler.__name__)
+                      for name, entry in reg._REGISTRY.items()
+                      if entry.handler.__name__ != name]
+        assert reg._REGISTRY, "nothing registered — the scan itself is broken"
+        assert mismatches == [], (
+            "a helper slipped between @tool(...) and its def: %r" % mismatches)
+    finally:
+        reg._REGISTRY.clear()
+        reg._REGISTRY.update(before)
+
+
+def test_the_noise_amplifiers_are_separately_switchable(monkeypatch):
+    """Measured 2026-08-26 from real standby clips: the room's noise floor
+    amplified to "speech" level (frame RMS 0.02-0.03 with nobody talking) —
+    a level bar that never rests, and a keyword spotter listening through
+    hiss. The compressor and the browser AGC are the two agents, and each
+    needs its own off switch that actually reaches the page."""
+    from fastapi.testclient import TestClient
+
+    from app.config import settings as cfg
+    from app.main import app
+
+    monkeypatch.setattr(cfg, "mic_compressor", False)
+    monkeypatch.setattr(cfg, "mic_agc", False)
+    mic = TestClient(app).get("/health").json()["mic"]
+    assert mic["compressor"] is False and mic["agc"] is False
+
+    from pathlib import Path as _P
+
+    src = (_P(__file__).resolve().parent.parent / "client"
+           / "index.html").read_text(encoding="utf-8")
+    chain = src[src.index("function buildMicChain"):]
+    chain = chain[:chain.index("function ", 10)]
+    assert "if (!micCompressor)" in chain, \
+        "the compressor cannot be switched off from .env"
+    assert "autoGainControl: micAGC" in src, "AGC is not wired to the switch"
+    assert "autoGainControl: true" not in src, \
+        "a hardcoded AGC remains on one of the mic paths"
+
+
+def test_gemini_speaks_its_greeting_on_the_initial_connect(monkeypatch):
+    """The greeting parameter rode in from session.py since the beginning
+    and only the OpenAI provider ever used it — on Gemini the robot never
+    announced itself. What looked like a wake greeting was the model
+    reacting to the wake word's tail audio, and the day the VAD near-field
+    floor ate that quiet tail (2026-08-26), waking Emma produced silence:
+    chime, then nothing, and the owner concluded she wasn't awake."""
+    import asyncio
+
+    from app.config import settings as cfg
+    from app.providers.gemini import GeminiProvider
+
+    monkeypatch.setattr(cfg, "gemini_api_key", "k")
+    provider = GeminiProvider("Kore", "inst", greeting="ทักทายผู้ใช้สั้นๆ")
+    sent = []
+
+    class FakeSession:
+        async def send_client_content(self, **kw):
+            sent.append(kw)
+
+    async def fake_connect():
+        provider._session = FakeSession()
+
+    monkeypatch.setattr(provider, "_connect", fake_connect)
+    asyncio.run(provider.__aenter__())
+    assert sent, "the greeting never reached the session"
+    assert "ทักทายผู้ใช้สั้นๆ" in str(sent[0]["turns"])
+
+    # And never on a resume: a robot re-introducing itself because the
+    # transport rotated past the duration cap reads as a mid-conversation
+    # reset to the person standing in front of it.
+    sent.clear()
+    provider._resume_handle = "handle"
+    assert asyncio.run(provider._reconnect()) is True
+    assert sent == [], "the robot re-greeted on a session resume"
+
+
+def test_get_provider_hands_gemini_the_greeting():
+    """The wire that was missing: get_provider accepted the greeting and
+    dropped it on the floor for this provider only."""
+    from app.providers import get_provider
+
+    provider = get_provider("gemini", "Kore", "inst", greeting="สวัสดี")
+    assert provider.greeting == "สวัสดี"
+
+
+def test_the_language_rule_pins_spoken_not_mentioned():
+    """Both halves of the 2026-08-26 session failure, kept from silently
+    vanishing: (1) a Thai question ABOUT Japanese was followed by an
+    all-Japanese reply to an English utterance — the reply language must
+    track what the guest SPEAKS, not what is being discussed; (2) "เปิดไฟ"
+    misheard as "il fai" must not read as a language change — one stray
+    utterance never flips the conversation. Both profiles share [กฎภาษา],
+    so both are checked."""
+    from app.prompts import build_instructions
+
+    for profile in ("condo", "emma"):
+        text = build_instructions("Test Condo", profile=profile)
+        assert "ไม่ใช่ภาษาที่ถูกพูดถึง" in text, profile
+        assert "โผล่ประโยคเดียว" in text, \
+            f"{profile}: the single-stray-utterance guard is gone"
 
 
 def test_vad_sensitivity_defaults_are_high():

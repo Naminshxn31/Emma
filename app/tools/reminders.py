@@ -276,6 +276,47 @@ def cancel_reminder(id: str) -> dict:
             "instruction": "ไม่พบรายการนี้ ให้เรียก list_reminders แล้วดู id ที่ถูกต้อง"}
 
 
+_THAI_DAYS = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
+_THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม",
+                "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม",
+                "พฤศจิกายน", "ธันวาคม"]
+
+
+@tool(
+    name="current_datetime",
+    description=(
+        "บอกวันที่และเวลาปัจจุบันของเครื่องนี้ (เวลาท้องถิ่น) ใช้ทันทีเมื่อถูกถามว่า "
+        "กี่โมง วันนี้วันอะไร พรุ่งนี้วันที่เท่าไหร่ "
+        # Seen live 2026-08-26: asked "ตอนนี้กี่โมง", the model answered
+        # "7 โมงปลาย 45 นาที เวลาสากล" — a UTC guess, hours off, spoken with
+        # full confidence — and "พรุ่งนี้วันอะไร" went to *web search*. The
+        # clock is on this machine; asking the internet or the training data
+        # for it is the wrong direction.
+        "ห้ามเดาเวลาเองหรือใช้เวลาสากล ห้ามค้นเว็บหาเวลา อ่านจากผลลัพธ์นี้เท่านั้น"
+    ),
+    parameters={"type": "object", "properties": {}},
+    tags=["reminders"],
+)
+def current_datetime() -> dict:
+    """The machine's own clock, spoken in the machine's own timezone.
+
+    Numbers-from-tools, the smallest possible case: the model's clock is
+    frozen at training time and its timezone instinct is UTC. Both are
+    always wrong here, and both were heard on the owner's screen.
+    """
+    now = datetime.now().astimezone()
+    return {
+        "ok": True,
+        "time": now.strftime("%H:%M"),
+        "date_th": (f"วัน{_THAI_DAYS[now.weekday()]}ที่ {now.day} "
+                    f"{_THAI_MONTHS[now.month - 1]} พ.ศ. {now.year + 543}"),
+        "date_iso": now.strftime("%Y-%m-%d"),
+        "timezone": str(now.tzinfo),
+        "instruction": ("อ่านเวลา/วันที่จากผลนี้ตรงๆ ตอบสั้นๆ "
+                        "ปี ค.ศ. คือ %d ปี พ.ศ. คือ %d" % (now.year, now.year + 543)),
+    }
+
+
 def reset() -> None:
     """Tests re-point the store and run one loop per test; both leak."""
     global _items, _watcher

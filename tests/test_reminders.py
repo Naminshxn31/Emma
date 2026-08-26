@@ -176,3 +176,27 @@ def test_emma_knows_what_time_it_is():
 
     text = build_instructions("X", profile="emma")
     assert _t.strftime("%Y-%m-%d") in text
+
+
+def test_the_clock_answers_from_this_machine_not_from_training():
+    """Live, 2026-08-26: "ตอนนี้กี่โมง" was answered "7 โมงปลาย 45 นาที
+    เวลาสากล" — a confident UTC guess hours off local time — and
+    "พรุ่งนี้วันอะไร" went to web search. The clock is on this machine;
+    the tool reads it and orders the model to do the same."""
+    from datetime import datetime
+
+    from app.tools.reminders import current_datetime
+
+    out = current_datetime()
+    now = datetime.now().astimezone()
+    assert out["ok"] is True
+    assert out["date_iso"] == now.strftime("%Y-%m-%d")
+    # The spoken Thai date carries the Buddhist year — the year Thai guests
+    # actually use — and the instruction spells out both calendars so the
+    # model cannot helpfully "correct" one into the other.
+    assert str(now.year + 543) in out["date_th"]
+    # Registered under the reminders group, reachable through the registry
+    # under its own name (see test_every_tool_is_registered_under_its_own_handler).
+    import app.tools.registry as reg
+
+    assert reg._REGISTRY["current_datetime"].handler.__name__ == "current_datetime"

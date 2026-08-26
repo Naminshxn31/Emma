@@ -437,6 +437,29 @@ def close_program(name: str) -> dict:
             "instruction": "ปิดไม่สำเร็จ (อาจต้องสิทธิ์สูงกว่า) ให้บอกเจ้าของตรงๆ ห้ามบอกว่าปิดแล้ว"}
 
 
+def _youtube_allows_embedding(video_id: str) -> bool:
+    """Ask YouTube itself, before the iframe finds out the hard way.
+
+    oEmbed returns 200 only for a video that exists and permits embedding;
+    401/403 is an uploader who forbade it, 404 is an id that never existed.
+    Fail-open on network trouble: the check must never make things worse
+    than the old behaviour, and the search request that produced the id
+    just succeeded over the same network.
+    """
+    try:
+        import httpx
+
+        r = httpx.get(
+            "https://www.youtube.com/oembed",
+            params={"url": "https://www.youtube.com/watch?v=" + video_id,
+                    "format": "json"},
+            timeout=4, follow_redirects=True,
+        )
+        return r.status_code == 200
+    except Exception:
+        return True
+
+
 @tool(
     name="play_youtube",
     description=(
@@ -466,6 +489,8 @@ def close_program(name: str) -> dict:
     },
     tags=["computer"],
 )
+
+
 def play_youtube(query: str) -> dict:
     """First hit, played directly. Born from a real exchange: "เอาอันแรกเลย"
     answered with "จัดไปค่ะ เปิดอันแรกให้แล้ว" — a claim, not an action,
@@ -479,7 +504,7 @@ def play_youtube(query: str) -> dict:
     q = (query or "").strip()
     if not q:
         return {"ok": False, "error": "empty query"}
-    video_id = title = None
+    candidates: list[tuple[str, str]] = []
     try:
         import httpx
 
@@ -488,18 +513,37 @@ def play_youtube(query: str) -> dict:
             headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "th-TH,th"},
             timeout=10, follow_redirects=True,
         )
-        m = _re.search(
+        for m in _re.finditer(
             r'"videoId":"([\w-]{11})".*?"title":\{"runs":\[\{"text":"(.*?)"',
             r.text, _re.S,
-        )
-        if m:
-            video_id, title = m.group(1), m.group(2)
+        ):
+            if m.group(1) not in (c[0] for c in candidates):
+                candidates.append((m.group(1), m.group(2)))
+            if len(candidates) >= 3:
+                break
     except Exception:
         logger.warning("youtube lookup failed for %r", q, exc_info=True)
 
+    # The first *playable* hit, not the first hit. Uploaders can forbid
+    # embedding per video, and the iframe then renders "Video unavailable"
+    # over a black screen — seen live 2026-08-26, repeatedly, because music
+    # labels forbid it often. YouTube's own oEmbed endpoint answers 200 only
+    # for a video that exists AND allows embedding, so each candidate is
+    # asked before it is put on screen.
+    video_id = title = None
+    can_embed = False
+    for vid, ti in candidates:
+        if _youtube_allows_embedding(vid):
+            video_id, title, can_embed = vid, ti, True
+            break
+    if video_id is None and candidates:
+        # Real videos, all embed-forbidden: play the first in its own
+        # window instead (a normal browser page plays anything).
+        video_id, title = candidates[0]
+
     if video_id:
         url = "https://www.youtube.com/watch?v=" + video_id
-        frame = embeddable(url)
+        frame = embeddable(url) if can_embed else None
         if frame:
             turnlog.record("play_youtube", query=q, video=video_id, where="stage")
             return {"ok": True, "playing": title or q, "url": url,
@@ -582,7 +626,18 @@ async def end_conversation() -> dict:
         return {"ok": True, "note": "ไม่มีสายให้วาง"}
 
     async def _hang_up_after_goodbye():
-        await asyncio.sleep(1.0)               # let the goodbye start flowing
+        # Wait for the goodbye to *begin*, not a fixed beat. The old
+        # `sleep(1.0)` was a guess-clock: when the model took longer than a
+        # second to start speaking (it usually does), the audio queue was
+        # still empty at the check, wait_until_heard returned instantly, and
+        # the line closed under the farewell — "ตอนไล่จะพูดไม่จบแล้วตัดไป",
+        # reported 2026-08-26. So: watch for audio to actually start flowing
+        # (bounded, in case the model says nothing at all), then wait for it
+        # to be heard.
+        for _ in range(32):                    # up to ~8s for speech to start
+            await asyncio.sleep(0.25)
+            if display.remaining_lead() > 0:
+                break
         await display.wait_until_heard(max_wait=20.0, then_pause=0.5)
         if session_module._active is not live:
             return                              # someone else took over

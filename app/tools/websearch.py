@@ -26,6 +26,24 @@ logger = logging.getLogger("condo_voice.websearch")
 MAX_RESULTS = 5
 
 
+def _searxng(query: str) -> list[dict]:
+    """One query against the local SearXNG. Raises on any failure — the
+    caller decides what a failure falls back to."""
+    import httpx
+
+    from app.config import settings
+
+    r = httpx.get(settings.searxng_url + "/search",
+                  params={"q": query, "format": "json", "language": "th"},
+                  timeout=6)
+    r.raise_for_status()
+    return [
+        {"title": x.get("title", ""), "snippet": x.get("content", ""),
+         "url": x.get("url", "")}
+        for x in r.json().get("results", [])[:MAX_RESULTS]
+    ]
+
+
 @tool(
     name="search_web",
     description=(
@@ -47,22 +65,6 @@ MAX_RESULTS = 5
     },
     tags=["websearch"],
 )
-def _searxng(query: str) -> list[dict]:
-    """One query against the local SearXNG. Raises on any failure — the
-    caller decides what a failure falls back to."""
-    import httpx
-
-    from app.config import settings
-
-    r = httpx.get(settings.searxng_url + "/search",
-                  params={"q": query, "format": "json", "language": "th"},
-                  timeout=6)
-    r.raise_for_status()
-    return [
-        {"title": x.get("title", ""), "snippet": x.get("content", ""),
-         "url": x.get("url", "")}
-        for x in r.json().get("results", [])[:MAX_RESULTS]
-    ]
 
 
 def search_web(query: str) -> dict:
