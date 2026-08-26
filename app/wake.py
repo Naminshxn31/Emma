@@ -39,25 +39,68 @@ logger = logging.getLogger("condo_voice.wake")
 #: calls; the variants catch the neighbourhood. (First real-mic session:
 #: TTS-tested EMMA alone did not fire on a live "เอ็มม่า".)
 _VARIANTS = {
-    # Measured 2026-08-24 with WAKE_DEBUG on: twenty seconds of speech at
-    # peak 0.24-0.33 — unambiguously loud, unambiguously the name — passed
-    # through these three without a single hit, then fired once later. So
-    # the neighbourhood was too small, in the direction the docstring above
-    # already guessed. AMA drops the doubled M (Thai says "อะ-หม่า" more
-    # openly than English "EMMA"); IMMA raises the first vowel.
+    # Two spellings, not five — measured 2026-08-25 against Thai neural-TTS
+    # renderings of the name (both th-TH voices, three written forms, three
+    # speaking rates; wavs in tests/data/wake/). The previous five-spelling
+    # list scored 5/8 with a false positive; this pair at threshold 0.10
+    # scores 7/8 with none. The counterintuitive part, kept here so nobody
+    # "improves" it back: **spellings compete inside one decoder beam, so
+    # adding weak ones makes the good ones worse.** With all five loaded,
+    # the plain female "เอ็มม่า" — the exact call the owner reported missing
+    # — was caught by nothing; with just these two, EMMA catches it.
     #
-    # Deliberately not widened past that. ANNA and ELMA encode cleanly too
-    # and are ordinary English words — a wake word that fires on the room's
-    # conversation is worse than one that needs saying twice.
-    "emma": ["EMMA", "AMMA", "EMA", "AMA", "IMMA"],
+    # Of the removed three: AMMA and EMA matched zero probes at any
+    # threshold (dead weight in the beam), and AMA fired on the English
+    # phrase "a comma". IMMA earns its slot as the only spelling that heard
+    # the short female "เอ็มม่า" at every threshold tried.
+    #
+    # Known remaining miss: a deep male voice saying the name at the head of
+    # a sentence (7/8). No spelling or boost reached it — boost 8 made
+    # everything worse — so it is accepted, not unknown.
+    #
+    # The third slot is earned from *real* clips, not TTS: the owner's mouth
+    # renders "เอ็มม่า" as "เอ็มอา/อิหม่า" (Gemini-transcribed miss clips,
+    # 2026-08-26) — a softened /m/ coda no TTS produces. First filled with
+    # AH MA (caught the compressed-chain clips); re-measured after the
+    # standby compressor came out and A MA won the rematch: it hears the
+    # clean-chain "เอ็มม่า" up to bar 0.08 (highest of 22 candidates) with
+    # the same false-fire profile. (Both plausibly match "อาม่า", grandma —
+    # on the owner's home machine that trade was taken knowingly.)
+    #
+    # The same clips also bounded what spelling tuning can do: about half of
+    # the real failed attempts were speech even *Gemini* could not transcribe
+    # — too quiet or too far. No keyword list fixes those; the microphone does.
+    "emma": ["EMMA", "IMMA", "A MA"],
+}
+
+#: Per-spelling threshold scale: this spelling's bar = WAKE_THRESHOLD × the
+#: factor. A *scale* rather than an absolute so WAKE_THRESHOLD stays the one
+#: knob — raise it against false fires and every spelling rises with it.
+#:
+#: Added after the first live morning with the shadow ear (2026-08-26): a
+#: real "เอ็มม่า" NEAR-MISSED — heard, scored under 0.10 — and the owner
+#: reported saying the name several times per wake. The measured combination
+#: that catches more without new false fires is EMMA at half the bar with
+#: IMMA staying at it: EMMA@0.05 *alone* fires on "อิ่มมาก", but with IMMA
+#: present at 0.10 the beam gives that utterance to the IMMA path, which
+#: then rejects it — measured clean on the whole negative set, and guarded
+#: by the other_imm_trap test. Halving IMMA as well brings the false fire
+#: back (measured); resist the symmetry.
+_SPELLING_SCALE = {
+    "EMMA": 0.5,
+    # 0.8, from the rematch on clean-chain clips: the confirmed "เอ็มม่า"
+    # scores just under the full bar on this path (hit at 0.08, miss at
+    # 0.10) and the false-fire profile at 0.8x measured identical to 1.0x —
+    # margin that costs real catches is not margin.
+    "A MA": 0.8,
 }
 
 #: Precomputed BPE for the variants, so the default name works even without
 #: sentencepiece installed. Any *other* WAKE_WORD needs sentencepiece.
 _KNOWN_ENCODINGS = {
     "EMMA": "▁E M MA",
-    "AMMA": "▁A M MA",
-    "EMA": "▁E MA",
+    "IMMA": "▁I M MA",
+    "A MA": "▁A ▁MA",
 }
 
 _spotter = None
@@ -81,39 +124,64 @@ def _spellings_for(word: str) -> list[str]:
     even reaching the detector, which is the question that has to be settled
     before any spelling can be judged.
     """
-    override = [s.strip().upper() for s in
+    override = [s.strip().upper().split(":", 1)[0] for s in
                 (settings.wake_spellings or "").split(",") if s.strip()]
     if override:
         return override
     return _VARIANTS.get(word, [word.upper()])
 
 
-def _encode_keyword(word: str) -> str | None:
+def _override_thresholds() -> dict[str, float]:
+    """Per-spelling thresholds from WAKE_SPELLINGS' `NAME:0.05` syntax.
+
+    Same reason the list itself is tunable from .env: which bar each
+    spelling deserves depends on a mouth and a room, and the built-in table
+    was itself corrected from a live morning's log. A malformed number is
+    skipped (the spelling still listens, at the default bar) rather than
+    taking the whole wake word down.
+    """
+    out: dict[str, float] = {}
+    for part in (settings.wake_spellings or "").split(","):
+        if ":" not in part:
+            continue
+        name, _, value = part.strip().upper().partition(":")
+        try:
+            out[name.strip()] = float(value)
+        except ValueError:
+            logger.warning("WAKE_SPELLINGS: %r is not a number — %s listens "
+                           "at WAKE_THRESHOLD instead", value, name.strip())
+    return out
+
+
+def _encode_keyword(word: str, threshold: float | None = None) -> str | None:
     """The KWS model wants BPE pieces, not letters. One line per spelling
     variant, every variant reporting the same @LABEL.
 
     `:boost` raises the score of the keyword path while it is being matched,
     `#threshold` is the score it must clear — both straight from the
     sherpa-onnx keywords-file format. `@LABEL` is what get_result returns.
+
+    `threshold` overrides the configured one — the shadow detector listens
+    for the same spellings at a floor value.
     """
     word = word.strip().lower()
     spellings = _spellings_for(word)
     label = word.upper()
 
-    encoded: list[str] = []
+    pairs: list[tuple[str, str]] = []
     try:
         import sentencepiece as spm
 
         sp = spm.SentencePieceProcessor()
         sp.load(str(_model_dir() / "bpe.model"))
         for spelling in spellings:
-            encoded.append(" ".join(sp.encode(spelling, out_type=str)))
+            pairs.append((spelling, " ".join(sp.encode(spelling, out_type=str))))
     except Exception:
         for spelling in spellings:
             pieces = _KNOWN_ENCODINGS.get(spelling)
             if pieces is not None:
-                encoded.append(pieces)
-        if not encoded:
+                pairs.append((spelling, pieces))
+        if not pairs:
             logger.warning(
                 "cannot encode wake word %r: sentencepiece is not available "
                 "and there is no precomputed encoding for it — only %s work "
@@ -121,11 +189,24 @@ def _encode_keyword(word: str) -> str | None:
                 word, sorted(_VARIANTS),
             )
             return None
+
+    overrides = _override_thresholds()
+
+    def bar(spelling: str) -> float:
+        # An explicit argument (the shadow's floor) flattens everything;
+        # otherwise WAKE_SPELLINGS' `NAME:0.05` wins as an absolute, then
+        # WAKE_THRESHOLD scaled by the built-in per-spelling factor.
+        if threshold is not None:
+            return threshold
+        if spelling in overrides:
+            return overrides[spelling]
+        return settings.wake_threshold * _SPELLING_SCALE.get(spelling, 1.0)
+
     return "\n".join(
         "%s :%.1f #%.2f @%s" % (
-            pieces, settings.wake_boost, settings.wake_threshold, label
+            pieces, settings.wake_boost, bar(spelling), label
         )
-        for pieces in encoded
+        for spelling, pieces in pairs
     )
 
 
@@ -158,24 +239,65 @@ def _get_spotter():
         return None
 
     try:
-        import sherpa_onnx
-
-        keywords_path = d / "keywords_active.txt"
-        keywords_path.write_text(keyword_line + "\n", encoding="utf-8")
-        _spotter = sherpa_onnx.KeywordSpotter(
-            tokens=str(d / "tokens.txt"),
-            encoder=str(d / "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"),
-            decoder=str(d / "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"),
-            joiner=str(d / "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx"),
-            keywords_file=str(keywords_path),
-            num_trailing_blanks=1,
-        )
+        _spotter = _make_spotter(keyword_line, "keywords_active.txt")
         logger.info("wake word ready: %r", settings.wake_word)
     except Exception:
         logger.warning("could not load the wake-word model", exc_info=True)
         _load_failed = True
         _spotter = None
     return _spotter
+
+
+def _make_spotter(keyword_line: str, filename: str):
+    import sherpa_onnx
+
+    d = _model_dir()
+    keywords_path = d / filename
+    keywords_path.write_text(keyword_line + "\n", encoding="utf-8")
+    return sherpa_onnx.KeywordSpotter(
+        tokens=str(d / "tokens.txt"),
+        encoder=str(d / "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"),
+        decoder=str(d / "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"),
+        joiner=str(d / "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx"),
+        keywords_file=str(keywords_path),
+        num_trailing_blanks=1,
+    )
+
+
+#: The score floor the shadow detector listens at. Not zero: at 0.0 every
+#: keyword path fires constantly and the near-miss signal means nothing.
+SHADOW_THRESHOLD = 0.02
+
+_shadow_spotter = None
+_shadow_failed = False
+
+
+def _get_shadow_spotter():
+    """The same spellings at the floor threshold — WAKE_DEBUG's second ear.
+
+    The question WAKE_DEBUG could not answer was the detector-side half:
+    the RMS report proves a voice reached the socket, and then a missed
+    name is still two different problems — "scored just under the
+    threshold" (fix: lower WAKE_THRESHOLD a step) and "never resembled the
+    keyword at all" (fix: pronunciation or WAKE_SPELLINGS, and no threshold
+    will help). sherpa's spotter returns no score, so the shadow answers by
+    construction: it hears everything above the floor, and a shadow hit
+    with no real hit is, by definition, a score in the gap.
+    """
+    global _shadow_spotter, _shadow_failed
+    if _shadow_spotter is not None or _shadow_failed:
+        return _shadow_spotter
+    keyword_line = _encode_keyword(settings.wake_word,
+                                   threshold=SHADOW_THRESHOLD)
+    if keyword_line is None:
+        _shadow_failed = True
+        return None
+    try:
+        _shadow_spotter = _make_spotter(keyword_line, "keywords_shadow.txt")
+    except Exception:
+        logger.warning("could not build the shadow detector", exc_info=True)
+        _shadow_failed = True
+    return _shadow_spotter
 
 
 class WakeStream:
@@ -197,6 +319,35 @@ class WakeStream:
         self._probe_sum = 0.0
         self._probe_n = 0
         self._heard_anything = False
+        # WAKE_DEBUG's second ear: same spellings at the floor threshold.
+        # Only while debugging — it is a second full decode of every frame.
+        self._shadow = (_get_shadow_spotter()
+                        if settings.wake_debug and self._spotter else None)
+        self._shadow_stream = (self._shadow.create_stream()
+                               if self._shadow else None)
+        # WAKE_DEBUG's third tool: keep what the detector actually heard.
+        # The morning of 2026-08-26 exhausted the score-side diagnostics —
+        # real calls of the name scored under even the shadow's floor, while
+        # Thai-TTS renderings pass every test. The one thing that separates
+        # those worlds is the audio itself (mic + room + the browser's
+        # compressor/AGC/NS chain), and no amount of staring at thresholds
+        # reveals a waveform. So under debug, speech that produces no hit is
+        # written to data/wake_debug/ for offline analysis against the real
+        # voice. Owner's own machine, debug mode only, pruned to the newest
+        # twenty clips — this is a tuning instrument, not a recorder.
+        # WAKE_ENROLL widens the capture from "misses only" to "every speech
+        # window, hits included" — the collection step for teaching the
+        # matcher the owner's own voice. A hit is the *best* enrollment
+        # sample there is, which is exactly why the miss-only rule flips.
+        self._cap = (bytearray()
+                     if settings.wake_debug or settings.wake_enroll else None)
+        self._cap_max = 16000 * 2 * 6          # the last ~6 seconds
+        self._hit_this_window = False
+        if settings.wake_enroll:
+            logger.warning(
+                "WAKE_ENROLL is on: every speech window on this standby "
+                "socket is being saved to %s. Say the name 10-15 times, "
+                "then turn it off.", settings.wake_enroll_dir)
 
     @property
     def ok(self) -> bool:
@@ -219,8 +370,10 @@ class WakeStream:
         samples = (
             np.frombuffer(pcm16, dtype="<i2").astype("float32") / 32768.0
         )
-        if settings.wake_debug:
-            self._report(samples)
+        if self._cap is not None:
+            self._cap.extend(pcm16)
+            if len(self._cap) > self._cap_max:
+                del self._cap[:len(self._cap) - self._cap_max]
         self._stream.accept_waveform(16000, samples)
         hit = None
         while self._spotter.is_ready(self._stream):
@@ -229,6 +382,50 @@ class WakeStream:
             if result:
                 hit = result
                 self._spotter.reset_stream(self._stream)
+        if hit and self._cap is not None:
+            self._hit_this_window = True
+            if settings.wake_enroll:
+                # The browser closes this socket right after a hit (one
+                # detection, one session), so no report tick will follow —
+                # and a successful call is the best enrollment sample there
+                # is. Save it now or never.
+                self._save_clip("enroll")
+            else:
+                # A successful wake is not a miss; keep only what failed.
+                self._cap.clear()
+        if settings.wake_debug or settings.wake_enroll:
+            # After decoding, so the report tick can tell a window with a
+            # hit from a window of speech that produced nothing. Enrollment
+            # rides the same tick — it must not depend on WAKE_DEBUG also
+            # happening to be on (it was, on the machine this was built on,
+            # which is exactly how that coupling would have shipped unseen).
+            self._report(samples)
+        if self._shadow_stream is not None:
+            shadow_hit = None
+            self._shadow_stream.accept_waveform(16000, samples)
+            while self._shadow.is_ready(self._shadow_stream):
+                self._shadow.decode_stream(self._shadow_stream)
+                result = self._shadow.get_result(self._shadow_stream)
+                if result:
+                    shadow_hit = result
+                    self._shadow.reset_stream(self._shadow_stream)
+            if shadow_hit and not hit:
+                # The gap, caught in the act: the name was recognisable at
+                # the floor but scored under WAKE_THRESHOLD. This line is
+                # the difference between "lower the threshold a step" and
+                # "no threshold will help" — before it, both looked like
+                # nothing happening.
+                logger.warning(
+                    "wake NEAR MISS: %r scored between %.2f and %.2f — the "
+                    "name was heard but not accepted. Lower WAKE_THRESHOLD "
+                    "one step (e.g. -0.02) if this keeps appearing on real "
+                    "calls of the name.",
+                    shadow_hit, SHADOW_THRESHOLD, settings.wake_threshold,
+                )
+                from app import turnlog
+
+                turnlog.record("wake_near_miss", word=shadow_hit,
+                               threshold=settings.wake_threshold)
         if hit:
             logger.info("wake word heard: %r", hit)
         return hit
@@ -273,10 +470,49 @@ class WakeStream:
             verdict = "speech level reached — if the name still misses, it is the keyword, not the microphone"
         logger.info("wake audio: avg=%.4f peak=%.4f (speech >= %.2f) — %s",
                     avg, self._probe_peak, self.SPEECH, verdict)
+        if self._cap and self._probe_peak >= self.SPEECH:
+            if settings.wake_enroll:
+                # Collection mode: every speech window, hit or not.
+                self._save_clip("enroll")
+            elif not self._hit_this_window:
+                self._save_clip("miss")
+        self._hit_this_window = False
         self._probe_at = now
         self._probe_peak = 0.0
         self._probe_sum = 0.0
         self._probe_n = 0
+
+    def _save_clip(self, kind: str) -> None:
+        """Keep what the detector actually heard, for offline analysis.
+
+        "miss" (WAKE_DEBUG): speech that fired nothing — the recording of
+        exactly the thing every threshold and spelling had been tuned
+        *around* instead of *against*. "enroll" (WAKE_ENROLL): every speech
+        window, hits included — the owner teaching the matcher their own
+        voice. Written locally only, pruned, never on any log clock.
+        """
+        import time
+        import wave
+        from pathlib import Path
+
+        directory, keep = ((settings.wake_enroll_dir, 60) if kind == "enroll"
+                           else (settings.wake_debug_dir, 20))
+        try:
+            d = Path(directory).expanduser()
+            d.mkdir(parents=True, exist_ok=True)
+            path = d / time.strftime(f"{kind}-%Y%m%d-%H%M%S.wav")
+            with wave.open(str(path), "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(16000)
+                w.writeframes(bytes(self._cap))
+            self._cap.clear()
+            clips = sorted(d.glob(f"{kind}-*.wav"))
+            for old in clips[:-keep]:
+                old.unlink(missing_ok=True)
+            logger.info("wake %s clip saved: %s", kind, path)
+        except Exception:
+            logger.exception("could not save the wake %s clip", kind)
 
 
 #: Standby browsers currently holding a /ws/wake socket. Normally the wake
@@ -318,7 +554,9 @@ async def summon(reason: str = "server") -> int:
 
 def reset() -> None:
     """Tests swap models and settings; the singleton must not outlive them."""
-    global _spotter, _load_failed
+    global _spotter, _load_failed, _shadow_spotter, _shadow_failed
     _spotter = None
     _load_failed = False
+    _shadow_spotter = None
+    _shadow_failed = False
     _STANDBY.clear()
