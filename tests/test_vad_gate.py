@@ -161,6 +161,100 @@ def test_a_missing_model_falls_back_loudly_not_silently(monkeypatch, caplog, tmp
     assert "fetch_vad_model.py" in caplog.text
 
 
+QUIET_CHUNK = b"\x30\x00" * 160     # amplitude 48/32768 ≈ 0.0015 RMS-ish
+LOUD_CHUNK = (int(0.1 * 32767)).to_bytes(2, "little", signed=True) * 160
+
+
+def test_the_floor_keeps_far_speech_out_entirely():
+    """Silero answers "is somebody speaking", not "is somebody speaking to
+    us" — in the owner's room it opened the gate for conversations across
+    the room, and Emma answered words never aimed at her (measured on
+    screen, 2026-08-26: she narrated somebody's off-mic cursing back at
+    them). Loudness is the one signal that separates the person at the
+    microphone from the rest of the room, so quiet speech must produce NO
+    actions — not quieter ones."""
+    gate = VadGate(ScriptedDetector([True] * 10), prefix_padding_ms=100,
+                   min_rms=0.03)
+    gate._opened_at -= 10               # past the opening grace; see below
+    for _ in range(10):
+        assert gate.feed(QUIET_CHUNK) == []
+    assert not gate.in_speech
+
+
+def test_the_floor_opens_for_the_person_at_the_desk():
+    """The twin: speech above the floor passes with its pre-roll intact —
+    the floor rejects distance, not the first syllable."""
+    gate = VadGate(ScriptedDetector([False, True, True]), prefix_padding_ms=100,
+                   min_rms=0.03)
+    gate._opened_at -= 10               # past the opening grace
+    gate.feed(QUIET_CHUNK)              # room noise into the pre-roll
+    actions = gate.feed(LOUD_CHUNK)
+    assert [k for k, _ in actions] == ["start", "audio", "audio"]
+    assert gate.feed(LOUD_CHUNK) == [("audio", LOUD_CHUNK)]
+
+
+def test_the_floor_never_chops_an_open_segment():
+    """Applied only at the opening: a sentence trailing off quietly is still
+    the same sentence, and cutting it mid-word is the beheading bug at the
+    other end."""
+    gate = VadGate(ScriptedDetector([True, True, True]), prefix_padding_ms=100,
+                   min_rms=0.03)
+    gate.feed(LOUD_CHUNK)               # opens
+    assert gate.feed(QUIET_CHUNK) == [("audio", QUIET_CHUNK)], \
+        "the quiet tail of an open segment must still be forwarded"
+
+
+def test_the_floor_stands_down_for_the_opening_seconds():
+    """A wake-opened session begins with the wake tail — the very speech
+    that fired the detector, replayed in — and on 2026-08-26 the floor ate
+    exactly that (rms 0.006 < 0.010): Emma woke, heard nothing, said
+    nothing, and the owner concluded she wasn't awake. Whoever opened the
+    session was addressing the machine by definition, so for the first few
+    seconds quiet speech passes."""
+    gate = VadGate(ScriptedDetector([True]), prefix_padding_ms=100,
+                   min_rms=0.03)
+    actions = gate.feed(QUIET_CHUNK)      # quiet, but inside the grace
+    assert actions and actions[0][0] == "start", \
+        "the wake tail was distance-filtered at the door"
+
+
+def test_no_floor_means_the_old_behaviour_exactly():
+    """Default 0 = off: the showroom wants far pickup, and a pull must not
+    change what it hears."""
+    gate = VadGate(ScriptedDetector([True]), prefix_padding_ms=100)
+    actions = gate.feed(QUIET_CHUNK)
+    assert [k for k, _ in actions][0] == "start"
+
+
+def test_for_session_carries_the_configured_floor(monkeypatch):
+    """The setting must reach the gate — a knob wired to nothing is the
+    misconfiguration shape this project keeps paying for."""
+    from app import vad_gate
+
+    monkeypatch.setattr(settings, "vad_mode", "local")
+    monkeypatch.setattr(settings, "vad_min_rms", 0.07)
+    monkeypatch.setattr(vad_gate, "_make_detector",
+                        lambda: ScriptedDetector([]))
+    gate = vad_gate.for_session()
+    assert gate._min_rms == pytest.approx(0.07)
+
+
+def test_the_call_uses_its_own_mic_boost_not_standbys():
+    """The two modes want opposite microphones: standby's compressor lets
+    the name carry across the room, and the same compressor lifts everyone
+    else's conversation into the call. startMic must build its chain with
+    the call boost; the wake path keeps the standby one."""
+    src = (Path(__file__).parent.parent / "client" / "index.html").read_text(
+        encoding="utf-8")
+    call = src[src.index("async function startMic"):]
+    call = call[:call.index("worklet = new AudioWorkletNode")]
+    assert "buildMicChain(audioCtx, micSource, micCallBoost)" in call
+    wake_path = src[src.index("async function startWakeMode"):]
+    wake_path = wake_path[:wake_path.index("wakeWorklet = new AudioWorkletNode")]
+    assert "micCallBoost" not in wake_path, \
+        "standby must keep far-field reach — that is how the name is heard"
+
+
 def test_the_real_detector_hears_the_committed_speech():
     """Real Silero over the committed TTS wav: start, audio, end — on a
     machine with the model. On one without, this line is what is going

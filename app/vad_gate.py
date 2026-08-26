@@ -58,13 +58,39 @@ class VadGate:
     and short commands vanish entirely.
     """
 
-    def __init__(self, detector, prefix_padding_ms: int, sample_rate: int = 16000) -> None:
+    def __init__(self, detector, prefix_padding_ms: int, sample_rate: int = 16000,
+                 min_rms: float = 0.0) -> None:
         self._detector = detector
         self._rate = sample_rate
         #: Bytes of pre-roll to keep: ms * (2 bytes/sample) * samples/ms.
         self._preroll_max = int(prefix_padding_ms * 2 * sample_rate / 1000)
         self._preroll = bytearray()
         self.in_speech = False
+        #: Near-field floor (VAD_MIN_RMS): a speech segment may only *open*
+        #: if its trigger chunk is at least this loud. Silero answers "is
+        #: somebody speaking", not "is somebody speaking to us" — in the
+        #: owner's room it opened the gate for other people's conversations
+        #: across the room, and Emma answered words that were never aimed at
+        #: her. Loudness is the one signal that separates the person at the
+        #: microphone from the rest of the room. 0 = off (the default; the
+        #: showroom wants far pickup). Applied only at the opening: once a
+        #: segment is open, a sentence trailing quiet must not be chopped.
+        self._min_rms = float(min_rms)
+        self._floor_logged_at = 0.0
+        #: The floor stands down for the session's first few seconds. A
+        #: wake-opened session begins with the wake tail — the very speech
+        #: that fired the detector, replayed in — and on 2026-08-26 the
+        #: floor ate exactly that (rms 0.006 < 0.010): Emma woke, heard
+        #: nothing, said nothing, and the owner concluded she wasn't awake.
+        #: Whoever opened this session was addressing the machine by
+        #: definition; distance-filtering their own opening words is the
+        #: floor firing on the one utterance it exists to protect.
+        import time
+
+        self._opened_at = time.monotonic()
+
+    #: Seconds after opening during which the floor does not apply.
+    FLOOR_GRACE_S = 3.0
 
     def feed(self, pcm16: bytes) -> list[tuple[str, bytes]]:
         if not pcm16:
@@ -74,6 +100,28 @@ class VadGate:
         samples = np.frombuffer(pcm16, dtype="<i2").astype("float32") / 32768.0
         self._detector.accept_waveform(samples)
         speaking = bool(self._detector.is_speech_detected())
+
+        import time as _time
+
+        if (speaking and not self.in_speech and self._min_rms > 0.0
+                and _time.monotonic() - self._opened_at > self.FLOOR_GRACE_S):
+            rms = float(np.sqrt((samples * samples).mean()))
+            if rms < self._min_rms:
+                # Too far away to be talking to us. Treated as silence, so
+                # the pre-roll keeps rolling — if the speaker steps closer
+                # mid-sentence, the segment opens with its head intact.
+                import time
+
+                now = time.monotonic()
+                if now - self._floor_logged_at > 5.0:
+                    logger.info(
+                        "vad floor: speech detected but under VAD_MIN_RMS "
+                        "(rms=%.4f < %.3f) — not forwarded. Lower the floor "
+                        "if this was the person at the microphone.",
+                        rms, self._min_rms,
+                    )
+                    self._floor_logged_at = now
+                speaking = False
 
         actions: list[tuple[str, bytes]] = []
         if speaking and not self.in_speech:
@@ -153,8 +201,11 @@ def for_session():
     detector = _make_detector()
     if detector is None:
         return None
-    logger.info("local VAD active: silence stays here, Gemini hears speech only")
-    return VadGate(detector, prefix_padding_ms=settings.vad_prefix_padding_ms)
+    logger.info("local VAD active: silence stays here, Gemini hears speech only%s",
+                (" | near-field floor %.3f" % settings.vad_min_rms)
+                if settings.vad_min_rms > 0 else "")
+    return VadGate(detector, prefix_padding_ms=settings.vad_prefix_padding_ms,
+                   min_rms=settings.vad_min_rms)
 
 
 def reset_warnings() -> None:
