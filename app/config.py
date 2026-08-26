@@ -47,6 +47,36 @@ def _get_bool(name: str, default: bool) -> bool:
     return val.strip().lower() in {"1", "true", "yes", "on"}
 
 
+#: Tool groups a MULTI_SESSION server may load — everything else drives the
+#: one physical machine and cannot be shared by concurrent conversations:
+#:
+#:   smarthome/computer/robot/documents  the host's lights, keyboard, legs
+#:                                       and printer, shared by definition
+#:   slides                              one Canva window, one STATE, one
+#:                                       tour position — the exact collision
+#:                                       the supersede rule was built to stop
+#:   reminders                           rings *this* room
+#:   memory                              one persistent store; testers would
+#:                                       write into each other's (and the
+#:                                       owner's) memory
+#:   calc                                module-level STATE merged per call —
+#:                                       two concurrent testers would merge
+#:                                       budgets into one sheet, and one
+#:                                       person's numbers on another's screen
+#:                                       is the transcript-wipe bug with money
+#:
+#: The survivors are stateless reads: the unit card, search, documents-as-
+#: knowledge, web search. An allow-list rather than a deny-list so a new
+#: group is excluded until someone decides otherwise — same direction as
+#: _OPT_IN.
+MULTI_SESSION_SAFE = frozenset({"units", "knowledge", "mydocs", "websearch"})
+
+#: What a blank TOOL_GROUPS means under MULTI_SESSION. mydocs/websearch stay
+#: opt-in (named in TOOL_GROUPS to appear), mirroring app.tools._OPT_IN —
+#: a test asserts the two lists cannot drift apart.
+MULTI_SESSION_DEFAULT = frozenset({"units", "knowledge"})
+
+
 @dataclass
 class Settings:
     # Which persona this server runs: "condo" (the gallery receptionist,
@@ -118,10 +148,34 @@ class Settings:
     # 1.0 = chain off (gallery default). 1.5-2.5 is the useful range;
     # beyond that the noise floor comes up with the voice.
     mic_boost: float = float(os.getenv("MIC_BOOST", "1.0"))
+    #: Boost during a *call*, when different from the standby one. The two
+    #: modes want opposite microphones: standby must hear the name from
+    #: across the room (far-field: compressor + gain), but a call is one
+    #: person at the desk, and the same compressor lifts everyone else's
+    #: conversation to their level — Emma then answers words never aimed at
+    #: her. Blank = same as MIC_BOOST, so machines that never asked for the
+    #: split keep exactly one knob. 1.0 = the chain is bypassed on calls.
+    call_mic_boost_raw: str = os.getenv("CALL_MIC_BOOST", "").strip()
     # Browser noise suppression eats quiet distant voices along with the
     # noise. Turn it off when chasing range in a quiet room; keep it on in
     # a noisy one. Measure by ear, not by theory.
     mic_noise_suppression: bool = _get_bool("MIC_NOISE_SUPPRESSION", True)
+    #: The compressor half of MIC_BOOST's far-field recipe, separately
+    #: switchable. Ratio 8 above -45dB lifts *everything* quiet — including
+    #: the room's own noise floor, measured on this machine sitting right at
+    #: the "speech" bar (frame RMS 0.02-0.03 in windows with nobody talking,
+    #: captured 2026-08-26). A level bar that never rests and a keyword
+    #: spotter listening through amplified hiss are both this. Off = plain
+    #: gain: speech and noise scale together instead of noise catching up.
+    mic_compressor: bool = _get_bool("MIC_COMPRESSOR", True)
+    #: Browser automatic gain control. In a *quiet* room AGC hunts upward
+    #: until something reaches its target level — and the only thing there
+    #: is the noise floor. Same failure as the compressor, different agent.
+    mic_agc: bool = _get_bool("MIC_AGC", True)
+
+    @property
+    def call_mic_boost(self) -> float:
+        return float(self.call_mic_boost_raw) if self.call_mic_boost_raw else self.mic_boost
 
     # --- Wake word ("Emma") ---
     # Off by default: the gallery robot is started by staff each morning and
@@ -137,9 +191,12 @@ class Settings:
     )
     # Score shaping for the keyword path. Raise the threshold if the name
     # fires on speech that merely resembles it; raise the boost if a clear
-    # call of the name is being missed.
-    wake_boost: float = float(os.getenv("WAKE_BOOST", "2.0"))
-    wake_threshold: float = float(os.getenv("WAKE_THRESHOLD", "0.25"))
+    # call of the name is being missed. Defaults are the values measured
+    # best on 2026-08-25 against Thai TTS renderings of the name (7/8
+    # caught, zero false positives on the negative set) — see the table in
+    # app/wake.py. Boost past ~5 measured strictly worse.
+    wake_boost: float = float(os.getenv("WAKE_BOOST", "3.0"))
+    wake_threshold: float = float(os.getenv("WAKE_THRESHOLD", "0.10"))
     #: Log what the standby microphone is actually sending, every couple of
     #: seconds, while waiting for the name.
     #:
@@ -154,6 +211,16 @@ class Settings:
     #: Off by default: it is two lines a second in a log the gallery reads
     #: for other reasons. Turn it on while chasing the microphone, off after.
     wake_debug: bool = _get_bool("WAKE_DEBUG", False)
+    #: Where WAKE_DEBUG writes clips of speech that fired nothing — the
+    #: owner's real voice through the real chain, which is the one input all
+    #: TTS-based tuning could never test. Debug only, newest 20 kept.
+    wake_debug_dir: str = os.getenv("WAKE_DEBUG_DIR", "data/wake_debug")
+    #: Enrollment collection: save EVERY speech window on the standby
+    #: socket (hits included) so a matcher can learn the owner's own voice —
+    #: the one input no TTS proxy renders. Deliberate sessions only: turn
+    #: on, say the name 10-15 times, turn off.
+    wake_enroll: bool = _get_bool("WAKE_ENROLL", False)
+    wake_enroll_dir: str = os.getenv("WAKE_ENROLL_DIR", "data/wake_enroll")
     #: Comma list of spellings to listen for, overriding the built-ins.
     #: Which spellings catch a real call of the name depends on the mouth,
     #: the room and the microphone, so it has to be tunable where those are
@@ -164,6 +231,15 @@ class Settings:
     tools_enabled: bool = _get_bool("TOOLS_ENABLED", True)
     #: Blank = every group. Otherwise a comma list, e.g. "smarthome".
     tool_groups: str = os.getenv("TOOL_GROUPS", "")
+    #: Shared test server: many browsers, one server, no machine. Off by
+    #: default — the showroom default must stay byte-identical after a pull,
+    #: which is the one thing the profile seam exists to protect. When on,
+    #: concurrent sessions stop superseding each other and the tool set is
+    #: forced down to groups that are safe to share (see
+    #: `enabled_tool_groups`), because "everyone in the company can try it"
+    #: must not mean "everyone in the company can print PDFs and press keys
+    #: on the host".
+    multi_session: bool = _get_bool("MULTI_SESSION", False)
 
     # Broadlink IR hub for the gallery lights/AC. Point these at the JSON
     # files the `emma` project already learned the codes into, or leave them
@@ -490,6 +566,17 @@ class Settings:
     # a pull, and local needs a one-time model fetch.
     vad_mode: str = os.getenv("VAD_MODE", "gemini").strip().lower()
     vad_model: str = os.getenv("VAD_MODEL", "data/wake/silero_vad.onnx")
+    #: VAD_MODE=local only — near-field floor. A speech segment opens only
+    #: if its trigger chunk reaches this RMS; quieter speech (someone else's
+    #: conversation across the room) is treated as silence and never sent.
+    #: 0 = off. NOTE the scale depends on the mic chain in front of it:
+    #: WakeStream's 0.05-0.2 reference was measured *behind* the MIC_BOOST
+    #: compressor; with CALL_MIC_BOOST=1.0 (the pairing this floor wants —
+    #: a compressor squeezing far voices up to near level defeats any
+    #: loudness floor behind it) the same speech lands several times lower.
+    #: Tune from the "vad floor: ... rms=X" log lines, not from theory —
+    #: the first guess here was wrong by 3x for exactly this reason.
+    vad_min_rms: float = float(os.getenv("VAD_MIN_RMS", "0"))
     # OpenAI only: semantic_vad waits on whether the sentence sounds finished.
     openai_turn_detection: str = os.getenv("OPENAI_TURN_DETECTION", "semantic_vad")
     openai_vad_eagerness: str = os.getenv("OPENAI_VAD_EAGERNESS", "medium")
@@ -586,16 +673,27 @@ class Settings:
         if not self.tools_enabled:
             return set()
         groups = {g.strip() for g in self.tool_groups.split(",") if g.strip()}
+        base: set[str] | None
         if groups:
-            return groups
-        if self.assistant_profile == "emma":
-            return {"smarthome", "reminders", "memory", "mydocs",
+            base = groups
+        elif self.assistant_profile == "emma":
+            base = {"smarthome", "reminders", "memory", "mydocs",
                     "websearch", "computer"}
-        if self.assistant_profile == "translator":
+        elif self.assistant_profile == "translator":
             # An interpreter has one job. A tool the model can see is a tool
             # it will eventually call — mid-translation.
-            return set()
-        return None
+            base = set()
+        else:
+            base = None
+        if self.multi_session:
+            # Decided here and nowhere else, because everything reads this
+            # method — load_tools, the boot warnings, the prompt suffixes,
+            # the reminder rearm hook. A second decision point is how the
+            # config-vs-gate drift bug happens.
+            if base is None:
+                return set(MULTI_SESSION_DEFAULT)
+            return base & MULTI_SESSION_SAFE
+        return base
 
 
 settings = Settings()

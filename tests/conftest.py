@@ -83,8 +83,18 @@ def _fresh_async_state():
     _settings.assistant_profile = "condo"
     _settings.ws_token = ""          # the LAN gate; tests opt in explicitly
     _settings.wake_enabled = False
-    _settings.wake_threshold = 0.25
-    _settings.wake_boost = 2.0
+    # WAKE_ENROLL=true in the machine's .env (an enrollment session) would
+    # make every wake test save clips into data/wake_enroll — the machine-
+    # state trap with a recorder attached. Tests that mean it set it.
+    _settings.wake_enroll = False
+    # And WAKE_DEBUG=true in the same .env made an enroll test pass for the
+    # wrong reason before this pin existed: the capture tick only ran
+    # because debug happened to be on here. The suite must not inherit it.
+    _settings.wake_debug = False
+    # The shipped defaults, re-measured 2026-08-25 (see app/wake.py): the
+    # detection fixtures assert against these exact values.
+    _settings.wake_threshold = 0.10
+    _settings.wake_boost = 3.0
     # Two more knobs whose *default* is right for the gallery and wrong for a
     # 20-second test timeout. Both were the documented trap — "green on a
     # machine that is missing something" — reaching its payday: they only
@@ -126,6 +136,11 @@ def _fresh_async_state():
     _settings.inventory_key = ""
     _settings.units_show_price = False
     _settings.searxng_url = ""       # เครื่องที่มี SearXNG ต้องไม่เปลี่ยนสี suite   # นโยบายราคา: default ปิด
+    # MULTI_SESSION on the office test server would un-supersede every
+    # takeover test and strip the tool groups the robot/slide tests need —
+    # the TOOL_GROUPS trap again, one knob over. Tests that mean the shared
+    # mode set it themselves.
+    _settings.multi_session = False
     # The web stage turns `open_in_browser` and `play_youtube` into "put it
     # on the screen" instead of `os.startfile`. A test that leaves it on
     # rewires four other tests that never mentioned it — and because

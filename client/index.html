@@ -800,7 +800,16 @@ Promise.all([
   if (typeof health.transcript_keep_min === 'number') {
     transcriptKeepMin = health.transcript_keep_min;
   }
-  if (health.mic) { micBoost = health.mic.boost || 1; micNS = !!health.mic.noise_suppression; }
+  if (health.mic) {
+    micBoost = health.mic.boost || 1;
+    // The call's own boost: standby keeps far-field reach (you call her
+    // name from anywhere), the call listens to the person at the desk.
+    micCallBoost = (typeof health.mic.boost_call === 'number') ? health.mic.boost_call : micBoost;
+    micNS = !!health.mic.noise_suppression;
+    // Default true when the server predates the switches.
+    micCompressor = health.mic.compressor !== false;
+    micAGC = health.mic.agc !== false;
+  }
   wakeAvailable = !!(health.wake && health.wake.ready);
   if (wantsPicker) return;    // ?picker=1 — stay on the voice carousel
   if (autoConnect) {
@@ -1768,7 +1777,7 @@ function startCall() {
 async function startMic() {
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: true },
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
     });
   } catch (e) {
     setState('error');
@@ -1789,7 +1798,7 @@ async function startMic() {
   URL.revokeObjectURL(url);
 
   micSource = audioCtx.createMediaStreamSource(micStream);
-  const shaped = buildMicChain(audioCtx, micSource);
+  const shaped = buildMicChain(audioCtx, micSource, micCallBoost);
   worklet = new AudioWorkletNode(audioCtx, 'cap', { processorOptions: { targetRate: inputRate } });
   worklet.port.onmessage = (e) => {
     if (e.data && e.data.level !== undefined) {
@@ -2082,7 +2091,7 @@ let superseded = false;
 let standDown = false, standDownReason = '';
 // Mic shaping (MIC_BOOST / MIC_NOISE_SUPPRESSION in .env): compressor+gain
 // between the mic and everything that listens. See buildMicChain().
-let micBoost = 1, micNS = true;
+let micBoost = 1, micCallBoost = 1, micNS = true, micCompressor = true, micAGC = true;
 
 async function startWakeMode() {
   if (!wakeAvailable || wakeWs) return;
@@ -2110,6 +2119,14 @@ async function startWakeMode() {
     let evt;
     try { evt = JSON.parse(msg.data); } catch { return; }
     if (evt.type === 'wake') {
+      // Acknowledge *now*, before the dial. Between the name being heard
+      // and Emma's greeting there are 2-4 seconds of getUserMedia + WS +
+      // Gemini setup, and dead air after a wake word reads as "she didn't
+      // hear me" — the owner repeats the name into a session that is
+      // already opening. A local chime is the one response that can be
+      // instant, because it never leaves this machine.
+      playWakeChime();
+      sleepNote('ได้ยินแล้วค่ะ — กำลังเปิดสาย…');
       // The name was heard. Keep the standby mic alive but redirect it into
       // the tail buffer; the wake socket itself closes now — the ears' job
       // is done, and a detector listening through the whole conversation
@@ -2157,7 +2174,7 @@ async function startWakeMode() {
 
   try {
     wakeMicStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: true },
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
     });
   } catch (e) {
     // No permission — the button path stays. Say which mode was lost.
@@ -2218,23 +2235,57 @@ function sleepNote(text) {
   $('callNote').textContent = text;
 }
 
-function buildMicChain(ctx, source) {
+function buildMicChain(ctx, source, boost = micBoost) {
   // Far-field recipe: squeeze the dynamic range (so far/quiet speech and
   // near/loud speech land closer together), then lift the result. With
-  // MIC_BOOST=1.0 the chain is skipped entirely — the gallery's audio path
-  // stays byte-identical to what it always was.
-  if (micBoost === 1) return source;
+  // boost=1.0 the chain is skipped entirely — the audio path stays
+  // byte-identical to what it always was. The caller picks which knob:
+  // standby passes the default (reach), the call passes micCallBoost —
+  // the same compressor that lets the name carry across the room also
+  // lifts everyone else's conversation into the call.
+  if (boost === 1) return source;
+  const gain = ctx.createGain();
+  gain.gain.value = boost;
+  if (!micCompressor) {
+    // MIC_COMPRESSOR=false: plain gain. The compressor lifts everything
+    // quiet — including the room's own noise floor, measured sitting right
+    // at the "speech" bar with nobody talking. Gain alone scales speech
+    // and noise together instead of letting noise catch up.
+    source.connect(gain);
+    return gain;
+  }
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -45;   // start squeezing well below speech peaks
   comp.knee.value = 30;
   comp.ratio.value = 8;
   comp.attack.value = 0.003;
   comp.release.value = 0.25;
-  const gain = ctx.createGain();
-  gain.gain.value = micBoost;
   source.connect(comp);
   comp.connect(gain);
   return gain;
+}
+
+function playWakeChime() {
+  // Two soft rising tones, ~0.3s, through the wake AudioContext — which is
+  // already resumed and unlocked, because it has been capturing the mic.
+  // Kept synthesized rather than a file: nothing to load, nothing to 404,
+  // and it works exactly when the wake path works.
+  try {
+    const ctx = wakeCtx;
+    if (!ctx || ctx.state !== 'running') return;
+    const t0 = ctx.currentTime;
+    [[660, 0], [880, 0.12]].forEach(([freq, at]) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t0 + at);
+      g.gain.exponentialRampToValueAtTime(0.12, t0 + at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.18);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(t0 + at); osc.stop(t0 + at + 0.2);
+    });
+  } catch {}   // a missed chime must never block the dial
 }
 
 function armAudioUnlock(ctx) {

@@ -119,6 +119,23 @@ async def _log_effective_config() -> None:
 
     names = [t.name for t in tools.load_tools()]
     log.info("tools: %s", ", ".join(names) if names else "(none)")
+    if settings.multi_session:
+        # Said out loud, because from a tester's chair "the robot can't do X"
+        # and "X is stripped in this mode" look identical. Names what was
+        # asked for and refused, so the .env line explains itself at boot.
+        from app.config import MULTI_SESSION_SAFE
+
+        asked = {g.strip() for g in settings.tool_groups.split(",") if g.strip()}
+        stripped = asked - MULTI_SESSION_SAFE
+        log.info(
+            "MULTI_SESSION: on — concurrent sessions do not supersede each "
+            "other, machine screens are dark, tool groups limited to %s%s. "
+            "Free-tier Gemini caps concurrent Live sessions — expect "
+            "connection errors beyond ~3 callers without billing.",
+            ",".join(sorted(settings.enabled_tool_groups() or set())) or "(none)",
+            (" (stripped from TOOL_GROUPS: %s)" % ",".join(sorted(stripped)))
+            if stripped else "",
+        )
     # Two ways to end up without a tool you thought you had, both of which
     # look identical from the conversation ("เอมม่าทำสิ่งนั้นไม่ได้ค่ะ") and
     # neither of which said anything at boot until now.
@@ -328,7 +345,15 @@ async def health() -> dict:
         # else can walk up to this screen".
         "transcript_keep_min": settings.transcript_keep_min,
         "mic": {"boost": settings.mic_boost,
-                "noise_suppression": settings.mic_noise_suppression},
+                # The call's own boost — standby keeps far-field reach, the
+                # call listens to the person at the desk. Same value unless
+                # CALL_MIC_BOOST is set.
+                "boost_call": settings.call_mic_boost,
+                "noise_suppression": settings.mic_noise_suppression,
+                # The two noise amplifiers, separately switchable — see
+                # config.py for the measured reason each earned a switch.
+                "compressor": settings.mic_compressor,
+                "agc": settings.mic_agc},
         "robot": robot_link.status(),
         "providers_configured": {
             "gemini": bool(settings.gemini_api_key),
