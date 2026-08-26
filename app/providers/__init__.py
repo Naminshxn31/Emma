@@ -21,7 +21,8 @@ def get_provider(provider: str, voice: str, instructions: str, greeting: str | N
     if provider == "gemini":
         from app.providers.gemini import GeminiProvider
 
-        return GeminiProvider(voice, instructions, use_tools=use_tools)
+        return GeminiProvider(voice, instructions, greeting=greeting,
+                              use_tools=use_tools)
     if provider == "openai":
         from app.providers.openai_realtime import OpenAIProvider
 

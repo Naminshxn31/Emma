@@ -237,8 +237,20 @@ class GeminiProvider(VoiceProvider):
     session_limit_minutes = 15  # audio-only cap for Live API sessions
     auto_resumes = True          # ...but we rejoin with a handle past it
 
-    def __init__(self, voice: str, instructions: str, use_tools: bool = True) -> None:
+    def __init__(self, voice: str, instructions: str, greeting: str | None = None,
+                 use_tools: bool = True) -> None:
         super().__init__(voice, instructions)
+        #: Spoken once, on the *initial* connect only. This parameter rode in
+        #: from session.py since the beginning and was silently dropped here
+        #: — only the OpenAI provider ever used it — so on Gemini the robot
+        #: never announced itself. What looked like a wake greeting all along
+        #: was the model reacting to the wake word's tail audio, and the day
+        #: the VAD near-field floor ate that quiet tail (2026-08-26), waking
+        #: Emma produced pure silence: chime, then nothing, and the owner
+        #: concluded she wasn't awake. A knob wired to nothing is this
+        #: project's signature misconfiguration; this one held a first
+        #: impression.
+        self.greeting = greeting
         #: The translator profile runs toolless BY CONFIG, not by asking the
         #: prompt nicely — a declared tool is a callable tool, whatever the
         #: instructions say, and an interpreter calling set_lights
@@ -442,6 +454,7 @@ class GeminiProvider(VoiceProvider):
                 self.model = fallback
                 try:
                     await self._connect()
+                    await self._send_greeting()
                     return self
                 except Exception as second:
                     raise ProviderError(
@@ -449,7 +462,23 @@ class GeminiProvider(VoiceProvider):
                         "fallback %s: %s" % (settings.gemini_model, fallback, second)
                     ) from second
             raise ProviderError(f"Could not open a Gemini Live session: {exc}") from exc
+        await self._send_greeting()
         return self
+
+    async def _send_greeting(self) -> None:
+        """Ask the model to speak its opening line — initial connect only.
+
+        Deliberately not inside `_connect`: `_reconnect` reuses that to
+        resume past the duration cap, and a robot re-introducing itself
+        mid-conversation because the transport rotated would read as a
+        reset to the person standing in front of it.
+        """
+        if not self.greeting or self._session is None:
+            return
+        try:
+            await self.send_text(self.greeting)
+        except Exception:
+            logger.exception("could not deliver the greeting")
 
     async def _reconnect(self) -> bool:
         """Rejoin the conversation after the duration cap, using the handle.
