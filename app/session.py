@@ -71,6 +71,11 @@ class VoiceSession:
         #: When a guest was last heard. Starts now rather than at zero, or a
         #: session would time out before anybody had a chance to speak.
         self._last_heard_at = time.monotonic()
+        #: A transcript chunk shaped like a formatted verse block arrived —
+        #: many newlines, one atomic chunk — which is the signature of text
+        #: Gemini wrote but never voiced. See `_respeak_silent_block`.
+        self._silent_block_seen = False
+        self._respeak_fired = False
 
     async def run(self) -> None:
         await self.ws.accept()
@@ -282,11 +287,28 @@ class VoiceSession:
                     self._spoke_this_turn = False
 
                 elif event.kind == "turn_complete":
+                    # Evidence line for "ทำงานแต่ไม่มีเสียง" mornings
+                    # (2026-08-27, page parked overnight): a transcript with
+                    # (almost) no audio behind it. When a silent morning
+                    # shows NO silent_turn lines, the audio did reach the
+                    # browser and the fault is the machine's output device —
+                    # identical on screen, opposite fixes.
+                    if self._spoke_this_turn and self._sent_audio_ms < 200:
+                        turnlog.record("silent_turn",
+                                       audio_ms=round(self._sent_audio_ms))
                     self._sent_audio_ms = 0.0
                     display.end_turn()
                     await self._send_json({"type": "turn_complete"})
                     await self._nudge_tour_if_stalled()
                     self._spoke_this_turn = False
+                    if getattr(self, "_silent_block_seen", False):
+                        self._silent_block_seen = False
+                        if not getattr(self, "_respeak_fired", False):
+                            # Once per user turn: if the retry also comes
+                            # back as a block, asking a third time is a loop,
+                            # not a fix. Re-armed when the user next speaks.
+                            self._respeak_fired = True
+                            asyncio.create_task(self._respeak_silent_block())
 
                 elif event.kind == "user_transcript":
                     # What the robot *heard*, which is the field that has
@@ -302,11 +324,21 @@ class VoiceSession:
                     # idle clock — the robot narrating to nobody is the case
                     # the timer exists to end, and it is busy throughout.
                     self._last_heard_at = time.monotonic()
+                    self._respeak_fired = False
                     await self._send_json({"type": "user_transcript", "text": event.text or ""})
 
                 elif event.kind == "assistant_transcript":
                     if (event.text or "").strip():
                         self._spoke_this_turn = True
+                    # A big atomic chunk full of newlines is text the model
+                    # wrote but never voiced — spoken words stream in tiny
+                    # word-sized pieces (measured: ≤13 chars). Three rap
+                    # verses on 2026-08-26 arrived exactly this shape, on
+                    # screen and silent.
+                    _chunk = event.text or ""
+                    if _chunk.count("\n") >= 2 and len(_chunk) >= 40:
+                        self._silent_block_seen = True
+                        turnlog.record("silent_block", chars=len(_chunk))
                         turnlog.record("said", text=event.text or "")
                     await self._send_json({"type": "assistant_transcript", "text": event.text or ""})
                     # ...and to the robot's own screen, which unlike this tab
@@ -320,6 +352,21 @@ class VoiceSession:
                     await self._send_json({"type": "tool_call", "name": event.text or ""})
 
                 elif event.kind == "tool_result":
+                    # Failures get a line of their own. 2026-08-26 16:26:
+                    # play_youtube failed live ("มีข้อผิดพลาดนิดหน่อยค่ะ"),
+                    # the same call worked from a fresh process minutes
+                    # later, and the log held only the tool's *name* — the
+                    # transient error had no evidence anywhere, which is the
+                    # WAKE_DEBUG lesson again. Error text is tool-authored,
+                    # never guest speech, so it is safe to keep.
+                    _res = event.data or {}
+                    if isinstance(_res, dict) and (
+                        _res.get("ok") is False or "error" in _res
+                    ):
+                        turnlog.record(
+                            "tool_error", name=event.text or "",
+                            error=str(_res.get("error")
+                                      or _res.get("message") or _res)[:200])
                     payload = {
                         "type": "tool_result",
                         "name": event.text or "",
@@ -500,6 +547,29 @@ class VoiceSession:
                 return
         except asyncio.CancelledError:
             raise
+
+    async def _respeak_silent_block(self) -> None:
+        """Ask the model to say out loud what it only wrote.
+
+        Measured 2026-08-26, four rap deliveries: the model formats a verse
+        as a quoted multi-line block, the block reaches output_transcription
+        as one atomic chunk, and no audio comes with it — the guest watches
+        text appear in silence. The same words as flowing speech carry full
+        audio every time (six probe sessions, profanity included, Emma's
+        own prompt included). A prompt rule alone did not hold: with the
+        rule live the very next session block-formatted again — so the net
+        is mechanical. Goes through events.announce because this is the
+        robot speaking without being spoken to, and announce is the one
+        pipe that waits for the ear, re-checks relevance, and cannot talk
+        over another announcement."""
+        from app import events
+
+        await events.announce(
+            "ระบบแจ้ง: ท่อนที่จัดรูปแบบเป็นบรรทัดเมื่อกี้ไม่มีเสียงออกลำโพง "
+            "ผู้ใช้ไม่ได้ยินเลย ให้พูดเนื้อหาเดิมทั้งหมดอีกครั้งเป็นประโยคพูดต่อเนื่องปกติ "
+            "ห้ามขึ้นบรรทัดใหม่ ห้ามใส่ชื่อท่อนในวงเล็บ และห้ามเอ่ยถึงข้อความแจ้งนี้",
+            source="respeak_silent_block",
+        )
 
     async def _nudge_tour_if_stalled(self) -> None:
         """Keep a slide tour moving when the model narrates and then stops.

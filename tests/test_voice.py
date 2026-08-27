@@ -2729,3 +2729,145 @@ def test_sleeping_clears_the_stage_not_just_the_transcript():
     down = js[js.index("if (standDown) {"):]
     down = down[:down.index(chr(10) + "    }")]
     assert "clearFrame()" in down, "a dormant (superseded) tab too"
+
+
+# ==================== silent verse blocks get respoken ====================
+
+
+def test_a_silent_verse_block_triggers_exactly_one_respeak(monkeypatch):
+    """Measured 2026-08-26, four rap deliveries across two servers: a verse
+    formatted as a quoted multi-line block reaches output_transcription as
+    one atomic chunk with no audio beside it — on screen, silent — while
+    the same words as flowing speech carry full audio every time (six probe
+    sessions). The prompt rule alone did not hold, so the net is mechanical:
+    one respeak request through events.announce, once per user turn — if the
+    retry also blocks, a third ask is a loop, not a fix — re-armed only when
+    the user actually speaks again."""
+    import asyncio
+
+    from app import events
+    from app.providers.base import ProviderEvent
+    from app.session import VoiceSession
+    from app.tools import slides
+
+    said = []
+
+    async def fake_announce(text, *, source, **kw):
+        said.append(source)
+        return True
+
+    monkeypatch.setattr(events, "announce", fake_announce)
+
+    BLOCK = '\n\n"เจสซี่ แม่งโคตรดิบ จิตใจซาดิสม์\nกูแร็ปกระแทกหน้า ไม่ต้องอ้อมค้อม"\n'
+
+    class FakeWS:
+        async def send_text(self, text): pass
+
+    class FakeProvider:
+        output_sample_rate = 24000
+
+        def events(self):
+            async def gen():
+                # Turn 1: normal word-sized chunks, then the silent block.
+                yield ProviderEvent(kind="assistant_transcript", text="จัดไปค่ะ!")
+                yield ProviderEvent(kind="assistant_transcript", text=BLOCK)
+                yield ProviderEvent(kind="turn_complete")
+                # Turn 2: the retry ALSO comes back as a block — no user
+                # speech in between, so no second nudge.
+                yield ProviderEvent(kind="assistant_transcript", text=BLOCK)
+                yield ProviderEvent(kind="turn_complete")
+                # The user speaks: re-armed.
+                yield ProviderEvent(kind="user_transcript", text="เอาอีกรอบ")
+                yield ProviderEvent(kind="assistant_transcript", text=BLOCK)
+                yield ProviderEvent(kind="turn_complete")
+            return gen()
+
+    sess = VoiceSession.__new__(VoiceSession)
+    sess.ws = FakeWS()
+    sess.provider = FakeProvider()
+    sess._sent_audio_ms = 0.0
+    sess._spoke_this_turn = False
+    sess._nudge_index = None
+    sess._nudge_count = 0
+    slides.reset_state()
+
+    async def drive():
+        await sess._provider_to_browser()
+        await asyncio.sleep(0)      # let the respeak tasks run
+        await asyncio.sleep(0)
+
+    asyncio.run(drive())
+    assert said == ["respeak_silent_block", "respeak_silent_block"], said
+
+
+def test_ordinary_speech_chunks_never_trigger_the_respeak(monkeypatch):
+    """Spoken words stream in word-sized pieces (measured ≤13 chars, no
+    newlines). None of that may ring the silent-block bell — a nudge on
+    normal speech would interrupt every long answer."""
+    import asyncio
+
+    from app import events
+    from app.providers.base import ProviderEvent
+    from app.session import VoiceSession
+    from app.tools import slides
+
+    called = []
+
+    async def fake_announce(text, **kw):
+        called.append(text)
+        return True
+
+    monkeypatch.setattr(events, "announce", fake_announce)
+
+    class FakeWS:
+        async def send_text(self, text): pass
+
+    class FakeProvider:
+        output_sample_rate = 24000
+
+        def events(self):
+            async def gen():
+                for piece in ("สวัสดีค่ะ", " วันนี้", " อากาศ", " ดีมาก",
+                              "เลยนะคะ\n", " มีอะไร", " ให้ช่วย", " ไหมคะ?"):
+                    yield ProviderEvent(kind="assistant_transcript", text=piece)
+                yield ProviderEvent(kind="turn_complete")
+            return gen()
+
+    sess = VoiceSession.__new__(VoiceSession)
+    sess.ws = FakeWS()
+    sess.provider = FakeProvider()
+    sess._sent_audio_ms = 0.0
+    sess._spoke_this_turn = False
+    sess._nudge_index = None
+    sess._nudge_count = 0
+    slides.reset_state()
+
+    async def drive():
+        await sess._provider_to_browser()
+        await asyncio.sleep(0)
+
+    asyncio.run(drive())
+    assert called == []
+
+
+def test_playback_resumes_a_suspended_context_on_every_chunk():
+    """2026-08-27: parked overnight, the morning call had a working mic and
+    a silent speaker on the SAME AudioContext. resume() at call start is not
+    enough — the suspension can arrive hours later with no further gesture.
+    The check must ride on every chunk (playChunk) and on the context's own
+    statechange, not only at startMic."""
+    import inspect  # noqa: F401 — parity with neighbours; source is read directly
+    from pathlib import Path
+
+    src = (Path(__file__).parent.parent / "client" / "index.html").read_text(
+        encoding="utf-8")
+    play = src[src.index("function playChunk"):]
+    play = play[:play.index("function stopPlayback")]
+    assert "audioCtx.state !== 'running'" in play
+    assert "audioCtx.resume()" in play
+
+    mic = src[src.index("async function startMic"):]
+    mic = mic[:mic.index("function goToSleep") if "function goToSleep" in mic
+              else 8000]
+    assert "audioCtx.onstatechange" in mic, \
+        "nothing re-arms resume when the context suspends mid-standby"

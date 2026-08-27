@@ -274,6 +274,49 @@ def test_a_tool_that_changes_nothing_on_screen_is_not_logged_as_a_slide_change(l
     assert [r for r in read(logging_on) if r["event"] == "screen"] == []
 
 
+def test_a_failed_tool_leaves_its_error_in_the_log(logging_on):
+    """2026-08-26 16:26, live: play_youtube failed ("มีข้อผิดพลาดนิดหน่อยค่ะ"),
+    the identical call worked from a fresh process minutes later, and the
+    log held only the tool's name — a transient failure with no evidence
+    anywhere is the WAKE_DEBUG hole again. The error text is written by the
+    tool, never by the guest, so keeping it breaks no privacy rule. Success
+    results stay unlogged: 59 tools' worth of ok:true is noise."""
+    import asyncio
+
+    from app.providers.base import ProviderEvent
+    from app.session import VoiceSession
+
+    class FakeWS:
+        async def send_text(self, text): pass
+
+    class FakeProvider:
+        output_sample_rate = 24000
+
+        def events(self):
+            async def gen():
+                yield ProviderEvent(kind="tool_result", text="play_youtube",
+                                    data={"ok": False,
+                                          "error": "window handle is dead"})
+                yield ProviderEvent(kind="tool_result", text="set_lights",
+                                    data={"ok": True, "state": "on"})
+            return gen()
+
+    sess = VoiceSession.__new__(VoiceSession)
+    sess.ws = FakeWS()
+    sess.provider = FakeProvider()
+    sess._sent_audio_ms = 0.0
+    sess._spoke_this_turn = False
+    from app.tools import slides
+    slides.reset_state()
+
+    asyncio.run(sess._provider_to_browser())
+
+    errors = [r for r in read(logging_on) if r["event"] == "tool_error"]
+    assert len(errors) == 1, "exactly the failure, not the success"
+    assert errors[0]["name"] == "play_youtube"
+    assert "window handle is dead" in errors[0]["error"]
+
+
 def test_old_logs_are_forgotten(monkeypatch, tmp_path):
     """These are recordings of members of the public. Nothing was deleting them.
 
@@ -360,3 +403,57 @@ def test_a_file_that_is_not_ours_is_left_alone(monkeypatch, tmp_path):
     turnlog.record("session_start")
     turnlog.close()
     assert stranger.exists(), "deleted a file it did not create"
+
+
+def test_a_spoken_turn_with_no_audio_is_logged_as_silent(logging_on):
+    """2026-08-27, page parked overnight: morning transcripts flowed, tools
+    fired, speakers silent. Two entirely different faults paint that same
+    screen — Gemini sending text without audio, or the machine's output
+    device dying in its sleep — and the log could not tell them apart. A
+    turn that produced a transcript but (almost) no audio now leaves a
+    silent_turn line; a silent morning WITHOUT these lines means the audio
+    reached the browser and the fault is the machine's speakers."""
+    import asyncio
+
+    from app.providers.base import ProviderEvent
+    from app.session import VoiceSession
+    from app.tools import slides
+
+    class FakeWS:
+        async def send_text(self, text): pass
+        async def send_bytes(self, data): pass
+
+    def session_with(events_list):
+        class FakeProvider:
+            output_sample_rate = 24000
+
+            def events(self):
+                async def gen():
+                    for e in events_list:
+                        yield e
+                return gen()
+
+        sess = VoiceSession.__new__(VoiceSession)
+        sess.ws = FakeWS()
+        sess.provider = FakeProvider()
+        sess._sent_audio_ms = 0.0
+        sess._spoke_this_turn = False
+        sess._nudge_index = None
+        sess._nudge_count = 0
+        return sess
+
+    slides.reset_state()
+    # Transcript, no audio: the silent shape.
+    asyncio.run(session_with([
+        ProviderEvent(kind="assistant_transcript", text="สวัสดีค่ะ"),
+        ProviderEvent(kind="turn_complete"),
+    ])._provider_to_browser())
+    # Transcript with real audio: one second of PCM, nothing to report.
+    asyncio.run(session_with([
+        ProviderEvent(kind="assistant_transcript", text="สวัสดีค่ะ"),
+        ProviderEvent(kind="audio", audio=b"\x00" * 48000),
+        ProviderEvent(kind="turn_complete"),
+    ])._provider_to_browser())
+
+    silent = [r for r in read(logging_on) if r["event"] == "silent_turn"]
+    assert len(silent) == 1, "exactly the audioless turn, not the audible one"

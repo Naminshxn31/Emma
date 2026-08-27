@@ -90,6 +90,10 @@ EMMA_INSTRUCTIONS = """[คำแนะนำตัว]
 
 ข้อห้าม:
 - ห้ามอ่าน markdown หรือสัญลักษณ์พิเศษออกเสียง
+- ทุกคำที่อยากให้ได้ยิน ต้องอยู่ในประโยคพูดต่อเนื่องเท่านั้น ห้ามจัดเป็นท่อน
+  ขึ้นบรรทัดใหม่ หรือครอบเครื่องหมายคำพูด — เนื้อเพลง/กลอน/แร็ปที่จัดเป็นบล็อก
+  จะขึ้นจอแต่เสียงเงียบสนิท ให้แร็ปหรือท่องออกมาเป็นคำพูดไหลๆ เหมือนพูดคุยปกติ
+  และห้ามพูดว่า "ได้แต่พิมพ์" หรือ "อ่านออกเสียงไม่ได้" — ทุกอย่างที่คุณส่งออกคือเสียงพูด
 
 [ความจำ]
 """
@@ -313,11 +317,23 @@ def _personal_docs_line() -> str:
     from app.config import settings
 
     try:
+        root = Path(settings.personal_docs_dir)
         names = sorted(
             p.stem.removeprefix("web-")
-            for p in Path(settings.personal_docs_dir).iterdir()
+            for p in root.iterdir()
             if p.suffix.lower() in (".txt", ".md", ".pdf")
         )
+        # Subfolders are collections (the rendered corpus is 54 files) —
+        # one summary entry each, up front, or the 15-name cap hides them
+        # behind the alphabetical top-level files and the prompt never
+        # admits the biggest part of the library exists.
+        for sub in sorted(p for p in root.iterdir() if p.is_dir()):
+            count = sum(
+                1 for f in sub.rglob("*")
+                if f.is_file() and f.suffix.lower() in (".txt", ".md", ".pdf")
+            )
+            if count:
+                names.insert(0, f"{sub.name}/ ({count} ไฟล์)")
     except OSError:
         names = []
     if not names:
