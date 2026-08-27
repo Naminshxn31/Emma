@@ -89,7 +89,7 @@ def _read_file(path: Path) -> list[str]:
         return []
 
 
-def _chunks(path: Path) -> list[dict]:
+def _chunks(path: Path, name: str) -> list[dict]:
     """Blocks packed into ~CHUNK_CHARS pieces that never split a paragraph."""
     out: list[dict] = []
     buf = ""
@@ -98,24 +98,36 @@ def _chunks(path: Path) -> list[dict]:
         if not block:
             continue
         if buf and len(buf) + len(block) > CHUNK_CHARS:
-            out.append({"file": path.name, "text": buf})
+            out.append({"file": name, "text": buf})
             buf = block
         else:
             buf = (buf + "\n\n" + block) if buf else block
     if buf:
-        out.append({"file": path.name, "text": buf})
+        out.append({"file": name, "text": buf})
     return out
+
+
+def _doc_files(d: Path) -> list[Path]:
+    """Every document under the folder, subfolders included. iterdir()
+    here once made a whole rendered corpus (personal-docs/corpus/, 54
+    files) silently invisible: search still said found=True — from the
+    handful of top-level web pages — so nothing looked broken."""
+    return sorted(
+        p for p in d.rglob("*")
+        if p.is_file() and p.suffix.lower() in (".txt", ".md", ".pdf")
+    )
 
 
 def _fingerprint() -> tuple:
     d = _docs_dir()
     if not d.is_dir():
         return ()
-    return tuple(sorted(
-        (p.name, p.stat().st_mtime_ns, p.stat().st_size)
-        for p in d.iterdir()
-        if p.suffix.lower() in (".txt", ".md", ".pdf")
-    ))
+    # Relative path, not name: the fingerprint must see subfolder files
+    # too, or a file dropped there never triggers a rebuild.
+    return tuple(
+        (p.relative_to(d).as_posix(), p.stat().st_mtime_ns, p.stat().st_size)
+        for p in _doc_files(d)
+    )
 
 
 def _get_index() -> dict:
@@ -129,9 +141,8 @@ def _get_index() -> dict:
     chunks: list[dict] = []
     d = _docs_dir()
     if d.is_dir():
-        for p in sorted(d.iterdir()):
-            if p.suffix.lower() in (".txt", ".md", ".pdf"):
-                chunks.extend(_chunks(p))
+        for p in _doc_files(d):
+            chunks.extend(_chunks(p, p.relative_to(d).as_posix()))
     bm25 = BM25([
         content_tokens(robust_tokens(chunk["text"])) for chunk in chunks
     ])

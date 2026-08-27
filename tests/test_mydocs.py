@@ -166,3 +166,44 @@ def test_ordinary_questions_are_not_caught_by_the_gate(_own_folder):
     _write(_own_folder, "gym.txt", "ฟิตเนสของโครงการเปิดตลอดและผ่อนคลายด้วยซาวน่า")
     out = mydocs.search_my_documents("ฟิตเนสเป็นยังไงบ้าง")
     assert out.get("commercial_question") is not True
+
+
+# ============ subfolders: the rendered corpus lives one level down ============
+
+
+def test_a_file_in_a_subfolder_is_searchable_without_a_restart(_own_folder):
+    """corpus_to_docs.py renders 54 documents into personal-docs/corpus/ —
+    and iterdir() never saw them. Search still said found=True from the
+    top-level web pages, so nothing looked broken; the biggest part of the
+    library was simply absent. Both halves must recurse: the index (or the
+    file is never read) and the fingerprint (or dropping a file into the
+    subfolder never triggers a rebuild — this test writes it *after* the
+    first search so a stale cache fails here)."""
+    _write(_own_folder, "web-note.txt", "เรื่องอื่นที่ไม่เกี่ยวข้องกันเลย")
+    assert mydocs.search_my_documents("สระว่ายน้ำถ้ำอยู่ชั้นไหน")["found"] is False
+
+    sub = _own_folder / "corpus"
+    sub.mkdir()
+    _write(sub, "embassy-life.md",
+           "สระว่ายน้ำถ้ำ Cave Pool ของ Embassy Life อยู่ชั้นสาม เปิดทุกวัน")
+    out = mydocs.search_my_documents("สระว่ายน้ำถ้ำอยู่ชั้นไหน")
+    assert out["found"] is True
+    assert out["results"][0]["file"] == "corpus/embassy-life.md", \
+        "the file id must say which collection it came from"
+
+
+def test_the_prompt_names_the_collection_not_its_54_filenames(_own_folder):
+    """The doc list in the prompt is capped at 15 names, sorted — 54 slug
+    filenames would either flood the budget or hide behind the cap. A
+    subfolder appears as one summary entry, first, and its long filenames
+    stay out of the prompt."""
+    from app.prompts import build_instructions
+
+    sub = _own_folder / "corpus"
+    sub.mkdir()
+    _write(sub, "EMBASSY-LIFE-Brochure-E-Brochure-EMBASSY-LIFE-pdf.md", "ข้อความ")
+    _write(sub, "Empire-Information-Company-Profile-pdf.md", "ข้อความ")
+
+    text = build_instructions("X", profile="emma")
+    assert "corpus/ (2 ไฟล์)" in text
+    assert "EMBASSY-LIFE-Brochure" not in text

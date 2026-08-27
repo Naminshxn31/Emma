@@ -97,6 +97,7 @@ python scripts/approve_narration.py --all --by "ชื่อ"
 python scripts/build_embeddings.py    # สร้าง embeddings ครั้งเดียว (อดทนกับ rate limit)
 python scripts/fetch_wake_model.py    # โหลดโมเดล wake word ครั้งเดียว (~15MB)
 python scripts/import_website.py <url> # ดูดเว็บลง data/personal-docs/ ให้ emma ค้น
+python scripts/corpus_merge.py         # ต่อ shard ใหม่จาก emma_extract.py (บน D:) เข้าไฟล์รวม — append-only
 python scripts/contextualize_corpus.py # Contextual Retrieval: LLM เขียนบริบทต่อ chunk ของ corpus บน D: (resume ได้, รันเพิ่มเฉพาะเอกสารใหม่)
 python scripts/corpus_to_docs.py       # render corpus ที่มีบริบทแล้วลง personal-docs/corpus/ ให้ mydocs (idempotent)
 python scripts/probe_web_search.py    # เช็คว่า google_search grounding ใช้ได้ยัง (ต้อง billing)
@@ -659,6 +660,32 @@ search_condo_info เป็นผลข้างเคียงบนเคร�
 knowledge เก็บ alias `_is_commercial` ไว้ให้ของเก่า ตอนนี้ search_my_documents
 ดักด้วย: คำถามเงิน → found=false + ชี้ฝ่ายขาย **ไม่แนบเนื้อบทความไปด้วย**
 เพราะคลังคือ marketing copy ที่มี "yields 7-10%" แบบไม่มีคนเซ็น
+
+### คลัง corpus ของ emma (D:\Data → personal-docs/corpus/)
+
+**ท่อสี่ขั้น เมื่อมีไฟล์ใหม่ลง D:\Data:** `emma_extract.py` (อยู่บน D: ใน
+emma-corpus/) → `corpus_merge.py` → `contextualize_corpus.py` → `corpus_to_docs.py`
+ทุกขั้นรันซ้ำได้ ขั้นแรกข้ามไฟล์ที่ทำแล้ว (\_done.txt) ขั้นสอง append-only
+
+**mydocs เคยมองไม่เห็นโฟลเดอร์ย่อยทั้งใบ** `iterdir()` สแกนชั้นเดียว — corpus 54
+ไฟล์ที่ render ลง `personal-docs/corpus/` ไม่ถูก index เลย และ**ไม่มีอาการ**:
+search ยังตอบ found=True จากไฟล์เว็บชั้นบน ตอนนี้ทั้ง index และ fingerprint
+recurse (`_doc_files`) และรายการเอกสารใน prompt สรุปโฟลเดอร์ย่อยเป็น
+"corpus/ (54 ไฟล์)" — ไม่เทชื่อ slug ยาวๆ ใส่ prompt
+
+**pdftotext คนละเครื่องให้ข้อความคนละแบบ — id เดิม เนื้อเปลี่ยน** วัดจริง:
+โบรชัวร์เดิม id เดิม ต่างเกิน whitespace 57/58 chunk เพราะลำดับ layout ไม่เหมือนกัน
+บริบทที่ LLM เขียนผูกกับ*ข้อความตอนนั้น*ของ id นั้น — merge จึง**ห้ามแตะ chunk
+ที่มีอยู่แล้วเด็ดขาด** (id ชนแม้ตัวเดียว = ข้ามทั้งเอกสาร)
+
+**ฉบับซ้ำแยกด้วยชื่อไฟล์ ไม่ใช่ความคล้ายเนื้อหา** วัดแล้ว: รายงาน MEP
+คนละสัปดาห์ (เนื้อหาต่างจริง) ได้ token containment 0.96-0.99 เท่ากับไฟล์ก๊อปแท้ๆ
+เพราะเทมเพลต+ชื่อห้องแชร์คำเกือบหมด ต่างแค่ตัวเลข — กติกาที่ใช้ได้คือชื่อ:
+ตัด "(Small Size)"/"low size"/เลขก๊อปท้ายชื่อ แล้วชนกับของเดิม = ข้าม ส่วนไฟล์
+ข้ามเครื่องสองตัวที่กติกาชื่อไม่ครอบอยู่ใน `_merge_skip.txt` (ครั้งเดียวจบ —
+ต่อไปสกัดเครื่องเดียวกัน exact-text dedup จับเองตามกลไกเดิมของคลัง)
+และ**ชื่อซ้ำอย่างเดียวห้ามใช้ตัดสิน** — `Update งานสภาปัต.xlsx` สามฉบับต่างสัปดาห์
+อยู่ในคลังโดยตั้งใจ
 
 ### เกณฑ์ตัดสินการค้นหา
 
