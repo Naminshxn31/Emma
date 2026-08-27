@@ -508,3 +508,51 @@ def test_every_spelling_reaches_the_keyword_file_under_one_label(monkeypatch):
     rows = [r for r in line.splitlines() if r.strip()]
     assert len(rows) == len(wake._spellings_for("emma"))
     assert all(r.endswith("@EMMA") for r in rows), rows
+
+
+def test_debug_mode_keeps_the_hit_clip_too(monkeypatch, tmp_path):
+    """2026-08-27 08:52: a false wake — room chatter fired the detector and
+    Emma greeted a conversation nobody was having with her. The miss clips
+    could not reproduce the hit offline, and the audio that actually fired
+    was the audio this path used to throw away ("a successful wake is not a
+    miss"). A false wake IS a hit; under WAKE_DEBUG the hit clip is the
+    evidence, kept under its own name so the miss-pruning cannot eat it."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "wake_debug", True)
+    monkeypatch.setattr(settings, "wake_enroll", False)
+    monkeypatch.setattr(settings, "wake_debug_dir", str(tmp_path))
+
+    stream = _probe_stream()
+    stream._cap = bytearray(b"\x01\x02" * 4000)   # capture on, as debug mode has it
+    stream._cap_max = 16000 * 2 * 6
+    stream._hit_this_window = False
+
+    class OneHitSpotter:
+        def __init__(self):
+            self.fired = False
+
+        def is_ready(self, s):
+            if self.fired:
+                return False
+            self.fired = True
+            return True
+
+        def decode_stream(self, s): pass
+
+        def get_result(self, s):
+            return "EMMA"
+
+        def reset_stream(self, s): pass
+
+    class FakeStream:
+        def accept_waveform(self, rate, samples): pass
+
+    stream._spotter = OneHitSpotter()
+    stream._stream = FakeStream()
+    stream._shadow_stream = None
+    monkeypatch.setattr("app.wake._get_shadow_spotter", lambda: None)
+    hit = stream.feed(b"\x01\x02" * 160)
+    assert hit == "EMMA"
+    clips = list(tmp_path.glob("hit-*.wav"))
+    assert len(clips) == 1, "the firing audio must be kept, not cleared"

@@ -390,8 +390,16 @@ class WakeStream:
                 # and a successful call is the best enrollment sample there
                 # is. Save it now or never.
                 self._save_clip("enroll")
+            elif settings.wake_debug:
+                # A hit clip, because a FALSE wake is a hit too. 2026-08-27
+                # 08:52: room chatter near-missed for 15 straight seconds,
+                # then fired — Emma greeted a conversation nobody was having
+                # with her — and the one clip that could say which spelling
+                # fired on what sound was the one this branch used to throw
+                # away ("a successful wake is not a miss"). The miss clips
+                # alone could not reproduce the hit offline.
+                self._save_clip("hit")
             else:
-                # A successful wake is not a miss; keep only what failed.
                 self._cap.clear()
         if settings.wake_debug or settings.wake_enroll:
             # After decoding, so the report tick can tell a window with a
