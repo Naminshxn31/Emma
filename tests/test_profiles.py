@@ -281,3 +281,73 @@ def test_the_gallery_prompt_learns_the_library_only_when_it_is_loaded(monkeypatc
     # and their figures ("yields 7-10%") have no approver.
     assert "ห้ามอ้างตัวเลขการเงินจากบทความ" in withlib
     assert "ฝ่ายขาย" in withlib.split("ห้ามอ้างตัวเลขการเงินจากบทความ", 1)[1]
+
+
+# ==================== the translator switch on the page ====================
+
+
+def _client_src():
+    from pathlib import Path
+
+    return (Path(__file__).parent.parent / "client" / "index.html").read_text(
+        encoding="utf-8")
+
+
+def test_the_switch_languages_are_real_server_languages():
+    """The client's TRANSLATOR_LANGS list feeds ?lang= straight into
+    build_instructions; a code the server does not know falls back to
+    English with only a log warning. Cross-check the two maps so the client
+    cannot drift into offering a language the prompt cannot name."""
+    import re
+
+    from app.prompts import _LANG_NAMES
+
+    src = _client_src()
+    block = src[src.index("const TRANSLATOR_LANGS"):]
+    block = block[:block.index("};")]
+    codes = re.findall(r"(\w{2}):\s*'", block)
+    assert codes, "could not parse TRANSLATOR_LANGS from the client"
+    for code in codes:
+        assert code in _LANG_NAMES, f"client offers {code!r}, server cannot name it"
+    assert "th" not in codes, "ไทย ↔ ไทย is not a translation"
+
+
+def test_flipping_the_switch_mid_call_goes_through_the_close_path():
+    """The old socket's onclose releases the microphone unconditionally —
+    that line exists because every exit used to leak the mic. A new call
+    dialed before it fires gets its mic pulled from under it (digital
+    silence, peak=0.0000). So setTranslator must never call startCall()
+    itself: it closes the socket and lets onclose consume modeRestart,
+    after the standDown branch so a superseded tab stays lost."""
+    src = _client_src()
+    body = src[src.index("function setTranslator"):]
+    body = body[:body.index("\n$('translatorBtn')")]
+    assert "startCall(" not in body, \
+        "setTranslator dials over a live socket — mic race reintroduced"
+    assert "modeRestart = true" in body and "ws.close()" in body
+    # The switch edits the URL — the one source of truth startCall reads.
+    assert "history.replaceState" in body
+
+    onclose = src[src.index("ws.onclose = "):][:12000]
+    restart = onclose.index("if (modeRestart)")
+    assert onclose.index("standDown = false") < restart, \
+        "a superseded tab must stand down before any mode-switch redial"
+    assert restart < onclose.index("autoConnect && !manualEnd"), \
+        "modeRestart must win before the generic redial backoff"
+
+
+def test_emma_is_told_formatted_verse_goes_silent():
+    """2026-08-26, measured three times (turnlog 14:50, 14:53, 17:11): Emma
+    delivered a rap verse as a quoted multi-line block — the text hit the
+    transcript as one atomic chunk and the speakers stayed silent, while
+    every flowing-speech delivery (5 probe sessions: same words, same
+    profanity, one with Emma's full prompt) produced complete audio. The
+    model then told the owner "ได้แต่พิมพ์" — a capability it invented to
+    explain its own silence, and then argued when the owner said he heard
+    nothing. The rule pins both halves: verse must be flowing speech, and
+    the text-only excuse is forbidden by name."""
+    from app.prompts import build_instructions
+
+    text = build_instructions("X", profile="emma")
+    assert "ประโยคพูดต่อเนื่อง" in text
+    assert "ได้แต่พิมพ์" in text, "the observed excuse must be quoted verbatim"

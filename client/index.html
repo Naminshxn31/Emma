@@ -52,6 +52,7 @@
   .btn.wide { width: 100%; padding: 1rem; font-size: 1rem; }
   .btn:disabled { opacity: .4; cursor: not-allowed; }
   .btn.ghost { background: transparent; color: #8e8e8e; border: 1px solid rgba(128,128,128,.35); }
+  .btn.ghost.on { color: #3b82f6; border-color: #3b82f6; font-weight: 700; }
   @media (prefers-color-scheme: dark) { .btn { background: #f2f2f2; color: #0d0d0d; } }
 
   .orb.listening { animation: breathe 2.4s ease-in-out infinite; }
@@ -648,6 +649,11 @@
       <div class="controls">
         <button class="btn ghost" id="muteBtn">Mute</button>
         <button class="btn ghost icon" id="copyBtn" title="Copy transcript">Copy</button>
+        <!-- Translator switch. Invisible on the robot's chest screen by
+             construction (body.kiosk hides .col-chat): a passer-by must not
+             be able to flip the machine into interpreter mode. -->
+        <select class="btn ghost icon" id="langSel" title="ล่ามแปลเป็นภาษา" hidden></select>
+        <button class="btn ghost icon" id="translatorBtn" title="โหมดล่าม ไทย ↔ ภาษาอื่น">ล่าม</button>
         <button class="btn" id="endBtn">End</button>
       </div>
     </div>
@@ -1519,6 +1525,11 @@ registerProcessor('cap', Cap);
 
 function playChunk(arrayBuffer) {
   if (!audioCtx || arrayBuffer.byteLength < 2) return;
+  // A page parked overnight can have its context suspended long after the
+  // call opened fine — transcript moves, speakers stay silent. resume() is
+  // idempotent and cheap; state !== 'running' is the one signal this side
+  // ever gets, so check it on every chunk, not only at call start.
+  if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
   const i16 = new Int16Array(arrayBuffer);
   const f32 = new Float32Array(i16.length);
   for (let i = 0; i < i16.length; i++) f32[i] = i16[i] / (i16[i] < 0 ? 0x8000 : 0x7fff);
@@ -1734,6 +1745,7 @@ function startCall() {
       // button be the takeover.
       const why = standDownReason;
       standDown = false; standDownReason = ''; superseded = false;
+      modeRestart = false;   // a lost tab must not redial for a mode switch
       clearFrame();          // a dormant tab must not keep a guest's screen up
       $('convo').classList.add('slept');
       finalizeAll();
@@ -1749,6 +1761,16 @@ function startCall() {
       }
       sleptAt = Date.now();
       scheduleTranscriptWipe();
+      return;
+    }
+    if (modeRestart) {
+      // The translator switch flipped mid-call. The teardown above has run
+      // and the microphone is free; dial again — startCall() reads the new
+      // ?profile/?lang from the URL the switch just wrote. After standDown,
+      // deliberately: a tab that lost the robot must stay lost, whatever
+      // mode it wanted next.
+      modeRestart = false;
+      startCall();
       return;
     }
     if (autoConnect && !manualEnd && !idleParked) {
@@ -1793,6 +1815,11 @@ async function startMic() {
   // speakers stay silent, mic hears nothing. Detect it, say it on screen,
   // and let the first tap anywhere unlock both directions.
   armAudioUnlock(audioCtx);
+  // And keep watching after the start: overnight power saving can suspend
+  // the context hours into a standby without another gesture ever coming.
+  audioCtx.onstatechange = () => {
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  };
   const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
   await audioCtx.audioWorklet.addModule(url);
   URL.revokeObjectURL(url);
@@ -1989,6 +2016,71 @@ $('muteBtn').onclick = () => {
   $('muteBtn').textContent = muted ? 'Unmute' : 'Mute';
   setState(muted ? 'muted' : (playing ? 'speaking' : 'listening'));
 };
+
+// ==================== translator switch ====================
+// One source of truth: the page URL. startCall() already reads
+// ?profile/?lang from location.search on every dial, and the bookmark form
+// (/?profile=translator&lang=ru) must keep working unchanged — so the
+// switch *edits the URL* rather than keeping a mode variable that could
+// disagree with it. Mirrors _LANG_NAMES in app/prompts.py minus Thai; a
+// test cross-checks the two so they cannot drift apart.
+const TRANSLATOR_LANGS = {
+  en: 'อังกฤษ', zh: 'จีน', ja: 'ญี่ปุ่น', ko: 'เกาหลี', ru: 'รัสเซีย',
+  ar: 'อาหรับ', fr: 'ฝรั่งเศส', de: 'เยอรมัน', es: 'สเปน', hi: 'ฮินดี',
+  id: 'อินโดนีเซีย', vi: 'เวียดนาม', my: 'พม่า', km: 'เขมร', lo: 'ลาว',
+  ms: 'มาเลย์',
+};
+let modeRestart = false;      // set by the switch, consumed in ws.onclose
+
+function translatorOn() {
+  return new URLSearchParams(location.search).get('profile') === 'translator';
+}
+
+function paintTranslator() {
+  const on = translatorOn();
+  $('translatorBtn').classList.toggle('on', on);
+  $('langSel').hidden = !on;
+}
+
+function setTranslator(on, lang) {
+  const q = new URLSearchParams(location.search);
+  if (on) {
+    q.set('profile', 'translator');
+    q.set('lang', lang || $('langSel').value || 'en');
+  } else {
+    q.delete('profile'); q.delete('lang');
+  }
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : ''));
+  paintTranslator();
+  const inCall = ['connecting', 'listening', 'hearing', 'speaking', 'muted']
+      .includes($('stateLabel').textContent);
+  if (inCall) {
+    // Restart through the close path, never over a live socket: the old
+    // socket's onclose releases the microphone unconditionally, and a new
+    // call dialed before it fires would have its mic pulled from under it.
+    modeRestart = true;
+    try { ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'stop' })); } catch {}
+    try { ws && ws.close(); } catch {}
+  } else {
+    systemLine(on
+      ? `โหมดล่ามพร้อม (ไทย ↔ ${TRANSLATOR_LANGS[q.get('lang')] || 'อังกฤษ'}) — เริ่มคุยได้เลย`
+      : 'กลับโหมดผู้ช่วยปกติแล้ว');
+  }
+}
+
+$('translatorBtn').onclick = () => setTranslator(!translatorOn());
+$('langSel').onchange = () => setTranslator(true, $('langSel').value);
+(function initTranslatorUI() {
+  const sel = $('langSel');
+  for (const [code, name] of Object.entries(TRANSLATOR_LANGS)) {
+    const o = document.createElement('option');
+    o.value = code; o.textContent = 'ไทย ↔ ' + name;
+    sel.appendChild(o);
+  }
+  const fromUrl = new URLSearchParams(location.search).get('lang');
+  if (fromUrl && TRANSLATOR_LANGS[fromUrl]) sel.value = fromUrl;
+  paintTranslator();
+})();
 
 $('endBtn').onclick = () => {
   // One button, two jobs — see setState(). Asleep it is the Start button
