@@ -434,11 +434,13 @@ def test_lights_on_sends_ir_and_updates_state(smarthome):
 
 def test_handlers_return_facts_not_thai_sentences(smarthome):
     """The model speaks the reply, so a hardcoded Thai string would break
-    the moment a guest asks in Chinese."""
+    the moment a guest asks in Chinese. "instruction" is exempt alongside
+    "note": it is a directive TO the model (the one channel commands
+    actually reach it through), never a sentence spoken verbatim."""
     out = run(registry.dispatch("set_lights", {"on": True}))
     assert "reply" not in out
     assert all(not isinstance(v, str) or v in ("ok", "mock", "failed")
-               for k, v in out.items() if k != "note")
+               for k, v in out.items() if k not in ("note", "instruction"))
 
 
 def test_ac_temperature_is_clamped_and_flagged(smarthome):
@@ -631,3 +633,33 @@ def test_an_unreachable_hub_makes_the_ac_result_honest(smarthome, monkeypatch):
         assert "ห้ามยืนยันว่าทำสำเร็จ" in out["instruction"]
 
     asyncio.run(body())
+
+
+def test_a_successful_send_still_admits_it_cannot_see_the_room(smarthome):
+    """Live, 2026-08-26 15:55: the hub took every frame ("ok" was truthful),
+    the lamp never reacted, the owner said "แปลว่าเปิดไฟไม่ได้" — and the
+    model argued back "เปิดได้ปกติเลยค่ะ". IR is one-way; ok means the hub
+    accepted the payload, not that the room changed. The note rides on every
+    ok result because a rule the model must remember across turns is a rule
+    it loses (the UNITS_SAMPLE lesson), and it must not displace the failure
+    instruction, which says something different."""
+    from app.tools.smarthome import IR_ONE_WAY_NOTE, set_air_conditioner, set_lights
+
+    out = run(set_lights(True))
+    assert out["hardware"] == "ok"
+    assert out["instruction"] == IR_ONE_WAY_NOTE
+    assert "ทางเดียว" in IR_ONE_WAY_NOTE and "ห้ามเถียง" in IR_ONE_WAY_NOTE
+
+    out = run(set_air_conditioner(temp=22))
+    assert out["hardware"] == "ok"
+    assert out["instruction"] == IR_ONE_WAY_NOTE
+
+    smarthome.send.result = "failed"
+    out = run(set_lights(False))
+    assert "ห้ามยืนยันว่าทำสำเร็จ" in out["instruction"], \
+        "the failure instruction must survive the ok-note addition"
+
+    smarthome.send.result = "mock"
+    out = run(set_lights(True))
+    assert out.get("instruction") != IR_ONE_WAY_NOTE, \
+        "mock is not ok — nothing was sent at all"

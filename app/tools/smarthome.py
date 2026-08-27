@@ -35,6 +35,20 @@ def snapshot() -> dict:
     return {"lights": STATE["lights"], "ac": dict(STATE["ac"])}
 
 
+#: Attached to EVERY successful send — a rule the model must remember
+#: across turns is a rule it loses (the UNITS_SAMPLE lesson). Live,
+#: 2026-08-26 15:55: the hub accepted every frame ("ok" was truthful), the
+#: lamp never reacted, the owner said "แปลว่าเปิดไฟไม่ได้" — and the model
+#: argued back "เปิดได้ปกติเลยค่ะ ... ตอนนี้ไฟเปิดอยู่ค่ะ". IR is one-way:
+#: "ok" means the hub took the payload, not that the room changed. Nobody
+#: on this side can see the room; the person standing in it can.
+IR_ONE_WAY_NOTE = (
+    "ส่งสัญญาณถึงตัวส่ง IR แล้ว แต่ IR เป็นทางเดียว มองไม่เห็นว่าอุปกรณ์เปลี่ยนจริงไหม "
+    "ถ้าผู้ใช้บอกว่าไฟหรือแอร์ไม่ตอบสนอง ให้เชื่อเขาทันที ห้ามเถียงว่า 'เปิดได้ปกติ' "
+    "ให้แนะนำเช็คว่าหัวส่งสัญญาณหันหาอุปกรณ์และไม่มีของบัง"
+)
+
+
 def _worst(results: list[str]) -> str:
     """Worst outcome wins.
 
@@ -81,6 +95,8 @@ async def set_lights(on: bool) -> dict:
             "ส่งคำสั่งไปที่ตัวควบคุมไฟไม่สำเร็จ ให้บอกผู้ใช้ตรงๆ ว่าไฟยังไม่ได้ปิดหรือเปิด "
             "ห้ามยืนยันว่าทำสำเร็จ"
         )
+    elif hardware == "ok":
+        out["instruction"] = IR_ONE_WAY_NOTE
     return out
 
 
@@ -171,6 +187,8 @@ async def set_air_conditioner(
             "ส่งคำสั่งไปที่แอร์ไม่สำเร็จ (ตัวส่งสัญญาณไม่ตอบ) ให้บอกผู้ใช้ตรงๆ "
             "ห้ามยืนยันว่าทำสำเร็จ"
         )
+    elif hardware == "ok":
+        out["instruction"] = IR_ONE_WAY_NOTE
     if clamped:
         # Tell the model, so it can mention the limit rather than silently
         # confirming a temperature the unit never got.
