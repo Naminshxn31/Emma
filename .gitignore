@@ -59,3 +59,10 @@ data/emma-corpus/
 data/reminders.json
 data/memory.json
 data/personal-docs/
+
+# Face models (280MB, restored with one command) and everything built from
+# the enrolment photographs. The gallery is a file of vectors, not pictures,
+# but it is still a list of who works here and who has walked in — it is the
+# owner's data, like data/memory.json, not the repo's.
+#   python scripts/fetch_face_model.py
+data/faces/

@@ -177,6 +177,95 @@ class Settings:
     def call_mic_boost(self) -> float:
         return float(self.call_mic_boost_raw) if self.call_mic_boost_raw else self.mic_boost
 
+    # --- Recognising faces at the door ---
+    # Off by default, and for the usual reason: the showroom machine pulls
+    # this repo and its behaviour must not change. A camera that starts
+    # naming people the morning after a git pull is the loudest possible
+    # version of that mistake.
+    # Who renders the enrolment station's spoken lines (app/voice.py).
+    # "gemini" = the robot's own voice (Kore), ten free renders a day and no
+    # names; "local" = Thai MMS-VITS on this machine, unlimited and offline,
+    # in its own voice. Switching = a different voice = delete
+    # data/faces/voice/ first; state() warns if two voices share the cache.
+    tts_provider: str = os.getenv("TTS_PROVIDER", "gemini")
+    face_enabled: bool = _get_bool("FACE_ENABLED", False)
+    # Which model pack recognises faces. "auraface" (Apache-2.0, commercial
+    # use allowed) is the default; "buffalo_l" is the original insightface
+    # pack whose weights are licensed for non-commercial research only —
+    # kept loadable strictly for comparison runs. See _PACKS in faces.py.
+    face_model_pack: str = os.getenv("FACE_MODEL_PACK", "auraface")
+    face_gallery: str = os.getenv("FACE_GALLERY", "data/faces/gallery.npz")
+    # Cosine threshold — a property of the model pack, re-measured with
+    # `scripts/eval_faces.py` whenever FACE_MODEL_PACK changes.
+    #
+    # auraface (default pack), measured 2026-08-31, same protocol (149
+    # enrolled, 156 held-out probes, 41 strangers): rank-1 152/156, genuine
+    # p5 0.365, but a stranger's best match reaches 0.477 — three pairs in
+    # 0.454-0.477 were reviewed by eye and could NOT be confirmed as the
+    # same person, so they stand as false accepts. 0.50 greets 136/156
+    # (87.2%), never wrongly, never a stranger. The licence bought this:
+    # buffalo_l measured 156/156 with impostors under 0.342 (threshold 0.45
+    # on that pack), but its weights are non-commercial-research-only.
+    # A silence costs a greeting; a wrong name is said out loud to the
+    # person it is wrong about — the default protects the second.
+    # And every photograph behind these numbers is a studio portrait: the
+    # entrance camera is a different instrument (check-face-range.cmd).
+    face_threshold: float = float(os.getenv("FACE_THRESHOLD", "0.50"))
+    # How many frames in a row must agree before anybody is greeted. One
+    # frame is a bad witness — blur, a turning head, someone crossing
+    # behind. Same reasoning as the VAD's `min_silence_duration`.
+    face_confirm_frames: int = int(os.getenv("FACE_CONFIRM_FRAMES", "3"))
+    # Somebody standing at the desk is one arrival, not one per frame.
+    face_cooldown_s: float = float(os.getenv("FACE_COOLDOWN_S", "600"))
+    # Whether a face nobody knows is also worth waking up for. On is the
+    # point of a receptionist — most visitors are strangers — but it is the
+    # setting that decides whether a camera aimed at a corridor opens a
+    # Gemini session for every passer-by, so it is reachable without editing
+    # code. The cooldown applies to strangers as one group, so the worst
+    # case is one session per FACE_COOLDOWN_S, not one per person.
+    face_greet_strangers: bool = _get_bool("FACE_GREET_STRANGERS", True)
+    # Narrower than this and they are across the room, not at the door —
+    # which is also where recognition is least reliable, so both reasons
+    # point the same way.
+    #
+    # The default is desk range. Measured on the owner's room (29 Aug,
+    # Facecam at 1280x720): standing in the doorway the face is 53-59px and
+    # the right name still scores 0.45-0.58, while walking blurs it to 44px
+    # with garbage scores (0.10-0.13) — so that machine runs FACE_MIN_PX=50
+    # in .env to make the doorway wake the robot. Wrong-name flickers at
+    # that size measured 0.08-0.13, nowhere near FACE_THRESHOLD.
+    face_min_px: int = int(os.getenv("FACE_MIN_PX", "110"))
+    # Which capture index the entrance camera is on. -1 searches for the
+    # first one showing a *moving* picture, which is the only reliable way
+    # to tell a lens from a virtual camera: on the owner's machine index 0
+    # is the Elgato Virtual Camera, permanently displaying a flawless still
+    # of its own logo, and index 1 is the real Facecam. Set the number here
+    # once it is known so nothing has to search at startup.
+    face_camera: int = int(os.getenv("FACE_CAMERA", "-1"))
+    # How many CPU cores onnxruntime may use. Left to itself it takes every
+    # one of them, and a 16-core showroom PC sat at 100% the moment the
+    # camera came on — while also running a live voice session. Measured
+    # end to end through `facewatch.Watcher.see`, at FACE_FPS=5:
+    #
+    #   threads   idle    someone there   time to decide (3 confirms)
+    #   default   18.5%   79.3%           0.6 s
+    #   4         10.1%   43.4%           0.7 s
+    #   2          7.8%   18.5%           1.2 s   <- default
+    #   1          6.1%    6.4%           2.1 s
+    #
+    # Two, because this job does not need to be fast. Somebody walking up
+    # to a desk is in frame for seconds, and deciding in 1.2s instead of
+    # 0.6s costs nothing anybody can perceive while it hands three quarters
+    # of the machine back to the thing that does have to answer instantly.
+    # Drop to 1 on a weaker machine; 0 means "let onnxruntime decide",
+    # which is the setting that caused the complaint.
+    face_threads: int = int(os.getenv("FACE_THREADS", "2"))
+    # How often frames are actually analysed. The camera hands over 30 a
+    # second and a decision needs nowhere near that: somebody walking up to
+    # a desk is in frame for seconds, and `FACE_CONFIRM_FRAMES` counts
+    # agreeing looks, not video frames.
+    face_fps: float = float(os.getenv("FACE_FPS", "5"))
+
     # --- Wake word ("Emma") ---
     # Off by default: the gallery robot is started by staff each morning and
     # must not grow a hot mic by surprise. The owner's machine turns it on.

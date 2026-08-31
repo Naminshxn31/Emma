@@ -266,6 +266,47 @@ def _no_real_browser(monkeypatch, request):
     monkeypatch.setattr(webstage, "_wanted", None)
 
 @pytest.fixture(autouse=True)
+def _no_real_face_models(monkeypatch, request):
+    """The tests must never load the 280MB face pack.
+
+    Row two of the table in CLAUDE.md, arriving a third time. `buffalo_l`
+    lives under `data/faces/`, which is gitignored — so CI never has it and
+    every test here is green there, while the owner's machine, the only one
+    that matters, spends seconds of ONNX loading inside a 20s timeout the
+    first time any test touches `app.faces`.
+
+    Same treatment as `_local_encoder`: stub the loader to return None. Every
+    caller already handles "no models on this machine" because a showroom
+    without them has to keep working. A test that means to exercise real
+    recognition opts out with `@pytest.mark.allow_face_models`.
+    """
+    if request.node.get_closest_marker("allow_face_models"):
+        return
+    from app import faces
+    from app.config import settings
+
+    def refuse(det_size: int = 640):
+        return None
+
+    monkeypatch.setattr(faces, "_analyzer", refuse)
+    # And the entrance camera stays shut. `_analyzer` already stops the
+    # watcher from loading, but the switch is what the startup hook reads,
+    # and a suite whose colour depends on the machine's .env is the thing
+    # this file exists to prevent.
+    monkeypatch.setattr(settings, "face_enabled", False)
+    # The face knobs, pinned to the code defaults. The owner's .env holds
+    # doorway-measured values (FACE_MIN_PX=50 among them), and the first
+    # time it did, two enrolment tests turned red on this machine while CI
+    # stayed green — the exact two-colour suite this fixture exists to
+    # prevent. A test that wants another value patches it itself.
+    monkeypatch.setattr(settings, "face_min_px", 110)
+    monkeypatch.setattr(settings, "face_threshold", 0.50)
+    monkeypatch.setattr(settings, "face_confirm_frames", 3)
+    monkeypatch.setattr(settings, "face_cooldown_s", 600.0)
+    monkeypatch.setattr(settings, "face_greet_strangers", True)
+
+
+@pytest.fixture(autouse=True)
 def _forget_what_was_heard():
     """"What the guest last said" is module state, and it now decides whether
     a tool acts. A test that leaves "ปิดสไลด์" behind arms the next one."""
@@ -273,3 +314,34 @@ def _forget_what_was_heard():
     heard.forget()
     yield
     heard.forget()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_tts(monkeypatch, tmp_path):
+    """No test spends money, hits the network, or writes into the voice cache.
+
+    `app/voice.py` renders a sentence with the API when the cache misses, and
+    the cache is a real directory under `data/faces/`. Both halves of that
+    belong to the machine, not to the suite: the same argument as the browser
+    windows and the 280MB face pack. The cache is pointed at tmp and the
+    renderer is stubbed to fail, which is the path every caller must already
+    survive — the station beeps instead of speaking.
+    """
+    from app import voice
+
+    def refuse(text: str, model: str):
+        raise RuntimeError("no tts in tests")
+
+    monkeypatch.setattr(voice, "CACHE", tmp_path / "voice")
+    monkeypatch.setattr(voice, "_render", refuse)
+    monkeypatch.setattr(voice, "_render_local",
+                        lambda text: (_ for _ in ()).throw(RuntimeError("no tts")))
+    monkeypatch.setattr(voice, "_local", None)
+    # And the provider itself is pinned: the suite must not change colour
+    # because the machine's .env chose a different voice.
+    from app.config import settings as _settings
+    monkeypatch.setattr(_settings, "tts_provider", "gemini")
+    # The "no renders left today" latch is module state and correct in
+    # production; carried between tests it makes the result depend on the
+    # order they ran in. Exactly why conftest resets `_embedding_failed`.
+    monkeypatch.setattr(voice, "_spent", set())

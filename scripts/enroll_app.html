@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ลงทะเบียนใบหน้า</title>
+<style>
+  :root { --ok:#1f9d4d; --bad:#cf3030; --busy:#c77a12; --line:#d9d9df; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "Segoe UI", sans-serif; margin: 0;
+         background: #f4f4f6; color: #16161a; }
+  header { padding: 14px 22px; background: #16161a; color: #fff;
+           display: flex; align-items: baseline; gap: 14px; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header span { font-size: 13px; color: #a5a5ad; }
+  main { display: grid; grid-template-columns: minmax(0,1fr) 330px;
+         gap: 20px; padding: 20px; align-items: start; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .stage { position: relative; background: #000; border-radius: 12px;
+           overflow: hidden; aspect-ratio: 16/9; }
+  video, canvas.overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+  video { object-fit: cover; }
+  .status { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px;
+            background: linear-gradient(transparent, rgba(0,0,0,.75));
+            color: #fff; font-size: 16px; display: flex; justify-content: space-between; }
+  .panel { background: #fff; border-radius: 12px; padding: 16px;
+           box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .panel + .panel { margin-top: 16px; }
+  label { display: block; font-size: 13px; color: #55555c; margin: 12px 0 5px; }
+  input, select { width: 100%; padding: 9px 10px; font-size: 16px;
+                  border: 1px solid var(--line); border-radius: 8px; }
+  input:focus, select:focus { outline: 2px solid #4a6cf7; border-color: transparent; }
+  button { font-size: 15px; padding: 10px 16px; border-radius: 8px; border: 0;
+           background: #16161a; color: #fff; cursor: pointer; width: 100%; margin-top: 12px; }
+  button.ghost { background: #ececed; color: #16161a; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .shots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .shots img { width: 64px; height: 64px; object-fit: cover; border-radius: 7px; }
+  .msg { margin-top: 12px; font-size: 14px; line-height: 1.55; padding: 10px 12px;
+         border-radius: 8px; display: none; }
+  .msg.bad { display: block; background: #fdeceb; color: #8d1d1d; }
+  .msg.good { display: block; background: #e9f7ee; color: #145c30; }
+  ul.done { list-style: none; padding: 0; margin: 8px 0 0; font-size: 14px; }
+  ul.done li { padding: 5px 0; border-bottom: 1px solid #f0f0f2;
+               display: flex; justify-content: space-between; }
+  .hint { font-size: 13px; color: #6a6a72; line-height: 1.6; margin: 10px 0 0; }
+  .ring { position: absolute; left: 0; right: 0; top: 14px; display: flex;
+          justify-content: center; pointer-events: none; }
+  .ring i { display: block; height: 6px; width: 220px; border-radius: 3px;
+            background: rgba(255,255,255,.25); overflow: hidden; }
+  .ring i::after { content: ""; display: block; height: 100%; width: var(--hold, 0%);
+                   background: #2fd06a; transition: width .1s linear; }
+  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 10px 0 0;
+             font-size: 14px; }
+  ol.steps li { counter-increment: s; padding: 7px 0 7px 30px; position: relative;
+                color: #8a8a92; }
+  ol.steps li::before { content: counter(s); position: absolute; left: 0; top: 6px;
+        width: 21px; height: 21px; border-radius: 50%; background: #e6e6e9;
+        color: #6a6a72; font-size: 12px; display: grid; place-items: center; }
+  ol.steps li.now { color: #16161a; font-weight: 600; }
+  ol.steps li.now::before { background: #4a6cf7; color: #fff; }
+  ol.steps li.done { color: #1f9d4d; }
+  ol.steps li.skipped { color: #b0b0b8; text-decoration: line-through; }
+  ol.steps li.skipped::before { content: "–"; background: #f0f0f2; color: #b0b0b8; }
+  ol.steps li.done::before { content: "✓"; background: #d8f2e2; color: var(--ok); }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 14px;
+            color: #16161a; margin-top: 12px; }
+  .toggle input { width: auto; }
+  .hint.warn { color: #8d1d1d; background: #fdeceb; padding: 9px 11px;
+               border-radius: 8px; }
+  .spread { font-size: 13px; color: #6a6a72; margin-top: 10px; }
+  .spread b { color: #16161a; }
+</style>
+
+<header>
+  <h1>ลงทะเบียนใบหน้า</h1>
+  <span>เปิดค้างไว้ได้ ลงทะเบียนทีละคนต่อกันไปเรื่อยๆ</span>
+</header>
+
+<main>
+  <div>
+    <div class="stage">
+      <video id="cam" autoplay muted playsinline></video>
+      <canvas id="ov" class="overlay"></canvas>
+      <div class="ring" id="ring"><i></i></div>
+      <div class="status">
+        <span id="verdict">กำลังเปิดกล้อง…</span>
+        <span id="size"></span>
+      </div>
+    </div>
+    <p class="hint">
+      ทำตามคำสั่งบนภาพไปทีละข้อ ค้างท่าไว้จนแถบเขียวด้านบนเต็ม <b>กล้องจะเก็บให้เอง</b>
+      ไม่ต้องกดปุ่ม — ปุ่มมีไว้เผื่อจับไม่ติด (ข้อสุดท้ายค้างนานกว่าเพื่อน จะได้ยิ้มทัน)
+      <br>ยืนห่างประมาณที่ลูกค้าจะยืนจริง
+    </p>
+  </div>
+
+  <div>
+    <div class="panel">
+      <label for="dev">กล้อง</label>
+      <select id="dev"></select>
+      <label class="toggle"><input type="checkbox" id="speak" checked>
+        ให้ Emma พูดบอกท่า</label>
+      <div class="hint" id="voiceNote"></div>
+
+      <label for="name">ชื่อที่หุ่นจะเรียก</label>
+      <input id="name" placeholder="เช่น คุณต้า" autocomplete="off">
+
+      <ol class="steps" id="steps"></ol>
+      <button id="shoot" disabled>เก็บภาพเอง</button>
+      <div class="shots" id="shots"></div>
+      <div class="spread" id="spread"></div>
+
+      <button id="save" disabled>บันทึกคนนี้</button>
+      <button id="clear" class="ghost" disabled>ทิ้งภาพที่เก็บไว้</button>
+      <div class="msg" id="msg"></div>
+    </div>
+
+    <div class="panel">
+      <b style="font-size:14px">ลงทะเบียนแล้ว</b>
+      <ul class="done" id="done"></ul>
+      <p class="hint">เสร็จแล้วรัน <code>python scripts/build_face_gallery.py</code>
+        ถึงจะมีผลกับหุ่น</p>
+    </div>
+  </div>
+</main>
+
+<script>
+// Must match PROTOCOL in enroll_app.py. See the note there: this page is
+// re-read from disk on every load, the server is not, so a station left
+// running across an edit pairs a new page with an old server.
+const PROTOCOL = 8;
+
+const $ = id => document.getElementById(id);
+const video = $('cam'), ov = $('ov');
+let stream = null, lastLook = null, busy = false, stopped = false;
+
+async function post(path, body) {
+  const r = await fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                              body: JSON.stringify(body || {})});
+  if (!r.ok) throw new Error(path + ' -> ' + r.status);
+  return r.json();
+}
+
+function halt(text) {
+  stopped = true;
+  $('verdict').textContent = text;
+  $('verdict').style.color = '#ff9c9c';
+  $('shoot').disabled = true;
+  say(text, false);
+}
+
+async function checkVersion() {
+  let v = null;
+  try {
+    v = await (await fetch('/version')).json();
+  } catch (e) {
+    // A server older than this page has no /version route at all, so the
+    // failure *is* the answer. Written out rather than left as an empty
+    // catch: an empty one is how the last mismatch went unnoticed, and
+    // nothing downstream can tell a deliberate silence from an accidental
+    // one.
+    v = null;
+  }
+  if (!v || v.protocol !== PROTOCOL) {
+    halt('โปรแกรมที่เปิดอยู่เป็นเวอร์ชันเก่า — ปิดหน้าต่าง cmd แล้วดับเบิลคลิก ' +
+         'enroll-faces.cmd ใหม่ แล้วรีเฟรชหน้านี้');
+    return false;
+  }
+  speechAvailable(!!v.speaks);
+  return true;
+}
+
+function grab(quality) {
+  // A hidden canvas at the video's real size. The look-loop uses a small
+  // one (it only needs a box); a capture uses the full frame, because that
+  // pixel data becomes an enrolment photo.
+  const c = document.createElement('canvas');
+  const scale = quality === 'full' ? 1 : Math.min(1, 640 / video.videoWidth);
+  c.width = video.videoWidth * scale;
+  c.height = video.videoHeight * scale;
+  c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', quality === 'full' ? 0.92 : 0.7);
+}
+
+function paint(look) {
+  const ctx = ov.getContext('2d');
+  ov.width = video.videoWidth || 1280;
+  ov.height = video.videoHeight || 720;
+  ctx.clearRect(0, 0, ov.width, ov.height);
+  if (!look || !look.box) return;
+  // The server measured the box on its own downscaled copy, so it comes
+  // back with the size it was measured against. Scaling here rather than
+  // guessing keeps the rectangle on the face when the two differ.
+  const [fw, fh] = look.frame || [ov.width, ov.height];
+  const k = ov.width / fw, ky = ov.height / fh;
+  const [x1, y1, x2, y2] = look.box;
+  ctx.strokeStyle = look.ok ? '#2fd06a' : '#ff5a5a';
+  ctx.lineWidth = Math.max(2, ov.width / 320);
+  ctx.strokeRect(x1 * k, y1 * ky, (x2 - x1) * k, (y2 - y1) * ky);
+}
+
+// How long the pose has to hold before the shot is taken. Long enough that
+// walking through the frame cannot trigger it, short enough that nobody has
+// to stand still and wonder. Same idea as FACE_CONFIRM_FRAMES on the robot
+// side: one frame is a bad witness.
+//
+// The number comes from the server with each step, because it is a property
+// of the *instruction*: the last step asks for a smile, which nothing in
+// this pipeline can see, so the shot used to fire the moment the face came
+// back to frontal — before the smile. This is only the fallback for a
+// reply that predates that.
+const HOLD_MS = 600;
+let holdingSince = 0;
+
+// Emma says the instruction, because the person doing it is looking at a
+// lens, not at a list. Same argument as the preview window itself: the
+// feedback has to reach where they are. Local speech synthesis, not the
+// model — this is a fixed set of sentences, and a page that needs the
+// network to tell somebody to turn their head is a page that stops working
+// when the network does.
+// The browser's own speechSynthesis was the obvious way to do this and it
+// does not work here: this machine has no Thai voice and Windows offers
+// none to install — SAPI5, OneCore, Settings and Edge all list the same
+// three English voices. A Thai sentence read by an English voice is worse
+// than silence, so the page fell silent, which is what the owner heard.
+//
+// So the sentences come from the server as audio, in the same voice the
+// robot speaks with. `app/voice.py` renders each one once and keeps it;
+// after the first run every line is a file on disk.
+let speakOn = true, lastSaid = '', lastSaidAt = 0;
+const player = new Audio();
+
+function speechAvailable(yes) {
+  $('speak').disabled = !yes;
+  if (yes) {
+    speakOn = $('speak').checked;
+    $('voiceNote').className = 'hint';
+    $('voiceNote').textContent = 'เสียงของ Emma (เสียงเดียวกับหุ่น)';
+    return;
+  }
+  // A ticked box over silence is the sleep screen's level meter again:
+  // "off" and "cannot" must not look the same.
+  speakOn = false;
+  $('speak').checked = false;
+  $('voiceNote').className = 'hint warn';
+  $('voiceNote').textContent = 'เครื่องนี้ไม่มี GEMINI_API_KEY ใน .env ' +
+    'Emma จึงพูดไม่ได้ — จะมีเสียง “ติ๊ง” ตอนเก็บภาพแทน';
+}
+
+// Sentences wait for each other. "เก็บแล้ว" and the next instruction both
+// want saying at the same instant — the shot is taken and the step changes
+// in the same tick — and the second one used to cut the first off a syllable
+// in. Which is the audio-lead bug in miniature: the thing that changed the
+// state raced the thing announcing it. The queue is the same answer the
+// subtitle track uses, that piece k waits for piece k-1.
+const queue = [];
+let playing = false, playToken = 0;
+
+function playNext() {
+  const text = queue.shift();
+  if (text === undefined) { playing = false; return; }
+  playing = true;
+  // A clip can end, fail to load, or be refused, and more than one of those
+  // can fire for the same sentence. The token means only the first of them
+  // moves the queue on.
+  const mine = ++playToken;
+  const advance = () => { if (mine === playToken) playNext(); };
+  player.onended = advance;
+  player.onerror = advance;
+  player.src = '/voice?text=' + encodeURIComponent(text);
+  player.play().catch(err => {
+    // Only one of these is worth a red box. A browser that will not play
+    // audio until the page has been clicked is something the operator can
+    // fix and has to be told about. A sentence the server could not render
+    // is already on the screen in words — turning that into a warning as
+    // well would fill the panel with red every time the free tier's quota
+    // ran out mid-queue.
+    if (err.name !== 'NotAllowedError') { advance(); return; }
+    queue.length = 0;
+    playing = false;
+    $('voiceNote').className = 'hint warn';
+    $('voiceNote').textContent = 'คลิกที่หน้าเว็บหนึ่งครั้งก่อน แล้ว Emma จะเริ่มพูด';
+  });
+}
+
+function say_out_loud(text, {force = false} = {}) {
+  if (!speakOn || !text) return;
+  const now = Date.now();
+  // Don't repeat the same line while somebody is still working on it. And a
+  // correction that arrives while Emma is mid-sentence is dropped, not
+  // queued: the look loop offers it again in 200ms if it is still true, so
+  // queueing it only guarantees she is behind by one.
+  if (!force && (playing || (text === lastSaid && now - lastSaidAt < 6000))) return;
+  lastSaid = text; lastSaidAt = now;
+  queue.push(text);
+  while (queue.length > 2) queue.shift();
+  if (!playing) playNext();
+}
+
+// The sound that does not need a language pack. Whoever is being enrolled
+// is looking at the lens, not at the panel, so "the shot was taken" has to
+// arrive as something other than a thumbnail appearing off to the side.
+let tone = null, tonesBroken = false;
+
+function beep(freq, ms) {
+  if (tonesBroken) return;
+  try {
+    tone = tone || new (window.AudioContext || window.webkitAudioContext)();
+    if (tone.state === 'suspended') tone.resume();
+    const osc = tone.createOscillator(), gain = tone.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, tone.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.22, tone.currentTime + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, tone.currentTime + ms / 1000);
+    osc.connect(gain).connect(tone.destination);
+    osc.start();
+    osc.stop(tone.currentTime + ms / 1000);
+  } catch (e) {
+    // No audio device, or a browser that will not open one. Stop trying
+    // rather than throwing once per shot into the capture path.
+    tonesBroken = true;
+  }
+}
+
+let spokenStep = null;
+
+function speakGuidance(look) {
+  if (look.step !== spokenStep) {
+    spokenStep = look.step;
+    // The prompt carries a trailing note when a step was skipped; the
+    // spoken version drops it — nobody needs to hear why a step vanished.
+    say_out_loud((look.prompt || '').split(' — ')[0], {force: true});
+    return;
+  }
+  // `say` is the server's sentence for the ear; `reason` is the one for the
+  // screen, and it carries pixel counts. The page does not edit either into
+  // the other — a sentence assembled here is a sentence nothing rendered.
+  if (!look.ok && look.say) say_out_loud(look.say);
+}
+
+function drawSteps(look) {
+  if (!look.steps) return;
+  $('steps').innerHTML = look.steps.map(s =>
+    `<li class="${s.done ? 'done' : s.skipped ? 'skipped'
+                 : (s.key === look.step ? 'now' : '')}">${s.prompt}</li>`
+  ).join('');
+}
+
+async function loop() {
+  if (stopped) return;
+  if (stream && video.videoWidth && !busy) {
+    busy = true;
+    try {
+      lastLook = await post('/look', {image: grab('small'),
+                                      fullWidth: video.videoWidth});
+      paint(lastLook);
+      drawSteps(lastLook);
+      speakGuidance(lastLook);
+      $('verdict').textContent = lastLook.ok ? 'ค้างไว้…' : (lastLook.reason || '');
+      $('verdict').style.color = lastLook.ok ? '#7ef0a5' : '#ffd08a';
+      $('size').textContent = lastLook.width ? lastLook.width + 'px' : '';
+      $('shoot').disabled = !lastLook.ok;
+
+      if (lastLook.ok && playing) {
+        // Emma has not finished the instruction. The smile clip runs 3.4s
+        // against a 2.5s hold, and counting them concurrently fired the
+        // shutter before the word "ยิ้ม" had been said — the last portrait
+        // of the owner's own enrolment is a man listening, not smiling.
+        // Nobody can follow an instruction they have not heard yet, so the
+        // countdown starts when the sentence ends.
+        holdingSince = 0;
+        $('ring').firstElementChild.style.setProperty('--hold', '0%');
+      } else if (lastLook.ok) {
+        const hold = lastLook.hold_ms || HOLD_MS;
+        if (!holdingSince) holdingSince = Date.now();
+        const held = Date.now() - holdingSince;
+        $('ring').firstElementChild.style.setProperty(
+          '--hold', Math.min(100, held / hold * 100) + '%');
+        // A wait long enough to notice has to be counted out loud, or it
+        // reads as the page having stopped.
+        if (hold >= 1000)
+          $('verdict').textContent = 'ค้างไว้… ' + Math.ceil((hold - held) / 1000);
+        if (held >= hold) { holdingSince = 0; await shoot(); }
+      } else {
+        holdingSince = 0;
+        $('ring').firstElementChild.style.setProperty('--hold', '0%');
+      }
+    } catch (e) {
+      // Never silent. A swallowed error here is exactly how a new page ran
+      // against an old server for a whole enrolment session without one
+      // visible sign.
+      halt('ติดต่อโปรแกรมไม่ได้: ' + e.message +
+           ' — ปิดหน้าต่าง cmd แล้วเปิด enroll-faces.cmd ใหม่');
+    }
+    busy = false;
+  }
+  setTimeout(loop, 200);
+}
+
+function isVirtual(label) {
+  // "Elgato Virtual Camera", OBS, ManyCam and friends. They enumerate like
+  // hardware and can be perfectly functional, but they are a *pass-through*
+  // of something else — on this machine the physical Facecam is a separate
+  // entry, and pointing the enrolment station at the copy means depending
+  // on a second program being open.
+  return /virtual|obs|manycam|droidcam|snap camera/i.test(label || '');
+}
+
+async function cameras() {
+  let devs = (await navigator.mediaDevices.enumerateDevices())
+               .filter(d => d.kind === 'videoinput');
+  // Real cameras first, so the default pick is the lens.
+  devs = devs.slice().sort((a, b) => isVirtual(a.label) - isVirtual(b.label));
+  $('dev').innerHTML = devs.map((d, i) =>
+    `<option value="${d.deviceId}">${d.label || ('กล้อง ' + (i + 1))}` +
+    `${isVirtual(d.label) ? ' (กล้องเสมือน)' : ''}</option>`).join('');
+  return devs;
+}
+
+async function start(deviceId) {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: deviceId ? {deviceId: {exact: deviceId}, width: 1280, height: 720}
+                    : {width: 1280, height: 720}});
+  video.srcObject = stream;
+  const devs = await cameras();   // labels only exist once permission is granted
+  if (!deviceId && devs.length && !isVirtual(devs[0].label)) {
+    // The browser hands out whatever it likes first, which on this machine
+    // was the virtual camera. Now that the labels are readable, switch to
+    // the real one once.
+    const current = stream.getVideoTracks()[0].getSettings().deviceId;
+    if (current !== devs[0].deviceId) return start(devs[0].deviceId);
+  }
+  if (devs.length) $('dev').value = stream.getVideoTracks()[0].getSettings().deviceId;
+}
+
+function say(text, good) {
+  $('msg').textContent = text;
+  $('msg').className = 'msg ' + (good ? 'good' : 'bad');
+}
+
+function showShots(shots) {
+  $('shots').innerHTML = (shots || []).map(s => `<img src="${s.thumb}">`).join('');
+  const any = (shots || []).length > 0;
+  $('save').disabled = !any;
+  $('clear').disabled = !any;
+}
+
+async function refreshDone() {
+  const r = await (await fetch('/enrolled')).json();
+  $('done').innerHTML = r.enrolled.length
+    ? r.enrolled.map(([n, c]) => `<li><span>${n}</span><span>${c} ภาพ</span></li>`).join('')
+    : '<li style="color:#8a8a92">ยังไม่มีใคร</li>';
+}
+
+$('speak').onchange = e => {
+  speakOn = e.target.checked && !$('speak').disabled;
+  if (speakOn) return;
+  queue.length = 0;
+  playing = false;
+  player.pause();
+};
+
+$('dev').onchange = () => start($('dev').value).catch(e => say(String(e), false));
+
+async function shoot() {
+  const r = await post('/capture', {image: grab('full'),
+                                    fullWidth: video.videoWidth});
+  if (!r.ok) { beep(200, 220); say(r.reason, false); return; }
+  $('msg').className = 'msg';
+  showShots(r.shots);
+  drawSteps(r);
+  spokenStep = null;              // the next prompt is news again
+  beep(880, 120);
+  say_out_loud('เก็บแล้ว', {force: true});
+  if (r.spread !== undefined) {
+    // The number that answers "are five shots enough". Five frames of
+    // somebody holding still sit near 0.99 and carry what one carries;
+    // shots that actually differ come out lower.
+    const good = r.spread < 0.92;
+    $('spread').innerHTML = `ความต่างของภาพ: <b>${r.spread.toFixed(3)}</b> ` +
+      (good ? '— ครอบคลุมหลายมุมแล้ว' : '— ยังคล้ายกันมาก ลองขยับให้ต่างกว่านี้');
+  }
+}
+
+$('shoot').onclick = shoot;
+
+$('save').onclick = async () => {
+  const r = await post('/save', {name: $('name').value});
+  if (!r.ok) { say(r.reason, false); return; }
+  say(`บันทึก ${r.name} แล้ว (${r.total} ภาพ, ความต่าง ${r.spread})`, true);
+  beep(660, 90); setTimeout(() => beep(990, 160), 130);
+  say_out_loud('บันทึกเรียบร้อย คนต่อไปได้เลย', {force: true});
+  spokenStep = null;
+  // Clear the name too: the next person is the next person, and a name
+  // left in the box is how somebody gets enrolled twice under it.
+  $('name').value = '';
+  showShots([]);
+  drawSteps(r);
+  $('spread').textContent = '';
+  refreshDone();
+  $('name').focus();
+};
+
+$('clear').onclick = async () => {
+  const r = await post('/discard');
+  showShots([]); drawSteps(r); $('spread').textContent = '';
+  $('msg').className = 'msg';
+};
+
+checkVersion()
+  .then(ok => ok && start().then(refreshDone).then(loop))
+  .catch(e => { $('verdict').textContent = 'เปิดกล้องไม่ได้: ' + e; });
+</script>
+</html>
