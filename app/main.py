@@ -319,6 +319,33 @@ def _wake_ready() -> bool:
     return settings.wake_enabled and wake.available()
 
 
+@app.get("/unit_price")
+async def unit_price(room: str, token: str | None = None):
+    """Tap-to-reveal prices for the unit card — both nationalities.
+
+    The numbers go straight from the sales DB to the browser on a human's
+    tap; they never enter a tool result, so the model still cannot read a
+    price aloud (the standing "ห้ามโชว์ราคา" order is about the model and
+    the idle screen, and both stay priceless). Guarded by WS_TOKEN exactly
+    like the sockets: this endpoint hands out money figures, and "some
+    browser on the LAN" must not be enough.
+    """
+    import asyncio
+    import hmac
+
+    from fastapi.responses import JSONResponse
+
+    if settings.ws_token and not hmac.compare_digest(
+            (token or "").encode(), settings.ws_token.encode()):
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    from app.tools import units as units_mod
+
+    pair = await asyncio.to_thread(units_mod.price_pair, room)
+    if pair is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return pair
+
+
 @app.get("/health")
 async def health() -> dict:
     from app.tools import robot_link

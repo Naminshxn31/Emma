@@ -271,6 +271,39 @@ def _live_find(room: str) -> dict | None:
     return card
 
 
+def price_pair(room: str) -> dict | None:
+    """Both nationalities' prices for one unit — the tap-to-reveal card.
+
+    Deliberately a plain function, NOT a @tool: the standing order is that
+    prices never pass through the model, and this path honours it — the
+    numbers travel HTTP endpoint → browser on a human's tap, while the tool
+    results Gemini reads stay stripped by _apply_price_policy. (Do not move
+    this between a @tool decorator and its def — the decorator-twin bug.)
+
+    Field naming decoded from the pricing engine (condo-inventory
+    lib/pricing.js): promo_price is Price CN/TN — the THAI price, pricelist
+    column R — and base_price is Price FN, the FOREIGNER price, column S.
+    The sales app's old card showed them as "ตั้ง/โปรฯ", a discount that
+    never existed.
+    """
+    if not live_configured():
+        return None
+    unit_no = _normalize_room(room)
+    if unit_no is None:
+        return None
+    try:
+        rows = _live_get({"select": "unit_no,promo_price,base_price,msize",
+                          "unit_no": f"eq.{unit_no}", "limit": "1"})
+    except Exception:
+        logger.exception("price_pair: live inventory unreachable")
+        return None
+    if not rows:
+        return None
+    r = rows[0]
+    return {"room": r.get("unit_no"), "thai": r.get("promo_price"),
+            "foreign": r.get("base_price"), "sqm": r.get("msize")}
+
+
 def _apply_price_policy(card: dict) -> dict:
     """Remove the numbers, keep the filterability.
 
@@ -359,8 +392,17 @@ def find_units(max_price_thb: float | None = None,
         return {"ok": False, "error": "no live inventory",
                 "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกลูกค้าว่า "
                                 "ขอเช็ครายการห้องว่างกับฝ่ายขาย ห้ามแต่งรายการเอง")}
+    # A budget question reads best-first: promo_price.asc answered "มีเงิน
+    # 10 ล้าน ซื้อห้องไหนได้บ้าง" with the eight cheapest studios in the
+    # building — measured 2026-08-27: the budget actually reached 59 LAGOON
+    # units of 52sqm and the screen showed eight 25sqm twins instead. With
+    # a cap, descending; without one, the cheapest entry point stays the
+    # honest default and that path is byte-identical to before.
+    descending = bool(max_price_thb)
     params: dict = {"select": _LIVE_SELECT, "status": "eq.available",
-                    "order": "promo_price.asc", "limit": "8"}
+                    "order": ("promo_price.desc" if descending
+                              else "promo_price.asc"),
+                    "limit": "48" if descending else "8"}
     price_parts = []
     if min_price_thb:
         price_parts.append(f"promo_price.gte.{int(min_price_thb)}")
@@ -382,18 +424,57 @@ def find_units(max_price_thb: float | None = None,
         return {"ok": False, "error": "inventory unreachable",
                 "instruction": ("เช็คระบบผังขายไม่ได้ตอนนี้ ให้บอกลูกค้าตรงๆ "
                                 "ว่าขอตรวจสอบกับฝ่ายขาย ห้ามแต่งรายการเอง")}
+    total = None
+    if descending:
+        # Variety beats eight twins: one unit per size first (the guest is
+        # choosing a room type, not a room number), then fill from the top.
+        # When the 48-row page is full the cheap end is fetched too, so the
+        # spread covers both ends of the budget instead of one price band.
+        total_known = len(rows) < 48
+        pool = list(rows)
+        if not total_known:
+            have = {r.get("unit_no") for r in pool}
+            cheap = _live_get({**params, "order": "promo_price.asc"})
+            pool += [r for r in cheap if r.get("unit_no") not in have]
+        else:
+            total = len(rows)
+        picked, seen_sizes = [], set()
+        for r in pool:
+            if len(picked) >= 8:
+                break
+            size = r.get("msize") or r.get("size_sqm")
+            if size in seen_sizes:
+                continue
+            seen_sizes.add(size)
+            picked.append(r)
+        for r in pool:
+            if len(picked) >= 8:
+                break
+            if r not in picked:
+                picked.append(r)
+        picked.sort(key=lambda r: -(r.get("promo_price") or r.get("base_price") or 0))
+        rows = picked
     units_found = [_apply_price_policy(_card_from_live(r)) for r in rows]
-    # The query is capped at 8 rows, and "ทั้งหมด 8 ห้อง" was said on screen
+    # The query is capped, and "ทั้งหมด 8 ห้อง" was once said on screen
     # about a budget that actually fits 105 — the cap spoken as the total.
     # A full count costs a second request; honesty costs a word.
-    capped = len(rows) >= 8
-    count_phrase = (f"อย่างน้อย {len(units_found)} ห้อง (แสดง {len(units_found)} "
-                    "รายการราคาต่ำสุด อาจมีมากกว่านี้)"
-                    if capped else f"{len(units_found)} ห้อง")
+    if descending:
+        capped = total is None
+        count_phrase = (f"ทั้งหมด {total} ห้องในงบ (แสดง {len(units_found)} "
+                        "ห้องคละขนาด เรียงจากราคาสูงในงบลงมา)"
+                        if total is not None else
+                        f"หลายสิบห้องในงบ (แสดงตัวอย่าง {len(units_found)} "
+                        "ห้องคละขนาด เรียงจากราคาสูงในงบลงมา อาจมีมากกว่านี้)")
+    else:
+        capped = len(rows) >= 8
+        count_phrase = (f"อย่างน้อย {len(units_found)} ห้อง (แสดง {len(units_found)} "
+                        "รายการราคาต่ำสุด อาจมีมากกว่านี้)"
+                        if capped else f"{len(units_found)} ห้อง")
     turnlog.record("find_units", count=len(units_found), capped=capped,
                    max_price=max_price_thb, building=building)
     return {"ok": True, "screen": "unitlist", "units": units_found,
             "count": len(units_found),
+            "total": total,          # known exact total, or None when capped
             "capped": capped,
             "instruction": ((f"พบ{count_phrase} " "อ่านจากรายการเท่านั้น ไล่ 2-3 ห้องแรก "
                              "สั้นๆ เลขห้อง ขนาด ราคา ห้ามแต่งห้องเพิ่ม "

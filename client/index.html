@@ -982,6 +982,36 @@ function showUnit(u) {
       const b = document.createElement('b'); b.textContent = baht(u.price_thb); return b;
     })(), el('บาท'));
     [...price.children].forEach((c) => (c.style.display = 'inline'));
+  } else if (u.source === 'live' && !document.body.classList.contains('kiosk')) {
+    // Tap-to-reveal, one nationality at a time. The DB carries two prices
+    // (promo_price = Price CN/TN คนไทย, base_price = Price FN ต่างชาติ —
+    // pricelist columns R/S), and the wrong-nationality figure must not
+    // float up in front of whoever is standing there — pressing IS the
+    // decision. Fetched from /unit_price on the tap, so the numbers still
+    // never pass through the model or its tool results. Not on the kiosk:
+    // the robot's chest is public, and a passer-by's tap is not a decision.
+    const revealPrice = (label, key) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.className = 'btn ghost';
+      b.style.cssText = 'font-size:.85rem;padding:.4rem .8rem;margin-right:.5rem';
+      b.onclick = async () => {
+        try {
+          const tok = new URLSearchParams(location.search).get('token');
+          const res = await fetch('/unit_price?room=' + encodeURIComponent(u.room)
+            + (tok ? '&token=' + encodeURIComponent(tok) : ''));
+          if (!res.ok) throw new Error();
+          const d = await res.json();
+          const shown = el(label + ': ' + (d[key] != null ? baht(d[key]) + ' บาท' : '—'));
+          shown.style.cssText = 'display:inline;font-weight:700;margin-right:.8rem';
+          b.replaceWith(shown);
+        } catch {
+          b.textContent = label + ' — เช็คไม่ได้';
+        }
+      };
+      return b;
+    };
+    price.append(revealPrice('ราคาคนไทย', 'thai'), revealPrice('ราคาต่างชาติ', 'foreign'));
   } else {
     // Two different absences. A sample table missing its column is a gap
     // waiting for the spreadsheet; a live card without a price is the
@@ -1153,30 +1183,48 @@ function showUnitList(r) {
   card.className = '';
   const title = document.createElement('div');
   title.className = 'uRoom';
-  title.textContent = 'ห้องว่าง ' + (r.count || 0) + ' ห้อง';
+  // total = exact count from the sales system; without it the list is a
+  // sample and the '+' says so — the cap spoken as the total was a real bug.
+  title.textContent = r.total ? ('ห้องว่าง ' + r.total + ' ห้อง')
+    : ('ห้องว่าง ' + (r.count || 0) + (r.capped ? '+' : '') + ' ห้อง');
   card.appendChild(title);
   const note = document.createElement('div');
   note.className = 'uWho';
-  note.textContent = 'สถานะสดจากระบบผังขาย ณ ตอนนี้';
+  note.textContent = 'สถานะสดจากระบบผังขาย ณ ตอนนี้'
+    + (r.capped ? ' · แสดงตัวอย่างคละขนาด' : '');
   card.appendChild(note);
   card.appendChild(Object.assign(document.createElement('hr'), { className: 'uRule' }));
+  // Cards in a grid, not rows: this screen is read from standing distance,
+  // and a guest choosing with a budget is choosing a room *type* — size and
+  // collection lead, the room number is how sales finds it afterwards.
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.7rem;margin-top:.6rem';
   for (const u of (r.units || [])) {
-    const row = document.createElement('div');
-    row.className = 'uMeta';
-    row.style.display = 'flex';
-    row.style.justifyContent = 'space-between';
-    row.style.padding = '.35rem 0';
-    const left = document.createElement('span');
-    left.textContent = 'ห้อง ' + u.room + '  ·  ' + (u.sqm || '—') + ' ตร.ม.' +
-      (u.aspect ? '  ·  ' + u.aspect : '');
-    const right = document.createElement('b');
-    right.style.color = '#e8c87a';
+    const cell = document.createElement('div');
+    cell.style.cssText = 'border:1px solid rgba(232,200,122,.28);border-radius:.7rem;'
+      + 'padding:.7rem .85rem;background:rgba(255,255,255,.04)';
+    const rm = document.createElement('div');
+    rm.style.cssText = 'font-size:1.45rem;font-weight:700;color:#e8c87a';
+    rm.textContent = u.room;
+    const sz = document.createElement('div');
+    sz.style.cssText = 'font-size:1.05rem;color:#f0e4c8;margin:.15rem 0 .25rem';
+    sz.textContent = (u.sqm || '—') + ' ตร.ม.' + (u.type ? ' · ' + u.type : '');
+    const meta = document.createElement('div');
+    meta.className = 'uWho';
+    meta.textContent = [u.collection, u.aspect,
+      (u.floor ? 'ชั้น ' + u.floor : '')].filter(Boolean).join(' · ');
+    cell.append(rm, sz, meta);
     // No price in the payload means policy, not absence — the rooms listed
     // already fit the asked budget, which is the answer the guest wanted.
-    right.textContent = u.price_thb ? baht(u.price_thb) + ' บาท' : '';
-    row.append(left, right);
-    card.appendChild(row);
+    if (u.price_thb) {
+      const pr = document.createElement('b');
+      pr.style.cssText = 'color:#e8c87a;display:block;margin-top:.3rem';
+      pr.textContent = baht(u.price_thb) + ' บาท';
+      cell.appendChild(pr);
+    }
+    grid.appendChild(cell);
   }
+  card.appendChild(grid);
   const stage = $('stage');
   if (stage.classList.contains('framed')) {
     $('stageFrame').removeAttribute('src');

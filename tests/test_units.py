@@ -420,17 +420,19 @@ def test_a_floor_with_no_image_says_which_floors_exist(monkeypatch):
 
 def test_a_capped_list_is_never_spoken_as_the_total(monkeypatch):
     """Said on screen: "ทั้งหมด 8 ห้อง" about a budget that fits 105 — the
-    query cap spoken as the answer. A full count costs a second request;
-    honesty costs a word."""
-    calls = _live_on(monkeypatch, [LIVE_ROW] * 8)
+    query cap spoken as the answer. The budget page is 48 rows now: a full
+    page still hedges, and fewer than a page IS the exact total, said as
+    one."""
+    calls = _live_on(monkeypatch, [LIVE_ROW] * 48)
     full = units.find_units(max_price_thb=10_000_000)
-    assert full["capped"] is True
-    assert "อย่างน้อย" in full["instruction"]
+    assert full["capped"] is True and full["total"] is None
+    assert "อาจมีมากกว่านี้" in full["instruction"]
 
     calls.clear()
     monkeypatch.setattr(units, "_live_get", lambda p: [LIVE_ROW] * 3)
     few = units.find_units(max_price_thb=10_000_000)
-    assert few["capped"] is False and "อย่างน้อย" not in few["instruction"]
+    assert few["capped"] is False and few["total"] == 3
+    assert "ทั้งหมด 3 ห้องในงบ" in few["instruction"]
 
 
 def test_the_boot_banner_tells_the_truth_about_the_link(monkeypatch):
@@ -466,3 +468,177 @@ def test_the_boot_banner_tells_the_truth_about_the_link(monkeypatch):
     fake.get = boom
     ok, msg = units.live_probe()
     assert not ok and "UNREACHABLE" in msg and "ConnectionError" in msg
+
+
+def _live_row(no, msize, price):
+    row = dict(LIVE_ROW)
+    row.update({"unit_no": no, "msize": msize, "promo_price": price,
+                "base_price": price})
+    return row
+
+
+def test_a_budget_question_reads_best_first_with_a_size_spread(monkeypatch):
+    """Measured live, 2026-08-27: "มีเงิน 10 ล้าน ซื้อห้องไหนได้บ้าง" showed
+    eight 25sqm studio twins — promo_price.asc put the whole answer in the
+    cheapest band while the budget actually reached 59 LAGOON units of
+    52sqm that were never shown. With a budget cap the query flips to
+    descending, pulls the cheap end too when the page is full, and picks
+    one unit per size before filling — the guest is choosing a room type,
+    not a room number."""
+    big = [_live_row(f"D-1{i:02d}", 52.0, 7_000_000 - i * 1000) for i in range(48)]
+    small = [_live_row(f"F-1{i:02d}", 25.0, 2_500_000 + i * 1000) for i in range(48)]
+    calls = []
+
+    def fake_get(params):
+        calls.append(dict(params))
+        return big if "desc" in params["order"] else small
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "inventory_url", "https://x.supabase.co")
+    monkeypatch.setattr(settings, "inventory_key", "k")
+    monkeypatch.setattr(units, "_live_get", fake_get)
+
+    out = units.find_units(max_price_thb=10_000_000)
+    assert calls[0]["order"] == "promo_price.desc"
+    assert calls[0]["limit"] == "48"
+    assert calls[1]["order"] == "promo_price.asc", \
+        "a full page must fetch the cheap end so the spread covers the range"
+    sizes = {u["sqm"] for u in out["units"]}
+    assert sizes == {52.0, 25.0}, "one per size first — not eight twins"
+    # Prices are stripped by policy before leaving the server, so order is
+    # asserted through what survives: the 52sqm top end leads, the cheap
+    # end trails.
+    assert out["units"][0]["sqm"] == 52.0, "best-first for a budget"
+    assert out["units"][-1]["room"].startswith("F-"), "cheap end included, last"
+    assert out["capped"] is True and out["total"] is None
+    assert "คละขนาด" in out["instruction"]
+
+
+def test_a_short_budget_answer_reports_its_exact_total(monkeypatch):
+    """Fewer rows than the page means the list IS the answer — say the real
+    total instead of hedging. The cap once got spoken as the total; the
+    reverse (a known total hedged as 'maybe more') is the same dishonesty
+    mirrored."""
+    rows = [_live_row("B-101", 52.0, 6_900_000), _live_row("B-102", 34.0, 3_900_000)]
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "inventory_url", "https://x.supabase.co")
+    monkeypatch.setattr(settings, "inventory_key", "k")
+    monkeypatch.setattr(units, "_live_get", lambda p: list(rows))
+
+    out = units.find_units(max_price_thb=10_000_000)
+    assert out["total"] == 2
+    assert "ทั้งหมด 2 ห้องในงบ" in out["instruction"]
+
+
+def test_no_budget_keeps_the_cheapest_first_default(monkeypatch):
+    """The showroom default is untouched: no cap, ascending, eight rows,
+    the old phrasing — a pull must not change what the walk-in flow shows."""
+    calls = _live_on(monkeypatch, [LIVE_ROW] * 8)
+    out = units.find_units(building="a")
+    assert calls[0]["order"] == "promo_price.asc"
+    assert calls[0]["limit"] == "8"
+    assert "ราคาต่ำสุด" in out["instruction"]
+    assert out["total"] is None
+
+
+def test_the_unit_list_renders_cards_and_the_plan_labels_sold():
+    """The owner's ask, 2026-08-27: the flat row list was hard to read from
+    standing distance, and the plan "ยังไม่เหมือน" the sales team's own —
+    theirs prints SOLD across the box, ours only tinted it. Cards in a
+    grid; HTML labels (not SVG text — the stretched viewBox distorts
+    glyphs)."""
+    from pathlib import Path
+
+    src = (Path(__file__).parent.parent / "client" / "index.html").read_text(
+        encoding="utf-8")
+    lst = src[src.index("function showUnitList"):]
+    lst = lst[:lst.index("function showPlan")] if "function showPlan" in lst else lst[:6000]
+    assert "repeat(auto-fill" in lst, "the list must be a card grid"
+
+    plan = src[src.index("function showPlan"):]
+    plan = plan[:plan.index("function showFrame")] if "function showFrame" in plan else plan[:8000]
+    assert "'SOLD'" in plan and "'จอง'" in plan
+    assert "document.createElementNS(NS, 'text')" not in plan, \
+        "SVG text stretches with the viewBox — labels are HTML"
+
+
+# ============ tap-to-reveal prices: two nationalities, zero model access ============
+
+
+def test_price_pair_maps_the_pricelist_columns_correctly(monkeypatch):
+    """Decoded from the pricing engine itself (condo-inventory
+    lib/pricing.js): promo_price is Price CN/TN — the THAI price, pricelist
+    column R — and base_price is Price FN, the FOREIGNER price, column S.
+    The sales app's old card labelled them "ตั้ง/โปรฯ", a discount that
+    never existed. Swapping these two silently misquotes every customer of
+    the wrong nationality, so the mapping is pinned."""
+    calls = _live_on(monkeypatch, [
+        {"unit_no": "A-801", "promo_price": 2_790_000, "base_price": 3_190_000,
+         "msize": 33.5},
+    ])
+    out = units.price_pair("A801")
+    assert out == {"room": "A-801", "thai": 2_790_000,
+                   "foreign": 3_190_000, "sqm": 33.5}
+    assert calls[0]["unit_no"] == "eq.A-801"
+
+    # Bare numbers never guess a building; no live link means no answer.
+    assert units.price_pair("801") is None
+    from app.config import settings
+    monkeypatch.setattr(settings, "inventory_url", "")
+    assert units.price_pair("A801") is None
+
+
+def test_price_pair_is_not_a_tool():
+    """The whole design: prices reach the browser through /unit_price on a
+    human's tap and NEVER through a tool result — the model cannot read a
+    number it never received. price_pair registered as a tool would undo
+    the standing ห้ามโชว์ราคา order in one decorator."""
+    from app.tools import load_tools, registry
+
+    load_tools()
+    assert "price_pair" not in registry._REGISTRY
+    assert "unit_price" not in registry._REGISTRY
+
+
+def test_the_price_endpoint_sits_behind_the_same_token_gate(monkeypatch):
+    """This endpoint hands out money figures; WS_TOKEN guards every socket
+    for the same reason, and 'some browser on the LAN' must not be enough
+    here either."""
+    from fastapi.testclient import TestClient
+
+    from app.config import settings
+    from app.main import app
+
+    monkeypatch.setattr(settings, "ws_token", "s3cret")
+    monkeypatch.setattr(units, "price_pair",
+                        lambda room: {"room": room, "thai": 1, "foreign": 2,
+                                      "sqm": 3.0})
+    client = TestClient(app)
+    assert client.get("/unit_price", params={"room": "A801"}).status_code == 403
+    assert client.get("/unit_price",
+                      params={"room": "A801", "token": "wrong"}).status_code == 403
+    ok = client.get("/unit_price", params={"room": "A801", "token": "s3cret"})
+    assert ok.status_code == 200 and ok.json()["thai"] == 1
+
+    monkeypatch.setattr(units, "price_pair", lambda room: None)
+    assert client.get("/unit_price",
+                      params={"room": "Z999", "token": "s3cret"}).status_code == 404
+
+
+def test_the_reveal_buttons_never_reach_the_kiosk():
+    """The robot's chest screen is the most public surface in the building
+    and a passer-by's tap is not a sales decision. The buttons live in the
+    live-source branch only, gated on body.kiosk, and the numbers come from
+    /unit_price at tap time — the tool payload stays priceless."""
+    from pathlib import Path
+
+    src = (Path(__file__).parent.parent / "client" / "index.html").read_text(
+        encoding="utf-8")
+    fn = src[src.index("function showUnit("):]
+    fn = fn[:fn.index("function showUnitList")]
+    assert "ราคาคนไทย" in fn and "ราคาต่างชาติ" in fn
+    assert "classList.contains('kiosk')" in fn
+    assert "/unit_price?room=" in fn
+    assert "u.source === 'live'" in fn

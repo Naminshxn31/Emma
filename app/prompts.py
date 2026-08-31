@@ -82,6 +82,7 @@ EMMA_INSTRUCTIONS = """[คำแนะนำตัว]
 5. คุยได้ทุกเรื่อง ตอบจากความรู้ของคุณได้เต็มที่ แต่แยกให้ชัดว่าอะไรคือข้อเท็จจริง อะไรคือความเห็น ไม่แน่ใจให้บอกว่าไม่แน่ใจ ห้ามแต่งข้อมูล
 5.1 ยกเว้นเรื่องในรายการเอกสารด้านล่าง: ต้องเรียก search_my_documents ก่อนตอบเสมอ แล้วตอบจากผลค้น ไม่พบค่อยใช้ search_web และบอกว่ามาจากเว็บภายนอก ห้ามตอบเรื่องพวกนี้จากความรู้ทั่วไปโดยไม่ค้น
 5.2 การพูด แปล เล่าเรื่อง แต่งประโยค ทุกภาษา คือความสามารถของตัวคุณเอง ทำได้ทันทีไม่ต้องใช้เครื่องมือใดๆ ถูกขอให้พูดภาษาญี่ปุ่นยาวๆ ก็พูดเลย ห้ามไปค้นเว็บหา
+5.3 "โครงการนี้" หรือ "โครงการของเรา" หมายถึงโครงการในเครือ Empire เท่านั้น (Embassy Life, The Embassy Pattaya) ให้ค้นเอกสารก่อนตอบเสมอ — เคยตอบว่า "ไม่ทราบว่าเป็นโครงการอะไร" ทั้งที่เอกสารมีคำตอบ และแนะนำเฉพาะโครงการในเครือ ห้ามยกโครงการนอกเครือมาแนะนำหรือเปรียบเทียบ
 [เอกสาร]
 6. สิ่งที่ทำได้ดูจากรายการเครื่องมือของคุณ เช่น คุมไฟแอร์ ตั้งเตือนจับเวลา จำข้อมูล ค้นเอกสาร ค้นเว็บ เปิดเว็บบนจอ ถูกสั่งให้เรียกเครื่องมือทันทีโดยไม่ต้องถามซ้ำ แล้วบอกผลสั้นๆ
 7. หลังเรียกเครื่องมือ ให้ดูผลลัพธ์ก่อนตอบ failed=สั่งอุปกรณ์ไม่สำเร็จ mock=ยังไม่ได้ต่ออุปกรณ์จริง ห้ามบอกว่าสำเร็จถ้าผลไม่ได้บอก
@@ -462,6 +463,22 @@ def build_instructions(
             .replace("[เอกสาร]", _personal_docs_line())
             .replace("[ความจำ]", memory_store.prompt_block())
         )
+        # No websearch group loaded: an instruction naming an undeclared
+        # tool is the refusing-model bug, and the fallback itself was the
+        # problem the owner turned the group off for (2026-08-27: "ทำไม
+        # เลือกบริษัทไทย" answered from siamconsultancy.com with a "75%"
+        # figure nobody signed — the assistant's information must be the
+        # company's own, prepared and approved, not whatever ranks first).
+        from app.config import settings as _settings
+
+        groups = _settings.enabled_tool_groups()
+        if groups is not None and "websearch" not in groups:
+            out = (out
+                   .replace("ไม่พบค่อยใช้ search_web และบอกว่ามาจากเว็บภายนอก",
+                            "ไม่พบให้บอกตรงๆ ว่าไม่มีในเอกสาร ห้ามเดา "
+                            "และห้ามอ้างข้อมูลจากเว็บภายนอก")
+                   .replace(" ค้นเอกสาร ค้นเว็บ เปิดเว็บบนจอ",
+                            " ค้นเอกสาร เปิดเว็บบนจอ"))
         return out + _units_tools_suffix()
 
     facts = extra_facts if extra_facts is not None else load_facts()

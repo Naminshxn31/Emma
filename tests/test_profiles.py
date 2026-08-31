@@ -351,3 +351,45 @@ def test_emma_is_told_formatted_verse_goes_silent():
     text = build_instructions("X", profile="emma")
     assert "ประโยคพูดต่อเนื่อง" in text
     assert "ได้แต่พิมพ์" in text, "the observed excuse must be quoted verbatim"
+
+
+def test_no_websearch_group_means_no_websearch_in_the_prompt(monkeypatch):
+    """Live, 2026-08-27: "ทำไมเลือกบริษัทไทย" was answered from
+    siamconsultancy.com with a "ถูกกว่า 75%" figure nobody signed — spoken
+    with the robot's confidence to a would-be buyer. The owner's call:
+    Emma is becoming the information assistant, the information must be
+    the company's own prepared data, web search off. With the group off,
+    the prompt must stop naming search_web (an instruction naming an
+    undeclared tool is the refusing-model bug) and must not promise a
+    web fallback that no longer exists."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "assistant_profile", "emma")
+    monkeypatch.setattr(settings, "tool_groups",
+                        "smarthome,reminders,memory,mydocs,computer")
+    text = build_instructions("X", profile="emma")
+    assert "search_web" not in text
+    assert "ค้นเอกสาร เปิดเว็บบนจอ" in text          # rule 6, websearch dropped
+    assert "ห้ามอ้างข้อมูลจากเว็บภายนอก" in text
+
+    # And the machines that keep the group keep the fallback.
+    monkeypatch.setattr(settings, "tool_groups", "")
+    assert "ไม่พบค่อยใช้ search_web" in build_instructions("X", profile="emma")
+
+    # The tool's own description must work on both kinds of machine, so it
+    # names no fallback tool at all.
+    from app.tools import load_tools, registry
+
+    load_tools()
+    assert "search_web" not in registry.get("search_my_documents").description
+
+
+def test_this_project_means_our_own_projects(monkeypatch):
+    """Same session: "สิ่งอำนวยความสะดวกของโครงการนี้" got "ไม่ทราบว่าเป็น
+    โครงการอะไร" — with the facilities sitting in the sales kit in her own
+    library. "โครงการนี้" from a guest in this company's building means this
+    company's projects, and recommendations stay in-group."""
+    text = build_instructions("X", profile="emma")
+    assert "ในเครือ Empire" in text
+    assert "ไม่ทราบว่าเป็นโครงการอะไร" in text       # the quoted live failure
+    assert "ห้ามยกโครงการนอกเครือ" in text
