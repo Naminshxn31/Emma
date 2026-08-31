@@ -46,6 +46,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import math
 import re
 import unicodedata
@@ -365,7 +366,15 @@ def _l2_normalise(vectors):
 #: Local, offline embeddings. Small enough to ship on the gallery PC and
 #: multilingual, which is the whole reason semantic search exists here — a
 #: Chinese or Russian question has to find a Thai slide.
-LOCAL_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+#:
+#: Configurable (EMBED_LOCAL_MODEL) because the genuine/garbage gap this
+#: index produces is measured, and the honest way to try a stronger model
+#: (BGE-M3) is to change one line, rebuild, and run eval_search.py again.
+#: The model name is baked into `embedding_signature`, so a change forces a
+#: rebuild instead of quietly mixing spaces.
+LOCAL_MODEL = os.getenv(
+    "EMBED_LOCAL_MODEL",
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 _local = None
 
 
