@@ -258,6 +258,59 @@ async def _rearm_reminders() -> None:
             "reminders: %d pending — watcher armed", len(reminders.pending()))
 
 
+def _quiet_connection_resets(loop) -> None:
+    """Stop Windows socket teardown from impersonating a crash.
+
+    Every time a browser tab refreshes or closes, the proactor loop tries to
+    shut down a TCP socket the other side has already abandoned, and Windows
+    answers WinError 10054. asyncio logs that as ERROR with a full traceback
+    — so the operator's console shows what looks like the robot failing, on
+    every single page reload, forever. It has been mistaken for a real fault
+    in this project more than once.
+
+    Only ConnectionResetError is swallowed, and only from the loop's
+    exception handler: a reset on a *live* session still surfaces through
+    the read path, where the session code already treats it as a disconnect.
+    Everything else goes to the default handler untouched.
+    """
+    def handler(loop, context):
+        if isinstance(context.get("exception"), ConnectionResetError):
+            return
+        loop.default_exception_handler(context)
+
+    loop.set_exception_handler(handler)
+
+
+@app.on_event("startup")
+async def _no_teardown_noise() -> None:
+    import asyncio
+
+    _quiet_connection_resets(asyncio.get_running_loop())
+
+
+@app.on_event("startup")
+async def _watch_the_door() -> None:
+    """Open the entrance camera, if this machine has one and wants it.
+
+    `FACE_ENABLED` is off by default and the showroom must stay that way:
+    every face that gets through opens a session, which is the one thing
+    the wake word exists to avoid. `greeter.start()` checks the switch
+    itself so nothing here has to be kept in step with it.
+    """
+    from app import greeter
+
+    greeter.start()
+
+
+@app.on_event("shutdown")
+async def _stop_watching_the_door() -> None:
+    """Let go of the camera. A held lens with nothing reading it keeps the
+    light on and stops the enrolment station opening the same device."""
+    from app import greeter
+
+    await greeter.stop()
+
+
 @app.on_event("shutdown")
 async def _close_web_stage() -> None:
     """A kiosk window outliving the server it was driven by is a fullscreen
@@ -364,7 +417,12 @@ async def health() -> dict:
         # Whether the page should open standby ears instead of waiting for
         # the Start button. `ready` is the honest half: enabled-but-missing-
         # model must not put the UI in a mode the server cannot serve.
-        "wake": {"enabled": settings.wake_enabled, "ready": _wake_ready()},
+        # `ready` means "a keyword will be listened for"; `standby` means
+        # "hold the socket open anyway" — true when the camera is the thing
+        # that will ring it. Two flags because the page does two different
+        # things: the second one must not open a microphone.
+        "wake": {"enabled": settings.wake_enabled, "ready": _wake_ready(),
+                 "standby": _wake_ready() or settings.face_enabled},
         "auto_connect": settings.auto_connect,
         # How long the page keeps the finished conversation readable after
         # the line sleeps. Served rather than hard-coded in the page so the
@@ -405,6 +463,27 @@ async def serve_display() -> FileResponse:
     return FileResponse(DISPLAY_INDEX, headers=_NO_CACHE)
 
 
+async def _hold_standby(websocket: WebSocket, wake) -> None:
+    """Keep a browser reachable without listening to it.
+
+    The microphone half of standby is off here: nothing is fed, so nothing
+    is heard, and the page is told so rather than left painting "ไมค์กำลัง
+    ฟังอยู่" over a socket that will never answer. That exact pairing — a
+    reassuring screen over a dead ear — is the bug `WAKE_DEBUG` was built
+    to find, and it is not worth repeating in a new place.
+    """
+    wake.register(websocket)
+    try:
+        while True:
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                return
+    except WebSocketDisconnect:
+        return
+    finally:
+        wake.unregister(websocket)
+
+
 @app.websocket("/ws/wake")
 async def ws_wake(websocket: WebSocket, token: str | None = None) -> None:
     """Standby ears. The browser streams PCM16 mono 16kHz here while no
@@ -422,6 +501,16 @@ async def ws_wake(websocket: WebSocket, token: str | None = None) -> None:
         return
     await websocket.accept()
     if not settings.wake_enabled or not wake.available():
+        if settings.face_enabled:
+            # No keyword, but there is a camera, and the camera needs
+            # somewhere to ring. This socket is two things wearing one name
+            # — a detector fed by the browser, and the bell the server pulls
+            # — and only the first half needs a model. Hanging up here left
+            # `events.announce(summon=True)` with nobody to call, so a face
+            # at the door could be recognised and then reach nothing.
+            await websocket.send_text(json.dumps({"type": "standby_only"}))
+            await _hold_standby(websocket, wake)
+            return
         # Tell the browser why, then hang up. The Start button still works;
         # wake mode is an upgrade, never a gate.
         await websocket.send_text(json.dumps({
@@ -464,10 +553,11 @@ async def ws_wake(websocket: WebSocket, token: str | None = None) -> None:
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket, voice: str | None = None, provider: str | None = None,
                       profile: str | None = None, lang: str | None = None,
-                      token: str | None = None) -> None:
+                      token: str | None = None, summoned: str | None = None) -> None:
     if await _reject_unauthorized(websocket, token):
         return
-    await handle_connection(websocket, provider=provider, voice=voice, profile=profile, lang=lang)
+    await handle_connection(websocket, provider=provider, voice=voice, profile=profile, lang=lang,
+                            summoned=summoned == "1")
 
 
 @app.websocket("/ws/display")

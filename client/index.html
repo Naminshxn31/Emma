@@ -51,9 +51,15 @@
          cursor: pointer; background: #0d0d0d; color: #fff; font-family: inherit; }
   .btn.wide { width: 100%; padding: 1rem; font-size: 1rem; }
   .btn:disabled { opacity: .4; cursor: not-allowed; }
+  /* The bottom-right button is one button wearing two labels (End in a
+     call, "เริ่มคุย" asleep). It is the only control that is always there,
+     so it does not change clothes with the colour scheme the way the
+     secondary buttons do - dark ground, white letters, both schemes. */
+  #endBtn { background: #0d0d0d; color: #fff; }
   .btn.ghost { background: transparent; color: #8e8e8e; border: 1px solid rgba(128,128,128,.35); }
   .btn.ghost.on { color: #3b82f6; border-color: #3b82f6; font-weight: 700; }
-  @media (prefers-color-scheme: dark) { .btn { background: #f2f2f2; color: #0d0d0d; } }
+  @media (prefers-color-scheme: dark) { .btn { background: #f2f2f2; color: #0d0d0d; }
+                                       #endBtn { background: #1c1c22; color: #fff; } }
 
   .orb.listening { animation: breathe 2.4s ease-in-out infinite; }
   .orb.hearing   { animation: breathe 1.1s ease-in-out infinite; }
@@ -816,7 +822,16 @@ Promise.all([
     micCompressor = health.mic.compressor !== false;
     micAGC = health.mic.agc !== false;
   }
-  wakeAvailable = !!(health.wake && health.wake.ready);
+  // Two questions, not one. `ready` is "a keyword will be listened for";
+  // `standby` is "hold the socket open" — true as well when the camera at
+  // the door is the thing that will ring it. A server that predates the
+  // second flag answers the first for both.
+  wakeListens = !!(health.wake && health.wake.ready);
+  wakeAvailable = !!(health.wake && (health.wake.standby ?? health.wake.ready));
+  // Kept separately from `health`, which lives inside this callback: the
+  // microphone can fail minutes later, and the question then is whether
+  // anything else can still ring this socket.
+  wakeCanBeRung = wakeAvailable;
   if (wantsPicker) return;    // ?picker=1 — stay on the voice carousel
   if (autoConnect) {
     startCall();              // no button, no name — straight in
@@ -1157,6 +1172,20 @@ function showPlan(r) {
     svg.appendChild(shape);
   }
   wrap.appendChild(svg);
+  // The sales team's own plan prints SOLD across the box; colour alone read
+  // as "not the same plan" to the person who lives with the original. HTML
+  // labels, not SVG text — the stretched viewBox distorts glyphs.
+  for (const u of (r.units || [])) {
+    if (u.dim || u.poly || !(u.status === 'sold' || u.status === 'reserved')) continue;
+    if (!(u.w >= 1.0 && u.h >= 1.5)) continue;     // too small to carry a word
+    const lab = document.createElement('div');
+    lab.style.cssText = 'position:absolute;left:' + u.x + '%;top:' + u.y + '%;'
+      + 'width:' + u.w + '%;height:' + u.h + '%;display:flex;align-items:center;'
+      + 'justify-content:center;pointer-events:none;color:#fff;font-weight:700;'
+      + 'font-size:min(1.15vmin,.6rem);text-shadow:0 1px 2px rgba(0,0,0,.65)';
+    lab.textContent = u.status === 'sold' ? 'SOLD' : 'จอง';
+    wrap.appendChild(lab);
+  }
   card.appendChild(wrap);
 
   const foot = document.createElement('div');
@@ -1765,7 +1794,9 @@ function startCall() {
   ws = new WebSocket(`${proto}://${location.host}/ws?voice=${encodeURIComponent(selectedVoice)}`
     + (urlProfile ? `&profile=${encodeURIComponent(urlProfile)}` : '')
     + (urlLang ? `&lang=${encodeURIComponent(urlLang)}` : '')
-    + (urlToken ? `&token=${encodeURIComponent(urlToken)}` : ''));
+    + (urlToken ? `&token=${encodeURIComponent(urlToken)}` : '')
+    + (summonedDial ? '&summoned=1' : ''));
+  summonedDial = false;             // one dial; the next one earns its own
   ws.binaryType = 'arraybuffer';
   ws.onmessage = onMessage;
   ws.onerror = () => { setState('error'); systemLine('เชื่อมต่อไม่สำเร็จ · connection error'); };
@@ -1845,14 +1876,22 @@ function startCall() {
 }
 
 async function startMic() {
+  // A refused microphone used to return from here, before the AudioContext
+  // below existed — so Emma had nowhere to play. Measured on the first
+  // camera greeting that worked end to end: the camera recognised somebody,
+  // the page was summoned, the session opened and the greeting arrived as
+  // *text on the screen* with the speakers silent. Listening and speaking
+  // are two directions and only one of them was denied; a robot that can
+  // greet you by name but not hear you is far better than one that does
+  // neither, and it is the whole point of a door camera.
+  micFailure = null;
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
     });
   } catch (e) {
-    setState('error');
-    systemLine('ไม่ได้รับสิทธิ์ใช้ไมโครโฟน · microphone permission denied');
-    return;
+    micStream = null;
+    micFailure = e;
   }
 
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
@@ -1871,6 +1910,32 @@ async function startMic() {
   const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
   await audioCtx.audioWorklet.addModule(url);
   URL.revokeObjectURL(url);
+
+  if (!micStream) {
+    // Playback is built and the socket is live; there is simply nothing
+    // feeding upstream. Said in words rather than left to the state word,
+    // because "she cannot hear me" and "she is broken" are the two readings
+    // and only one of them is true.
+    //
+    // And said with the *actual* error, because this line spent a day
+    // claiming "denied" for every failure while Edge, Windows and the site
+    // permission all read Allow — the browser distinguishes five different
+    // reasons and the first version of this message flattened them into the
+    // only one anybody could act on remotely.
+    setState('error');
+    const why = micFailure ? (micFailure.name || 'Error') : 'Error';
+    const advice = {
+      NotAllowedError: 'เบราว์เซอร์ไม่ให้ใช้ไมค์ — กดแม่กุญแจ > Microphone > Allow แล้วรีเฟรช',
+      NotFoundError: 'ไม่พบไมโครโฟนในเครื่อง — เช็คว่าเสียบอยู่และ Windows เห็นมัน',
+      NotReadableError: 'ไมค์ถูกโปรแกรมอื่นถืออยู่ หรือเปิดไม่ขึ้น — ปิดโปรแกรมที่ใช้ไมค์แล้วรีเฟรช',
+      OverconstrainedError: 'ไมค์ที่ขอไม่มีในเครื่อง — รีเฟรชแล้วลองใหม่',
+      SecurityError: 'หน้านี้ไม่ใช่ secure origin — เปิดผ่าน https หรือ localhost',
+    }[why] || ('เปิดไมค์ไม่สำเร็จ: ' + (micFailure && micFailure.message || why));
+    systemLine('ได้ยินเสียงเอมม่าได้ แต่พูดตอบไม่ได้ — ' + advice
+               + ' · mic failed: ' + why);
+    if (wakeHandover) stopWakeMode();
+    return;
+  }
 
   micSource = audioCtx.createMediaStreamSource(micStream);
   const shaped = buildMicChain(audioCtx, micSource, micCallBoost);
@@ -2196,7 +2261,8 @@ $('callOrb').onclick = () => {
 // half-loaded.
 
 let wakeWs = null, wakeCtx = null, wakeMicStream = null, wakeWorklet = null;
-let wakeAvailable = false, wakeStopping = false;
+let wakeAvailable = false, wakeStopping = false, wakeListens = false,
+    wakeCanBeRung = false;
 let wakeServerReady = false, wakeAudioFlowing = false, wakeListeningWord = 'emma';
 // The seconds between "Emma" and the session being ready are exactly when
 // the owner says the actual command — "Emma เปิดไฟ" is one breath. Dropping
@@ -2232,6 +2298,13 @@ let standDown = false, standDownReason = '';
 // Mic shaping (MIC_BOOST / MIC_NOISE_SUPPRESSION in .env): compressor+gain
 // between the mic and everything that listens. See buildMicChain().
 let micBoost = 1, micCallBoost = 1, micNS = true, micCompressor = true, micAGC = true;
+// Set when the server rang this page (camera, reminder) rather than a
+// heard name or a pressed button. The dial passes it on so the session
+// skips its opening line: the ring is followed by the real greeting, and
+// two greetings in a row had the second cutting the first off mid-word.
+let summonedDial = false;
+// The last getUserMedia failure, kept so the banner can name it.
+let micFailure = null;
 
 async function startWakeMode() {
   if (!wakeAvailable || wakeWs) return;
@@ -2239,7 +2312,7 @@ async function startWakeMode() {
   // origin.  Do not open a standby socket and paint "listening" when this
   // page can never produce audio (the old behaviour looked healthy but sent
   // the detector complete silence).
-  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+  if (wakeListens && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)) {
     wakeAvailable = false;
     sleepNote('ไมโครโฟนใช้ไม่ได้บน HTTP — เปิดหน้านี้ด้วย https:// หรือ localhost');
     return;
@@ -2271,9 +2344,19 @@ async function startWakeMode() {
       // the tail buffer; the wake socket itself closes now — the ears' job
       // is done, and a detector listening through the whole conversation
       // would be a hot mic with no purpose.
+      //
+      // Unless nobody spoke. A server-rung wake (`evt.reason` — the camera,
+      // a reminder) has no words behind it, so its tail is pure room noise,
+      // and flushing that into the fresh session fed the transcriber
+      // silence-shaped audio through the VAD's grace window. It answered
+      // with a stock sentence: a guest turn reading "I'm going to go to
+      // the bathroom." that no human said, which Emma then politely
+      // answered. Same disease as 我们走吧, same cure: what is never sent
+      // cannot hallucinate.
       wakeHandover = true;
+      summonedDial = !!evt.reason;
       wakeTail = [];
-      if (wakeWorklet) wakeWorklet.port.onmessage = (e) => {
+      if (!evt.reason && wakeWorklet) wakeWorklet.port.onmessage = (e) => {
         if (e.data && e.data.level !== undefined) return;
         wakeTail.push(e.data);
         if (wakeTail.length > WAKE_TAIL_MAX) wakeTail.shift();
@@ -2287,6 +2370,13 @@ async function startWakeMode() {
       wakeServerReady = true;
       wakeListeningWord = evt.word || 'emma';
       showWakeStandby(evt.word);
+    } else if (evt.type === 'standby_only') {
+      // The socket is a bell, not an ear, on this machine. Say so instead
+      // of painting "ไมค์กำลังฟังอยู่" over a microphone that was never
+      // opened — that pairing is the exact thing WAKE_DEBUG was built to
+      // find, and it is not worth rebuilding in a new place.
+      wakeListens = false;
+      sleepNote('กล้องหน้าประตูกำลังดูอยู่ — เดินเข้ามาได้เลย หรือกดปุ่ม "เริ่มคุย"');
     } else if (evt.type === 'wake_unavailable') {
       wakeAvailable = false;
       stopWakeMode();
@@ -2312,15 +2402,35 @@ async function startWakeMode() {
   };
   sock.onerror = () => { try { sock.close(); } catch {} };
 
+  if (!wakeListens) {
+    // Nothing to feed the detector with, because there is no detector. The
+    // socket stays open so the server can ring it when the camera sees
+    // somebody.
+    return;
+  }
   try {
     wakeMicStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
     });
   } catch (e) {
-    // No permission — the button path stays. Say which mode was lost.
+    // No permission for the *microphone*. That ends listening for a name,
+    // and it used to end the socket with it — which quietly took the camera
+    // down too, since the door camera rings this same socket. Measured on
+    // the first real run: a face was recognised at 0.617 and the greeting
+    // had nobody to ring.
+    //
+    // But the socket surviving is not the same as the greeting working. A
+    // summoned page dials through startMic(), which needs this exact
+    // permission, so a denied microphone means Emma cannot speak to anybody
+    // however she is woken. The first version of this line said the camera
+    // could still wake her, which was a promise the page could not keep —
+    // the same failure as a standby screen over an ear nobody opened. What
+    // is on the screen now is the thing to *do*.
+    wakeListens = false;
+    micDenied();
+    if (wakeCanBeRung) return;     // socket stays open, so a fix takes effect
     wakeAvailable = false;
     stopWakeMode();
-    sleepNote('กดปุ่ม "เริ่มคุย" ด้านล่าง (ไมค์สำหรับเรียกชื่อไม่ได้รับสิทธิ์)');
     return;
   }
   wakeCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2356,6 +2466,23 @@ async function startWakeMode() {
   silent.gain.value = 0;
   wakeWorklet.connect(silent);
   silent.connect(wakeCtx.destination);
+}
+
+async function micDenied() {
+  // "Blocked" and "never asked" need opposite instructions and look
+  // identical from the chair — the browser refuses both the same way.
+  let state = 'prompt';
+  try {
+    state = (await navigator.permissions.query({name: 'microphone'})).state;
+  } catch (e) {
+    // Firefox and older Chrome do not answer this query; the button advice
+    // below is the one that works either way.
+    state = 'prompt';
+  }
+  sleepNote(state === 'denied'
+    ? 'ไมค์ถูกบล็อกไว้ — กดไอคอนซ้ายของแถบที่อยู่ แล้วอนุญาตไมโครโฟน จากนั้นรีเฟรชหน้านี้'
+    : 'ยังไม่ได้อนุญาตไมค์ — กดปุ่ม "เริ่มคุย" ด้านล่างแล้วกด Allow ครั้งเดียว '
+      + 'หลังจากนั้นกล้องหน้าประตูจะปลุกเองได้');
 }
 
 function showWakeStandby(word = null) {

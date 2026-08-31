@@ -6,10 +6,42 @@ this project's HOST and PORT variables as bind options.  This entrypoint does.
 from __future__ import annotations
 
 import socket
+import sys
+import threading
+import time
+import webbrowser
 
 import uvicorn
 
 from app.config import settings
+
+
+def _open_when_up(url: str, delay: float = 2.5) -> None:
+    """Open the page once the server has had a moment to bind.
+
+    Not the LAN address printed above it: browsers only grant microphone
+    access on a secure origin, and `http://192.168.x.x` is not one. A
+    launcher that opened the LAN link would hand somebody a page that looks
+    right and cannot hear.
+
+    And `localhost`, not `127.0.0.1`, though both are secure origins and the
+    same machine. Permissions are stored *per origin* and those two are
+    different origins, so a page opened on one has none of the grants given
+    to the other. Read out of Chrome's own settings on the showroom machine
+    after the first camera greeting was lost:
+
+        http://localhost:8001   microphone allowed
+        http://127.0.0.1:8001   (not listed)
+
+    The page came up on the address with no grant, the standby ears were
+    refused, and the only visible symptom was a line about the microphone on
+    a screen nobody was reading yet.
+    """
+    def go() -> None:
+        time.sleep(delay)
+        webbrowser.open(url)
+
+    threading.Thread(target=go, daemon=True).start()
 
 
 def _lan_ip() -> str:
@@ -47,6 +79,11 @@ if __name__ == "__main__":
             "NOTE: display/robot connections work over LAN HTTP, but browsers "
             "require trusted HTTPS to grant microphone access on a LAN IP."
         )
+    if "--open" in sys.argv:
+        # For the double-click launchers. A camera that wakes the robot needs
+        # a page open to wake *into* — the summon rings standby browsers, and
+        # with none of them there the greeting is a line in the log.
+        _open_when_up(f"{scheme}://localhost:{settings.port}/{q}")
     uvicorn.run(
         "app.main:app",
         host=settings.host,

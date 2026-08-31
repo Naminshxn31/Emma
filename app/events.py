@@ -112,16 +112,32 @@ async def announce(
         from app import wake
 
         rang = await wake.summon(reason=source)
-        if rang:
+        if not rang:
+            # Said out loud because the alternative is one flat line that
+            # covers two completely different problems. "Nobody was on
+            # standby" is a page that is closed, or in a call, or that gave
+            # up its socket; "summoned 1, nobody dialled" is a page that
+            # heard the bell and could not connect. The first real camera
+            # greeting was lost to the first of those and the log could not
+            # tell them apart.
+            # Zero rings is not always zero answers: the greeter pre-rings
+            # the moment a face is close enough, and a browser already
+            # dialling has dropped its standby socket by the time this
+            # announcement rings again — so the poll below runs either way,
+            # and only the log line differs.
+            logger.info("no standby browser rang for %s — either no page is "
+                        "open at the sleep screen, or one is already "
+                        "dialling from an earlier ring", source)
+        else:
             logger.info("no session for %s — summoned %d standby browser(s)",
                         source, rang)
-            deadline = SUMMON_WAIT_S
-            while deadline > 0:
-                await asyncio.sleep(0.25)
-                deadline -= 0.25
-                session = session_module._active
-                if session is not None and session.provider is not None:
-                    break
+        deadline = SUMMON_WAIT_S
+        while deadline > 0:
+            await asyncio.sleep(0.25)
+            deadline -= 0.25
+            session = session_module._active
+            if session is not None and session.provider is not None:
+                break
     if session is None or session.provider is None:
         logger.info("no live session — dropping the %s announcement", source)
         turnlog.record("announce", source=source, sent=False, reason="no session")

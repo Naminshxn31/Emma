@@ -35,8 +35,18 @@ logger = logging.getLogger("condo_voice.session")
 
 class VoiceSession:
     def __init__(self, ws: WebSocket, provider_name: str | None = None, voice: str | None = None,
-                 profile: str | None = None, lang: str | None = None) -> None:
+                 profile: str | None = None, lang: str | None = None,
+                 summoned: bool = False) -> None:
         self.ws = ws
+        #: Opened because the server rang the page (a face at the door, a
+        #: reminder), not because somebody said the name or pressed Start.
+        #: Such a session gets its greeting from the event that rang it —
+        #: `events.announce` delivers one the moment the line is up — so the
+        #: provider's own opening line is dropped. With both, the second
+        #: arrived while the first was still being generated and Gemini
+        #: treated it as a barge-in: "หวัดดีค่ะ" cut off mid-word, then
+        #: "สวัสดีค่ะ มีอะไรให้ช่วยไหมคะ" — the robot interrupting itself.
+        self.summoned = summoned
         self.provider_name = provider_name or settings.provider
         #: Per-connection persona. The URL can ask for one (?profile=
         #: translator) so the sales room flips into interpreter mode with a
@@ -99,7 +109,7 @@ class VoiceSession:
         )
         provider = get_provider(
             self.provider_name, self.voice, instructions,
-            greeting=greeting_for(self.profile),
+            greeting=None if self.summoned else greeting_for(self.profile),
             # Toolless by config for the translator, not by prompt: a
             # declared tool is a callable tool whatever the prompt says.
             use_tools=(self.profile != "translator"),
@@ -720,7 +730,8 @@ _active: VoiceSession | None = None
 
 
 async def handle_connection(ws: WebSocket, provider: str | None = None, voice: str | None = None,
-                            profile: str | None = None, lang: str | None = None) -> None:
+                            profile: str | None = None, lang: str | None = None,
+                            summoned: bool = False) -> None:
     """Run a voice session, taking the robot over from any previous one.
 
     Newest wins rather than newest rejected. A stale tab must not be able to
@@ -770,7 +781,8 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
         if _calc is not None:
             _calc.reset()
 
-    session = VoiceSession(ws, provider_name=provider, voice=voice, profile=profile, lang=lang)
+    session = VoiceSession(ws, provider_name=provider, voice=voice, profile=profile, lang=lang,
+                           summoned=summoned)
     if not settings.multi_session:
         _active = session
     turnlog.record("session_start", provider=session.provider_name, voice=session.voice)
