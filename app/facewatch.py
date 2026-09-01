@@ -350,7 +350,14 @@ class Watcher:
         if runner_up >= 0 and (score - runner_up) < self.margin:
             return "margin (runner-up %.3f within %.2f)" % (runner_up, self.margin)
         if self.name_when_alone:
-            usable = sum(1 for f in found if (f.bbox[2] - f.bbox[0]) >= self.min_face_px)
+            # Company is somebody standing *with* them: a second face of
+            # comparable size. min_face_px alone (50px on the owner's
+            # doorway setup) let a poster, a screen, or a person across
+            # the room unname the one at the desk — measured 2026-09-01,
+            # the owner alone in frame, "company (2 faces in frame)".
+            primary = max(found, key=lambda f: f.bbox[2] - f.bbox[0])
+            bar = max(self.min_face_px, 0.6 * (primary.bbox[2] - primary.bbox[0]))
+            usable = sum(1 for f in found if (f.bbox[2] - f.bbox[0]) >= bar)
             if usable > 1:
                 return "company (%d faces in frame)" % usable
         from app import consent

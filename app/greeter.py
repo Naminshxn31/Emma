@@ -134,6 +134,26 @@ async def _greet(sighting) -> None:
     )
 
 
+def _in_conversation(session) -> bool:
+    """Is this a conversation a stranger's greeting would interrupt?
+
+    Not merely "is there a session". The pre-ring opens the session
+    *before* the face is confirmed, so by the time a stranger is
+    confirmed there is always a live session — the one rung for them —
+    and the first version of the no-interrupt rule threw away every
+    stranger's greeting on that basis (2026-09-01 14:5x: "greeting never
+    came (hold expired)", nobody greeted at all). A summoned session that
+    has not yet had its greeting is a line held open for exactly this
+    announcement; a session that has been greeted, or that somebody
+    opened by name or button, is a conversation.
+    """
+    if session is None:
+        return False
+    if getattr(session, "summoned", False) and not getattr(session, "_greeting_turn_seen", False):
+        return False
+    return True
+
+
 async def _open_camera_patiently(camera):
     """Open the camera, retrying on FACE_CAMERA_RETRY_S until it works.
 
@@ -252,7 +272,7 @@ async def run() -> None:
                             sighting.score)
                 sighting = None
             if sighting is not None and sighting.kind == "stranger" \
-                    and session_module._active is not None:
+                    and _in_conversation(session_module._active):
                 # A stranger wakes the line up; a stranger does not cut into
                 # a conversation. Measured 2026-09-01, one session: three
                 # "strangers" at 0.355 / 0.469 / 0.478 — every one of them

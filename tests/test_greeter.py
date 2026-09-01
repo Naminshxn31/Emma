@@ -1024,3 +1024,36 @@ def test_a_stranger_still_wakes_an_idle_line(monkeypatch):
     announced, _ = _run_with(monkeypatch, [_sighting(kind="stranger", name=None)],
                              face_greet_strangers=True)
     assert [a[0] for a in announced] == ["face_stranger"]
+
+
+# -- a line held open for the greeting is not a conversation ------------------
+
+class _Summoned:
+    summoned = True
+    _greeting_turn_seen = False
+
+
+class _Greeted(_Summoned):
+    _greeting_turn_seen = True
+
+
+def test_a_stranger_is_still_greeted_on_the_session_the_pre_ring_opened_for_them(monkeypatch):
+    """The pre-ring opens the session before the face is confirmed, so a
+    confirmed stranger always finds a live session — theirs. 2026-09-01
+    14:5x: every stranger greeting was dropped as "interrupting", and the
+    summoned session timed out with no greeting at all."""
+    from app import session as session_module
+
+    monkeypatch.setattr(session_module, "_active", _Summoned())
+    announced, _ = _run_with(monkeypatch, [_sighting(kind="stranger", name=None)],
+                             face_greet_strangers=True)
+    assert [a[0] for a in announced] == ["face_stranger"]
+
+
+def test_once_greeted_a_summoned_session_is_a_conversation(monkeypatch):
+    from app import session as session_module
+
+    monkeypatch.setattr(session_module, "_active", _Greeted())
+    announced, _ = _run_with(monkeypatch, [_sighting(kind="stranger", name=None)],
+                             face_greet_strangers=True)
+    assert announced == []

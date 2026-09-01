@@ -281,3 +281,18 @@ def test_the_revoke_script_revokes(capsys):
     assert revoke_face.main(["--list"]) == 0
     out = capsys.readouterr().out
     assert "revoked" in out and "ต้า" in out
+
+
+def test_company_means_a_face_of_comparable_size_not_a_poster_across_the_room(monkeypatch):
+    """min_face_px alone let a 50px face in the background unname the
+    person at the desk (2026-09-01: the owner alone, "company (2 faces in
+    frame)"). Company is somebody standing with them."""
+    w = _watcher(min_face_px=50)
+    near = faces.Face((0, 0, 200, 200), 0.9, ALICE)
+    far = faces.Face((400, 0, 470, 70), 0.9, BOB)        # 70px: past min_face_px, a third of the primary
+    monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [near, far])
+    assert w.see(FRAME, now=0.0).kind == "known"
+    beside = faces.Face((400, 0, 560, 160), 0.9, BOB)     # 160px: standing next to them
+    monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [near, beside])
+    w.forget()
+    assert _twice(w, 1.0).meta["unnamed"].startswith("company")
