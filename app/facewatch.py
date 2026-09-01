@@ -87,6 +87,19 @@ class Sighting:
         return self.meta.get("group", "")
 
 
+def _overlap(a, b) -> float:
+    """Intersection over union of two (x1, y1, x2, y2) boxes; 0 when either is missing."""
+    if not a or not b:
+        return 0.0
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    if inter <= 0:
+        return 0.0
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
 class Watcher:
     """Frames in, sightings out. One per camera.
 
@@ -238,6 +251,7 @@ class Watcher:
                 if float(np.dot(face.vec, entry["vec"])) >= self.threshold:
                     stranger_seen = entry
                     entry["at"] = now
+                    entry["bbox"] = tuple(face.bbox)
                     break
 
         key = (f"name:{name}" if name
@@ -322,13 +336,40 @@ class Watcher:
                 if float(np.dot(face.vec, entry["vec"])) >= self.threshold:
                     self._strangers.remove(entry)
                     return None
+            # The vector dedupe above cannot see the other half of this:
+            # the approach frames of a colleague (blurred, 0.10-0.32
+            # against the gallery) greeted anonymously, and the same
+            # person named nine seconds later once they stood still
+            # (2026-09-01 15:48). A garbage frame's vector matches
+            # nobody, its owner included — but its *box* is where that
+            # person was standing. A colleague confirmed soon after an
+            # anonymous greeting, in the same spot, is that arrival;
+            # somebody walking in behind them lands in a different box.
+            for entry in list(self._strangers):
+                recent = (now - entry.get("greeted_at", entry["at"])) < self.STRANGER_TO_NAME_S
+                if recent and _overlap(face.bbox, entry.get("bbox")) >= self.SAME_SPOT_IOU:
+                    logger.info("face: %s confirmed %.0fs after an anonymous greeting in "
+                                "the same spot — same arrival, not greeting twice",
+                                name, now - entry.get("greeted_at", entry["at"]))
+                    self._strangers.remove(entry)
+                    return None
             return Sighting(kind="known", name=name, score=float(score),
                             meta=dict(meta))
 
         if stranger_seen is not None:
             return None                    # greeted already; clock refreshed
 
-        self._strangers.append({"vec": np.array(face.vec, copy=True), "at": now})
+        # A stranger has to be closer than a colleague before the robot
+        # speaks. Measured on the doorway setup (31 Aug): standing at the
+        # door a face is 59-68px and a colleague scores 0.64-0.78; walking
+        # in it is 41-51px, blurred, scoring 0.10-0.32 against the gallery
+        # - and six of those frames passed as "a stranger" while the
+        # colleague was still on their way to being recognised.
+        if (x2 - x1) < self.min_face_px * self.STRANGER_PX_FACTOR:
+            return None
+
+        self._strangers.append({"vec": np.array(face.vec, copy=True), "at": now,
+                                "greeted_at": now, "bbox": tuple(face.bbox)})
         # A remembered face costs 2KB; forgetting the oldest is cheaper
         # than comparing against a whole Saturday.
         del self._strangers[:-16]
@@ -372,6 +413,15 @@ class Watcher:
         if not allowed:
             return "consent %s" % state
         return None
+
+    #: A stranger must be this many times min_face_px wide before the
+    #: anonymous greeting fires (see the stranger branch of `see`).
+    STRANGER_PX_FACTOR = 1.3
+    #: A colleague confirmed within this many seconds of an anonymous
+    #: greeting, standing where it fired, is the same person arriving.
+    STRANGER_TO_NAME_S = 20.0
+    #: How much the two boxes must overlap to be "the same spot".
+    SAME_SPOT_IOU = 0.3
 
     def forget(self) -> None:
         """Drop the cooldowns and the streak.

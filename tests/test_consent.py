@@ -313,3 +313,47 @@ def test_the_pre_ring_waits_for_a_stranger_to_nearly_confirm(monkeypatch):
     _frame_with(monkeypatch, ALICE)
     w2.see(FRAME, now=0.0); w2.see(FRAME, now=0.2)
     assert w2.someone_at == 0.2, "a colleague still rings at two"
+
+
+# -- one arrival, one greeting ---------------------------------------------------
+
+def test_a_stranger_is_greeted_only_once_close_enough(monkeypatch):
+    """Walking in, a face is 41-51px and scores garbage against the gallery;
+    six such frames used to pass as a stranger (2026-09-01 15:48, score
+    0.103) while the colleague was still on the way to being recognised.
+    A stranger has to stand closer than a colleague before the robot speaks."""
+    w = _watcher(min_face_px=50)
+    _frame_with(monkeypatch, _unit(0, 0, 1), width=55)      # past 50, under 65
+    for i in range(8):
+        assert w.see(FRAME, now=i * 0.2) is None
+    _frame_with(monkeypatch, _unit(0, 0, 1), width=70)
+    seen = w.see(FRAME, now=5.0) or w.see(FRAME, now=5.2)
+    assert seen is not None and seen.kind == "stranger"
+
+
+def test_a_colleague_confirmed_right_after_an_anonymous_greeting_is_not_greeted_again(monkeypatch):
+    """The approach frames were greeted anonymously; the same person named
+    nine seconds later is one arrival greeted twice. The vector dedupe
+    cannot see it — a garbage frame matches nobody, its owner included."""
+    w = _watcher(min_face_px=50)
+    _frame_with(monkeypatch, _unit(0, 0, 1), width=200)      # a blur nobody matches
+    assert _twice(w, 0.0).kind == "stranger"
+    _frame_with(monkeypatch, ALICE, width=200)                # ...resolves into ต้า, same box
+    assert w.see(FRAME, now=9.0) is None, "greeted twice"
+    w.forget()
+    _frame_with(monkeypatch, _unit(0, 0, 1), width=200)
+    assert _twice(w, 100.0).kind == "stranger"
+    _frame_with(monkeypatch, ALICE, width=200)
+    assert w.see(FRAME, now=130.0).kind == "known", "a colleague half a minute later is a new arrival"
+
+
+def test_a_colleague_walking_in_behind_a_stranger_is_still_named(monkeypatch):
+    """The other half of the same-arrival rule: a different box is a
+    different person, however soon they follow."""
+    w = _watcher(min_face_px=50)
+    blur = faces.Face((0, 0, 200, 200), 0.9, _unit(0, 0, 1))
+    monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [blur])
+    assert _twice(w, 0.0).kind == "stranger"
+    behind = faces.Face((400, 0, 600, 200), 0.9, ALICE)
+    monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [behind])
+    assert w.see(FRAME, now=2.0).kind == "known"

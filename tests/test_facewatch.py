@@ -136,7 +136,11 @@ def test_a_stranger_and_a_colleague_have_separate_cooldowns(monkeypatch):
     _sees(monkeypatch, _unit(0.2, 0.2, 1))
     w.see(FRAME, now=0)
     assert w.see(FRAME, now=1).kind == "stranger"
-    _sees(monkeypatch, ALICE)
+    # Behind them, so in a different place — the same spot a second later
+    # would be the stranger's own face resolving into a name (see
+    # test_consent's same-arrival tests).
+    behind = faces.Face((400, 0, 600, 200), 0.9, ALICE)
+    monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [behind])
     assert w.see(FRAME, now=2).name == "ต้า"
 
 
