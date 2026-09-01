@@ -32,5 +32,9 @@
       "value": null
     }
   ],
-  "disclaimer": "ทั้งหมดคือ Preliminary Concept อาจเปลี่ยนแปลงได้"
+  "disclaimer": "ทั้งหมดคือ Preliminary Concept อาจเปลี่ยนแปลงได้",
+  "map": {
+    "url": null,
+    "_comment": "ลิงก์ Google Maps ของโครงการที่ฝ่ายขายยืนยัน (https://maps.app.goo.gl/... หรือ https://www.google.com/maps/...) — null = show_map บอกว่ายังไม่มีแผนที่ หุ่นห้ามเดาพิกัด"
+  }
 }

@@ -28,6 +28,8 @@ be one forgotten setting away from quoting invented prices.
 """
 from __future__ import annotations
 
+import re
+
 import json
 import logging
 from pathlib import Path
@@ -207,21 +209,31 @@ def _normalize_room(room: str) -> str | None:
     return f"{m.group(1)}-{m.group(2)}"
 
 
-def _live_get(params: dict) -> list[dict]:
+def _live_get(params: dict, table: str = "units") -> list[dict]:
     """One PostgREST read. Its own function so tests can stand it in."""
     import httpx
 
     headers = {"apikey": settings.inventory_key,
                "Authorization": f"Bearer {settings.inventory_key}"}
-    r = httpx.get(f"{settings.inventory_url}/rest/v1/units", params=params,
+    r = httpx.get(f"{settings.inventory_url}/rest/v1/{table}", params=params,
                   headers=headers, timeout=8)
     r.raise_for_status()
     return r.json()
 
 
-_LIVE_SELECT = ("unit_no,size_sqm,msize,view,side,collection,unit_option,"
+_LIVE_SELECT = ("id,unit_no,size_sqm,msize,view,side,collection,unit_option,"
                 "base_price,promo_price,status,note,updated_at,"
                 "floors(floor_number,buildings(code)),unit_types(name)")
+
+#: The sales team's per-unit promotions (condo-inventory, 27 Aug 2026):
+#: `pricing_unit_promotions` is a separate table — a promotion never
+#: overwrites the master prices — applied by an admin, lately from the
+#: promo inbox (Gmail → local model → review → apply). Emma reads the
+#: *result* of that workflow and nothing upstream of it.
+_PROMO_SELECT = ("unit_id,thai_price,foreign_price,note,updated_at,"
+                 "units!inner(id,unit_no,status,msize,size_sqm,view,side,unit_option,"
+                 "collection,base_price,promo_price,updated_at,"
+                 "floors!inner(floor_number,buildings!inner(code)),unit_types(name))")
 
 
 def _card_from_live(row: dict) -> dict:
@@ -236,6 +248,7 @@ def _card_from_live(row: dict) -> dict:
     unit_type = (row.get("unit_types") or {}).get("name") or ""
     price = row.get("promo_price") or row.get("base_price")
     return {
+        "id": row.get("id"),
         "room": row.get("unit_no"),
         "building": building,
         "floor": floors.get("floor_number"),
@@ -300,8 +313,32 @@ def price_pair(room: str) -> dict | None:
     if not rows:
         return None
     r = rows[0]
-    return {"room": r.get("unit_no"), "thai": r.get("promo_price"),
+    pair = {"room": r.get("unit_no"), "thai": r.get("promo_price"),
             "foreign": r.get("base_price"), "sqm": r.get("msize")}
+    # The active promotion rides along on the same tap: the person who
+    # pressed wanted the number that applies today, and the sales app's
+    # own quotation defaults to the promotion price when there is one.
+    try:
+        promo = _active_promotion(r.get("unit_no"))
+    except Exception:
+        logger.exception("price_pair: promotion lookup failed")
+        promo = None
+    if promo:
+        pair.update(promo_thai=promo.get("thai_price"),
+                    promo_foreign=promo.get("foreign_price"),
+                    promo_note=promo.get("note") or "")
+    return pair
+
+
+def _active_promotion(unit_no: str | None) -> dict | None:
+    """The active row of `pricing_unit_promotions` for one unit, or None."""
+    if not unit_no or not live_configured():
+        return None
+    rows = _live_get({"select": "unit_id,thai_price,foreign_price,note,updated_at,"
+                                "units!inner(unit_no)",
+                      "active": "eq.true", "units.unit_no": f"eq.{unit_no}",
+                      "limit": "1"}, table="pricing_unit_promotions")
+    return rows[0] if rows else None
 
 
 def _apply_price_policy(card: dict) -> dict:
@@ -344,7 +381,21 @@ def show_unit_live(room: str) -> dict:
                 "instruction": ("ไม่พบเลขห้องนี้ในระบบผังขาย ให้ทวนเลขห้องกับลูกค้า "
                                 "อีกครั้ง ห้ามแต่งข้อมูลห้องขึ้นมาเอง")}
     turnlog.record("show_unit", room=card["room"], sample=False, source="live")
+    try:
+        promo = _active_promotion(card["room"])
+    except Exception:
+        logger.exception("promotion lookup failed — card goes out without it")
+        promo = None
     card = _apply_price_policy(card)
+    if promo:
+        # The note is the sales team's own words (an admin applied it), so
+        # it goes on the card. The figures follow the price policy: they
+        # appear on the tap, never in what the model reads.
+        card["promo_note"] = promo.get("note") or ""
+        card["promo"] = True
+        if settings.units_show_price:
+            card["promo_thai_thb"] = promo.get("thai_price")
+            card["promo_foreign_thb"] = promo.get("foreign_price")
     if settings.units_show_price:
         note = ("ข้อมูลสดจากระบบผังขาย ณ ตอนนี้ สถานะ %s เป็นสถานะจริง "
                 "ราคาที่แสดงคือราคาขายจริง บอกข้อมูลสั้นๆ ห้ามคำนวณหรือปัดราคาเอง"
@@ -354,6 +405,10 @@ def show_unit_live(room: str) -> dict:
                 "นโยบายคือไม่เปิดเผยตัวเลขราคา ถ้าลูกค้าถามราคา ให้บอกว่า "
                 "ราคาและโปรโมชั่นล่าสุดขอให้คุยกับฝ่ายขายโดยตรง ห้ามพูดหรือเดาตัวเลขราคา"
                 % (card.get("status_th") or card.get("status")))
+    if promo:
+        note += (" ห้องนี้มีโปรโมชั่นอยู่ตอนนี้ (บอกลูกค้าว่ามีโปรโมชั่น "
+                 + ("รายละเอียด: %s " % card["promo_note"] if card.get("promo_note") else "")
+                 + "ตัวเลขให้ดูบนจอหรือคุยกับฝ่ายขาย)")
     return {"ok": True, "screen": "unit", "unit": card, "sample": False,
             "instruction": note}
 
@@ -609,3 +664,264 @@ def live_probe() -> tuple[bool, str]:
         return False, ("unit inventory: CONFIGURED BUT UNREACHABLE (%s) — "
                        "show_unit will refuse honestly; check the URL/key in .env"
                        % type(exc).__name__)
+
+
+# ==================== promotions, comparison, quotation, map ====================
+#
+# Sales list items 5, 6, 1/9 and 17 (docs/agent-list-สถานะ.md), wired on
+# 2026-09-01 to what condo-inventory actually has by then: a promotions
+# table, a quotation sheet with a URL, and the same units the card reads.
+# Nothing here invents a number: promotions come from the admin's applied
+# rows, the quotation is the sales app's own page put on the stage, the
+# comparison is counts and sizes, and the map link is whatever the sales
+# team wrote into condo_facts.json — or "no map yet".
+
+
+@tool(
+    name="list_promotions",
+    description=(
+        "รายการโปรโมชั่นที่ฝ่ายขายเปิดอยู่ตอนนี้จากระบบผังขาย ใช้เมื่อลูกค้าถามว่า "
+        "มีโปรโมชั่นอะไรบ้าง ห้องไหนมีโปร โปรล่าสุดคืออะไร "
+        "ผลลัพธ์คือรายการจริง ณ ตอนนี้ ให้อ่านจากรายการเท่านั้น ห้ามแต่งโปรหรือตัวเลขเพิ่ม "
+        "ถ้ารายการว่างให้บอกตรงๆ ว่าตอนนี้ยังไม่มีโปรโมชั่นในระบบ"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "building": {"type": "string", "description": "รหัสตึก เช่น A (ไม่ใส่ = ทุกตึก)"},
+        },
+    },
+    tags=["units"],
+)
+def list_promotions(building: str | None = None) -> dict:
+    if not live_configured():
+        return {"ok": False, "error": "no live inventory",
+                "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกลูกค้าว่า "
+                                "โปรโมชั่นล่าสุดสอบถามฝ่ายขาย ห้ามแต่งโปรเอง")}
+    params = {"select": _PROMO_SELECT, "active": "eq.true",
+              "units.status": "neq.sold", "order": "updated_at.desc", "limit": "24"}
+    if building:
+        params["units.unit_no"] = f"like.{building.strip().upper()}-*"
+    try:
+        rows = _live_get(params, table="pricing_unit_promotions")
+    except Exception:
+        logger.exception("promotions unreachable")
+        return {"ok": False, "error": "inventory unreachable",
+                "instruction": ("เช็คโปรโมชั่นจากระบบผังขายไม่ได้ตอนนี้ ให้บอกลูกค้าตรงๆ "
+                                "ว่าขอตรวจสอบกับฝ่ายขาย ห้ามแต่งโปรเอง")}
+    items = []
+    for row in rows:
+        unit = row.get("units") or {}
+        card = _apply_price_policy(_card_from_live(unit))
+        card["promo"] = True
+        card["promo_note"] = row.get("note") or ""
+        if settings.units_show_price:
+            card["promo_thai_thb"] = row.get("thai_price")
+            card["promo_foreign_thb"] = row.get("foreign_price")
+        card["promo_updated"] = (row.get("updated_at") or "")[:10]
+        items.append(card)
+    turnlog.record("list_promotions", count=len(items), building=building)
+    if not items:
+        return {"ok": True, "screen": "promotions", "promotions": [], "count": 0,
+                "instruction": ("ตอนนี้ยังไม่มีโปรโมชั่นเปิดอยู่ในระบบผังขาย ให้บอกลูกค้าตรงๆ "
+                                "และแนะนำให้สอบถามฝ่ายขายเผื่อมีโปรที่ยังไม่ลงระบบ")}
+    return {"ok": True, "screen": "promotions", "promotions": items, "count": len(items),
+            "instruction": (f"มีโปรโมชั่น {len(items)} ห้อง ขึ้นจอแล้ว อ่านจากรายการเท่านั้น "
+                            "ไล่เลขห้องกับรายละเอียดโปร 2-3 รายการแรกสั้นๆ "
+                            + ("" if settings.units_show_price else
+                               "นโยบายคือไม่พูดตัวเลขราคา ราคาโปรให้ดูบนจอหรือคุยกับฝ่ายขาย ")
+                            + "ห้ามแต่งโปรหรือเงื่อนไขเพิ่ม")}
+
+
+@tool(
+    name="compare_unit_types",
+    description=(
+        "เปรียบเทียบแบบห้องที่ยังว่าง (สตูดิโอ / 1 ห้องนอน / 2 ห้องนอน ...) จากระบบผังขาย: "
+        "จำนวนห้องว่าง ขนาด ชั้น วิวและทิศที่มี ใช้เมื่อลูกค้าถามว่า 1 ห้องนอนกับ 2 ห้องนอน "
+        "ต่างกันยังไง แบบไหนมีวิวอะไร ห้องแบบนี้มีกี่ห้อง "
+        "ผลลัพธ์คือตัวเลขจริง ณ ตอนนี้ ห้ามแต่งขนาดหรือวิวเพิ่ม"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "building": {"type": "string", "description": "รหัสตึก เช่น A (ไม่ใส่ = ทุกตึก)"},
+        },
+    },
+    tags=["units"],
+)
+def compare_unit_types(building: str | None = None) -> dict:
+    if not live_configured():
+        return {"ok": False, "error": "no live inventory",
+                "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกลูกค้าว่า "
+                                "ขอเช็คแบบห้องกับฝ่ายขาย ห้ามแต่งข้อมูลเอง")}
+    params = {"select": ("unit_no,msize,size_sqm,view,side,unit_option,collection,"
+                         "floors(floor_number,buildings(code)),unit_types(name)"),
+              "status": "eq.available", "limit": "2000"}
+    if building:
+        params["unit_no"] = f"like.{building.strip().upper()}-*"
+    try:
+        rows = _live_get(params)
+    except Exception:
+        logger.exception("live inventory unreachable")
+        return {"ok": False, "error": "inventory unreachable",
+                "instruction": ("เช็คระบบผังขายไม่ได้ตอนนี้ ให้บอกลูกค้าตรงๆ "
+                                "ว่าขอตรวจสอบกับฝ่ายขาย ห้ามแต่งข้อมูลเอง")}
+    groups: dict[str, dict] = {}
+    for r in rows:
+        kind = (r.get("unit_types") or {}).get("name") or "ไม่ระบุแบบ"
+        g = groups.setdefault(kind, {"type": kind, "available": 0, "sizes": [],
+                                     "floors": set(), "views": {}, "sides": {},
+                                     "options": {}, "buildings": set()})
+        g["available"] += 1
+        size = r.get("msize") or r.get("size_sqm")
+        if size:
+            g["sizes"].append(float(size))
+        floors = r.get("floors") or {}
+        if floors.get("floor_number") is not None:
+            g["floors"].add(int(floors["floor_number"]))
+        code = (floors.get("buildings") or {}).get("code")
+        if code:
+            g["buildings"].add(code)
+        for key, field in (("views", "view"), ("sides", "side"), ("options", "unit_option")):
+            v = r.get(field)
+            if v:
+                g[key][v] = g[key].get(v, 0) + 1
+    types = []
+    for g in sorted(groups.values(), key=lambda g: (min(g["sizes"]) if g["sizes"] else 0)):
+        types.append({
+            "type": g["type"],
+            "available": g["available"],
+            "sqm_min": min(g["sizes"]) if g["sizes"] else None,
+            "sqm_max": max(g["sizes"]) if g["sizes"] else None,
+            "floor_min": min(g["floors"]) if g["floors"] else None,
+            "floor_max": max(g["floors"]) if g["floors"] else None,
+            "buildings": sorted(g["buildings"]),
+            # Most common first, so "วิวอะไรบ้าง" reads the real spread.
+            "views": [f"{k} ({n})" for k, n in sorted(g["views"].items(), key=lambda kv: -kv[1])],
+            "sides": [f"{k} ({n})" for k, n in sorted(g["sides"].items(), key=lambda kv: -kv[1])],
+            "options": [f"{k} ({n})" for k, n in sorted(g["options"].items(), key=lambda kv: -kv[1])],
+        })
+    turnlog.record("compare_unit_types", types=len(types), units=len(rows), building=building)
+    if not types:
+        return {"ok": True, "screen": "unittypes", "types": [], "building": building,
+                "instruction": "ไม่พบห้องว่างตามเงื่อนไข ให้บอกลูกค้าตรงๆ"}
+    return {"ok": True, "screen": "unittypes", "types": types, "building": building,
+            "total_available": len(rows),
+            "instruction": (f"ห้องว่างทั้งหมด {len(rows)} ห้อง แบ่งเป็น {len(types)} แบบ ขึ้นจอแล้ว "
+                            "เทียบให้ฟังสั้นๆ จากตัวเลขในรายการ: จำนวนว่าง ขนาด ชั้น วิว/ทิศที่มี "
+                            "ห้ามแต่งขนาดหรือวิว "
+                            + ("" if settings.units_show_price else
+                               "ไม่พูดตัวเลขราคา ถ้าลูกค้าบอกงบให้ใช้ find_units แทน"))}
+
+
+@tool(
+    name="show_quotation",
+    description=(
+        "เปิดใบเสนอราคาของระบบผังขายขึ้นจอสำหรับห้องหนึ่ง ใช้เมื่อพนักงานหรือลูกค้าขอ "
+        "ใบเสนอราคา/quotation ของห้องนั้น ระบุสัญชาติผู้ซื้อ (thai/foreign — ถ้าไม่รู้ให้ถามก่อน "
+        "เพราะราคาและงวดต่างกัน) และสกุลเงินถ้าลูกค้าขอ เช่น USD EUR INR "
+        "ตัวเลขทั้งหมดอยู่บนจอ ห้ามอ่านราคา งวด หรืออัตราแลกเปลี่ยนออกเสียง "
+        "หน้านี้เป็นของพนักงานขาย ต้องล็อกอินอยู่บนจอ"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "room": {"type": "string", "description": "เลขห้อง เช่น A203"},
+            "ownership": {"type": "string", "enum": ["thai", "foreign"],
+                          "description": "thai = คนไทย, foreign = ต่างชาติ"},
+            "currency": {"type": "string",
+                         "description": "รหัสสกุลเงิน 3 ตัว เช่น THB USD EUR INR (ไม่ใส่ = THB)"},
+        },
+        "required": ["room", "ownership"],
+    },
+    tags=["units"],
+)
+def show_quotation(room: str, ownership: str = "thai", currency: str | None = None) -> dict:
+    """Item 1 (and the fee table of item 9) — not by generating a document.
+
+    The sales app already has the quotation sheet, an Excel replica the
+    team prints, with the payment schedule and the excluded costs (transfer
+    1%, common fee, sinking fund, meter fees) and a live exchange rate with
+    its source and time. Emma opens *that page* on the stage for the unit
+    asked, so every figure on the screen is the sales team's own — the
+    document a robot generates itself is the liability the print path
+    already refused to take (docs/เอกสารที่ให้หุ่นยนต์พิมพ์.md).
+    """
+    from app.tools import webstage
+
+    ownership = (ownership or "thai").strip().lower()
+    if ownership not in ("thai", "foreign"):
+        return {"ok": False, "error": "ownership must be thai or foreign",
+                "instruction": "ถามลูกค้าก่อนว่าซื้อในชื่อคนไทยหรือต่างชาติ แล้วเรียกใหม่"}
+    code = (currency or "THB").strip().upper()
+    if not re.fullmatch(r"[A-Z]{3}", code):
+        return {"ok": False, "error": "bad currency code",
+                "instruction": "สกุลเงินต้องเป็นรหัส 3 ตัว เช่น USD ให้ถามลูกค้าใหม่"}
+    if not webstage.enabled():
+        return {"ok": False, "error": "web stage off",
+                "instruction": ("เครื่องนี้ไม่ได้เปิดจอเว็บ (WEB_STAGE) ให้บอกว่าขอให้ฝ่ายขาย "
+                                "เปิดใบเสนอราคาให้จากระบบผังขายโดยตรง")}
+    if not live_configured():
+        return {"ok": False, "error": "no live inventory",
+                "instruction": "เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกว่าขอใบเสนอราคาจากฝ่ายขาย"}
+    try:
+        card = _live_find(room)
+    except Exception:
+        logger.exception("live inventory unreachable")
+        return {"ok": False, "error": "inventory unreachable",
+                "instruction": "เช็คระบบผังขายไม่ได้ตอนนี้ ให้บอกลูกค้าตรงๆ"}
+    if card is None or not card.get("id"):
+        return {"ok": False, "error": "unknown room", "asked": room,
+                "instruction": "ไม่พบเลขห้องนี้ในระบบผังขาย ให้ทวนเลขห้องกับลูกค้า"}
+    if card.get("status") == "sold":
+        return {"ok": False, "error": "sold", "room": card["room"],
+                "instruction": "ห้องนี้ขายแล้ว ออกใบเสนอราคาไม่ได้ ให้เสนอห้องอื่นด้วย find_units"}
+    url = (f"{settings.inventory_plan_base}/quotation/{card['id']}"
+           f"?ownership={ownership}&currency={code}")
+    webstage.request(url)
+    turnlog.record("show_quotation", room=card["room"], ownership=ownership, currency=code)
+    return {"ok": True, "screen": "web", "room": card["room"], "ownership": ownership,
+            "currency": code,
+            "instruction": (f"ใบเสนอราคาห้อง {card['room']} ({'คนไทย' if ownership == 'thai' else 'ต่างชาติ'}"
+                            f", {code}) กำลังขึ้นจอ ให้บอกสั้นๆ ว่าขึ้นจอแล้ว "
+                            "ตัวเลขทั้งหมดอยู่บนจอ ห้ามอ่านราคา งวด หรืออัตราแลกเปลี่ยน "
+                            "ถ้าจอขึ้นหน้าเข้าสู่ระบบ ให้บอกพนักงานขายล็อกอินก่อน "
+                            "ใบเสนอราคาเป็นของฝ่ายขาย พนักงานเป็นคนกรอกชื่อลูกค้าและกดพิมพ์เอง")}
+
+
+@tool(
+    name="show_map",
+    description=(
+        "แสดงแผนที่ตำแหน่งโครงการบนจอ (Google Maps) ใช้เมื่อลูกค้าถามว่าโครงการอยู่ตรงไหน "
+        "เดินทางยังไง ใกล้อะไร ถ้ายังไม่มีลิงก์แผนที่ที่ฝ่ายขายยืนยัน จะได้ error กลับมา "
+        "ให้บอกทำเลตามข้อมูลโครงการที่มี ห้ามเดาพิกัดหรือระยะทาง"
+    ),
+    parameters={"type": "object", "properties": {}},
+    tags=["units"],
+)
+def show_map() -> dict:
+    """Item 17 — a fixed, sales-confirmed pin, never a search the model
+    typed. The earlier route ("search Google Maps for the project name")
+    put the wrong place on the screen once; a pin somebody signed off on
+    cannot. The link lives in condo_facts.json under the same rule as
+    every other project fact there: empty until the sales team fills it."""
+    from app.tools import webstage
+
+    try:
+        facts = json.loads(Path(settings.project_knowledge_file).read_text(encoding="utf-8"))
+    except Exception:
+        facts = {}
+    link = ((facts.get("map") or {}).get("url") or "").strip()
+    if not link.startswith(("https://www.google.com/maps", "https://maps.app.goo.gl",
+                            "https://goo.gl/maps", "https://maps.google.com")):
+        return {"ok": False, "error": "no confirmed map link",
+                "instruction": ("ยังไม่มีลิงก์แผนที่ที่ฝ่ายขายยืนยันในระบบ ให้บอกทำเลด้วยคำพูด "
+                                "ตามข้อมูลโครงการที่มี ห้ามเดาพิกัด ระยะทาง หรือเวลาเดินทาง")}
+    if not webstage.enabled():
+        return {"ok": False, "error": "web stage off",
+                "instruction": "เครื่องนี้ไม่ได้เปิดจอเว็บ ให้บอกทำเลด้วยคำพูดตามข้อมูลโครงการ"}
+    webstage.request(link)
+    turnlog.record("show_map")
+    return {"ok": True, "screen": "web",
+            "instruction": ("แผนที่โครงการกำลังขึ้นจอ บอกสั้นๆ ว่าขึ้นจอแล้ว "
+                            "อธิบายทำเลได้เฉพาะตามข้อมูลโครงการ ห้ามเดาระยะทางหรือนาที")}

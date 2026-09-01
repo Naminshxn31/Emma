@@ -965,6 +965,16 @@ function showUnit(u) {
     card.appendChild(b);
   }
 
+  if (u.promo) {
+    // The sales team's own words (an admin applied this promotion); the
+    // figures follow the tap-to-reveal rule below, same as the list price.
+    const p = document.createElement('div');
+    p.className = 'uBadge';
+    p.style.cssText = 'margin-top:.5rem;background:rgba(232,200,122,.18);color:#e8c87a';
+    p.textContent = 'โปรโมชั่น' + (u.promo_note ? ' · ' + u.promo_note : '');
+    card.appendChild(p);
+  }
+
   const room = el('ห้อง ' + (u.room || '—'));
   room.className = 'uRoom';
   const bits = [];
@@ -1017,7 +1027,10 @@ function showUnit(u) {
             + (tok ? '&token=' + encodeURIComponent(tok) : ''));
           if (!res.ok) throw new Error();
           const d = await res.json();
-          const shown = el(label + ': ' + (d[key] != null ? baht(d[key]) + ' บาท' : '—'));
+          const promoKey = 'promo_' + key;
+          const shown = el(label + ': ' + (d[promoKey] != null
+            ? ('โปร ' + baht(d[promoKey]) + ' บาท' + (d[key] != null ? ' (ตั้ง ' + baht(d[key]) + ')' : ''))
+            : (d[key] != null ? baht(d[key]) + ' บาท' : '—')));
           shown.style.cssText = 'display:inline;font-weight:700;margin-right:.8rem';
           b.replaceWith(shown);
         } catch {
@@ -1251,6 +1264,118 @@ function showUnitList(r) {
       pr.textContent = baht(u.price_thb) + ' บาท';
       cell.appendChild(pr);
     }
+    grid.appendChild(cell);
+  }
+  card.appendChild(grid);
+  const stage = $('stage');
+  if (stage.classList.contains('framed')) {
+    $('stageFrame').removeAttribute('src');
+    stage.classList.remove('framed');
+  }
+  stage.classList.add('on', 'unit');
+  $('callScreen').classList.add('with-slides', 'stage-only');
+}
+
+//: Promotions the sales team has switched on right now — the applied rows
+//: of condo-inventory's promotion table, nothing upstream of them. Same
+//: grid as the unit list; the note is the team's own text, the figures
+//: appear only when the machine's policy shows prices.
+function showPromotions(r) {
+  const baht = (n) => Number(n).toLocaleString('th-TH', { maximumFractionDigits: 0 });
+  const card = $('unitCard');
+  card.textContent = '';
+  card.className = '';
+  const title = document.createElement('div');
+  title.className = 'uRoom';
+  title.textContent = r.count ? ('โปรโมชั่นตอนนี้ · ' + r.count + ' ห้อง') : 'ยังไม่มีโปรโมชั่นในระบบ';
+  card.appendChild(title);
+  const note = document.createElement('div');
+  note.className = 'uWho';
+  note.textContent = 'จากระบบผังขาย ณ ตอนนี้ · รายละเอียดและเงื่อนไขสอบถามฝ่ายขาย';
+  card.appendChild(note);
+  card.appendChild(Object.assign(document.createElement('hr'), { className: 'uRule' }));
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.7rem;margin-top:.6rem';
+  for (const u of (r.promotions || [])) {
+    const cell = document.createElement('div');
+    cell.style.cssText = 'border:1px solid rgba(232,200,122,.45);border-radius:.7rem;'
+      + 'padding:.7rem .85rem;background:rgba(232,200,122,.07)';
+    const rm = document.createElement('div');
+    rm.style.cssText = 'font-size:1.45rem;font-weight:700;color:#e8c87a';
+    rm.textContent = u.room;
+    const sz = document.createElement('div');
+    sz.style.cssText = 'font-size:1.05rem;color:#f0e4c8;margin:.15rem 0 .25rem';
+    sz.textContent = (u.sqm || '—') + ' ตร.ม.' + (u.type ? ' · ' + u.type : '') + (u.floor ? ' · ชั้น ' + u.floor : '');
+    const pn = document.createElement('div');
+    pn.style.cssText = 'color:#f0e4c8;font-weight:600;margin:.2rem 0';
+    pn.textContent = u.promo_note || 'มีโปรโมชั่น';
+    const meta = document.createElement('div');
+    meta.className = 'uWho';
+    meta.textContent = [u.collection, u.aspect, u.promo_updated ? 'อัปเดต ' + u.promo_updated : ''].filter(Boolean).join(' · ');
+    cell.append(rm, sz, pn, meta);
+    if (u.promo_thai_thb || u.promo_foreign_thb) {
+      const pr = document.createElement('b');
+      pr.style.cssText = 'color:#e8c87a;display:block;margin-top:.3rem';
+      pr.textContent = [u.promo_thai_thb ? 'ไทย ' + baht(u.promo_thai_thb) : '',
+        u.promo_foreign_thb ? 'ต่างชาติ ' + baht(u.promo_foreign_thb) : ''].filter(Boolean).join(' · ') + ' บาท';
+      cell.appendChild(pr);
+    }
+    grid.appendChild(cell);
+  }
+  card.appendChild(grid);
+  const stage = $('stage');
+  if (stage.classList.contains('framed')) {
+    $('stageFrame').removeAttribute('src');
+    stage.classList.remove('framed');
+  }
+  stage.classList.add('on', 'unit');
+  $('callScreen').classList.add('with-slides', 'stage-only');
+}
+
+//: Room types side by side: how many are free, how big, which floors and
+//: views. Counts and sizes from the live rows — no prices, by policy; a
+//: budget question goes through find_units where the price stays a filter.
+function showUnitTypes(r) {
+  const card = $('unitCard');
+  card.textContent = '';
+  card.className = '';
+  const title = document.createElement('div');
+  title.className = 'uRoom';
+  title.textContent = 'เทียบแบบห้องที่ว่าง' + (r.building ? ' · ตึก ' + r.building : '')
+    + (r.total_available ? ' · ' + r.total_available + ' ห้อง' : '');
+  card.appendChild(title);
+  const note = document.createElement('div');
+  note.className = 'uWho';
+  note.textContent = 'ห้องว่างจริงจากระบบผังขาย ณ ตอนนี้';
+  card.appendChild(note);
+  card.appendChild(Object.assign(document.createElement('hr'), { className: 'uRule' }));
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.8rem;margin-top:.6rem';
+  const line = (label, value) => {
+    const d = document.createElement('div');
+    d.className = 'uWho';
+    d.style.marginTop = '.25rem';
+    d.textContent = label + ': ' + value;
+    return d;
+  };
+  for (const t of (r.types || [])) {
+    const cell = document.createElement('div');
+    cell.style.cssText = 'border:1px solid rgba(232,200,122,.28);border-radius:.7rem;'
+      + 'padding:.8rem .9rem;background:rgba(255,255,255,.04)';
+    const name = document.createElement('div');
+    name.style.cssText = 'font-size:1.4rem;font-weight:700;color:#e8c87a';
+    name.textContent = t.type;
+    const count = document.createElement('div');
+    count.style.cssText = 'font-size:1.05rem;color:#f0e4c8;margin:.15rem 0 .3rem';
+    count.textContent = 'ว่าง ' + t.available + ' ห้อง';
+    cell.append(name, count);
+    const sz = t.sqm_min != null ? (t.sqm_min === t.sqm_max ? t.sqm_min + ' ตร.ม.' : t.sqm_min + '–' + t.sqm_max + ' ตร.ม.') : '—';
+    cell.appendChild(line('ขนาด', sz));
+    const fl = t.floor_min != null ? (t.floor_min === t.floor_max ? 'ชั้น ' + t.floor_min : 'ชั้น ' + t.floor_min + '–' + t.floor_max) : '—';
+    cell.appendChild(line('ชั้น', fl + (t.buildings && t.buildings.length ? ' · ตึก ' + t.buildings.join(', ') : '')));
+    if (t.views && t.views.length) cell.appendChild(line('วิว', t.views.slice(0, 4).join(', ')));
+    if (t.sides && t.sides.length) cell.appendChild(line('ทิศ', t.sides.slice(0, 4).join(', ')));
+    if (t.options && t.options.length) cell.appendChild(line('พิเศษ', t.options.join(', ')));
     grid.appendChild(cell);
   }
   card.appendChild(grid);
@@ -2117,6 +2242,8 @@ function onMessage(msg) {
       if (r.screen === 'unit' && r.unit) showUnit(r.unit);
       if (r.screen === 'calc') showCalc(r);
       if (r.screen === 'unitlist') showUnitList(r);
+      if (r.screen === 'promotions') showPromotions(r);
+      if (r.screen === 'unittypes') showUnitTypes(r);
       if (r.screen === 'plan') showPlan(r);
       if (r.screen === 'clear') clearFrame();
 
