@@ -72,6 +72,18 @@ class VoiceSession:
             time.monotonic() + self.SUMMONED_HOLD_MAX_S if summoned else None
         )
         self._greeting_turn_seen = False
+        #: Set while the model is not in the middle of answering a
+        #: server-side announcement. `events.announce` clears it when it
+        #: injects a turn and waits for it before injecting the next one.
+        #: The audio queue alone could not keep two announcements apart:
+        #: between "text sent" and "first audio chunk arrives" the queue
+        #: is empty, `wait_until_heard` returns at once, and the second
+        #: text lands while the model is still generating the first —
+        #: which Gemini treats as a barge-in. Seen on screen 2026-09-01:
+        #: "สวัสดีค่ะ มีอะไรให้" cut off, marked ถูกพูดแทรก, then the
+        #: second greeting. The robot interrupting itself, again.
+        self.turn_idle = asyncio.Event()
+        self.turn_idle.set()
         self.provider_name = provider_name or settings.provider
         #: Per-connection persona. The URL can ask for one (?profile=
         #: translator) so the sales room flips into interpreter mode with a
@@ -497,6 +509,9 @@ class VoiceSession:
                     self._sent_audio_ms = 0.0
                     display.end_turn()
                     self._greeting_turn_done()
+                    idle = getattr(self, "turn_idle", None)
+                    if idle is not None:
+                        idle.set()
                     await self._send_json({"type": "turn_complete"})
                     await self._nudge_tour_if_stalled()
                     self._spoke_this_turn = False

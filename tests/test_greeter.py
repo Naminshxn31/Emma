@@ -1105,3 +1105,84 @@ def test_an_ungreeted_summoned_session_gives_up_in_thirty_seconds(monkeypatch):
     monkeypatch.setattr(session_module.asyncio, "sleep", counted_sleep)
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(sess2._close_when_nobody_is_there())
+
+
+# -- one announcement finishes before the next one starts ------------------------
+
+def test_the_next_announcement_waits_for_the_previous_turn_to_complete(monkeypatch):
+    """Between "text sent" and "first audio chunk back" the browser's queue
+    is empty, so waiting on the queue alone let a second greeting land
+    while the model was still generating the first — a barge-in by the
+    robot's own hand (on screen 2026-09-01: ถูกพูดแทรก mid-greeting)."""
+    import asyncio
+
+    from app import display, events
+    from app import session as session_module
+
+    async def go():
+        sess = session_module.VoiceSession(None, provider_name="gemini")
+        sent = []
+
+        class _P:
+            async def send_text(self, text):
+                sent.append(text)
+
+        sess.provider = _P()
+        monkeypatch.setattr(session_module, "_active", sess)
+
+        async def heard(max_wait=25.0, then_pause=0.0):
+            return 0.0
+
+        monkeypatch.setattr(display, "wait_until_heard", heard)
+
+        assert await events.announce("หนึ่ง", source="t1") is True
+        assert not sess.turn_idle.is_set(), "the model owes a turn for the first text"
+
+        second = asyncio.create_task(events.announce("สอง", source="t2"))
+        await asyncio.sleep(0.05)
+        assert sent == ["หนึ่ง"], "the second announcement went in mid-turn"
+        sess.turn_idle.set()                       # turn_complete for the first
+        assert await second is True
+        assert sent == ["หนึ่ง", "สอง"]
+
+    asyncio.run(go())
+
+
+def test_a_turn_that_never_completes_does_not_park_announcements_forever(monkeypatch):
+    import asyncio
+
+    from app import display, events
+    from app import session as session_module
+
+    monkeypatch.setattr(events, "TURN_WAIT_S", 0.05)
+
+    async def go():
+        sess = session_module.VoiceSession(None, provider_name="gemini")
+        sent = []
+
+        class _P:
+            async def send_text(self, text):
+                sent.append(text)
+
+        sess.provider = _P()
+        monkeypatch.setattr(session_module, "_active", sess)
+
+        async def heard(max_wait=25.0, then_pause=0.0):
+            return 0.0
+
+        monkeypatch.setattr(display, "wait_until_heard", heard)
+        sess.turn_idle.clear()                     # a turn that never ends
+        assert await events.announce("สอง", source="t2") is True
+        assert sent == ["สอง"]
+
+    asyncio.run(go())
+
+
+def test_turn_complete_marks_the_session_idle_for_announcements():
+    import inspect
+
+    from app import session as session_module
+
+    src = inspect.getsource(session_module.VoiceSession._provider_to_browser)
+    branch = src.split('event.kind == "turn_complete"', 1)[1]
+    assert "idle.set()" in branch.split('await self._send_json({"type": "turn_complete"})', 1)[0]

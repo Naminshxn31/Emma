@@ -71,6 +71,11 @@ DEFAULT_PAUSE = 0.4
 #: measured) with margin; the reminder watcher retries the next tick anyway.
 SUMMON_WAIT_S = 12.0
 
+#: How long the next announcement waits for the model to finish answering
+#: the previous one. A greeting is a few seconds; a turn that never
+#: completes (transport hiccup) must not park every later announcement.
+TURN_WAIT_S = 15.0
+
 
 async def announce(
     text: str,
@@ -144,6 +149,18 @@ async def announce(
         return False
 
     async with _lock:
+        # First the model's turn, then the speakers. The audio queue is
+        # empty between "text sent" and "first chunk back", so waiting on
+        # it alone let the second announcement land while the model was
+        # still generating the first — a barge-in by the robot's own hand
+        # (on screen 2026-09-01: the greeting cut mid-word, ถูกพูดแทรก).
+        idle = getattr(session, "turn_idle", None)
+        if idle is not None and not idle.is_set():
+            try:
+                await asyncio.wait_for(idle.wait(), timeout=TURN_WAIT_S)
+            except asyncio.TimeoutError:
+                logger.info("previous announcement's turn never completed in %.0fs — "
+                            "sending %s anyway", TURN_WAIT_S, source)
         waited = await display.wait_until_heard(
             max_wait=max_wait, then_pause=then_pause
         )
@@ -166,9 +183,13 @@ async def announce(
                            reason="no longer relevant", waited=round(waited, 1))
             return False
 
+        if idle is not None:
+            idle.clear()                  # the model owes a turn for this text
         try:
             await session.provider.send_text(text)
         except Exception:
+            if idle is not None:
+                idle.set()
             logger.exception("could not deliver the %s announcement", source)
             turnlog.record("announce", source=source, sent=False,
                            reason="send failed", waited=round(waited, 1))
