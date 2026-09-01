@@ -538,6 +538,10 @@ class GeminiProvider(VoiceProvider):
                                      mime_type=f"audio/pcm;rate={self.input_sample_rate}")
                 )
 
+    def stand_down_floor(self) -> None:
+        if self._vad_gate is not None:
+            self._vad_gate.stand_down()
+
     async def send_text(self, text: str) -> None:
         """Push a server-side instruction in as its own turn.
 

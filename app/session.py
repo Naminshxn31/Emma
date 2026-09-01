@@ -34,6 +34,11 @@ logger = logging.getLogger("condo_voice.session")
 
 
 class VoiceSession:
+    #: Longest a summoned session stays deaf waiting for its greeting.
+    #: Dial + announce wait (0.4s) + generation + a spoken greeting is well
+    #: under this; past it, listening anyway is the only safe choice.
+    SUMMONED_HOLD_MAX_S = 10.0
+
     def __init__(self, ws: WebSocket, provider_name: str | None = None, voice: str | None = None,
                  profile: str | None = None, lang: str | None = None,
                  summoned: bool = False) -> None:
@@ -47,6 +52,23 @@ class VoiceSession:
         #: treated it as a barge-in: "หวัดดีค่ะ" cut off mid-word, then
         #: "สวัสดีค่ะ มีอะไรให้ช่วยไหมคะ" — the robot interrupting itself.
         self.summoned = summoned
+        #: While set, microphone audio from the browser is dropped here and
+        #: never reaches the model. A summoned session opens with the mic
+        #: live 2-3 seconds before its greeting has even been generated, and
+        #: whatever the room says in that window — the person at the door
+        #: starting to talk, the owner at the desk, a passer-by — lands as
+        #: the *first* turn, ahead of the greeting Emma was rung to give.
+        #: The owner's words: "ตื่นแล้วทักทาย ให้ emma พูดก่อนค่อยฟังคนพูด".
+        #: So a summoned session is deaf until the greeting has been heard
+        #: (`_greeting_turn_done` sets the moment from the browser's audio
+        #: lead), or until SUMMONED_HOLD_MAX_S if no greeting ever comes —
+        #: the announcement can be dropped (`still_relevant` false) and a
+        #: session that stays deaf forever is this bug with the sign
+        #: flipped. One clock, read where the audio arrives; no task.
+        self._ears_closed_until: float | None = (
+            time.monotonic() + self.SUMMONED_HOLD_MAX_S if summoned else None
+        )
+        self._greeting_turn_seen = False
         self.provider_name = provider_name or settings.provider
         #: Per-connection persona. The URL can ask for one (?profile=
         #: translator) so the sales room flips into interpreter mode with a
@@ -118,6 +140,11 @@ class VoiceSession:
         try:
             async with provider:
                 self.provider = provider
+                if self.summoned:
+                    # The machine opened this session to talk to somebody
+                    # at a distance; the near-field floor would filter out
+                    # exactly that person's reply. See VadGate.stand_down.
+                    provider.stand_down_floor()
                 await self._send_json({
                     "type": "ready",
                     "provider": self.provider_name,
@@ -179,6 +206,103 @@ class VoiceSession:
             except Exception:
                 pass
 
+    #: Seconds between microphone reports during a call.
+    MIC_REPORT_S = 5.0
+    #: Peak below this is room noise, not a voice (same bar as the standby
+    #: ears' SPEECH — one number for "is anybody talking" on both paths).
+    MIC_SPEECH = 0.02
+
+    def _mic_report(self, pcm16: bytes) -> None:
+        """Say what the call's microphone is sending, every few seconds.
+
+        The standby ears have had this since the day "เรียกแล้วไม่เกิดอะไรขึ้น"
+        could not be diagnosed; the call never did, and on 2026-08-31 the
+        same blindness came back one door over: the camera greeted, the
+        browser's bytes reached this pump (`ears_open` logged), and then
+        nothing — no `vad floor` line, no `heard`, the owner "พูดไม่ได้
+        สั่งอะไรไม่ได้เลย". A page sending all-zero PCM (another stream
+        still holding the device — the wake ears, in a handover), a
+        microphone too far to register, and a Silero that never opened
+        are three different repairs that leave the same empty log. This
+        line separates them. Three verdicts, the standby's three, plus
+        one the standby cannot need: a real microphone never reads an
+        exact zero, so peak=0.0000 is not "quiet" — it is a second
+        stream, and the fix is a reload, not a louder voice.
+        """
+        import math
+
+        import numpy as np
+
+        samples = np.frombuffer(pcm16, dtype="<i2").astype("float32") / 32768.0
+        if not len(samples):
+            return
+        rms = math.sqrt(float((samples * samples).sum()) / len(samples))
+        peak = float(np.abs(samples).max())
+        st = getattr(self, "_mic_probe", None)
+        if st is None:
+            st = self._mic_probe = {"at": time.monotonic(), "peak": 0.0,
+                                    "sum": 0.0, "n": 0, "zero": 0}
+        st["peak"] = max(st["peak"], rms)
+        st["sum"] += rms
+        st["n"] += 1
+        if peak == 0.0:
+            st["zero"] += 1
+        now = time.monotonic()
+        if now - st["at"] < self.MIC_REPORT_S:
+            return
+        avg = st["sum"] / st["n"]
+        gate = getattr(self.provider, "_vad_gate", None)
+        segs = getattr(gate, "segments", None)
+        if st["zero"] == st["n"]:
+            # Measured 2026-09-01: the browser's track read live and
+            # unmuted, the stream was the standby's own handed over, and
+            # the device was delivering nothing to ANY program (WASAPI,
+            # MME, WDM-KS all frameless). The fix was below the browser —
+            # hence check-mic.cmd, which asks the device directly.
+            verdict = ("DIGITAL SILENCE — every sample is exactly zero. A real "
+                       "microphone never reads that. Run check-mic.cmd: if the "
+                       "device shows NO FRAMES there too, it is the microphone "
+                       "itself (mute button, replug the USB, reboot) — no page "
+                       "reload or setting can help")
+        elif st["peak"] < self.MIC_SPEECH:
+            verdict = ("too quiet to be speech — room noise only. Move closer, "
+                       "or raise CALL_MIC_BOOST in .env")
+        elif segs == 0:
+            verdict = ("speech level reached but Silero opened no segment — "
+                       "the detector, not the microphone")
+        else:
+            verdict = "speech level reached — if nothing is heard, look at Gemini's side"
+        logger.info("call audio: avg=%.4f peak=%.4f (speech >= %.2f)%s — %s",
+                    avg, st["peak"], self.MIC_SPEECH,
+                    "" if segs is None else f" | vad segments={segs}", verdict)
+        # Numbers only, into the turn log: the console is the one thing a
+        # screenshot never contains, and the first report of this line
+        # (2026-09-01) arrived as exactly that — a screenshot.
+        turnlog.record("mic_report", avg=round(avg, 4), peak=round(st["peak"], 4),
+                       zero_frames=st["zero"], frames=st["n"], vad_segments=segs,
+                       verdict=verdict.split(" — ")[0][:40])
+        st.update(at=now, peak=0.0, sum=0.0, n=0, zero=0)
+
+    def _greeting_turn_done(self) -> None:
+        """The first completed turn of a summoned session is its greeting.
+
+        `turn_complete` means the model stopped *generating*; the browser
+        still has the whole greeting queued (the model writes 4-6x faster
+        than it speaks). The ears open when that queue runs dry — the same
+        clock every screen already waits on — and not one moment earlier,
+        because with HALF_DUPLEX the browser is muting its mic until then
+        anyway; the server hold just closes the window *before* playback
+        that the browser cannot see.
+        """
+        # getattr, like `_silent_block_seen` below: tests build sessions
+        # with __new__ and drive this pump without __init__ ever running.
+        if (getattr(self, "_ears_closed_until", None) is None
+                or getattr(self, "_greeting_turn_seen", False)):
+            return
+        self._greeting_turn_seen = True
+        self._ears_closed_until = min(self._ears_closed_until,
+                                      time.monotonic() + display.remaining_lead())
+
     # ---- browser -> provider ----
 
     async def _browser_to_provider(self) -> None:
@@ -189,6 +313,16 @@ class VoiceSession:
                     return
 
                 if (data := message.get("bytes")) is not None:
+                    if self._ears_closed_until is not None:
+                        if time.monotonic() < self._ears_closed_until:
+                            continue
+                        self._ears_closed_until = None
+                        logger.info("summoned session: greeting %s — listening now",
+                                    "heard" if self._greeting_turn_seen
+                                    else "never came (hold expired)")
+                        turnlog.record("ears_open",
+                                       greeted=self._greeting_turn_seen)
+                    self._mic_report(data)
                     await self.provider.send_audio(data)
                     continue
 
@@ -199,6 +333,20 @@ class VoiceSession:
                         continue
                     if event.get("type") == "stop":
                         return
+                    if event.get("type") == "mic_state":
+                        # The browser half of the `call audio:` report:
+                        # which device, whether the OS muted it, whether
+                        # the stream was handed over from standby or
+                        # opened fresh. Numbers and a device name only.
+                        logger.info("call mic (%s): %r muted=%s state=%s handed=%s",
+                                    event.get("why"), event.get("label"),
+                                    event.get("muted"), event.get("state"),
+                                    event.get("handed"))
+                        turnlog.record("mic_state", why=event.get("why"),
+                                       muted=bool(event.get("muted")),
+                                       state=event.get("state"),
+                                       handed=bool(event.get("handed")))
+                        continue
                     if event.get("type") == "audio_lead":
                         # How far the browser's audio queue runs ahead of the
                         # guest's ear. The other screens wait that long before
@@ -308,6 +456,7 @@ class VoiceSession:
                                        audio_ms=round(self._sent_audio_ms))
                     self._sent_audio_ms = 0.0
                     display.end_turn()
+                    self._greeting_turn_done()
                     await self._send_json({"type": "turn_complete"})
                     await self._nudge_tour_if_stalled()
                     self._spoke_this_turn = False

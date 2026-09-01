@@ -66,6 +66,8 @@ class VadGate:
         self._preroll_max = int(prefix_padding_ms * 2 * sample_rate / 1000)
         self._preroll = bytearray()
         self.in_speech = False
+        #: Speech segments opened so far — read by the call's mic report.
+        self.segments = 0
         #: Near-field floor (VAD_MIN_RMS): a speech segment may only *open*
         #: if its trigger chunk is at least this loud. Silero answers "is
         #: somebody speaking", not "is somebody speaking to us" — in the
@@ -87,10 +89,31 @@ class VadGate:
         #: floor firing on the one utterance it exists to protect.
         import time
 
-        self._opened_at = time.monotonic()
+        self._floor_off_until = time.monotonic() + self.FLOOR_GRACE_S
 
     #: Seconds after opening during which the floor does not apply.
     FLOOR_GRACE_S = 3.0
+
+    def stand_down(self) -> None:
+        """Switch the floor off for the rest of this session.
+
+        For a session the *machine* opened — the camera saw somebody at the
+        door and Emma greeted them — the floor's premise is inverted. It
+        exists to ignore people who are not talking to us; here Emma just
+        addressed, by name, a person standing exactly where the floor says
+        nobody worth hearing stands. Measured on 2026-08-31: อาซู่ greeted
+        at the door, answered, and the session logged nothing — not one
+        `heard` — while the page read LISTENING. VAD_MIN_RMS=0.01 sits at
+        the top of what the owner's own voice measures *at the desk*
+        (0.004-0.012, see config.py), so a voice from the doorway never had
+        a chance. The opening grace did not help either: for a summoned
+        session those three seconds are spent dialling and generating the
+        greeting, gone before the person has anything to answer.
+        """
+        if self._min_rms > 0.0 and self._floor_off_until != float("inf"):
+            logger.info("vad floor: standing down for this session — the "
+                        "machine opened it and greeted somebody at a distance")
+        self._floor_off_until = float("inf")
 
     def feed(self, pcm16: bytes) -> list[tuple[str, bytes]]:
         if not pcm16:
@@ -104,7 +127,7 @@ class VadGate:
         import time as _time
 
         if (speaking and not self.in_speech and self._min_rms > 0.0
-                and _time.monotonic() - self._opened_at > self.FLOOR_GRACE_S):
+                and _time.monotonic() > self._floor_off_until):
             rms = float(np.sqrt((samples * samples).mean()))
             if rms < self._min_rms:
                 # Too far away to be talking to us. Treated as silence, so
@@ -120,12 +143,23 @@ class VadGate:
                         "if this was the person at the microphone.",
                         rms, self._min_rms,
                     )
+                    # Into the turn log too. The console line above is the
+                    # only evidence the floor leaves, and the console is
+                    # the one thing nobody has when "ไมค์ค้าง" is reported
+                    # from a screenshot: a session with speech seen and no
+                    # `heard` looks identical whether the browser sent
+                    # nothing or the floor ate everything.
+                    from app import turnlog
+
+                    turnlog.record("vad_floor", rms=round(rms, 4),
+                                   floor=self._min_rms)
                     self._floor_logged_at = now
                 speaking = False
 
         actions: list[tuple[str, bytes]] = []
         if speaking and not self.in_speech:
             self.in_speech = True
+            self.segments += 1
             actions.append(("start", b""))
             if self._preroll:
                 actions.append(("audio", bytes(self._preroll)))

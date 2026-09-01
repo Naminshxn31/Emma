@@ -196,6 +196,24 @@ async def run() -> None:
                 logger.info("face: stranger (%.3f) — not greeting strangers",
                             sighting.score)
                 sighting = None
+            if sighting is not None and sighting.kind == "stranger" \
+                    and session_module._active is not None:
+                # A stranger wakes the line up; a stranger does not cut into
+                # a conversation. Measured 2026-09-01, one session: three
+                # "strangers" at 0.355 / 0.469 / 0.478 — every one of them
+                # one of the two people already talking to Emma, caught
+                # turning their head (the threshold is 0.50). Each landed
+                # as a user turn mid-sentence and Emma broke off to say
+                # "สวัสดีค่ะ มีอะไรให้ช่วยไหมคะ" to nobody. A known face is
+                # different: "หวัดดี พีท" mid-conversation carries a name
+                # somebody may want to hear. A stranger's greeting carries
+                # nothing the conversation did not already have.
+                logger.info("face: stranger (%.3f) during a live session — "
+                            "not interrupting", sighting.score)
+                turnlog.record("face_seen", kind="stranger",
+                               score=round(sighting.score, 3), group="",
+                               greeted=False, why="live_session")
+                sighting = None
             if sighting is not None:
                 logger.info("face: %s %s (%.3f)", sighting.kind,
                             sighting.name or "-", sighting.score)

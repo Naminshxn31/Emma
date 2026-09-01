@@ -52,3 +52,9 @@ sentencepiece>=0.2
 # Web search for Emma (DuckDuckGo, no key). Optional: without it the
 # search_web tool reports failure honestly instead of crashing.
 ddgs>=9.0
+
+# Microphone check below the browser (check-mic.cmd / scripts/check_mic.py).
+# Optional: only for diagnosing "Emma cannot hear" — on 2026-09-01 the USB
+# microphone delivered nothing to any program while the browser reported
+# the track live and unmuted, and nothing above the OS could tell.
+sounddevice>=0.5

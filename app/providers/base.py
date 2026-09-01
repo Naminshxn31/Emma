@@ -107,6 +107,16 @@ class VoiceProvider(abc.ABC):
         """
         return None
 
+    def stand_down_floor(self) -> None:
+        """Stop distance-filtering the microphone for this session.
+
+        Called for sessions the machine opened itself (a face at the door):
+        the person it greeted is far away by construction, and the
+        near-field floor would filter out the very reply the greeting asked
+        for. Default no-op — only the local VAD gate has a floor.
+        """
+        return None
+
     @abc.abstractmethod
     def events(self) -> AsyncIterator[ProviderEvent]:
         """Yield normalized events until the session ends."""

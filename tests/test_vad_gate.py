@@ -175,7 +175,7 @@ def test_the_floor_keeps_far_speech_out_entirely():
     actions — not quieter ones."""
     gate = VadGate(ScriptedDetector([True] * 10), prefix_padding_ms=100,
                    min_rms=0.03)
-    gate._opened_at -= 10               # past the opening grace; see below
+    gate._floor_off_until -= 10         # past the opening grace; see below
     for _ in range(10):
         assert gate.feed(QUIET_CHUNK) == []
     assert not gate.in_speech
@@ -186,7 +186,7 @@ def test_the_floor_opens_for_the_person_at_the_desk():
     the floor rejects distance, not the first syllable."""
     gate = VadGate(ScriptedDetector([False, True, True]), prefix_padding_ms=100,
                    min_rms=0.03)
-    gate._opened_at -= 10               # past the opening grace
+    gate._floor_off_until -= 10         # past the opening grace
     gate.feed(QUIET_CHUNK)              # room noise into the pre-roll
     actions = gate.feed(LOUD_CHUNK)
     assert [k for k, _ in actions] == ["start", "audio", "audio"]
@@ -216,6 +216,23 @@ def test_the_floor_stands_down_for_the_opening_seconds():
     actions = gate.feed(QUIET_CHUNK)      # quiet, but inside the grace
     assert actions and actions[0][0] == "start", \
         "the wake tail was distance-filtered at the door"
+
+
+def test_stand_down_switches_the_floor_off_for_the_session():
+    """A session the machine opened itself (camera at the door) greets a
+    person who is far away by construction. 2026-08-31: อาซู่ answered the
+    greeting from the doorway and the session logged not one `heard` — the
+    floor (0.01, already at the top of the owner's *desk* readings) ate
+    every word, long after the opening grace had been spent on the dial.
+    """
+    gate = VadGate(ScriptedDetector([True] * 4), prefix_padding_ms=100,
+                   min_rms=0.03)
+    gate._floor_off_until -= 10         # past the opening grace
+    assert gate.feed(QUIET_CHUNK) == [], "floor is on until told otherwise"
+    gate.stand_down()
+    actions = gate.feed(QUIET_CHUNK)
+    assert actions and actions[0][0] == "start", \
+        "after stand_down the doorway voice must open the gate"
 
 
 def test_no_floor_means_the_old_behaviour_exactly():
@@ -286,3 +303,13 @@ def test_the_real_detector_hears_the_committed_speech():
     assert "start" in kinds and "end" in kinds
     assert kinds.index("start") < kinds.index("end")
     assert kinds.count("start") >= 1 and kinds[0] != "end"
+
+
+def test_the_gate_counts_the_segments_it_opened():
+    """Read by the call's microphone report: "speech level reached but
+    Silero opened no segment" is a different repair from "no audio"."""
+    gate = VadGate(ScriptedDetector([True, True, False, False, True]), prefix_padding_ms=100)
+    assert gate.segments == 0
+    for _ in range(5):
+        gate.feed(LOUD_CHUNK)
+    assert gate.segments == 2

@@ -1885,13 +1885,31 @@ async function startMic() {
   // greet you by name but not hear you is far better than one that does
   // neither, and it is the whole point of a door camera.
   micFailure = null;
-  try {
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
-    });
-  } catch (e) {
-    micStream = null;
-    micFailure = e;
+  // In a handover the standby ears already hold a live stream from this
+  // device — the one whose level bar the owner watched move, the one that
+  // heard the name. Take THAT stream. Opening the device a second time is
+  // the digital-silence bug: measured 2026-09-01, a camera-rung call
+  // whose fresh getUserMedia stream delivered exact zeros for 85 seconds
+  // straight (`call audio: peak=0.0000`, every frame), and releasing the
+  // standby's tracks *before* asking again did not change a single
+  // sample. A stream that is already delivering audio cannot fail to
+  // open; handing it over removes the second open, and with it the bug's
+  // whole surface. Nulled out so stopWakeMode() below does not stop what
+  // the call now owns; releaseCallHardware() ends it when the call ends.
+  const handed = !!(wakeHandover && wakeMicStream
+    && wakeMicStream.getAudioTracks().some((t) => t.readyState === 'live'));
+  if (handed) {
+    micStream = wakeMicStream;
+    wakeMicStream = null;
+  } else {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
+      });
+    } catch (e) {
+      micStream = null;
+      micFailure = e;
+    }
   }
 
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
@@ -1937,6 +1955,7 @@ async function startMic() {
     return;
   }
 
+  reportMicState(handed);
   micSource = audioCtx.createMediaStreamSource(micStream);
   const shaped = buildMicChain(audioCtx, micSource, micCallBoost);
   worklet = new AudioWorkletNode(audioCtx, 'cap', { processorOptions: { targetRate: inputRate } });
@@ -1967,6 +1986,29 @@ async function startMic() {
     stopWakeMode();
   }
   setState('listening');
+}
+
+// What the call's microphone track actually is, sent to the server log:
+// device label, whether the browser reports it muted (the OS stopped
+// delivering — another program holding the device shows up here), and
+// whether it was handed over from standby or opened fresh. All-zero PCM
+// on the server side has three different causes and this line names
+// which; it is the browser half of the `call audio:` report.
+function reportMicState(handed) {
+  const t = micStream && micStream.getAudioTracks()[0];
+  if (!t) return;
+  const send = (why) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'mic_state', why, label: t.label || '',
+                             muted: !!t.muted, state: t.readyState, handed }));
+  };
+  send('start');
+  t.onmute = () => {
+    send('mute');
+    systemLine('ระบบหยุดส่งเสียงจากไมค์ (muted) — มีโปรแกรมอื่นถือไมค์อยู่ไหม');
+  };
+  t.onunmute = () => send('unmute');
+  if (t.muted) systemLine('ไมค์ที่ได้มาถูกระบบ mute ไว้ — เอมม่าจะไม่ได้ยิน จนกว่าจะปล่อยไมค์จากโปรแกรมอื่น');
 }
 
 function onMessage(msg) {

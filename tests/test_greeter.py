@@ -694,3 +694,333 @@ def test_the_socket_passes_the_flag_through(monkeypatch):
 
 async def _false():
     return False
+
+
+# -- speak first, then listen -------------------------------------------------
+
+class _MicWS:
+    """A browser that sends some mic chunks and then hangs up."""
+
+    def __init__(self, chunks):
+        self._queue = [{"bytes": c} for c in chunks] + [{"type": "websocket.disconnect"}]
+
+    async def receive(self):
+        return self._queue.pop(0)
+
+
+class _Ears:
+    """A provider that only records what audio reached it."""
+
+    def __init__(self):
+        self.heard = []
+        self.floor_down = False
+
+    async def send_audio(self, data):
+        self.heard.append(data)
+
+    def stand_down_floor(self):
+        self.floor_down = True
+
+
+def _pump(session, chunks):
+    import asyncio
+
+    session.ws = _MicWS(chunks)
+    asyncio.run(session._browser_to_provider())
+    return session.provider.heard
+
+
+def test_a_summoned_session_is_deaf_until_its_greeting_has_been_heard(monkeypatch):
+    """Rung by the camera, the session had its mic live 2-3s before the
+    greeting was even generated, so whatever the room said in that window
+    became the first turn — ahead of the greeting Emma was rung to give.
+    The owner: "ตื่นแล้วทักทาย ให้ emma พูดก่อนค่อยฟังคนพูด". Held until the
+    browser's audio queue for the greeting runs dry, the same clock every
+    screen waits on."""
+    from app import display
+    from app import session as session_module
+
+    sess = session_module.VoiceSession(None, provider_name="gemini", summoned=True)
+    sess.provider = _Ears()
+    assert _pump(sess, [b"\x01" * 320, b"\x02" * 320]) == [], \
+        "mic audio reached the model before the greeting"
+
+    # The greeting turn completes with 0s of audio still queued -> open.
+    monkeypatch.setattr(display, "remaining_lead", lambda: 0.0)
+    sess._greeting_turn_done()
+    assert _pump(sess, [b"\x03" * 320]) == [b"\x03" * 320]
+
+
+def test_the_ears_wait_for_the_greeting_to_be_heard_not_generated(monkeypatch):
+    """turn_complete means the model stopped *generating*; the browser still
+    has seconds of greeting queued. Opening on turn_complete would be the
+    audio-lead bug wearing a microphone."""
+    from app import display
+    from app import session as session_module
+
+    sess = session_module.VoiceSession(None, provider_name="gemini", summoned=True)
+    sess.provider = _Ears()
+    monkeypatch.setattr(display, "remaining_lead", lambda: 30.0)
+    sess._greeting_turn_done()
+    assert _pump(sess, [b"\x04" * 320]) == [], \
+        "opened while the greeting was still playing"
+
+
+def test_a_summoned_session_that_never_gets_its_greeting_listens_anyway():
+    """The announcement can be dropped (`still_relevant` false, the person
+    walked off and back). A session that stays deaf forever is the same bug
+    with the sign flipped, so the hold has a ceiling — and the log says
+    which of the two ways it opened."""
+    import time
+
+    from app import session as session_module
+
+    sess = session_module.VoiceSession(None, provider_name="gemini", summoned=True)
+    sess.provider = _Ears()
+    assert sess._ears_closed_until is not None
+    assert sess._ears_closed_until - time.monotonic() <= session_module.VoiceSession.SUMMONED_HOLD_MAX_S
+    sess._ears_closed_until = time.monotonic() - 1     # ceiling passed
+    assert _pump(sess, [b"\x05" * 320]) == [b"\x05" * 320]
+
+
+def test_a_plain_session_hears_from_the_first_byte():
+    """Wake word and button sessions are opened *by* the person talking;
+    holding their first words back would behead the utterance that opened
+    the session — the wake-tail bug all over again."""
+    from app import session as session_module
+
+    sess = session_module.VoiceSession(None, provider_name="gemini")
+    sess.provider = _Ears()
+    assert sess._ears_closed_until is None
+    assert _pump(sess, [b"\x06" * 320]) == [b"\x06" * 320]
+
+
+def test_turn_complete_is_what_ends_the_hold():
+    """Read from the source: the hook must sit in the turn_complete branch,
+    before the browser is told the turn is over."""
+    import inspect
+
+    from app import session as session_module
+
+    src = inspect.getsource(session_module.VoiceSession._provider_to_browser)
+    branch = src.split('event.kind == "turn_complete"', 1)[1]
+    assert "self._greeting_turn_done()" in branch.split('await self._send_json({"type": "turn_complete"})', 1)[0]
+
+
+def test_a_summoned_session_stands_the_near_field_floor_down():
+    """The floor exists to ignore people not talking to us. A session the
+    camera opened just greeted, by name, somebody standing at the door —
+    exactly where the floor says nobody worth hearing stands. 2026-08-31:
+    อาซู่ answered from the doorway and the session logged no `heard` at
+    all; VAD_MIN_RMS=0.01 is already at the top of the owner's own desk
+    readings (0.004-0.012)."""
+    import inspect
+
+    from app import session as session_module
+
+    src = inspect.getsource(session_module.VoiceSession.run)
+    after = src.split("self.provider = provider", 1)[1]
+    assert "if self.summoned:" in after[:400]
+    assert "provider.stand_down_floor()" in after[:600]
+
+
+def test_the_gemini_provider_forwards_stand_down_to_its_gate():
+    from app.providers import gemini
+
+    class _Gate:
+        down = False
+
+        def stand_down(self):
+            self.down = True
+
+    prov = gemini.GeminiProvider.__new__(gemini.GeminiProvider)
+    prov._vad_gate = _Gate()
+    prov.stand_down_floor()
+    assert prov._vad_gate.down
+    prov._vad_gate = None
+    prov.stand_down_floor()             # no gate: nothing to stand down, no error
+
+
+# -- the call's microphone leaves evidence, like the standby's does ------------
+
+def _session_with_ears(monkeypatch, segments):
+    from app import session as session_module
+
+    sess = session_module.VoiceSession(None, provider_name="gemini")
+    sess.provider = _Ears()
+    sess.provider._vad_gate = type("G", (), {"segments": segments})()
+    monkeypatch.setattr(session_module.VoiceSession, "MIC_REPORT_S", 0.0)
+    return sess
+
+
+def test_all_zero_mic_audio_is_called_digital_silence_not_quiet(monkeypatch, caplog):
+    """2026-08-31: camera greeted, the browser's bytes reached the pump,
+    and then nothing — no floor line, no `heard`. A real microphone never
+    reads an exact zero; all-zero PCM is a second stream on a device
+    another stream still holds (the standby ears, in a handover), and the
+    fix is a reload, not a louder voice. The log has to say which."""
+    import logging
+
+    sess = _session_with_ears(monkeypatch, segments=0)
+    with caplog.at_level(logging.INFO, logger="condo_voice.session"):
+        _pump(sess, [b"\x00" * 640, b"\x00" * 640])
+    lines = [r.getMessage() for r in caplog.records if "call audio" in r.getMessage()]
+    assert lines and "DIGITAL SILENCE" in lines[-1]
+
+
+def test_loud_audio_with_no_vad_segment_points_at_the_detector(monkeypatch, caplog):
+    import logging
+
+    loud = (int(0.3 * 32767)).to_bytes(2, "little", signed=True) * 320
+    sess = _session_with_ears(monkeypatch, segments=0)
+    with caplog.at_level(logging.INFO, logger="condo_voice.session"):
+        _pump(sess, [loud, loud])
+    lines = [r.getMessage() for r in caplog.records if "call audio" in r.getMessage()]
+    assert lines and "Silero opened no segment" in lines[-1]
+    assert "vad segments=0" in lines[-1]
+
+
+def test_quiet_audio_is_reported_as_too_quiet(monkeypatch, caplog):
+    import logging
+
+    quiet = b"\x30\x00" * 320
+    sess = _session_with_ears(monkeypatch, segments=0)
+    with caplog.at_level(logging.INFO, logger="condo_voice.session"):
+        _pump(sess, [quiet, quiet])
+    lines = [r.getMessage() for r in caplog.records if "call audio" in r.getMessage()]
+    assert lines and "too quiet" in lines[-1]
+
+
+def test_the_report_sits_on_the_forwarding_path_not_before_the_hold():
+    """Bytes dropped by the greeting hold are not "the microphone": what is
+    reported is exactly what the model is offered."""
+    import inspect
+
+    from app import session as session_module
+
+    src = inspect.getsource(session_module.VoiceSession._browser_to_provider)
+    block = src.split('message.get("bytes")', 1)[1].split("continue\n", 2)
+    assert "self._mic_report(data)" in src
+    assert src.index("self._mic_report(data)") > src.index('turnlog.record("ears_open"')
+    assert src.index("self._mic_report(data)") < src.index("await self.provider.send_audio(data)")
+
+
+def test_a_handover_hands_the_standby_stream_to_the_call():
+    """Measured 2026-09-01: a camera-rung call whose fresh getUserMedia
+    stream delivered exact zeros for the whole session (`call audio:
+    peak=0.0000`, 251/251 frames per report), and releasing the standby's
+    tracks *before* asking again changed nothing. The standby already
+    holds a live stream from this device; the call takes that one and
+    never opens the device a second time."""
+    from pathlib import Path
+
+    page = Path("client/index.html").read_text(encoding="utf-8")
+    start_mic = page.split("async function startMic()", 1)[1].split("function onMessage", 1)[0]
+    handed = start_mic.split("const handed =", 1)[1]
+    assert "micStream = wakeMicStream;" in handed
+    assert "wakeMicStream = null;" in handed
+    # The fresh open is the fallback, taken only when there is nothing to hand over.
+    assert handed.index("micStream = wakeMicStream;") < handed.index("getUserMedia(")
+    # And the earlier attempt is gone: no stopping standby tracks at the ring.
+    ring = page.split("summonedDial = !!evt.reason;", 1)[1].split("startCall();", 1)[0]
+    assert "getTracks().forEach((t) => t.stop())" not in ring
+
+
+def test_the_browser_reports_which_microphone_the_call_is_on():
+    """The browser half of the `call audio:` line — all-zero PCM has
+    several causes and only the browser can say whether the OS muted the
+    track. Sent on start and on every mute/unmute."""
+    from pathlib import Path
+
+    page = Path("client/index.html").read_text(encoding="utf-8")
+    assert "function reportMicState(handed)" in page
+    assert "type: 'mic_state'" in page
+    assert "t.onmute = () =>" in page
+    start_mic = page.split("async function startMic()", 1)[1].split("function onMessage", 1)[0]
+    assert "reportMicState(handed);" in start_mic
+
+
+def test_the_server_logs_the_mic_state_into_the_turn_log(monkeypatch):
+    import asyncio
+    import json
+
+    from app import session as session_module
+    from app import turnlog
+
+    seen = []
+    monkeypatch.setattr(turnlog, "record", lambda ev, **f: seen.append((ev, f)))
+
+    class _WS:
+        def __init__(self):
+            self._q = [{"text": json.dumps({"type": "mic_state", "why": "start",
+                                            "label": "USB mic", "muted": True,
+                                            "state": "live", "handed": True})},
+                       {"type": "websocket.disconnect"}]
+
+        async def receive(self):
+            return self._q.pop(0)
+
+    sess = session_module.VoiceSession(None, provider_name="gemini")
+    sess.provider = _Ears()
+    sess.ws = _WS()
+    asyncio.run(sess._browser_to_provider())
+    assert ("mic_state", {"why": "start", "muted": True, "state": "live", "handed": True}) in seen
+
+
+# -- the microphone check below the browser ------------------------------------
+
+def test_check_mic_verdicts_separate_dead_from_silent_from_alive():
+    """2026-09-01: two browser-side fixes changed nothing because the USB
+    microphone was delivering no frames to any program. The verdict that
+    would have said so in one line is this one."""
+    import numpy as np
+
+    from scripts import check_mic
+
+    assert check_mic.classify(None, 96000).startswith("NO FRAMES")
+    assert check_mic.classify(np.zeros(0, dtype="float32"), 96000).startswith("NO FRAMES")
+    assert check_mic.classify(np.zeros(96000, dtype="float32"), 96000).startswith("SILENT")
+    noise = np.full(96000, 0.002, dtype="float32")
+    assert check_mic.classify(noise, 96000) == "alive"
+    assert check_mic.classify(noise[:1000], 96000).startswith("stalling")
+
+
+def test_the_launcher_runs_the_mic_check():
+    from pathlib import Path
+
+    cmd = Path("check-mic.cmd").read_text(encoding="utf-8")
+    assert "scripts\\check_mic.py" in cmd
+    assert "pause" in cmd
+
+
+# -- a stranger wakes the line, a stranger does not interrupt it --------------
+
+def test_a_stranger_does_not_cut_into_a_live_conversation(monkeypatch):
+    """2026-09-01, one session: three "strangers" at 0.355/0.469/0.478 were
+    the two people already talking, caught turning their heads. Each one
+    became a user turn and Emma broke off mid-sentence to greet nobody."""
+    from app import session as session_module
+
+    monkeypatch.setattr(session_module, "_active", object())
+    announced, _ = _run_with(monkeypatch, [_sighting(kind="stranger", name=None)],
+                             face_greet_strangers=True)
+    assert announced == []
+
+
+def test_a_known_face_still_gets_a_name_mid_conversation(monkeypatch):
+    """The other half: "หวัดดี พีท" while โชกุน is talking carries a name
+    somebody may want to hear — measured working the same morning."""
+    from app import session as session_module
+
+    monkeypatch.setattr(session_module, "_active", object())
+    announced, _ = _run_with(monkeypatch, [_sighting()])
+    assert [a[0] for a in announced] == ["face_known"]
+
+
+def test_a_stranger_still_wakes_an_idle_line(monkeypatch):
+    from app import session as session_module
+
+    monkeypatch.setattr(session_module, "_active", None)
+    announced, _ = _run_with(monkeypatch, [_sighting(kind="stranger", name=None)],
+                             face_greet_strangers=True)
+    assert [a[0] for a in announced] == ["face_stranger"]
