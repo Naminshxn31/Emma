@@ -242,9 +242,16 @@ def test_only_a_google_maps_link_counts_as_the_map(monkeypatch, tmp_path, stage)
     assert units.show_map()["ok"] is False and stage == []
 
 
-def test_the_facts_file_has_the_map_slot_and_it_is_empty_until_sales_fills_it():
+def test_the_facts_file_map_slot_is_empty_or_a_confirmed_google_maps_link():
+    """Filled by the owner on 2026-09-01 (resolves to "Embassy World
+    Pattaya", 12.8848 N 100.8862 E). Empty is also a valid state; a link
+    to anywhere but Google Maps is not."""
     facts = json.loads(Path("data/condo_facts.json").read_text(encoding="utf-8"))
-    assert "map" in facts and facts["map"].get("url") in (None, "")
+    assert "map" in facts
+    url = facts["map"].get("url")
+    assert url in (None, "") or url.startswith(("https://maps.app.goo.gl/", "https://www.google.com/maps"))
+    if url:
+        assert facts["map"].get("confirmed_by"), "a filled link says who confirmed it"
 
 
 # ==================== the screen ====================
