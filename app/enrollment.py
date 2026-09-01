@@ -369,6 +369,13 @@ def save_shots(name: str, crops: list[np.ndarray], replace: bool = False) -> int
         ok, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
         if ok:
             buf.tofile(str(out))
+    # Standing in front of the camera, taking five shots of yourself and
+    # pressing save is consent to be recognised — the only kind of consent
+    # this system can actually witness. Recorded here, in the one function
+    # that writes shots, so the station and the CLI cannot disagree.
+    from app import consent
+
+    consent.record(name, by=name)
     return len(sorted(folder.glob("*.jpg")))
 
 

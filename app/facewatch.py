@@ -101,9 +101,18 @@ class Watcher:
                  threshold: float | None = None,
                  confirm_frames: int | None = None,
                  cooldown_s: float | None = None,
-                 min_face_px: int | None = None):
+                 min_face_px: int | None = None,
+                 margin: float | None = None,
+                 name_when_alone: bool | None = None):
         self.gallery = gallery
         self.threshold = settings.face_threshold if threshold is None else threshold
+        self.margin = settings.face_margin if margin is None else margin
+        self.name_when_alone = (settings.face_name_when_alone
+                                if name_when_alone is None else name_when_alone)
+        #: Why the last confirmed face was greeted without its name, by
+        #: name, so the log line is written once per person per reason and
+        #: not thirty times a second.
+        self._unnamed_logged: dict[str, str] = {}
         self.confirm_frames = (settings.face_confirm_frames
                                if confirm_frames is None else confirm_frames)
         self.cooldown_s = settings.face_cooldown_s if cooldown_s is None else cooldown_s
@@ -194,11 +203,24 @@ class Watcher:
 
         name, score, meta = None, -1.0, {}
         best = None
+        unnamed = None
         if self.gallery is not None and len(self.gallery):
-            i, score = self.gallery.match(face.vec)
+            i, score, runner_up = self.gallery.match2(face.vec)
             best = self.gallery.names[i]
             if score >= self.threshold:
                 name, meta = best, self.gallery.meta[i]
+                unnamed = self._why_not_name(name, score, runner_up, found)
+                if unnamed:
+                    # Recognised, but not to be named: greeted like a
+                    # stranger, with the reason carried on the sighting for
+                    # the turn log. The rest of this function treats the
+                    # face as unknown — including remembering it, so the
+                    # anonymous greeting is not repeated either.
+                    if self._unnamed_logged.get(name) != unnamed:
+                        logger.info("face: %s recognised (%.3f) but not named — %s",
+                                    name, score, unnamed)
+                        self._unnamed_logged[name] = unnamed
+                    name, meta = None, {"unnamed": unnamed, "would_be": best}
 
         # Strangers greeted longer ago than the cooldown are new arrivals
         # the next time they appear, so their memory expires with it.
@@ -306,6 +328,37 @@ class Watcher:
         del self._strangers[:-16]
         return Sighting(kind="stranger", name=None, score=float(score),
                         meta=dict(meta))
+
+    def _why_not_name(self, name: str, score: float, runner_up: float,
+                      found: list) -> str | None:
+        """None when the name may be spoken; otherwise the reason it may not.
+
+        Three reasons, from the outside review of 2026-09-01, each of which
+        turns a name into a plain greeting rather than into silence — a
+        greeting without a name is never wrong, a wrong name is:
+
+        - **margin**: the runner-up (a different person) is within
+          `margin` of the best. Close second = the frame where the nearest
+          is most likely the wrong one.
+        - **company**: more than one usable face in the frame. The model
+          is told one name and addresses everybody by it, and there is no
+          speaker identification to say who answered.
+        - **consent**: no record that this person agreed (only when
+          FACE_REQUIRE_CONSENT is on), or a record that says they withdrew
+          or that it expired (always). See app/consent.py.
+        """
+        if runner_up >= 0 and (score - runner_up) < self.margin:
+            return "margin (runner-up %.3f within %.2f)" % (runner_up, self.margin)
+        if self.name_when_alone:
+            usable = sum(1 for f in found if (f.bbox[2] - f.bbox[0]) >= self.min_face_px)
+            if usable > 1:
+                return "company (%d faces in frame)" % usable
+        from app import consent
+
+        allowed, state = consent.may_name(name)
+        if not allowed:
+            return "consent %s" % state
+        return None
 
     def forget(self) -> None:
         """Drop the cooldowns and the streak.

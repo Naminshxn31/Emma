@@ -205,6 +205,21 @@ def main() -> int:
         entries += more
         problems += more_problems
 
+    # Withdrawn or expired consent: out of the gallery, not merely unnamed.
+    # The watcher already refuses to name them from the next frame; this
+    # is where their vectors stop existing.
+    from app import consent
+
+    people = consent.load()
+    withdrawn = sorted({e["name"] for e in entries
+                        if consent.status(e["name"], people=people)
+                        in (consent.REVOKED, consent.EXPIRED)})
+    if withdrawn:
+        entries = [e for e in entries if e["name"] not in withdrawn]
+        print(f"\nleft out (consent revoked/expired): {', '.join(withdrawn)}")
+    for e in entries:
+        e["meta"]["consent"] = consent.status(e["name"], people=people)
+
     if not entries:
         print("nothing to enrol")
         return 1

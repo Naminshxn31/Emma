@@ -336,6 +336,22 @@ class Gallery:
     def __len__(self) -> int:
         return len(self.names)
 
+    def match2(self, vec: np.ndarray) -> tuple[int, float, float]:
+        """(index of nearest, its cosine, best cosine of a *different* name).
+
+        The runner-up is another person, not another shot of the same
+        person — five enrolment shots of โชกุน all scoring high is
+        agreement, not ambiguity. (-1, -1.0, -1.0) when empty; a runner-up
+        of -1.0 when only one person is enrolled.
+        """
+        if not len(self.vecs):
+            return -1, -1.0, -1.0
+        sims = self.vecs @ vec.astype(np.float32)
+        i = int(np.argmax(sims))
+        best = self.names[i]
+        others = [float(s) for s, n in zip(sims, self.names) if n != best]
+        return i, float(sims[i]), (max(others) if others else -1.0)
+
     def match(self, vec: np.ndarray) -> tuple[int, float]:
         """(index of nearest enrolled person, cosine). (-1, -1.0) when empty.
 

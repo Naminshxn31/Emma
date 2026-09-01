@@ -215,6 +215,28 @@ class Settings:
     # frame is a bad witness — blur, a turning head, someone crossing
     # behind. Same reasoning as the VAD's `min_silence_duration`.
     face_confirm_frames: int = int(os.getenv("FACE_CONFIRM_FRAMES", "3"))
+    #: How far the best match must lead the best match *of a different
+    #: person* before the robot says a name. Two colleagues who resemble
+    #: each other score close together, and "close second" is exactly the
+    #: frame where the nearest is wrong. Measured on AuraFace (31 Aug): the
+    #: right name at the desk scores >= 0.545 and the wrong-name flicker
+    #: tops out at 0.141 — a 0.10 margin never fires on that data, and it
+    #: is there for the day two look-alikes are enrolled.
+    face_margin: float = float(os.getenv("FACE_MARGIN", "0.10"))
+    #: Say a name only when that face is the only usable one in the frame.
+    #: With two people walking in together the model would be told one
+    #: name and address both of them by it; a greeting without a name is
+    #: never wrong. Off = the nearest face is named regardless (old behaviour).
+    face_name_when_alone: bool = _get_bool("FACE_NAME_WHEN_ALONE", True)
+    #: Require a consent record (data/faces/people.json) before naming
+    #: anybody. Off by default because the staff portraits in staff.csv
+    #: have no such record — the people in them never enrolled themselves
+    #: — and flipping this on before their consent is actually collected
+    #: would silently unname the whole sales team. Revoked and expired
+    #: records are honoured regardless of this switch: see app/consent.py.
+    face_require_consent: bool = _get_bool("FACE_REQUIRE_CONSENT", False)
+    #: How long a consent given at the enrolment station lasts.
+    face_consent_days: float = float(os.getenv("FACE_CONSENT_DAYS", "365"))
     # Somebody standing at the desk is one arrival, not one per frame.
     face_cooldown_s: float = float(os.getenv("FACE_COOLDOWN_S", "600"))
     # Whether a face nobody knows is also worth waking up for. On is the

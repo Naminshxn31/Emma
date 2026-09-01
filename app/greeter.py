@@ -70,11 +70,20 @@ def greeting_for(sighting) -> str:
     if sighting.kind == "known":
         who = sighting.name
         role = sighting.group
+        # The name is for this one sentence. There is no speaker
+        # identification in this system: after the greeting the model has
+        # no way to know whether the voice it hears is this person or
+        # somebody standing beside them, and left alone it assumes — and
+        # keeps using the name, and answers a stranger's question as if it
+        # were theirs. Quoted rather than described, because that is what
+        # has worked on this model every time.
         return (
             "%s เพิ่งเดินเข้ามาหน้าหุ่น%s — ทักทายด้วยชื่อสั้นๆ แล้วถามว่า"
             "ให้ช่วยอะไรไหม ห้ามพูดถึงกล้อง ห้ามพูดว่า "
-            "'ระบบจดจำใบหน้าตรวจพบ' หรือ 'สแกนเจอ'"
-            % (who, (" (%s)" % role) if role else "")
+            "'ระบบจดจำใบหน้าตรวจพบ' หรือ 'สแกนเจอ' "
+            "ใช้ชื่อเฉพาะในประโยคทักนี้เท่านั้น หลังจากนี้ห้ามเรียกชื่ออีก "
+            "และห้ามถือว่าคนที่พูดคือ%s — ไม่มีระบบจำเสียง อาจเป็นคนอื่นที่ยืนอยู่ด้วย"
+            % (who, (" (%s)" % role) if role else "", who)
         )
     return (
         "มีคนเดินเข้ามายืนหน้าหุ่น ยังไม่รู้ว่าเป็นใคร — ทักทายสั้นๆ "
@@ -109,8 +118,13 @@ def _say_who_is_missing(watcher) -> None:
 
 
 async def _greet(sighting) -> None:
+    extra = {}
+    if sighting.meta.get("unnamed"):
+        # Recognised but greeted without the name; the reason (margin,
+        # company, consent) is the whole story of that decision.
+        extra = {"unnamed": sighting.meta["unnamed"]}
     turnlog.record("face_seen", kind=sighting.kind, name=sighting.name,
-                   score=round(sighting.score, 3), group=sighting.group)
+                   score=round(sighting.score, 3), group=sighting.group, **extra)
     from app import events
 
     await events.announce(
