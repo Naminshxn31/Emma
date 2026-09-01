@@ -34,7 +34,8 @@
   ],
   "disclaimer": "ทั้งหมดคือ Preliminary Concept อาจเปลี่ยนแปลงได้",
   "map": {
-    "url": null,
-    "_comment": "ลิงก์ Google Maps ของโครงการที่ฝ่ายขายยืนยัน (https://maps.app.goo.gl/... หรือ https://www.google.com/maps/...) — null = show_map บอกว่ายังไม่มีแผนที่ หุ่นห้ามเดาพิกัด"
+    "url": "https://maps.app.goo.gl/aqvEKh8Px1M9hZwm8",
+    "_comment": "ลิงก์ Google Maps ของโครงการที่ฝ่ายขายยืนยัน (https://maps.app.goo.gl/... หรือ https://www.google.com/maps/...) — null = show_map บอกว่ายังไม่มีแผนที่ หุ่นห้ามเดาพิกัด",
+    "confirmed_by": "เจ้าของโปรเจกต์ 2026-09-01"
   }
 }

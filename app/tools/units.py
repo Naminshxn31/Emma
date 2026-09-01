@@ -905,10 +905,14 @@ def show_map() -> dict:
     put the wrong place on the screen once; a pin somebody signed off on
     cannot. The link lives in condo_facts.json under the same rule as
     every other project fact there: empty until the sales team fills it."""
+    from app import prompts
     from app.tools import webstage
 
+    # The same file the prompt's project facts come from — not the search
+    # knowledge file, which is what the first version read (and found no
+    # map in, with the owner's link sitting in condo_facts.json).
     try:
-        facts = json.loads(Path(settings.project_knowledge_file).read_text(encoding="utf-8"))
+        facts = json.loads(Path(prompts.CONDO_FACTS_FILE).read_text(encoding="utf-8"))
     except Exception:
         facts = {}
     link = ((facts.get("map") or {}).get("url") or "").strip()

@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 
+from app import prompts
 from app.config import settings
 from app.tools import units
 
@@ -220,7 +221,7 @@ def test_the_inventory_page_accepts_the_currency_parameter():
 def test_no_confirmed_map_link_means_no_map_and_no_guessing(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
     facts.write_text(json.dumps({"map": {"url": None}}), encoding="utf-8")
-    monkeypatch.setattr(settings, "project_knowledge_file", str(facts))
+    monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
     out = units.show_map()
     assert out["ok"] is False and stage == []
     assert "ห้ามเดาพิกัด" in out["instruction"]
@@ -229,7 +230,7 @@ def test_no_confirmed_map_link_means_no_map_and_no_guessing(monkeypatch, tmp_pat
 def test_a_confirmed_map_link_goes_on_the_stage(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
     facts.write_text(json.dumps({"map": {"url": "https://maps.app.goo.gl/abc123"}}), encoding="utf-8")
-    monkeypatch.setattr(settings, "project_knowledge_file", str(facts))
+    monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
     out = units.show_map()
     assert out["ok"] and stage == ["https://maps.app.goo.gl/abc123"]
 
@@ -237,7 +238,7 @@ def test_a_confirmed_map_link_goes_on_the_stage(monkeypatch, tmp_path, stage):
 def test_only_a_google_maps_link_counts_as_the_map(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
     facts.write_text(json.dumps({"map": {"url": "https://evil.example/x"}}), encoding="utf-8")
-    monkeypatch.setattr(settings, "project_knowledge_file", str(facts))
+    monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
     assert units.show_map()["ok"] is False and stage == []
 
 
