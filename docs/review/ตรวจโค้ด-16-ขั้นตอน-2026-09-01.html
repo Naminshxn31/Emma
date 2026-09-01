@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emma Code Audit</title>
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Sarabun:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F6F7F5;--surface:#FFFFFF;--ink:#1B2430;--muted:#5B6673;--rule:#D8DDE1;--accent:#0F6E7A;--accent-soft:#E3F0F1;
+--blocker:#9E1B1B;--critical:#C24A12;--high:#A6720A;--medium:#3C5A8A;--low:#4F6E5A;
+--blocker-bg:#F8E4E4;--critical-bg:#FBE8DD;--high-bg:#F8EFD6;--medium-bg:#E4EAF4;--low-bg:#E5EEE8;--code-bg:#EEF1F0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12171C;--surface:#1A2129;--ink:#E6EAEE;--muted:#9AA6B2;--rule:#2B343E;--accent:#5BBAC5;--accent-soft:#17323A;
+--blocker:#F08A8A;--critical:#F0A06E;--high:#E4C36A;--medium:#93B0E0;--low:#9CC4AB;--blocker-bg:#3A1C1C;--critical-bg:#3B2416;--high-bg:#382E14;--medium-bg:#1D2B40;--low-bg:#1C2E24;--code-bg:#222B34}}
+:root[data-theme="dark"]{--bg:#12171C;--surface:#1A2129;--ink:#E6EAEE;--muted:#9AA6B2;--rule:#2B343E;--accent:#5BBAC5;--accent-soft:#17323A;
+--blocker:#F08A8A;--critical:#F0A06E;--high:#E4C36A;--medium:#93B0E0;--low:#9CC4AB;--blocker-bg:#3A1C1C;--critical-bg:#3B2416;--high-bg:#382E14;--medium-bg:#1D2B40;--low-bg:#1C2E24;--code-bg:#222B34}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Sarabun","Noto Sans Thai",system-ui,sans-serif;font-size:16px;line-height:1.65}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr);max-width:1180px;margin:0 auto;padding:0 20px 80px}
+@media(min-width:1000px){.wrap{grid-template-columns:230px minmax(0,1fr);gap:40px}}
+nav.toc{display:none}
+@media(min-width:1000px){nav.toc{display:block;position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:36px 0 40px;font-size:13px}}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:3px 0 3px 10px;border-left:2px solid var(--rule)}
+nav.toc a:hover,nav.toc a:focus{color:var(--accent);border-left-color:var(--accent);outline:none}
+nav.toc .grp{font-family:"IBM Plex Sans Thai",sans-serif;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:11px;color:var(--muted);margin:16px 0 4px}
+main{min-width:0;padding-top:36px}
+h1,h2,h3,h4{font-family:"IBM Plex Sans Thai","Sarabun",sans-serif;text-wrap:balance;line-height:1.25;margin:0}
+h1{font-size:2.1rem;font-weight:700}
+h2{font-size:1.45rem;font-weight:600;margin-top:56px;padding-top:18px;border-top:1px solid var(--rule)}
+h3{font-size:1.12rem;font-weight:600;margin-top:30px}
+p{margin:12px 0;max-width:72ch}
+ul,ol{max-width:72ch;padding-left:1.3em}
+li{margin:4px 0}
+.eyebrow{font-family:"IBM Plex Sans Thai",sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.meta{color:var(--muted);font-size:14px;margin-top:10px;max-width:72ch}
+code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86em;background:var(--code-bg);padding:1px 5px;border-radius:3px}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:6px;overflow-x:auto;font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.5}
+pre code{background:none;padding:0}
+.tbl{overflow-x:auto;margin:14px 0;border:1px solid var(--rule);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top;text-align:left}
+th{font-family:"IBM Plex Sans Thai",sans-serif;font-weight:600;font-size:12.5px;letter-spacing:.03em;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:none}
+.pill{display:inline-block;font-family:"IBM Plex Sans Thai",sans-serif;font-size:11.5px;font-weight:600;letter-spacing:.04em;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.p-blocker{color:var(--blocker);background:var(--blocker-bg)}.p-critical{color:var(--critical);background:var(--critical-bg)}
+.p-high{color:var(--high);background:var(--high-bg)}.p-medium{color:var(--medium);background:var(--medium-bg)}
+.p-low{color:var(--low);background:var(--low-bg)}.p-ok{color:var(--accent);background:var(--accent-soft)}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 6px 6px 0;margin:18px 0;max-width:72ch}
+.callout.stop{border-left-color:var(--blocker);background:var(--blocker-bg)}
+.finding{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:16px 20px;margin:18px 0}
+.finding h3{margin-top:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.finding dl{display:grid;grid-template-columns:130px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.finding dt{font-family:"IBM Plex Sans Thai",sans-serif;font-weight:600;font-size:12.5px;letter-spacing:.03em;color:var(--muted);text-transform:uppercase;padding-top:2px}
+.finding dd{margin:0}
+.finding dd ul{margin:0;padding-left:1.1em}
+@media(max-width:600px){.finding dl{grid-template-columns:1fr}}
+.flow{font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.6}
+.tree{font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.5;columns:2;column-gap:32px}
+@media(max-width:800px){.tree{columns:1}}
+.tree div{break-inside:avoid}
+.check{display:grid;grid-template-columns:36px minmax(0,1fr);gap:8px 12px;align-items:start;margin:14px 0}
+.check .m{font-family:"IBM Plex Sans Thai",sans-serif;font-weight:700;font-size:15px;padding-top:2px}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+html{scroll-behavior:smooth}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="สารบัญ">
+  <div class="grp">โครงสร้าง</div>
+  <a href="#s1">1. ไฟล์และ Component</a>
+  <a href="#s2">2. Entry Point</a>
+  <a href="#s3">3. Voice Pipeline</a>
+  <a href="#s4">4. Vision Pipeline</a>
+  <a href="#s5">5. Face Recognition</a>
+  <a href="#s6">6. Robot Command Flow</a>
+  <a href="#s7">7. Cloud / API ภายนอก</a>
+  <a href="#s8">8. Secret</a>
+  <a href="#s9">9. ที่เก็บเสียง/ภาพ/embedding</a>
+  <div class="grp">ตรวจ</div>
+  <a href="#s10">10. Robot ไม่มี validation</a>
+  <a href="#s11">11. Error / Timeout / Retry</a>
+  <a href="#s12">12. Offline / Fallback</a>
+  <a href="#s13">13. PII ใน Log</a>
+  <a href="#s14">14. Test Coverage</a>
+  <a href="#s15">15. Dependency / Security</a>
+  <a href="#s16">16. Dead code / Debt</a>
+  <div class="grp">ผล</div>
+  <a href="#findings">รายการปัญหา</a>
+  <a href="#policy">นโยบายทักชื่อ 8 ข้อ</a>
+</nav>
+
+<main>
+<div class="eyebrow">Source Code Audit · Step-by-step</div>
+<h1>Emma Code Audit</h1>
+<p class="meta">ตรวจจากรีโป <code>condo-voice</code> branch <code>dev</code> @ <code>19a981e</code> (31 ส.ค. 2026) + working tree ที่ยังไม่ commit · เอกสาร SDK/API ที่ใช้ = <code>docs/robot-integration.md</code>, <code>docs/ต่อกับหุ่นยนต์ Astronaut.md</code> (สรุปจาก PDF ผู้ขาย 3 ฉบับ), <code>app/providers/base.py</code> (สเปกโปรโตคอล) · ไม่ได้รันโปรแกรม ไม่ได้แตะฮาร์ดแวร์ · ต่อจาก <a href="https://claude.ai/code/artifact/25b5dd7b-b0e4-4549-979f-74a243faebb3">Field-Readiness Review</a> — ปัญหาที่ซ้ำกันอ้างเลข C-n จากฉบับนั้น</p>
+
+<div class="callout stop"><strong>หลักการที่ใช้:</strong> "รันได้" ไม่ใช่หลักฐานว่าปลอดภัยหรือพร้อม production ทุกข้อด้านล่างชี้ไฟล์/บรรทัด สิ่งที่ยืนยันจากโค้ดไม่ได้จะเขียนว่า <em>ไม่มีข้อมูล</em></div>
+
+<!-- ============================================================ -->
+<h2 id="s1">1. โครงสร้างไฟล์และ Component</h2>
+<p>โค้ดหลัก 15,543 บรรทัดใน <code>app/</code> (37 โมดูล) + client HTML 3,023 บรรทัด + scripts 35 ไฟล์ + tests 32 ไฟล์ (989 เทสต์)</p>
+<div class="tree">
+<div><strong>app/ — เซิร์ฟเวอร์</strong><br>
+main.py 594 · FastAPI, 3 WebSocket, auth gate, startup hooks<br>
+session.py 951 · VoiceSession: pump 2 ทาง, idle, robot msgs<br>
+config.py 788 · Settings ทั้งหมดจาก .env<br>
+prompts.py 505 · system instruction ต่อ profile<br>
+events.py 179 · announce() ทางเดียวที่หุ่นพูดเอง<br>
+display.py 319 · คิวเสียง/audio lead/ซับไตเติล<br>
+heard.py 189 · guard คำสั่ง "ปิด/ลา" จาก transcript<br>
+turnlog.py 130 · jsonl ต่อเทิร์น + retention<br>
+wake.py 570 · sherpa-onnx KWS + standby/summon<br>
+vad_gate.py 248 · Silero gate + floor<br>
+camera.py 159 · เปิดกล้อง + liveness ของ<em>กล้อง</em><br>
+faces.py 383 · SCRFD/AuraFace + Gallery<br>
+facewatch.py 318 · Watcher: ตัดสิน known/stranger<br>
+greeter.py 254 · loop กล้อง → announce(summon)<br>
+enrollment.py 380 · กติกาลงทะเบียน 5 ท่า<br>
+voice.py 338 · local TTS (สถานีลงทะเบียน)<br>
+memory_store.py 118 · memory.json ของเจ้าของ<br>
+voices.py · แคตตาล็อกเสียง</div>
+<div><strong>app/providers/</strong><br>
+base.py 126 · สเปก ProviderEvent/VoiceProvider<br>
+gemini.py 732 · Live API, resume/go_away, fallback<br>
+openai_realtime.py 246 · ทางเลือก (จ่ายเงิน)<br>
+thai_spacing.py · transcript_filter.py<br><br>
+<strong>app/tools/ — 40 tools ใน 11 กลุ่ม</strong><br>
+registry.py 297 · @tool, timeout, dispatch<br>
+slides.py 1134 · canva_display.py 998 · slide_search.py 379<br>
+retrieval.py 847 · knowledge.py · mydocs.py · project_knowledge.py<br>
+units.py 611 · Supabase + การ์ดห้อง · calc.py<br>
+robot.py 155 · robot_link.py 242<br>
+smarthome.py · broadlink_ir.py<br>
+computer.py 657 · webstage.py 256 · websearch.py<br>
+documents.py 363 · reminders.py · memory.py<br><br>
+<strong>client/</strong> index.html 2633 (หน้าเดียว + kiosk skin) · display.html 390<br>
+<strong>scripts/</strong> enroll_app.py/.html, build_face_gallery, eval_faces, eval_search, analyze_log, fetch_*_model, check_mic …<br>
+<strong>data/</strong> slides/, faces/{models,enrolled,gallery.npz}, wake/, logs/, wake_debug/, memory.json, condo_facts.json</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2">2. Entry Point</h2>
+<div class="tbl"><table>
+<thead><tr><th>Entry</th><th>ไฟล์</th><th>หมายเหตุ</th></tr></thead>
+<tbody>
+<tr><td>เซิร์ฟเวอร์</td><td><code>run_server.py</code> → <code>uvicorn app.main:app</code> (อ่าน HOST/PORT/SSL จาก .env, เปิดเบราว์เซอร์ที่ localhost)</td><td>ไม่มี service/supervisor — process เดียว, ตายแล้วไม่ฟื้น</td></tr>
+<tr><td>Startup hooks</td><td><code>main.py</code>: <code>_log_effective_config</code>, <code>_rearm_reminders</code>, <code>_no_teardown_noise</code>, <code>_watch_the_door</code> (greeter.start)</td><td>กล้องเปิดที่นี่ถ้า <code>FACE_ENABLED</code></td></tr>
+<tr><td>HTTP</td><td><code>/</code> <code>/display</code> <code>/health</code> <code>/voices</code> <code>/unit_price</code> <code>/slides/*</code></td><td><code>/unit_price</code> คืนราคา — มี token gate</td></tr>
+<tr><td>WebSocket</td><td><code>/ws</code> (สนทนา + คำสั่งหุ่น) <code>/ws/wake</code> (standby ears) <code>/ws/display</code> (จอรับอย่างเดียว)</td><td>ทั้งสามผ่าน <code>_reject_unauthorized</code> เมื่อตั้ง <code>WS_TOKEN</code></td></tr>
+<tr><td>สถานีลงทะเบียน</td><td><code>scripts/enroll_app.py</code> :8770 bind 127.0.0.1</td><td>process แยก ถูกต้อง</td></tr>
+<tr><td>Robot app</td><td><em>ไม่มี</em> — ต้องเขียน Android ตาม <code>docs/ต่อกับหุ่นยนต์ Astronaut.md</code></td><td>—</td></tr>
+</tbody></table></div>
+
+<!-- ============================================================ -->
+<h2 id="s3">3. Voice Pipeline</h2>
+<pre class="flow">[standby]  browser mic (AEC/NS/AGC + compressor MIC_BOOST) ──PCM16 16k──▶ /ws/wake
+             └▶ wake.WakeStream.feed → sherpa KWS (EMMA×0.5 / IMMA×1.0 / "A MA"×0.8 ของ WAKE_THRESHOLD)
+             └▶ hit → {"type":"wake"} → browser ปิด /ws/wake, เปิด /ws   (wav ถูกเขียนถ้า WAKE_DEBUG/ENROLL)
+[call]     browser mic (CALL_MIC_BOOST) ──PCM16──▶ /ws → VoiceSession._browser_to_provider
+             └▶ summoned? ears closed ≤10 s จนกว่า greeting ถูกได้ยิน (working tree)
+             └▶ provider.send_audio → VadGate.feed (Silero; pre-roll; VAD_MIN_RMS floor; grace 3 s; stand_down)
+                  └▶ activity_start / audio / activity_end → Gemini Live
+           Gemini ──audio 24k + transcripts + tool calls──▶ _provider_to_browser
+             └▶ audio → browser (display.set_audio_lead จาก "played")
+             └▶ heard.record(transcript)  → turnlog "heard"
+             └▶ tool_call → registry.dispatch_all (ตามลำดับ; timeout 15 s / 30 s paced)
+             └▶ go_away → _reconnect ด้วย resume handle → ProviderEvent("resumed")
+[self-speech] events.announce() ← tour nudge / follow_canva / robot_arrived / reminder / face
+             └▶ wait_until_heard → still_relevant → send_text  (lock เดียว)</pre>
+<p>HALF_DUPLEX (เปิดใน .env เจ้าของ): เบราว์เซอร์<strong>ไม่ส่ง</strong>ไมค์ขณะ <code>playing</code> (<code>index.html:1972</code>) — คือจุดที่คำสั่ง "หยุด" ระหว่างหุ่นพูดไม่มีวันถึงเซิร์ฟเวอร์</p>
+
+<!-- ============================================================ -->
+<h2 id="s4">4. Vision Pipeline</h2>
+<pre class="flow">greeter.run()  (asyncio task จาก startup)
+  camera.open_camera(FACE_CAMERA | -1=ค้นหาตัวที่ภาพขยับ)  →  cap.read ที่ FACE_FPS=5
+  → asyncio.to_thread(watcher.see, frame)
+       faces.locate(frame)            SCRFD det 640 — ทุกหน้าในเฟรม เรียงใหญ่→เล็ก
+       เอาเฉพาะ found[0] (ใหญ่สุด)    ← ไม่มี person detection, ไม่มี tracking
+       width < FACE_MIN_PX → None
+       faces.describe(frame, face)    AuraFace 512-d (เฉพาะหน้าที่ผ่าน 2 ด่านแรก)
+  → someone_at → wake.summon("face_approach") ก่อน confirm ครบ (pre-ring, ≤1 ครั้ง/15 s)</pre>
+<p>ภาพไม่ถูกส่งไปที่ไหน ไม่ถูกเขียน (ยกเว้น <code>scripts/watch_camera.py --probe</code> เขียน <code>data/faces/camera_probe/*.jpg</code> — เครื่องมือวินิจฉัย)</p>
+
+<!-- ============================================================ -->
+<h2 id="s5">5. Face Recognition Pipeline</h2>
+<pre class="flow">enrol:  enroll_app.py / enroll_face.py → enrollment.usable_face (≥110 px, หน้าเดียวเด่น ≥4×)
+        → 5 ท่า (front/side/side/far/front2) → review(): shots_agree ≥0.45, check_against_gallery
+        → save_shots: JPG crop (+45% margin) → data/faces/enrolled/<ชื่อ>/*.jpg     ← ภาพดิบถาวร
+build:  build_face_gallery.py: staff.csv(สตูดิโอ) + enrolled/ [+ --with-brokers opt-in]
+        → Gallery.save → gallery.npz {names, vecs, meta{group}, model_tag}            ← ไม่มี consent
+match:  facewatch.see: gallery.match(vec) → (best_i, cosine)
+        score ≥ 0.50 → name  |  ≥0.42 → presence เท่านั้น  |  else stranger
+        stranger vec เทียบกับ _strangers[≤16] ใน RAM (กันทักซ้ำ, หมดอายุตาม cooldown 600 s)
+        streak: known ต้อง 3 เฟรม, stranger 6 เฟรม → Sighting
+greet:  greeter._greet → turnlog face_seen{name,score} → events.announce(greeting_for(...), summon=True)
+        greeting_for(known) = "<ชื่อ> เพิ่งเดินเข้ามา… ห้ามพูดถึงกล้อง"</pre>
+
+<!-- ============================================================ -->
+<h2 id="s6">6. Robot Command Flow</h2>
+<pre class="flow">Gemini tool call go_to_place(place)
+  → registry.dispatch (timeout 15 s; drop unknown args)
+  → robot.go_to_place: robot_link.find_place(place)   [ทุกคำในชื่อ POI ต้องอยู่ในคำขอ; ไม่ match → ถามกลับ]
+  → robot_link.send("move_to_point", place=…)
+       ROBOT_ENABLED false → "mock"
+       session._active None หรือ STATE.connected False → "mock"
+       else live._send_json({"type":"robot","action":…,"args":…})  → "ok"   (fire-and-forget)
+  ← {"ok", "hardware", "instruction"}   STATE.moving=True (สิ่งที่ส่ง ไม่ใช่วัด)
+robot app (ยังไม่มี) → SDK moveToPoint → callback → {"type":"robot_arrived","place","ok"} ขึ้น /ws
+  → session._browser_to_provider → robot_link.arrived → events.announce("ถึงแล้ว…")
+robot app → {"type":"robot_ready","places":[…]} → robot_link.app_connected  ← ใครส่งก็ได้บน /ws</pre>
+<p>คำสั่งที่มี: <code>move_to_point</code> <code>cancel_navigation</code> <code>go_home</code> — ระดับสูงทั้งหมด ไม่มีความเร็ว/พิกัดดิบ/แขนกล ✓ · ชั้นที่<strong>ไม่มี</strong>: permission, safety policy, allow-list POI, battery/state check ที่วัดจริง, timeout รอ arrived, device identity</p>
+
+<!-- ============================================================ -->
+<h2 id="s7">7. การเชื่อมต่อ Cloud และ API ภายนอก</h2>
+<div class="tbl"><table>
+<thead><tr><th>ปลายทาง</th><th>ไฟล์</th><th>ข้อมูลที่ออก</th><th>Timeout</th><th>Retry</th><th>ล้มแล้ว</th></tr></thead>
+<tbody>
+<tr><td>Gemini Live (Google)</td><td><code>providers/gemini.py</code></td><td>เสียงช่วงพูด, system prompt (มี facts, memory ของ emma, ชื่อคนจากกล้อง), tool results</td><td>SDK default</td><td>resume handle บน go_away; model fallback เฉพาะ 404/not found/quota</td><td>session จบ → เงียบ</td></tr>
+<tr><td>Gemini embed / OpenAI Realtime</td><td><code>retrieval.py</code>, <code>openai_realtime.py</code></td><td>ข้อความค้น / เสียง</td><td>—</td><td>embed: attempts=6 ตอน build, 1 ตอน query ✓</td><td>lexical only</td></tr>
+<tr><td>Supabase PostgREST</td><td><code>units.py:216,599</code></td><td>query ยูนิต (service-role key ใน header)</td><td>8 s / probe 4 s</td><td>ไม่มี</td><td>error → บอกลูกค้าเช็คไม่ได้ (ไม่ถอย sample) ✓</td></tr>
+<tr><td>DuckDuckGo (ddgs)</td><td><code>websearch.py</code></td><td>คำค้นจากบทสนทนา</td><td>6 s</td><td>ไม่มี</td><td>found=false ✓</td></tr>
+<tr><td>Vercel static (floor plans)</td><td><code>units.py</code> / <code>data/floor-plan-assets.json</code></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>Broadlink hub (LAN)</td><td><code>broadlink_ir.py</code></td><td>IR code</td><td>socket timeout</td><td>rediscovery ครั้งเดียว</td><td>"failed"/"mock" ✓</td></tr>
+<tr><td>Canva (Chromium)</td><td><code>canva_display.py</code></td><td>—</td><td>arrive 8 s, click 1.5–3 s</td><td>เปิดหน้าต่างใหม่เมื่อ handle ตาย</td><td>เสียงไปต่อ ภาพไม่ขึ้น</td></tr>
+<tr><td>Client → ภายนอก</td><td><code>index.html</code>, <code>display.html</code></td><td>ไม่มี — หน้าเว็บไม่โหลดฟอนต์/สคริปต์จากโดเมนอื่น (grep URL แล้ว: มีแค่ลิงก์ aistudio ในข้อความ setup) ✓</td><td>—</td><td>—</td><td>—</td></tr>
+</tbody></table></div>
+
+<!-- ============================================================ -->
+<h2 id="s8">8. จุดเก็บ API Key และ Secret</h2>
+<div class="tbl"><table>
+<thead><tr><th>Secret</th><th>ที่เก็บ</th><th>ถึงไหน</th><th>ประเมิน</th></tr></thead>
+<tbody>
+<tr><td><code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code></td><td><code>.env</code> (gitignored) → <code>settings</code></td><td>process เท่านั้น; <code>/health</code> คืน bool</td><td><span class="pill p-ok">ดี</span></td></tr>
+<tr><td><code>WS_TOKEN</code></td><td><code>.env</code>; เทียบ <code>compare_digest</code></td><td><strong>URL query</strong> ทุกหน้า/ทุก socket + <code>/unit_price?token=</code>; ฝังใน docs (agent-list) ให้พนักงานพิมพ์บนจอที่สอง</td><td><span class="pill p-high">รั่วผ่าน history/proxy/screenshot</span></td></tr>
+<tr><td><code>INVENTORY_SUPABASE_KEY</code></td><td><code>.env</code> — service role (ข้าม RLS)</td><td>header ทุก request</td><td><span class="pill p-high">สิทธิ์เกินงาน (ใช้แค่อ่าน)</span></td></tr>
+<tr><td>TLS key</td><td><code>certs/lan-key.pem</code> (gitignored)</td><td>uvicorn</td><td>mkcert — LAN เท่านั้น</td></tr>
+<tr><td>Broadlink MAC/IP</td><td><code>data/broadlink_device.json</code> (gitignored)</td><td>—</td><td>ไม่ใช่ secret จริง</td></tr>
+<tr><td>Robot ↔ server</td><td><em>ไม่มี</em></td><td>—</td><td><span class="pill p-blocker">C-2</span></td></tr>
+</tbody></table></div>
+<p>ไม่มี secret hard-code ในโค้ด (grep รูปแบบ Google key / OpenAI key / JWT ใน app/ scripts/ client/ — ไม่พบ ✓) · ไม่มี rotation · <code>.env</code> บนเครื่องเจ้าของมี 160 บรรทัด — คู่มือย้ายเครื่องบอกให้ก๊อปมือ</p>
+
+<!-- ============================================================ -->
+<h2 id="s9">9. จุดเก็บข้อมูลเสียง ภาพ และ Face Embedding</h2>
+<div class="tbl"><table>
+<thead><tr><th>ข้อมูล</th><th>ที่เก็บ</th><th>เขียนโดย</th><th>เมื่อไร</th><th>ลบ</th><th>ประเมิน</th></tr></thead>
+<tbody>
+<tr><td>เสียงดิบ (wav 16k)</td><td><code>data/wake_debug/{hit,miss}-*.wav</code>, <code>data/wake_enroll/enroll-*.wav</code></td><td><code>wake.py:507-518</code></td><td><code>WAKE_DEBUG</code> / <code>WAKE_ENROLL</code> = true (เปิดอยู่บนเครื่องเจ้าของ: มีไฟล์ 27 ส.ค.)</td><td>เก็บล่าสุด 20 ไฟล์/ชนิด (rolling) — ไม่มีอายุ</td><td><span class="pill p-high">C-7: ขัด docstring turnlog</span></td></tr>
+<tr><td>Transcript</td><td><code>data/logs/YYYY-MM-DD.jsonl</code> ฟิลด์ <code>heard.text</code>, <code>said.text</code></td><td><code>session.py:477,501</code></td><td>ทุกเทิร์น</td><td>30 วันตามชื่อไฟล์ ✓</td><td><span class="pill p-medium">มีเบอร์โทร ไม่ mask</span></td></tr>
+<tr><td>เฟรมกล้อง</td><td>RAM เท่านั้น (<code>camera_probe/</code> เฉพาะสคริปต์วินิจฉัย)</td><td>—</td><td>—</td><td>—</td><td><span class="pill p-ok">ดี</span></td></tr>
+<tr><td>Face crop (JPG)</td><td><code>data/faces/enrolled/&lt;ชื่อ&gt;/*.jpg</code></td><td><code>enrollment.save_shots</code></td><td>ลงทะเบียน</td><td>ลบมือ + rebuild</td><td><span class="pill p-high">C-3: ถาวร ไม่เข้ารหัส ไม่มี consent</span></td></tr>
+<tr><td>Face embedding</td><td><code>data/faces/gallery.npz</code> (pickle-able object arrays)</td><td><code>Gallery.save</code></td><td>build</td><td>rebuild</td><td><span class="pill p-high">C-3</span> + โหลดด้วย <code>allow_pickle=True</code> (F-9)</td></tr>
+<tr><td>Stranger embedding</td><td>RAM <code>Watcher._strangers</code> ≤16</td><td><code>facewatch.see</code></td><td>ทุกคนแปลกหน้าที่ถูกทัก</td><td>cooldown 600 s / restart</td><td><span class="pill p-medium">C-15: ระบุใน DPIA</span></td></tr>
+<tr><td>Eval cache</td><td><code>data/faces/eval_cache.npz</code> 736 KB</td><td><code>eval_faces.py</code></td><td>รัน eval</td><td>มือ</td><td>embedding ของโบรกเกอร์ 147 คน + staff — <span class="pill p-medium">ควรอยู่ใต้กติกาเดียวกับ gallery</span></td></tr>
+<tr><td>ชื่อ + score</td><td>turnlog <code>face_seen</code>; console <code>logger.info("face: known พีท (0.612)")</code></td><td><code>greeter.py:112,231</code></td><td>ทุกครั้งที่ทัก</td><td>30 วัน / console ไม่เก็บ</td><td>จำเป็นต่อ audit ✓ แต่ควรใช้ id แทนชื่อถ้ามี</td></tr>
+</tbody></table></div>
+
+<!-- ============================================================ -->
+<h2 id="s10">10. คำสั่งที่อาจควบคุม Robot (และเครื่อง) โดยไม่มี validation</h2>
+<div class="tbl"><table>
+<thead><tr><th>Tool / message</th><th>Validation ที่มี</th><th>ที่ขาด</th><th>ระดับ</th></tr></thead>
+<tbody>
+<tr><td><code>go_to_place(place)</code></td><td>POI ต้องอยู่ในแผนที่ (whole-name match) ✓; mock ประกาศ ✓</td><td>allow-list ฝั่งเซิร์ฟเวอร์ (ทุก POI บนแผนที่ไปได้หมด), ยืนยันด้วยเสียง, แบต/สถานะ, มีคนอยู่หน้าหุ่นไหม, rate limit</td><td><span class="pill p-blocker">Blocker เมื่อมีหุ่น</span></td></tr>
+<tr><td><code>return_to_base</code></td><td>—</td><td>เหมือนบน (เดินได้ทั้งที่มีลูกค้ายืนขวาง)</td><td><span class="pill p-high">High</span></td></tr>
+<tr><td><code>stop_moving</code></td><td>ส่งเสมอแม้คิดว่าหยุดอยู่ ✓</td><td>ไม่ผ่าน LLM ไม่ได้ — คือปัญหาไม่ใช่ validation</td><td><span class="pill p-blocker">C-1</span></td></tr>
+<tr><td>inbound <code>robot_ready</code>/<code>robot_arrived</code></td><td>token เดียวกับเบราว์เซอร์</td><td>device identity; <code>robot_arrived</code> ปลอมทำให้หุ่นประกาศ "ถึงแล้ว" ทั้งที่ยังเดิน (announce เข้าบทสนทนา)</td><td><span class="pill p-blocker">C-2</span></td></tr>
+<tr><td><code>open_program(name)</code></td><td>ปฏิเสธ path/<code>:</code>/<code>/</code>; จับคู่กับ Start Menu ✓</td><td>fallback <code>os.startfile(q)</code> กับคำ <code>[a-z0-9.+_-]{2,40}</code> ใดๆ → "cmd", "powershell", "regedit", "mstsc" เปิดได้ด้วยเสียง</td><td><span class="pill p-high">F-7</span></td></tr>
+<tr><td><code>close_program(name)</code></td><td>regex + taskkill ไม่มี /F ✓</td><td>"explorer"/"uvicorn"/"python" ปิดได้ (python = ปิดตัวเอง)</td><td><span class="pill p-medium">Medium</span></td></tr>
+<tr><td><code>open_in_browser(url)</code> / <code>play_youtube</code></td><td>scheme http(s) เท่านั้น ✓</td><td>ไม่มี domain allow-list ในโหมด kiosk — phishing บนจอสาธารณะ</td><td><span class="pill p-high">C-11</span></td></tr>
+<tr><td><code>set_lights/set_air_conditioner</code></td><td>range temp 16–30 ✓, hardware flag ✓</td><td>ไม่มี rate limit (IR spam)</td><td><span class="pill p-low">Low</span></td></tr>
+<tr><td><code>print_document(copies)</code></td><td>เลือกจาก catalogue ✓, cap copies ✓</td><td>—</td><td><span class="pill p-ok">ดี</span></td></tr>
+</tbody></table></div>
+
+<!-- ============================================================ -->
+<h2 id="s11">11. Error Handling, Timeout, Retry, Circuit Breaker</h2>
+<div class="tbl"><table>
+<thead><tr><th>จุด</th><th>มี</th><th>ขาด</th></tr></thead>
+<tbody>
+<tr><td>Tool dispatch (<code>registry.py:159-190</code>)</td><td>timeout 15 s (30 s paced), TypeError → error dict, Exception → <code>str(exc)</code> ส่งกลับโมเดล, ไม่ raise</td><td><code>str(exc)</code> อาจพก path/ข้อความภายในไปให้โมเดลพูด; ไม่มี circuit breaker ต่อ tool ที่ล้มซ้ำ</td></tr>
+<tr><td>Gemini connect (<code>gemini.py</code>)</td><td>go_away → resume; fallback model เฉพาะ error ที่บอกว่าโมเดลใช้ไม่ได้ ✓ (ตั้งใจไม่ fallback ทุก error)</td><td>ไม่มี retry บน network error ชั่วคราว (ตั้งใจ — แต่แปลว่าเน็ตกระตุก = สายหลุด); ไม่มี backoff ฝั่งเบราว์เซอร์ที่วัดได้ในรอบนี้</td></tr>
+<tr><td>Session loop (<code>session.py:191</code>)</td><td><code>asyncio.wait(FIRST_COMPLETED)</code> — pump ตัวหนึ่งตาย = จบสาย (ตั้งใจ)</td><td>exception ใน <code>_provider_to_browser</code> ถูก log แต่ลูกค้าได้ความเงียบ ไม่มีประโยคบอก</td></tr>
+<tr><td>Supabase (<code>units.py</code>)</td><td>timeout 8/4 s, error → "เช็คไม่ได้" ✓</td><td>ไม่มี retry/breaker — ทุกคำถามยูนิตตอน DB ล่มรอ 8 s</td></tr>
+<tr><td>Embedding (<code>retrieval.py</code>)</td><td>attempts=6 + backoff ตอน build, 1 ตอน query, latch <code>_embedding_failed</code> ปิดยาวทั้ง run ✓ = circuit breaker ที่ไม่มี half-open</td><td>ไม่รีเซ็ตจนรีสตาร์ต</td></tr>
+<tr><td>กล้อง (<code>greeter.run</code>)</td><td>30 เฟรมว่างติดกัน → ปิด + warning</td><td>ไม่ retry/reopen — กล้องหลุดชั่วคราว = ปิดจนรีสตาร์ต</td></tr>
+<tr><td>Canva</td><td>arrive timeout 8 s, handle ตาย → เปิดใหม่ (มี guard ตาม intent)</td><td>—</td></tr>
+<tr><td>Robot</td><td>send fail → "failed"; ไม่รอ arrived ✓</td><td>ไม่มี timeout รอ <code>robot_arrived</code> — ถ้าแอปเงียบ <code>STATE.moving</code> ค้าง True ตลอด; แอปหลุด → <code>app_gone</code> reset แต่หุ่นจริงเดินต่อ</td></tr>
+<tr><td>turnlog</td><td>never raises, warn once ✓</td><td>—</td></tr>
+</tbody></table></div>
+
+<!-- ============================================================ -->
+<h2 id="s12">12. Offline Mode และ Fallback</h2>
+<ul>
+  <li><strong>ทำงานได้โดยไม่มีเน็ต:</strong> wake word, VAD, face detect/ID, local TTS ของสถานีลงทะเบียน, BM25 search, IR — ทั้งหมดในเครื่อง ✓</li>
+  <li><strong>ไม่ทำงานเมื่อไม่มีเน็ต:</strong> ทุกอย่างที่ลูกค้าได้ยิน — ไม่มีประโยคเดียวที่หุ่นพูดได้เองในเครื่อง (<code>app/voice.py</code> มี TTS ไทยแต่ใช้แค่กับสถานีลงทะเบียน)</li>
+  <li><strong>Fallback ที่มี:</strong> <code>GEMINI_MODEL_FALLBACK</code> (โมเดลถอน), lexical เมื่อ embed ล้ม, mock เมื่อ hardware ไม่มี, sample units <em>ปิด</em>เมื่อ DB ล่ม (ถูกต้อง)</li>
+  <li><strong>เบราว์เซอร์:</strong> <code>/ws</code> reconnect เมื่อ token ผิดหยุดถาวรพร้อมเหตุผล ✓; เมื่อเน็ตหลุดกลางสาย → <code>goToSleep()</code> → รอ wake — ลูกค้าไม่รู้ว่าเกิดอะไร</li>
+</ul>
+<p>สรุป: <strong>ไม่มี offline mode</strong> ตามนิยามของ brief (คำสั่งฉุกเฉิน, เรียกพนักงาน, บอกว่าเน็ตหลุด) — README ยอมรับข้อนี้ตรงๆ</p>
+
+<!-- ============================================================ -->
+<h2 id="s13">13. ข้อมูลส่วนบุคคลใน Log</h2>
+<div class="tbl"><table>
+<thead><tr><th>Sink</th><th>Event / บรรทัด</th><th>PII</th><th>ประเมิน</th></tr></thead>
+<tbody>
+<tr><td>turnlog</td><td><code>heard.text</code> / <code>said.text</code> (<code>session.py:477,501</code>)</td><td>คำพูดเต็มของลูกค้า, เบอร์โทร (prompt สั่งทวน), ชื่อ, งบ</td><td><span class="pill p-medium">ตั้งใจ + 30 วัน — ต้อง mask ตัวเลขยาว</span></td></tr>
+<tr><td>turnlog</td><td><code>face_seen.name</code>, <code>reminder_*.label</code>, <code>mydocs_lookup.query</code>, <code>commercial_question.query</code>, <code>open_browser.url</code>, <code>play_youtube.query</code></td><td>ชื่อคน, เนื้อหาเตือน, คำค้น (สิ่งที่ลูกค้าสนใจ)</td><td><span class="pill p-medium">ยอมรับได้ใน 30 วัน; summaries ไม่ควรพก query</span></td></tr>
+<tr><td>console (uvicorn)</td><td><code>gemini.py:574</code> <code>"tool call: %s(%s)", name, args</code></td><td><strong>args ทั้งหมด</strong> — <code>remember(fact=…)</code>, <code>set_reminder(label=…)</code>, <code>calc_roi(งบ)</code>, <code>find_units(budget)</code> พิมพ์ลง stdout; ถ้าตั้ง log ไปไฟล์/journal จะไม่มี retention</td><td><span class="pill p-high">F-8</span></td></tr>
+<tr><td>console</td><td><code>greeter.py:231</code> <code>"face: known %s (%.3f)"</code>, <code>_say_who_is_missing</code> พิมพ์ชื่อทุกคนที่ลงทะเบียน</td><td>ชื่อพนักงาน</td><td><span class="pill p-low">Low</span></td></tr>
+<tr><td>console</td><td><code>registry.py:189</code> <code>logger.exception("tool %s failed")</code> → traceback มี args ใน frame</td><td>ตาม args</td><td><span class="pill p-low">Low</span></td></tr>
+<tr><td>console</td><td><code>heard</code>/transcript ไม่ถูก log ระดับ info (ตรวจแล้ว)</td><td>—</td><td><span class="pill p-ok">ดี</span></td></tr>
+<tr><td>ไฟล์ wav</td><td><code>wake_debug/</code></td><td>เสียงจริง</td><td><span class="pill p-high">C-7</span></td></tr>
+<tr><td>log-summaries</td><td><code>analyze_log --save</code></td><td>จงใจไม่มี free text ✓ (มีเทสต์)</td><td><span class="pill p-ok">ดี</span></td></tr>
+</tbody></table></div>
+
+<!-- ============================================================ -->
+<h2 id="s14">14. Test Coverage</h2>
+<p>989 เทสต์ / 32 ไฟล์ / timeout 20 s ต่อเทสต์ / conftest pin สภาพเครื่อง (embed off, browser blocked, face models stubbed, ws_token, profile) — ชุดเทสต์<strong>ไม่เปลี่ยนสีตาม .env</strong> ซึ่งเป็นคุณสมบัติที่หายาก · ไม่มี coverage report ในรีโป (มี <code>.coverage</code> ใน gitignore แต่ไม่มีตัวเลข)</p>
+<div class="tbl"><table>
+<thead><tr><th>โมดูล</th><th>เทสต์ตรง</th><th>ช่องว่างที่เห็น</th></tr></thead>
+<tbody>
+<tr><td><code>facewatch.py</code></td><td>20</td><td>ไม่มีเทสต์ "หลายหน้าในเฟรม → ไม่ส่งชื่อ" เพราะพฤติกรรมนั้นยังไม่มี; <code>SOFT_PRESENCE</code> ยังไม่วัด</td></tr>
+<tr><td><code>greeter.py</code></td><td>53 (working tree +330 บรรทัด)</td><td>ครอบ summon/stranger/live-session ดี</td></tr>
+<tr><td><code>faces.py</code> / <code>enrollment.py</code></td><td>15 / 79</td><td>เทสต์ยันว่า <code>allowed_modules</code> ไม่มี genderage? (ไม่เห็น — ควรมี)</td></tr>
+<tr><td><code>robot.py</code> / <code>robot_link.py</code></td><td>26 (test_robot.py)</td><td>ไม่มีเทสต์ "robot_ready จาก client ที่ไม่ใช่หุ่นถูกปฏิเสธ" (พฤติกรรมยังไม่มี); ไม่มีเทสต์ timeout รอ arrived</td></tr>
+<tr><td><code>session.py</code></td><td>ผ่าน test_profiles/multi_session/greeter</td><td>ไม่มีเทสต์ตรงของ pump/idle/summoned-deaf window นอก working tree; ไฟล์ใหญ่สุดที่เทสต์ยากสุด</td></tr>
+<tr><td><code>main.py</code> auth</td><td>มี (WS_TOKEN; <code>/unit_price</code> gate ทดสอบใน <code>test_units.py:605</code> ✓)</td><td>ไม่มีเทสต์ "token ใน query ถูกปฏิเสธ" เพราะยังเป็นพฤติกรรมที่ต้องการอยู่ (F-6)</td></tr>
+<tr><td><code>camera.py</code>, <code>voice.py</code>, <code>display.py</code></td><td>1 / ? / ผ่านอื่น</td><td>hardware-bound; ยอมรับได้</td></tr>
+<tr><td><code>computer.py</code></td><td>test_websearch_computer.py</td><td>ต้องเพิ่ม: <code>open_program("cmd")</code> ต้องถูกปฏิเสธ</td></tr>
+<tr><td>ภาคสนาม</td><td>0</td><td>ไม่มีผล WER/FAR/latency บันทึกในรีโป — เทสต์ detection ใช้ TTS wav + คลิปจริงที่ commit ✓ แต่ face ใช้สตูดิโอเท่านั้น</td></tr>
+</tbody></table></div>
+
+<!-- ============================================================ -->
+<h2 id="s15">15. Dependency และความเสี่ยงด้าน Security</h2>
+<ul>
+  <li><strong>ไม่มี lockfile</strong> — <code>requirements.txt</code> ใช้ <code>&gt;=</code> ทั้งหมด (fastapi, google-genai, sherpa-onnx, playwright, insightface* …) เครื่องห้องขายกับเครื่องเจ้าของได้เวอร์ชันต่างกันได้ทุกครั้งที่ install; ไม่มี <code>pip-audit</code>/SBOM · *insightface/onnxruntime/opencv ไม่อยู่ใน requirements.txt เลย (ติดตั้งมือ) — เครื่องใหม่ตาม <code>docs/ติดตั้ง-emma-เครื่องใหม่.md</code> จะไม่มี face</li>
+  <li><strong><code>np.load(allow_pickle=True)</code></strong> (<code>faces.py:369</code>, <code>eval_faces.py:107</code>) — gallery.npz ที่ถูกแทนที่บนดิสก์ = code execution ตอนบูต; ผูกกับ C-3 (ไฟล์ไม่เข้ารหัส/ไม่มี ACL)</li>
+  <li><strong>Playwright persistent Chromium</strong> เปิดเว็บภายนอกด้วยโปรไฟล์ที่คงอยู่ (<code>webstage.py</code>) บนเครื่องที่มี .env — sandbox ของ Chromium ช่วย แต่โปรไฟล์นั้น login อะไรค้างได้</li>
+  <li><strong>CORS <code>allow_credentials=True</code></strong> กับ <code>cors_origins</code> จาก .env — ถ้าตั้ง <code>*</code> จะขัด spec; ไม่กระทบ WS (WS ไม่ใช้ CORS — โค้ดรู้)</li>
+  <li><strong>google-genai / gemini-3.1-flash-live-preview</strong> — preview model; SDK ที่ตามไม่ทันจะ break config (โค้ดมี fallback field เก่า/ใหม่ใน transcription แล้ว)</li>
+  <li><strong>ddgs</strong> — scraper ไม่เป็นทางการ พังได้ทุกเมื่อ (โค้ดล้มอย่างซื่อสัตย์ ✓)</li>
+  <li><strong>buffalo_l</strong> ยังโหลดได้ด้วย env เดียว — license ห้ามเชิงพาณิชย์ ควรมีเทสต์/boot warning ใน profile condo</li>
+  <li><strong>Windows-only paths</strong> (<code>os.startfile</code>, taskkill, PowerShell print) — ไม่ portable ไป Android/Linux บนหุ่น (ตั้งใจ: เซิร์ฟเวอร์อยู่บน PC)</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s16">16. Dead Code, Duplicate Logic, Technical Debt</h2>
+<div class="tbl"><table>
+<thead><tr><th>รายการ</th><th>ที่</th><th>ประเภท</th><th>หมายเหตุ</th></tr></thead>
+<tbody>
+<tr><td><code>Tool.confirm</code>, <code>Tool.long_running</code></td><td><code>registry.py</code></td><td>Dead flag</td><td>ไม่มีโค้ดอ่านทั้งสองตัว (grep ทั้ง app/) — ธงที่ดูเหมือนด่านแต่ไม่ใช่ = อันตรายกว่าไม่มี (roadmap เขียนเอง)</td></tr>
+<tr><td><code>knowledge._is_commercial</code> alias</td><td><code>knowledge.py:55</code></td><td>Compat shim</td><td>ตั้งใจ; ควรมี deprecation date</td></tr>
+<tr><td><code>openai_realtime.py</code></td><td>providers</td><td>Path ที่ไม่ได้ใช้ในโปรดักชัน</td><td>ยังมีเทสต์ 2 ไฟล์อ้าง; ค่าบำรุงรักษาต่อโปรโตคอลที่เปลี่ยน — ตัดสินใจว่าจะรักษาหรือ freeze</td></tr>
+<tr><td><code>hide_slide</code></td><td><code>slides.py:944</code></td><td>Tool ที่โมเดลไม่เคยเรียก</td><td>CLAUDE.md ระบุเอง (0 ครั้งใน 59 สไลด์) — <code>analyze_log</code> จับได้; ควรตัดหรือรวมกับ close</td></tr>
+<tr><td><code>data/faces/label_staff.html</code> 726 KB</td><td>data</td><td>Artifact ชั่วคราว</td><td>ผลจาก <code>label_staff_faces.py</code> — มีรูปหน้าพนักงานฝังใน HTML? (ขนาดชี้ว่ามี) → อยู่ใต้ C-3</td></tr>
+<tr><td><code>STATUS.md</code> (6 ส.ค., 244 เทสต์), roadmap (544), CLAUDE.md (737)</td><td>docs</td><td>เอกสารล้าสมัย</td><td>จริง 989 — ตัวเลขในเอกสารเป็นหนี้ทันทีที่เขียน</td></tr>
+<tr><td>สองทางเข้าคำสั่งหุ่นบน WS เดียว</td><td><code>session.py:357-380</code></td><td>Design debt</td><td>เบราว์เซอร์กับหุ่นใช้ endpoint + token เดียวกัน = ต้องแยกก่อนมีหุ่น (C-2)</td></tr>
+<tr><td>module-level STATE (slides, robot_link, smarthome, calc)</td><td>tools/</td><td>Debt สำหรับ multi-robot</td><td>ตั้งใจ (หุ่นเดียว) มีเทสต์เตือนที่ calc</td></tr>
+<tr><td><code>session.py</code> 951 บรรทัด, <code>slides.py</code> 1134, <code>canva_display.py</code> 998</td><td>—</td><td>ไฟล์ใหญ่</td><td>คอมเมนต์ยาวมาก (ตั้งใจเป็น "เหตุผลในโค้ด") — อ่านง่ายแต่ diff ยาก; ไม่ใช่ปัญหาต้องแก้</td></tr>
+<tr><td>uncommitted 631 บรรทัด</td><td>working tree</td><td>WIP</td><td>mic report, summoned-deaf window, stand_down — รอเจ้าของ verify</td></tr>
+<tr><td>Thai file/dir names + cp874 traps</td><td>faces/enrollment/documents</td><td>Platform debt</td><td>แก้แล้วทีละจุด (np.fromfile, imencode, encoding=utf-8) — ควรมี helper เดียว</td></tr>
+</tbody></table></div>
+
+<!-- ============================================================ -->
+<h2 id="findings">รายการปัญหา (รูปแบบเต็ม)</h2>
+<p class="fact">เรียงตามความรุนแรง · ปัญหาที่วิเคราะห์ละเอียดแล้วใน Field-Readiness Review (C-1 หยุดผ่าน LLM, C-2 สวมรอยหุ่น, C-3 consent, C-4 free tier, C-5 offline, C-6 ชื่อฝังบทสนทนา, C-7 wav) ไม่ทวนซ้ำ — ด้านล่างคือปัญหา<strong>ระดับโค้ด</strong>ที่พบเพิ่มในรอบนี้</p>
+
+<div class="finding">
+<h3><span class="pill p-critical">Critical</span> F-1 ไม่มี timeout รอ <code>robot_arrived</code> — หุ่น "กำลังเดิน" ตลอดกาลในสายตาเซิร์ฟเวอร์</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/tools/robot_link.py</code> <code>send()</code>, <code>STATE["moving"]</code>; <code>app/tools/robot.py</code></dd>
+<dt>ผลกระทบ</dt><dd>โมเดลถูกสั่ง "ห้ามบอกว่าถึงก่อนได้รับแจ้ง" — ถ้าแจ้งไม่มาเลย ลูกค้ายืนรอกับหุ่นที่พูดว่า "กำลังพาไป" ไม่มีที่สิ้นสุด; <code>get_robot_status</code> รายงาน moving=True ผิด</dd>
+<dt>สถานการณ์</dt><dd>แอปบนหุ่น crash หลังรับ <code>move_to_point</code> แต่ก่อน callback; หรือ SDK ยกเลิกเงียบเพราะ localization หาย</dd>
+<dt>วิธีแก้</dt><dd>ตั้ง deadline ต่อคำสั่ง (เช่น 90 s) ใน <code>robot_link</code>; หมดเวลา → <code>STATE.moving=False</code> + <code>events.announce("ยังไม่ได้รับสัญญาณว่าถึง…เสนอเดินไปเอง/เรียกเจ้าหน้าที่", source="robot_timeout")</code>; แอปส่ง heartbeat/status ทุก 5 s</dd>
+<dt>Acceptance</dt><dd>ไม่มี <code>robot_arrived</code> ภายใน deadline → log <code>robot_timeout</code> + ประกาศ 1 ครั้ง + state กลับเป็นไม่เดิน</dd>
+<dt>Test</dt><dd><code>test_go_to_place_without_arrival_times_out_and_announces</code>; <code>test_timeout_does_not_fire_after_real_arrival</code></dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-critical">Critical</span> F-2 แอปบนหุ่นไม่ถูกกำหนดให้ยกเลิกการเดินเมื่อ WS หลุด</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>docs/ต่อกับหุ่นยนต์ Astronaut.md</code> (สเปกแอป) — ไม่มีข้อนี้; <code>robot_link.app_gone</code> docstring ยอมรับว่า "หุ่นที่กำลังเดินจะเดินต่อ"</dd>
+<dt>ผลกระทบ</dt><dd>หุ่นเคลื่อนที่โดยไม่มีใครควบคุมและไม่มีใครหยุดด้วยเสียงได้ (เสียงต้องผ่านเซิร์ฟเวอร์ที่หลุดไปแล้ว)</dd>
+<dt>สถานการณ์</dt><dd>Wi-Fi ห้องขายสะดุด 10 วินาทีระหว่างพาลูกค้าไปห้องตัวอย่าง</dd>
+<dt>วิธีแก้</dt><dd>เขียนลงสเปกแอปเป็นข้อบังคับ: link lost &gt; N s → <code>cancelNavigation()</code> + พูดประโยคในเครื่อง; watchdog นี้อยู่บนหุ่น ไม่ใช่เซิร์ฟเวอร์</dd>
+<dt>Acceptance</dt><dd>R-09: ฆ่า uvicorn กลางทาง หุ่นหยุดใน ≤2 s</dd>
+<dt>Test</dt><dd>ฝั่งแอป (instrumented test); ฝั่งเซิร์ฟเวอร์: <code>test_app_gone_marks_robot_unknown_not_stopped</code> (ยืนยันว่าเซิร์ฟเวอร์ไม่แกล้งบอกว่าหยุด)</dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-high">High</span> F-3 <code>robot_arrived</code> ปลอมจากเบราว์เซอร์ทำให้หุ่นประกาศ "ถึงแล้ว"</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/session.py:371-380</code></dd>
+<dt>ผลกระทบ</dt><dd>ข้อความจาก client ใดๆ (devtools) กลายเป็น user turn ที่โมเดลเชื่อ — เป็น prompt injection ผ่านโปรโตคอล ไม่ใช่ผ่านเสียง</dd>
+<dt>สถานการณ์</dt><dd>ลูกค้าเปิด devtools บนจอ kiosk ส่ง <code>{"type":"robot_arrived","place":"ห้องน้ำ"}</code></dd>
+<dt>วิธีแก้</dt><dd>รับ <code>robot_*</code> เฉพาะซ็อกเก็ตที่ยืนยันเป็นหุ่น (ROBOT_TOKEN) และเฉพาะเมื่อ <code>STATE.moving</code> จริง; อื่นๆ log + ignore</dd>
+<dt>Acceptance</dt><dd>ข้อความ robot_* จากซ็อกเก็ตเบราว์เซอร์ไม่เปลี่ยน STATE และไม่ announce</dd>
+<dt>Test</dt><dd><code>test_robot_messages_from_browser_socket_are_ignored</code>; <code>test_arrived_without_pending_move_is_ignored</code></dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-high">High</span> F-4 <code>return_to_base</code> และ <code>go_to_place</code> ไม่มี allow-list และไม่ต้องยืนยัน</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/tools/robot.py</code>; <code>robot_link.places()</code> = ทุก POI บนแผนที่</dd>
+<dt>ผลกระทบ</dt><dd>POI ที่ทีมสร้างไว้ใช้งานภายใน (ห้องเก็บของ, จุดชาร์จหลังร้าน) กลายเป็นจุดที่ลูกค้าสั่งไปได้; ฟังผิด "ไปสระ" → "ไปสะ…" ไม่มีด่านทวน</dd>
+<dt>สถานการณ์</dt><dd>เด็กพูด "ไปหลังบ้าน" — ถ้ามี POI ชื่อนั้น หุ่นเดิน</dd>
+<dt>วิธีแก้</dt><dd><code>ROBOT_ALLOWED_PLACES</code> ใน .env เป็น allow-list ที่ intersect กับแผนที่; ใช้ <code>heard.last()</code> ยืนยันว่ามีชื่อจุดหมายในคำพูดจริง (รูปเดียวกับ <code>CONFIRM_FIRST</code>); เดินได้เฉพาะเมื่อ <code>facewatch.someone_at</code> เร็วๆ นี้ (มีคนอยู่หน้าหุ่น)</dd>
+<dt>Acceptance</dt><dd>POI นอกลิสต์ → <code>{"ok":false,"error":"not allowed"}</code> ก่อนถึง <code>send()</code></dd>
+<dt>Test</dt><dd><code>test_go_to_place_refuses_poi_outside_allow_list</code>; <code>test_go_to_place_asks_when_heard_lacks_destination</code></dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-high">High</span> F-5 <code>allow_pickle=True</code> บนไฟล์ที่ไม่มี integrity check</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/faces.py:369</code>, <code>scripts/eval_faces.py:107</code></dd>
+<dt>ผลกระทบ</dt><dd>ใครเขียนทับ <code>data/faces/gallery.npz</code> ได้ = รันโค้ดใน process เซิร์ฟเวอร์ตอนบูต (มีสิทธิ์เปิดโปรแกรม กดปุ่ม ถือ key)</dd>
+<dt>สถานการณ์</dt><dd>เครื่องห้องขายแชร์บัญชี; USB ที่ "ก๊อป gallery มาจากเครื่องเจ้าของ"</dd>
+<dt>วิธีแก้</dt><dd>เก็บ names/meta เป็น JSON แยก, vecs เป็น float32 array → <code>np.load(allow_pickle=False)</code>; เพิ่ม HMAC ด้วย key ใน .env</dd>
+<dt>Acceptance</dt><dd><code>Gallery.load</code> ไม่ใช้ pickle; ไฟล์ที่ถูกแก้ล้มเหลวพร้อม log</dd>
+<dt>Test</dt><dd><code>test_gallery_load_refuses_pickled_objects</code>; <code>test_gallery_round_trip_without_pickle</code></dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-high">High</span> F-6 <code>WS_TOKEN</code> เดินทางใน URL</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/main.py</code> ทุก endpoint (<code>token: str | None</code> query), <code>client/index.html</code>, <code>docs/agent-list-สถานะ.md</code> (สอนพนักงานพิมพ์ <code>?token=</code>)</dd>
+<dt>ผลกระทบ</dt><dd>token ติดใน browser history, screenshot, proxy/Tailscale log, และถูกพิมพ์บนจอที่สอง; token เดียวเปิดสิทธิ์ทุกอย่างรวม <code>/unit_price</code></dd>
+<dt>สถานการณ์</dt><dd>พนักงานถ่ายรูปจอที่ขึ้น URL ส่งกลุ่ม LINE</dd>
+<dt>วิธีแก้</dt><dd>ส่ง token เป็น first message หลัง accept (โค้ด accept-then-close อยู่แล้ว) หรือ cookie HttpOnly ที่ตั้งจากหน้า login ครั้งเดียว; <code>/unit_price</code> ใช้ header</dd>
+<dt>Acceptance</dt><dd>ไม่มี <code>token=</code> ใน URL ใดที่หน้าเว็บสร้าง; เทสต์ยันว่า query token ถูกปฏิเสธ</dd>
+<dt>Test</dt><dd><code>test_ws_token_in_query_is_rejected</code>; <code>test_first_message_token_is_accepted</code>; source-scan test ห้าม <code>?token=</code> ใน client/</dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-high">High</span> F-7 <code>open_program</code> fallback เปิด shell ได้ด้วยเสียง</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/tools/computer.py:380-386</code> <code>os.startfile(q)</code> เมื่อ <code>q</code> ตรง <code>[a-z0-9.+_-]{2,40}</code></dd>
+<dt>ผลกระทบ</dt><dd>"cmd", "powershell", "regedit", "mstsc", "control" ผ่าน regex และไม่ต้องอยู่ใน Start Menu — ขัด docstring ที่บอกว่า security model คือ "only launch targets the machine itself lists"</dd>
+<dt>สถานการณ์</dt><dd>คนในบ้านตะโกน "Emma เปิด powershell" หรือคลิปเสียงจากทีวี</dd>
+<dt>วิธีแก้</dt><dd>ตัด fallback ทิ้ง หรือแทนด้วย allow-list ตายตัว (notepad, calc, mspaint); ห้าม <code>computer</code> group ใน profile condo ด้วยเทสต์</dd>
+<dt>Acceptance</dt><dd><code>open_program("cmd")</code> → not found; profile condo โหลด computer ไม่ได้แม้ตั้ง TOOL_GROUPS</dd>
+<dt>Test</dt><dd><code>test_open_program_never_launches_a_shell</code> (parametrize cmd/powershell/regedit); <code>test_condo_profile_cannot_load_computer_tools</code></dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-high">High</span> F-8 ทุก tool argument ถูกพิมพ์ลง console log</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/providers/gemini.py:574</code> <code>logger.info("tool call: %s(%s)", name, args)</code></dd>
+<dt>ผลกระทบ</dt><dd><code>remember(fact="เมียชื่อ…")</code>, <code>set_reminder(label="นัดหมอ…")</code>, <code>calc_roi(budget=…)</code>, <code>find_units(max_price=…)</code> ลง stdout ซึ่งไม่มี retention และมักถูก redirect ไปไฟล์บนเครื่องห้องขาย</dd>
+<dt>สถานการณ์</dt><dd>ตั้ง uvicorn ให้เขียน log ไฟล์เพื่อดีบัก แล้วลืม — เก็บงบลูกค้าตลอดไป</dd>
+<dt>วิธีแก้</dt><dd>log ชื่อ tool + <em>คีย์</em> ของ args เท่านั้นที่ระดับ info; ค่าเต็มเฉพาะ debug; turnlog "tool" มีอยู่แล้วและมี retention</dd>
+<dt>Acceptance</dt><dd>ที่ log level INFO ไม่มีค่า arg ปรากฏ</dd>
+<dt>Test</dt><dd><code>test_tool_call_log_line_has_no_argument_values</code> (caplog)</dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-high">High</span> F-9 Face dependencies ไม่อยู่ใน requirements และไม่มี lockfile</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>requirements.txt</code> (ไม่มี insightface/onnxruntime/opencv-python); <code>docs/ติดตั้ง-emma-เครื่องใหม่.md</code></dd>
+<dt>ผลกระทบ</dt><dd>เครื่องใหม่ตามคู่มือได้ระบบไม่มีกล้อง <em>เงียบๆ</em> (<code>faces.available()</code> คืน False = "recognition off" ซึ่งเป็นสถานะปกติ); เวอร์ชันลอย = พฤติกรรมต่างกันข้ามเครื่อง</dd>
+<dt>สถานการณ์</dt><dd>ติดตั้งเครื่องห้องขาย FACE_ENABLED=true แต่ไม่มี insightface → ไม่มีใครรู้ว่ากล้องไม่ทำงานจนลูกค้าเดินเข้ามา</dd>
+<dt>วิธีแก้</dt><dd>เพิ่ม extras <code>requirements-face.txt</code> + pin ด้วย <code>pip-compile</code>/lock; boot warning เมื่อ FACE_ENABLED แต่ import ล้ม (ตอนนี้เป็น info)</dd>
+<dt>Acceptance</dt><dd>FACE_ENABLED=true + โมดูลขาด → WARNING ที่บูตพร้อมคำสั่งติดตั้ง</dd>
+<dt>Test</dt><dd><code>test_face_enabled_without_models_warns_loudly</code></dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-medium">Medium</span> F-10 <code>Tool.confirm</code> / <code>long_running</code> เป็นธงเปล่า</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/tools/registry.py:81-86</code></dd>
+<dt>ผลกระทบ</dt><dd>คนเพิ่ม tool ใหม่ตั้ง <code>confirm=True</code> แล้วเชื่อว่ามีด่าน; <code>long_running</code> ไม่ถูกส่งไปเป็น NON_BLOCKING ให้ Gemini 2.5 ทั้งที่ <code>supports_non_blocking()</code> มีอยู่</dd>
+<dt>วิธีแก้</dt><dd>ทำ confirm ให้ทำงาน (pending call + ต้องได้ยินคำยืนยันในเทิร์นถัดไป) หรือลบ flag ออกพร้อม comment; ต่อ <code>long_running</code> เข้า declaration เมื่อโมเดลรองรับ</dd>
+<dt>Acceptance</dt><dd>ไม่มี field ใน registry ที่ไม่มีโค้ดอ่าน</dd>
+<dt>Test</dt><dd><code>test_confirm_tool_waits_for_spoken_confirmation</code>; <code>test_every_tool_flag_is_read_somewhere</code> (source scan)</dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-medium">Medium</span> F-11 กล้องหลุดแล้วไม่กลับมา</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/greeter.py</code> <code>MAX_EMPTY_READS=30</code> → <code>return</code></dd>
+<dt>ผลกระทบ</dt><dd>USB สะดุดครั้งเดียว = ไม่มีทักทายจนรีสตาร์ต; ไม่มี alert</dd>
+<dt>วิธีแก้</dt><dd>ปิด → รอ 30 s → <code>open_camera</code> ใหม่ (backoff สูงสุด 5 นาที) + record <code>camera_lost</code>/<code>camera_back</code> ใน turnlog</dd>
+<dt>Acceptance</dt><dd>ถอด-เสียบกล้องแล้วกลับมาทักได้ภายใน 1 นาที</dd>
+<dt>Test</dt><dd><code>test_greeter_reopens_camera_after_empty_reads</code></dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-medium">Medium</span> F-12 <code>dispatch</code> ส่ง <code>str(exc)</code> ให้โมเดล</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/tools/registry.py:189-190</code></dd>
+<dt>ผลกระทบ</dt><dd>ข้อความ exception (path บนเครื่อง, URL Supabase, ชื่อไฟล์ไทย) ถูกโมเดลอ่านออกเสียงหรือขึ้นจอได้</dd>
+<dt>วิธีแก้</dt><dd>คืน <code>{"ok":false,"error":"internal","instruction":"…ขอโทษสั้นๆ…"}</code> และเก็บรายละเอียดใน log/turnlog เท่านั้น</dd>
+<dt>Acceptance</dt><dd>ผล tool ที่ล้มไม่มี path/URL</dd>
+<dt>Test</dt><dd><code>test_tool_exception_text_does_not_reach_the_model</code></dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-medium">Medium</span> F-13 ชุด eval ใบหน้าอ่านจาก <code>D:/Data</code> — วัดซ้ำบนเครื่องอื่นไม่ได้</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>scripts/eval_faces.py</code> <code>BROKER_JSON/BROKER_PHOTOS/STAFF_DIR</code> hard-code; <code>eval_cache.npz</code> เก็บ embedding ของคนที่ไม่ได้ยินยอมให้ใช้กับระบบนี้ (โบรกเกอร์)</dd>
+<dt>ผลกระทบ</dt><dd>ตัวเลข 0.50 ไม่มีใครทวนได้; cache เป็นข้อมูลชีวมิติของ 147 คนนอกโปรเจกต์</dd>
+<dt>วิธีแก้</dt><dd>รับ path เป็น argument; ลบ eval_cache หลังตัดสินใจหรือให้อยู่ใต้ DPIA; เขียนผลลง <code>data/log-summaries/face-eval-YYYY-MM-DD.json</code></dd>
+<dt>Acceptance</dt><dd>eval รันได้ด้วย <code>--probe-dir</code> อย่างเดียว; ผลถูก commit เป็นตัวเลข</dd>
+<dt>Test</dt><dd>ไม่ใช่ unit test — checklist ก่อน pilot</dd>
+</dl></div>
+
+<div class="finding">
+<h3><span class="pill p-low">Low</span> F-14 <code>close_program</code> ปิดตัวเองหรือ explorer ได้</h3>
+<dl>
+<dt>ไฟล์</dt><dd><code>app/tools/computer.py:422</code></dd>
+<dt>วิธีแก้</dt><dd>deny-list: python, uvicorn, explorer, chrome (ถ้าเป็น kiosk), taskkill</dd>
+<dt>Test</dt><dd><code>test_close_program_refuses_protected_processes</code></dd>
+</dl></div>
+
+<!-- ============================================================ -->
+<h2 id="policy">นโยบายทักชื่อ 8 ข้อ — เทียบกับโค้ดจริง</h2>
+<p>เงื่อนไขที่กำหนด: <em>ห้ามทักชื่อจากผลจดจำครั้งเดียว</em> และต้องผ่านครบ 8 ข้อ — ตรวจใน <code>facewatch.Watcher.see</code> + <code>greeter</code></p>
+
+<div class="check">
+<div class="m"><span class="pill p-high">✗</span></div><div><strong>1. ลงทะเบียนและให้ความยินยอมแล้ว</strong> — ลงทะเบียน ✓ (อยู่ใน gallery); ยินยอม ✗ ไม่มีฟิลด์ ไม่มีการเช็ค · <em>แก้:</em> <code>meta.consent_at</code> บังคับใน <code>build_face_gallery</code>; <code>see()</code> ข้าม entry ที่ไม่มี</div>
+<div class="m"><span class="pill p-ok">✓</span></div><div><strong>2. Confidence สูงกว่าเกณฑ์</strong> — <code>score ≥ 0.50</code> (วัด FAR=0 บนสตูดิโอ) ✓ แต่ต้อง re-calibrate ที่จุดติดตั้ง (C-8)</div>
+<div class="m"><span class="pill p-high">✗</span></div><div><strong>3. Liveness ผ่าน</strong> — ไม่มี · <em>ทางเลือกที่สมเหตุสมผล:</em> ตราบที่ผลลัพธ์เป็นแค่คำทัก ให้ทดแทนด้วย "motion ระหว่าง confirm frames + ขนาดหน้าเปลี่ยน" (cheap liveness) และ<strong>ห้าม</strong>ใช้ผลจดจำเปิดสิทธิ์ใด (เทสต์บังคับ)</div>
+<div class="m"><span class="pill p-ok">✓</span></div><div><strong>4. ตรวจต่อเนื่องหลายเฟรม</strong> — known 3 เฟรม, stranger 6 เฟรม (<code>FACE_CONFIRM_FRAMES</code>) ✓ ที่ 5 fps = 0.6/1.2 s</div>
+<div class="m"><span class="pill p-high">✗</span></div><div><strong>5. ไม่มี candidate อื่นคะแนนใกล้เคียง</strong> — <code>Gallery.match</code> คืนแค่ argmax; ไม่เช็ค margin ระหว่างอันดับ 1 กับ 2 · <em>แก้:</em> คืน top-2, ต้อง <code>s1 − s2 ≥ 0.10</code> (วัดค่าจริงจาก eval) ไม่งั้นทักทั่วไป · <em>เทสต์:</em> <code>test_close_second_candidate_blocks_the_name</code></div>
+<div class="m"><span class="pill p-high">✗</span></div><div><strong>6. ไม่ได้ถอนความยินยอม</strong> — ไม่มีสถานะถอน; ถอน = ลบโฟลเดอร์ + rebuild ด้วยมือ · <em>แก้:</em> <code>revoked_at</code> + คำสั่ง revoke ที่ลบ crops ทันที</div>
+<div class="m"><span class="pill p-high">✗</span></div><div><strong>7. สถานที่/ช่วงเวลาอนุญาต</strong> — ไม่มี; กล้องทักทุกเวลาที่เซิร์ฟเวอร์รัน · <em>แก้:</em> <code>FACE_GREET_HOURS=09:00-18:00</code> + <code>FACE_NAME_GROUPS=staff</code> (ทักชื่อเฉพาะพนักงาน ลูกค้าได้คำทักทั่วไปเสมอ)</div>
+<div class="m"><span class="pill p-high">✗</span></div><div><strong>8. ไม่มีคนอื่นอยู่ใกล้</strong> — <code>see()</code> ใช้ <code>found[0]</code> เท่านั้น; <code>len(found)</code> ไม่ถูกใช้ตัดสิน (ใช้เฉพาะตอน enrol) · <em>แก้:</em> ถ้า <code>len(found) &gt; 1</code> และหน้าอื่น ≥ <code>FACE_MIN_PX</code> → ทักทั่วไป · <em>เทสต์:</em> <code>test_second_face_in_frame_downgrades_to_generic_greeting</code></div>
+<div class="m"><span class="pill p-ok">✓</span></div><div><strong>เมื่อไม่แน่ใจใช้คำทักทั่วไป</strong> — 0.42–0.50 = เงียบ (ไม่ทักเลย); stranger = ทักทั่วไป ✓ ปลอดภัยกว่าที่กำหนดในช่วงกลาง</div>
+<div class="m"><span class="pill p-ok">✓</span></div><div><strong>Cooldown</strong> — 600 s ต่อคน + ต่อ stranger-vec; refresh เมื่อยังอยู่; ไม่ฟื้นคนที่ออกไปแล้ว ✓ ละเอียดกว่าที่ขอ</div>
+<div class="m"><span class="pill p-medium">△</span></div><div><strong>บันทึกเฉพาะ event ที่จำเป็น ไม่เก็บภาพดิบโดยไม่มีเหตุผล</strong> — เฟรมไม่ถูกเขียน ✓; <code>face_seen</code> มีชื่อ+score (จำเป็นต่อ audit) ✓; crop JPG ตอนลงทะเบียนเก็บถาวร "เพื่อ re-embed เมื่อเปลี่ยนโมเดล" — เหตุผลมี แต่ต้องผ่าน DPO และมีอายุ; <code>label_staff.html</code> 726 KB และ <code>eval_cache.npz</code> ไม่มีเหตุผลค้างอยู่</div>
+</div>
+
+<p><strong>สรุปนโยบาย: ผ่าน 3/8 (2, 4, และ fallback/cooldown)</strong> — โครงสร้าง <code>see()</code> รองรับการเพิ่มด่านที่เหลือได้โดยไม่รื้อ เพราะการตัดสินใจอยู่ที่เดียว (ตามที่ docstring ตั้งใจ) ข้อ 5 และ 8 เป็นโค้ดไม่เกินครึ่งวัน ข้อ 1/6/7 ต้องมี data model ใหม่ + คำตอบจาก DPO</p>
+
+<div class="callout"><strong>ข้อสรุปของการตรวจโค้ด:</strong> โค้ดรันได้และเทสต์เขียว แต่ (ก) ไม่มีชั้นความปลอดภัยที่อยู่นอก LLM สำหรับหุ่น, (ข) ช่องทางเข้าของหุ่นกับเบราว์เซอร์ยังเป็นช่องเดียวกัน, (ค) ระบบใบหน้าผ่านนโยบาย 3 จาก 8 ข้อ, (ง) มี secret/PII 4 จุดที่หลุดออกนอกกลไก retention (URL token, console args, wav debug, face crops) — จึง<strong>ไม่ถือว่าพร้อม production</strong> และไม่ถือว่า "ปลอดภัย" ในความหมายที่ brief กำหนด แม้จะเป็นโค้ดที่มีวินัยสูงกว่าโปรเจกต์ส่วนใหญ่ที่ผมเคยตรวจ</div>
+</main>
+</div>
+
+</body>
+</html>
