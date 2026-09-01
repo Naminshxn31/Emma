@@ -26,6 +26,7 @@ exists because "mock" was being reported as "ok".
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -109,6 +110,7 @@ def reset_state() -> None:
         "battery": None, "charging": None,
     })
     KNOWN_PLACES.clear()
+    _cancel_arrival_watch()
 
 
 def app_connected(names: list[str] | None = None) -> None:
@@ -209,7 +211,57 @@ async def send(action: str, **args: Any) -> str:
     return "ok"
 
 
-async def arrived(place: str | None, ok: bool = True) -> None:
+#: The task that gives up on an arrival that never comes.
+_arrival_watch: asyncio.Task | None = None
+
+
+def _cancel_arrival_watch() -> None:
+    global _arrival_watch
+    task, _arrival_watch = _arrival_watch, None
+    if task is not None and not task.done():
+        task.cancel()
+
+
+def start_arrival_watch(place: str, seconds: float) -> None:
+    """Arm the deadline for `place`. Cleared by `arrived()` or any reset.
+
+    An app that crashes after accepting the order sends nothing — no
+    arrival, no failure — and `moving=True` used to be forever: the model
+    had been told to wait for the arrival message, so it waited, and the
+    guest stood beside a robot that was "on its way" indefinitely. When
+    the deadline passes the walk is cancelled (the app may still be alive
+    and merely stuck), the state is cleared, and the model is told the
+    truth in its own turn, the same road an arrival takes.
+    """
+    _cancel_arrival_watch()
+    if seconds <= 0:
+        return
+
+    async def watch() -> None:
+        await asyncio.sleep(seconds)
+        if not STATE["moving"] or STATE["destination"] != place:
+            return
+        logger.warning("robot: no arrival report for %r after %.0fs — cancelling "
+                       "the walk and telling the model", place, seconds)
+        STATE["moving"] = False
+        STATE["destination"] = None
+        try:
+            await send("cancel_navigation")
+        except Exception:                          # pragma: no cover - belt
+            logger.exception("could not cancel after arrival timeout")
+        from app import events, turnlog
+
+        turnlog.record("robot_arrival_timeout", place=place, seconds=seconds)
+        await events.announce(
+            "หุ่นยนต์ไม่รายงานว่าถึง%s ภายในเวลาที่กำหนด สั่งหยุดแล้ว "
+            "ให้บอกลูกค้าตรงๆ ว่าพาไปไม่สำเร็จ แล้วเสนอเรียกเจ้าหน้าที่" % place,
+            source="robot_arrival_timeout")
+
+    global _arrival_watch
+    _arrival_watch = asyncio.create_task(watch())
+
+
+async def arrived(place: str | None, ok: bool = True) -> bool:
     """The robot finished moving. Tell the model, so it can say so out loud.
 
     Injected as a turn rather than left in state, because nothing else would
@@ -217,7 +269,15 @@ async def arrived(place: str | None, ok: bool = True) -> None:
     there is no turn boundary coming. `_resume_after_silence` in `session.py`
     exists for the same reason — a robot waiting for something that will never
     fire is the failure this project keeps rediscovering.
+
+    Returns False — and says nothing to the model — when no walk is pending.
+    An arrival with nothing to arrive from is a stale callback, a replay, or
+    a sender that is not the robot; none of them earns a turn.
     """
+    if not STATE["moving"]:
+        logger.info("robot_arrived(%r) ignored — no walk in progress", place)
+        return False
+    _cancel_arrival_watch()
     STATE["moving"] = False
     STATE["destination"] = None
 
@@ -240,3 +300,4 @@ async def arrived(place: str | None, ok: bool = True) -> None:
     # rest of what it was saying, so the robot interrupted itself to report
     # that it had arrived. Same shape as the tour nudge, one path further out.
     await events.announce(text, source="robot_arrived")
+    return True

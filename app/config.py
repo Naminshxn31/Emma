@@ -265,6 +265,11 @@ class Settings:
     # a desk is in frame for seconds, and `FACE_CONFIRM_FRAMES` counts
     # agreeing looks, not video frames.
     face_fps: float = float(os.getenv("FACE_FPS", "5"))
+    #: Seconds between attempts to reopen the camera after it stops
+    #: delivering frames (USB hiccup, cable, the enrolment station holding
+    #: it). 0 = give up, the pre-2026-09-01 behaviour: greeting off until
+    #: the server restarts, with nothing on the machine saying so.
+    face_camera_retry_s: float = float(os.getenv("FACE_CAMERA_RETRY_S", "10"))
 
     # --- Wake word ("Emma") ---
     # Off by default: the gallery robot is started by staff each morning and
@@ -557,6 +562,18 @@ class Settings:
     # the assistant announced it had switched off an air conditioner that
     # never received anything.
     robot_enabled: bool = _get_bool("ROBOT_ENABLED", False)
+    #: The robot app's own credential, carried inside `robot_ready`. Distinct
+    #: from WS_TOKEN on purpose: WS_TOKEN is in every browser's URL on the
+    #: LAN, and until 2026-09-01 any page that had it could send
+    #: `robot_ready` and become "the robot" — `available()` would flip and
+    #: every walk command would go to it. Empty = no socket is ever
+    #: accepted as the robot (robot stays mock), which is the safe default.
+    robot_token: str = os.getenv("ROBOT_TOKEN", "")
+    #: How long a walk may take before the server stops believing the robot
+    #: is still on its way. Without it, an app that crashed after taking
+    #: the order left `moving=True` forever — no arrival, no error, and a
+    #: model told to "wait for the arrival message" that never came.
+    robot_arrival_timeout_s: float = float(os.getenv("ROBOT_ARRIVAL_TIMEOUT_S", "120"))
     #: Pretend destinations, so the guiding conversation can be rehearsed
     #: before the robot exists. Ignored the moment a real robot reports its
     #: own map. Never makes anything move — see `robot_link.places`.

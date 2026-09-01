@@ -58,3 +58,15 @@ ddgs>=9.0
 # microphone delivered nothing to any program while the browser reported
 # the track live and unmuted, and nothing above the OS could tell.
 sounddevice>=0.5
+
+
+# Face recognition for the door camera (FACE_ENABLED=true): SCRFD detection +
+# ArcFace embeddings on CPU. Optional — without these the camera greeter says
+# so at startup and everything else runs. Model pack: python scripts/fetch_face_model.py
+# (AuraFace, Apache-2.0; buffalo_l is research-only). These were installed by
+# hand on the owner's machine and missing here until 2026-09-01, which is how
+# a second machine would have failed to reproduce the setup.
+insightface>=0.7
+onnxruntime>=1.17
+opencv-python>=4.9
+scikit-image>=0.22

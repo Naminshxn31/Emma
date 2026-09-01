@@ -67,6 +67,9 @@ async def go_to_place(place: str) -> dict:
     if hardware == "ok":
         robot_link.STATE["moving"] = True
         robot_link.STATE["destination"] = target
+        from app.config import settings
+
+        robot_link.start_arrival_watch(target, settings.robot_arrival_timeout_s)
 
     return {
         "ok": hardware != "failed",

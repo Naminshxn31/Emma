@@ -374,16 +374,14 @@ def open_program(name: str) -> dict:
                 "candidates": matches[:8],
                 "instruction": "เจอหลายโปรแกรม ให้ถามเจ้าของว่าหมายถึงตัวไหน"}
 
-    # Nothing in the Start Menu. A bare well-known token (notepad, calc)
-    # still launches through ShellExecute's own lookup — one word, no
-    # arguments possible, so there is nothing to inject into.
-    if re.fullmatch(r"[a-z0-9.+_-]{2,40}", q):
-        try:
-            os.startfile(q)
-            turnlog.record("open_program", name=q, ok=True)
-            return {"ok": True, "opened": q}
-        except OSError:
-            pass
+    # Nothing in the Start Menu means nothing to open. There used to be a
+    # fallback here that handed a bare token to ShellExecute's own lookup
+    # ("one word, no arguments, nothing to inject") — which is true, and
+    # beside the point: "cmd", "powershell", "regedit", "diskpart" are all
+    # one word, none of them is in the Start Menu, and this server sits on
+    # 0.0.0.0 taking commands from a microphone. Notepad and Calculator
+    # are Start Menu entries and still open through the list above; the
+    # list is the allow-list, and the allow-list is the whole point.
     near = sorted(n for n in apps if any(w in n for w in q.split()))[:8]
     turnlog.record("open_program", name=q, ok=False)
     return {"ok": False, "error": "not found",

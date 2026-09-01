@@ -120,6 +120,33 @@ async def _greet(sighting) -> None:
     )
 
 
+async def _open_camera_patiently(camera):
+    """Open the camera, retrying on FACE_CAMERA_RETRY_S until it works.
+
+    Returns None only when retrying is switched off. Says something on the
+    first failure and then about once a minute — a line every ten seconds
+    for a camera that is unplugged all weekend is noise, silence is the bug
+    this replaces.
+    """
+    attempt = 0
+    while True:
+        cap = await asyncio.to_thread(camera.open_camera)
+        if cap is not None:
+            if attempt:
+                logger.info("camera is back after %d attempt(s)", attempt)
+            return cap
+        if settings.face_camera_retry_s <= 0:
+            logger.warning("camera greeting off — no camera opened "
+                           "(try: python scripts/watch_camera.py --list)")
+            return None
+        if attempt % 6 == 0:
+            logger.warning("no camera opened — retrying every %.0fs "
+                           "(try: python scripts/watch_camera.py --list)",
+                           settings.face_camera_retry_s)
+        attempt += 1
+        await asyncio.sleep(settings.face_camera_retry_s)
+
+
 async def run() -> None:
     """Watch until cancelled. Never raises into the server that started it."""
     import time
@@ -137,10 +164,8 @@ async def run() -> None:
 
     _say_who_is_missing(watcher)
 
-    cap = await asyncio.to_thread(camera.open_camera)
+    cap = await _open_camera_patiently(camera)
     if cap is None:
-        logger.warning("camera greeting off — no camera opened "
-                       "(try: python scripts/watch_camera.py --list)")
         return
 
     interval = 1.0 / max(settings.face_fps, 0.5)
@@ -156,9 +181,25 @@ async def run() -> None:
             if not ok or frame is None:
                 empty += 1
                 if empty >= MAX_EMPTY_READS:
+                    # Not the end. A camera that stops delivering is a
+                    # USB hiccup or somebody else holding the device, and
+                    # both end on their own — the loop used to end with
+                    # them, silently, until the next restart. Release the
+                    # dead handle and try again on a timer.
+                    with contextlib.suppress(Exception):
+                        cap.release()
+                    if settings.face_camera_retry_s <= 0:
+                        logger.warning("camera stopped returning frames — "
+                                       "greeting off until the server restarts "
+                                       "(FACE_CAMERA_RETRY_S=0)")
+                        return
                     logger.warning("camera stopped returning frames — "
-                                   "greeting off until the server restarts")
-                    return
+                                   "reopening every %.0fs", settings.face_camera_retry_s)
+                    cap = await _open_camera_patiently(camera)
+                    if cap is None:
+                        return
+                    empty = 0
+                    continue
                 await asyncio.sleep(interval)
                 continue
             empty = 0

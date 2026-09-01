@@ -300,6 +300,9 @@ def _no_real_face_models(monkeypatch, request):
     # stayed green — the exact two-colour suite this fixture exists to
     # prevent. A test that wants another value patches it itself.
     monkeypatch.setattr(settings, "face_min_px", 110)
+    # A greeter loop that reconnects forever never ends; tests hand it a
+    # camera with N frames and expect the run to return when they are gone.
+    monkeypatch.setattr(settings, "face_camera_retry_s", 0.0)
     monkeypatch.setattr(settings, "face_threshold", 0.50)
     monkeypatch.setattr(settings, "face_confirm_frames", 3)
     monkeypatch.setattr(settings, "face_cooldown_s", 600.0)

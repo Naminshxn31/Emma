@@ -201,6 +201,17 @@ class VoiceSession:
             logger.exception("voice session failed")
             await self._send_json({"type": "error", "code": "internal", "message": str(exc)})
         finally:
+            if getattr(self, "_is_robot", False):
+                # The robot's socket is gone. `app_gone` existed for this
+                # and nothing called it (found 2026-09-01): the state said
+                # "connected" until the next restart, every walk command
+                # went down a socket that no longer existed and came back
+                # "ok". The robot itself, if mid-walk, keeps walking —
+                # that is the app's job to stop, and the reason the app
+                # must cancel navigation on its own when the link drops.
+                from app.tools import robot_link
+
+                robot_link.app_gone()
             try:
                 await self.ws.close()
             except Exception:
@@ -359,11 +370,29 @@ class VoiceSession:
                         # reporting which POIs its own map actually contains.
                         # The robot is the authority on that — the points were
                         # made by walking it there once — so this is the only
-                        # place `KNOWN_PLACES` comes from. A browser never
-                        # sends this, which is what keeps `available()` from
-                        # meaning "some socket is open".
+                        # place `KNOWN_PLACES` comes from.
+                        #
+                        # "A browser never sends this" was the whole guard
+                        # until 2026-09-01. It is true of the page this
+                        # project ships and of nothing else: any client on
+                        # the LAN holding WS_TOKEN (it is in every browser's
+                        # URL) could send it, become "the robot", and take
+                        # every walk command. So the robot carries its own
+                        # credential, and no ROBOT_TOKEN configured means no
+                        # socket is ever the robot.
                         from app.tools import robot_link
 
+                        if (not settings.robot_token
+                                or event.get("token") != settings.robot_token):
+                            logger.warning("robot_ready ignored — %s",
+                                           "ROBOT_TOKEN is not set on this server"
+                                           if not settings.robot_token
+                                           else "wrong token")
+                            turnlog.record("robot_rejected",
+                                           why="no_server_token" if not settings.robot_token
+                                           else "bad_token")
+                            continue
+                        self._is_robot = True
                         robot_link.app_connected(event.get("places") or [])
                         turnlog.record("robot_ready",
                                        places=len(robot_link.KNOWN_PLACES))
@@ -371,8 +400,16 @@ class VoiceSession:
                     if event.get("type") == "robot_arrived":
                         # Sent when the SDK's navigation callback fires, long
                         # after the tool call that started the walk returned.
+                        # Only from the socket that proved it is the robot,
+                        # and only while a walk is pending (`arrived` checks
+                        # that half) — an arrival from anywhere else is a
+                        # turn injected into the conversation by a stranger.
                         from app.tools import robot_link
 
+                        if not getattr(self, "_is_robot", False):
+                            logger.warning("robot_arrived ignored — this socket "
+                                           "never sent an accepted robot_ready")
+                            continue
                         place = event.get("place")
                         ok = bool(event.get("ok", True))
                         turnlog.record("robot_arrived", place=place, ok=ok)

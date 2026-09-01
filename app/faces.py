@@ -354,20 +354,40 @@ class Gallery:
 
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
+        # Unicode arrays, not object arrays: an object array can only be
+        # read back with allow_pickle=True, and a pickle is code — a
+        # gallery file somebody edits (or swaps in) would then run inside
+        # this process on the next load. Names and JSON strings fit in
+        # fixed-width 'U' arrays, which numpy reads without unpickling.
         np.savez(
             path,
-            names=np.array(self.names, dtype=object),
-            vecs=self.vecs,
-            meta=np.array([json.dumps(m, ensure_ascii=False) for m in self.meta], dtype=object),
-            model_tag=self.model_tag,
+            names=np.array(self.names, dtype=str),
+            vecs=np.asarray(self.vecs, dtype=np.float32),
+            meta=np.array([json.dumps(m, ensure_ascii=False) for m in self.meta], dtype=str),
+            model_tag=np.array(self.model_tag, dtype=str),
         )
 
     @classmethod
     def load(cls, path: str | Path) -> "Gallery":
         import json
 
-        data = np.load(str(path), allow_pickle=True)
-        tag = str(data["model_tag"])
+        try:
+            data = np.load(str(path), allow_pickle=False)
+            tag = str(data["model_tag"])
+            # Read every array here: numpy raises for an object array on
+            # *access*, not on open, so a check that only reads the tag
+            # would pass the old format straight into the constructor.
+            names = [str(n) for n in data["names"]]
+            vecs = data["vecs"]
+            meta = [json.loads(m) for m in data["meta"]]
+        except ValueError as exc:
+            # The pre-2026-09-01 format stored object arrays. Refusing is
+            # the point — see `save` — and the fix is one command.
+            raise ValueError(
+                f"gallery {path} is in the old pickled format (or damaged): "
+                f"{exc}. Rebuild it: build-face-gallery.cmd "
+                f"(python scripts/build_face_gallery.py)"
+            ) from None
         if tag != MODEL_TAG:
             # Loud, not lenient. Vectors from another model still produce
             # cosines; they just point at the wrong people.
@@ -375,9 +395,4 @@ class Gallery:
                 f"gallery {path} was built with {tag!r}, this build uses "
                 f"{MODEL_TAG!r} — rebuild it, the vectors are not comparable"
             )
-        return cls(
-            [str(n) for n in data["names"]],
-            data["vecs"],
-            [json.loads(m) for m in data["meta"]],
-            tag,
-        )
+        return cls(names, vecs, meta, tag)

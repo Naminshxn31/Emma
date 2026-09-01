@@ -571,7 +571,14 @@ class GeminiProvider(VoiceProvider):
             for fc in function_calls
         ]
         for _cid, name, args in calls:
-            logger.info("tool call: %s(%s)", name, args)
+            # Names of the arguments, never their values: the values are
+            # phone numbers (Emma reads them back to confirm), budgets,
+            # room numbers, what somebody asked her to remember. The
+            # console is the least-governed store on the machine — no
+            # retention, no redaction, copied into chat windows whole.
+            # Each tool's turnlog line records the specific fields that
+            # are worth keeping, by name, under TURN_LOG_KEEP_DAYS.
+            logger.info("tool call: %s(%s)", name, ", ".join(sorted(args)))
             yield ProviderEvent(kind="tool_call", text=name)
 
         results = await tools.dispatch_all(calls)
