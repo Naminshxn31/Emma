@@ -2082,7 +2082,7 @@ def test_the_idle_watcher_is_not_even_started_when_switched_off(monkeypatch):
         encoding="utf-8")
     guarded = source.split("jobs = {up, down, unanswered}", 1)[1]
     creation = guarded.split("asyncio.wait", 1)[0]
-    assert "if settings.idle_timeout_s:" in creation, (
+    assert "if settings.idle_timeout_s or self.summoned:" in creation, (
         "the idle watcher must be created only when it is switched on")
 
 

@@ -34,6 +34,9 @@ logger = logging.getLogger("condo_voice.session")
 
 
 class VoiceSession:
+    #: A summoned session that never got its greeting and heard nobody
+    #: ends this soon, whatever IDLE_TIMEOUT_S says.
+    SUMMONED_ABANDON_S = 30.0
     #: Longest a summoned session stays deaf waiting for its greeting.
     #: Dial + announce wait (0.4s) + generation + a spoken greeting is well
     #: under this; past it, listening anyway is the only safe choice.
@@ -186,7 +189,7 @@ class VoiceSession:
                 # narrating one shared window is the two-clocks bug times N.
                 if settings.canva_url and settings.canva_poll_s > 0 and not settings.multi_session:
                     jobs.add(asyncio.create_task(self._follow_canva()))
-                if settings.idle_timeout_s:
+                if settings.idle_timeout_s or self.summoned:
                     jobs.add(asyncio.create_task(self._close_when_nobody_is_there()))
                 _done, pending = await asyncio.wait(
                     jobs, return_when=asyncio.FIRST_COMPLETED,
@@ -722,12 +725,19 @@ class VoiceSession:
         seconds. Off by default, because a demo that hangs up mid-sentence
         because somebody set it to thirty seconds is worse than the bill.
         """
-        limit = settings.idle_timeout_s
-        if not limit:                     # never started; see `run`
-            return
         try:
             while True:
                 await asyncio.sleep(5.0)
+                limit = settings.idle_timeout_s
+                if self.summoned and not getattr(self, "_greeting_turn_seen", False):
+                    # Rung by the camera and never greeted: the face that
+                    # rang did not confirm (a colleague in cooldown whose
+                    # score dipped for two frames). Nothing to say and
+                    # nobody talking is not a conversation worth two
+                    # minutes of an open Gemini line.
+                    limit = min(limit, self.SUMMONED_ABANDON_S) if limit else self.SUMMONED_ABANDON_S
+                if not limit:
+                    continue
                 quiet = time.monotonic() - self._last_heard_at
                 if quiet < limit:
                     continue

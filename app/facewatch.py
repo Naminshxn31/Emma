@@ -284,13 +284,19 @@ class Watcher:
             self._streak += 1
         else:
             self._streak_key, self._streak = key, 1
-        if greetable and self._streak >= 2:
-            self.someone_at = now
         # A stranger has to hold the frame twice as long as a colleague.
         # The gallery can vouch for a colleague; for a stranger the only
         # witness is persistence - and the 0.062-scoring garbage frame that
         # was greeted this morning would not have survived six frames.
         needed = self.confirm_frames if name else self.confirm_frames * 2
+        # The pre-ring fires one frame before confirmation, not at two:
+        # for a colleague that is the same thing (needed 3), for a
+        # stranger it is frame 5 of 6. Ringing strangers at two frames
+        # dialled Gemini for a colleague in cooldown whose score dipped
+        # under the bar for two frames (2026-09-01 15:xx) — a session
+        # nobody greeted and nobody spoke to, held open for two minutes.
+        if greetable and self._streak >= max(2, needed - 1):
+            self.someone_at = now
         if self._streak < needed:
             return None
 

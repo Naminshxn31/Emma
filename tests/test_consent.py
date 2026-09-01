@@ -296,3 +296,20 @@ def test_company_means_a_face_of_comparable_size_not_a_poster_across_the_room(mo
     monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [near, beside])
     w.forget()
     assert _twice(w, 1.0).meta["unnamed"].startswith("company")
+
+
+def test_the_pre_ring_waits_for_a_stranger_to_nearly_confirm(monkeypatch):
+    """Two frames of an unknown face rang Gemini for a colleague in
+    cooldown whose score dipped under the bar (2026-09-01 15:xx): a
+    session nobody greeted, held open for two minutes. A stranger rings
+    at frame needed-1; a colleague still rings at two."""
+    w = _watcher(confirm_frames=3)
+    _frame_with(monkeypatch, _unit(0, 0, 1))          # nobody in the gallery
+    w.see(FRAME, now=0.0); w.see(FRAME, now=0.2)
+    assert w.someone_at is None, "rang on two frames of a stranger"
+    w.see(FRAME, now=0.4); w.see(FRAME, now=0.6); w.see(FRAME, now=0.8)
+    assert w.someone_at == 0.8, "frame 5 of 6 rings"
+    w2 = _watcher(confirm_frames=3)
+    _frame_with(monkeypatch, ALICE)
+    w2.see(FRAME, now=0.0); w2.see(FRAME, now=0.2)
+    assert w2.someone_at == 0.2, "a colleague still rings at two"

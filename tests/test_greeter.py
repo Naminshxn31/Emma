@@ -1057,3 +1057,51 @@ def test_once_greeted_a_summoned_session_is_a_conversation(monkeypatch):
     announced, _ = _run_with(monkeypatch, [_sighting(kind="stranger", name=None)],
                              face_greet_strangers=True)
     assert announced == []
+
+
+def test_an_ungreeted_summoned_session_gives_up_in_thirty_seconds(monkeypatch):
+    """Rung, never greeted, nobody talking: not worth two minutes of an
+    open Gemini line. Measured 2026-09-01 15:xx."""
+    import asyncio
+    import pytest
+    import time
+
+    from app import session as session_module
+
+    sess = session_module.VoiceSession(None, provider_name="gemini", summoned=True)
+    sess._last_heard_at = time.monotonic() - 31
+    sent = []
+
+    async def send(msg):
+        sent.append(msg)
+
+    sess._send_json = send
+    monkeypatch.setattr(session_module.settings, "idle_timeout_s", 0)      # off — still ends
+
+    async def no_sleep(s):
+        pass
+
+    monkeypatch.setattr(session_module.asyncio, "sleep", no_sleep)
+    from app.tools import slides
+
+    async def shut():
+        pass
+
+    monkeypatch.setattr(slides, "shutdown_display", shut)
+    asyncio.run(sess._close_when_nobody_is_there())
+    assert sent and sent[0]["type"] == "idle_timeout"
+
+    # ...but once greeted it follows IDLE_TIMEOUT_S like any session (0 = never).
+    sess2 = session_module.VoiceSession(None, provider_name="gemini", summoned=True)
+    sess2._greeting_turn_seen = True
+    sess2._last_heard_at = time.monotonic() - 1000
+    calls = []
+
+    async def counted_sleep(s):
+        calls.append(s)
+        if len(calls) > 3:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(session_module.asyncio, "sleep", counted_sleep)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(sess2._close_when_nobody_is_there())
