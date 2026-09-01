@@ -93,6 +93,17 @@ class VadGate:
 
     #: Seconds after opening during which the floor does not apply.
     FLOOR_GRACE_S = 3.0
+    #: The floor under the floor. A muted or dead microphone reads exact
+    #: zeros with a 1-LSB dither at the edges (peak 0.0001), and Silero
+    #: flagged those edges as speech: measured 2026-09-01 14:35-14:38, a
+    #: summoned session (near-field floor stood down) opened eight
+    #: segments on a hardware-muted USB mic and Gemini answered the
+    #: silence with "I want to know the price of the product." five times
+    #: — 我们走吧 in English. The quietest real speech at the desk is
+    #: 0.004-0.012 rms (config.py); this is ten times under that and five
+    #: times over the dither. Applies always: stand_down lowers the
+    #: near-field floor to *this*, never to nothing.
+    SILENCE_RMS = 0.0005
 
     def stand_down(self) -> None:
         """Switch the floor off for the rest of this session.
@@ -126,9 +137,27 @@ class VadGate:
 
         import time as _time
 
+        if speaking and not self.in_speech:
+            rms = float(np.sqrt((samples * samples).mean()))
+            if rms < self.SILENCE_RMS:
+                # Not "far away" — nothing. A segment opened here sends
+                # silence-shaped bytes upstream, which is the one input a
+                # speech model answers with a sentence nobody said.
+                import time
+
+                now = time.monotonic()
+                if now - self._floor_logged_at > 5.0:
+                    logger.info("vad: speech flagged on near-silent audio "
+                                "(rms=%.5f < %.4f) — a muted or dead microphone, "
+                                "not a voice; not forwarded", rms, self.SILENCE_RMS)
+                    from app import turnlog
+
+                    turnlog.record("vad_floor", rms=round(rms, 5),
+                                   floor=self.SILENCE_RMS, why="silence")
+                    self._floor_logged_at = now
+                speaking = False
         if (speaking and not self.in_speech and self._min_rms > 0.0
                 and _time.monotonic() > self._floor_off_until):
-            rms = float(np.sqrt((samples * samples).mean()))
             if rms < self._min_rms:
                 # Too far away to be talking to us. Treated as silence, so
                 # the pre-roll keeps rolling — if the speaker steps closer

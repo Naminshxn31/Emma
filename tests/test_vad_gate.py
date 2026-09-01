@@ -313,3 +313,22 @@ def test_the_gate_counts_the_segments_it_opened():
     for _ in range(5):
         gate.feed(LOUD_CHUNK)
     assert gate.segments == 2
+
+
+MUTED_CHUNK = (b"\x00\x00" * 159) + b"\x03\x00"   # exact zeros with a 1-LSB edge
+
+
+def test_a_muted_microphone_never_opens_a_segment_even_with_the_floor_down():
+    """2026-09-01 14:35-14:38: a hardware-muted USB mic (peak 0.0001),
+    the near-field floor stood down for a camera-opened session, Silero
+    flagging the dither edges as speech - and Gemini answering the
+    silence with "I want to know the price of the product." five times.
+    The floor under the floor is not a knob and stand_down does not
+    touch it."""
+    gate = VadGate(ScriptedDetector([True] * 11), prefix_padding_ms=100, min_rms=0.03)
+    gate.stand_down()
+    for _ in range(10):
+        assert gate.feed(MUTED_CHUNK) == []
+    assert gate.segments == 0
+    # ...and it is a floor, not a wall: real quiet speech still opens.
+    assert gate.feed(QUIET_CHUNK)[0][0] == "start"
