@@ -665,18 +665,27 @@ def test_a_stalled_tour_is_nudged_then_left_alone(slides):
     Real forward progress resets the budget."""
     from app.session import VoiceSession
 
+    import asyncio
+
+    from app import display
+
+    sess = _lone_session()
+
     class FakeProvider:
         def __init__(self):
             self.sent = []
 
         async def send_text(self, text):
             self.sent.append(text)
+            # A model that ignores the nudge still *finishes the turn* — it
+            # answers (or calls next_slide silently) and turn_complete
+            # arrives. Since 276abc4 `announce` waits on that before the
+            # next injection; a fake that never completes leaves
+            # `turn_idle` cleared, the second nudge parks for TURN_WAIT_S,
+            # and the third trips "bound to a different event loop"
+            # because each asyncio.run() below is a new loop.
+            sess.turn_idle.set()
 
-    import asyncio
-
-    from app import display
-
-    sess = _lone_session()
     sess._spoke_this_turn = True     # it narrated the slide, then stopped
     sess.provider = FakeProvider()
     display.set_audio_lead(0)        # nothing queued: the nudge fires promptly
