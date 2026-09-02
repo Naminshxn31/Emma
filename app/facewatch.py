@@ -154,6 +154,13 @@ class Watcher:
         #: vector is already in hand at that point; remembering it is what
         #: lets a *different* face through while the same face stays quiet.
         self._strangers: list[dict] = []
+        #: Where and when the last *named* greeting fired. The mirror of
+        #: the same-arrival rule below: a colleague greeted by name whose
+        #: following frames blur (score 0.223 against the gallery,
+        #: measured 2026-09-02 while โชกุน stood right at the lens) held a
+        #: six-frame streak as "a stranger" and was greeted a second time,
+        #: anonymously, seconds after hearing their own name.
+        self._named: dict | None = None
 
     # -- loading ---------------------------------------------------------
 
@@ -353,6 +360,7 @@ class Watcher:
                                 name, now - entry.get("greeted_at", entry["at"]))
                     self._strangers.remove(entry)
                     return None
+            self._named = {"at": now, "bbox": tuple(face.bbox)}
             return Sighting(kind="known", name=name, score=float(score),
                             meta=dict(meta))
 
@@ -366,6 +374,26 @@ class Watcher:
         # - and six of those frames passed as "a stranger" while the
         # colleague was still on their way to being recognised.
         if (x2 - x1) < self.min_face_px * self.STRANGER_PX_FACTOR:
+            return None
+
+        # The mirror of the stranger→known dedupe above: a colleague was
+        # just greeted by name, and now an unmatchable face is confirmed
+        # in the same spot. That is their own blur (0.223 at the lens,
+        # 2026-09-02), not a new visitor — and it is remembered as a
+        # greeted stranger so the swallow outlives the 20s window; without
+        # that, the same blur re-confirms and greets anonymously the
+        # moment the window closes, while the person is still standing
+        # there. Somebody arriving behind them lands in a different box
+        # and is still greeted.
+        if (self._named is not None
+                and (now - self._named["at"]) < self.STRANGER_TO_NAME_S
+                and _overlap(face.bbox, self._named["bbox"]) >= self.SAME_SPOT_IOU):
+            logger.info("face: a stranger confirmed %.0fs after a named greeting in "
+                        "the same spot — their own blur, not greeting twice",
+                        now - self._named["at"])
+            self._strangers.append({"vec": np.array(face.vec, copy=True), "at": now,
+                                    "greeted_at": now, "bbox": tuple(face.bbox)})
+            del self._strangers[:-16]
             return None
 
         self._strangers.append({"vec": np.array(face.vec, copy=True), "at": now,
@@ -432,3 +460,4 @@ class Watcher:
         self._streak_key, self._streak = None, 0
         self._last_greeted.clear()
         self._strangers.clear()
+        self._named = None

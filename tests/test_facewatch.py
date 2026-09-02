@@ -329,3 +329,30 @@ def test_a_remembered_stranger_does_not_ring(monkeypatch):
     for t in (2, 3, 4):
         w.see(FRAME, now=t)
     assert w.someone_at is None
+
+
+# -- a named greeting is not followed by an anonymous one for the same face ----
+
+def test_a_colleagues_blur_after_their_named_greeting_is_not_a_new_stranger(monkeypatch):
+    """The mirror of the same-arrival rule: โชกุน was greeted by name
+    (0.546), then his frames blurred at the lens (0.223 against the
+    gallery), held a streak as "a stranger", and he was greeted a second
+    time — anonymously, seconds after hearing his own name (2026-09-02)."""
+    w = _watcher(confirm_frames=1, cooldown_s=600)
+    _sees(monkeypatch, ALICE)
+    assert w.see(FRAME, now=0).name == "ต้า"
+    garbage = _unit(0, 0, 0, 1)          # matches nobody, its owner included
+    _sees(monkeypatch, garbage)
+    for i in range(30):                   # well past the 20s same-spot window
+        assert w.see(FRAME, now=1.0 + i) is None, "greeted twice"
+
+
+def test_a_real_stranger_behind_a_greeted_colleague_is_still_greeted(monkeypatch):
+    """The other half: a different box is a different person."""
+    w = _watcher(confirm_frames=1, cooldown_s=600)
+    _sees(monkeypatch, ALICE)
+    assert w.see(FRAME, now=0).name == "ต้า"
+    other = faces.Face((400, 0, 600, 200), 0.9, _unit(0, 0, 0, 1))
+    monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [other])
+    w.see(FRAME, now=1)
+    assert w.see(FRAME, now=2).kind == "stranger"
