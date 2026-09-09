@@ -30,6 +30,8 @@ import asyncio
 import logging
 from typing import Any
 
+from app.robot_backend import active as simulation_backend
+
 logger = logging.getLogger("condo_voice.robot")
 
 #: Points of interest the robot knows, mirrored from the robot's own map.
@@ -48,6 +50,7 @@ STATE: dict[str, Any] = {
     "destination": None,
     "battery": None,
     "charging": None,
+    "status_source": "unknown",
 }
 
 
@@ -66,7 +69,9 @@ def places() -> list[str]:
     so `send()` still answers "mock" and the result still tells the model to
     say the robot cannot go anywhere yet.
     """
-    if KNOWN_PLACES:
+    if backend := simulation_backend.get():
+        return list(backend.places)
+    if STATE["connected"] or KNOWN_PLACES:
         return KNOWN_PLACES
     from app.config import settings
 
@@ -74,7 +79,16 @@ def places() -> list[str]:
 
 
 def snapshot() -> dict:
-    return dict(STATE)
+    if backend := simulation_backend.get():
+        return dict(backend.state)
+    state = dict(STATE)
+    if state["status_source"] in {"unknown", "stop_requested", "timeout", "disconnected", "transport_failed"}:
+        state["moving"] = None
+    return state
+
+
+def is_simulated() -> bool:
+    return simulation_backend.get() is not None
 
 
 def available() -> bool:
@@ -83,7 +97,7 @@ def available() -> bool:
     Deliberately not "is a websocket open". The voice client in a browser is
     also on that socket, and it has no arms.
     """
-    return bool(STATE["connected"])
+    return bool(snapshot()["connected"])
 
 
 def status() -> dict:
@@ -108,23 +122,29 @@ def reset_state() -> None:
     STATE.update({
         "connected": False, "moving": False, "destination": None,
         "battery": None, "charging": None,
+        "status_source": "unknown",
     })
     KNOWN_PLACES.clear()
     _cancel_arrival_watch()
 
 
-def app_connected(names: list[str] | None = None) -> None:
+def app_connected(names: list[str] | None = None) -> bool:
     """The robot app reported in, with the POIs its map actually contains.
 
     The parameter is `names`, not `places`, because `places()` is a function in
     this module and a parameter of that name shadows it — harmless today, a
     confusing bug the first time somebody adds a line here that needs it.
     """
+    if (not isinstance(names, list) or len(names) > 1000
+            or any(not isinstance(name, str) or not name.strip()
+                   or len(name) > 200 for name in names)):
+        return False
     STATE["connected"] = True
     KNOWN_PLACES.clear()
-    KNOWN_PLACES.extend(names or [])
+    KNOWN_PLACES.extend(dict.fromkeys(names))
     logger.info("robot app connected — %d places on its map: %s",
                 len(KNOWN_PLACES), ", ".join(KNOWN_PLACES) or "(none)")
+    return True
 
 
 def app_gone() -> None:
@@ -134,6 +154,7 @@ def app_gone() -> None:
     if STATE["connected"]:
         logger.info("robot app disconnected")
     reset_state()
+    STATE["status_source"] = "disconnected"
 
 
 def find_place(request: str) -> str | None:
@@ -172,7 +193,10 @@ def find_place(request: str) -> str | None:
     # Two POIs can both be contained in one request when one name contains the
     # other ("ห้องตัวอย่าง" inside "ห้องตัวอย่าง 2 ห้องนอน"). The longer name
     # is the more specific request, so it wins.
-    return max(matches, key=lambda place: len(set(tokenize(place))))
+    maximal = [place for place in dict.fromkeys(matches)
+               if not any(set(tokenize(place)) < set(tokenize(other))
+                          for other in matches)]
+    return maximal[0] if len(maximal) == 1 else None
 
 
 async def send(action: str, **args: Any) -> str:
@@ -191,6 +215,9 @@ async def send(action: str, **args: Any) -> str:
     later through `arrived()` as its own turn — the same shape as the
     `resumed` event and `follow_canva`.
     """
+    if backend := simulation_backend.get():
+        return await backend.send(action, **args)
+
     from app.config import settings
 
     if not settings.robot_enabled:
@@ -204,9 +231,15 @@ async def send(action: str, **args: Any) -> str:
         return "mock"
 
     try:
-        await live._send_json({"type": "robot", "action": action, "args": args})
+        # UI sends may be best-effort, but a movement command must expose a
+        # failed transport. Do not use VoiceSession._send_json (it swallows).
+        import json
+
+        await live.ws.send_text(json.dumps(
+            {"type": "robot", "action": action, "args": args}, ensure_ascii=False))
     except Exception:
         logger.exception("could not send robot command %r", action)
+        STATE["status_source"] = "transport_failed"
         return "failed"
     return "ok"
 
@@ -245,16 +278,23 @@ def start_arrival_watch(place: str, seconds: float) -> None:
                        "the walk and telling the model", place, seconds)
         STATE["moving"] = False
         STATE["destination"] = None
+        STATE["status_source"] = "timeout"
+        hardware = "failed"
         try:
-            await send("cancel_navigation")
+            hardware = await send("cancel_navigation")
         except Exception:                          # pragma: no cover - belt
             logger.exception("could not cancel after arrival timeout")
         from app import events, turnlog
 
-        turnlog.record("robot_arrival_timeout", place=place, seconds=seconds)
+        turnlog.record("robot_arrival_timeout", place=place, seconds=seconds,
+                       cancel_hardware=hardware)
+        cancellation = ("ส่งคำสั่งหยุดแล้ว แต่ยังยืนยันว่าหุ่นหยุดจริงไม่ได้"
+                        if hardware == "ok" else
+                        "ส่งคำสั่งหยุดไม่สำเร็จ ยังยืนยันว่าหุ่นหยุดจริงไม่ได้")
         await events.announce(
-            "หุ่นยนต์ไม่รายงานว่าถึง%s ภายในเวลาที่กำหนด สั่งหยุดแล้ว "
-            "ให้บอกลูกค้าตรงๆ ว่าพาไปไม่สำเร็จ แล้วเสนอเรียกเจ้าหน้าที่" % place,
+            "หุ่นยนต์ไม่รายงานว่าถึง%s ภายในเวลาที่กำหนด %s "
+            "ให้บอกลูกค้าตรงๆ ว่าพาไปไม่สำเร็จ แล้วเรียกเจ้าหน้าที่ตรวจสอบหุ่น"
+            % (place, cancellation),
             source="robot_arrival_timeout")
 
     global _arrival_watch
@@ -274,12 +314,20 @@ async def arrived(place: str | None, ok: bool = True) -> bool:
     An arrival with nothing to arrive from is a stale callback, a replay, or
     a sender that is not the robot; none of them earns a turn.
     """
+    if type(ok) is not bool or not isinstance(place, str) or not place.strip():
+        logger.warning("robot_arrived ignored — invalid place or ok")
+        return False
     if not STATE["moving"]:
         logger.info("robot_arrived(%r) ignored — no walk in progress", place)
+        return False
+    if place and place != STATE["destination"]:
+        logger.info("robot_arrived(%r) ignored — destination is %r", place,
+                    STATE["destination"])
         return False
     _cancel_arrival_watch()
     STATE["moving"] = False
     STATE["destination"] = None
+    STATE["status_source"] = "arrival_report"
 
     from app import events
 

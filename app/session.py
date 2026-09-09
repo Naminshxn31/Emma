@@ -29,6 +29,7 @@ from app import display, heard, turnlog, voices
 from app.config import settings
 from app.prompts import build_instructions, greeting_for
 from app.providers import ProviderError, default_voice_for, get_provider
+from app.robot_backend import active as simulation_backend
 
 logger = logging.getLogger("condo_voice.session")
 
@@ -91,6 +92,12 @@ class VoiceSession:
         #: machine's configured profile, and unknown names land on condo
         #: inside build_instructions — same safety as everywhere else.
         self.profile = (profile or settings.assistant_profile).strip().lower()
+        # A public mode URL cannot unlock the machine owner's private persona.
+        if self.profile not in {"condo", "emma", "translator"}:
+            self.profile = "condo"
+        if (self.profile == "emma" and settings.assistant_profile != "emma"
+                and simulation_backend.get() is None):
+            self.profile = "condo"
         #: Translator mode's Thai->X target (?lang=es on the page URL).
         self.lang = (lang or "en").strip().lower()
         chosen = voice or default_voice_for(self.provider_name)
@@ -124,6 +131,15 @@ class VoiceSession:
         self._silent_block_seen = False
         self._respeak_fired = False
 
+    @property
+    def metrics(self):
+        # Lazy also supports protocol tests that construct sessions via __new__.
+        if not hasattr(self, "_metrics"):
+            from app.metrics import SessionMetrics
+
+            self._metrics = SessionMetrics(getattr(self, "provider_name", "unknown"))
+        return self._metrics
+
     async def run(self) -> None:
         await self.ws.accept()
 
@@ -152,22 +168,34 @@ class VoiceSession:
             use_tools=(self.profile != "translator"),
         )
 
+        from app.metrics import active
+
+        metrics_token = active.set(self.metrics)
+        self.metrics.labels.update(model=getattr(provider, "model", settings.openai_model
+                                                if self.provider_name == "openai" else ""),
+                                   vad=settings.vad_mode if self.provider_name == "gemini"
+                                   else settings.openai_turn_detection)
         try:
             async with provider:
+                if hasattr(provider, "model"):
+                    self.metrics.labels["model"] = provider.model
                 self.provider = provider
                 if self.summoned:
                     # The machine opened this session to talk to somebody
                     # at a distance; the near-field floor would filter out
                     # exactly that person's reply. See VadGate.stand_down.
                     provider.stand_down_floor()
+                turnlog.record("voice_ready")
                 await self._send_json({
                     "type": "ready",
+                    "diagnostic_session_id": turnlog.session_id.get() if simulation_backend.get() is not None else None,
                     "provider": self.provider_name,
                     # Which persona this session actually opened with — shown
                     # in the header, because "ไม่เห็นแปลภาษาเลย" turned out to
                     # mean a translator URL served by a pre-translator server,
                     # and nothing on screen said which mode was really running.
                     "profile": self.profile,
+                    "robot_simulator": simulation_backend.get() is not None,
                     "voice": self.voice,
                     "input_rate": provider.input_sample_rate,
                     "output_rate": provider.output_sample_rate,
@@ -200,7 +228,12 @@ class VoiceSession:
                 # machine's, and N testers' sessions each polling and
                 # narrating one shared window is the two-clocks bug times N.
                 if settings.canva_url and settings.canva_poll_s > 0 and not settings.multi_session:
-                    jobs.add(asyncio.create_task(self._follow_canva()))
+                    if simulation_backend.get() is None:
+                        jobs.add(asyncio.create_task(self._follow_canva()))
+                if backend := simulation_backend.get():
+                    from app.robot_voice import watch_robot
+
+                    jobs.add(asyncio.create_task(watch_robot(self, backend)))
                 if settings.idle_timeout_s or self.summoned:
                     jobs.add(asyncio.create_task(self._close_when_nobody_is_there()))
                 _done, pending = await asyncio.wait(
@@ -211,11 +244,20 @@ class VoiceSession:
                 await asyncio.gather(*pending, return_exceptions=True)
 
         except ProviderError as exc:
+            from app.robot_diagnostics import failure_kind
+            turnlog.record("provider_error", category=failure_kind(exc))
             await self._send_json({"type": "error", "code": "provider_error", "message": str(exc)})
         except Exception as exc:
             logger.exception("voice session failed")
             await self._send_json({"type": "error", "code": "internal", "message": str(exc)})
         finally:
+            self.metrics.finish("session_closed")
+            active.reset(metrics_token)
+            for name in ("_nudge_task", "_respeak_task"):
+                task = getattr(self, name, None)
+                if task is not None and not task.done():
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
             if getattr(self, "_is_robot", False):
                 # The robot's socket is gone. `app_gone` existed for this
                 # and nothing called it (found 2026-09-01): the state said
@@ -357,8 +399,18 @@ class VoiceSession:
                         event = json.loads(text)
                     except json.JSONDecodeError:
                         continue
+                    if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+                        continue
+                    if (simulation_backend.get() is not None
+                            and event.get("type") in {"robot_ready", "robot_arrived"}):
+                        # Only the simulator engine can report its navigation.
+                        # Even a valid hardware token cannot attach a real robot.
+                        continue
                     if event.get("type") == "stop":
                         return
+                    if event.get("type") == "client_metric":
+                        self.metrics.client(event)
+                        continue
                     if event.get("type") == "mic_state":
                         # The browser half of the `call audio:` report:
                         # which device, whether the OS muted it, whether
@@ -407,8 +459,10 @@ class VoiceSession:
                                            why="no_server_token" if not settings.robot_token
                                            else "bad_token")
                             continue
+                        if not robot_link.app_connected(event.get("places")):
+                            logger.warning("robot_ready ignored — invalid places")
+                            continue
                         self._is_robot = True
-                        robot_link.app_connected(event.get("places") or [])
                         turnlog.record("robot_ready",
                                        places=len(robot_link.KNOWN_PLACES))
                         continue
@@ -426,9 +480,9 @@ class VoiceSession:
                                            "never sent an accepted robot_ready")
                             continue
                         place = event.get("place")
-                        ok = bool(event.get("ok", True))
-                        turnlog.record("robot_arrived", place=place, ok=ok)
-                        await robot_link.arrived(place, ok)
+                        ok = event.get("ok")
+                        if await robot_link.arrived(place, ok):
+                            turnlog.record("robot_arrived", place=place, ok=ok)
                         continue
                     if event.get("type") == "played":
                         # Browser reporting how much reply audio it actually
@@ -446,13 +500,25 @@ class VoiceSession:
     async def _provider_to_browser(self) -> None:
         try:
             async for event in self.provider.events():
+                if event.kind == "speech_stopped":
+                    self.metrics.speech_end(event.text or "provider_vad_event")
+                    continue
+                if event.kind == "usage":
+                    self.metrics.usage(event.data or {})
+                    continue
+                if event.kind in {"assistant_transcript", "tool_call"}:
+                    self.metrics.ensure()
                 if event.kind == "audio" and event.audio:
+                    if (turn_id := self.metrics.audio()) is not None:
+                        await self._send_json({"type": "metric_turn", "turn_id": turn_id})
                     self._sent_audio_ms += (
                         len(event.audio) / 2 / self.provider.output_sample_rate * 1000
                     )
                     await self.ws.send_bytes(event.audio)
 
                 elif event.kind == "speech_started":
+                    self.metrics.finish("new_speech")
+                    self.metrics.pending_end = None
                     # Close the question the moment a voice starts, not when
                     # the transcript lands. A guest thinking out loud through
                     # "เอ่อ... เคยมาค่ะ ตอนเด็กๆ" takes several seconds, and
@@ -469,6 +535,7 @@ class VoiceSession:
                     await display.set_phase("listening")
 
                 elif event.kind == "interrupted":
+                    self.metrics.finish("interrupted")
                     self._sent_audio_ms = 0.0
                     self._spoke_this_turn = False
                     # A barge-in mid-tour is a pause, not a skip: keep the deck
@@ -497,6 +564,7 @@ class VoiceSession:
                     self._spoke_this_turn = False
 
                 elif event.kind == "turn_complete":
+                    self.metrics.finish()
                     # Evidence line for "ทำงานแต่ไม่มีเสียง" mornings
                     # (2026-08-27, page parked overnight): a transcript with
                     # (almost) no audio behind it. When a silent morning
@@ -522,7 +590,7 @@ class VoiceSession:
                             # back as a block, asking a third time is a loop,
                             # not a fix. Re-armed when the user next speaks.
                             self._respeak_fired = True
-                            asyncio.create_task(self._respeak_silent_block())
+                            self._respeak_task = asyncio.create_task(self._respeak_silent_block())
 
                 elif event.kind == "user_transcript":
                     # What the robot *heard*, which is the field that has
@@ -553,7 +621,7 @@ class VoiceSession:
                     if _chunk.count("\n") >= 2 and len(_chunk) >= 40:
                         self._silent_block_seen = True
                         turnlog.record("silent_block", chars=len(_chunk))
-                        turnlog.record("said", text=event.text or "")
+                    turnlog.record("said", text=event.text or "")
                     await self._send_json({"type": "assistant_transcript", "text": event.text or ""})
                     # ...and to the robot's own screen, which unlike this tab
                     # is being read by the guest — so it goes through the
@@ -566,6 +634,8 @@ class VoiceSession:
                     await self._send_json({"type": "tool_call", "name": event.text or ""})
 
                 elif event.kind == "tool_result":
+                    if backend := simulation_backend.get():
+                        backend._event("tool_result", tool=event.text or "", result=event.data or {})
                     # Failures get a line of their own. 2026-08-26 16:26:
                     # play_youtube failed live ("มีข้อผิดพลาดนิดหน่อยค่ะ"),
                     # the same call worked from a fresh process minutes
@@ -838,6 +908,8 @@ class VoiceSession:
         to move for the nudge to repeat freely, and MAX_TOUR_NUDGES caps how
         long we lean on a model that keeps ignoring it.
         """
+        if simulation_backend.get() is not None:
+            return
         from app.tools import slides
 
         if not slides.should_continue_tour():
@@ -940,6 +1012,18 @@ class VoiceSession:
 _active: VoiceSession | None = None
 
 
+def _reset_conversation_state() -> None:
+    import sys
+
+    for name in ("app.tools.slides", "app.tools.calc"):
+        module = sys.modules.get(name)
+        if module is not None:
+            (module.reset_state if name.endswith("slides") else module.reset)()
+    heard.forget()
+    display.set_audio_lead(0)
+    display.cancel_pending_reveal()
+
+
 async def handle_connection(ws: WebSocket, provider: str | None = None, voice: str | None = None,
                             profile: str | None = None, lang: str | None = None,
                             summoned: bool = False) -> None:
@@ -961,7 +1045,8 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
     # firing. The machine-bound tool groups are already stripped in
     # `enabled_tool_groups`, so the shared state the takeover exists to
     # clear (slides.STATE, the calc sheet) can never be written here.
-    previous = _active if not settings.multi_session else None
+    single_session = not settings.multi_session or simulation_backend.get() is not None
+    previous = _active if single_session else None
     if previous is not None:
         logger.info("a new voice session took over — closing the previous one")
         turnlog.record("session_takeover")
@@ -992,22 +1077,28 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
         if _calc is not None:
             _calc.reset()
 
+    if single_session:
+        _reset_conversation_state()
+
     session = VoiceSession(ws, provider_name=provider, voice=voice, profile=profile, lang=lang,
                            summoned=summoned)
-    if not settings.multi_session:
+    if single_session:
         _active = session
+    import uuid
+
+    log_token = turnlog.session_id.set(uuid.uuid4().hex)
     turnlog.record("session_start", provider=session.provider_name, voice=session.voice)
     try:
         await session.run()
     finally:
-        if _active is session:
-            _active = None
-        # Wipe the robot's screen now, not on a timer. Nobody is watching it
-        # when a visitor walks away, and it is the most public surface in the
-        # building — the conversation tab's TRANSCRIPT_KEEP_MIN grace exists
-        # because one person is sitting in front of that one. (The display
-        # writers no-op under MULTI_SESSION, so this is safe to leave
-        # unconditional — see display._machine_owned.)
-        await display.clear_subtitle()
-        await display.set_phase("idle")
-        turnlog.record("session_end")
+        try:
+            if _active is session:
+                _reset_conversation_state()
+                _active = None
+            # A superseded visitor cannot wipe the new owner's subtitles.
+            if _active is None:
+                await display.clear_subtitle()
+                await display.set_phase("idle")
+            turnlog.record("session_end")
+        finally:
+            turnlog.session_id.reset(log_token)

@@ -48,7 +48,7 @@ class ProviderEvent:
         # The guest began speaking. Distinct from "interrupted": whether it
         # counts as barge-in depends on whether a reply is currently playing,
         # and only the browser knows that.
-        "speech_started",
+        "speech_started", "speech_stopped", "usage",
         "interrupted", "turn_complete", "error",
         # The provider rejoined its own session past the duration cap. Nothing
         # for the browser, but the *server* needs it: the model comes back

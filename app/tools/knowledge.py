@@ -81,7 +81,11 @@ def _entry(slide: dict) -> dict:
         out["description"] = description[:600]
     script = slide.get("script_th") or slide.get("script_en")
     if script:
-        out["approved_script"] = script
+        if slide.get("script_approved"):
+            out["approved_script"] = script
+        else:
+            out["draft_script"] = script
+            out["script_is_draft"] = True
     return out
 
 
@@ -106,6 +110,7 @@ def _entry(slide: dict) -> dict:
     # Tagged as a slide tool too: it changes what's on screen, so the
     # registry must push the update out to the displays.
     tags=["knowledge", "slides"],
+    blocking=True,
 )
 def search_condo_info(query: str) -> dict:
     slides = load_slides()
@@ -214,8 +219,14 @@ def search_condo_info(query: str) -> dict:
         title=hits[0].get("title_th"),
         runners_up=[h.get("id") for h in hits[1:4]],
     )
-    result["now_showing"] = slides_mod.show_current(hits[0])
-    resume = slides_mod.resume_hint()
+    from app.config import settings
+
+    if settings.multi_session:
+        return result
+    from app.tool_io import on_loop
+
+    result["now_showing"] = on_loop(slides_mod.show_current, hits[0])
+    resume = on_loop(slides_mod.resume_hint)
     if resume:
         result["presentation"] = resume
     result["note"] = "แสดงภาพที่ตรงกับคำตอบบนจอแล้ว " + result["note"]

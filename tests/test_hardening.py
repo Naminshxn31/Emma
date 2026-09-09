@@ -319,6 +319,12 @@ def test_a_walk_with_no_arrival_times_out_cancels_and_tells_the_model(monkeypatc
     sent, announced = [], []
 
     class _Live:
+        def __init__(self):
+            self.ws = self
+
+        async def send_text(self, text):
+            sent.append(json.loads(text))
+
         async def _send_json(self, msg):
             sent.append(msg)
 

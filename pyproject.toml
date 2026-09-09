@@ -1,0 +1,28 @@
+[project]
+name = "condo-voice"
+version = "0.1.0"
+description = "Local voice assistant and sales gallery kiosk"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+  "fastapi==0.141.1", "uvicorn[standard]==0.52.1", "python-dotenv==1.2.2",
+  "google-genai==2.16.0", "websockets==16.1.1", "httpx==0.28.1",
+  "pythainlp==5.3.5", "numpy==2.5.1",
+]
+
+[project.optional-dependencies]
+local-search = ["sentence-transformers==5.7.0"]
+face = ["insightface==1.0.1", "onnxruntime==1.29.0", "opencv-python==5.0.0.93", "scikit-image==0.26.0"]
+# The Windows wheel needs core DLLs; resolver metadata omits this dependency.
+wake = ["sherpa-onnx==1.13.6", "sherpa-onnx-core==1.13.6", "sentencepiece==0.2.2"]
+browser = ["playwright==1.62.0"]
+hardware = ["broadlink==0.19.0", "sounddevice==0.5.6"]
+documents = ["pymupdf==1.28.0", "reportlab==5.0.0"]
+websearch = ["ddgs==9.15.0"]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "pytest-timeout==2.4.0"]
+
+[tool.uv]
+package = false
+# This lock targets the OS/Python actually exercised by this kiosk.
+environments = ["sys_platform == 'win32' and platform_machine == 'AMD64'"]

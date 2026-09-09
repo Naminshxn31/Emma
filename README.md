@@ -1,5 +1,25 @@
 # Condo Voice Assistant
 
+Robot rehearsal before hardware arrives: run `start-robot-simulator.cmd`, then
+open **http://127.0.0.1:8010**. The [Thai simulator guide](docs/robot-simulator.md)
+explains controls, fault scenarios, SDK mapping, and what still needs a real robot.
+The main page opens a third-person visitor view alongside Emma voice controls.
+Click the scene, walk with WASD/arrows, and drag to look around. Press V for the
+overview, F to follow Emma, or use the on-screen movement buttons.
+Ask Emma to switch virtual lights, AC, curtains or TV, or use the smart-home panel;
+these commands change the simulated room and never send IR to real devices.
+The scene uses local Three.js assets and falls back to 2.5D if WebGL is unavailable.
+Allow the microphone,
+then call Emma when standby is ready; use Start if needed. Readiness indicators,
+a speaker test, and JSON rehearsal export are available on the same page.
+The standalone voice page remains at **http://127.0.0.1:8010/voice**; keep one
+voice page open at a time. Voice uses the existing provider configuration and API quota.
+
+Development history: every code, configuration, test, or documentation change
+must be recorded in [CHANGELOG.md](CHANGELOG.md), as required by
+[AGENTS.md](AGENTS.md). The September review and its follow-up validation are
+linked there.
+
 A ChatGPT-style voice assistant for a condo sales gallery robot: pick a
 voice, then just talk. Natural-sounding speech, interruptible mid-sentence,
 Thai and English without switching modes.
@@ -105,6 +125,12 @@ next to `+` in the terminal panel → PowerShell.)
 
 **Windows (PowerShell)**
 
+The reproducible installation targets **Python 3.14 on Windows AMD64**.
+`requirements.txt` is exported from `uv.lock` with all optional features and
+development dependencies. See [measurement and installation](docs/measurement-and-installation.md)
+for a locked uv install, feature selection, isolated upgrade checks, metrics
+reports, and train/test evaluation. Do not sync over an environment serving a live session.
+
 ```powershell
 cd C:\path\to\condo-voice
 python -m venv .venv
@@ -116,14 +142,9 @@ copy .env.example .env
 If PowerShell blocks the activate script with an execution-policy error, run
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then retry.
 
-**macOS / Linux**
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-```
+**macOS / Linux:** the current lock/export is Windows-specific. It is not an
+installation recipe for other operating systems; their native dependencies
+need a separately resolved and tested environment.
 
 Get a **free** Gemini key at
 [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and put it in
@@ -180,6 +201,25 @@ http://192.168.0.30:8000/display?token=paste-something-long-and-random-here
 Wrong or missing token: the page says so and stops trying, rather than
 retrying every two seconds. Leaving `WS_TOKEN` empty is only safe with
 `HOST=127.0.0.1`; the server prints a warning at startup if it is not.
+
+Slide images also require `WS_TOKEN` when configured. Both supplied pages
+attach it only to this server's `/slides/` image requests. Metadata such as
+`index.json`, embeddings and backups is never served from that endpoint,
+even with a token. Refresh existing browser tabs after updating the server.
+
+Tool groups are enforced when building the provider schema and again when
+dispatching a call; importing another tool module does not grant access to
+its tools. `MULTI_SESSION=true` disables machine display effects and personal
+memory in the prompt. Private memory also requires the `memory` tool group.
+The URL option `?profile=emma` is only honored on a server configured with
+`ASSISTANT_PROFILE=emma`; a condo server can still select `translator`.
+
+Network/search and printer work runs outside the audio event loop. A tool
+timeout means its outcome is unknown, not that a physical action was undone.
+An in-flight print job blocks duplicate print submissions until it finishes.
+Ordinary ended conversations clear their ROI/presentation state; persistent
+owner memory is separate. Turn logs include a random session ID so concurrent
+conversations and worker completions can be correlated.
 
 ### When the transcript doesn't match what was said
 
@@ -448,10 +488,12 @@ slides currently carry fewer than three keywords and average 127 characters of
 searchable text; that is what makes the distributions overlap. Adding the
 words guests actually use will separate them.
 
-The question file is deliberately outside the script: the sales team can add
-what they get asked without touching Python, and a threshold calibrated on one
-list and asserted against another is not calibrated at all — which happened
-here, twice.
+The question file is deliberately outside the script. Evaluation now uses a
+reviewed group manifest: `--split train` (default) calibrates, while `--split test`
+and `--split all` score without suggesting settings. Update the manifest when
+adding questions. The historical questions were already used for tuning; the
+partition is for regression tracking, not an unseen voice benchmark. See the
+[evaluation workflow](docs/measurement-and-installation.md).
 
 ### Adding a tool
 
@@ -748,7 +790,8 @@ project before deploying, and check
 
 Either way: end the session when nobody is talking to it rather than idling
 connected. For a permanently-on robot, a wake-word gate that only opens a
-session after "เฮ้ เอ็มม่า" is the usual answer. Not implemented here.
+session after "เฮ้ เอ็มม่า" is supported via `WAKE_ENABLED` and the local
+model installed by `python scripts/fetch_wake_model.py`.
 
 ## If replies feel slow
 
@@ -830,7 +873,8 @@ Check, in order:
 pytest
 ```
 
-495 tests, no API key and no network (~90s). The OpenAI path runs against a
+The suite uses mocked external services; see CHANGELOG.md for the latest
+test count and timings. The OpenAI path runs against a
 local WebSocket server impersonating the Realtime API (exercising the real
 `websockets` client, real JSON on the wire, and both relay pumps); the Gemini
 path runs against a scripted fake live session.
@@ -872,11 +916,13 @@ package and the code never ran at all.
 
 This is the voice layer, running on a PC. It is not yet on a robot.
 
-- **Wake word** — the session starts when someone presses the button. This is
-  the one that costs money rather than convenience: a session left open all
-  day burns quota on an empty room. A wake word that opens a session only when
-  somebody is actually there is the fix, and it belongs on the robot, not here.
-- **The app on the robot.** The server side is done and tested — four tools,
+See the [9 September robot arrival checklist](docs/robot-arrival-2026-09-09.md)
+for verified prerequisites, vendor questions and physical acceptance tests.
+
+- **Wake word on the Android app** — the browser/server wake path is
+  implemented. Integrating and validating it with the robot's actual audio
+  hardware still needs the Android app and physical-device testing.
+- **The app on the robot.** The server has four tested tools,
   a protocol, and a mock that lets the whole thing be exercised without
   hardware (`ROBOT_MOCK_PLACES`). What is missing is the Android app that
   receives `{"type": "robot", ...}` and calls `AoboRobotManager`. The spec it
@@ -885,10 +931,10 @@ This is the voice layer, running on a PC. It is not yet on a robot.
   whether the robot's own built-in voice assistant can be turned off. If it
   can't, it will fight this one for the microphone, and that is an
   architecture problem rather than a code one.
-- **Guiding a guest, heard end to end.** `go_to_place` returns immediately and
-  reports arrival as a separate turn, which is tested; but with no robot the
-  mock always answers "can't go anywhere", so the *successful* half of that
-  conversation — "this way" ... "we're here" — has never been listened to.
+- **Guiding a guest on real hardware.** The isolated 3D simulator can rehearse
+  successful and failed trips with Emma. Real navigation still requires the
+  Android bridge, vendor SDK and physical tests. Production command ACKs,
+  command IDs, heartbeat and battery/charging telemetry are not implemented.
 - **The robot's audio path is unverified.** Nothing here has been tested
   against the robot's microphone array or its echo cancellation, and that —
   not the software — is where this is most likely to disappoint. A robot's own
@@ -899,9 +945,10 @@ This is the voice layer, running on a PC. It is not yet on a robot.
   shape is not a local model but a small local command set for the things that
   must work when the line drops: stop, cancel navigation, fetch a human, show
   a QR code, and say that the connection is down.
-- **Robot-to-server authentication** — `/ws` is open to anything that can reach
-  the port. Fine on a wired gallery LAN, not fine the moment the robot is on
-  Wi-Fi or the server is reachable from outside.
+- **Robot app verification** — the server checks `WS_TOKEN` for connection
+  access and a separate `ROBOT_TOKEN` in `robot_ready`. An app must provide
+  both when configured. Actual hardware command acknowledgment and behavior
+  when connectivity fails still need end-to-end validation on the robot.
 - **A spend alert** — `IDLE_TIMEOUT_S` now ends a session with no guest
   speech, and `what_guests_ask.py` reports minutes per day, but nothing
   watches the number for you. Measured on the gallery's own project the headroom is large (peak

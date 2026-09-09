@@ -156,6 +156,8 @@ async def show(slide: dict | None) -> None:
     """A tool changed the slide. Put it up when the guest can hear it."""
     global _reveal_seq, _reveal_task
 
+    if not _machine_owned():
+        return
     _reveal_seq += 1
     if _audio_lead_ms < 200:
         await _reveal(slide)
@@ -163,6 +165,15 @@ async def show(slide: dict | None) -> None:
 
     seq = _reveal_seq
     _reveal_task = asyncio.create_task(_reveal_later(slide, seq, _audio_lead_ms / 1000))
+
+
+def cancel_pending_reveal() -> None:
+    """A queued picture belongs to the visitor whose voice queued it."""
+    global _reveal_seq, _reveal_task
+    _reveal_seq += 1
+    if _reveal_task is not None and not _reveal_task.done():
+        _reveal_task.cancel()
+    _reveal_task = None
 
 
 async def _reveal_later(slide: dict | None, seq: int, delay: float) -> None:
@@ -175,6 +186,8 @@ async def _reveal_later(slide: dict | None, seq: int, delay: float) -> None:
 
 
 async def _reveal(slide: dict | None) -> None:
+    if not _machine_owned():
+        return
     await broadcast({"type": "slide", "slide": slide})
     # Opt-in mirror onto a real Canva window — no-op unless CANVA_URL is set.
     # Imported here (not at module load) so a machine without `playwright`

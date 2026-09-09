@@ -311,7 +311,8 @@ class WakeStream:
     QUIET = 0.005
     SPEECH = 0.02
 
-    def __init__(self) -> None:
+    def __init__(self, *, diagnostics: bool = True) -> None:
+        self._diagnostics = diagnostics
         self._spotter = _get_spotter()
         self._stream = self._spotter.create_stream() if self._spotter else None
         self._probe_at = 0.0
@@ -322,7 +323,7 @@ class WakeStream:
         # WAKE_DEBUG's second ear: same spellings at the floor threshold.
         # Only while debugging — it is a second full decode of every frame.
         self._shadow = (_get_shadow_spotter()
-                        if settings.wake_debug and self._spotter else None)
+                        if diagnostics and settings.wake_debug and self._spotter else None)
         self._shadow_stream = (self._shadow.create_stream()
                                if self._shadow else None)
         # WAKE_DEBUG's third tool: keep what the detector actually heard.
@@ -340,10 +341,10 @@ class WakeStream:
         # matcher the owner's own voice. A hit is the *best* enrollment
         # sample there is, which is exactly why the miss-only rule flips.
         self._cap = (bytearray()
-                     if settings.wake_debug or settings.wake_enroll else None)
+                     if diagnostics and (settings.wake_debug or settings.wake_enroll) else None)
         self._cap_max = 16000 * 2 * 6          # the last ~6 seconds
         self._hit_this_window = False
-        if settings.wake_enroll:
+        if diagnostics and settings.wake_enroll:
             logger.warning(
                 "WAKE_ENROLL is on: every speech window on this standby "
                 "socket is being saved to %s. Say the name 10-15 times, "
@@ -401,7 +402,7 @@ class WakeStream:
                 self._save_clip("hit")
             else:
                 self._cap.clear()
-        if settings.wake_debug or settings.wake_enroll:
+        if self._diagnostics and (settings.wake_debug or settings.wake_enroll):
             # After decoding, so the report tick can tell a window with a
             # hit from a window of speech that produced nothing. Enrollment
             # rides the same tick — it must not depend on WAKE_DEBUG also

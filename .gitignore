@@ -1,14 +1,24 @@
 .env
+# Local diagnostics and proprietary robot delivery files
+debug.log
+vendor/aobo/incoming/
+tools/android/platform-tools/
+tools/android/*.zip
+tools/android/download-receipt.json
 # Local HTTPS private key and certificate (regenerate with mkcert per machine)
 certs/
 __pycache__/
 *.pyc
 .venv/
+.venv-smoke/
+.uv-cache/
+data/eval-runs/
 venv/
 .pytest_cache/
 # Scratch run directories from `pytest --basetemp=...`. Seven of them had
 # collected at the repo root; none are worth a line in anyone's diff.
 .pytest_*/
+.pytest-tmp-*/
 
 # Hub identity (MAC/IP of the Broadlink device on your network)
 data/broadlink_device.json

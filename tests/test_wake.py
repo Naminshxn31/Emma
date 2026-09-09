@@ -115,6 +115,26 @@ def test_the_name_alone_wakes(monkeypatch):
 
 
 @needs_model
+def test_simulator_detector_hears_without_recording_diagnostics(monkeypatch):
+    monkeypatch.setattr(settings, "wake_enabled", True)
+    monkeypatch.setattr(settings, "wake_debug", True)
+    monkeypatch.setattr(settings, "wake_enroll", True)
+
+    def forbidden(*args):
+        raise AssertionError("simulation must not record rehearsal audio")
+
+    monkeypatch.setattr(wake.WakeStream, "_save_clip", forbidden)
+    monkeypatch.setattr(wake.WakeStream, "_report", forbidden)
+    monkeypatch.setattr(wake, "_get_shadow_spotter", forbidden)
+    stream = wake.WakeStream(diagnostics=False)
+    assert stream.ok and stream._cap is None
+    pcm = _pcm("emma.wav")
+    hits = [hit for i in range(0, len(pcm), 3200)
+            if (hit := stream.feed(pcm[i:i + 3200]))]
+    assert hits == ["EMMA"]
+
+
+@needs_model
 def test_the_name_mid_sentence_wakes(monkeypatch):
     """"Emma, turn off the lights" — the natural phrasing. Requiring the
     name in isolation would train the owner to talk like a robot."""
@@ -403,7 +423,7 @@ def test_the_probe_stays_quiet_unless_asked(monkeypatch):
     from app.config import settings
 
     src = inspect.getsource(wake.WakeStream.feed)
-    assert "if settings.wake_debug or settings.wake_enroll:" in src, \
+    assert "if self._diagnostics and (settings.wake_debug or settings.wake_enroll):" in src, \
         "the probe must be behind an explicit switch, not always on"
     import re
 
@@ -525,6 +545,7 @@ def test_debug_mode_keeps_the_hit_clip_too(monkeypatch, tmp_path):
 
     stream = _probe_stream()
     stream._cap = bytearray(b"\x01\x02" * 4000)   # capture on, as debug mode has it
+    stream._diagnostics = True
     stream._cap_max = 16000 * 2 * 6
     stream._hit_this_window = False
 

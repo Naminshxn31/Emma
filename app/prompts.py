@@ -414,6 +414,30 @@ def build_instructions(
     on condo — a typo in .env should get you the receptionist, not a
     half-built persona.
     """
+    from app.robot_backend import active as simulation_backend
+
+    if backend := simulation_backend.get():
+        # Rehearsal never loads the owner's memories, documents or condo facts.
+        return (
+            'คุณคือ "Emma" หรือ "เอ็มม่า" ผู้ช่วยสั่งงานด้วยเสียง พูดไทยเป็นธรรมชาติ '
+            'สุภาพ กระชับ ใช้คำลงท้ายค่ะ สนทนาต่อระหว่างหุ่นจำลองเดินได้\n'
+            'ขณะนี้อยู่ในโหมดซ้อมกับหุ่นจำลองเท่านั้น ไม่มีหุ่นจริงเชื่อมต่อ '
+            'ทักทายแล้วบอกสั้นๆ ว่าพร้อมซ้อมสั่งหุ่นจำลอง\n'
+            'เมื่อผู้ใช้ขอให้พาไป ให้เรียก go_to_place ด้วยชื่อจุดหมาย ห้ามแค่ตอบรับโดยไม่เรียกเครื่องมือ '
+            'เมื่อพูด หยุด รอก่อน ไม่ไปแล้ว ให้เรียก stop_moving ทันที '
+            'กลับฐาน/กลับจุดจอด ให้เรียก return_to_base และถามสถานะใช้ get_robot_status\n'
+            'จุดในแผนที่สมมติ: ' + ', '.join(backend.places) + '\n'
+            'อ้างผลจากเครื่องมือทุกครั้ง ไม่เดาจุดหมาย ไม่พูดว่าถึงแล้วก่อนมี robot_arrived สำเร็จ '
+            'คำตอบและสถานะทั้งหมดเป็นการจำลอง ต้องไม่อ้างว่ามอเตอร์จริงเดินหรือหยุด '
+            'ถ้าคำสั่งล้มเหลวหรือการเชื่อมต่อหลุด ให้บอกว่ายังยืนยันผลไม่ได้ '
+            'ถ้าเครื่องมือไม่เปิดใช้ ให้บอกตรงๆ ว่ายังสั่งตัวจำลองไม่ได้ '
+            'เมื่อขอเปิดปิดไฟ/แอร์/ม่าน/ทีวี ให้เรียก set_simulated_device '
+            'device ใช้ lights/ac/curtains/tv; on คือเปิดปิด; value คือความสว่างไฟ 0..100 '
+            'หรืออุณหภูมิแอร์ 16..30 หรือเปอร์เซ็นต์เปิดม่าน 0..100; อ่านสถานะใช้ get_simulated_home '
+            'ไฟควบคุมทั้งฉาก ไม่มีการแบ่งห้อง ถ้าขอเฉพาะห้องให้ชี้แจงก่อน ไม่อ้างว่าเลือกโซนได้ '
+            'อุปกรณ์บ้านทั้งหมดเป็นจำลอง ไม่มีเครื่องมือควบคุมบ้านจริง คอมพิวเตอร์ หรือข้อมูลส่วนตัวในเซสชันนี้'
+        )
+
     if profile not in PROFILES:
         logger.warning("unknown ASSISTANT_PROFILE %r — using the condo profile", profile)
         profile = "condo"
@@ -454,6 +478,12 @@ def build_instructions(
         # them into the registry as a side effect, and building a prompt
         # must never change which functions the model can call.
         from app import memory_store
+        from app.config import settings as _settings
+
+        groups = _settings.enabled_tool_groups()
+        private_memory = (
+            not _settings.multi_session and groups is not None and "memory" in groups
+        )
 
         out = (
             EMMA_INSTRUCTIONS
@@ -461,7 +491,8 @@ def build_instructions(
             .replace("[เวลาปัจจุบัน]", stamp)
             .replace("[กฎภาษา]", _language_rule(languages))
             .replace("[เอกสาร]", _personal_docs_line())
-            .replace("[ความจำ]", memory_store.prompt_block())
+            .replace("[ความจำ]", memory_store.prompt_block() if private_memory
+                     else "ความจำส่วนตัว: ไม่เปิดใช้ในเซสชันนี้")
         )
         # No websearch group loaded: an instruction naming an undeclared
         # tool is the refusing-model bug, and the fallback itself was the

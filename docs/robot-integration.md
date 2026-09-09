@@ -1,5 +1,12 @@
 # Robot integration notes
 
+Current delivery checklist and verified limitations: [9 September readiness review](robot-arrival-2026-09-09.md). No Android bridge APK/AAR is bundled; software tests do not certify hardware readiness.
+
+Interactive command rehearsal is now available at `http://127.0.0.1:8010`
+after running `start-robot-simulator.cmd`. See [the simulator guide](robot-simulator.md)
+for source PDF page references, command lifecycle tests, and the remaining
+Android/AAR work. This is our simulator, not the vendor's SDK MOCK runtime.
+
 Source documents reviewed:
 
 - `aobo_robot_sdk_v2_thai.pdf` (35 pages)
@@ -21,13 +28,16 @@ The current command contract maps cleanly to the documented SDK:
 |---|---|
 | `move_to_point` | resolve a saved POI and start navigation |
 | `cancel_navigation` | `manager.cancelNavigation()` |
-| `go_home` | navigate to the configured home/charging POI |
+| `go_home` | `manager.goHome()` with the robot's configured charging base |
 | robot status | navigation callbacks + `manager.getBatteryPercentage()` |
 | POI refresh | enumerate the map's saved points after connect/map load |
 
-The Android bridge must report asynchronous navigation updates back as
-`arrived`, `navigation_failed`, and `status`; a tool call must not wait for the
-robot to finish walking.
+The current server accepts `robot_ready` and `robot_arrived` (with explicit
+boolean `ok: true` or `ok: false` and the matching destination). These are the
+implemented wire names. Status/battery telemetry, command IDs, ACKs and
+heartbeat handling still require a bridge/server protocol extension; do not
+send `arrived`, `navigation_failed` or `status` expecting current handlers.
+A tool call must not wait for the robot to finish walking.
 
 ## Audio hardware facts to verify on arrival
 

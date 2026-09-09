@@ -64,6 +64,7 @@ def _searxng(query: str) -> list[dict]:
         "required": ["query"],
     },
     tags=["websearch"],
+    blocking=True,
 )
 
 

@@ -23,6 +23,8 @@ from __future__ import annotations
 import json
 import logging
 import time
+from contextvars import ContextVar
+from threading import RLock
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +35,8 @@ logger = logging.getLogger("condo_voice.turnlog")
 _fh = None
 _path: Path | None = None
 _warned = False
+session_id: ContextVar[str | None] = ContextVar("turnlog_session_id", default=None)
+_write_lock = RLock()
 
 
 def _forget_old_logs(folder: Path) -> None:
@@ -108,10 +112,27 @@ def _handle():
 
 def record(event: str, **fields: Any) -> None:
     """Append one event. Never raises: this is instrumentation, not the job."""
+    from app.robot_backend import active as simulation_backend
+
+    if simulation_backend.get() is not None:
+        # A strict allowlist keeps rehearsal metrics separate from transcripts.
+        recorder = getattr(simulation_backend.get(), "record_diagnostic", None)
+        if recorder is not None:
+            recorder(event, fields, session_id.get())
+        return
+    # Worker tools may finish together. Protect opening/rotation and writing
+    # as one operation so the first two events cannot overwrite the handle.
+    with _write_lock:
+        _record(event, fields)
+
+
+def _record(event: str, fields: dict) -> None:
     fh = _handle()
     if fh is None:
         return
     row = {"t": time.strftime("%H:%M:%S"), "event": event}
+    if (sid := session_id.get()) is not None:
+        row["session_id"] = sid
     row.update({k: v for k, v in fields.items() if v is not None})
     try:
         fh.write(json.dumps(row, ensure_ascii=False) + "\n")

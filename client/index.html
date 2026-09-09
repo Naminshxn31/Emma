@@ -8,6 +8,9 @@
      otherwise 404 on every page load and clutter the server log). -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='g' cx='32%25' cy='28%25'%3E%3Cstop offset='0' stop-color='%238ED0F5'/%3E%3Cstop offset='0.78' stop-color='%231B6FE0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23g)'/%3E%3C/svg%3E" />
 <style>
+  #robotSimBanner { width:100%; max-width:1200px; background:#e7f3ea; color:#245b3e; border:1px solid #bcd5c2; border-radius:10px; padding:12px 16px; margin-bottom:12px; font-size:13px; line-height:1.6; }
+  #robotSimBanner a { color:inherit; font-weight:600; }
+  body.robot-simulation #callScreen { height:calc(100vh - 8rem); }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
          background: #fff; color: #0d0d0d; min-height: 100vh; display: flex; flex-direction: column;
@@ -604,6 +607,8 @@
 </head>
 <body>
 
+<aside id="robotSimBanner" hidden>Emma · โหมดสั่งหุ่นจำลองเท่านั้น · ใช้ API เสียงที่ตั้งไว้เดิม<br>ลองพูด “พาไปห้องตัวอย่าง” “หยุดก่อน” หรือ “กลับฐาน” · <a href="/" target="_blank" rel="noopener">ดูแผนที่จำลอง ↗</a></aside>
+
 <section class="screen active" id="pickerScreen">
   <h1>Choose a voice</h1>
   <p class="sub" id="providerLine">…</p>
@@ -786,7 +791,17 @@ function kioskSay(text) {
 Promise.all([
   fetch('/voices').then((r) => r.json()),
   fetch('/health').then((r) => r.json()),
-]).then(([vd, health]) => {
+]).then(async ([vd, health]) => {
+  if (health.robot_simulator) {
+    document.body.classList.add('robot-simulation');
+    $('robotSimBanner').hidden = false;
+    $('translatorBtn').hidden = true;
+    document.title = 'Emma · Robot Simulator';
+    const script = document.createElement('script');
+    script.src = '/simulator-voice.js';
+    await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.append(script); });
+    await window.simulatorVoice.init(health);
+  }
   voices = vd.voices;
   providerName = health.provider;
   idx = Math.max(0, voices.findIndex((v) => v.id === vd.default));
@@ -855,6 +870,10 @@ Promise.all([
 const liveTurn = { user: null, bot: null };
 const LABEL = { user: 'คุณ · You', bot: 'ผู้ช่วย · Assistant' };
 const TOOL_LABELS = {
+  go_to_place: 'ไปจุดหมาย · robot',
+  stop_moving: 'หยุด · robot',
+  return_to_base: 'กลับฐาน · robot',
+  get_robot_status: 'สถานะหุ่น · robot',
   set_lights: 'ไฟ · lights',
   set_air_conditioner: 'แอร์ · air conditioner',
   get_room_status: 'สถานะห้อง · room status',
@@ -1453,7 +1472,13 @@ function showStage(slide, displays) {
     stage.classList.remove('framed');
   }
   $('callScreen').classList.add('with-slides');
-  $('stageImg').src = slide.url;
+  // Only attach credentials to this server's slide assets, never a remote URL.
+  const assetUrl = new URL(slide.url, location.href);
+  const assetToken = new URLSearchParams(location.search).get('token');
+  if (assetToken && assetUrl.origin === location.origin && assetUrl.pathname.startsWith('/slides/')) {
+    assetUrl.searchParams.set('token', assetToken);
+  }
+  $('stageImg').src = assetUrl.href;
   $('stageTitle').textContent = slide.title_th || slide.title_en || '';
   $('stagePos').textContent =
     slide.position && slide.total ? `${slide.position} / ${slide.total}` : '';
@@ -1725,7 +1750,17 @@ registerProcessor('cap', Cap);
 
 // ---------------- playback ----------------
 
+// BEGIN CLIENT METRICS (also exercised with a fake Web Audio clock in Node).
+let metricTurn = null;
+let metricPlaybackSent = false;
+function reportClientMetric(name, ms) {
+  if (!metricTurn || !Number.isFinite(ms) || !ws || ws.readyState !== WebSocket.OPEN) return;
+  try { ws.send(JSON.stringify({type: 'client_metric', turn_id: metricTurn, name, ms})); } catch {}
+}
+// END CLIENT METRICS
+
 function playChunk(arrayBuffer) {
+  const receivedAt = performance.now();
   if (!audioCtx || arrayBuffer.byteLength < 2) return;
   // A page parked overnight can have its context suspended long after the
   // call opened fine — transcript moves, speakers stay silent. resume() is
@@ -1749,12 +1784,20 @@ function playChunk(arrayBuffer) {
   // startCall() and stopPlayback().
   const at = Math.max(audioCtx.currentTime, playHead);
   src.start(at);
+  if (!metricPlaybackSent && metricTurn && audioCtx.state === 'running') {
+    // Scheduled queue delay, not proof of audible output at the speaker.
+    reportClientMetric('playback_schedule_ms', performance.now() - receivedAt
+                       + Math.max(0, at - audioCtx.currentTime) * 1000);
+    metricPlaybackSent = true;
+  }
   playHead = at + buf.duration;
+  const playbackContext = audioCtx;
   sources.push(src);
   reportAudioLead();
   playing = true;
   setState('speaking');
   src.onended = () => {
+    if (audioCtx !== playbackContext) return;
     sources = sources.filter((s) => s !== src);
     if (!sources.length) { playing = false; setState('listening'); }
   };
@@ -1776,6 +1819,8 @@ function stopPlayback() {
 // ---------------- call ----------------
 
 function releaseCallHardware() {
+  metricTurn = null;
+  metricPlaybackSent = false;
   try { worklet && (worklet.port.onmessage = null, worklet.disconnect()); } catch {}
   try { micSource && micSource.disconnect(); } catch {}
   micStream && micStream.getTracks().forEach((t) => t.stop());
@@ -1860,7 +1905,12 @@ function scheduleTranscriptWipe() {
 }
 
 function startCall() {
+  if (window.simulatorVoice && !window.simulatorVoice.ownsAudio) {
+    window.simulatorVoice.acquire().then(ok => { if (ok) startCall(); });
+    return;
+  }
   manualEnd = false;
+  window.simulatorVoice?.connecting();
   idleParked = false;
   superseded = false;
   standDown = false; standDownReason = '';
@@ -1923,9 +1973,12 @@ function startCall() {
     + (summonedDial ? '&summoned=1' : ''));
   summonedDial = false;             // one dial; the next one earns its own
   ws.binaryType = 'arraybuffer';
-  ws.onmessage = onMessage;
-  ws.onerror = () => { setState('error'); systemLine('เชื่อมต่อไม่สำเร็จ · connection error'); };
+  const callSocket = ws;
+  ws.onmessage = msg => { if (ws === callSocket) onMessage(msg); };
+  ws.onerror = () => { if (ws !== callSocket) return; setState('error'); systemLine('เชื่อมต่อไม่สำเร็จ · connection error'); };
   ws.onclose = () => {
+    if (ws !== callSocket) return;
+    window.simulatorVoice?.closed();
     // Before any branch, because the branches are where this keeps getting
     // lost. The socket closing *is* the call ending, whatever the reason,
     // and a call that has ended has no business still holding the machine's
@@ -1985,6 +2038,7 @@ function startCall() {
       const wait = redialDelay;
       redialDelay = Math.min(redialDelay * 2, 30000);
       setTimeout(() => {
+        if (ws !== callSocket) return;
         if (!ws || (ws.readyState !== WebSocket.OPEN &&
                     ws.readyState !== WebSocket.CONNECTING)) startCall();
       }, wait);
@@ -1994,6 +2048,7 @@ function startCall() {
     // after a beat — immediately would race the tail of Emma's last audio
     // still leaving the speaker, and she would answer herself.
     setTimeout(() => {
+      if (ws !== callSocket) return;
       if (!ws || (ws.readyState !== WebSocket.OPEN &&
                   ws.readyState !== WebSocket.CONNECTING)) goToSleep();
     }, 1500);
@@ -2001,6 +2056,23 @@ function startCall() {
 }
 
 async function startMic() {
+  // Build playback synchronously on ready: the greeting can arrive while
+  // getUserMedia is still pending. Keep the already-unlocked wake context
+  // on a name-triggered call; createBuffer uses outputRate independently.
+  if (wakeHandover && wakeCtx && wakeCtx.state !== 'closed') {
+    audioCtx = wakeCtx;
+    wakeCtx = null;
+  } else {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
+  }
+  const callCtx = audioCtx;
+  // Register the gesture handler BEFORE resume: a suspended context's
+  // resume promise may remain pending until that very gesture happens.
+  armAudioUnlock(audioCtx);
+  audioCtx.resume().catch(() => {});
+  audioCtx.onstatechange = () => {
+    if (audioCtx === callCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  };
   // A refused microphone used to return from here, before the AudioContext
   // below existed — so Emma had nowhere to play. Measured on the first
   // camera greeting that worked end to end: the camera recognised somebody,
@@ -2028,31 +2100,25 @@ async function startMic() {
     wakeMicStream = null;
   } else {
     try {
-      micStream = await navigator.mediaDevices.getUserMedia({
+      const openedStream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
       });
+      if (audioCtx !== callCtx) {
+        openedStream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      micStream = openedStream;
     } catch (e) {
+      if (audioCtx !== callCtx) return;
       micStream = null;
       micFailure = e;
     }
   }
 
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
-  await audioCtx.resume();
-  // Auto-connect means this can all happen before the person has ever
-  // touched the page — and Chrome keeps an AudioContext suspended until the
-  // first gesture, so Emma "speaks" into a muted context: transcript moves,
-  // speakers stay silent, mic hears nothing. Detect it, say it on screen,
-  // and let the first tap anywhere unlock both directions.
-  armAudioUnlock(audioCtx);
-  // And keep watching after the start: overnight power saving can suspend
-  // the context hours into a standby without another gesture ever coming.
-  audioCtx.onstatechange = () => {
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-  };
   const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
-  await audioCtx.audioWorklet.addModule(url);
-  URL.revokeObjectURL(url);
+  try { await callCtx.audioWorklet.addModule(url); }
+  finally { URL.revokeObjectURL(url); }
+  if (audioCtx !== callCtx) return;
 
   if (!micStream) {
     // Playback is built and the socket is live; there is simply nothing
@@ -2110,7 +2176,7 @@ async function startMic() {
     }
     stopWakeMode();
   }
-  setState('listening');
+  setState(playing ? 'speaking' : 'listening');
 }
 
 // What the call's microphone track actually is, sent to the server log:
@@ -2150,7 +2216,12 @@ function onMessage(msg) {
   try { evt = JSON.parse(msg.data); } catch { return; }
 
   switch (evt.type) {
+    case 'metric_turn':
+      metricTurn = typeof evt.turn_id === 'string' ? evt.turn_id : null;
+      metricPlaybackSent = false;
+      break;
     case 'ready':
+      window.simulatorVoice?.ready(evt);
       redialDelay = 2000;
       inputRate = evt.input_rate;
       outputRate = evt.output_rate;
@@ -2171,7 +2242,9 @@ function onMessage(msg) {
       // the guest starting to talk, and the local level meter already showed
       // that before this event crossed the network.
       if (playing) {
+        const clearingAt = performance.now();
         const heard = stopPlayback();
+        reportClientMetric('interruption_clear_ms', performance.now() - clearingAt);
         const ratio = sentMs > 0 ? heard / sentMs : 1;
         sentMs = 0;
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -2186,7 +2259,9 @@ function onMessage(msg) {
       break;
 
     case 'interrupted': {
+      const clearingAt = performance.now();
       const heardMs = stopPlayback();
+      reportClientMetric('interruption_clear_ms', performance.now() - clearingAt);
       const ratio = sentMs > 0 ? heardMs / sentMs : 1;
       sentMs = 0;
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -2226,6 +2301,11 @@ function onMessage(msg) {
       if (r.hardware === 'failed') line += ' — ส่งสัญญาณไม่สำเร็จ · hardware not reached';
       else if (r.hardware === 'mock') line += ' — จำลอง (ยังไม่ต่ออุปกรณ์จริง) · simulated';
       else if (r.ok === false) line += ' — ' + (r.error || 'failed');
+      else if (r.hardware === 'simulated') {
+        line += ['go_to_place', 'return_to_base'].includes(evt.name)
+          ? ' — รับคำสั่งจำลองแล้ว · รอผลเดินทาง'
+          : ' — ผลจากตัวจำลอง · simulated';
+      }
       else line += ' — สำเร็จ · done';
       systemLine(line, r.embed ? { embed: r.embed }
                      : (r.screen === 'unit' && r.unit ? { unit: r.unit } : null));
@@ -2272,6 +2352,12 @@ function onMessage(msg) {
       break;
 
     case 'error':
+      window.simulatorVoice?.failed(evt);
+      if (evt.code === 'simulator_busy') {
+        standDown = true; standDownReason = 'superseded';
+        systemLine(evt.message || 'มีอีกหน้ากำลังคุยอยู่');
+        break;
+      }
       if (evt.code === 'unauthorized') {
         // Wrong/missing token: stand down completely. Redialing an auth
         // failure every two seconds is a polite little brute-force loop.
@@ -2476,6 +2562,8 @@ let summonedDial = false;
 let micFailure = null;
 
 async function startWakeMode() {
+  if (window.simulatorVoice && !window.simulatorVoice.ownsAudio) return;
+  if (ws && [WebSocket.CONNECTING, WebSocket.OPEN].includes(ws.readyState)) return;
   if (!wakeAvailable || wakeWs) return;
   // Chrome only exposes getUserMedia on localhost or a trusted HTTPS
   // origin.  Do not open a standby socket and paint "listening" when this
@@ -2498,6 +2586,7 @@ async function startWakeMode() {
   wakeWs = sock;
 
   sock.onmessage = (msg) => {
+    if (wakeWs !== sock) return;
     let evt;
     try { evt = JSON.parse(msg.data); } catch { return; }
     if (evt.type === 'wake') {
@@ -2549,7 +2638,7 @@ async function startWakeMode() {
     } else if (evt.type === 'wake_unavailable') {
       wakeAvailable = false;
       stopWakeMode();
-    } else if (evt.type === 'error' && evt.code === 'unauthorized') {
+    } else if (evt.type === 'error' && ['unauthorized', 'simulator_busy'].includes(evt.code)) {
       // The same stand-down the call socket does, and it has to be repeated
       // here because the guard there only ever protected /ws. Without it the
       // onclose handler below rearms two seconds later — for ever, with the
@@ -2561,11 +2650,13 @@ async function startWakeMode() {
     }
   };
   sock.onclose = () => {
-    if (wakeWs === sock) wakeWs = null;
+    if (wakeWs !== sock) return;
+    if (wakeHandover) { wakeWs = null; return; }
+    stopWakeMode();
     // A dropped standby socket (server restart, sleep/resume) rearms
     // itself; deliberate teardown does not.
-    if (!wakeStopping && wakeAvailable &&
-        $('pickerScreen').classList.contains('active')) {
+    if (wakeAvailable && (!ws || ws.readyState === WebSocket.CLOSED) &&
+        $('stateLabel').textContent === 'sleep') {
       setTimeout(startWakeMode, 2000);
     }
   };
@@ -2578,10 +2669,14 @@ async function startWakeMode() {
     return;
   }
   try {
-    wakeMicStream = await navigator.mediaDevices.getUserMedia({
+    const openedStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
     });
+    if (wakeWs !== sock || wakeStopping) { openedStream.getTracks().forEach(t => t.stop()); return; }
+    wakeMicStream = openedStream;
   } catch (e) {
+    if (wakeWs !== sock || wakeStopping) return;
+    micFailure = e;
     // No permission for the *microphone*. That ends listening for a name,
     // and it used to end the socket with it — which quietly took the camera
     // down too, since the door camera rings this same socket. Measured on
@@ -2603,11 +2698,13 @@ async function startWakeMode() {
     return;
   }
   wakeCtx = new (window.AudioContext || window.webkitAudioContext)();
-  await wakeCtx.resume();
+  const standbyContext = wakeCtx;
   armAudioUnlock(wakeCtx);
+  wakeCtx.resume().catch(() => {});
   const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
-  await wakeCtx.audioWorklet.addModule(url);
-  URL.revokeObjectURL(url);
+  try { await standbyContext.audioWorklet.addModule(url); }
+  finally { URL.revokeObjectURL(url); }
+  if (wakeWs !== sock || wakeStopping || wakeCtx !== standbyContext) return;
   const src = buildMicChain(wakeCtx, wakeCtx.createMediaStreamSource(wakeMicStream));
   // The KWS model is 16kHz regardless of which voice provider is active.
   wakeWorklet = new AudioWorkletNode(wakeCtx, 'cap', { processorOptions: { targetRate: 16000 } });
@@ -2730,9 +2827,10 @@ function armAudioUnlock(ctx) {
   const prev = $(note).textContent;
   $(note).textContent = 'แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียง · tap once to enable audio';
   const unlock = () => {
-    ctx.resume().then(() => { if ($(note).textContent.includes('แตะหน้าจอ')) $(note).textContent = prev; });
     document.removeEventListener('pointerdown', unlock);
     document.removeEventListener('keydown', unlock);
+    if (ctx.state === 'closed') return;
+    ctx.resume().then(() => { if ($(note).textContent.includes('แตะหน้าจอ')) $(note).textContent = prev; }).catch(() => {});
   };
   document.addEventListener('pointerdown', unlock);
   document.addEventListener('keydown', unlock);

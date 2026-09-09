@@ -49,6 +49,12 @@ class FakeSession:
     def __init__(self):
         self.sent = []
         self.provider = FakeProvider()
+        self.ws = self
+
+    async def send_text(self, text):
+        import json
+
+        await self._send_json(json.loads(text))
 
     async def _send_json(self, payload):
         self.sent.append(payload)
@@ -206,7 +212,7 @@ def test_no_robot_connected_is_mock_not_failure(monkeypatch):
 
     out = run(registry.dispatch("go_to_place", {"place": "ห้องตัวอย่าง"}))
     assert out["hardware"] == "mock"
-    assert out["moving"] is False, "claimed to be walking with no robot attached"
+    assert out["moving"] is None, "physical motion must be unknown without a robot report"
 
 
 def test_mock_mode_tells_the_model_not_to_claim_it_is_walking(monkeypatch):
@@ -359,7 +365,7 @@ def test_pretend_places_make_the_conversation_testable_before_the_robot(monkeypa
     assert out["ok"] is True, "the guiding path is still unreachable"
     assert out["place"] == "ห้องตัวอย่าง"
     assert out["hardware"] == "mock"
-    assert out["moving"] is False, "a pretend place must not become a real journey"
+    assert out["moving"] is None, "a pretend place cannot confirm physical motion"
 
 
 def test_a_real_map_overrides_the_pretend_one(robot, monkeypatch):

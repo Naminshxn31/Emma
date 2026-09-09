@@ -176,6 +176,7 @@ def _get_index() -> dict:
         "required": ["query"],
     },
     tags=["mydocs"],
+    blocking=True,
 )
 def search_my_documents(query: str) -> dict:
     from app.tools.retrieval import is_commercial

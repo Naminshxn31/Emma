@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Emma World · Robot Playground</title>
+  <link rel="stylesheet" href="/simulator.css">
+  <script src="/robot-scene.js" defer></script>
+  <script src="/simulator.js" defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand"><div class="brand-icon" aria-hidden="true">E<span>·</span></div><div><p class="eyebrow">CONDO VOICE / INTERACTIVE PLAYGROUND</p><h1>Emma <span>World</span></h1></div></div>
+    <div class="header-actions"><span class="badge"><span></span> SIMULATION ONLY</span><a class="voice-link" href="#emmaPanel">คุยกับ Emma ↓</a></div>
+  </header>
+  <div class="notice">ตัวจำลองระดับคำสั่ง ไม่มีการสั่งหุ่นจริง • ปุ่มและข้อความไม่ใช้ API เสียง • คุยกับ Emma ใช้ provider และโควตา API เดิม</div>
+  <section class="stats" aria-label="สถานะจำลอง">
+    <div><span>การเชื่อมต่อจำลอง</span><strong id="connection">กำลังโหลด…</strong></div>
+    <div><span>สถานะการเดินทาง</span><strong id="phase">—</strong></div>
+    <div><span>จุดหมาย</span><strong id="destination">—</strong></div>
+    <div><span>แบตเตอรี่สมมติ</span><strong id="battery">—</strong></div>
+  </section>
+  <div class="workspace">
+    <section class="panel map-panel">
+      <div class="panel-heading"><div><p class="eyebrow">01 / YOUR VIRTUAL VISIT</p><h2>เดินชมบ้านกับ Emma</h2></div><div class="view-switch"><button id="walkMode" aria-pressed="false">เดินสำรวจ · V</button><span class="tag" id="sceneStatus" role="status">กำลังเปิด 3D…</span></div></div>
+      <div class="world" id="world">
+        <canvas id="map" tabindex="0" role="img" aria-label="ฉากบ้าน 3D บุคคลที่สาม คลิกแล้วใช้ WASD เดิน ลากมองรอบตัว กด V เพื่อดูภาพรวม" aria-describedby="sceneHelp">เลือกจุดหมายจากรายการคำสั่งแทนการใช้แผนที่ได้</canvas>
+        <div class="world-label"><span class="live-dot"></span> LIVE WORLD <small>ผังและเฟอร์นิเจอร์สมมติ</small></div>
+        <p id="explorerHint" class="explorer-hint" hidden>คุณ / ผู้เยี่ยมชม <span>คลิกฉาก แล้วใช้ WASD เดิน · ลากมองรอบตัว</span></p>
+        <div id="walkPad" class="walk-pad" aria-label="ปุ่มเดินของผู้เยี่ยมชม" hidden><button data-walk="KeyW" aria-label="เดินหน้า">↑</button><button data-walk="KeyA" aria-label="เดินซ้าย">←</button><button data-walk="KeyS" aria-label="ถอยหลัง">↓</button><button data-walk="KeyD" aria-label="เดินขวา">→</button></div>
+        <div class="camera-tools" aria-label="กล้องในเกม"><button id="zoomOut" aria-label="ซูมออก" title="ซูมออก">−</button><span id="zoomLevel">100%</span><button id="zoomIn" aria-label="ซูมเข้า" title="ซูมเข้า">+</button><button id="centerCamera" aria-label="ดูทั้งฉาก" title="ดูทั้งฉาก · 0">◎</button><button id="followRobot" aria-label="กล้องตามหุ่น" aria-pressed="false" title="กล้องตามหุ่น · F">F</button><button id="fullscreen" aria-label="เต็มจอ" title="เต็มจอ">⛶</button></div>
+        <div class="mission-card"><div class="avatar" aria-hidden="true"><span>••</span></div><div><p>EMMA / NAVIGATION</p><strong id="missionTitle">พร้อมออกเดินทาง</strong><div class="progress-track"><progress id="journeyProgress" max="100" value="0" aria-label="ความคืบหน้าการเดินทาง"></progress></div><span id="missionDetail">เลือกจุดหมายเพื่อเริ่มซ้อม</span></div></div>
+        <div class="mini-wrap"><p>MINIMAP <span>N ↑</span></p><canvas id="minimap" width="145" height="93" role="img" aria-label="แผนที่ย่อและตำแหน่งหุ่น"></canvas></div>
+      </div>
+      <div class="map-footer" id="sceneHelp"><span id="sceneModeHelp">ลากหมุน 3D · คลิกขวาลากเลื่อน · ล้อเมาส์ซูม · แตะเลือกจุด · ดับเบิลคลิกเดินทาง</span><span><kbd>Space</kbd> หยุด <kbd>F</kbd> ตามหุ่น</span></div>
+      <div id="message" class="message" role="status">เลือกจุดหมาย แล้วลองสั่งเดินทางได้เลย</div>
+    </section>
+    <section class="panel voice-panel" id="emmaPanel">
+      <div class="panel-heading"><div><p class="eyebrow">02 / TALK TO EMMA</p><h2>เรียก “เอ็มม่า” ได้เลย</h2></div><span class="tag">VOICE + WORLD</span></div>
+      <p id="voiceSummary" class="voice-summary" role="status">กำลังตรวจความพร้อมเสียง…</p>
+      <iframe id="emmaVoice" src="/voice?embed=1" title="คุยกับ Emma และตรวจไมโครโฟนลำโพง" allow="microphone; autoplay"></iframe>
+      <p class="hint voice-help">อนุญาตไมค์ครั้งแรก · ปิดแท็บเสียงอื่นหากขึ้นว่ามีอีกแท็บใช้ไมค์ · ปุ่ม End จบสายและกลับรอฟังชื่อ</p>
+    </section>
+    <section class="panel home-panel" aria-label="อุปกรณ์ smart home จำลอง">
+      <div class="panel-heading"><div><p class="eyebrow">SMART HOME / VIRTUAL DEVICES</p><h2>สั่งแล้วเห็นผลในบ้าน</h2></div><span class="tag">อุปกรณ์จำลอง</span></div>
+      <p class="hint">พูด “เอ็มม่า ปิดไฟ” “เปิดม่าน” “ปรับแอร์ 23 องศา” หรือ “เปิดทีวี” · ไฟควบคุมทั้งฉาก</p>
+      <div class="home-grid">
+        <div class="home-device"><div class="device-heading"><strong>ไฟในบ้าน</strong><button id="lightsToggle" aria-pressed="true">เปิดอยู่</button></div><label for="lightLevel">ความสว่าง <output id="lightValue">85%</output></label><input id="lightLevel" type="range" min="0" max="100" value="85"></div>
+        <div class="home-device"><div class="device-heading"><strong>เครื่องปรับอากาศ</strong><button id="acToggle" aria-pressed="true">เปิดอยู่</button></div><label for="acTemperature">อุณหภูมิที่ตั้ง (จำลอง)</label><input id="acTemperature" type="number" min="16" max="30" value="25" aria-label="อุณหภูมิแอร์ องศาเซลเซียส"></div>
+        <div class="home-device"><div class="device-heading"><strong>ม่านหน้าต่าง</strong><button id="curtainToggle" aria-pressed="true">ปิดม่าน</button></div><label for="curtainLevel">เปิด <output id="curtainValue">80%</output></label><input id="curtainLevel" type="range" min="0" max="100" value="80"></div>
+        <div class="home-device"><div class="device-heading"><strong>ทีวีห้องตัวอย่าง</strong><button id="tvToggle" aria-pressed="false">ปิดอยู่</button></div><p class="hint">หน้าจอในห้องเปลี่ยนตามสถานะ · ไม่เล่นเสียงทับ Emma</p><p id="homeFeedback" role="status">กำลังอ่านสถานะอุปกรณ์…</p></div>
+      </div>
+    </section>
+    <details class="panel controls">
+      <summary>คำสั่งและสถานการณ์ทดสอบ <span>เปิดเมื่อต้องการสั่งด้วยปุ่มหรือจำลองปัญหา</span></summary>
+      <p class="eyebrow">02 / MISSION CONTROL</p><h2>ออกเดินทางกัน</h2>
+      <p class="hint">พูด “เอ็มม่า พาไปห้องตัวอย่าง” ในแผงเสียงด้านบน หรือใช้คำสั่งทดสอบต่อไปนี้</p>
+      <label for="place">จุดหมายที่เลือก</label>
+      <select id="place"></select>
+      <label for="utterance">ชื่อจุดหมายที่ต้องการทดสอบ</label>
+      <input id="utterance" maxlength="200" value="ห้องตัวอย่าง" placeholder="เช่น พาไปห้องตัวอย่าง">
+      <p class="hint">ส่งเข้า go_to_place โดยตรง ไม่ใช่ระบบรู้จำเสียงหรือแปลเจตนา</p>
+      <button id="go" class="primary">เริ่มเดินทาง <span>→</span></button>
+      <div class="button-row"><button id="stop" class="stop">■ หยุดการจำลอง</button><button id="home">⌂ กลับฐาน</button></div>
+      <button id="status" class="quiet">อ่านสถานะจากเครื่องมือ</button>
+      <hr>
+      <label for="fault">เหตุการณ์สำหรับคำสั่งถัดไป</label>
+      <select id="fault"><option value="none">ปกติ · ถึงจุดหมาย</option><option value="obstacle">มีสิ่งกีดขวาง · ค้างกลางทาง</option><option value="navigation_failed">นำทางล้มเหลว</option><option value="no_arrival">ไม่ได้รับรายงานว่าถึง</option><option value="ack_lost">ไม่ได้รับ ACK · ผลคำสั่งไม่ทราบ</option></select>
+      <div class="button-row timing"><label for="duration">เวลาเดิน (วินาที)<input id="duration" type="number" min="1" max="30" value="6"></label><label for="timeout">หมดเวลา (วินาที)<input id="timeout" type="number" min="2" max="60" value="12"></label></div>
+      <button id="configure">ใช้กับคำสั่งถัดไป</button>
+      <div class="button-row"><button id="disconnect">จำลองหลุดการเชื่อมต่อ</button><button id="duplicate">ส่งคำสั่งเดิมซ้ำ</button></div>
+    </details>
+  </div>
+  <section class="panel journal">
+    <div class="panel-heading"><div><p class="eyebrow">03 / EVENT JOURNAL</p><h2>คำสั่งและผลตอบรับ</h2></div><div class="button-row"><button id="export">บันทึกผล JSON</button><button id="reset">เริ่มรอบใหม่</button></div></div>
+    <p class="hint">ACK = รับคำสั่งแล้ว • arrived = ถึงจุดหมายแล้ว • เก็บ 500 เหตุการณ์ล่าสุดในหน่วยความจำ</p>
+    <div class="table-wrap"><table><thead><tr><th scope="col">เวลา</th><th scope="col">เหตุการณ์</th><th scope="col">รายละเอียด</th><th scope="col">คำสั่ง</th></tr></thead><tbody id="events"></tbody></table></div>
+    <details><summary>ผลล่าสุดจากเครื่องมือระบบหลัก</summary><pre id="result">ยังไม่มีคำสั่ง</pre></details>
+  </section>
+  <section class="panel diagnostic-panel">
+    <div class="panel-heading"><div><p class="eyebrow">04 / REHEARSAL HEALTH</p><h2>ผลซ้อมเสียง</h2></div><span id="diagnosticCount" class="tag">0 เหตุการณ์</span></div>
+    <div class="diagnostic-stats"><div>บริการเสียง<strong id="providerStatus">ยังไม่เปิดสาย</strong></div><div>เวลารับเสียงตอบ p50<strong id="latency50">ยังไม่มีข้อมูล</strong></div><div>เวลารับเสียงตอบ p95<strong id="latency95">ยังไม่มีข้อมูล</strong></div></div>
+    <p class="hint">วัดเวลาจากสัญญาณจบเสียงถึงข้อมูลเสียงจาก AI ไม่ใช่เสียงที่ได้ยินจากลำโพง · เก็บสูงสุด 800 เหตุการณ์ใน RAM และรวมใน “บันทึกผล JSON” · metrics ไม่เก็บคำพูดหรือไฟล์เสียง</p>
+    <details><summary>ดูเหตุการณ์เสียงล่าสุด</summary><div class="table-wrap"><table><thead><tr><th>เวลา</th><th>เหตุการณ์</th><th>ข้อมูลวัด</th></tr></thead><tbody id="diagnosticRows"></tbody></table></div></details>
+  </section>
+  <footer>ระยะทาง ความเร็ว แบตเตอรี่ และการชาร์จเป็นค่าจำลอง • การทดสอบมอเตอร์ เซนเซอร์ ไมค์ และระยะเบรก ต้องทำบนหุ่นจริง</footer>
+</main>
+</body>
+</html>

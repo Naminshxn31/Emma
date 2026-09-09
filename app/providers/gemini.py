@@ -362,7 +362,9 @@ class GeminiProvider(VoiceProvider):
             gemini_tool = tools.as_gemini_tool()
             if gemini_tool is not None:
                 config["tools"] = [gemini_tool]
-        if settings.web_search:
+        from app.robot_backend import active as simulation_backend
+
+        if settings.web_search and simulation_backend.get() is None:
             # Native grounding: Google runs the search, the model reads the
             # results. Behind a default-off flag because it has never been
             # verified against this live model — see WEB_SEARCH in config.
@@ -530,6 +532,10 @@ class GeminiProvider(VoiceProvider):
                 await self._session.send_realtime_input(
                     activity_start=types.ActivityStart())
             elif kind == "end":
+                from app.metrics import active
+
+                if active.get() is not None:
+                    active.get().speech_end("gemini_local_vad_decision")
                 await self._session.send_realtime_input(
                     activity_end=types.ActivityEnd())
             else:
@@ -545,15 +551,17 @@ class GeminiProvider(VoiceProvider):
     async def send_text(self, text: str) -> None:
         """Push a server-side instruction in as its own turn.
 
-        `send_client_content` (not `send_realtime_input`) so it lands as a
-        complete turn the model answers, rather than being folded into the
-        audio stream. Marked as `user` because Live has no separate channel
-        for a mid-session system aside; the wording carries that it's an
-        instruction to act, not something to read aloud.
+        Gemini 3.1 uses realtime text; client content only seeds history and
+        can complete silently without producing greeting/arrival audio.
+        Keep the explicit user turn on older models. These are instructions
+        to act, not text to read aloud; events.announce handles turn timing.
         """
         from google.genai import types
 
         if self._session is None:
+            return
+        if self.model.removeprefix("models/").startswith("gemini-3.1-flash-live"):
+            await self._session.send_realtime_input(text=text)
             return
         await self._session.send_client_content(
             turns=types.Content(role="user", parts=[types.Part(text=text)]),
@@ -581,7 +589,9 @@ class GeminiProvider(VoiceProvider):
             logger.info("tool call: %s(%s)", name, ", ".join(sorted(args)))
             yield ProviderEvent(kind="tool_call", text=name)
 
-        results = await tools.dispatch_all(calls)
+        results = (await tools.dispatch_all(calls) if self.use_tools else
+                   [(cid, name, {"ok": False, "error": "tools disabled for this session"})
+                    for cid, name, _args in calls])
 
         responses = [
             types.FunctionResponse(id=cid, name=name, response=result)
@@ -664,6 +674,17 @@ class GeminiProvider(VoiceProvider):
                             "the session will end when the socket closes"
                         )
                         continue
+
+                    usage = getattr(message, "usage_metadata", None)
+                    if usage is not None:
+                        from app.metrics import counts
+
+                        keys = ("prompt_token_count", "response_token_count", "total_token_count",
+                                "cached_content_token_count", "tool_use_prompt_token_count",
+                                "thoughts_token_count")
+                        data = {key: getattr(usage, key, None) for key in keys}
+                        yield ProviderEvent(kind="usage", data={
+                            "source": "gemini_report", **counts(data, keys)})
 
                     tool_call = getattr(message, "tool_call", None)
                     if tool_call and getattr(tool_call, "function_calls", None):

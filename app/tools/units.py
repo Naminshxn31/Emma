@@ -130,6 +130,7 @@ _STATUS_TH = {"available": "ว่าง", "reserved": "จอง", "sold": "ข
         "required": ["room"],
     },
     tags=["units"],
+    blocking=True,
 )
 def show_unit(room: str) -> dict:
     if live_configured():
@@ -432,6 +433,7 @@ def show_unit_live(room: str) -> dict:
         },
     },
     tags=["units"],
+    blocking=True,
 )
 def find_units(max_price_thb: float | None = None,
                min_price_thb: float | None = None,
@@ -587,6 +589,7 @@ def _plan_paths() -> dict[int, str]:
         },
     },
     tags=["units"],
+    blocking=True,
 )
 def show_plan(floor: int = 1, building: str | None = None) -> dict:
     if not live_configured():
@@ -692,6 +695,7 @@ def live_probe() -> tuple[bool, str]:
         },
     },
     tags=["units"],
+    blocking=True,
 )
 def list_promotions(building: str | None = None) -> dict:
     if not live_configured():
@@ -748,6 +752,7 @@ def list_promotions(building: str | None = None) -> dict:
         },
     },
     tags=["units"],
+    blocking=True,
 )
 def compare_unit_types(building: str | None = None) -> dict:
     if not live_configured():
@@ -835,6 +840,7 @@ def compare_unit_types(building: str | None = None) -> dict:
         "required": ["room", "ownership"],
     },
     tags=["units"],
+    blocking=True,
 )
 def show_quotation(room: str, ownership: str = "thai", currency: str | None = None) -> dict:
     """Item 1 (and the fee table of item 9) — not by generating a document.
@@ -898,6 +904,7 @@ def show_quotation(room: str, ownership: str = "thai", currency: str | None = No
     ),
     parameters={"type": "object", "properties": {}},
     tags=["units"],
+    blocking=True,
 )
 def show_map() -> dict:
     """Item 17 — a fixed, sales-confirmed pin, never a search the model

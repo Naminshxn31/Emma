@@ -682,6 +682,7 @@ def _build_deck(tour: str) -> list[str]:
         "required": ["query"],
     },
     tags=["slides"],
+    blocking=True,
 )
 def show_slide(query: str) -> dict:
     slides = load_slides()
@@ -701,13 +702,14 @@ def show_slide(query: str) -> dict:
             "hint": "ไม่พบภาพที่ตรงกับคำค้นนี้",
         }
 
-    STATE["detour"] = True
-    shown = _set_current(hits[0].slide)
+    from app.tool_io import on_loop
+
+    shown = on_loop(show_current, hits[0].slide)
     alternatives = [h.slide["id"] for h in hits[1:4] if h.found]
     out = {"ok": True, "slide": shown, "alternatives": alternatives}
     if shown.get("script"):
         out["instruction"] = SPEAK_SCRIPT
-    resume = resume_hint()
+    resume = on_loop(resume_hint)
     if resume:
         out["presentation"] = resume
     return out

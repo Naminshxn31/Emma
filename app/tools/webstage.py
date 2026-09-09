@@ -52,7 +52,7 @@ def enabled() -> bool:
     own browser, and a receptionist that starts putting arbitrary web pages on
     the presentation screen because a visitor asked is a different product.
     """
-    return bool(settings.web_stage)
+    return bool(settings.web_stage) and not settings.multi_session
 
 
 def is_open() -> bool:
@@ -176,6 +176,12 @@ async def _shutdown_quietly() -> None:
 
 
 def request(url: str) -> None:
+    from app.tool_io import on_loop
+
+    on_loop(_request, url)
+
+
+def _request(url: str) -> None:
     """Put this page on the screen. **Returns immediately.**
 
     Called from inside a tool call, and function calling on Gemini is
@@ -186,6 +192,8 @@ def request(url: str) -> None:
     """
     global _wanted, _task
 
+    if settings.multi_session:
+        return
     _wanted = url
     if _task is None or _task.done():
         # Keep the reference: a bare create_task can be collected mid-flight,

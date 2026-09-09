@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from app.slide_assets import SlideAssets
 
 from app import display, turnlog, voices
 from app.config import settings
@@ -38,7 +38,7 @@ _slides_path = Path(settings.slides_dir).expanduser()
 if not _slides_path.is_absolute():
     _slides_path = ROOT / _slides_path
 if _slides_path.is_dir():
-    app.mount("/slides", StaticFiles(directory=str(_slides_path)), name="slides")
+    app.mount("/slides", SlideAssets(directory=str(_slides_path)), name="slides")
 
 _MODEL_FOR = {"gemini": lambda: settings.gemini_model, "openai": lambda: settings.openai_model}
 
@@ -164,7 +164,7 @@ async def _log_effective_config() -> None:
         log.info("robot: enabled — waiting for the app to send robot_ready; "
                  "until then every movement runs in mock mode (%s)",
                  robot_link.status())
-    if settings.canva_url:
+    if settings.canva_url and not settings.multi_session:
         # Actually open it, rather than checking that the *package* imports.
         # The old check passed while Chromium itself was missing, so the
         # window silently never appeared and nothing said why. Opening it now
@@ -187,7 +187,9 @@ async def _log_effective_config() -> None:
     # quietly — one line of truth at boot.
     from app.tools import units as _units
 
-    ok_inv, detail_inv = _units.live_probe()
+    import asyncio
+
+    ok_inv, detail_inv = await asyncio.to_thread(_units.live_probe)
     (log.info if ok_inv else log.warning)("%s", detail_inv)
 
     # Semantic search: on or off, said out loud at boot.

@@ -34,6 +34,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from app import turnlog
+from app.tool_io import on_loop
 from app.tools.registry import tool
 
 logger = logging.getLogger("condo_voice.computer")
@@ -138,6 +139,7 @@ def _put_on_screen(url: str) -> str | None:
         "required": ["url"],
     },
     tags=["computer"],
+    blocking=True,
 )
 def open_in_browser(url: str) -> dict:
     parsed = urlparse((url or "").strip())
@@ -162,7 +164,7 @@ def open_in_browser(url: str) -> dict:
     try:
         import os
 
-        os.startfile(url)  # Windows: default browser
+        on_loop(os.startfile, url)  # Windows: default browser
     except Exception:
         logger.exception("could not open %r", url)
         turnlog.record("open_browser", url=url, ok=False)
@@ -258,6 +260,7 @@ def _press_media_key(vk: int) -> None:
         "required": ["action"],
     },
     tags=["computer"],
+    blocking=True,
 )
 def media_control(action: str, times: int = 1) -> dict:
     vk = _MEDIA_KEYS.get(action)
@@ -341,6 +344,7 @@ _NAME_TOKEN = None  # set below; simple import-order convenience
         "required": ["name"],
     },
     tags=["computer"],
+    blocking=True,
 )
 def open_program(name: str) -> dict:
     import os
@@ -361,7 +365,7 @@ def open_program(name: str) -> dict:
     if len(matches) == 1:
         target = matches[0]
         try:
-            os.startfile(str(apps[target]))
+            on_loop(os.startfile, str(apps[target]))
         except Exception:
             logger.exception("could not launch %r", target)
             turnlog.record("open_program", name=target, ok=False)
@@ -403,6 +407,7 @@ def open_program(name: str) -> dict:
         "required": ["name"],
     },
     tags=["computer"],
+    blocking=True,
 )
 def close_program(name: str) -> dict:
     import re
@@ -486,6 +491,7 @@ def _youtube_allows_embedding(video_id: str) -> bool:
         "required": ["query"],
     },
     tags=["computer"],
+    blocking=True,
 )
 
 
@@ -552,7 +558,7 @@ def play_youtube(query: str) -> dict:
             return {"ok": True, "playing": title or q, "url": url, "where": "screen",
                     "note": "เล่นบนจอแล้ว บอกชื่อคลิปให้เจ้าของฟังสั้นๆ"}
         try:
-            os.startfile(url)
+            on_loop(os.startfile, url)
         except Exception:
             logger.exception("could not open %r", url)
             return {"ok": False, "error": "could not open",
@@ -572,7 +578,7 @@ def play_youtube(query: str) -> dict:
                                 "บอกเจ้าของตรงๆ ว่าขึ้นหน้าค้นให้ ให้เขาเลือกเอง "
                                 "ห้ามบอกว่าเล่นวิดีโอแล้ว")}
     try:
-        os.startfile(fallback)
+        on_loop(os.startfile, fallback)
     except Exception:
         return {"ok": False, "error": "could not open",
                 "instruction": "เปิดเบราว์เซอร์ไม่สำเร็จ ให้บอกเจ้าของตรงๆ"}

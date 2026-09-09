@@ -279,11 +279,18 @@ def send_to_printer(path: Path, copies: int) -> tuple[bool, str]:
     tags=["documents"],
     # Paper does not come back. Not reversible, unlike every other tool here.
     confirm=True,
+    exclusive=True,
     # Spooling a job takes a few seconds and the guest is standing there
     # waiting for the sound of the printer.
     paced=True,
 )
 async def print_document(document: str, copies: int = 1) -> dict:
+    from app.tool_io import run_blocking
+
+    return await run_blocking(_print_document, document, copies)
+
+
+def _print_document(document: str, copies: int = 1) -> dict:
     available = load_catalogue()
     if not available:
         return {

@@ -88,9 +88,11 @@ _loaded = False
 def load_tools() -> list[Tool]:
     """Import the enabled tool modules once, and return what got registered."""
     global _loaded
-    if _loaded:
-        return all_tools()
-
+    from app.robot_backend import active as simulation_backend
+    if simulation_backend.get() is not None:
+        importlib.import_module("app.tools.simulation_home")
+    # Imports are cached by Python. Re-evaluate the selection so a changed
+    # configuration cannot leave the newly permitted groups unregistered.
     for module_path in _modules_to_load(settings.enabled_tool_groups()):
         try:
             importlib.import_module(module_path)

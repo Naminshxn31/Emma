@@ -1,5 +1,7 @@
 # condo-voice
 
+**ทุกครั้งที่แก้หรือเพิ่มไฟล์ต้องบันทึกใน [CHANGELOG.md](CHANGELOG.md)** ตามคำสั่งเจ้าของวันที่ 2026-09-08 และ [AGENTS.md](AGENTS.md) ระบุสิ่งที่เปลี่ยน เหตุผล และผลตรวจจริง รวมถึงการแก้เทสต์/เอกสารด้วย ห้ามใส่ secret หรือข้อมูลส่วนบุคคลลงประวัติ
+
 หุ่นยนต์ต้อนรับพูดภาษาไทยประจำห้องขายคอนโด "Embassy World" (Empire Group)
 ใช้ Gemini Live API แบบ speech-to-speech คุมสไลด์บนหน้าต่าง Canva จริง
 
@@ -89,7 +91,7 @@ Gemini ยังถอดไม่ออก (เบา/ไกลเกิน) �
 
 ```bash
 uvicorn app.main:app --port 8000     # รันเซิร์ฟเวอร์
-python -m pytest tests/ -q            # เทสต์ (737 ตัว, ใช้เวลา ~3 นาที)
+python -m pytest tests/ -q            # เทสต์; จำนวน/ผลล่าสุดอยู่ CHANGELOG.md
 python -m pytest tests/test_slides.py -q
 python scripts/eval_search.py         # วัดคุณภาพการค้นสไลด์
 python scripts/analyze_log.py --days 7  # อ่าน data/logs/ ว่าเกิดอะไรขึ้นจริง

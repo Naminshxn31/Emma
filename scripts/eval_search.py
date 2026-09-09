@@ -29,6 +29,8 @@ the winning slide's title should contain.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -227,11 +229,85 @@ def _best_pair(pairs: list[tuple[float, float, bool]]) -> None:
             print("  ! would now miss a good question (sim %.3f, cover %.2f)" % (sim, cov))
 
 
+def question_id(question):
+    return hashlib.sha256(question.encode("utf-8")).hexdigest()[:16]
+
+
+def select_split(questions, split, manifest):
+    if split == "all":
+        return questions
+    entries = manifest["cases"]
+    if {question_id(q) for q, _ in questions} != set(entries):
+        raise ValueError("Split manifest does not match questions; review and version the split first")
+    groups = {}
+    for entry in entries.values():
+        if entry["split"] not in {"train", "test"}:
+            raise ValueError("Invalid split")
+        if groups.setdefault(entry["group"], entry["split"]) != entry["split"]:
+            raise ValueError("A semantic group crosses train/test")
+    return [(q, e) for q, e in questions if entries[question_id(q)]["split"] == split]
+
+
+def evaluate_questions(questions, search, commercial):
+    """Exactly one outcome per case, including refusals, no hits and errors."""
+    rows = []
+    for question, expected in questions:
+        negative = question.startswith("!")
+        text = question.lstrip("!")
+        row = {"id": question_id(question), "question": text, "expected": expected,
+               "negative": negative, "status": "fail", "reason": "", "title": "",
+               "similarity": None, "coverage": None, "standout": None}
+        try:
+            if commercial(text):
+                row.update(status="pass" if negative else "fail", reason="commercial_refusal")
+            else:
+                hits = search(text)
+                if not hits:
+                    row.update(status="pass" if negative else "fail", reason="no_hits",
+                               similarity=-1.0, coverage=0.0, standout=-1.0)
+                else:
+                    top = hits[0]
+                    title = top.slide.get("title_th") or top.slide.get("title_en") or ""
+                    passed = (not top.found if negative else top.found and
+                              (not expected or expected.casefold() in title.casefold()))
+                    row.update(status="pass" if passed else "fail", reason="ranked_result",
+                               title=title, similarity=top.similarity, coverage=top.coverage,
+                               standout=top.standout)
+        except Exception as exc:
+            # Infrastructure failure is not a correct rejection or a retrieval miss.
+            row.update(status="skipped", reason=type(exc).__name__)
+        rows.append(row)
+    return rows
+
+
+def result_counts(rows):
+    out = {status: sum(r["status"] == status for r in rows) for status in ("pass", "fail", "skipped")}
+    out["total"] = len(rows)
+    scored = out["pass"] + out["fail"]
+    out["accuracy"] = out["pass"] / scored if scored else None
+    return out
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", type=Path, help="question list")
     parser.add_argument("--lexical", action="store_true", help="disable embeddings")
+    parser.add_argument("--split", choices=("train", "test", "all"), default="train")
+    parser.add_argument("--manifest", type=Path, default=ROOT / "data/eval/splits-v1.json")
+    parser.add_argument("--json-output", type=Path, help="write reproducible per-case report")
+    parser.add_argument("--write-cache", action="store_true", help="persist paid query embeddings")
     args = parser.parse_args()
+
+    questions = load_questions(args.file)
+    if args.file and args.split != "all" and args.manifest == ROOT / "data/eval/splits-v1.json":
+        parser.error("Custom --file requires its own --manifest or --split all")
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8")) if args.split != "all" else {}
+    try:
+        questions = select_split(questions, args.split, manifest)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if not questions:
+        parser.error("Selected split is empty")
 
     from app.config import settings
 
@@ -253,7 +329,8 @@ def main() -> int:
     # the questions from the calibration it was printing.
     from app.tools.retrieval import save_query_cache, use_query_cache
 
-    use_query_cache(ROOT / "data" / "eval_query_cache.npz")
+    if not args.lexical:
+        use_query_cache(ROOT / "data" / "eval_query_cache.npz")
 
     index = slide_search.get_index(slides)
     mode = "hybrid (BM25 + embeddings)" if index.semantic_enabled else "lexical only (BM25)"
@@ -262,72 +339,55 @@ def main() -> int:
         print("  NOTE: embeddings unavailable — cross-language questions will fail.")
         print("  Check GEMINI_API_KEY and network, or pass --lexical to silence this.\n")
 
-    positives, negatives, wrong = [], [], []
+    positives, negatives = [], []
     pos_out, neg_out = [], []       # the same queries, judged by standout
     pairs = []                      # (similarity, coverage, should_miss)
-    print("%-30s %6s %6s %6s %-5s %s"
-          % ("question", "cover", "sim", "stand", "found", "top slide"))
+    print("%-6s %-30s %s %s" % ("status", "question", "reason", "top candidate"))
     print("-" * 104)
 
-    for question, expected in load_questions(args.file):
-        should_miss = question.startswith("!")
-        text = question.lstrip("!")
-        # The same first gate the tool has. `search_condo_info` refuses
-        # commercial questions *before* searching, so measuring
-        # `search_slides` alone reports failures the guest can never see —
-        # "ค่าส่วนกลางเท่าไหร่" was counted as a wrong answer here while the
-        # robot has always replied "no data, ask the sales team".
-        #
-        # This is the third time in this project that a measurement was taken
-        # one layer away from the thing being judged. It reads as rigour and
-        # it produces numbers about something else.
-        if _is_commercial(text):
-            print("%-30s %6s %6s %6s %-5s %s"
-                  % (text[:30], "-", "-", "-", "no", "(commercial — refused before search)"))
-            if not should_miss:
-                wrong.append((text, "refused as commercial", "-"))
-            continue
+    def measured_search(query):
+        if not args.lexical and not index.semantic_enabled:
+            raise RuntimeError("Requested semantic search is unavailable")
+        hits = search_slides(query)
+        if not args.lexical and not index.semantic_enabled:
+            raise RuntimeError("Semantic search failed during evaluation")
+        if settings.search_reranker_model and slide_search._reranker_failed:
+            raise RuntimeError("Requested reranker is unavailable")
+        return hits
 
-        hits = search_slides(text)
-        if not hits:
-            print("%-30s %6s %6s %6s %-5s %s"
-                  % (text[:30], "-", "-", "-", "no", "(nothing)"))
-            (negatives if should_miss else positives).append(0.0)
-            (neg_out if should_miss else pos_out).append(0.0)
-            pairs.append((-1.0, 0.0, should_miss))
-            continue
+    rows = evaluate_questions(questions, measured_search, _is_commercial)
+    summary = result_counts(rows)
+    for row in rows:
+        print("%-6s %-30s %s %s" % (row["status"], row["question"][:30], row["reason"], row["title"][:34]))
+        if row["similarity"] is not None and row["status"] != "skipped":
+            (negatives if row["negative"] else positives).append(row["similarity"])
+            (neg_out if row["negative"] else pos_out).append(row["standout"])
+            pairs.append((row["similarity"], row["coverage"], row["negative"]))
+    print("\n{pass} correct, {fail} wrong, {skipped} skipped / {total} total".format(**summary))
+    if args.json_output:
+        deck_hash = hashlib.sha256(json.dumps(slides, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        report = {"schema_version": 1, "split": args.split,
+                  "dataset_version": manifest.get("version", "custom"),
+                  "dataset_sha256": hashlib.sha256(json.dumps(questions, ensure_ascii=False).encode()).hexdigest(),
+                  "deck_sha256": deck_hash, "mode": mode,
+                  "semantic_available_at_end": index.semantic_enabled,
+                  "effective_embed_provider": index.semantic.provider if index.semantic_enabled else "off",
+                  "config": {k: getattr(settings, k) for k in
+                             ("embed_provider", "search_min_similarity", "search_local_min_coverage",
+                              "search_reranker_model", "search_reranker_candidates")},
+                  "summary": summary, "cases": rows}
+        report["config"]["lexical_min_coverage"] = slide_search.MIN_COVERAGE
+        report["config"]["search_local_min_similarity"] = settings.search_local_min_similarity
+        args.json_output.parent.mkdir(parents=True, exist_ok=True)
+        args.json_output.write_text(json.dumps(report, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
 
-        # `hits[0]`, and `knowledge.search_condo_info` now agrees: the top
-        # hit decides. It used to scan the whole list, so the eval could
-        # report a question rejected while the tool answered it from an
-        # eighth-placed slide — RRF ranks by compromise, not by similarity.
-        top = hits[0]
-        pairs.append((top.similarity, top.coverage, should_miss))
-        title = top.slide.get("title_th") or top.slide.get("title_en") or ""
-        ok = " "
-        if should_miss:
-            negatives.append(top.similarity)
-            neg_out.append(top.standout)
-            if top.found:
-                ok, _ = "!", wrong.append((text, "should have found nothing", title))
-        else:
-            positives.append(top.similarity)
-            pos_out.append(top.standout)
-            if not top.found:
-                ok, _ = "!", wrong.append((text, "found nothing", title))
-            elif expected and expected.lower() not in title.lower():
-                ok, _ = "!", wrong.append((text, "expected %r" % expected, title))
-
-        print("%s%-29s %6.2f %6.2f %6.2f %-5s %s" % (
-            ok, text[:29], top.coverage, top.similarity, top.standout,
-            "yes" if top.found else "no", title[:34],
-        ))
-
-    save_query_cache()
-    print("\n%d correct, %d wrong" % (
-        len(positives) + len(negatives) - len(wrong), len(wrong)))
-    for text, why, got in wrong:
-        print("  %-32s %-28s got: %s" % (text[:32], why, got[:30]))
+    # Only training data may produce calibration suggestions.
+    if args.split != "train" or summary["skipped"]:
+        if summary["skipped"]:
+            print("Calibration disabled: some cases could not be evaluated.")
+        if args.write_cache:
+            save_query_cache()
+        return 1 if summary["fail"] or summary["skipped"] else 0
 
     # The calibration payoff: where the two populations actually separate.
     real = [s for s in positives if s >= 0]
@@ -355,8 +415,9 @@ def main() -> int:
         print("\nNo similarities recorded — running without embeddings.")
 
     # Whatever was paid for this run is kept, even if the run was cut short.
-    save_query_cache()
-    return 1 if wrong else 0
+    if args.write_cache:
+        save_query_cache()
+    return 1 if summary["fail"] or summary["skipped"] else 0
 
 
 if __name__ == "__main__":

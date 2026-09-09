@@ -17,6 +17,11 @@ from app.config import settings
 from app.tools import computer, websearch
 
 
+@pytest.fixture(autouse=True)
+def _enable_tested_tools(monkeypatch):
+    monkeypatch.setattr(settings, "tool_groups", "computer,websearch")
+
+
 # ==================== search_web ====================
 
 

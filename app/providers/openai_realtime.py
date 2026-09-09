@@ -159,10 +159,12 @@ class OpenAIProvider(VoiceProvider):
             calls.append((call.get("call_id"), call.get("name", ""), args))
 
         for _cid, name, args in calls:
-            logger.info("tool call: %s(%s)", name, args)
+            logger.info("tool call: %s(%s)", name, ", ".join(sorted(args)))
             yield ProviderEvent(kind="tool_call", text=name)
 
-        results = await tools.dispatch_all(calls)
+        results = (await tools.dispatch_all(calls) if self.use_tools else
+                   [(cid, name, {"ok": False, "error": "tools disabled for this session"})
+                    for cid, name, _args in calls])
 
         for call_id, name, result in results:
             await self._ws.send(json.dumps({
@@ -208,10 +210,28 @@ class OpenAIProvider(VoiceProvider):
                     # actually playing.
                     yield ProviderEvent(kind="speech_started")
 
+                elif etype == "input_audio_buffer.speech_stopped":
+                    yield ProviderEvent(kind="speech_stopped", text="openai_vad_event")
+
                 elif etype == "session.updated":
                     self.configured = True
 
                 elif etype == "response.done":
+                    response = evt.get("response") or {}
+                    usage = response.get("usage")
+                    if isinstance(usage, dict):
+                        from app.metrics import counts
+
+                        data = counts(usage, ("input_tokens", "output_tokens", "total_tokens"))
+                        details = usage.get("input_token_details") or {}
+                        data.update(counts(details, ("cached_tokens",)))
+                        for key, target in (("input_token_details", "input_audio_tokens"),
+                                            ("output_token_details", "output_audio_tokens")):
+                            audio = counts(usage.get(key), ("audio_tokens",))
+                            if audio:
+                                data[target] = audio["audio_tokens"]
+                        yield ProviderEvent(kind="usage", data={
+                            "source": "openai_response", "response_id": response.get("id"), **data})
                     # Function calls arrive as items on the finished response;
                     # run them and ask for a follow-up reply.
                     outputs = ((evt.get("response") or {}).get("output") or [])

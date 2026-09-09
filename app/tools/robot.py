@@ -2,7 +2,7 @@
 
 Same rule as `smarthome`: handlers return **facts**, not sentences, so the
 model phrases the confirmation in whatever language the guest is speaking.
-Every result carries `hardware` ("ok" / "mock" / "failed") so it can tell
+Every result carries `hardware` ("ok" / "mock" / "simulated" / "failed") so it can tell
 somebody the robot didn't actually move, instead of announcing a journey that
 never happened.
 
@@ -67,6 +67,7 @@ async def go_to_place(place: str) -> dict:
     if hardware == "ok":
         robot_link.STATE["moving"] = True
         robot_link.STATE["destination"] = target
+        robot_link.STATE["status_source"] = "command_sent"
         from app.config import settings
 
         robot_link.start_arrival_watch(target, settings.robot_arrival_timeout_s)
@@ -74,12 +75,15 @@ async def go_to_place(place: str) -> dict:
     return {
         "ok": hardware != "failed",
         "place": target,
-        "moving": robot_link.STATE["moving"],
+        "moving": robot_link.snapshot()["moving"],
         "hardware": hardware,
         "instruction": (
-            "บอกลูกค้าว่ากำลังพาไป แล้วชวนคุยระหว่างทางได้ "
+            "ส่งคำสั่งไปจุดหมายแล้ว ยังไม่ได้ยืนยันว่าหุ่นเริ่มเดิน ชวนคุยระหว่างรอได้ "
             "ห้ามบอกว่าถึงแล้ว รอจนกว่าจะมีข้อความแจ้งว่าถึง"
             if hardware == "ok" else
+            "กำลังเดินในตัวจำลองเท่านั้น ห้ามบอกว่าหุ่นจริงกำลังเดิน "
+            "ห้ามบอกว่าถึงแล้ว รอผลการจำลอง"
+            if hardware == "simulated" else
             "ยังไม่ได้เชื่อมต่อหุ่นยนต์จริง ให้บอกลูกค้าตรงๆ ว่ายังพาไปไม่ได้ "
             "ห้ามบอกว่ากำลังเดินไป"
         ),
@@ -104,15 +108,24 @@ async def stop_moving() -> dict:
     replies "I'm not moving" while rolling towards someone is the worst
     possible time to trust a cached flag.
     """
+    was_moving = robot_link.snapshot()["moving"]
     hardware = await robot_link.send("cancel_navigation")
-    was_moving = robot_link.STATE["moving"]
-    robot_link.STATE["moving"] = False
-    robot_link.STATE["destination"] = None
+    if hardware == "ok":
+        robot_link.STATE["moving"] = False
+        robot_link.STATE["destination"] = None
+        robot_link.STATE["status_source"] = "stop_requested"
+        robot_link._cancel_arrival_watch()
     return {
         "ok": hardware != "failed",
         "was_moving": was_moving,
         "hardware": hardware,
-        "instruction": "หยุดแล้ว ตอบรับสั้นๆ แล้วถามว่าลูกค้าต้องการอะไรต่อ",
+        "instruction": (
+            "ส่งคำสั่งหยุดแล้ว แต่ยังไม่ได้ยืนยันว่าหุ่นหยุดจริง ตอบรับสั้นๆ"
+            if hardware == "ok" else
+            "หยุดในตัวจำลองแล้ว ไม่มีการสั่งหุ่นจริง"
+            if hardware == "simulated" else
+            "ยังยืนยันการหยุดไม่ได้ ห้ามบอกว่าหยุดแล้ว ให้แจ้งเจ้าหน้าที่ตรวจสอบหุ่น"
+        ),
     }
 
 
@@ -130,10 +143,20 @@ async def return_to_base() -> dict:
     if hardware == "ok":
         robot_link.STATE["moving"] = True
         robot_link.STATE["destination"] = "base"
+        robot_link.STATE["status_source"] = "command_sent"
+        from app.config import settings
+
+        robot_link.start_arrival_watch("base", settings.robot_arrival_timeout_s)
     return {
         "ok": hardware != "failed",
         "hardware": hardware,
-        "instruction": "กำลังกลับจุดจอด ให้กล่าวลาลูกค้าสั้นๆ",
+        "instruction": (
+            "ส่งคำสั่งกลับจุดจอดแล้ว รอหุ่นรายงานว่าถึงก่อนยืนยันการชาร์จ"
+            if hardware == "ok" else
+            "กำลังกลับฐานในตัวจำลองเท่านั้น ห้ามอ้างว่าหุ่นจริงกำลังกลับหรือชาร์จ"
+            if hardware == "simulated" else
+            "ยังสั่งกลับจุดจอดจริงไม่ได้ ให้บอกตรงๆ ห้ามบอกว่ากำลังกลับหรือชาร์จ"
+        ),
     }
 
 
@@ -149,10 +172,18 @@ async def return_to_base() -> dict:
 def get_robot_status() -> dict:
     state = robot_link.snapshot()
     state["places"] = list(robot_link.places())
-    state["hardware"] = "ok" if robot_link.available() else "mock"
-    if not robot_link.available():
+    state["hardware"] = ("simulated" if robot_link.is_simulated() else
+                         "ok" if robot_link.available() else "mock")
+    if robot_link.is_simulated():
+        state["instruction"] = "ทั้งหมดเป็นสถานะจำลอง ไม่ใช่ข้อมูลจากหุ่นจริง"
+    elif not robot_link.available():
         state["instruction"] = (
             "ยังไม่ได้เชื่อมต่อหุ่นยนต์จริง ถ้าลูกค้าถามเรื่องการพาไป "
             "ให้บอกตรงๆ ว่ายังพาไปไม่ได้"
+        )
+    else:
+        state["instruction"] = (
+            "สถานะอ้างอิงคำสั่งล่าสุดหรือรายงานถึงจุดหมายเท่านั้น ยังไม่มี telemetry "
+            "moving=null คือไม่ทราบ ห้ามยืนยันว่าเดิน หยุด หรือชาร์จจากการส่งคำสั่งสำเร็จ"
         )
     return state

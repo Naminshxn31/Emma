@@ -469,9 +469,9 @@ def test_a_refused_microphone_still_lets_emma_be_heard():
     catch = body.split("} catch (e) {")[1].split("}")[0]
 
     # The permission failure records the fact and falls through to the
-    # audio graph; it does not leave the function.
+    # audio graph; only a call that ended during permission may return.
     assert "micStream = null" in catch
-    assert "return" not in catch
+    assert "return" not in catch.replace("if (audioCtx !== callCtx) return;", "")
     assert body.index("audioCtx = new") < body.index("if (!micStream) {")
     # And the banner names the browser's actual error, because "denied"
     # covered five different failures while every permission read Allow.

@@ -19,6 +19,8 @@ from app.prompts import build_instructions
 
 @pytest.fixture(autouse=True)
 def _own_store(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "assistant_profile", "emma")
+    monkeypatch.setattr(settings, "tool_groups", "memory")
     monkeypatch.setattr(settings, "memory_file", str(tmp_path / "memory.json"))
     memory_store.reset()
     yield

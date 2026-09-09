@@ -564,7 +564,8 @@ def test_the_noise_amplifiers_are_separately_switchable(monkeypatch):
         "a hardcoded AGC remains on one of the mic paths"
 
 
-def test_gemini_speaks_its_greeting_on_the_initial_connect(monkeypatch):
+@pytest.mark.parametrize("model", ["gemini-3.1-flash-live-preview", "gemini-2.5-flash-native-audio-preview-12-2025"])
+def test_gemini_speaks_its_greeting_on_the_initial_connect(monkeypatch, model):
     """The greeting parameter rode in from session.py since the beginning
     and only the OpenAI provider ever used it — on Gemini the robot never
     announced itself. What looked like a wake greeting was the model
@@ -577,11 +578,15 @@ def test_gemini_speaks_its_greeting_on_the_initial_connect(monkeypatch):
     from app.providers.gemini import GeminiProvider
 
     monkeypatch.setattr(cfg, "gemini_api_key", "k")
+    monkeypatch.setattr(cfg, "gemini_model", model)
     provider = GeminiProvider("Kore", "inst", greeting="ทักทายผู้ใช้สั้นๆ")
     sent = []
 
     class FakeSession:
         async def send_client_content(self, **kw):
+            sent.append(kw)
+
+        async def send_realtime_input(self, **kw):
             sent.append(kw)
 
     async def fake_connect():
@@ -590,7 +595,8 @@ def test_gemini_speaks_its_greeting_on_the_initial_connect(monkeypatch):
     monkeypatch.setattr(provider, "_connect", fake_connect)
     asyncio.run(provider.__aenter__())
     assert sent, "the greeting never reached the session"
-    assert "ทักทายผู้ใช้สั้นๆ" in str(sent[0]["turns"])
+    field = "text" if model.startswith("gemini-3.1") else "turns"
+    assert "ทักทายผู้ใช้สั้นๆ" in str(sent[0][field])
 
     # And never on a resume: a robot re-introducing itself because the
     # transport rotated past the duration cap reads as a mid-conversation
@@ -1249,7 +1255,7 @@ def test_interruption_passes_the_spoken_ratio_to_the_bubble():
     js = _client_js()
     for case in ("case 'speech_started':", "case 'interrupted':"):
         start = js.index(case)
-        body = js[start:start + 700]
+        body = js[start:js.index("\n    case ", start + len(case))]
         assert "heard / sentMs" in body or "heardMs / sentMs" in body, case
         assert "spokenRatio: ratio" in body, case
 
@@ -2687,6 +2693,8 @@ def test_the_microphone_is_released_before_any_close_branch():
     js = _client_js()
     body = js[js.index("ws.onclose = () => {"):]
     body = body[:body.index("\n  };")]
+    # A callback from an old socket must not release the current call's mic.
+    body = body.replace("if (ws !== callSocket) return;", "")
     stmts = [ln.strip() for ln in body.splitlines()
              if ln.strip() and not ln.strip().startswith("//")]
     release = next(i for i, ln in enumerate(stmts) if "releaseCallHardware()" in ln)

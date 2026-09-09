@@ -1,0 +1,510 @@
+{
+  "version": "regression-v1-2026-09-08",
+  "provenance": "Historical questions previously used for tuning; grouped regression partition, not an unseen voice benchmark.",
+  "cases": {
+    "f36b5cb5d8923013": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "3e669b39a33241fc": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "c76fa48500fb54d6": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "a24e5822b9c1d179": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "3a9b25a8c8d4ed54": {
+      "group": "positive:bungee",
+      "split": "train"
+    },
+    "38fdb197db1db88b": {
+      "group": "positive:pilates",
+      "split": "test"
+    },
+    "fa109f863f09f241": {
+      "group": "positive:spinning",
+      "split": "train"
+    },
+    "f15bbad8f9b34680": {
+      "group": "positive:สแกนร่างกาย",
+      "split": "train"
+    },
+    "a0339f78f3f98f09": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "3cfb8cca03e6f4f7": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "696aa50ae98bb244": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "185e1343f46026b1": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "0c2e37003b4cf707": {
+      "group": "positive:park",
+      "split": "train"
+    },
+    "2310baf96f37ba32": {
+      "group": "positive:unspecified",
+      "split": "train"
+    },
+    "0c1dce1ff425b172": {
+      "group": "positive:sauna",
+      "split": "train"
+    },
+    "d2b9e46063a66632": {
+      "group": "positive:sauna",
+      "split": "train"
+    },
+    "c2ce64e2205f6167": {
+      "group": "positive:himalayan",
+      "split": "train"
+    },
+    "ef19b3527bb4da11": {
+      "group": "positive:thermal",
+      "split": "train"
+    },
+    "277adde4683f88d1": {
+      "group": "positive:ice bath",
+      "split": "train"
+    },
+    "e79471cb4069e529": {
+      "group": "positive:ice bath",
+      "split": "train"
+    },
+    "3e001e499cdaa483": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "72c82d314ab2fff3": {
+      "group": "positive:ห้องน้ำ",
+      "split": "test"
+    },
+    "66f395dbd6a56558": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "be98f8bd06f9b2eb": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "d8a7a3430593b567": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "3ea90c050d746552": {
+      "group": "positive:co-working",
+      "split": "test"
+    },
+    "97e2c7409e1e5f3c": {
+      "group": "positive:junior",
+      "split": "test"
+    },
+    "4d8378c291a0852e": {
+      "group": "positive:aqua cinema",
+      "split": "train"
+    },
+    "a48c86437278e6e5": {
+      "group": "positive:aqua cinema",
+      "split": "train"
+    },
+    "d51b8433777d54b3": {
+      "group": "positive:ล็อบบี้",
+      "split": "train"
+    },
+    "0dbd093209f0e9b7": {
+      "group": "positive:social club",
+      "split": "test"
+    },
+    "5d0658cf89841917": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "ff4f7f252969aa5b": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "46a62746c960c6f3": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "30b28e383a0448a4": {
+      "group": "positive:ชั้น 3",
+      "split": "train"
+    },
+    "e4e13b05ce26e641": {
+      "group": "positive:แปลน",
+      "split": "train"
+    },
+    "9a5226acf9f216c7": {
+      "group": "positive:ทำเล",
+      "split": "train"
+    },
+    "ffeb41e533127af0": {
+      "group": "positive:ทำเล",
+      "split": "train"
+    },
+    "a902a0380965356c": {
+      "group": "positive:สนามบิน",
+      "split": "test"
+    },
+    "43f6dc58a21c2231": {
+      "group": "positive:จอมเทียน",
+      "split": "train"
+    },
+    "d32071accafde509": {
+      "group": "positive:พัทยา",
+      "split": "train"
+    },
+    "4b6b49a6a7afdac2": {
+      "group": "positive:ผู้พัฒนา",
+      "split": "train"
+    },
+    "67234adfcd17d3e8": {
+      "group": "positive:empire",
+      "split": "test"
+    },
+    "98dc1a47a9a156d9": {
+      "group": "positive:empire",
+      "split": "test"
+    },
+    "4bad9c4a5a93f24e": {
+      "group": "positive:รางวัล",
+      "split": "train"
+    },
+    "f2c968512114b4da": {
+      "group": "positive:future home",
+      "split": "train"
+    },
+    "ce82125345746325": {
+      "group": "positive:embassy ai",
+      "split": "train"
+    },
+    "2d3fe963878d4608": {
+      "group": "positive:future home",
+      "split": "train"
+    },
+    "ed1f17c09c3f9d36": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "d884624376145989": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "f2f602875f4d01d5": {
+      "group": "positive:sauna",
+      "split": "train"
+    },
+    "7e946eba837619bb": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "768599192d46387d": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "10f93673e966c3b0": {
+      "group": "positive:aqua cinema",
+      "split": "train"
+    },
+    "095d3f3dd2fbe159": {
+      "group": "positive:ล็อบบี้",
+      "split": "train"
+    },
+    "11ac826853e58107": {
+      "group": "positive:empire",
+      "split": "test"
+    },
+    "0d1d883929db0cb2": {
+      "group": "positive:สนามบิน",
+      "split": "test"
+    },
+    "881efbd3facd6039": {
+      "group": "positive:co-working",
+      "split": "test"
+    },
+    "c6fb5581ad85e68d": {
+      "group": "positive:junior",
+      "split": "test"
+    },
+    "5bbbc6ae3e0b2a15": {
+      "group": "positive:แปลน",
+      "split": "train"
+    },
+    "57d6cf56b687fd60": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "ba08782b41001a19": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "99d53159801ebfcc": {
+      "group": "positive:sauna",
+      "split": "train"
+    },
+    "865dbc98d1657370": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "8501be9859bf3950": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "0cff7f27e50ceb54": {
+      "group": "positive:aqua cinema",
+      "split": "train"
+    },
+    "c200d6982893b8a4": {
+      "group": "positive:empire",
+      "split": "test"
+    },
+    "52f08014edeed938": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "e880a73421b39e4c": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "a5a9feb8fac7c0fe": {
+      "group": "positive:sauna",
+      "split": "train"
+    },
+    "d1726c7451540700": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "912a9660185aa5bf": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "848d19e76245fc98": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "c7062ade0389e410": {
+      "group": "positive:unspecified",
+      "split": "train"
+    },
+    "e62da7c9585fc9c8": {
+      "group": "positive:sauna",
+      "split": "train"
+    },
+    "17d01e92657defdc": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "79dc73f1dd2831bd": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "622c235026dd78b4": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "b7392eeaf49a6d78": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "172989a93d2e616f": {
+      "group": "positive:sauna",
+      "split": "train"
+    },
+    "4acad5a7bdf622a3": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "3b4f9b8d091f0578": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "b12b97d5e6d853d3": {
+      "group": "positive:unspecified",
+      "split": "train"
+    },
+    "f1ff6edae81c2c8a": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "f4361b7d95d55a9d": {
+      "group": "positive:unspecified",
+      "split": "train"
+    },
+    "2fc81532458e3eaa": {
+      "group": "positive:pool",
+      "split": "train"
+    },
+    "f0583311b2fd446d": {
+      "group": "positive:biogenesis",
+      "split": "train"
+    },
+    "58a3fb9a53335129": {
+      "group": "positive:sauna",
+      "split": "train"
+    },
+    "e0d18278ff784273": {
+      "group": "positive:ใต้ดิน",
+      "split": "train"
+    },
+    "22262994b5eef8b7": {
+      "group": "positive:ห้องพัก",
+      "split": "train"
+    },
+    "2349703711eb080a": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "becd1f40770f42d7": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "228494c6a4565722": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "15965b3d3115f9e2": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "0f8c47d1b6aed4f2": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "e56ac478ec440aa0": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "df6e857186949730": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "4a7c89cfa312eacb": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "a7dd33ba99df4548": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "64e258b3e3fc0f2d": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "cdc0ab3f730bbfc6": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "70be38abb70d15ee": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "69f94cdb6b81fb3d": {
+      "group": "negative:ต้องหาไม่เจอ: สิ่งอำนวยความสะดวกที่โครงการนี้ไม่มี",
+      "split": "train"
+    },
+    "fa4fc55821be0c36": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "62d91832f7732601": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "04ee8def465db5b2": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "f75860b8845e90a5": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "dd440a4df0234f8f": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "1e037b0205429634": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "9cd98c49d56d9523": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "37dcb9cb28de213a": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "1b1dbea8574381c3": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "0a394295805cd63f": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "57b88ed26b4045e8": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "b2edc27046a79a4f": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "ec41b71198e0061a": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "829bb40f6b221a75": {
+      "group": "negative:ต้องหาไม่เจอ: คำถามเชิงพาณิชย์",
+      "split": "train"
+    },
+    "cea30f9e578474a6": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    },
+    "5f7a1e752016c2d9": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    },
+    "c518374756c9451e": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    },
+    "45247683e32f27c8": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    },
+    "7095eb319baef975": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    },
+    "66705919e4b8857e": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    },
+    "8ac56b2cefa08159": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    },
+    "3164fce54d168dfa": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    },
+    "6ae398c2c9260778": {
+      "group": "negative:ต้องหาไม่เจอ: นอกเรื่องสิ้นเชิง",
+      "split": "test"
+    }
+  }
+}

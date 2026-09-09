@@ -88,9 +88,14 @@ class Tool:
     #: sets this must bound its own wait and say why.
     paced: bool = False
     tags: list[str] = field(default_factory=list)
+    # Permission group, independent of display-effect tags and handler mocks.
+    group: str | None = None
+    blocking: bool = False
+    exclusive: bool = False
 
 
 _REGISTRY: dict[str, Tool] = {}
+_inflight: dict[object, asyncio.Task] = {}
 
 
 def tool(
@@ -102,6 +107,8 @@ def tool(
     long_running: bool = False,
     paced: bool = False,
     tags: list[str] | None = None,
+    blocking: bool = False,
+    exclusive: bool = False,
 ) -> Callable:
     def decorate(fn: Callable) -> Callable:
         if name in _REGISTRY:
@@ -115,14 +122,36 @@ def tool(
             long_running=long_running,
             paced=paced,
             tags=tags or [],
+            group=fn.__module__.removeprefix("app.tools.")
+            if fn.__module__.startswith("app.tools.") else None,
+            blocking=blocking,
+            exclusive=exclusive,
         )
         return fn
 
     return decorate
 
 
+def allowed(entry: Tool) -> bool:
+    from app.config import settings
+    from app.tools import _OPT_IN
+
+    if not settings.tools_enabled:
+        return False
+    from app.robot_backend import active as simulation_backend, SIMULATION_TOOLS
+
+    if simulation_backend.get() is not None:
+        return entry.group in {"robot", "simulation_home"} and entry.name in SIMULATION_TOOLS
+    if entry.group == "simulation_home":
+        return False
+    groups = settings.enabled_tool_groups()
+    if entry.group is None:
+        return True
+    return entry.group not in _OPT_IN if groups is None else entry.group in groups
+
+
 def all_tools() -> list[Tool]:
-    return list(_REGISTRY.values())
+    return [entry for entry in _REGISTRY.values() if allowed(entry)]
 
 
 def get(name: str) -> Tool | None:
@@ -135,11 +164,42 @@ def clear() -> None:
 
 
 async def dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
+    from app.metrics import active
+
+    observer = active.get()
+    if observer is None:
+        return await _dispatch(name, args)
+    turn_id = observer.ensure()
+    started = observer.clock()
+    outcome = "cancelled_or_error"
+    try:
+        result = await _dispatch(name, args)
+        outcome = "ok" if result.get("ok") else "failed"
+        return result
+    finally:
+        # No arguments or error text: only a known tool name and elapsed wait.
+        observer.record("metric_tool", turn_id=turn_id,
+                        name=name if name in _REGISTRY else "unknown", outcome=outcome,
+                        elapsed_ms=round((observer.clock()-started)*1000, 3))
+
+
+async def _dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
     """Run a tool by name. Always returns a dict, never raises."""
     entry = _REGISTRY.get(name)
     if entry is None:
         logger.warning("model called unknown tool %r", name)
         return {"ok": False, "error": f"unknown tool: {name}"}
+    if not allowed(entry):
+        return {"ok": False, "error": f"tool disabled: {name}"}
+    from app.turnlog import session_id
+
+    # Independent visitors may query the same read tool simultaneously;
+    # physical exclusive jobs (printing) remain owned by the whole machine.
+    scope = session_id.get()
+    job_key = name if entry.exclusive or scope is None else (scope, name)
+    if job_key in _inflight and not _inflight[job_key].done():
+        return {"ok": False, "error": "busy",
+                "instruction": "คำสั่งก่อนยังไม่จบ ห้ามสั่งซ้ำ ให้รอหรือติดต่อเจ้าหน้าที่"}
 
     args = dict(args or {})
 
@@ -156,8 +216,38 @@ async def dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
             logger.warning("%s called with unknown args %s — ignoring", name, sorted(unexpected))
             args = {k: v for k, v in args.items() if k not in unexpected}
 
+    from threading import Event
+
+    abandoned = Event()
     try:
-        result = entry.handler(**args)
+        if entry.blocking or entry.exclusive:
+            from app.tool_io import run_blocking
+
+            task = asyncio.create_task(
+                run_blocking(entry.handler, _abandoned=abandoned, **args)
+                if entry.blocking else entry.handler(**args))
+            _inflight[job_key] = task
+
+            def finished(job):
+                if _inflight.get(job_key) is job:
+                    _inflight.pop(job_key, None)
+                # Consume an abandoned result, including its exception.
+                if not job.cancelled():
+                    error = job.exception()
+                    if abandoned.is_set():
+                        from app import turnlog
+
+                        result = job.result() if error is None else {}
+                        turnlog.record("tool_finished_after_wait", name=name,
+                                       ok=error is None and isinstance(result, dict)
+                                       and result.get("ok", True))
+
+            task.add_done_callback(finished)
+            # Keep the worker owned after timeout, preventing duplicate
+            # physical actions. Its native I/O timeout still bounds the job.
+            result = asyncio.shield(task)
+        else:
+            result = entry.handler(**args)
         if inspect.isawaitable(result):
             # Nothing gets to hold the conversation open indefinitely.
             #
@@ -173,6 +263,7 @@ async def dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
             ceiling = SLOW_TOOL_TIMEOUT_S if entry.paced else TOOL_TIMEOUT_S
             result = await asyncio.wait_for(result, timeout=ceiling)
     except asyncio.TimeoutError:
+        abandoned.set()
         logger.error(
             "tool %s did not finish within %.0fs — returning an error so the "
             "conversation can continue", name,
@@ -181,8 +272,11 @@ async def dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
         return {
             "ok": False,
             "error": "timeout",
-            "instruction": "เครื่องมือไม่ตอบสนอง ให้ขอโทษสั้นๆ แล้วคุยต่อตามปกติ ห้ามเงียบ",
+            "instruction": "เครื่องมือไม่ตอบสนอง ยังยืนยันผลไม่ได้ ห้ามสั่งซ้ำเอง ให้ขอโทษสั้นๆ แล้วคุยต่อ ห้ามเงียบ",
         }
+    except asyncio.CancelledError:
+        abandoned.set()
+        raise
     except TypeError as exc:
         # Wrong/missing arguments from the model — recoverable, tell it so.
         logger.warning("bad arguments for %s: %s", name, exc)
@@ -244,7 +338,7 @@ def as_openai_tools() -> list[dict[str, Any]]:
             "description": t.description,
             "parameters": t.parameters,
         }
-        for t in _REGISTRY.values()
+        for t in all_tools()
     ]
 
 
@@ -257,7 +351,7 @@ def as_gemini_tool():
     from google.genai import types
 
     declarations = []
-    for t in _REGISTRY.values():
+    for t in all_tools():
         kwargs: dict[str, Any] = {
             "name": t.name,
             "description": t.description,

@@ -300,7 +300,12 @@ function render(slide) {
       front = 1 - front;
     };
     img.onerror = () => { $('idle').classList.remove('hide'); };
-    img.src = slide.url;
+    const assetUrl = new URL(slide.url, location.href);
+    const assetToken = new URLSearchParams(location.search).get('token');
+    if (assetToken && assetUrl.origin === location.origin && assetUrl.pathname.startsWith('/slides/')) {
+      assetUrl.searchParams.set('token', assetToken);
+    }
+    img.src = assetUrl.href;
     currentUrl = slide.url;
   }
 

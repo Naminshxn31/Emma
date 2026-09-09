@@ -193,6 +193,7 @@ def test_narration_script_is_offered_as_approved_copy(loaded, monkeypatch):
     library = loaded.load_slides()
     target = dict(library[0])
     target["script_th"] = "บทที่อนุมัติแล้ว"
+    target["script_approved"] = True
     monkeypatch.setattr(loaded, "_slides", [target] + library[1:])
 
     out = run(registry.dispatch("search_condo_info", {"query": target["title_th"]}))
