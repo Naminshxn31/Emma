@@ -84,13 +84,9 @@ def test_providers_report_their_session_limits():
 
 
 def test_gemini_voice_ids_match_documented_list():
-    expected = {
-        "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede", "Autonoe",
-        "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome", "Fenrir", "Gacrux",
-        "Iapetus", "Kore", "Laomedeia", "Leda", "Orus", "Pulcherrima", "Puck",
-        "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Sulafat", "Umbriel",
-        "Vindemiatrix", "Zephyr", "Zubenelgenubi",
-    }
+    # Trimmed to two on 2026-09-14 by the owner ("เหลือสองเสียงนี้พอ") —
+    # Despina (default) and Zephyr. Full 30-voice set is in git history.
+    expected = {"Despina", "Zephyr"}
     assert voices.ids_for("gemini") == expected
 
 
@@ -103,7 +99,7 @@ def test_openai_voice_ids_match_documented_list():
 def test_voices_endpoint_follows_provider(client):
     gem = client.get("/voices?provider=gemini").json()
     oai = client.get("/voices?provider=openai").json()
-    assert len(gem["voices"]) == 30 and gem["default"] in voices.ids_for("gemini")
+    assert len(gem["voices"]) == 2 and gem["default"] in voices.ids_for("gemini")
     assert len(oai["voices"]) == 10 and oai["default"] in voices.ids_for("openai")
     assert all(len(v["gradient"]) == 2 for v in gem["voices"] + oai["voices"])
 
@@ -501,8 +497,17 @@ def test_system_instruction_stays_short():
     # single stray utterance — mishears look like foreign words constantly,
     # and a robot that flips language on every blip feels broken, not
     # multilingual.
+    # Raised an eighth time (3800 -> 4700) for SALES_HOST_BLOCK, the voice
+    # the owner asked for on 2026-09-11 after handing over four sales
+    # documents: emotion before logic, the host's first person, no opening
+    # with price, and the promises never to make (returns, urgency,
+    # "finished" for what the material calls a concept). The documents went
+    # into the searchable library; the block is only what cannot wait for a
+    # search because it shapes every sentence. Trimmed from ~1040 to ~850
+    # characters first — every rule that could live in a tool description
+    # or the facts block already does.
     text = build_instructions("Test Condo")
-    assert len(text) < 3800, "system instruction grew to %d chars" % len(text)
+    assert len(text) < 4700, "system instruction grew to %d chars" % len(text)
 
 
 def test_every_tool_is_registered_under_its_own_handler():
@@ -844,8 +849,8 @@ def test_unknown_voice_falls_back_to_default(client, monkeypatch):
 
 def test_valid_voice_is_honoured(client, monkeypatch):
     _fake_gemini(monkeypatch, [_Msg(_Content(turn_complete=True))])
-    with client.websocket_connect("/ws?voice=Sulafat") as ws:
-        assert ws.receive_json()["voice"] == "Sulafat"
+    with client.websocket_connect("/ws?voice=Zephyr") as ws:
+        assert ws.receive_json()["voice"] == "Zephyr"
 
 
 # ==================== OpenAI provider (fake realtime server) ====================
@@ -2170,7 +2175,7 @@ def test_every_socket_refuses_a_missing_or_wrong_token(monkeypatch):
     monkeypatch.setattr(settings, "ws_token", "secret123")
     client = TestClient(app)
 
-    for path in ("/ws/wake", "/ws/display", "/ws"):
+    for path in ("/ws/wake", "/ws/display", "/ws", "/ws/camera"):
         with client.websocket_connect(path) as ws:
             evt = ws.receive_json()
         assert evt["code"] == "unauthorized", path
@@ -2879,3 +2884,21 @@ def test_playback_resumes_a_suspended_context_on_every_chunk():
               else 8000]
     assert "audioCtx.onstatechange" in mic, \
         "nothing re-arms resume when the context suspends mid-standby"
+
+
+def test_the_page_lets_a_url_override_mic_agc_per_client():
+    """Two microphones, one server (2026-09-11): the desk PC and the robot's
+    4-mic array share .env, and with Chrome's AGC on the robot heard the
+    whole showroom at desk level — 7 of 15 turns were other people's
+    conversations. `?agc=0` (and `?ns=`) on the kiosk URL overrides the
+    server's choice for that client only; the .env default is untouched."""
+    from pathlib import Path
+
+    src = (Path(__file__).parent.parent / "client" / "index.html").read_text(encoding="utf-8")
+    health_block = src.index("micAGC = health.mic.agc !== false;")
+    override = src.index("micq.get('agc')")
+    assert override > health_block, "the URL must win over /health, so it is applied after"
+    assert "micAGC = micq.get('agc') === '1'" in src
+    assert "micNS = micq.get('ns') === '1'" in src
+    # Only an explicit 0/1 overrides — a stray ?agc=yes must not flip anything.
+    assert "['0', '1'].includes(micq.get('agc'))" in src

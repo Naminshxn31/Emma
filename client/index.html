@@ -750,6 +750,147 @@ if (kioskMode) {
   setInterval(kioskClock, 10000);
   kioskClock();
   armIdleCursor();
+  // After load, not during parsing: measured on the robot 2026-09-11, a
+  // getUserMedia issued while the document was still loading never
+  // settled (no prompt, no error, no stream) while the same call a few
+  // seconds later succeeded at once.
+  window.addEventListener('load', () => setTimeout(startRobotCamera, 1500));
+}
+
+//: ---- the robot's own camera, sent to the server (`?cam=1`) ----
+//: The face greeter runs on the server, and the server's OpenCV can only
+//: open a lens on the machine it runs on - the desk PC. The robot's cameras
+//: are on the robot, where the only thing of ours that runs is this page.
+//: So the page asks Android for the camera the way it asks for the mic and
+//: streams JPEG frames to /ws/camera; the server reads them as if they were
+//: a USB camera (FACE_CAMERA_SOURCE=robot). Video only - the mic has its
+//: own two paths (wake, call) and a third capture would be the "second
+//: getUserMedia on the same device" bug all over again. Kiosk only, opt-in
+//: by URL: a desk browser must never start uploading its webcam because a
+//: flag was left on.
+const robotCamWanted = kioskMode && new URLSearchParams(location.search).get('cam') === '1';
+const robotCamToken = new URLSearchParams(location.search).get('token');
+const ROBOT_CAM_FPS = Math.min(10, Math.max(1,
+  Number(new URLSearchParams(location.search).get('camfps')) || 4));
+let robotCamSock = null, robotCamDelay = 2000, robotCamDown = false;
+
+//: Which of the robot's cameras: `?camdev=N` = the Nth video input Chrome
+//: lists (default 0). Both of this robot's lenses report "facing back", so
+//: facingMode cannot pick the one that looks at the visitor; only a person
+//: standing in front of it can, by trying N=0 and N=1.
+const ROBOT_CAM_DEV = Math.max(0, Number(new URLSearchParams(location.search).get('camdev')) || 0);
+let robotCamTries = 0, robotCamGen = 0;
+
+async function startRobotCamera() {
+  if (!robotCamWanted || robotCamDown || robotCamSock) return;
+  const gen = ++robotCamGen;
+  let stream;
+  try {
+    const cams = (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'videoinput');
+    const pick = cams[ROBOT_CAM_DEV] || cams[0];
+    // A request that neither resolves nor rejects is the failure seen on
+    // the robot; treat eight seconds of nothing as a failure and retry.
+    stream = await Promise.race([
+      navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 },
+                 ...(pick && pick.deviceId ? { deviceId: { exact: pick.deviceId } } : {}) },
+        audio: false,
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('camera request hung')), 8000)),
+    ]);
+    if (gen !== robotCamGen) { stream.getTracks().forEach((t) => t.stop()); return; }
+  } catch (e) {
+    // Measured on the robot 2026-09-11: the first request at page load
+    // came back "NotAllowedError: Permission denied" while site and app
+    // permissions were both granted, and the same request a moment later
+    // succeeded. Try again a few times before giving up for the page's
+    // lifetime — a denial that is real stays a denial on every retry.
+    console.warn('robot camera: getUserMedia failed', e);
+    robotCamTries += 1;
+    if (robotCamTries >= 6) { robotCamDown = true; return; }
+    setTimeout(startRobotCamera, 10000);
+    return;
+  }
+  const video = document.createElement('video');
+  video.muted = true; video.playsInline = true; video.srcObject = stream;
+  video.style.display = 'none';
+  document.body.appendChild(video);
+  await video.play();
+  const canvas = document.createElement('canvas');
+  const draw = canvas.getContext('2d');
+
+  const connect = () => {
+    if (robotCamDown) return;
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const sock = new WebSocket(`${proto}://${location.host}/ws/camera`
+      + (robotCamToken ? `?token=${encodeURIComponent(robotCamToken)}` : ''));
+    robotCamSock = sock;
+    sock.onopen = () => { robotCamDelay = 2000; };
+    sock.onmessage = (m) => {
+      let evt;
+      try { evt = JSON.parse(m.data); } catch { return; }
+      // Same rule as the other three sockets: a wrong token is final, not
+      // a reason to redial every two seconds with the camera light on.
+      if (evt.type === 'error' && evt.code === 'unauthorized') {
+        robotCamDown = true;
+        try { sock.close(); } catch {}
+      } else if (evt.type === 'camctl') {
+        // The cockpit asked to adjust this camera (zoom). The track is here,
+        // on the robot's page; apply within what the camera actually supports.
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = track.getCapabilities ? track.getCapabilities() : {};
+          const adv = {};
+          if (evt.zoom != null && caps.zoom) {
+            adv.zoom = Math.max(caps.zoom.min, Math.min(caps.zoom.max, Number(evt.zoom)));
+          }
+          if (Object.keys(adv).length) track.applyConstraints({ advanced: [adv] }).catch(() => {});
+        } catch (e) {}
+      }
+    };
+    sock.onclose = () => {
+      if (robotCamSock !== sock) return;
+      robotCamSock = null;
+      if (robotCamDown) return;
+      setTimeout(connect, robotCamDelay);
+      robotCamDelay = Math.min(robotCamDelay * 2, 30000);
+    };
+  };
+  connect();
+
+  let lastVT = -1, lastVTat = Date.now();
+  const capTimer = setInterval(() => {
+    if (gen !== robotCamGen) { clearInterval(capTimer); return; }  // superseded
+    const s = robotCamSock;
+    // Freeze guard: a live video advances currentTime; a frozen one — the tab
+    // was backgrounded and getUserMedia stalled on the way back — does not,
+    // yet this loop keeps pushing the last frame, so the server never sees it
+    // go stale (the 2s freshness check only catches a stopped push). If time
+    // stops advancing while the page is visible, tear the camera down and take
+    // it from the top with a fresh getUserMedia.
+    if (!document.hidden && video.videoWidth) {
+      if (video.currentTime !== lastVT) { lastVT = video.currentTime; lastVTat = Date.now(); }
+      else if (Date.now() - lastVTat > 3000) {
+        clearInterval(capTimer);
+        try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+        try { video.remove(); } catch {}
+        try { if (robotCamSock) robotCamSock.close(); } catch {}
+        robotCamSock = null;
+        setTimeout(startRobotCamera, 300);
+        return;
+      }
+    }
+    // bufferedAmount: a slow link must drop frames, not queue them -
+    // a face recognised from a frame twenty seconds old greets a back.
+    if (!s || s.readyState !== WebSocket.OPEN || s.bufferedAmount > 400000
+        || !video.videoWidth) return;
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    draw.drawImage(video, 0, 0);
+    canvas.toBlob((b) => {
+      if (b && robotCamSock === s && s.readyState === WebSocket.OPEN) s.send(b);
+    }, 'image/jpeg', 0.7);
+  }, 1000 / ROBOT_CAM_FPS);
 }
 
 //: Kiosk screens should not show a pointer, but "should not show" is not
@@ -837,6 +978,19 @@ Promise.all([
     micCompressor = health.mic.compressor !== false;
     micAGC = health.mic.agc !== false;
   }
+  // Per-client override, because two microphones share one server: the
+  // desk PC and the robot's 4-mic USB array. Measured 2026-09-11 on the
+  // robot with Chrome's AGC on: conversations across the showroom arrived
+  // at the same level as the person in front of it (7 of 15 heard turns
+  // were other people's), so the VAD floor tuned on the desk mic could not
+  // tell them apart — AGC does the far-field compressor's job all over
+  // again, on the one path (the call) that must NOT reach far. The .env
+  // value stays the desk's; the robot's kiosk URL carries ?agc=0 (and
+  // ?ns=0/1 for the same reason). Anything but 0/1 leaves the server's
+  // choice alone.
+  const micq = new URLSearchParams(location.search);
+  if (['0', '1'].includes(micq.get('agc'))) micAGC = micq.get('agc') === '1';
+  if (['0', '1'].includes(micq.get('ns'))) micNS = micq.get('ns') === '1';
   // Two questions, not one. `ready` is "a keyword will be listened for";
   // `standby` is "hold the socket open" — true as well when the camera at
   // the door is the thing that will ring it. A server that predates the
@@ -1966,6 +2120,15 @@ function startCall() {
   // a bookmark per mode, no .env edit, no restart.
   const urlq = new URLSearchParams(location.search);
   const urlProfile = urlq.get('profile'), urlLang = urlq.get('lang'), urlToken = urlq.get('token');
+  // ?voice=Zephyr on the page URL pins this connection's voice — a bookmark
+  // per voice (a Thai-voice link, an English-voice link), same idea as
+  // ?profile. A voice is one-per-session on Gemini Live, so this cannot
+  // switch by language mid-call; it just fixes which voice a session opens with.
+  const urlVoice = urlq.get('voice');
+  if (urlVoice && voices.length) {
+    const vi = voices.findIndex(v => v.id.toLowerCase() === urlVoice.toLowerCase());
+    if (vi >= 0) { idx = vi; selectedVoice = voices[vi].id; }
+  }
   ws = new WebSocket(`${proto}://${location.host}/ws?voice=${encodeURIComponent(selectedVoice)}`
     + (urlProfile ? `&profile=${encodeURIComponent(urlProfile)}` : '')
     + (urlLang ? `&lang=${encodeURIComponent(urlLang)}` : '')

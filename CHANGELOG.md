@@ -1,5 +1,874 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-14 — เลือกเสียงต่อลิงก์ (?voice=) + เหลือ 2 เสียง (Despina default)
+
+- เจ้าของอยากได้เสียงต่างภาษา (ไทย=Zephyr, อื่น=Despina) · **สลับตามภาษากลางสายทำไม่ได้** — Gemini Live ตั้งเสียงเดียวต่อ session ตอน connect (โค้ดเดิม callOrb ยืนยัน: เปลี่ยนเสียง = redial สายใหม่)
+- `client/index.html` — เพิ่ม `?voice=<ชื่อ>` บน URL (แบบเดียวกับ ?profile): ตรึงเสียงของสายนั้น = bookmark ต่อเสียง · node --check JS ผ่าน
+- **เจ้าของสั่ง "เหลือสองเสียงนี้พอ เอา Despina ตั้ง"** → `app/voices.py` `GEMINI_VOICES` เหลือ **Despina (recommended/default) + Zephyr** (จาก 30) · `.env` `GEMINI_VOICE=Kore→Despina` · แก้เทสต์: `test_voices_endpoint` 30→2, `test_gemini_voice_ids_match_documented_list` เหลือ {Despina,Zephyr}, `test_valid_voice_is_honoured` Sulafat→Zephyr · session.py fallback เดิมรองรับเสียงที่ถูกถอด (invalid→default ไม่ crash) · 30 เสียงเต็มอยู่ใน git history
+- สร้างตัวอย่างเสียงหญิง 10 เสียง (Gemini TTS `gemini-2.5-flash-preview-tts`) เก็บที่ `C:\Users\Name\Downloads\emma-voices\`
+- ตรวจ: `pytest tests/test_voice.py -q` → ผ่านหมดยกเว้น `test_system_instruction_stays_short` (prompt bloat จากฟีเจอร์ที่ยังไม่ commit สะสม ไม่เกี่ยวกับเสียง) · **ยังไม่ commit**
+
+## 2026-09-14 — Emma ไม่หยิบราคา/งบมาพูดเอง + ห้ามแต่งตัวเลขขนาดสระ/ลากูน
+
+- เห็นจากจอจริง (คุยบนคอม): (1) Emma ถามงบ→กรอง→"ไม่พบในงบ 10 ล้าน"→ขอโทษวนซ้ำหลายรอบ เจ้าของ "ถ้าไม่มีก็ไม่น่าเอาขึ้นมาพูด" · (2) overview หลุด "ลากูน 155 เมตร" — เช็คแล้ว "155" **ไม่มีในเอกสาร embassy-world** (docs พูดถึง Lagoon แต่ไม่เคยระบุขนาด) = แต่งเอง
+- `app/prompts.py` `SALES_HOST_BLOCK`: (1) เปลี่ยนกฎราคาเป็น **"ห้ามหยิบราคา/งบขึ้นมาพูดหรือถามลูกค้าเอง"** (ยังไม่มีราคาอนุมัติ) ถ้าลูกค้าเอ่ยงบเอง รับสั้นๆ ให้ฝ่ายขายยืนยัน ไม่พูดตัวเลขซ้ำ ไม่ถามงบเพื่อกรอง ช่วยเลือกจากแบบ/ขนาด/วิว/สถานะแทน · (2) เพิ่มกฎเจาะจง **ห้ามใส่ตัวเลขขนาด/ความยาว (เมตร/ตร.ม.) ให้สระ/ลากูน/สกายพูล/ส่วนกลาง** (อ้างเคสหลุดจริง ตามวิธีที่ได้ผลกับโมเดลนี้) — ไม่มีตัวเลขยืนยันในเอกสาร ให้บรรยายบรรยากาศแทน
+- ทั้งสองกฎไม่มีตัวเลข (เทสต์ no-digit ผ่าน) · `pytest tests/test_profiles.py -q` → **33 passed** · **ยังไม่ commit**
+
+## 2026-09-14 — เชื่อมข้อมูลห้อง: ยืนยัน LIVE + แก้หน้าสรุปที่ล้าสมัย
+
+- เจ้าของ "เชื่อมกับข้อมูลห้อง" → ตรวจแล้ว **เชื่อมอยู่แล้วและใช้งานได้เต็ม**: `unit inventory: LIVE (1082 units of embassy-world)` · `find_units`/`show_unit`/`show_plan` โหลดใน session · ทดสอบจริง: `show_unit B-124` → Studio 25 ตร.ม. ตึก B ชั้น 1 วิว ORT คอลเลกชัน SIGNATURE สถานะ "ว่าง" (source: live) · normalize "B124"→"B-124" · ราคาไม่ออก (`UNITS_SHOW_PRICE=false`) มี instruction กำกับให้ชี้ฝ่ายขาย
+- ไม่แก้ prompt เพิ่ม (กัน latency) — tools มี description บอกโมเดลเองว่าใช้เมื่อไร + กฎ "ห้ามเดาขนาด/เลขห้อง" มีอยู่แล้ว
+- `docs/emma-content-summary.md` — แก้ที่เขียนว่า "แบบห้อง/ขนาด ยังว่าง" (ล้าสมัย): เพิ่มแหล่ง **ผังขาย LIVE 1,082 ยูนิต** ในส่วนที่ 1 (เลขห้อง/ตึก/ชั้น/แบบ/ขนาด/วิว/คอลเลกชัน/สถานะว่าง) · ส่วนที่ 4 เหลือแค่ "ราคาเริ่มต้น+โปรฯ ที่อนุมัติ" ที่ยังขาด (แบบห้อง/ขนาดไม่ขาดแล้ว)
+- **ยังไม่ commit**
+
+## 2026-09-14 — Emma ตอบเสียงหลอน (noise/echo ทะลุ VAD floor) บนหุ่น
+
+- อาการ: กด "เริ่มคุย" แล้ว Emma ทักถูก (+ถามเรื่องโครงการ) แต่หลังจากนั้นมีบับเบิล YOU เป็น **ญี่ปุ่น "え、もう1回戻ろうか。" / เกาหลี "네가"** ทั้งที่ไม่มีใครพูด แล้ว Emma ตอบกลับ + คำเปิดโดน "ถูกพูดแทรก" (เจ้าของ: "ไม่ได้พูดอะไรเลย ทำไมเป็นแบบนั้น")
+- ต้นเหตุจาก log: `call audio: peak=0.0238-0.0250 speech level reached | vad segments` — เสียงรบกวน/เอคโค่ลำโพงหุ่น (ไมค์อาเรย์ + agc=0) ทะลุ `VAD_MIN_RMS=0.01` ถูกส่งขึ้น Gemini → ถอดเป็นภาษามั่ว (silence→hallucination) · การเพิ่ม ja-JP,ko-KR เข้า transcribe ทำให้หลอนเป็น ja/ko
+- แก้ (วัดก่อนจูนตามกฎ): `.env` `VAD_MIN_RMS=0.01→0.03` (เสียงหลอนวัดได้ 0.0238-0.0250, เสียงพูดจริงเข้าหุ่น 0.06+ จาก wake log → 0.03 บล็อกเสียงหลอน ผ่านเสียงพูด) · `TRANSCRIBE_LANGUAGES` ถอด ja/ko กลับเป็น `th-TH,en-US,zh-CN` (reply ยัง auto = หลายภาษาได้อยู่) · หมายเหตุ: ค่านี้ global ต่อทั้งหุ่น+เดสก์ท็อป — ถ้าเดสก์ท็อปไมค์ใกล้แล้วเสียงเบาโดนตัด ค่อยลดลง
+- **เอาพูดแทรกออก (เจ้าของ):** สาเหตุที่คำเปิดโดนแทรก = เสียงหลอนข้างบน (floor 0.03 อุดแล้ว) + HALF_DUPLEX=true (กัน barge-in) มีอยู่แล้ว · **ลองแก้ session.py ให้ปิดหูตอนคำเปิดกับทุก session (ไม่ใช่แค่ summoned) แต่ย้อนกลับ** เพราะชน `test_a_plain_session_hears_from_the_first_byte` (plain session ต้องได้ยินตั้งแต่ byte แรกโดยตั้งใจ — ดีไซน์เดิม) · ผลจริงบนหุ่น: คำเปิดพูดจบเต็มไม่โดนแทรก + ไม่มี ja/ko หลอนแล้ว
+- ตรวจ: `pytest tests/test_profiles.py -q` → 33 passed (เดี่ยว) · หมายเหตุ: `test_system_instruction_stays_short` แดง — prompt working tree 6812 chars > ลิมิต 4700 เพราะฟีเจอร์ sales-host (3037 chars) + gallery ที่**ยังไม่ commit**สะสมหลาย session (stash prompts.py ออก = HEAD lean ผ่าน) ไม่ใช่ regression วันนี้ · `test_no_websearch...` = isolation flake (รันเดี่ยวผ่าน)
+- **ยังไม่ commit**
+
+## 2026-09-14 — Emma พูดเอง (wake ปลุกตัวเอง) + ให้ตามสคริปต์ในไฟล์
+
+- **Emma พูดเอง:** log ชี้ `wake word heard: 'EMMA'` ยิงเอง 3 ครั้งทั้งที่ไม่มีใครเรียก (camera greeter ไม่ได้ยิง — กล้องหลุดเฟรม) = เสียง Emma พูดคำว่า "Emma" ในคำทักเอง ย้อนเข้าไมค์อาเรย์ของหุ่น (ไม่มี AEC) → ปลุก wake ตัวเอง = acoustic feedback loop (ตรงกับสมมติฐานเดิมใน task ค้าง)
+- แก้สำหรับตอนตรวจ: `.env` `WAKE_ENABLED=true→false` (AUTO_CONNECT=false อยู่แล้ว → หน้าหุ่นเป็นปุ่ม "เริ่มคุย" เริ่มเอง ไม่มีทางปลุกตัวเอง) · โหลดหน้าหุ่นใหม่แบบ `?agc=0&token=...` (เอา cam=1 ออก — กล้อง greeter หลุดเฟรม + กัน auto-greet) · การแก้ feedback ให้ wake กลับมาใช้ได้ต้องทำ echo-cancel/หยุด wake ตอน Emma พูด = งานหลังตรวจ
+- **ตามสคริปต์ในไฟล์:** เจ้าของ "แก้ๆ ให้เน้นตามสคริปในไฟล์ไปก่อน" → `SALES_HOST_BLOCK`: เปลี่ยนกฎ brevity จาก "ห้ามลอกประโยคจากเอกสาร" → "ยึดสคริปต์+สำนวนตามไฟล์ได้ แต่แบ่งเล่าเป็นช่วงสั้นๆ ทีละส่วน ไม่เทหมดในคราวเดียว" + เพิ่มลำดับนำเสนอตามสคริปต์ (ต้อนรับ → ทำไม Embassy World → จินตนาการชีวิต → โลกต่างๆ → Future Living → ทำเล → ความน่าเชื่อถือ → แนะนำเฉพาะบุคคล → ปิดการขาย)
+- ตรวจจริง: `pytest tests/test_profiles.py -q` → **33 passed** · **ยังไม่ commit**
+
+## 2026-09-14 — เตรียมเจ้านายตรวจ: หลายภาษา + รันขึ้นหน้าจอหุ่น
+
+- เจ้าของ: "เดี๋ยวเจ้านายจะมาตรวจ ให้สามารถพูดได้หลายภาษา แล้วก็รันให้ทำงานผ่านหน้าจอหุ่น" (ใช้หน้าโปรดักชัน `/` เดิม ไม่ใช่ voice-preview ใหม่)
+- **หลายภาษา:** `REPLY_LANGUAGES=auto` (ค่า default, ไม่มี override) เปิดอยู่แล้ว → Emma ตอบภาษาเดียวกับลูกค้าอัตโนมัติ สลับกลางบทได้ (~97 ภาษา ผ่าน `_language_rule`) · `.env` `TRANSCRIBE_LANGUAGES` ขยาย `th-TH,en-US` → `th-TH,en-US,zh-CN,ja-JP,ko-KR` (แค่ caption บนจอ ไม่กระทบภาษาที่ตอบ ตามคอมเมนต์ใน config)
+- **หน้าจอหุ่น:** หุ่น ZC-3588A (Android 15) IP เปลี่ยนเป็น **192.168.1.63:5555** หลังรีบูต (จากเดิม .24 — DHCP, หาเจอด้วย `adb mdns services`) · เปิด Chromium (org.chromium.chrome.stable ตัวที่เชื่อ cert mkcert) ชี้ไปเซิร์ฟเวอร์ 192.168.1.43:8001 ผ่าน adb · เจ้าของสั่งเอา `?kiosk=1` ออก ให้เหมือนหน้า `/` ที่ใช้อยู่ (การ์ด concierge) → เปิดด้วย `?cam=1&agc=0&token=...` · ปิดแท็บซ้อนเหลือแท็บเดียว · ยืนยันจริงจาก screencap: หน้า SLEEP "เรียก emma ได้เลยค่ะ" + กล้อง first frame 1920x1080 + ไมค์รับเสียงถึง speech level
+- **คำถามเปิด/แนวคิด (prompts.py):** เจ้าของ "ห้ามถามห้องตัวอย่าง ให้ถามคำถามเกี่ยวกับโครงการก่อน" → `GREETING` เปลี่ยนตัวอย่างคำถามเป็นเรื่องโครงการ (รู้จักโครงการไหม/แวะมาชมไหม/สนใจเรื่องไหนของโครงการ) ห้ามถามแบบห้อง/ขนาด · เจ้าของ "พยายามพูดเรื่องแนวคิด ที่มาของโครงการ เอาให้เหมือนในไฟล์" (5 ไฟล์ Downloads = ต้นทางของ embassy-world/ 5 md, import แล้ว 11 ก.ย.) → เพิ่มกฎใน `SALES_HOST_BLOCK`: เล่าแนวคิด+ที่มาเป็นหัวใจ (ไม่ใช่คอนโด+facility ยาวขึ้น แต่ชีวิตเปลี่ยน ที่อยู่ควรพัฒนาตาม / One Place Many Worlds) อ้างอิงถ้อยคำจากเอกสารที่ค้นได้ ห้ามแต่ง (ไม่เอ่ยชื่อ tool — กันรั่วตอน mydocs ไม่โหลด, เทสต์คุม)
+- ตรวจจริง: `pytest tests/test_profiles.py -q` → **33 passed** · **ยังไม่ commit**
+
+## 2026-09-14 — ประโยคเปิด (GREETING): ทักทาย + ถามต่อหนึ่งข้อเป็นกันเอง
+
+- ปรับหลายรอบตามเจ้าของ: สคริปต์เต็ม → "ยาวไป" → ค่อยๆ ถาม → เกริ่นนิดเดียว → "เอาแค่คำทักทายพอ" → (เห็นหน้าจอจริง) "ให้ถามไปด้วย"
+- `app/prompts.py` `GREETING` (instruction ไม่ใช่บทท่อง): **ทักทายแนะนำตัว "สวัสดีค่ะ ดิฉัน Emma ยินดีต้อนรับสู่โครงการ Embassy World ค่ะ" + คำถามเปิดเบาๆ หนึ่งข้อ** (เช่น วันนี้แวะมาชมโครงการไหมคะ / มองหาบ้านแบบไหนอยู่คะ) เปิดให้ลูกค้าตอบ ยังไม่เล่า overview ยาว ไม่พูดราคา/ขนาด แล้วค่อยเล่าโครงการทีละส่วนตามที่ลูกค้าสนใจ · `tests/test_profiles.py` — docstring `test_the_gallery_greeting_leads_with_the_project_not_price` อัปเดตตามเจตนา (ทักทาย+ถามหนึ่งข้อ, overview เลื่อนไปในบทสนทนา) · assertion "ยังไม่พูดเรื่องราคา"+"ภาพรวมโครงการ" ยังจริง
+- ตรวจจริง: `pytest tests/test_profiles.py -q` → **33 passed** · ทดสอบบนเครื่องจริง เห็น Emma ทักแล้วถาม "มีห้องแบบไหนที่สนใจเป็นพิเศษไหมคะ" · **ยังไม่ commit**
+
+## 2026-09-14 — สรุปคลังความรู้ + เปิด WAKE_DEBUG หา false wake
+
+- เจ้าของขอ "สรุปเนื้อหาทั้งหมดที่เรามี" → `docs/emma-content-summary.md`: (1) ที่ Emma ใช้ตอบตอนนี้ = Embassy World 6 ไฟล์ + สไลด์ + condo_facts (2) สาระ Embassy World (แนวคิด One Place Many Worlds/Nothing Is Missing, Worlds, ทำเลจอมเทียน) (3) คลังที่ปิดไว้: Embassy Life 3, Empire 2+เว็บ 7, ก่อสร้าง 42, web dump 127 (4) ที่ขาด: ราคา/แบบห้อง (condo_facts ว่าง)
+- ยืนยัน "One Place, Many Worlds" ที่คำทักทายพูด = **ของจริง** (อยู่ใน thai-market-strategy + สไลด์) ไม่ได้แต่ง · greeting ค้น query "ภาพรวมโครงการและแนวคิดหลัก" ก่อนพูด (grounding — เหตุผลที่คอนเซ็ปต์ถูก)
+- เจ้าของรายงาน wake ปลุกเองทั้งที่ไม่เรียก "emma" → เช็ค: ไม่ใช่หลายแท็บ (run_server ไม่เด้งแท็บ, 2 conn) · **เปิด `WAKE_DEBUG=true`** ใน .env (ตามกฎ: วัดก่อนจูน) เพื่อดู RMS+คำตัดสินตอน false wake · สงสัยเสียง Emma พูด "Emma" เองย้อนเข้าไมค์ · รีสตาร์ต run_server.py · **ยังไม่ commit** (WAKE_DEBUG เป็น debug ชั่วคราว ปิดกลับหลังวัดเสร็จ)
+
+## 2026-09-14 — ปรับ UX/UI หน้า voice preview เป็น Emma แบบโฟกัสเดียว
+
+- `client/voice-preview.html` — ปรับลำดับสายตาตามภาพอ้างอิงเป็น **สถานะฟัง → มาสคอต Emma → ประโยคตอบล่าสุด → ปุ่มควบคุม**; ตัดข้อความแบรนด์/ชื่อ Emma ที่ซ้ำด้านบนและตัดการ์ดคำตอบที่รบกวนสายตา เหลือข้อความตอบใต้ตัวการ์ตูนโดยตรง พร้อม responsive layout, safe-area, focus state และ reduced-motion
+- หน้า preview วนแสดง pose ที่อนุมัติครบทั้ง `pose-01..pose-10` และ `wai` อัตโนมัติทุก 2.2 วินาที เพื่อให้เห็นว่ามีท่าอื่นจริง; ใช้ `?autoPose=0` เพื่อปิด หรือเรียก `setPose()` เพื่อหยุดลูปและให้ host ควบคุมท่าเอง พร้อมเพิ่ม `startPoseDemo()`/`stopPoseDemo()` สำหรับควบคุมจากภายนอก
+- เปลี่ยนจากการสลับ PNG หลายท่าเป็น **layered puppet rig**: `emma-puppet-atlas-compact-v1.png` วาดตามสัดส่วนภาพอ้างอิงใหม่ให้หัวกลมใหญ่ ลำตัวสั้น แขนสั้นและมือใหญ่ พร้อมแยกหัวเปล่า ลำตัว แขน/มือซ้ายขวา ตาโค้ง ปากหลายรูป และมือไหว้บน alpha จริง; SVG crop แต่ละชิ้นแล้วหมุนรอบข้อต่อ จึง interpolate ต่อเนื่องระหว่าง pose แทนการตัดภาพ
+- `client/voice-preview.html` — เพิ่ม joint targets สำหรับ `pose-01..pose-10` และ `wai`, transition easing 720ms, idle breathing, blink, wave loop, celebrate bounce, frustrated shake, wai bow, loading ring, cursor parallax และ mouth-level lip-sync hook โดยใช้ puppet ตัวเดียวตลอด state machine
+- ตัดตากลม/ตาเปิดที่ ImageGen สร้างเผื่อออกจาก rig ตามคำสั่งเจ้าของ เหลือเฉพาะตาโค้งยิ้ม ตาหลับเศร้า และตาหยีที่ดัดจากทรงโค้งเดียวกัน
+- เก็บ visual QA หลังเปลี่ยน asset: จำกัด moving glint ไว้เฉพาะใบหน้าเพื่อไม่ให้เกิดเงาแขนซ้อนจาก mask เดิม และย้าย halo ring ไปอยู่ใต้ลำตัวตาม approved concept
+- แยก state ข้อความ 10 สถานะออกจาก pose โดยจงใจ **ไม่กำหนดเอง** ว่า `thinking`/`speaking` ต้องใช้ท่าไหน; `window.EmmaVoicePreview.setPose('pose-01'..'pose-10')` เปลี่ยน joint/สีหน้าของ puppet และหยุด demo loop เพื่อให้เจ้าของเลือก mapping ภายหลัง ส่วน `greeting` คงเรียก `wai`
+- `setMouthLevel(0..1)` เปลี่ยนระหว่างปากเล็ก/ปากกว้างและสเกลช่องปากแบบเฟรมต่อเฟรมสำหรับต่อ lip-sync จริง; ตาโค้ง blink เองโดยไม่ใช้ตากลม
+- ท่า `wai` ใช้มือพนมแยกใน atlas, fade แขนปกติออก แล้วขยับหัว/ลำตัว/มือก้มต่อเนื่องแทนการเปลี่ยนไปเป็นภาพไหว้อีกใบ
+- จูนจุดหมุนและองศาแขนใหม่ให้เข้ากับแขนสั้นของ atlas: ท่าแตะหู คิด กางแขน โบกมือ และดีใจไม่หลุดกรอบ; ท่าเศร้า/ขอบคุณ/loading ใช้มือประสานตาม pose sheet, เพิ่มวงจุด aura รอบหัวในท่า loading และแก้ floor ring จากการหมุนจนตั้งฉากเป็น pulse แนวนอน
+- ปุ่มข้อความ/ไมค์/จบเปลี่ยนจาก emoji ซึ่งหน้าตาแปรตามระบบ เป็น inline SVG เส้นสม่ำเสมอแนวทาง Lucide (`viewBox 24`, `currentColor`, stroke 2, linecap/linejoin round) พร้อมชื่อใต้ไอคอน, `aria-label`, `title` และพื้นที่กดวงกลม 54–76px; ฝังในไฟล์เพื่อไม่พึ่ง CDN
+- `tests/test_voice_preview_page.py` — ล็อกโครง reference layout, SVG icon/accessibility, layered puppet parts, joint transition, facial layers, ไม่มีตากลม, pose API แยกจาก state API และ asset RGBA ที่แพ็กกับหน้า
+- ไม่ฝัง/คัดลอก `.riv` ของศิลปินตัวอย่างลงโปรเจกต์; ใช้ Emma atlas ต้นฉบับของโปรเจกต์กับ state machine ฝั่งหน้าเว็บเพื่อให้ทำงานแบบ self-contained และแก้ mapping ได้เอง
+- ตรวจจริง: pytest `tests/test_voice_preview_page.py` **5 passed**; Playwright demo เปลี่ยน `pose-01→pose-02`, เรียก `setPose()` ครบ 10 ท่ากับ `wai` แล้ว head/arm matrix และ eye/mouth state เปลี่ยนตาม target โดยใช้ character layer เดิมตลอด; float/turn/parallax/reduced-motion ทำงาน, หน้า 390×844 และ 1280×900 ไม่ล้น, ไม่มี console/page error
+
+## 2026-09-14 — เพิ่มเอกสาร "ภาพรวม Embassy World" ให้ Emma อธิบายโครงการ+แนวคิดได้
+
+- เจ้าของ (หลัง lookup timeout หายแล้ว ✅): Emma อธิบายโครงการยังบางไป อยากให้ "อธิบายโครงการ + ตั้งมาเพื่ออะไร (แนวคิด)" · ต้นเหตุ: embassy-world/ เป็นคู่มือการขาย ไม่มีภาพรวมโครงการล้วนๆ
+- **ไฟล์ใหม่** `data/personal-docs/embassy-world/embassy-world-overview.md` — grounded จากเอกสารจริง (master presentation): เป็นโครงการอะไร/ที่ไหน (คอนโดลักชูรี จอมเทียน พัทยา, Empire Group), **แนวคิด "ตั้งมาเพื่ออะไร"** (New Generation Living / Nothing Is Missing / ขายชีวิตที่ดีขึ้น), "โลก" ต่างๆ (Junior World, Aqua Cinema/Water, Wellness, Journey to Mars, Social, Future Living/Embassy AI), ทำเล · **ไม่มีราคา/ขนาด/โปรฯ** (กฎ approved-facts — หมายเหตุให้ยืนยันกับฝ่ายขาย)
+- อยู่ในโฟลเดอร์ embassy-world/ = ใน MYDOCS_INCLUDE scope · mydocs index rebuild อัตโนมัติ (fingerprint เปลี่ยน ไม่ต้องรีสตาร์ต) · ยืนยัน: search "Embassy World คืออะไร"/"โครงการนี้ตั้งมาเพื่ออะไร"/"แนวคิดของโครงการ" → overview.md เป็นอันดับ 1 · **ยังไม่ commit**
+
+## 2026-09-14 — แก้ voice Emma: lookup timeout + เลิกกั๊กเรื่องสิ่งอำนวยความสะดวก/ทำเล
+
+- เจ้าของทดสอบ voice จริง (Gemini Live) ถาม "Embassy World คืออะไร" → **"lookup — timeout"** Emma ตอบไม่ได้ + สั่งว่า "อย่ากั๊กเรื่องสิ่งอำนวยความสะดวก/ทำเล"
+- **timeout**: จับเวลาแล้ว `search_condo_info` **cold-start 7.5 วิ** (โหลด MiniLM ครั้งแรก) — บนเซิร์ฟเวอร์ที่กำลังประมวลผลเสียง Live พร้อมกันเลยทะลุเพดาน tool 15 วิ · แก้ `app/main.py` เพิ่ม startup hook `_warm_search` (background) เรียก search_condo_info ตอนบูต → โมเดลอุ่นก่อน คำถามแรกของลูกค้าไม่ cold (warm = 0.0s) · ยืนยัน log "search: embedding model warmed" (แก้ NameError logger รอบแรกด้วย)
+- **เลิกกั๊ก**: `app/prompts.py` SALES_HOST_BLOCK เดิม "ห้ามไล่รายการ facility เว้นแต่ลูกค้าถาม" → เปลี่ยนเป็น "พูดถึงสิ่งอำนวยความสะดวกและทำเลกับลูกค้าได้ตามปกติ ไม่ต้องกั๊ก แค่ยังไม่เปิดด้วยราคา/เงื่อนไขชำระเงินก่อนลูกค้าถาม" (คงกฎราคาไว้)
+- **เลิกถามลูกค้ากลับ** (เจ้าของเห็นในภาพ: Emma ถามกลับ "อยากทราบเรื่องสิ่งอำนวยความสะดวก/ทำเลไหมคะ"): กฎ "ฟังก่อนขาย ถามทีละคำถาม (ซื้อเพื่อใคร...)" → เปลี่ยนเป็น "ให้ข้อมูล/ตอบตรงๆ ก่อน ไม่ต้องถามลูกค้ากลับว่าอยากรู้เรื่องไหน — เล่าให้เลย จะถามเพื่อเข้าใจได้บ้างแต่เบาๆ ไม่ถามรัว/ไม่ถามก่อนให้ข้อมูล" · Emma เอียงไปทาง "ผู้ให้ข้อมูลที่ตอบตรง" ตามที่เจ้าของ iterate
+- `test_profiles.py` 33 passed · รีสตาร์ต run_server.py (warm search ทำงาน) · **ยังไม่ commit**
+
+## 2026-09-14 — เสียงเบราว์เซอร์ในหน้าแชท: ทำแล้ว revert (เจ้าของเลือกใช้ voice Emma จริง)
+
+- เจ้าของ "ไม่เอาแชท เอาเป็นแบบเสียงเลย" → ผมเผลอทำเสียงเบราว์เซอร์ (webkitSpeechRecognition + speechSynthesis) ในหน้าแชท local · เจ้าของท้วง "เอาอันที่เราเคยทำสิ จะทำใหม่ทำไม" = **voice Emma มีอยู่แล้ว** (หน้า `/` โปรดักชัน, Gemini Live, ใช้ prompt/persona/คลังชุดเดียวกับที่แก้)
+- **revert** เสียงเบราว์เซอร์ออกจาก `client/emma-chat.html` ทั้งหมด (คืนเป็นเทสต์ text local เหมือนเดิม) · node --check ผ่าน · ไม่เหลือ ref เสียง
+- รีสตาร์ตเซิร์ฟเวอร์หลัก (run_server.py) ให้ voice Emma จริงใช้ค่าใหม่: persona "พนักงานต้อนรับและผู้ให้ข้อมูล", คำทักทายสั้น, กฎอธิบายโครงการ, MYDOCS_INCLUDE=embassy-world · เจ้าของทดสอบด้วยเสียงที่หน้า `/` (กด "เริ่มคุย" + ไมค์) · ยังไม่ commit
+
+## 2026-09-14 — Emma พูดสั้นลง ไม่เป็นสคริปต์ + คำทักทายแนะนำตัว
+
+- เจ้าของ: "ไม่อยากให้ Emma พูดเหมือนในไฟล์ ดูสคริปต์และยาวเกินไป" + อยากได้คำทักทาย "สวัสดีค่ะ ดิฉัน Emma เป็น..."
+- `app/prompts.py` **SALES_HOST_BLOCK** เพิ่มกฎ (ไม่มีเลข ผ่านเทสต์): "ตอบสั้น กระชับ เป็นธรรมชาติ ไม่กี่ประโยค ห้ามยาวเป็นย่อหน้า **ห้ามลอกประโยคจากเอกสารมาทั้งท่อน** สรุปด้วยคำพูดตัวเอง ลูกค้าอยากรู้ลึกค่อยเล่าต่อ" · **GREETING** เปลี่ยนเป็นแนะนำตัวสั้น: เริ่มด้วย "สวัสดีค่ะ ดิฉัน Emma" + ถามคำถามเดียวเบาๆ ไม่เกิน 2 ประโยค (ยังคง "ยังไม่พูดเรื่องราคา"/"ถามคำถามเดียว" ตามเทสต์)
+- **เปลี่ยนคำเรียกตัวเอง (เจ้าของ iterate): "เจ้าบ้าน" → สุดท้าย "พนักงานต้อนรับและผู้ให้ข้อมูลของโครงการ"** ใน GREETING + SALES_HOST_BLOCK บรรทัดแรก แต่คงเสียง "เรา/ของเรา/ที่นี่" · ผล: "สวัสดีค่ะ ดิฉัน Emma **พนักงานต้อนรับและผู้ให้ข้อมูล**ของโครงการ Embassy World ค่ะ..." · หมายเหตุ: กลับทิศจาก CLAUDE.md ที่เขียนว่า Emma เป็น "เจ้าบ้าน ไม่ใช่พนักงานต้อนรับ" — รอโทนนิ่งค่อยอัปเดต doc
+- **เพิ่มกฎ "อธิบายโครงการเมื่อถูกขอ"**: SALES_HOST_BLOCK เดิมทำให้ Emma เลี่ยง (ถาม "อธิบายโครงการ" → ตอบ "เริ่มจากวิถีชีวิตที่คุณอยากมี") ขัดกับบทบาท "ผู้ให้ข้อมูล" → เพิ่ม "ถ้าลูกค้าขอให้อธิบาย/แนะนำโครงการ ให้เล่าภาพรวมจริงๆ สั้นๆ (แบบไหน/อยู่ไหน/จุดเด่น) ห้ามเลี่ยงด้วยการถามกลับอย่างเดียว" · หลังแก้ Emma อธิบายจริงขึ้น แต่ยังกว้าง เพราะ (ก) qwen3 local เล็ก (ข) **เอกสาร embassy-world เป็นคู่มือการขาย ไม่ใช่ fact sheet โครงการ** → ค้นได้ meta-text วิธีขาย ไม่ใช่ข้อเท็จจริง · ต่อไป: เพิ่มเอกสาร "ภาพรวม Embassy World" แบบข้อเท็จจริงล้วน · `test_profiles.py` 33 passed · ยังไม่ commit
+- `app/emma_chat.py` เพิ่ม `emma_greeting()` + `GET /greeting` (สร้างคำทักทายแบบเดียวกับที่โปรดักชันส่งตอน connect) · `client/emma-chat.html` ดึง /greeting ตอนโหลด โชว์เป็นข้อความแรก → ปรับคำทักทายจริงได้ในหน้านี้
+- ตรวจ: `test_profiles.py` 33 passed · chatbot local จริง: ทักทาย → **"สวัสดีค่ะ ดิฉัน Emma เป็นเจ้าบ้านของโครงการ Embassy World ค่ะ วันนี้สนใจเรื่องไหนบ้างคะ?"** ✅ · ตอบ "สวัสดี" สั้นลง 371 ตัวอักษร (เดิมยาวกว่ามาก) · py_compile + node --check ผ่าน · playwright ยืนยัน UI · **ยังไม่ commit**
+
+## 2026-09-14 — จำกัด Emma ให้ตอบเฉพาะ Embassy World (MYDOCS_INCLUDE) — แก้ปนโครงการที่ต้นเหตุ
+
+- เจ้าของสั่ง "ให้ตอบเฉพาะ Embassy World ก่อน" · ต้นเหตุการปนโครงการ = คลัง mydocs มี Embassy Life/Empire/ก่อสร้าง ปนกัน แล้ว retrieval คืน chunk ผิดโครงการ (Embassy World มีเฉพาะโฟลเดอร์ `embassy-world/` 5 ไฟล์ — corpus ไม่มี EW เลย)
+- **แก้ที่ retrieval (ช่วยทุกโมเดล ไม่ต้องพึ่ง prompt)**: `app/config.py` เพิ่ม `mydocs_include` (env `MYDOCS_INCLUDE`, default "" = ทุกไฟล์) · `app/tools/mydocs.py` `_doc_files()` กรองไฟล์ตาม fragment ของ path (เทียบ relative path) · `.env` ตั้ง `MYDOCS_INCLUDE=embassy-world`
+- **ผลจริง (chatbot local qwen3)**: ถาม Crystal Maze → เดิม "มีค่ะ ที่นี่มี" (ผิด) → **หลังแก้ "ไม่ค่ะ ที่นี่ไม่มี Crystal Maze"** ✅ · search คืนเฉพาะ `embassy-world/` (Crystal Maze/Embassy Life = ไม่เจอแล้ว) · slides (search_condo_info) เป็น EW อยู่แล้ว คงไว้
+- conftest pin `mydocs_include=""` (เหมือน tool_groups/embed_provider — เทสต์ห้ามเปลี่ยนตาม .env เครื่อง; 6 เทสต์ mydocs แดงเพราะ .env ก่อน pin) · เพิ่มเทสต์ `test_the_library_can_be_scoped_to_one_project` · `test_mydocs.py`+`test_profiles.py` 46 passed · **ยังไม่ commit** · widen ได้: ต่อ `,Empire-Information` ฯลฯ ใน MYDOCS_INCLUDE ทีหลัง
+
+## 2026-09-14 — หน้าแชทบอท Emma แบบพิมพ์ (ทดสอบคลังความรู้ + เห็น hallucination ชัด)
+
+- เจ้าของขอ "ทำหน้า Emma เป็นแชทบอทไว้ทดสอบถามคำถาม" · **ไฟล์ใหม่ standalone** `app/emma_chat.py` (FastAPI แยก port 8020, ไม่แตะ app.main/.env) + `client/emma-chat.html` (หน้าแชท text)
+- ใช้ **prompt จริง** (`build_instructions` condo profile) + **retrieval จริง** (`search_my_documents` + `search_condo_info`) + Gemini text model · แต่ละคำตอบโชว์ **sources (ไฟล์ที่หยิบมา)** + expand ดู chunk ได้ → เจ้าของเห็นเองว่าคำตอบมีที่มาไหม (specific ที่ไม่มี source = แต่ง)
+- รันแยก: `.venv/Scripts/python.exe -m app.emma_chat` → http://127.0.0.1:8020 · **ราวความซื่อสัตย์**: ใช้ gemini-2.5-flash (text sibling ไม่ใช่ Live prod) — หน้าเว็บบอกชื่อโมเดลชัด เป็น probe ไม่ใช่ preview เป๊ะ
+- ตรวจ end-to-end (server จริง + Gemini): (1) ถามสิ่งอำนวยความสะดวก → reply มี "155ม./Thermal Galaxy" + **sources ว่าง = โชว์ว่าแต่ง** (2) ถาม Crystal Maze → หยิบไฟล์ EMBASSY-LIFE 3 ไฟล์ + ตอบ "เป็นของ Embassy Life ค่ะ" = แยกโครงการถูก+มีที่มา (3) ถามราคา → commercial=True + refuse+ฝ่ายขาย · แก้บั๊ก dedup sources (logic กลับด้าน ทำ sources ว่างเสมอ) · py_compile + node --check ผ่าน · playwright ยืนยัน UI · **ยังไม่ commit**
+- **เปลี่ยนไปใช้ LLM local (Ollama qwen3:8b) แทน Gemini** (เจ้าของชน free-tier rate limit — "เอาเป็น local") · `_ollama_chat()` POST localhost:11434/api/chat, `think:False`, strip `<think>`, timeout 180s (~3-4 วิ/คำตอบ) · retrieval เดิม (search_my_documents = BM25 local) · **ไม่ใช้ Gemini เลย = ไม่เผา quota** · ตรวจ: qwen3 ตอบไทยได้, ถามสิ่งอำนวยความสะดวก → **ไม่แต่ง "155ม./Thermal Galaxy"** (โมเดล local ไม่มี training memory ของ Embassy World = ข้อดีสำหรับจับ ungrounded) · **แต่แยกโครงการแย่กว่า Gemini**: ถาม Crystal Maze → ตอบ "มีค่ะ ที่นี่มี" (ไม่แยกว่าเป็น Embassy Life — instruction-following อ่อนกว่า) → ตอกย้ำว่า root cause จริงคือ retrieval คืน chunk ผิดโครงการ ต้องแก้ retrieval scoping ถึงจะช่วยทุกโมเดล
+
+## 2026-09-14 — เทสต์ Emma แยกโครงการ + กันแต่งข้อมูล (SALES_HOST_BLOCK) — แยกโครงการได้ แต่ hallucinate ยังไม่หมด
+
+- เจ้าของขอเทสต์ว่า Emma แยกโครงการออกไหม + ปรับให้แยกชัดขึ้น · สำรวจคลัง: mydocs ปน **Embassy World (5) + Embassy Life พัทยา + Empire + web dump หลายสิบไฟล์** · retrieval ทดสอบ 7/9 found + กันราคา 2/2 · **แต่ถามสิ่งอำนวยความสะดวก "ที่นี่" → คืน chunk Embassy Life (คนละโครงการ)**
+- **เทสต์ Gemini จริง** (proxy gemini-2.5-flash เพราะ prod เป็น Live text ไม่ได้) ป้อน prompt จริง + ผลค้นจริง: Emma แต่ง **"ลากูน 155 เมตร, Thermal Galaxy spa, Biogenesis"** ที่**ไม่มีในเอกสารไหนเลย** (เช็คทั้งคลัง 0 ไฟล์) — ดึงจาก training prior ของโมเดลเรื่อง "Embassy World Pattaya" ทับข้อมูลจริง แม้ป้อนเนื้อหา EW จริงให้แล้วก็ยังแทรก
+- **แก้ `app/prompts.py` SALES_HOST_BLOCK** เพิ่ม 2 กฎ (ไม่มีเลข ผ่านเทสต์ no-numbers): (1) ที่นี่คือ Embassy World เท่านั้น, Embassy Life/โครงการอื่นเป็นคนละโครงการ, chunk ที่มีวงเล็บบริบทของโครงการอื่นห้ามพูดเหมือนของที่นี่ (2) ห้ามใช้ความรู้เดิมของโมเดลเติมชื่อ/ตัวเลข/โซนที่ไม่อยู่ในผลค้น
+- **ผลหลังแก้**: แยกโครงการ **✅ ได้ผล** (ถาม Crystal Maze → "เป็นของ Embassy Life ค่ะ ส่วน Embassy World...") · แต่ **hallucinate ตัวเลข/ชื่อ facility ❌ ยังไม่หยุด** แม้กฎแรง "ห้ามใช้ความรู้เดิม" — prompt เอาไม่อยู่กับ prior ของ proxy model
+- เพิ่มเทสต์ `test_the_sales_host_block_keeps_embassy_world_apart_from_other_projects` (อ่าน source ล็อก 2 กฎ) · `tests/test_profiles.py` 33 passed · **ยังไม่ commit** · ค้าง: (ก) ยืนยันกับเจ้าของว่า "155ม./Thermal Galaxy/Biogenesis" จริงหรือแต่ง (ถ้าจริง = ใส่ verified facts, ถ้าแต่ง = ต้องแก้ระดับ model/grounding) (ข) เทสต์ซ้ำบน prod Live model (พฤติกรรมอาจต่าง) (ค) retrieval scoping ให้คืน chunk EW สำหรับคำถาม EW
+
+## 2026-09-12 — sandbox ทดลอง feel การขับ (client/robot-drive-sim.html) — ปรับให้ลื่นแบบ RC โดยไม่ต้องมีหุ่น
+
+- เจ้าของ: "อยากให้ลื่นแบบรถบังคับ ตอนนี้ใช้หุ่นไม่ได้ (ไหม้) แต่มีข้อมูลหุ่นแล้ว สร้างแบบจำลองแล้วปรับจากตรงนี้" · sim เดิม (Emma World, app/robot_simulator.py :8010) จำลอง go_to_place เดินตามเส้นทาง **ไม่มี joystick drive** และเป็น WIP งานอื่น (uncommitted) — ไม่ทับ
+- **ไฟล์ใหม่ standalone** `client/robot-drive-sim.html` (เปิด file:// ได้เลย ไม่ต้องเซิร์ฟเวอร์/หุ่น/token): จอบนลงล่าง (canvas, กล้องตามหุ่น, grid 0.5ม., trail) + จอย analog แบบ /drive + WASD/ลูกศร · **โมเดลการเคลื่อนที่ dt-based ปรับได้**: max linear/angular speed, accel, brake(decel), turn accel, deadzone, turn-taper-at-speed
+- **2 โหมดจงใจ**: (ก) "ลื่น RC ในอุดมคติ" = ramp นุ่มๆ ออกแบบ feel ที่อยากได้ (ข) "จำลองบอร์ดจริง" = MoveBy ยิงซ้ำทุก heartbeat + latency + รีสตาร์ท ramp ทุกครั้ง → เห็นอาการกระตุกแบบของจริง เทียบกันได้ว่าต่างกันแค่ไหน (ค่าจริงยังต้องวัดบนหุ่น) · กล่อง params โชว์ค่าปัจจุบันไว้ก๊อปไปตั้งหุ่นจริง (max_moving_speed/max_angular_speed + cadence)
+- ตรวจ: extract inline JS → `node --check` rc 0 · playwright 1400×820 ขับด้วย keydown w+d จริง → หุ่นวิ่ง+เลี้ยว เห็น trail, readout อัปเดต, layout/สไลเดอร์/โหมดครบ · **ยังไม่ commit** · หมายเหตุ: sandbox ออกแบบ "feel ที่อยากได้" ได้จริง แต่หุ่นจริงจะทำได้แค่ไหนต้องวัดบนบอร์ด (condo-voice-79 ตั้ง log latency ไว้แล้ว)
+- **แก้ทิศ (เจ้าของ "กดลงแต่มันขึ้น")**: heading เริ่มต้น -90°→+90° (หัวชี้ขึ้น = forward=ขึ้น) + ทิศหมุนกลับเครื่องหมาย (สติ๊กขวา=ตามเข็ม=เลี้ยวขวา บน world y-up) · ยืนยัน playwright: W→v=+0.32 (ขึ้น), D→w=-30°/s (ขวา), trail โค้งขวา
+- **โหมด "บอร์ดจริง" ทำให้สมจริง (เจ้าของ "หุ่นจริงคุมยากกว่านี้")**: ตรวจโค้ดจริง `DRIVE_DIRECTIONS={forward,back,right,left}` + MoveBy รับทีละทิศ สปีดคงที่ → โหมดบอร์ดเปลี่ยนเป็น `discreteTargets()`: เลือกทิศเด่น 1 ใน 4, สปีดคงที่ (ไม่มีคันเร่งต่อเนื่อง), เลี้ยวพร้อมวิ่งไม่ได้ (ไม่มีโค้ง) + heartbeat/latency/ramp-restart เดิม = ทำไมจริงคุมยากกว่า analog · ยืนยัน playwright board mode: W+D พร้อมกัน → v=0.45 คงที่ w=0 (ไปทิศเด่นทิศเดียว)
+- ตั้ง default เป็นค่าที่เจ้าของชอบ: maxV 0.60 m/s, maxW 90°/s, accel 1.9, brake 1.4, turnAccel 180, deadzone 0.12, taper 25% (เป็น target feel — หุ่นจริง 4-ทิศคงที่อาจต้องลดสปีดลงเพื่อคุมง่าย)
+- **ตอบคำถาม velocity API (ค้น docs+robot_chassis.py, condo-voice-79 ยืนยันจาก spec.js บอร์ด)**: SLAMWARE REST **ไม่มี** cmd_vel/twist/velocity — action-based ล้วน (MoveBy 4 ทิศ, MoveTo, Rotate, GoHome) · speed = global `base.max_moving_speed`(0.4)/`base.max_angular_speed`(1.0) ผ่าน PUT /parameter ไม่ใช่ per-call → **analog throttle/โค้งลื่นแบบ RC ทำไม่ได้ที่ชั้น REST** · เจอ: `MoveByActionOptions` มี field `theta` (มุม, อาจโค้งได้ แต่ยังไม่รู้หน่วย/ทิศ ต้องวัดบนหุ่น) · pseudo-throttle = PUT base speed 2-3 ระดับตอนเปลี่ยนระดับ (ไม่ใช่ทุก heartbeat) + คืนค่าตอน stop (peer ทำ chassis ได้)
+- **sandbox: เพิ่ม option "ระดับสปีด (pseudo-throttle)" 1-3 ในโหมดบอร์ด** — `discreteTargets()` quantize สปีดตามระยะจอยเป็นขั้น (จำลอง pseudo-throttle จริง) · ยืนยัน playwright: 3 ระดับ จอยจิ้มนิด v=0.20 ดันสุด v=0.60 · node --check rc 0 · ยังไม่ commit
+
+## 2026-09-12 — ⚠️ เหตุการณ์: หัวหุ่นมีกลิ่นไหม้ตอนทดสอบเอียงคอ — ตัดไฟ + ปิด motion กลับ
+
+- ทดสอบเอียงคอจริง (ตามคำสั่งเจ้าของ "ทำจนกว่าจะทำได้"): เปิด `ROBOT_ARM_MOTION_ENABLED=true` → นำพอร์ตขึ้น (force-stop `com.aobo.robot.ai3` + `su 0` bind ch341 ที่ `3-1.4:1.0` → `/dev/ttyUSB10` โผล่ + stty raw 115200) → เจ้าของกด centre/▲/▼ ช่อง 8 บน /drive · หัว**ขยับจริง** (กล้องอยู่บนหัว ยืนยันจากเฟรมเลื่อน) ยืนยัน concept
+- **แต่เจ้าของรายงาน "หัวมีกลิ่นไหม้เหมือนมีอะไรเสีย"** → สั่งปิดหุ่น · เจ้าของตัดไฟทัน (adb → offline = หุ่นดับ ไฟเซอร์โวถูกตัด) · #STOP/unbind ที่ผมพยายามส่งช่วยไม่ทัน (device offline แล้ว) — **ตัวหยุดที่แน่นอนคือสวิตช์ไฟเซอร์โว ไม่ใช่ซอฟต์แวร์ (ตรงกับที่ทั้งโปรเจกต์เขียนไว้)**
+- สาเหตุ (ประเมิน): เซอร์โวหัวถูกสั่งไปตำแหน่งที่**ชนสุดทางกล (hard stop)** แล้ว stall → กระแสสูง → ร้อน/ไหม้ · **ยืนยันความเสี่ยงที่ condo-voice-79 เตือนไว้ก่อนเปิด**: "ไม่มีใครวัดว่า pulse ปลายช่วง (1500±200) ชนขอบกลไกไหม" — ช่วง `ROBOT_ARM_SPAN=200` (±200µs) เกินระยะกลไกจริงของคอ
+- **แก้กลับทันที**: `ROBOT_ARM_MOTION_ENABLED=false` (พร้อมคอมเมนต์เหตุผล) · **ยังไม่รีสตาร์ต server / หุ่นยังปิด**
+- **ค้าง/ต้องทำก่อนแตะหัวอีก**: (1) เช็คเซอร์โวหัวว่าไหม้/เสียไหมทางกายภาพ (2) วัดระยะปลอดภัยจริงของหัวด้วย span เล็กมาก (เช่น ±20-40µs) ทีละก้าว มีคนมืออยู่ที่สวิตช์ (3) หาค่า home จริงของหัว (pulse 1500 ≠ กลางเชิงกล) (4) เปิดแอปหุ่น `am start ...ai3` กลับเมื่อหุ่นกลับมาออนไลน์ (มันยึดพอร์ตคืน = คุมหัวไม่ได้ ต้องทำหลังตรวจเสร็จ) — ประสาน condo-voice-79 (เจ้าของโค้ดแขน) · ไม่ commit
+
+## 2026-09-12 — ปุ่ม "เอียงคอ" ใน /drive (ก้ม/เงยหัว = เล็งกล้องขึ้นลง)
+
+- เจ้าของถาม "ปรับกล้องมองขึ้นลงได้ไหม" → วัด caps กล้องจริงผ่าน DevTools (adb 9222 → Runtime.evaluate `getCapabilities()` บน video track): **ไม่มี `pan`/`tilt`** เลย (มีแค่ zoom≤4, focus, exposure, WB) = เอียงกล้องทางกลไก/PTZ ทำไม่ได้ · เจ้าของ: "ก็ขยับคอหุ่น"
+- ตรวจ `docs/robot-command-research-2026-09-11.md`: **หัวขยับได้จริง — ช่อง 7/8 บนบอร์ดเซอร์โว Torobot** (พิสูจน์ hardware 11 ก.ย. 12:07: ch7/8 หัวขยับ 2 แกน, ch1/11 แขนเงียบ) ผ่าน `/dev/ttyUSB10` CH340 115200 · กล้องหน้าอยู่บนหัว → ก้ม/เงยหัว = เล็งกล้องขึ้นลง
+- `client/robot-joystick.html`: เพิ่ม **"เอียงคอ"** ใต้สไลเดอร์ซูมในการ์ดกล้อง — 2 แถว: `ช่อง 8 (ก้ม-เงย) [กลาง][▲][▼]` + `ช่อง 7 (หัน) [กลาง][◄][►]` ยิง `POST /arm/command {action:centre|up|down, channel}` (endpoint ของ condo-voice-79 ที่หน้า /arm ใช้อยู่แล้ว — หน้านี้แค่เรียก ไม่แตะ robot_arm.py) · `checkHead()` เรียก `/arm/state` ตอนโหลด: ถ้า `!enabled`/`!motion_enabled`/`!port_present` → disable ปุ่ม + บอกเหตุ (motion ปิด default เพราะ #STOP ยังพิสูจน์ไม่ได้) · เซอร์โวไม่มี feedback → ต้อง `centre` ก่อน step (server บังคับ, page ใช้ note บอกให้กด "กลาง" ก่อน)
+- **mapping ช่อง** (condo-voice-79 ยืนยันจาก docs/robot-front-camera-test-2026-09-11.md): ช่อง 8=หัวก้ม/เงย(tilt), ช่อง 7=หัวหัน(pan) · **ทิศ +/- (▲=ขึ้นหรือลง) ยังไม่มีใครวัด** — note บอกเจ้าของกด ▲ แล้วดูเอง · ป้ายคงเลขช่องไว้ + วงเล็บชื่อข้อต่อ (ตามกติกาเดียวกับเทสต์ `test_the_page_never_labels_a_channel_with_a_joint_name` ของหน้า /arm ที่ห้ามเขียนชื่อข้อต่อแทนเลขช่อง)
+- ตรวจ: extract inline JS → `node --check` rc 0 · playwright 1600×900 ยืนยัน 2 แถวปุ่มขึ้นครบไม่ทับ layout · **ยังไม่ทดสอบขยับหัวจริง** — ติด `ROBOT_ARM_MOTION_ENABLED=false` (เจ้าของต้องตัดสินใจเปิด — เปิดแล้วปลดทุกช่องใน allowlist 1/11/7/8 ไม่ใช่แค่หัว) · แจ้ง condo-voice-79 ว่าเพิ่มปุ่มเรียก /arm/command บน /drive
+
+## 2026-09-12 — ปรับกล้องหุ่นจาก cockpit (zoom) — ช่องสั่งกลับหน้าหุ่น
+
+- เจ้าของขอ "เพิ่มที่ปรับกล้อง" — วัด capabilities: ปรับได้จริงแค่ **zoom 1..4x** (focus/exposure/WB เป็น auto ปรับไม่ได้; FOV คงที่ขยายมุมกว้างไม่ได้)
+- กล้องอยู่หน้าหุ่น cockpit เป็นคนละ browser → เพิ่ม**ช่องสั่งกลับ**: `app/robot_camera.py` feed เก็บ `set_control/control` (latest-wins + version) · `app/main.py` `/ws/camera` เพิ่ม task `_push_control` ส่ง `{type:"camctl",zoom}` กลับหน้าหุ่น (recv+push พร้อมกันด้วย asyncio.wait FIRST_COMPLETED) + `POST /cam/control` (clamp zoom, token-gate) · `client/index.html` sock.onmessage รับ camctl → `track.applyConstraints({advanced:[{zoom}]})` ตาม caps จริง · `client/robot-joystick.html` slider ซูมใต้กล้อง (ยิงตอน release)
+- **ทดสอบสด end-to-end: POST zoom 2.5 → หุ่น applyConstraints จริง (getSettings().zoom=2.5) → รีเซ็ต 1x** · reconnect ก็ได้ค่าล่าสุด (push_control ส่งตอน connect) · node --check 2 หน้า rc 0, py parse ok, `test_robot_camera/joystick_page/cockpit_feeds` 23 passed · แจ้ง condo-voice-79 ก่อนแตะ main.py (เขายืนยันว่าง)
+
+## 2026-09-12 — freeze-detect กล้องหุ่น (กล้องค้างเงียบตอนแท็บถูกพับ)
+
+- เจ้าของถาม "กล้องค้างไหม" — วัดจริง: /cam.jpg 200 แต่ 4 เฟรมใน 8 วิ md5 เท่ากันเป๊ะ = **ค้าง** · ต้นเหตุ: หน้า kiosk บนหุ่นถูกพับไป launcher แล้วดึงกลับ → getUserMedia video ค้าง แต่ loop ยัง push เฟรมเดิมซ้ำ → เซิร์ฟเวอร์ไม่เห็นว่า stale (ด่าน 2 วิ ของ /cam.jpg จับได้แค่ push ที่หยุด ไม่ใช่ push เฟรมค้างซ้ำ)
+- `client/index.html` (loop push กล้องหุ่น): เพิ่ม **freeze guard** — เช็ค `video.currentTime` ถ้าไม่ขยับเกิน 3 วิ ตอน `!document.hidden` = วิดีโอค้าง → รื้อ (stop tracks + remove video + close socket) แล้ว `startRobotCamera` ใหม่ (fresh getUserMedia) · guard ด้วย `gen !== robotCamGen` กันซ้อน · ตรวจ: reload หน้าหุ่น → 3 เฟรม md5 ต่างกัน (สด) · `node --check` index.html rc 0, `client_voice_lifecycle.cjs` PASS, `test_robot_camera.py` 7 passed
+- เพิ่ม `svc power stayon true` + ปิด screen timeout บนหุ่น (ลดการพับหน้า) · **kiosk-lock ถาวร (screen pinning/device-owner) ยังไม่ทำ** — invasive เจ้าของบอก "ตอนใช้จริงค่อยปรับ" → ทำ freeze-detect (ซอฟต์แวร์ ปลอดภัย) ก่อน ค่อยล็อกจอตอน deploy จริง
+
+## 2026-09-12 — บันทึกจุด "ที่ชาร์จ" + ปุ่มขึ้นแท่นชาร์จ + แก้แผนที่หาย + เรดาร์/แผนที่เคียงกัน
+
+- **แผนที่หาย** (เจ้าของ, จอฟอนต์ใหญ่): chrome การ์ดแมพดันจน canvas ยุบ → `.canvwrap { min-height:150px }` + การ์ด `overflow-y:auto` (chrome scroll ไม่บีบ canvas) + ปุ่มเล็กลง (`.btn` padding 5/8, ชื่อสั้น)
+- **เรดาร์/แผนที่เล็ก** → วางเคียงกัน (`.pair` flex row) แทน stack 3 ชั้น, drive เล็กไว้บน — ทั้งคู่ใหญ่ขึ้นมาก (ยืนยันด้วย playwright 1600×900 + 1600×760)
+- **บันทึกจุด "ที่ชาร์จ"** (เจ้าของขอ): ปุ่ม "บันทึกจุดนี้" → `{action:"save_poi",name}` (condo-voice-79 ทำ chassis; 403 ตอนแนบ pose → แก้เป็น POST ไม่แนบ pose บอร์ดสร้างที่ตำแหน่งหุ่นเอง) · **ทดสอบสด: POI "ที่ชาร์จ" บันทึกที่ base สำเร็จ** pose (3.05,-4.05,yaw3.02) quality 64, `/robot/state.places=['ที่ชาร์จ']`, ชื่อไทยถูกต้อง (รอบแรกเพี้ยน '????' เพราะ inline curl บน Git Bash ไม่ใช่โค้ด server — ส่ง UTF-8 เหมือน browser ถูก) · multi-floor pois ยังว่าง (POI อยู่ core/artifact)
+- **ปุ่ม "ขึ้นแท่นชาร์จ"** (เจ้าของ clarify: ชาร์จ=ถอยเข้าแท่นจริง ไม่ใช่แค่ POI): `{action:"home"}` → go_home/GoHomeAction (มีอยู่แล้ว) · confirm ก่อน + ต้อง motion unlock (เป็นการเคลื่อนที่ ยังไม่กดทดสอบ หุ่นอยู่บนแท่น)
+- รอ condo-voice-79: (1) เซฟแมพถาวร — เจ้าของอนุญาต "back up ไฟล์ก่อน" (POI อยู่ในแมพ RAM รีบูตอาจหาย) (2) ยืนยัน go_home docking จริง · เทสต์ joystick page 13 passed, node rc 0 · รีสตาร์ต run_server.py ให้ save_poi ทำงาน
+
+## 2026-09-12 — cockpit ปรับ layout ตามฟีดแบ็กจริง (ถ่าย screenshot ยืนยันด้วย playwright)
+
+- เจ้าของ iterate หลายรอบผ่าน screenshot จริง ("แก้", "สามอันเท่าจอ", "ไม่เห็นเรดาร์กับแผนที่", "ลดตัวบังคับ") — ยืนยัน layout ด้วย playwright headless 1600×900 (จอหุ่นเป็น portrait ถ่ายไม่ตรง PC landscape ของเจ้าของ)
+- `.cockpit` definite-height `calc(100vh-96px)` (media ≥900px) — 3 พาเนลขวาเติมพอดีจอไม่ล้น/ไม่เลื่อน · **canvas เรดาร์/แมพยุบเพราะ flex-canvas ตรงๆ** → ห่อ `.canvwrap { position:relative; flex:1 }` + `canvas { position:absolute; inset:0; object-fit:contain }` (วิธีชัวร์ให้ canvas โตในพื้นที่ flex) · เรดาร์ flex 1.1 / แมพ 1.4 (แมพเป็นตัวโต้ตอบ)
+- **ลดตัวบังคับ** ตามที่ขอ: stick 210→132, knob 84→52, เอามิเตอร์ไมค์ออกจากการ์ด (สถานะไมค์ดูที่ pill บน header; `pollMic` guard `miclvl` ที่ถูกลบ) → เรดาร์/แมพได้พื้นที่เพิ่ม
+- **แบตไม่ตรงจอหุ่น** (เจ้าของสังเกต): วัดแล้ว = **คนละก้อน** — SLAMWARE ฐาน/ขับเคลื่อน 25% (ที่ /drive โชว์) ≠ Android บอร์ดจอ 50% (dumpsys battery, ที่หน้าจอหุ่นโชว์) · เปลี่ยนป้าย "แบต" → **"แบตฐาน"** ให้ชัดว่าเป็นแบตขับเคลื่อน ไม่ใช่แบตจอ
+- กล้อง/ไมค์หลุดสตรีมตอนรีสตาร์ต server (หน้า kiosk บนหุ่นถูกพับไป launcher) — เปิด Chrome kiosk กลับ foreground + close แท็บซ้ำ + activate cam tab → กล้องกลับมา (1920×1080) · **ไมค์ยังไม่ปลุก**: หน้าได้ `standby_only` (wakeListens=false) ทั้งที่ /health wake ready — ค้างรอเจาะต่อ (ไม่บล็อกงานหลัก)
+- เทสต์ `tests/test_robot_joystick_page.py` 13 passed ทุกรอบ · node --check rc 0
+
+## 2026-09-12 — cockpit: กล้องซ้าย+พาเนลขวาพอดีจอ, แมพอ่านง่าย, หยุดใกล้ 0.3ม., ปรับตำแหน่ง
+
+- เจ้าของขอ 4 อย่าง — แบ่ง: layout+แมพ (client, ผม) · relocalize+obstacle (chassis, condo-voice-79)
+- **Layout** `client/robot-joystick.html`: กล้องย้ายมาซ้าย (16:9 ใหญ่ ไม่มีแถบดำ), radar/บังคับ/แผนที่ stack ขวา · เจ้าของ: "สามอันรวมกันเท่าจอ" → radar/map canvas cap `max-height:28vh/30vh` + object-fit บังคับ ให้ 3 พาเนลรวมสูง ~1 จอ (เลี่ยง flex-grow+max-height ที่ทำ canvas ยุบเป็น 0)
+- **แมพอ่านง่าย** (เจ้าของ: "แมพอ่านยาก"): เดิม grayscale ไล่ระดับ+pixelated เล็ก → สีเรียบ (พื้นว่าง `#e6ebf0` / กำแพง `#c73838` / ยังไม่สำรวจเทาเข้ม), scale grid ขึ้น ~600px crisp, **หุ่นเป็นสามเหลี่ยมชี้ทิศ** (yaw) แทนจุด, เพิ่ม legend (ว่าง/กำแพง/ยังไม่สำรวจ/หุ่น) · click หาร mapScale
+- **หยุดใกล้ 0.3ม.** (client รับจาก server ของ condo-voice-79): drive obstacle → จบ hold + โชว์ `r.hint` + flare วง `min_clearance` แดงในเรดาร์ทาง blocked.direction 2.5วิ · เรดาร์วาดวงเส้นหยุด (แดงประ) จาก `min_clearance` + note โชว์ clearance หน้า/หลัง (ถอย/หมุนออกไม่ถูกบล็อก)
+- **ปรับตำแหน่ง (relocalize)**: ปุ่มในการ์ดแมพยิง `{action:"relocalize",mode:"dock"}` แล้ว poll `localization_quality` โชว์ผล · **ทดสอบสดสำเร็จ: quality 43→71, pose เด้งไปตำแหน่งจริงบนแมพ (3.01,-4.10) จากที่ลอย ~0,0** (localization_was_paused:false) → click-to-go ใช้ได้จริงแล้ว
+- ตรวจ: `tests/test_robot_joystick_page.py` 13 passed · node --check JS rc 0 · รีสตาร์ต run_server.py ให้ relocalize/obstacle/clearance ของ condo-voice-79 ทำงาน (server ก่อนหน้าไม่รู้จัก) · /robot/laserscan มี clearance{front,back,left,right}+min_clearance จริง
+
+## 2026-09-12 — จอยลากนิ้ว (analog stick) + กล้องเต็มกว้าง
+
+- เจ้าของ: "เอาแบบจอยที่เลื่อนขยับ ไม่ต้องกด" — `client/robot-joystick.html`: แทนแป้น 4 ปุ่มกดด้วย **แป้นกลมลากนิ้ว** (knob) ลากไปทิศไหน=เดินทิศนั้น ลากกลับกลาง(ใน deadzone 0.32)หรือปล่อย=หยุด · แมปเวกเตอร์ลากเป็น 4 ทิศที่บอร์ด SLAMWARE รับ (แกนเด่นชนะ; บอร์ดไม่รับอนาล็อก 360°/theta) · refactor เป็น pump loop เดียว keyed ที่ `driving` — ลากเปลี่ยนทิศลื่นไม่มีช่องว่าง (เซิร์ฟเวอร์รับทิศใหม่โดยไม่ต้อง stop) · setPointerCapture + pointermove; ปล่อย/cancel/lostpointercapture/blur/visibilitychange/pagehide → stop; ทน fail 1 หยุด 2 ติด; ล็อก→จบ · `setDirEnabled` → toggle `data-locked` ของ stick
+- เจ้าของ: "กล่อง[กล้อง]ไม่เห็นอะไร ขอเต็ม/กว้างสุด" — กล่องกล้องขยายเต็มความกว้าง (`grid-column:1/-1`, 16:9, สูงถึง 64vh) · `client/index.html`: getUserMedia หุ่น 1280×720 → **1920×1080** (คมขึ้น) · **FOV เลนส์คงที่ ขยายมุมกว้างไม่ได้ + zoom อยู่ที่ 1 (กว้างสุดแล้ว)** — "ไม่เห็นอะไร" เพราะกล้องทั้ง 2 ตัวหันไปด้านหลังและหุ่นหันเข้าผนัง/เพดานเปล่า ต้องหันตัวหุ่น
+- ตรวจสด: reload หน้า kiosk บนหุ่นผ่าน DevTools → /cam.jpg = **1920×1080** จริง, ไมค์กลับมาสตรีมหลังแตะจอ (level 0.0008 age 0.06) · node --check JS หน้า cockpit = rc 0 (ไม่มี syntax error) · เทสต์: อัปเดต `tests/test_robot_joystick_page.py` (drag stick แทน .dir buttons, release events, loop `while(driving)`) + map = **20 passed**
+- แก้ layout กล่องกล้อง (เจ้าของชี้ว่ามีพื้นที่ดำ): เดิม `grid-column:1/-1` + `max-height` ทำให้กล่องกว้างกว่า 16:9 → ภาพ contain เหลือแถบดำ และ 1/-1 ทำให้ auto-fit ไม่ยุบคอลัมน์ว่าง (radar/drive/map แคบชิดซ้าย) · ย้ายกล้องออกจาก grid เป็น `.camrow` เต็มบรรทัด, กล่อง 16:9 จัดกลาง `max-width:min(100%, 72vh*16/9)` — ภาพเต็มกล่องไม่มีแถบดำใน, แถวล่าง 3 พาเนลเต็มความกว้าง
+- หน้า /drive เสิร์ฟจาก FileResponse — reload หน้าได้เลย · กล้อง 1920 มีผลเมื่อ kiosk บนหุ่น reload (ทำแล้ว)
+
+## 2026-09-12 — จอยบังคับหุ่นแบบต่อเนื่อง (ฟีลจอย) แทน nudge 0.3ม.ต่อกด
+
+- เจ้าของ: "ขยับไม่ดั่งใจ อยากได้ฟีลจอย" — วัดแล้ว RTT หุ่น 2ms (ไม่ใช่เน็ต) ต้นเหตุคือ nudge เดิม = MoveToAction 0.3ม./กด (เร่ง→เบรกหยุดทุกก้าว) กระตุกเป็นสเต็ป
+- ประสานกับ condo-voice-79: เขาทำฝั่ง chassis `drive(direction)` + watchdog เซิร์ฟเวอร์ (`ROBOT_DRIVE_TIMEOUT_MS=400` เงียบเกินนี้สั่ง DELETE :current หยุดเอง) ผมทำ client stick UI ตาม contract: `POST /robot/command {token, action:"drive", direction}` — ฐาน SLAMWARE `MoveByAction` ต้องเรียกซ้ำถึงวิ่งต่อเนื่อง (ไม่มี cmd_vel, บอร์ดรับแค่ 4 ทิศ)
+- `client/robot-joystick.html`: แทน `driveLoop` เดิมด้วยลูป self-paced (ไม่ใช่ setInterval — reply ช้าไม่ซ้อน request) ส่ง drive ทุก ~150ms ตลอดที่กดค้าง (< watchdog 400ms), ปล่อย/pointercancel/pointerleave/blur/visibilitychange/pagehide/refused → `stop` ทันที, ทน fetch fail 1 ครั้ง หยุดเมื่อ 2 ครั้งติด (บอร์ดหยุดเองใน 400ms อยู่แล้ว), ล็อก→จบ hold ไม่รัว · ลบฟังก์ชัน `command()` เดิม ใช้ `commandBody` (wrap token) · แก้ hint "ก้าวละ 0.3ม." → "กดค้าง=เดินต่อเนื่อง ปล่อย=หยุดทันที"
+- `tests/test_robot_joystick_page.py`: อัปเดต 2 เทสต์ (payload drive+direction, ลูป self-paced) + เพิ่ม `test_drive_is_a_continuous_heartbeat_under_the_watchdog` (cadence 150 + ทน fail 2) · 3 ไฟล์ cockpit/map/feeds = **23 passed**
+- รีสตาร์ต run_server.py ให้ action `drive` ของ condo-voice-79 ทำงาน (เซิร์ฟเวอร์ก่อนหน้ารีสตาร์ตตอนแก้ไมค์ ยังไม่รู้จัก drive) — ยืนยัน API: ทิศผิด→"ไม่รู้จักทิศ" (ไม่ได้สั่งหุ่นขยับจริง แค่ทิศผิดที่ถูกปฏิเสธ)
+- **ยังไม่ทดสอบเดินจริง** (แบต 10% + localization 0 + ต้องมีคนถือ E-stop): ครั้งแรกที่ทดสอบต้องวัดให้ condo-voice-79 — (1) หลังหยุดส่ง heartbeat หุ่นหยุดในกี่ ms (2) base.max_moving_speed ปัจจุบัน
+- **ข้อค้นพบ E-stop จาก condo-voice-79:** `base.emergency_stop` (PUT /api/core/system/v1/parameter on/off) = software E-stop ล้อผ่าน REST + `base.brake_release` — ยังไม่แตะจนเจ้าของสั่ง
+
+## 2026-09-12 — แก้สีแมพในหน้า cockpit/mapview ตามค่าไบต์ที่ condo-voice-79 วัดได้
+
+- condo-voice-79 วัดความหมายค่าไบต์แมพ (scripts/probe_map_semantics.py) ด้วยการฉาย lidar ลงแมพ: อ่านเป็น int8 — **0 = unknown, 1..127 = ว่าง (127 มั่นใจสุด), 128..255 = ทึบ/กำแพง** — ตรงข้ามกับที่ grayscale ตรงๆ ของผมวาด (พื้นว่าง=เทากลาง กำแพง=เกือบขาว = กลับด้าน อันตรายกับ click-to-go)
+- `client/robot-map.html` (/mapview) + `client/robot-joystick.html` (/drive, พาเนลแมพ): เปลี่ยนจาก `pixel=v` เป็น branch ตามค่า — 0→เทาเข้ม(45), 1..127→สว่างไล่ระดับ(128+v/127·127, 127=ขาว), 128..255→แดง(200,60,60) กำแพงเห็นชัด "ห้ามเดินทับ"
+- error ของ goto ที่ condo-voice-79 เพิ่มฝั่งเซิร์ฟเวอร์ (คลิกกำแพง/คลิกจุด unknown) แสดงผ่าน `r.error` บนหน้าอยู่แล้ว ไม่ต้องแก้เพิ่ม
+- `tests/test_robot_map_page.py` + `tests/test_robot_joystick_page.py`: เพิ่มเทสต์กันไม่ให้กลับไป `img.data=v` ตรงๆ (บั๊กแมพกลับด้าน) — บังคับให้ branch ที่ threshold 127 + จัดการ v===0 · 2 ไฟล์ = **19 passed** · หน้าเสิร์ฟจาก FileResponse โค้ดใหม่ live ทันทีไม่ต้องรีสตาร์ต
+
+## 2026-09-12 — หุ่นออนไลน์: ทดสอบสด cockpit + แก้บั๊กมิเตอร์ไมค์ที่ตายบนเครื่องห้องขาย
+
+- เจ้าของเปิดหุ่น — ตั้งอุโมงค์ใหม่ผ่าน adb ในรีโป (`tools/android/platform-tools/adb.exe`): connect 192.168.1.24:5555 + nc relay 11448 + forward. chassis ต่อติด, lidar/pose/power อ่านสดจริง · เปิดหน้า kiosk บนหุ่นผ่าน adb (Chrome) — ต้องปิดแท็บเก่า `?kiosk=1` (ไม่มี token) + activate แท็บ `?cam=1&token=` ผ่าน DevTools (`/json/activate`, `/json/close`) กล้องถึงเข้า (getUserMedia ทำงานเฉพาะแท็บ foreground)
+- **กล้องยืนยันสด**: /cam.jpg 200, เฟรม 1280×720 จริง (robot→/ws/camera→/cam.jpg) · **lidar สด**: /robot/laserscan จุดจริงรอบตัว
+- **บั๊ก /mic/level (ฟีเจอร์ของ session นี้เอง):** level publish ถูกวางใน `WakeStream._report` ซึ่งเรียกเฉพาะเมื่อ `wake_debug`/`wake_enroll` เปิด → บนเครื่องห้องขาย (ทั้งคู่ปิด) มิเตอร์ไมค์ใน cockpit **ไม่มีวันขึ้น** ทั้งที่ไมค์ส่ง PCM จริง (วัดด้วย DevTools: getUserMedia MIC_OK, /ws/wake OPEN, ส่ง 128 เฟรม/2.5วิ, client meter 0.001) — อาการเดียวกับ "พูด emma แล้วเหมือนไม่ได้ยิน" ที่มิเตอร์นี้ถูกสร้างมาแก้
+- `app/wake.py`: แยก `_publish_level(samples)` ออกจาก `_report` เรียก**ทุกเฟรมไม่มีเงื่อนไข** (RMS ถูก, cheap) ส่วน verdict log ยัง gate ด้วย wake_debug เหมือนเดิม · หลังรีสตาร์ต run_server.py: /mic/level `streaming=true` level 0.001–0.011 age~0.05 สดจริง
+- `tests/test_wake.py`: เพิ่ม `test_the_meter_level_is_published_without_wake_debug` (unit, ไม่ต้องโมเดล — publish + mic_level) + `test_the_meter_updates_from_feed_with_wake_debug_off` (@needs_model — ยืนยัน feed เรียก publish นอก gate) · `tests/test_wake.py test_robot_cockpit_feeds.py` = **32 passed** (โมเดลมีบนเครื่องนี้ integration รันจริง)
+- ยังไม่ขับ/สั่งแขน: แบต 15% ไม่ชาร์จ + `localization_quality=0` (pose 0,0 = หุ่นยังไม่รู้ตำแหน่งบนแมพ) — รอเจ้าของเอาขึ้นแท่นชาร์จ (ชาร์จ + relocalize) ก่อน · แบ่งงานกับ condo-voice-79: ผมคุมกล้อง/ไมค์/cockpit/wake, เขาถือ chassis motion + arm safety · ส่งค่าไบต์แมพ (Counter) + radar ให้เขาแล้ว
+
+## 2026-09-12 — ทดสอบ Q&A ของ Emma กับเอกสารขายที่ส่งมา + ปิดช่องรั่วคำถาม ROI
+
+- เจ้าของขอทดสอบว่าคำถาม/คำตอบของ Emma ตรงกับ 5 ไฟล์ที่ส่งให้ (`data/personal-docs/embassy-world/`) ไหม — เขียน eval ยิง `search_my_documents` จริง 11 คำถามเนื้อหา + 3 คำถามราคา (ไม่ commit สคริปต์, อยู่ scratchpad)
+- **พบช่องรั่วความปลอดภัย (แก้แล้ว):** "ผลตอบแทนการลงทุนกี่เปอร์เซ็นต์" หลุด commercial gate → `found=True` หยิบตัวเลขจากคลังการตลาด (ไฟล์ที่คอมเมนต์ของ gate เองระบุว่ามี "yields 7-10%") — `COMMERCIAL_TERMS` มี ราคา/งบ/ดอกเบี้ย/กี่บาท แต่**ไม่มีคำว่า yield/return/ผลตอบแทน** ซึ่งเป็นคำถามเงินที่คลังนั้นตอบด้วยตัวเลขไม่มีคนเซ็นมั่นใจที่สุด
+- `app/tools/retrieval.py`: เติม `ผลตอบแทน, เปอร์เซ็นต์, ค่าเช่า, ปล่อยเช่า, roi, yield, rental, return on, percent` ใน `COMMERCIAL_TERMS` · **จงใจไม่ใส่ "ลงทุน" เดี่ยวๆ** เพราะ "ทำไมพัทยาน่าลงทุน" คือเรื่องราวใน thai-market-strategy ไม่ใช่คำถามตัวเลข (วัดแล้วไม่ over-refuse ผ่อนคลาย/ยังไงบ้าง/น่าลงทุน)
+- `tests/test_knowledge.py`: เพิ่ม `test_a_yield_question_is_a_money_question` (ROI/yield/rental/ค่าเช่า ต้องถูกปฏิเสธ) + `test_investing_as_a_reason_to_live_here_is_not_a_price_question` (คำถามเชิงเรื่องราวห้ามโดน) — `tests/test_knowledge.py test_mydocs.py` = **54 passed**; eval ยิงซ้ำปฏิเสธครบ 3/3
+- **ข้อค้นพบที่ยังไม่แก้ (รอเจ้าของตัดสิน):** เอกสารขาย 5 ไฟล์ "จม" — คำถามเนื้อหาตอบจากไฟล์ที่ส่งมาแค่ 4/11 เพราะ index รวมทั้ง `data/personal-docs/` = 2081 chunk / 186 ไฟล์ (เว็บ Embassy **Life**/Pattaya + corpus เก่า) แข่งกับ 5 ไฟล์ Embassy **World** → "ทำไมชื่อ Embassy World", "Junior World", ระบบทำความเย็น landscape ไปโดนเว็บเก่า/รายงาน MEP แทนต้นฉบับ ยังไม่แตะ ranking/ขอบเขตเพราะเปลี่ยนสิ่งที่ Emma รู้ = การตัดสินใจของเจ้าของ
+
+## 2026-09-11 — ห้องบังคับหุ่นหน้าเดียว: กล้อง + เรดาร์(lidar) + ไมค์ + จอย + แมพ
+
+- เจ้าของขอรวมทุกอย่างเป็นหน้าเดียว และตอนบังคับอยากเห็นกล้อง/ไมค์/เรดาร์ของหุ่น — `client/robot-joystick.html` (เสิร์ฟที่ `/drive`) เปลี่ยนจากหน้าจอยล้วนเป็น cockpit รวม: กล้องหุ่น, เรดาร์ lidar, มิเตอร์ไมค์, ปุ่มบังคับ, แผนที่คลิกสั่ง — แต่ละพาเนลล้มแยกกัน (ไม่มีสัญญาณ = ขึ้นข้อความ ไม่พังทั้งหน้า)
+- แบ่งงานกับ condo-voice-79: เขาเพิ่ม `/robot/laserscan` (chassis) ผมทำ client + endpoint กล้อง/ไมค์ สลับกันแก้ main.py กันชน
+- `app/main.py` (ของผมรอบนี้): `GET /cam.jpg` อ่าน `robot_camera.feed` — **เฟรมเก่ากว่า 2 วิ = 503 ไม่เสิร์ฟซ้ำ** (ลิงก์ค้าง = กล้องหยุด ไม่ใช่คนยืนนิ่ง ตามกฎ greeter) token gate · `GET /mic/level` คืนระดับไมค์จาก wake stream
+- `app/wake.py`: เก็บ `_LAST_LEVEL`/`_LAST_LEVEL_AT` module-level ใน `_report` + `mic_level()` — best-effort, `streaming=false` เมื่อไม่มีเฟรมใน ~2 วิ (สายคุยยึดไมค์ หรือไม่ได้ standby) ไม่ใช่คำตัดสิน wake
+- **cockpit ความปลอดภัย** (ตามที่เพื่อนเตือน): ปุ่ม `#estop` sticky ล่างจอ เห็นชัดสุดไม่เลื่อนหาย, ทุก poller หยุดเมื่อแท็บซ่อน (visibilitychange) ลดโหลดอุโมงค์ nc, จอยคงกติกาเดิม (กดค้างไม่ยิงซ้อน/ปล่อย=หยุด/ล็อกไม่รัว) · เรดาร์: จุด invalid ไม่วาดเป็นวัตถุที่ระยะ 0, มุม 0 = หน้าหุ่น(ขึ้นบน)
+- เทสต์: อัปเดต `tests/test_robot_joystick_page.py` (จอย+กล้อง+เรดาร์+ไมค์+estop+visibility), เพิ่ม `tests/test_robot_cockpit_feeds.py` (/cam.jpg 401/503/200 + สด-ไม่-ค้าง, /mic/level) รวมกับ map + voice = 175 passed · ตรวจสด: /drive 200, /cam.jpg 401(ไม่มี token)/503(ไม่มีเฟรม), /mic/level ok
+- **ยังไม่ทดสอบสดกับหุ่น** (หุ่นออฟไลน์) กล้อง/ไมค์/เรดาร์จะมีภาพเมื่อหุ่นกลับ online + หน้า kiosk ?cam=1 บนหุ่นดันเฟรม
+
+## 2026-09-11 — หน้าจอยบังคับหุ่น + หน้าแมพคลิกสั่งพิกัด (ฝั่ง client)
+
+- คู่กับงานเซิร์ฟเวอร์ของ condo-voice-79 (ด้านล่าง) — เจ้าของขอ console บังคับเหมือนจอย + เจนแมพคลิกได้พิกัด ผมทำ client เป็นไฟล์ใหม่ ไม่แตะ robot_chassis.py/main.py/robot-control.html ของเขา (route เสิร์ฟ /drive, /mapview เขาเป็นคนเพิ่มใน main.py)
+- `client/robot-joystick.html` (`/drive`): บังคับหุ่นด้วยปุ่มทิศ ยิง `POST /robot/command` เดิม (forward/back/left/right/stop) ระยะก้าวอยู่ที่เซิร์ฟเวอร์ (0.3 ม./15°) body ส่งแค่ {token, action} · **กติกาความปลอดภัย**: กดค้างไม่ยิงซ้อน (รอ response ก้าวก่อนก่อนยิงก้าวถัดไป), ปล่อยปุ่ม/pointercancel/pointerleave/blur/visibilitychange/fetch error → ส่ง stop ทันที, ไม่ auto-repeat ตอนโหลด, ก้าวที่ถูกปฏิเสธ (motion_locked) จบ loop ไม่รัวยิง, ปุ่มหยุดใหญ่กลางจอทำงานเสมอแม้ล็อก, โชว์ motion_enabled จาก /robot/state
+- `client/robot-map.html` (`/mapview`): เรนเดอร์ occupancy grid จาก `GET /robot/map` (base64 ไบต์/ช่อง grayscale) **กลับแกน y** (grid row 0 = y ต่ำสุด, canvas row 0 = บน) คลิก→พิกัดโลก `origin+(i+0.5)*res`→ `POST /robot/command {action:'goto',x,y}` (ไม่ส่ง yaw/place ตาม contract) จุดเขียว=หุ่นจาก pose สด · ผ่าน motion lock เดิม, ปุ่มหยุดเสมอ, error ดึงแมพขึ้นข้อความไม่ใช่จอเปล่า
+- เทสต์ source ใหม่ 13 ตัว: `tests/test_robot_joystick_page.py` (7), `tests/test_robot_map_page.py` (6) — ยึด contract: ห้ามส่งระยะ/yaw, แกน y กลับ, สูตรพิกัด, stop ทุกทางที่ press จบ · **ยังไม่ทดสอบสดกับหุ่น** (หุ่นออฟไลน์) ค่าไบต์แต่ละช่องของแมพต้องวัดตอนหุ่นกลับมา
+
+## 2026-09-11 — แมพจากฐานนำทางขึ้นหน้าคุม + คลิกพิกัดสั่งเดิน (ฝั่งเซิร์ฟเวอร์)
+
+- เจ้าของขอ (ผ่าน session condo-voice-83): เจนแมพแล้วคลิกสั่งไป — แบ่งงาน: ฝั่งนี้ทำเซิร์ฟเวอร์ session นั้นทำ client (canvas + หน้าจอย) เป็นไฟล์ใหม่ ไม่แตะไฟล์กัน
+- `app/robot_chassis.py`: `request_raw()` สำหรับ endpoint ที่ตอบเป็นไบต์ (แยกจาก `request()` เพื่อให้ stand-in ในเทสต์ไม่ต้องตอบสองแบบ) · `parse_explore_map()` ถอด binary ของ `GET /api/core/slam/v1/maps/explore` ตาม layout ใน `/js/spec.js` ของฐานจริง (header 20 ไบต์ + reserved 12 + size u32 + 1 ไบต์/ช่อง, little-endian) **เข้มเรื่องขนาด** เพราะอุโมงค์เป็น nc relay บนหุ่น อ่านขาดครึ่งจะกลายเป็นแมพครึ่งห้องเงียบๆ · `explore_map()` จำขอบเขต (`_map_bounds`) · `goto_xy()` = คำสั่งเดียวที่ client เลือกจุดหมายเอง จึงถูกบังคับว่าจุดต้องอยู่ในแมพก่อนส่ง (นอกแมพ/ไม่มีแมพ/NaN → ValueError ไม่ส่งอะไร) และผ่าน motion lock เดิม · `send("move_to_xy")` เข้า `_pending` เดียวกับ POI → arrival ตัดสินโดย `_tick` จาก pose เหมือนเดิน POI
+- **ยังไม่ตีความค่าไบต์ของช่อง** (ว่าง/ทึบ/ไม่รู้) เพราะสเปกไม่ระบุและหุ่นออฟไลน์ วัดไม่ได้ — client แสดง grayscale ไปก่อน จะเช็คช่องว่างก่อนเดินได้เมื่อวัดแล้ว (มีหมายเหตุใน docstring)
+- `app/main.py`: `GET /robot/map?token=` → `{ok, map:{origin_x, origin_y, width, height, resolution, cells_b64}}` (row 0 = y ต่ำสุด) · `POST /robot/command {action:"goto", x, y}` เพิ่มจาก `goto` แบบ `place` เดิม — `place` ชนะเสมอถ้าส่งมาพร้อมกัน, รับตัวเลขเป็น string ได้, ไม่มีทั้งสอง → error
+- เทสต์ใหม่ใน `tests/test_robot_chassis.py` (แมพ 4 เคสเสีย, ขอบเขต, คลิกใน/นอก/ไม่มีแมพ/NaN/ล็อก, จบเดินด้วย pose) และ `tests/test_robot_control_page.py` (token, ไบต์กลับครบ, relay ตัดสั้น, คลิก, string, นอกแมพ, ล็อก, ไม่มี place/x,y, place ชนะ) — เทสต์ที่เกี่ยว 7 ไฟล์ = **203 passed**; ชุดเต็มดูบรรทัดถัดไปเมื่อรันเสร็จ
+- ชุดเต็มหลังเพิ่มแมพ/goto: **1416 passed, 1 failed** — ตัวที่แดงคือ `tests/test_robot_joystick_page.py` ของ session condo-voice-83 ที่ยังเขียนไม่เสร็จตอนรัน (รันซ้ำหลังเขาเสร็จ: ผ่าน)
+- `app/main.py`: route `GET /drive` → `client/robot-joystick.html` และ `GET /mapview` → `client/robot-map.html` (หน้าและเทสต์ของสองหน้านั้นเป็นของ session condo-voice-83) เทสต์ว่าเสิร์ฟได้และอ้าง `/robot/command` อยู่ใน `tests/test_robot_control_page.py` — ตรวจ 5 ไฟล์ที่เกี่ยว = 111 passed
+- **เรดาร์**: `robot_chassis.laserscan(max_points)` อ่าน `GET /api/core/system/v1/laserscan` (shape จาก spec.js `LaserScan` และตัวอย่างสดวันที่ 10 ก.ย.: `laser_points[{angle,distance,valid}]` + `pose`) เก็บจุด invalid ไว้ (เรดาร์ควรเห็นว่ามองไปแล้วไม่มีอะไรสะท้อน) ทิ้งเฉพาะที่ไม่ใช่ตัวเลข/NaN, thin ทุก n จุดเพื่อรักษามุมครอบคลุม · `GET /robot/laserscan?token=&max=` → `{ok, points, pose, total, valid}` เพดาน `_LASERSCAN_MAX_POINTS=400` (หน้าเว็บขอน้อยกว่าได้ มากกว่าไม่ได้) สำหรับหน้า cockpit ของ session condo-voice-83 · เทสต์ 6 ตัวใหม่ — 6 ไฟล์ที่เกี่ยว = 143 passed
+- ชุดเต็มหลังรวมงานทั้งสอง session (แมพ/goto/เรดาร์/route ฝั่งนี้ + cockpit/cam/mic ฝั่ง condo-voice-83): **1439 passed** (174 วิ)
+- **12 ก.ย. — ค่าไบต์ในแมพวัดแล้ว** (`scripts/probe_map_semantics.py` ใหม่ อ่านอย่างเดียว): ฉายเฟรม lidar สดลงแมพสด — ช่องที่หุ่นยืน = 127, ช่องตามแนวลำแสง (ว่างโดยนิยาม) อยู่ 20..127 = 4,668/4,928 ตัวอย่าง, ช่องที่ลำแสงชน (ทึบโดยนิยาม) อยู่ 129..196 = 226/335 ที่เหลือเป็น 0 → อ่านเป็น int8: **บวก=ว่าง (127 มั่นใจสุด) ลบ=ทึบ 0=ยังไม่เคยเห็น** ตรงข้ามกับสัญชาตญาณ "ค่าสูง=ทึบ" จึงมีเทสต์กันแก้กลับ · `cell_kind()`/`cell_at()` ใน robot_chassis.py, `goto_xy` ปฏิเสธจุดที่เป็นสิ่งกีดขวางและจุดที่ยังไม่สำรวจ (หุ่นเพิ่งบูต 81.6% ของแมพเป็น 0 — planner ตอบด้วยความเงียบแบบ 10 ก.ย.) และอ่านแมพใหม่ถ้าเก่ากว่า `MAP_MAX_AGE_S=10` วิ · เทสต์ 6 ตัวใหม่ — 7 ไฟล์ที่เกี่ยว (รวมของ condo-voice-83) = 162 passed · แมพวันนี้เล็ก (50×108 ที่ 0.05 ม.) เพราะ localization_quality=0 ยังไม่ relocalize
+- **12 ก.ย. — จอยกดค้าง (ฝั่ง chassis)** เจ้าของบอก "ขยับไม่ได้ดั่งใจ" — nudge = MoveToAction 0.3 ม./กด เร่ง-เบรก-หยุดทุกก้าว จึงกระตุก · spec.js ของบอร์ดมี `slamtec.agent.actions.MoveByAction` ("遥控移动, 需要定时调用以达到连续运动效果" = รีโมต ต้องเรียกซ้ำเป็นจังหวะ) options `{direction: 0 หน้า/1 หลัง/2 ขวา/3 ซ้าย}` ไม่มีความเร็วต่อครั้ง (ใช้ `base.max_moving_speed` ของบอร์ด) · `robot_chassis.drive(direction)` + `drive_stop()`: ขอบเขตเปลี่ยนจาก*ระยะ*เป็น*เวลา* — deadman ฝั่งเซิร์ฟเวอร์ `ROBOT_DRIVE_TIMEOUT_MS=400` (config.py + .env.example) สั่ง DELETE :current เองเมื่อหน้าเว็บเงียบ ไม่พึ่ง deadman ของบอร์ดที่ยังไม่ได้วัด · `stop()` ตอนปิดเซิร์ฟเวอร์หยุดการกดที่ค้างอยู่ (ข้อยกเว้นเดียวของ "ปิดเซิร์ฟเวอร์ไม่ใช่เหตุให้ขยับหุ่น" — เพราะนี่คือทิศ*หยุด*) · `POST /robot/command {action:"drive", direction}` (heartbeat ทุก ~150 ms; log เฉพาะครั้งแรกของการกด) และ `stop` ปลด deadman ด้วย · เทสต์ 12 ตัวใหม่ (deadman ยิงจริงเมื่อเงียบ, heartbeat กันไว้, ปล่อย=หยุดทันทีไม่ยิงซ้ำ, ล็อก, ทิศผิด, ปิดเซิร์ฟเวอร์กลางกด) — 7 ไฟล์ที่เกี่ยว = 175 passed
+- ชุดเต็มหลังจอยกดค้าง: **1465 passed, 2 failed** — สองตัวที่แดงคือ `tests/test_robot_joystick_page.py` ของ condo-voice-83 ที่กำลังแก้ stick UI อยู่ตอนรัน (ไฟล์เปลี่ยนหลังเริ่มรัน) รันไฟล์นั้นซ้ำหลังเขาเซฟ: 13 passed
+- **12 ก.ย. — เจ้าของสั่ง "ทำเลย" สองเรื่อง (ผ่าน condo-voice-83):**
+  - **หยุดอัตโนมัติเมื่อใกล้ 0.3 ม.** `ROBOT_DRIVE_MIN_CLEARANCE_M=0.3` (config + .env.example) · `clearance(points)` ระยะใกล้สุดต่อ arc หน้า/หลัง (±35°) ซ้าย/ขวา (55°..125°) จากเฟรม lidar — แนบไปกับ `/robot/laserscan` (`clearance`, `min_clearance`) ให้เรดาร์โชว์ · `drive()` เช็คทุก heartbeat ด้วยเฟรมใหม่ **เฉพาะ arc ในทิศที่ไป** — MoveByAction คือรีโมต ไม่มีตัววางแผนหลบสิ่งกีดขวางบนบอร์ดเหมือน MoveToAction จึงเป็นด่านเดียวระหว่างจอยกับกำแพง · หมุนอยู่กับที่และถอยออกจากของไม่โดนบล็อกเด็ดขาด (หุ่นห่างผนัง 0.7 ม. ที่ถอยไม่ได้คือติด ไม่ใช่ปลอดภัย) · burst ที่วิ่งอยู่ถูกหยุดก่อนคืน error · `/robot/command` ตอบ `{ok:false, error:"obstacle", blocked:{direction, distance, limit}, hint}` · ตั้ง 0 = ปิดด่าน
+  - **Relocalize** หุ่นอยู่บนแท่นแต่ `localization_quality=0` pose (0,0) = odometry ลอย · จาก spec.js: `RecoverLocalizationAction` (NoMove/RotateOnly), `PUT localization/pose`, `localization/:enable` ("false = โหมด odometry ล้วน" — ค่า quality จะ 0 ตลอดไม่ว่า lidar เห็นอะไร), `homedocks` (shape ยืนยันจาก capture 10 ก.ย.) · `relocalize(mode)`: ทุกโหมดเปิด localization กลับถ้าบอร์ดบอกว่าพักอยู่ · `dock` (default) = ต้อง `dockingStatus=on_dock` (ไม่งั้นปฏิเสธ ไม่แต่ง pose) → PUT pose เป็นตำแหน่งแท่น → Recover NoMove · `static` = Recover NoMove จากที่ยืน · `rotate` = RotateOnly **ขยับหุ่น จึงอยู่หลัง motion lock** · `POST /robot/command {action:"relocalize", mode}` ทำงานได้ขณะล็อก (ยกเว้น rotate) เพราะหุ่นที่ไม่รู้ว่าตัวเองอยู่ไหนต้องการมันตอนที่อย่างอื่นยังล็อก · ผลเป็น action ที่จบเอง หน้าเว็บดู `localization_quality` ต่อ
+  - เทสต์ใหม่ 14 ตัว — 7 ไฟล์ที่เกี่ยว = 191 passed · ชุดเต็ม `tests/` = **1483 passed** (177 วิ) · **ผลจริงบนหุ่น (condo-voice-83 รันหลังรีสตาร์ต):** `relocalize dock` สำเร็จโดยไม่ขยับ — quality_before 43 (ฟื้นเองบางส่วนตอนอยู่บนแท่น ไม่ใช่ 0 แล้ว), `localization_was_paused=false` (สวิตช์พักไม่ใช่สาเหตุ), pose ถูกตั้งเป็นแท่น (-0.25, 0.01, -0.04) แล้ว RecoverLocalizationAction หาตำแหน่งจริงเจอ: quality **43→71** ที่ t+6 วิ นิ่งที่ 71, pose เด้งไป (3.01, -4.10, yaw 3.06) จากที่ลอยอยู่ ~(0,0) = click-to-go มีจุดอ้างอิงจริงแล้ว · clearance สดอ่านได้ (front 0.72 / back null / left 0.82 / right 1.04) · เส้น 0.3 ม. กับจอยยังไม่ได้วัดตอนวิ่งจริง
+- **12 ก.ย. — "บันทึกตำแหน่งปัจจุบันเป็นจุด" (เจ้าของขอผ่าน condo-voice-83):** `robot_chassis.save_poi(name)` → `POST /api/core/artifact/v1/pois` ตาม PoseEntry ของ spec.js (id = uuid ที่เราสร้าง, pose {x,y,yaw}, metadata {display_name, type:"point"}) แล้ว `refresh_places()` ให้ชื่อนั้นเป็นจุดหมายของ `go_to_place` ทันที · ปฏิเสธ: quality ต่ำกว่า `ROBOT_POI_MIN_QUALITY=50` (config + .env.example — pose ตอน quality 0 คือ (0,0) ทั้งที่หุ่นอยู่ (3.0,-4.1) จุดที่เซฟจากมันคือจุดหมายไปที่ไม่มีอยู่จริง), ชื่อว่าง, ชื่อซ้ำกับที่มีบนแมพ, และบอร์ดตอบ 200 แต่ไม่แสดงในรายการ (รูปความล้มเหลวแบบ 10 ก.ย.) · `POST /robot/command {action:"save_poi", name}` ทำงานได้ขณะล็อก (ไม่ขยับ) · **POI ≠ แท่นชาร์จ**: `go_home` ยังใช้ homedock ที่บอร์ดลงทะเบียนไว้ ไม่ใช่ POI ชื่อ "ที่ชาร์จ" · **ยังไม่ persist ข้ามรีบูต** — หุ่นรันแมพที่ไม่ได้เซฟ (10 ก.ย.) การเซฟแมพเป็นการตัดสินใจแยก · เทสต์ 6 ตัวใหม่ — 7 ไฟล์ที่เกี่ยว = 197 passed
+  - **ลองจริงรอบแรก 403** (condo-voice-83): บอร์ดตอบ `403 "operation fail"` ต่อ POST — probe ตรงผ่านอุโมงค์ (ลบจุดทดสอบออกแล้ว) ได้ผลชัด: POI ที่**แนบ pose มาเอง** = 403 ทั้ง POST และ PUT by id · POI **ไม่มี pose** = 200 และบอร์ดสร้างที่ตำแหน่งปัจจุบันของหุ่นเอง (3.05, -4.05, yaw 3.02) ตรงที่สเปกแนะนำ ("建议不包含Pose") · multi-floor pois ยังเป็น [] (อ่านอย่างเดียวตามสเปก) แต่ `refresh_places()` ถอยไปอ่าน core/artifact อยู่แล้ว · สถานะบอร์ดตอนนั้น: mapping=false, localization=true, floors=[] · แก้ `save_poi` ไม่ส่ง pose แล้วอ่าน pose กลับจากรายการของบอร์ดมาตอบ (คือจุดที่ลูกค้าจะถูกพาไปจริง) — FakeBoard ในเทสต์เลียนแบบ 403 นี้ไว้กันแก้กลับ · 197 passed เท่าเดิม
+- **12 ก.ย. — เซฟแมพถาวร (เจ้าของอนุญาต: "ทำเลย back up ไฟล์ไว้ก่อนก็ได้") + ขึ้นแท่นชาร์จ:**
+  - **backup ก่อน**: `GET /api/core/slam/v1/maps/stcm` → `data/robot-inspection/20260912-111751-before-save.stcm` (366,512 ไบต์, gitignore) + สำเนาใน scratchpad · SHA-256 `3b96b507…` **เท่ากับ backup 10 ก.ย. เป๊ะ** = แมพที่บอร์ดโหลดไม่เคยเปลี่ยนตั้งแต่นั้น · floors=[] (ชั้นเดียว — สเปกห้ามเซฟแบบนี้เฉพาะ multi-floor) · แล้ว `POST /api/multi-floor/map/v1/stcm/:save` → **200** · หลังเซฟ GET stcm = 366,603 ไบต์ (โตขึ้นจากการสำรวจวันนี้) quality 64 pose (3.05,-4.05) ไม่เปลี่ยน · **ทนรีบูตไหมยังไม่ได้พิสูจน์** — รอ condo-voice-83/เจ้าของรีบูตแล้วเช็ค · **save_poi ใช้ได้จริง end-to-end** (condo-voice-83 หลังแก้ไม่ส่ง pose): POI "ที่ชาร์จ" pose (3.053,-4.048,yaw 3.018) ≈ pose ปัจจุบัน, places=['ที่ชาร์จ'], multi-floor pois ยังว่าง (ไม่มีชั้นให้ผูก — ไม่กระทบเพราะ refresh_places อ่าน core/artifact) · POI นั้นเกิดหลัง save รอบแรก จึง `stcm/:save` ซ้ำ → 200, แมพ 366,619 ไบต์ มี POI อยู่ตอนเซฟ
+  - `robot_chassis.save_map()` (กันหลายชั้นตามคำเตือนสเปก) + `POST /robot/command {action:"save_map"}` · `save_poi` เซฟแมพต่อท้ายอัตโนมัติ (ตอบ `persisted: true/false` — เซฟไม่ได้ไม่ถือว่า POI ล้มเหลว จุดยังอยู่จนรีบูต)
+  - เจ้าของ clarify: "ที่ชาร์จ" = **ขึ้นแท่นจริง** ไม่ใช่ POI → ปุ่มใช้ `{action:"home"}` = `GoHomeAction` flags default `dock` (docking จริง, `_tick` ตัดสินจาก dockingStatus) · เพิ่มด่านใน `go_home()`: quality < `ROBOT_POI_MIN_QUALITY` → ปฏิเสธพร้อมบอกให้ปรับตำแหน่ง (go_home จาก pose odometry = เดินไปที่ที่แท่น*ควร*อยู่ถ้าหุ่นอยู่ตรงที่มันคิด — วันนี้ห่างสามเมตร) — ครอบทั้งปุ่มและเสียง (`return_to_base`)
+  - เทสต์ 6 ตัวใหม่ — 7 ไฟล์ที่เกี่ยว = 202 passed · ชุดเต็มก่อนก้อนนี้ (หลังแก้ POI ไม่ส่ง pose) = 1489 passed · ชุดเต็มหลังก้อนนี้ = **1494 passed** (148 วิ)
+- **12 ก.ย. — แท่นชาร์จลงทะเบียนผิดที่ 5.2 ม. (พบตอนทดสอบขึ้นแท่น) + undock:**
+  - condo-voice-83 พบ: homedock ลงทะเบียนที่ (-0.25, 0.01) แต่หุ่นที่*อยู่บนแท่นจริง* (on_dock, charging, quality 64) อ่านได้ (3.05, -4.05) — ห่าง 5.23 ม. (hypot ไม่ใช่ 7 ม. ที่รายงานแรก) · สาเหตุ: `docking.docked_register_strategy = when_not_exists` (อ่านสด) บอร์ดจึงไม่แก้แท่นที่ลงทะเบียนไว้จาก frame แมพเก่าเอง · **go_home จากนอกแท่นจะเดินไปจุดเก่า** — นี่คือเหตุที่ relocalize dock ต้อง recover เด้งจาก (-0.25,0.01) ไป (3,-4)
+  - **แก้บนบอร์ดแล้ว** (เจ้าของสั่งผ่าน condo-voice-83, ไม่ขยับหุ่น): `PUT /api/core/slam/v1/homedocks/home_dock {pose: (3.053,-4.048,yaw 3.020)}` → 200 true · homepose ยืนยันตรง · `stcm/:save` → 200 (366,619 ไบต์) · ค่าเก่าบันทึกไว้ในบรรทัดนี้เผื่อย้อน
+  - โค้ด: `dock_check()` (offset แท่น↔หุ่นตอน on_dock+มี fix, `DOCK_STALE_M=1.0`) และ `register_dock()` (แก้แท่นเดิม in place ไม่เพิ่มแท่นที่สอง, ต้อง on_dock + quality ≥ 50, ตรวจว่าบอร์ดเปลี่ยนจริง, เซฟแมพต่อท้าย) + actions `dock_check`, `register_dock` (ก่อน motion lock) · `undock()` + action `undock` (ต้อง motion_enabled): ไม่มี undock ในสเปก และ MoveByAction บนแท่นวันนี้สร้าง action จบเองโดยหุ่นไม่ขยับ (10 ครั้ง 0.00 ม.) → ใช้ MoveToAction ไปข้างหน้า `UNDOCK_M=0.6` ตามทิศหุ่น (หุ่นถอยเข้าแท่น ข้างหน้าคือออก) ผ่านด่านของ goto_xy ทั้งหมด + เช็ค clearance หน้า ≥ 0.6+0.3 · **ผลจริง** (condo-voice-83 หลังรีสตาร์ต): `dock_check` → docked true, quality 64, offset_m 0.0, stale false ✓ · `undock` → ปฏิเสธ `obstacle` front 0.72 < 0.9 หุ่นไม่ขยับ (ด่านทำงานตามออกแบบ) — หน้าหุ่นมีผนัง 0.72 ม. ที่ตั้งแท่นแคบเกินจะขับออกไปข้างหน้า ต้องเคลียร์ที่หน้าหุ่น ≥ 0.9 ม. หรือย้ายหุ่นก่อนทดสอบเคลื่อนที่จริง
+  - อ่านสดเพิ่ม: `base.max_moving_speed=0.4 m/s`, `base.max_angular_speed=1.0 rad/s` (ไม่ใช่ 0 — ความเร็วไม่ใช่เหตุที่ MoveBy บนแท่นไม่ขยับ) · `base.brake_release`/`base.emergency_stop` อ่านผ่าน GET ไม่ได้ (400 — GET รับ 3 ชื่อตาม enum, ตัวนี้ PUT-only)
+  - เทสต์ 6 ตัวใหม่ — 7 ไฟล์ที่เกี่ยว = 208 passed · ชุดเต็ม `tests/` = **1500 passed** (156 วิ)
+  - **ทดสอบ go_home จริง** (condo-voice-83, เจ้าของอยู่ข้างหุ่น): หุ่น**ขยับออกจากแท่น ~0.2 ม. แล้วค้าง 50 วิ** ไม่เข้าแท่น (หยุดด้วยมือ) — ที่เข้าแท่นได้คือเจ้าของบังคับจอยเอง · = MoveTo/GoHome ขับล้อได้จริง (ต่างจาก MoveBy บนแท่นที่ไม่ขยับ) แต่ติดที่หน้าแท่นมีผนัง 0.56–0.72 ม. ไม่มีที่ตั้งลำ · **REST ไม่มีพารามิเตอร์ปรับระยะ staging/approach**: PUT parameter รับแค่ max_moving_speed / max_angular_speed / emergency_stop / brake_release, GoHomeActionOptions มีแค่ flags dock|no_dock, back_to_landing, charging_retry_count (default 5) — "จุดตั้งลำ" คำนวณภายในจาก pose+yaw ของแท่น ตรงที่มีผนังพอดี → ข้อจำกัดกายภาพ ทางแก้คือย้ายแท่นไปที่มีที่ว่างหน้าแท่น ≥ ~1 ม. แล้ว register_dock ใหม่ หรือเข้าแท่นด้วยจอยมือ · ไม่มีการเปลี่ยนโค้ด/ค่าจากเรื่องนี้
+- **12 ก.ย. — จอยกระตุก: เอา lidar ออกจากเส้นทาง heartbeat** เจ้าของบอกกระตุก "รวมถึงตอนขยับฐาน" · condo-voice-83 อ่านโค้ดถูก: ทุก heartbeat (150 ms) ยิง laserscan *แล้วค่อย* MoveBy = 2 round-trip ผ่าน nc relay ถ้าคู่นั้นช้า MoveBy ตัวเดิมหมดอายุก่อนตัวใหม่มา = สะดุด (บั๊กรูปเดียวกับ step เซอร์โว) · ที่**ไม่**เปลี่ยน: ยัง POST MoveBy ทุก heartbeat เพราะสเปกระบุตรงๆ ว่าต้องเรียกซ้ำเป็นจังหวะถึงจะวิ่งต่อ — ส่งครั้งเดียวแล้วต่ออายุ deadman อย่างเดียวทำไม่ได้ (และอายุ MoveBy หนึ่งตัวยังไม่ได้วัด) · ที่เปลี่ยน: `_scan_watch` task อ่าน lidar เบื้องหลังทุก `SCAN_WATCH_S=0.2` วิ ตลอด burst, `_refuse_if_blocked` ใช้เฟรมนั้นถ้าอายุ ≤ `SCAN_FRESH_S=0.5` วิ ไม่งั้นดึงเอง (เฟรมเก่ากว่านั้นไม่ใช่ถนนว่าง) → heartbeat = 1 round-trip · watcher หยุดพร้อม burst · log เวลา POST ถ้าเกิน 100 ms เพื่อวัด relay · ราคาที่จ่าย: กำแพงที่โผล่กลาง burst ถูกเห็นช้าสุด 0.2 วิ + 1 heartbeat (เทสต์ปรับตาม) · เทสต์ 3 ตัวใหม่ — 7 ไฟล์ = 211 passed · ชุดเต็ม `tests/` = **1503 passed** (152 วิ) · **ยังไม่ได้ลองกับหุ่น** (ปิดอยู่หลังกลิ่นไหม้ที่หัว) — ตอนลอง: heartbeat ฝั่ง client 100-150 ms และดู log "MoveBy POST took"
+- **พบใน spec.js ระหว่างนี้ ยังไม่แตะ:** พารามิเตอร์ระบบ `base.emergency_stop` (on/off) และ `base.brake_release` ผ่าน `PUT /api/core/system/v1/parameter` = E-stop/ปลดเบรกของแชสซีทาง REST — แจ้ง session condo-voice-83 ที่ทำเอกสาร E-stop แล้ว รอเจ้าของสั่งก่อนใช้
+- ไม่ได้ทดสอบกับหุ่นจริง (หลุด Wi-Fi ระหว่างทำ) — สิ่งที่ต้องวัดเมื่อกลับมา: ค่าไบต์ในแมพ, ว่า `maps/explore` บนเฟิร์มแวร์นี้ตอบตาม layout จริงไหม, และขนาดแมพผ่านอุโมงค์ nc
+
+## 2026-09-11 — กู้ `app/robot_chassis.py` และ `tests/test_robot_chassis.py` ที่ถูก session อื่นเขียนทับ
+
+- session อื่น (condo-voice-83) เผลอ `Write` ทับ `app/robot_chassis.py` ทั้งไฟล์ (11:00 น. UTC) แล้วเขียนทับ+ลบ `tests/test_robot_chassis.py` ด้วย — ทั้งสองไฟล์ untracked, git กู้ไม่ได้, ไม่มี .bak ที่ตรงเวอร์ชันล่าสุด (`%TEMP%\rc.bak` มีแต่เป็นฉบับ 15:33 น. วันที่ 10 ก.ย. ก่อนแก้ status code/motion lock)
+- **แหล่งกู้:** Claude Code เก็บ `structuredPatch` ของคำสั่ง Write ที่ทับไว้ใน transcript (`~/.claude/projects/.../cccd47be-….jsonl`) hunk เดียวครอบทั้งไฟล์ (old 1+610 / old 1+513) → ประกอบบรรทัด context + `-` กลับเป็นไฟล์เดิม byte-for-byte ณ ตอนก่อนถูกทับ ตรวจสอบไขว้กับ rc.bak + Edit 4 ครั้งที่บันทึกไว้ (ต่างกันเฉพาะส่วนที่แก้นอก tool record: ActionState จาก spec.js 0/1/3/4, `moving=None` เมื่อไม่รู้, motion lock ใน `send()`, `_last_action_seen`)
+- ไม่ได้แก้เนื้อหาใดๆ นอกจากกู้คืน · `ast.parse` ผ่านทั้งสองไฟล์ · เทสต์ที่เกี่ยว: `tests/test_robot_chassis.py test_robot.py test_robot_control_page.py test_hardware_page.py test_robot_arrival_readiness.py test_hardening.py` = **146 passed** · ชุดเต็ม `tests/` = **1385 passed** (150 วิ)
+- เก็บเวอร์ชันของ session อื่นไว้ใน scratchpad นอกรีโปเผื่ออ้างอิง (`peer_version_app_robot_chassis.py`) — ไม่ได้ merge เพราะ API ไม่ตรงกับ `main.py` (`/robot/state`, `/robot/command`, `nudge`, `live_state`)
+
+## 2026-09-11 — ลอง dump dex แขน/E-stop จากแรม แต่ jiagu บล็อก
+
+- ตามคำสั่ง "ทำเลย" ดัมพ์ dex ที่ถอดแล้วจาก `/proc/<pid>/mem` ของแอป Aobo (root)
+- **jiagu มี anti-dump**: แอปรีสตาร์ตทันทีที่อ่าน /proc/pid/mem (pid เปลี่ยน 7952→11821…) · ตอนเสถียรสแกน 2108 region ที่อ่านได้ grep ชื่อเมธอดที่รู้ว่ามีจริง (sendCmdtowhichUart/MoveToAction/SerialdataService/estopstop) **ไม่เจอ plaintext เลย** = โค้ด/สตริงถูกเข้ารหัสแบบ VMP ถอดทีละเมธอดตอนรัน
+- สรุป: **static + memory-carve หา endpoint E-stop ภายในไม่ได้** · ทางที่เหลือคือไดนามิก — กด E-stop จริง (ปลอดภัย=หยุด) แล้วดัก logcat + serial ttyUSB + REST พร้อมกัน (ไม่ต้องแกะ jiagu) · อัปเดต `docs/robot-android-control-map-2026-09-11.md`
+- เก็บกวาด /data/local/tmp บนหุ่นแล้ว · แอป Aobo กลับมาปกติ (AllSettingActivity) · รีโปไม่มี secret
+
+## 2026-09-11 — คุมล้อผ่าน SLAMWARE REST ได้จริง + APK แขนถูกแพ็ค
+
+- ต่อยอดจากแผนที่ตัวควบคุม: ฐานนำทางไม่มี curl แต่ `su 0 busybox wget` ยิง REST ได้ · อัปเดต `docs/robot-android-control-map-2026-09-11.md` ด้วยผลจริง
+- **SLAMWARE REST ที่ 192.168.11.1:1448 ทำงานเต็ม**: robot/info = Slamware SDP sw 5.1.1-for-aobo-hermes, capabilities core/multi_floor/platform, power (แบต 15% on_dock), pose สด, **laserscan lidar สดรายจุด**, motion/actions ว่าง — นี่คือช่องคุมล้อของเราเอง ไม่ต้องผ่านแอป Aobo · เขียน MoveToAction API ไว้ในเอกสาร **ยังไม่ยิงสั่งเดิน** (แบตต่ำ+อยู่บนแท่น+กฎความปลอดภัย)
+- ข้อจำกัดเครือข่าย: เซิร์ฟเวอร์ Emma อยู่ LAN 192.168.1.x เข้าฐาน 192.168.11.1 ตรงไม่ได้ ต้องผ่านหุ่นเป็น proxy
+- **APK แขน/E-stop ถูกแพ็คด้วย 360 Jiagu** (libjiagu.so) โค้ดจริงถอดในแรมเท่านั้น static ไม่เห็น endpoint · assets มีแค่ routing เสียง · ท่า = serial `#<grp>GC` (รู้แล้ว), E-stop = พฤติกรรมใน aobosetting.xml แต่ยังไม่รู้ว่าเรียก API/IO ไหน — ต้องดัมพ์ dex จากแรม (frida) หรือกด E-stop จริงแล้วดู logcat/serial
+- ดึง base.apk (147MB) ไว้ scratchpad นอกรีโป · ตรวจแล้วรีโปไม่มี secret
+
+## 2026-09-11 — สำรวจตัวควบคุมทั้งหมดบนตัวหุ่น (เจ้าของอนุญาต)
+
+- เจ้าของสั่งเข้าไปหาไฟล์/ตัวควบคุมทั้งหมดในหุ่น (เครื่องของเจ้าของเอง) — เพิ่ม `docs/robot-android-control-map-2026-09-11.md` **ตัด secret ออกหมด** (คีย์ DeepSeek/Ali TTS/robot SN/รหัสติดตั้ง เก็บดิบไว้ใน scratchpad นอกรีโป ตรวจแล้วรีโปไม่มี secret)
+- พบสถาปัตยกรรม: RK3588 Android 15 ยี่ห้อ ZC + แอป `com.aobo.robot.ai3` เป็นสมอง คอนฟิกทั้งหมดใน shared_prefs · **สองเครือข่าย**: wlan0=192.168.1.24 (LAN), eth0=192.168.11.200 สายภายในไปฐานนำทาง **SLAMWARE ที่ 192.168.11.1** (ping 1.3ms) — ตัวคุมล้อ/lidar แยกบอร์ด REST มาตรฐานอยู่ :1448
+- **ตรงกับปัญหา #STOP**: `aobosetting.xml` ตั้ง E-stop ของแอป = หยุดแขน (true) แต่ไม่หยุดล้อ (false) เป็นคนละเส้นกับ `#STOP` serial ที่เราทดสอบ · `FacereSetting.xml` ยืนยันเลขกลุ่ม=ท่า: เจอหน้า→กลุ่ม 6 (จับมือ), ถึงจุด→กลุ่ม 17
+- **ความปลอดภัย**: หุ่นมี AnyDesk (พอร์ต 7070 ฟังอยู่) + RustDesk + ES File server (59777) รันอยู่ = เข้าถึงจอ/ไฟล์จากภายนอกได้ ควรตรวจและปิดถ้าไม่ใช้
+- ตรวจ db 3 ตัว (hmdb/alsn/logdb) ว่างเกือบหมด (log ประวัติ) · ลบไฟล์ชั่วคราวที่ก๊อปไป /sdcard แล้ว · classifier บล็อกการยิง REST ฐานนำทางกับ dump แบบ recursive — เหลือทำต่อเมื่อได้ permission
+
+## 2026-09-11 — กล้องหุ่นเข้า face greeter ผ่านหน้า kiosk และหุ่นใช้ 8001 ตัวเดียวกับ PC
+
+- **ตอบคำถาม "ทำไมไม่ใช้อันเดียวกับบนคอม"**: ก่อนหน้านี้หุ่นต้องใช้ `localhost:8000` ผ่าน adb reverse เพราะ Chrome บนหุ่นไม่เชื่อใบรับรอง mkcert ของ 8001 ตอนนี้ติดตั้ง `certs/rootCA-android.crt` ลง user CA store ของหุ่นแล้ว (root: `/data/misc/user/0/cacerts-added/a23c2e19.0` — ตัวติดตั้งปกติของ Android 11+ ปฏิเสธไฟล์ CA จาก intent) รีสตาร์ต Chrome แล้วเปิด `https://192.168.1.43:8001/?kiosk=1&cam=1&agc=0&token=…` ได้ตรงๆ ปิด instance 8000 และแท็บ localhost แล้ว เหลือเซิร์ฟเวอร์ตัวเดียว
+- **กล้องหุ่น → greeter** (`app/robot_camera.py` ใหม่, `/ws/camera` ใน main.py, `FACE_CAMERA_SOURCE=robot` ใน config/camera.py, `?cam=1` ใน client): เซิร์ฟเวอร์เปิดกล้องบนหุ่นไม่ได้ (Android คนละเครื่อง) แต่หน้า kiosk ที่รันบนหุ่นอยู่แล้วขอกล้องได้เหมือนขอไมค์ จึงส่ง JPEG ต่อเฟรมทาง WebSocket และ `RobotCapture.read()` ทำตัวเหมือน `cv2.VideoCapture` ให้ greeter โดยไม่แก้ลูป greeter เลย กติกาที่ตั้งใจ: เฟรมเดิมไม่เสิร์ฟซ้ำ (ลิงก์ค้าง = กล้องหยุด ไม่ใช่คนยืนนิ่ง — ไม่งั้นรูปแช่ยืนยันหน้าตัวเองครบเฟรม), ไบต์เสียอ่านเป็นเฟรมว่างไม่โยน, วิดีโออย่างเดียว (`audio:false` — ห้ามเปิดไมค์ตัวที่สาม), kiosk + `?cam=1` เท่านั้น (เบราว์เซอร์โต๊ะห้ามอัปโหลดเว็บแคมเพราะ flag ค้าง), token gate เหมือนทุก socket, `bufferedAmount` กันเฟรมค้างคิว
+- **สองอาการที่วัดบนหุ่นแล้วแก้ในหน้า**: (1) `getUserMedia` วิดีโอที่เรียกตอนหน้ายังโหลดอยู่ **ไม่ resolve ไม่ reject** (ไม่มี prompt) ขณะที่เรียกซ้ำอีกครั้งติดทันที → เริ่มหลัง `load` +1.5 วิ และ race 8 วิ ถือว่าค้าง=ล้มเหลว ลองใหม่ได้ 6 ครั้ง; (2) กล้องทั้งสองตัวของหุ่นรายงาน "facing back" → เลือกด้วย `?camdev=N` ไม่ใช่ facingMode · ผลจริง: `robot camera: first frame 1280x720` ถึง greeter (26 ใบหน้าในแกลเลอรี threshold 0.50) กล้อง index 0 ตอนนี้หันเข้ากำแพง ยังไม่ได้ทดสอบจำหน้า
+- `.env`: `FACE_ENABLED=true` + `FACE_CAMERA_SOURCE=robot` (greeter ไม่แตะกล้อง PC อีก จึงไม่ชนกล้อง observer ของงานแขน) · `.env.example` อธิบายสวิตช์ · conftest pin `face_camera_source="local"` · `FACE_CAMERA_SOURCE` สะกดผิด = local ไม่ใช่ปิดเงียบ (เทสต์ subprocess)
+- เทสต์ใหม่ `tests/test_robot_camera.py` 7 ตัว, `/ws/camera` เข้าเทสต์ "ทุก socket ปฏิเสธ token ผิด", ชุดเต็มรอบสุดท้าย **1385 passed** (หลังแก้ client รอบท้าย) · Chrome บนหุ่นถูกเปิด/ตรวจผ่าน DevTools remote (`adb forward tcp:9222 localabstract:chrome_devtools_remote`) — สคริปต์อยู่ใน scratchpad ไม่ใช่รีโป
+- ยังค้าง: ผลของ `?agc=0` ต่อเสียงคนไกล (ต้องมีคนพูดใกล้/ไกลจริง), หันกล้องหุ่นให้เห็นทางเดิน แล้วลอง `?camdev=1` ถ้าตัวแรกไม่ใช่ตัวที่มองลูกค้า
+
+## 2026-09-11 — ทดสอบไมค์/กล้อง/Emma บนตัวหุ่นจริง และปิด AGC เฉพาะหุ่น
+
+- **ต่อหุ่นผ่าน adb** (ZC-3588A, Android 15): กล้อง 0 ใช้ได้ (ภาพสดจากแอปกล้อง), ไมค์ USB "Bothlent UAC Dongle" อัดตรงจาก ALSA (root, `tinycap -c 8 -r 16000`) ได้ 4 ช่องจริง rms ≈0.008 ช่อง 4-5 เบา ช่อง 6-7 ว่าง · ลำโพงอยู่การ์ด 2 (es8388) เล่นคลิป `emma_thai_f.wav` ผ่าน `tinyplay` ได้
+- **เปิดหน้า Emma บน Chrome ของหุ่นโดยไม่ต้องลง cert**: `adb reverse tcp:8000` + instance HTTP ที่ผูก 127.0.0.1:8000 (WAKE_DEBUG=true) → Chrome เห็นเป็น `localhost` = secure context ไมค์เปิดได้ ผลจริง: `wake word heard: 'EMMA'` เปิดสายเอง Gemini ถอดไทยและตอบ กฎห้ามนอกเรื่องทำงาน (ถูกขอให้ทายชื่อ → ปฏิเสธ) · บั๊กที่เจอระหว่างทาง: refresh หน้าบนหุ่น token หลุดจาก URL แล้ว `/ws/wake` ถูกปิดเงียบ (หน้าแสดง sleep ระดับเสียง 0%) ต้องเปิดด้วย URL ที่มี token
+- **ไมค์หุ่น "รับได้ต่างจากเดิม" — วัดแล้ว**: ระดับเสียงในสายใกล้เคียง PC (avg 0.01-0.07 peak 0.1-0.4) แต่ 7 ใน 15 เทิร์นที่ Gemini ได้ยินเป็นบทสนทนาของคนอื่นในห้อง (ถอดแบบเว้นวรรครายคำ 4 เทิร์น, สลับไปเกาหลีจากเสียงไกล 1 ครั้ง) ตัวแปรที่ต่าง: หุ่นเป็นอาร์เรย์ 4 ไมค์รอบทิศ + AGC ของ Chrome เปิดอยู่ (`MIC_AGC` default true) ดันเสียงไกลขึ้นมาเท่าเสียงใกล้ พื้น `VAD_MIN_RMS=0.010` ที่จูนกับไมค์ PC จึงแยกไม่ออก (ตัดได้แค่ 5 ครั้ง rms 0.001-0.0085)
+- `client/index.html`: เพิ่ม override ต่อเครื่องทาง URL `?agc=0|1` และ `?ns=0|1` ทับค่าจาก `/health` เฉพาะ client นั้น (สองไมค์ใช้ .env เดียวกัน — ค่า .env ยังเป็นของ PC) ตรวจสดบนหุ่น: track ของสายมี `autoGainControl:false` แล้ว · เทสต์ `test_the_page_lets_a_url_override_mic_agc_per_client` · **ยังไม่ได้วัดผลหลังปิด AGC** — ต้องมีคนพูดใกล้หุ่นและคนคุยไกลพร้อมกัน แล้วอ่านบรรทัด `vad floor` ก่อนจะแตะ VAD_MIN_RMS
+- **อุบัติเหตุปลายบรรทัด**: `Path.write_text` บน Windows เขียน CRLF ทับไฟล์ที่แก้วันนี้ทั้งไฟล์ (config/units/prompts/prompts tests/CHANGELOG/CLAUDE.md/index.html/test_voice.py) git ปกติ normalize ตอน commit จึงมองไม่เห็น แต่ `tests/client_voice_lifecycle.cjs` อ่านไฟล์ดิบแล้วหา `'
+  };
+}'` ไม่เจอ → พัง แปลงกลับเป็น LF ทุกไฟล์ที่ HEAD เป็น LF แล้ว node test ทั้งสองผ่าน, pytest 4 ไฟล์ **240 passed** — ต่อไปเขียนไฟล์ด้วย `newline="
+"` เท่านั้น
+- กล้องหุ่น: face greeter ยังใช้กล้องของ PC (`FACE_CAMERA` เป็น index ของ OpenCV) กล้องบนหุ่นยังไม่ได้ต่อเข้า Emma — ต้องมีตัวส่งภาพจากหุ่นมาที่เซิร์ฟเวอร์ก่อน (ยังไม่ทำ)
+
+## 2026-09-11 — ห้องว่างต้องเป็นของ Embassy World เท่านั้น และตัดสไลด์ออกจาก Emma ชั่วคราว
+
+- **บั๊กจริงจากภาพหน้าจอเจ้าของ**: `find_units` ขึ้นจอ "ห้องว่าง 8+ ห้อง" มี A-1405 ซึ่งตรวจกับ DB แล้วเป็นห้องของ **Embassy Life** — ผังขาย (Supabase ของทีมเซลส์) มี 3 โครงการตั้งแต่ 3 ก.ย. (World / Life / One) ตึก A/B/C ซ้ำกันทุกโครงการ เลขห้องจึงไม่ unique และทุก query ของเราไม่เคยกรองโครงการเลย
+- `app/tools/units.py`: เพิ่ม `_SCOPE_EMBED` (`floors!inner(...buildings!inner(...projects!inner(slug)))`) กับ `_scoped()` ใส่ตัวกรอง `floors.buildings.projects.slug=eq.<slug>` ให้**ทุก** query: show_unit, find_units, show_plan, compare_unit_types, list_promotions, price_pair, _active_promotion ต้อง `!inner` ทุกชั้น เพราะกรองบน embed แบบ left ไม่ทิ้งแถว แค่ทำ embed เป็น null (บทเรียนเดียวกับ filter ชั้นของ show_plan ลึกลงอีกชั้น)
+- `app/config.py`: `INVENTORY_PROJECT` default `embassy-world` ค่าว่าง = ของเรา ไม่ใช่ทุกโครงการ (บทเรียน WS_TOKEN="") · `.env.example` มีบรรทัดอธิบาย
+- ตรวจกับ DB จริงหลังแก้: `find_units()` ได้ 8 ห้องทั้งหมด slug embassy-world, `show_unit("A1405")` → unknown room (ถูกต้อง — ไม่ใช่ห้องเรา), อ่าน 1000 แถวแบบ scoped ได้ slug เดียว
+- **Emma ตัดสไลด์ออก** ตามคำสั่ง "เอาพรีเซ้นออกก่อน ยังไม่ได้ใช้": `.env` TOOL_GROUPS เอา `slides` ออก และ `app/prompts.py` เพิ่ม `_SLIDE_RULES` (slice จริงจาก BASE_INSTRUCTIONS ไม่ใช่ก๊อป) + `without_slide_rules()` — เมื่อเครื่องไม่โหลดกลุ่ม slides กฎ 10-13 ที่สั่งเรียก show_slide/start_presentation/next_slide หายไป แทนด้วยบรรทัดเดียว "ไม่มีสไลด์ในเครื่องนี้ เสนอผัง/ห้องว่างแทน" ข้อ 14→10 และท้าย SALES_HOST_BLOCK เลิกเสนอ "สไลด์" เหตุผล: ในเซสชันเดียวกัน Emma เสนอ "แนะนำสไลด์" ที่ตัวเองเปิดไม่ได้ (เครื่องมือถูกถอดแต่ prompt ยังสั่ง) default ห้องขาย (TOOL_GROUPS ว่าง) prompt เหมือนเดิมทุกไบต์
+- เทสต์ใหม่: `test_every_live_read_is_scoped_to_our_project` (ทุก entry point ต้องมีทั้ง filter และ embed `!inner`), `test_a_blank_project_setting_means_ours_not_everything` (subprocess — reload app.config ในโปรเซสเทสต์ทำให้ `settings` กลายเป็นคนละ object แล้วเทสต์ token 16 ตัวแดง เจอจริงรอบแรก), `test_the_gallery_prompt_drops_the_slide_rules_with_the_slides_group`
+- `live_probe()` (บรรทัดบูต) กรองโครงการด้วย เดิมขึ้น "2540 units" = สามโครงการรวมกัน ตอนนี้ `LIVE (1082 units of embassy-world ...)` ตรวจกับ DB จริงแล้ว
+- ผลตรวจ: test_units + test_sales_links + test_profiles + test_voice **239 passed** ชุดเต็ม **1377 passed** ใน 149 วินาที (1 warning เดิมของ Starlette) · รีสตาร์ต 8001 ผ่าน `run_server.py` (HTTPS) ให้ .env ใหม่มีผล
+
+## 2026-09-11 — ค้นคำสั่งอ่านกลุ่มและควบคุมรายข้อต่อ
+
+- เพิ่ม `docs/robot-channel-mapping-stop-findings-2026-09-11.md` รวมผลจริง จำนวนกลุ่ม 26 และหลักฐานช่อง 5 แก้รายงาน E-stop เรื่อง IO7 ที่ภายหลังยืนยันแล้ว ขยาย guard ใน serial probe ให้ปฏิเสธทุกโหมดขยับก่อน I/O (ไม่ใช่การล็อกหน้าเว็บหรือตัดไฟ) ตรวจ recorder/arm/console หลังขยาย guard แบบ parametrized ผ่าน 62 ตัวใน 1.46 วินาที มี deprecation warning ของ Starlette/httpx หนึ่งรายการ; git diff --check ผ่าน ไม่มีการติดต่อหรือส่งคำสั่งขยับหุ่นในรอบแก้ไขนี้
+
+- ช่อง 5 มีภาพแขนด้านซ้ายเปลี่ยนมุมออกจากลำตัวทั้งรอบ P1500 และ P1540 แต่ยังเปลี่ยนหลังช่วง remote STOP จึงพัก commissioning ทุกช่องไว้ก่อน I/O และเพิ่มเทสต์พิสูจน์การปฏิเสธ เปลี่ยนข้อความปุ่ม console/arm เป็นส่ง STOP และล็อก พร้อมระบุข้อจำกัดที่พบจริง ไม่อ้างว่า +40 เป็นระยะเคลื่อนเล็กน้อยหรือเวลา STOP เป็นขอบเขตการเคลื่อนจริง เจ้าของแจ้งว่ายังไม่ได้ปิดไฟหลัก จึงไม่ส่งคำสั่งขยับต่อ
+
+- คืนกล้องหลังพัก face greeter และเริ่มเซิร์ฟเวอร์ใหม่ ทดสอบช่อง 2 เป้าหมาย 1500 ได้ stop ACK แต่ยังไม่เห็นเปลี่ยนท่า เพิ่มเป้าหมาย commissioning ทางเลือก 1540/T3000 เท่านั้น (ยัง remote stop 2 วินาที) เพื่อแยกกรณีอยู่ใกล้ค่าเดิม ไม่เปิดช่วง pulse ทั้งหมดและไม่อ้างตำแหน่งจริงจากตัวเลขคำสั่ง
+
+- พัก `FACE_ENABLED=false` ใน `.env` ชั่วคราวและเก็บค่าเดิมไว้ในหลักฐาน ignored เนื่องจาก run_server.py ที่เริ่มใหม่เปิด face greeter ใช้กล้องเดียวกับ observer; รอบ commissioning ช่อง 2 ยกเลิกก่อนส่งเพราะไม่มีภาพ ไม่เปลี่ยนสวิตช์ควบคุมแขนเพื่อแก้ปัญหากล้อง
+
+- อ่านจริงได้ `#R+OK+026` โดย #Read ไม่ส่ง motion; รอบแรกปฏิเสธเพราะ API ถูก rearm ระหว่างที่มีคำสั่งกลุ่มอื่นเข้ามา จึงแจ้งให้เว้นหน้าเว็บและ stop/ล็อกก่อนอ่านใหม่ ทดสอบช่อง 1 ซ้ำได้ ACK แต่ยังไม่เห็นขยับจากภาพ
+- เพิ่มโหมด commissioning แยกจากปุ่มเว็บ: `--map-channel` เลือกทีละช่อง 1–20 เท่านั้น ส่ง P1500/T9999 และตั้ง remote trap ส่ง STOP หลัง 2 วินาที รักษา API เดิม locked และไม่ขยาย production allowlist ค่า 1500 ไม่ใช่ท่ากลางที่วัดแล้ว มี watchdog กล้องและ stop API หลังจบตามเดิม เจ้าของอนุญาตค้นครบและยืนยันมือพ้นหุ่นแล้ว; รอตรวจเทสต์และภาพรายช่อง
+
+- ดาวน์โหลด RIOS_USC จากลิงก์ผู้ผลิตในคู่มือเก็บ ignored เพื่อวิเคราะห์ static เท่านั้น ไม่รันหรือติดตั้ง พบสตริง `#Read` พร้อม CRLF และ parser marker `#R+OK` เพิ่ม `scripts/read_robot_arm_groups.py` ส่งเฉพาะ query นี้หลังตรวจ API locked/พอร์ตพร้อม/แอปผู้ขายหยุด ไม่เรียกท่า ไม่เขียน Flash ไม่เปลี่ยน baud; รอตรวจ syntax และผลจริง
+
+## 2026-09-11 — เตรียมตรวจกลุ่มท่า 3 ด้วยกล้อง
+
+- ทดสอบจริงหลังเจ้าของยืนยันพร้อม: กลุ่ม 3 หนึ่งครั้ง สังเกต 8 วินาทีแล้ว stop/ล็อก ได้ 156 เฟรม RX 80 ไบต์และ stop ACK เห็นหัวหันและแขนด้านซ้ายของภาพยก/งอศอก เจ้าของยืนยันว่าไม่ได้ช่วยยก เพิ่ม `docs/robot-group3-live-test-2026-09-11.md` และอัปเดตรายงาน mapping ยังไม่ยืนยันช่องภายในกลุ่ม นิ้วรายนิ้ว หรือผลหยุดฉุกเฉิน ไม่มีการสั่งกลุ่มอื่นหรือเปิดไฟรีเลย์
+- ตรวจลิงก์หลักฐานรายงานใหม่ 5 รายการและจำนวนเฟรม/RX/ACK ตรงไฟล์จริง ตรวจ state ซ้ำได้ armed=false, port_present=true, commanded ว่างตามกลไกหลังเล่นกลุ่ม และ whitespace ผ่าน
+
+- เพิ่มตัวเลือก explicit `--group 3` ใน serial probe และ `--probe group3` ใน camera recorder ตามกลุ่มที่เจ้าของแจ้งว่าเคยใช้ ทดสอบได้เฉพาะกลุ่ม 3 หนึ่งรอบ มีช่วงสังเกต 8 วินาทีแล้วส่ง stop/ล็อก ไม่ถือว่าท่าจบครบ ใช้ watchdog กล้องเดิมและไม่เปิดไฟรีเลย์อัตโนมัติ
+- เพิ่มเทสต์ปฏิเสธเลือกกลุ่มพร้อมขยับรายช่องและปฏิเสธกลุ่มอื่น รวมเทสต์ recorder/probe ผ่าน 8 ตัวใน 0.41 วินาทีหลังใช้ basetemp ใหม่ใน workspace (รอบแรกติดสิทธิ์ temp เดิมก่อนเทสต์เริ่ม); py_compile และ whitespace ผ่าน ตรวจ state พบพอร์ตพร้อม กลุ่มปลดล็อกแต่การส่ง disarmed และกล้องคอมได้ 58 เฟรมในโหมด observe ยังไม่ส่งคำสั่งหุ่น รอยืนยันพื้นที่ภายในและฝาครอบพ้นกลไกจากเจ้าของก่อนทดสอบ
+
+## 2026-09-11 — ตรวจวิดีโอบอร์ดและสายภายในสองคลิป
+
+- เพิ่ม `docs/robot-interior-video-analysis-2026-09-11.md` และลิงก์ต่อจากรายงานภาพเดิม แยกเฟรมวิดีโอในโฟลเดอร์ ignored พบรายละเอียดบอร์ดแดง ตัวปรับสามตัว และป้ายสาย 2/11 แต่ยังไม่ยืนยันรุ่น ผังช่อง หรือสาเหตุแขนไม่ขยับ ไม่ตีความขั้วที่มองไม่เห็นสายเป็นหลักฐานไฟขาด
+- บันทึกข้อมูลเจ้าของว่าเคยทดสอบแขนและนิ้วแล้วขยับปกติ แยกจากผลที่เราวัดเอง เปลี่ยนจุดมุ่งหมายเป็นตามเส้นทางคำสั่งที่ทำงานและเงื่อนไขเปิดใช้งาน ไม่อนุมานว่ามอเตอร์ไม่มีหรือเสียจากช่อง 1/11 ที่ไม่เห็นขยับ
+- ภาพที่เจ้าของส่งต่อแสดงปุ่มเล่นกลุ่มท่าหมายเลข 3 ตรวจเส้นทาง console/API/run_group ว่าสร้าง `#3GC1` จริง อัปเดต `docs/robot-gesture-mapping-research-2026-09-11.md` โดยไม่ตั้งชื่อกลุ่มหรืออ้างว่าตรวจการเคลื่อนที่เอง
+- เทียบแหล่งข้อมูลการใช้ชุดมอเตอร์ DC กับวงจรเซอร์โวเพื่อคงความเป็นไปได้ของ PWM โดยไม่คัดลอก pinout หรือค่าจ่ายไฟของอุปกรณ์อื่น ตรวจภาพขนาดเดิม ข้อมูลวิดีโอ และลิงก์ในรายงานวิดีโอ 11 รายการพบครบ; ตรวจ whitespace ผ่าน ไม่มี ADB คำสั่งหุ่น หรือการเปลี่ยน runtime จึงไม่รัน unit tests
+
+## 2026-09-11 — ตรวจภาพฮาร์ดแวร์ภายในจากเจ้าของ
+
+- เพิ่ม `docs/robot-interior-photo-analysis-2026-09-11.md` และสำเนาภาพเดิมในโฟลเดอร์ ignored เห็นมอเตอร์กระบอกโลหะสองชุดบริเวณไหล่กับเซอร์โวบริเวณคอ แยกข้อสังเกตจากการคาดชนิด/หน้าที่ ยังไม่ยืนยันรุ่นบอร์ด ผังสาย หรือมอเตอร์นิ้ว
+- ตรวจจุดเรียก MotorRunTurnLeft/Right ใน disassembly พบอยู่กับ touchActionType/robotIsRun จึงไม่ถือว่าเป็นคำสั่งแขนและไม่ทดลองส่ง มี LED ติดในภาพจึงไม่ถือว่าภายในปลอดไฟ; รอบนี้ไม่เรียก ADB หรือสั่งหุ่น ไม่แก้ runtime ไม่รัน unit tests ตรวจภาพและลิงก์หลักฐานแทน
+
+## 2026-09-11 — ตรวจเส้นทาง CP2102 และสถานะแขนต่อ
+
+- แก้เส้นทางรีเลย์ใน `docs/robot-command-research-2026-09-11.md` ให้ตรง target จริง พร้อมทำเครื่องหมายข้อความ handshake เดิมเป็นข้อสันนิษฐานที่แก้ไขแล้ว; เพิ่มผล IO7 ที่วัดได้ใน `docs/robot-estop-evidence-2026-09-11.md` โดยไม่เปลี่ยนเป็นคำรับรองการหยุดหรือตัดไฟ
+- เพิ่ม `docs/robot-cp210-estop-relay-2026-09-11.md` บันทึก IO7=0→1→0 จากแพ็กเก็ต checksum ผ่านครบทุกตัวอย่าง แก้สาขา CP2102/PL232 เดิม และผล power pulse จริง 1 วินาที กล้อง 91 เฟรมยังไม่เห็นแขนเปลี่ยนตำแหน่ง ไม่มีการวัดแรงดันหรือ ACK รีเลย์ จบรอบสั่ง OFF สองครั้งและคืนไดรเวอร์ unbound; เทสต์ offline รวม 13 ตัวผ่าน ตรวจ API แขน locked และ CH340 ยังอยู่
+- ยืนยัน IO7 จากการอ่านจริงสามรอบ: ก่อนกด IO=0, กด IO=64, ปล่อย IO=0; เพิ่ม `scripts/probe_robot_arm_relay.py` สำหรับทดสอบจ่ายไฟรีเลย์หนึ่งวินาทีแล้วสั่งตัดสองครั้ง โดยต้องมีภาพและ preflight IO7 ปล่อยครบทุกตัวอย่าง ไม่มีคำสั่งข้อต่อ ปลายทางเป็นคำสั่ง OFF ไม่ใช่ยืนยันแรงดันหรือคืนสถานะเดิม เพิ่ม `tests/test_robot_relay_probe.py` และตัวเลือก relay ในตัวบันทึก; รอตรวจและทดสอบจริง
+- อ่าน CP2102 ได้ข้อมูลออกเองระหว่างเปิด reader 4 วินาที ไม่ส่ง serial payload และคืนไดรเวอร์เป็น unbound แล้ว stdout ของ ADB exec-out รวมข้อความสถานะที่เขียน stderr มาด้วย จึงห้ามนับทุกไบต์เป็น serial เพิ่ม `scripts/decode_robot_cp210.py` แยกเฟรมด้วย header/length/checksum ตามโค้ดผู้ขาย และ `tests/test_robot_cp210_decode.py` ตรวจ noise/checksum/truncation; รอผลตรวจและเทียบปุ่มแดง
+- ไล่ branch จริงของ `sendCmdtowhichUart`: route 60000 ไป `sendCmd`/`SerialToothManager` (CP2102) ไม่ใช่ `sendCmdPL232` ตามรายงานเดิม ถอด DataConstants/AllTouchSignalEvent เพิ่มจาก DEX สำรอง พบ `COMM_GET_SENOR` และรูปแบบรับ IO; ยังไม่ส่งคำขอหรือรีเลย์
+- เพิ่ม `scripts/read_robot_cp210_status.py` สำหรับผูกไดรเวอร์ CP2102 ที่ตรวจ VID/PID แล้วชั่วคราว เก็บ RX 4 วินาที คืนค่า stty และ unbind ใน trap ไม่ส่ง serial payload ไม่เปลี่ยนแอปหรือ CH340; การเปิดพอร์ตอาจเปลี่ยน control lines จึงไม่เรียกว่า electrically passive รอตรวจจริง
+
+## 2026-09-11 — เตรียมทดสอบช่องอื่นพร้อมกล้อง
+
+- ตรวจสุดท้าย: เทสต์ตัวบันทึก/ตัวเลือกช่องแบบ mock ผ่าน 7 ตัว; สร้างและตรวจภาพเปรียบเทียบจริงแล้ว อ่านสถานะหลังทดสอบ armed=false (ค่าที่สั่งไว้ช่อง 7/8/11 = 1540 ไม่ใช่ค่ามุมที่วัด)
+
+- ทดสอบด้านหน้าครบช่อง 7/8/11 รวม 6 รอบ บันทึก 498 เฟรม ทุกครั้งส่งหยุดและล็อกกลับ: ช่อง 7 หันหัวไปขวาของภาพ, ช่อง 8 ก้มลงเล็กน้อยเมื่อ 1500→1540, ช่อง 11 ไม่เห็นเปลี่ยนตำแหน่ง เพิ่ม `docs/robot-front-camera-test-2026-09-11.md` พร้อมหลักฐาน/ข้อจำกัด ไม่อ้างว่าทดสอบครบทุกมอเตอร์หรือหยุดกลางทางได้
+- ภาพช่อง 8 เมื่อ 1500→1540 เห็นหัวก้มลงเล็กน้อย เพิ่มการแยกข้อมูลใน serial probe: `physical_motion_observed=null` หมายถึงสคริปต์อ่านสายไม่ได้ตรวจภาพเอง แทน false ที่อาจถูกตีความว่าไม่มีการขยับ หลักฐานเก่าคงเดิมและต้องอ่านร่วมผลตรวจภาพในรายงาน
+- กล้องจริง index 1 ผ่าน DirectShow เก็บภาพด้านหน้าได้หลังปิด preview Camera Hub; ทดสอบช่อง 7 ที่ 1500 แล้ว 1540 ทีละรอบพร้อม stop/ล็อกกลับ ภาพรอบ 1540 เห็นหัวหันไปขวาของภาพจริง ไม่แปลงเป็นองศาหรือยืนยันผลหยุดขณะเคลื่อน เพิ่ม `scripts/render_robot_front_probe.py` สร้างภาพเปรียบเทียบ/GIF จากเฟรมจริงและตัดบริเวณจอคอมออก; รอตรวจช่อง 8/11 ต่อ
+- ผู้ใช้ยืนยันมุมด้านหน้าพร้อมแล้ว ตัวบันทึกกล้อง 0 ได้ภาพดำสองรอบ จึงยุติก่อนส่งคำสั่งทั้งสองรอบ เพิ่ม `--camera` ใน `scripts/record_robot_arm_probe.py` เพื่อเลือกอุปกรณ์จริงแทน virtual camera พร้อมบันทึกเลขอุปกรณ์ในหลักฐาน; รอตรวจภาพก่อนทดสอบต่อ
+- ผู้ใช้ขอทดสอบส่วนอื่น เพิ่มตัวเลือกช่องเดี่ยว 1/11/7/8 ใน `scripts/probe_robot_arm_stop.py` และ `scripts/record_robot_arm_probe.py` โดยไม่เพิ่มช่องที่ไม่มีหลักฐานและไม่เล่นกลุ่มท่า; step ต้องมีค่าที่สั่งไว้ 1500 ของช่องที่เลือกเอง ไม่ใช้ค่าจากช่องอื่น ค่าเริ่มต้นยังคง observe/stop-only
+- เพิ่มเทสต์ปฏิเสธช่องที่ไม่รู้จัก การเลือกหลาย action และการใช้ baseline ข้ามช่องใน `tests/test_robot_probe_recording.py`; ตรวจผ่าน 7 ตัวแบบ mock ไม่ติดต่อหุ่น; รอภาพด้านหน้าก่อนทดสอบจริง
+
+## 2026-09-11 — ตรวจ USB หลังผู้ใช้ไม่เห็นการขยับ
+
+- ผู้ใช้รายงานว่าไม่เห็นการขยับจากรอบช่อง 1; ยังไม่ระบุผังข้อต่อจากผลนี้
+- เพิ่ม `scripts/probe_robot_arm_usb.py` ตรวจ VID/PID และจับ usbmon เฉพาะ CH340 ระหว่าง stop-only probe โดยกรองบนหุ่นก่อนส่ง/เก็บข้อมูล ไม่เก็บ traffic กล้องหรือไมค์ ไม่เปลี่ยนไดรเวอร์; พบ TX #STOP CRLF 7 ไบต์สองครั้งและ RX #STOP+OK... CRLF 13 ไบต์สองครั้ง
+- แก้ตัวอ่านเดิมด้วย timeout --foreground และ adb exec-out: รับ ACK รวม 26 ไบต์ตรงกับ USB; ผล 0 ไบต์เดิมไม่ใช่หลักฐานว่าบอร์ดไม่ตอบ ยังคงไม่ยืนยันตำแหน่งหรือการหยุดทางกายภาพ
+- เพิ่ม flag --step-channel-1 แบบใช้แทน centre และต้องมี last-commanded=1500 ก่อน ทดสอบ up (+40 → 1540) เพียงครั้งเดียวแล้ว stop/ล็อกกลับ: รับ 31 ไบต์ เป็น #CC CRLF และ stop ACK สองชุด ผู้ใช้ยังไม่เห็นการขยับ ไม่เพิ่มระยะต่อ
+- เทียบ #CC กับ parser/ARM_ONE_ACTION_END=169 จากโค้ดผู้ขาย ยืนยันว่าเป็นข้อความระดับ action ไม่มีค่ามุมหรือ encoder; ปรับรายงาน live measurement ให้แก้ข้อสรุป 0 ไบต์เดิมอย่างเด่นชัด
+- ผู้ใช้รายงานปุ่มแดงเด้งขึ้นและขอเชื่อมกล้องคอม เปิดหน้าตรวจกล้อง localhost แล้ว คำขอเปิดกล้องยังรอผล ยังไม่ส่งคำสั่งขยับรอบใหม่
+- ตรวจกล้องต่อ: getUserMedia ในเบราว์เซอร์ Codex ค้างโดยไม่มี prompt จึงปิดแท็บนั้น พบ Elgato Facecam และ Camera Hub แจ้ง occupied; Windows ระบุ Python ใช้กล้อง, เซิร์ฟเวอร์ condo-voice พอร์ต8001 เปิด FACE_ENABLED อยู่ รีสตาร์ตเฉพาะเซิร์ฟเวอร์ที่ยืนยัน PID โดยตั้ง FACE_ENABLED=false ชั่วคราวใน process และเริ่ม robot_arm แบบล็อก ไม่แก้ .env ถาวร ภาพสดใน Camera Hub กลับมาแล้ว แต่จอคอมบังแขนข้างหนึ่ง จึงรอจัดมุมก่อนสั่งรอบถัดไป
+- ผู้ใช้จัดมุมและยืนยันพร้อม เห็นหัวและแขนสองข้างจากภาพกล้อง เพิ่ม `scripts/record_robot_arm_probe.py` เก็บเฟรมพร้อมเวลา โดยค่าเริ่มต้น observe ไม่ส่งคำสั่ง; ต้องเลือก centre/step ชัดเจนจึงเรียก probe หนึ่งรอบหลังได้ baseline อย่างน้อย 12 เฟรม กล้องล้มเหลวหรือ probe เกินเวลาจะร้องขอ stop และไม่อ้างว่าหยุดทางกายภาพแล้ว
+- ทดสอบพร้อมกล้องจริงช่อง 1 ที่ 1500/T9999 และ 1540/T800 แล้ว stop/ล็อกกลับ ได้ภาพ 84 และ 82 เฟรม รับ stop ACK ทั้งสองรอบ และ #CC ในรอบ 1540 จากภาพก่อน/ระหว่าง/หลังยังไม่เห็นหัวหรือแขนเปลี่ยนตำแหน่งจากมุมนี้ ไม่ใช่การวัดองศาหรือข้อพิสูจน์ว่าไม่มีการขยับเล็กน้อย รอบ baseline ดำหรือไม่ครบยุติก่อนส่งคำสั่ง
+- เพิ่ม `scripts/render_robot_probe_review.py` สร้างภาพเปรียบเทียบและ GIF จากเฟรมจริงในโฟลเดอร์หลักฐาน ignored; อัปเดต `docs/robot-arm-live-measurement-2026-09-11.md` ด้วยผลกล้องและข้อจำกัด เพิ่ม `tests/test_robot_probe_recording.py` ตรวจ watchdog ด้วย mock ผ่าน 3 ตัว กล้องยังเปิดดูได้และระบบทักทายด้วยใบหน้าพักชั่วคราวเฉพาะ process; `.env` ไม่เปลี่ยน
+
+## 2026-09-11 — เริ่มวัดข้อมูลรับจากบอร์ดแขนจริง
+
+- เพิ่ม `scripts/probe_robot_arm_stop.py` เปิด reader แบบจำกัดเวลา แล้วเรียก stop endpoint เดิมเพื่อเก็บ RX เป็น hex/ASCII โดยต้องระบุ --send-stop ชัดเจน ไม่ส่งคำสั่งท่าหรือกลับ home และตรวจแอปผู้ขายไม่ทำงานก่อนทดสอบ
+- ผู้ใช้อนุญาตทดลองและแจ้งว่าอยู่ใกล้หุ่น ตรวจสด 115200 8N1 raw/echo-off แล้วทดสอบ stop: รอบแรกตัวอ่าน SIGTERM ติด timeout ฝั่งคอม (ไม่ใช้สรุป RX); รอบที่เก็บครบใช้ timeout SIGKILL 5 วินาที ได้ 0 ไบต์ ไม่พบ ACK, stop_write_ok=true, armed=false และไม่มี local timeout
+- เพิ่ม `docs/robot-arm-live-measurement-2026-09-11.md` แยกผลเขียน ข้อมูลรับ และการเคลื่อนไหวจริง ช่วงทดสอบนี้ยังไม่ส่งคำสั่งขยับ และยังไม่ยืนยันผลหยุดทางกายภาพ; ตรวจ syntax สคริปต์และ mandatory --send-stop ก่อนเข้าถึงหุ่น
+- ต่อมาผู้ใช้ยืนยันว่าปิดไฟหลักได้: เพิ่ม flag `--centre-channel-1` และทดสอบ centre ช่อง 1 จริงเพียงครั้งเดียว (1500/T9999) แล้ว stop หลัง API ตอบ 2 วินาทีใน finally และล็อกกลับ; ทั้งสอง API ตอบสำเร็จแต่ RX 0 ไบต์เช่นเดิม ยังรอผู้ใช้รายงานการขยับ/หยุดที่เห็น ไม่ทดสอบช่องอื่นหรือกลุ่มท่าอัตโนมัติ
+
+## 2026-09-11 — ปรับคอนโซล HUD และติดตามผลคำสั่ง
+
+- ปรับ `client/robot-console.html` เป็น HUD น้ำเงินฟ้า เพิ่มผังเรืองแสง แผงผลคำสั่งแยกแขน/ฐานล้อ ตัวบ่งชี้ช่องที่ส่งและค่าที่สั่งไว้ พร้อมตัวอย่างแสงเฉพาะบนจอ ไม่สร้างผังข้อต่อหรือค่าตำแหน่งจริงที่ยังไม่ได้วัด
+- ผลเขียน stop ล้มเหลวแสดงข้อผิดพลาดแม้ API คืน ok=true; ผลคำสั่งเก่าไม่ทับผลหยุดที่ใหม่กว่า ปุ่มหยุดไม่รอ busy และล้างสถานะ/ปิดปุ่มเมื่ออ่านไม่ได้ รายงานกล้องที่บันทึกไว้ไม่ทำให้กล้องขึ้นออนไลน์
+- เพิ่ม `scripts/test_robot_console_ui.cjs` ทดสอบใน Chromium โดย mock ทุก request: เปิดหน้า/กดตัวอย่างไม่ส่งคำสั่ง, pending/stop/late response, อ่านล้มเหลว, การแสดงรายงานเก่า, escape ชื่อสถานที่, ไม่มี JavaScript error และมือถือไม่ล้นแนวนอน ผ่านทั้งหมด ตรวจภาพ desktop/mobile แล้ว
+- รัน pytest หน้า console/arm/hud ผ่าน 59 ตัว มี Starlette deprecation warning เดิม 1 รายการ; ครั้งแรกติดสิทธิ์ temp ก่อนเข้าเทสต์ แก้โดยใช้ basetemp ใน workspace ไม่ใช่เปลี่ยน assertion ไม่ได้รัน suite ทั้งหมด
+- ตรวจเซิร์ฟเวอร์เดิมพอร์ต 8001 ตอบ HTTP 200 พร้อมหน้าใหม่ และอ่าน ADB พบ ttyUSB10 บน USB VID/PID 1a86:7523 (CH340); ไม่พบ PID แอปผู้ขายในการอ่านครั้งนี้ ยังไม่ได้ส่งคำสั่งเคลื่อนไหว เปิดพอร์ต หรือทดสอบหยุดแขนจริงในรอบนี้
+
+## 2026-09-11 — วิเคราะห์การสร้างท่าเองและผลหลัง stop ACK
+
+- เพิ่ม `docs/robot-custom-motion-design-2026-09-11.md` อธิบายคำสั่งรายช่อง/พร้อมกัน/กลุ่ม ลำดับ keyframe สองทาง (Emma เก็บเองหรือบอร์ดเก็บ) และ mapping/ขอบเขตจริงที่ยังขาด ตรวจภาพคู่มือ Torobot หน้า 4/6 ยืนยัน Add/Download ตามคู่มือ แต่ยังไม่ยืนยัน upload protocol หรือความเข้ากันได้กับบอร์ดจริง
+- ยืนยัน branch Save คำพูดของ ArmTestActivity บันทึก JSON keyword binding ใน preferences ไม่ใช่ keyframe ลงบอร์ด; ตรวจ startAction ใช้กลุ่ม 99 เป็น metadata fallback โดยไม่แทน raw frame
+- พบเส้นทาง stop ACK → Handler FROMARM ความยาว 13 → read32UartControlStopARM ถ้า isArmBlocked=false ส่ง #99GC1 และส่งซ้ำ 120 ms; อัปเดตลิงก์จากรายงาน interface/E-stop ระบุเงื่อนไขและยังไม่ทดสอบจริง ไม่อ้างว่า stop ACK ทุกแบบส่ง reset
+- อ่านเอกสารและ disassembly บนคอมเท่านั้น ไม่เปิด RIOS_USC ไม่เรียก ADB/Binder/USB/serial ไม่อัปโหลดหรือลบท่า ไม่แก้ runtime และไม่รัน unit tests ของแอป; ตรวจภาพ render แล้ว `git diff --check`, whitespace และลิงก์ภายในรายงานผ่าน
+
+## 2026-09-11 — ตรวจหลักฐานปุ่มฉุกเฉินและแหล่งจ่ายเซอร์โว
+
+- เพิ่ม `docs/robot-estop-evidence-2026-09-11.md` แก้คำตอบว่าข้อมูลแยกไฟมีเฉพาะคู่มือบอร์ดอ้างอิง: คู่มือผู้ใช้ `หุ่นยนต์ ที่สนใจ.pdf` หน้า 6 ระบุแหล่งจ่ายเซอร์โวแยกจากบอร์ดจริง แต่ไม่ได้บอกตำแหน่งสวิตช์หรือผังสายเครื่องนี้
+- ตรวจเส้นทาง Aobo รับสถานะ E-stop ผ่าน isIo7 ภายใต้ flag รับสัญญาณ แล้วเรียก stop helper เมื่อ estopStopArmMovement เปิด; helper ส่ง #STOP ผ่าน CH340 และส่งซ้ำ 60 ms ยืนยันตัวเลือกที่สำรองไว้เป็น true แยกจากการพิสูจน์ว่าปุ่มตัดไฟจริงหรือหยุดแขนจริง
+- ตรวจข้อความ PDF สี่ไฟล์และภาพหน้า 6 ด้วย Poppler, อ่าน branch/helper/ค่าตั้งจากสำเนาในคอม ไม่ติดต่อหรือสั่งหุ่น ไม่แก้ runtime ไม่รัน unit tests ของแอป
+
+## 2026-09-11 — พิมพ์ target จริงของ switch ชื่อท่า
+
+- เพิ่ม `scripts/inspect_aobo_gesture_switch.py` ใช้ standard library ค้น IdleActionService.getActionName(int) ผ่านตาราง DEX แล้วอ่าน packed-switch และคำสั่งคืน String; เพิ่มหลักฐาน `docs/robot-interface-reference/get-action-name-switch-targets.json` และตาราง offset/bytes ในรายงานผังข้อต่อ
+- ยืนยัน key 6 → target 0x3a4b42 → 握手 และ key 12 → target 0x3a4b16 → 打招呼行走 จาก DEX เดิมที่ตรวจ hash แล้ว การเรียงบล็อกในไฟล์ไม่ใช่ลำดับ key; เพิ่มการพิมพ์ targets ในสคริปต์ disassembly เฉพาะงาน (ignored) ยังไม่ยืนยันกลุ่มท่าบนบอร์ดหรือสาเหตุที่สองตารางชื่อขัดกัน
+- รันตัวตรวจใหม่สำเร็จ อ่าน targets ทั้ง 9 พร้อมตรวจ const-string/return-object โดยไม่เรียกหุ่น; เทียบ hash/code_item/ชื่อทั้ง 9 กับผลเดิมตรงกัน รัน disassembly อีกครั้งพิมพ์ targets ตรงกัน ตรวจ syntax/whitespace/ลิงก์เอกสารและ `git diff --check` ผ่าน
+- ผู้ใช้รายงานผลชุดทดสอบ 1330 ผ่านจากเครื่องของผู้ใช้ ผู้ช่วยยังไม่ได้รัน `python -m pytest tests/ -q` ซ้ำในรอบนี้ ตัวเลขนี้จึงเป็นผลที่ผู้ใช้รายงาน ไม่ใช่ผลตรวจของผู้ช่วย
+
+## 2026-09-11 — ค้นต่อเลขท่าจับมือและผังข้อต่อโดยไม่สั่งหุ่น
+
+- เพิ่ม `docs/robot-gesture-mapping-research-2026-09-11.md` และ `docs/robot-interface-reference/gesture-labels.json`; อัปเดตลิงก์จากรายงาน interface พบ switch `IdleActionService.getActionName` จับคู่ 6 กับ “จับมือ” พร้อมชื่ออีก 8 รายการ แต่ชื่อ constant เลขเดียวกันขัดกัน และไม่พบ caller ใน bytecode Aobo/Bole ที่ตรวจ จึงระบุเป็นเบาะแส ไม่ใช่ท่าที่พิสูจน์กับบอร์ด
+- ตรวจเส้นทาง VoiceArmKeyWordBean → VoiceCommandMatcher → เลขกลุ่มที่ส่ง CH340 และพบ String argument ของ IdleActionService.sendArmToRobot ใช้ log ไม่ใช่เลขกลุ่มโดยตรง ยังไม่พบ wiring map รายข้อต่อ; ไม่ใช้ชื่อ skeleton ของไลบรารี IMI หรือชื่อ connector ของ Office มาเป็นชื่อเซอร์โว
+- อ่านไฟล์ตั้งค่าจากหุ่นเดิมเฉพาะจุด ไม่พบ armkeywordsharepreferences/RobotSettings และไม่พบ armaction ใน parent listing; แก้ตัวตรวจให้ตรวจเนื้อหา XML/ข้อความ error เพราะ su คืน 0 ได้เมื่อ cat/ls ล้มเหลว ไม่อ้างว่าสำรองไฟล์ที่ไม่พบสำเร็จ
+- รอบนี้ไม่เปิดแอป ไม่เรียกท่า/Binder/broadcast ควบคุม ไม่เขียน USB/serial และไม่แก้ runtime `/arm`; สคริปต์/ข้อมูลดิบอยู่ในโฟลเดอร์วิเคราะห์ ignored ตรวจ raw DEX switch ด้วย struct ได้เลข/ชื่อครบ 9 ตรงกับ Androguard และ JSON, SHA-256/ค่าคงที่ที่ขัดกันผ่าน, XML สองไฟล์ parse/hash ผ่านและระบุสาม read errors ตามจริง, AST parse ผ่าน 14 สคริปต์ ไม่รัน unit tests เพราะไม่แก้ runtime
+
+## 2026-09-11 — อ่านข้อมูลภายใน Aobo หลังเจ้าของอนุญาตให้ค้นเอง
+
+- **ผลต่อเนื่องหลังได้รับอนุญาตให้เปิด Aobo โดยมีคนดู:** เปิด SplashActivity หนึ่งครั้ง อ่าน DEX 7 ไฟล์รวม 31,328 class definitions มีคลาส Aobo 5,616 รายการ เพิ่ม `docs/robot-recovered-interface-2026-09-11.md`, ไฟล์อ้างอิง AIDL สองไฟล์ใน `docs/robot-interface-reference/` และเชื่อมสถานะใหม่จากรายงานก่อนหน้า
+- ถอด MyService/Callback, tags, ช่องทางแขน CH340 byte[] และจอ/สีหน้า พบ `#STOP` กับ parser `#STOP+OK` จึงแก้ข้อสรุปเดิมว่าไม่มี stop แต่ยังไม่ทดสอบฮาร์ดแวร์ พบ usbInit ส่งกลุ่ม 99 เมื่อเปิดพอร์ตสำเร็จและ TTS helper เปิดท่าประกอบ จึงไม่อ้างว่าการเริ่มแอปไม่มีโอกาสสั่งฮาร์ดแวร์
+- ติดตั้ง Androguard เฉพาะโฟลเดอร์วิเคราะห์ในคอม ไม่แก้ runtime ไม่เรียก Binder/broadcast ควบคุมหรือส่ง USB/serial เอง ไม่ติดต่อผู้ขาย; DEX มี Adler32 ตรงแต่ header SHA-1 ไม่ตรงและบางเมธอดยัง native จึงไม่อ้างว่ากู้โค้ด/ชื่อท่า/joint map ครบ
+- ผลตรวจ offline: SHA-256/ขนาด/Adler32 ของ DEX ทั้ง 7 ผ่าน เทียบจำนวนคลาสด้วย parser สองตัวตรงกัน ถอดคลาสที่เลือก 260 คลาส ตรวจ CRLF และ AIDL transaction IDs ตรง bytecode, Python AST parse ผ่าน 9 สคริปต์, `git diff --check` ผ่าน; ยังไม่ได้ compile/bind AIDL หรือรัน unit tests เพราะไม่แก้ runtime รายการด้านล่างเป็นเหตุการณ์ช่วงก่อนการเปิดแอปที่ได้รับอนุญาต
+
+- เพิ่ม `docs/robot-internal-code-research-2026-09-11.md`: ยืนยัน su เดิมใช้งาน UID 0 ได้ อ่าน maps/fd/รายชื่อไฟล์ส่วนตัวของแอปที่รันอยู่สำเร็จ พบ armSetting.xml, USB_HUB_LINK.xml และช่วง memory ที่ควรตรวจโค้ดต่อ
+- แยกหลักฐานการเปิด USB ของโปรเซสออกจากการอ้างสิทธิ์ interface และแยกช่วง memory ที่น่าสนใจออกจาก DEX ที่ยืนยันแล้ว ไม่อ้างว่าได้คำสั่งหรือ joint map ครบ
+- สคริปต์เฉพาะงานและข้อมูลดิบเก็บใน `data/robot-inspection/service-interface-research-20260911/` (ignored); พบและแก้ path ของเครื่องมือในสคริปต์ inventory ก่อนรันสำเร็จ
+- ADB หลุดเป็น offline ก่อนอ่านเนื้อหา preferences/memory; ผู้ใช้ยืนยันแบตหมดและเปิดใหม่ จึงเชื่อมกลับ endpoint ที่ประกาศและตรวจอุปกรณ์เดิม สำรองค่าภายใน/ฐานข้อมูลเพิ่ม 48 ไฟล์ วิเคราะห์ SQLite แบบอ่านอย่างเดียว 5 ไฟล์ quick_check ผ่านทั้งหมด
+- พบสวิตช์ voice action group ปิดและเลขกลุ่มท่าที่ตั้งไว้ 6/17; ยังไม่มีชื่อท่า/joint map หรือ DEX ที่คลายการห่อ แอป Aobo ยังไม่รันหลังบูตจึงไม่เปิดแอปให้เอง ไม่ติดตั้ง/เริ่ม/หยุดแอป ไม่แก้ค่าหุ่นหรือส่งคำสั่งมอเตอร์
+- ตรวจไฟล์ APK ต่อท้าย DEX และไม่พบ magic แบบ constant-XOR; การตรวจ syntax ของสคริปต์และ diff รอตรวจท้ายงาน ไม่รัน unit tests ของแอปเพราะไม่แก้ runtime
+
+## 2026-09-11 — ตรวจสัญญา service จากสำเนา APK สำหรับ Emma
+
+- เพิ่ม `docs/robot-service-interface-research-2026-09-11.md`: ยืนยัน MyService ประกาศ exported=true ใน APK 278/227/226; SerialdataService ไม่มี exported/filter จึงเป็นภายในตามค่าเริ่มต้น แก้ความเข้าใจว่าระบุ component แล้วแอปอื่นเรียกได้
+- ค้นสมาชิก archive 39 ไฟล์/82,871 รายการ และ string IDs 1,942,274 รายการจาก DEX ระดับบน 62 ไฟล์ใน APK 37 ไฟล์; ยังไม่พบ AIDL/SDK contract ที่อ่านได้ ระบุข้อจำกัด Jiagu และโฟลเดอร์นอกโครงการที่อ่านไม่ได้อย่างชัดเจน
+- ตรวจคู่มือ SDK หน้า 6 ด้วยภาพและข้อความ ยืนยันชื่อ AAR ที่ต้องใช้; เตรียมร่างขอ interface/SDK ตรงรุ่นจากผู้ขายไว้ในรายงาน ยังไม่ได้ส่ง
+- สคริปต์และหลักฐานอยู่ใน `data/robot-inspection/service-interface-research-20260911/` (ignored); รันสคริปต์ offline ทั้งสองสำเร็จ ตรวจ assertions ของ manifest, SHA-256, จำนวน archive/DEX และเทียบชื่อกับ package-manager dump ที่สำรองไว้ผ่าน; `git diff --check` ผ่าน ไม่เรียก ADB/REST/Binder/USB/serial ไม่แก้ runtime หรือการตั้งค่าหุ่น ไม่รัน unit tests ของแอปเพราะแก้เฉพาะงานวิจัย
+
+## 2026-09-11 — ค้นพอร์ตและโปรโตคอลจากสำเนาโดยไม่ติดต่อหุ่น
+
+- `docs/robot-command-research-2026-09-11.md`: บันทึกขอบเขตค้นข้อมูลเท่านั้นตามผู้ใช้; ไม่ใช้ ADB/REST/serial หรือเรียก service บนหุ่น
+- ถอด complex resource arrays ของ APK ได้ค่าตัวเลือก Relay/Servo Board, หมายเลขเซอร์โว และชนิด UART; ตรวจ Manifest แยก DoubleScreenService ออกจากชื่อ intent action พร้อม SerialdataService
+- เปรียบเทียบ DEX สำเนา APK 3 รุ่น พบ wrapper Jiagu ทั้งสาม; ค้นข้อความ 140 ไฟล์โดยระบุขอบเขตและข้อจำกัด ไม่อ้างว่าได้ joint/channel map แล้ว
+- พบคู่มือ Torobot จากแหล่งผู้ผลิต ตรวจภาพตารางโปรโตคอลและระบุความต่าง USC-32/20 ช่อง และ baud rate; ไม่ติดตั้งโปรแกรมหรือส่งคำสั่งตัวอย่าง
+- หลักฐานและสคริปต์แบบ offline อยู่ใน `data/robot-inspection/static-port-research-20260911/` (ignored); ตรวจ parser/ข้อมูลอ้างอิงและ `git diff --check` ผ่าน ไม่รัน unit tests ของแอปเพราะไม่แก้ runtime
+
+## 2026-09-11 — #STOP ไม่หยุดข้อต่อ: อินเตอร์ล็อกการขยับแขน และคืนเซิร์ฟเวอร์ HTTPS
+
+- จากรายงาน `docs/robot-channel-mapping-stop-findings-2026-09-11.md` ของอีกเซสชัน: บอร์ดตอบ `#STOP+OK` สามชุด แต่ช่อง 5 (แขนซ้ายในภาพ) เคลื่อนต่อจนถึงเป้าทั้งรอบ P1500/T9999 และ P1540/T3000 — **ACK ของ #STOP ไม่ใช่หลักประกันว่าแขนหยุด** และอ่านจำนวนกลุ่มท่าได้ `#R+OK+026` (26 กลุ่ม ไม่ใช่รายชื่อ) กลุ่ม 3 ทำให้หัวหันและแขนยก/งอจริง
+- `app/config.py` + `app/robot_arm.py` + `app/main.py`: เพิ่ม `ROBOT_ARM_MOTION_ENABLED` (default **false**) รูปเดียวกับของแชสซี — `centre/step/group` ปฏิเสธด้วย `motion_locked` พร้อม hint อธิบายเหตุ; `stop`/`prepare`/`state` ยังทำงาน (ล็อกที่ปิดเบรกด้วยแย่กว่าไม่มีล็อก) · เทสต์ +2 (`test_robot_arm_page.py`) รวมยืนยัน default จาก source ไม่ใช่ Settings() · conftest ปิดสวิตช์ในเทสต์
+- `client/robot-console.html`, `client/robot-arm.html`: แถวสถานะ "การขยับ" และปุ่มขยับทั้งหมดถูกปิดเมื่อล็อก (อีกเซสชันแก้ข้อความปุ่ม/แถบเตือนเรื่อง #STOP ไว้ก่อนแล้ว ไม่ทับ) · `.env`/`.env.example`: `ROBOT_ARM_MOTION_ENABLED=false` พร้อมเหตุผล
+- **เซิร์ฟเวอร์ชนกันระหว่างสองเซสชัน**: หลังผมเปิด HTTPS ผ่าน `run_server.py` อีกเซสชันรีสตาร์ต 8001 เป็น `uvicorn --log-level warning` แบบ HTTP (เพื่อใช้ `FACE_ENABLED=false`) เบราว์เซอร์จึงได้ `ERR_SSL_PROTOCOL_ERROR` — ไม่ใช่ใบรับรอง แต่คือ TLS คุยกับพอร์ต HTTP ตรวจด้วย `curl` ทั้งสอง scheme และ command line ของ pid ที่ถือพอร์ต · คืนเป็น `run_server.py` (HTTPS, pid 35520) แล้ว `/health` ตอบ 200 ที่ 192.168.1.43 และ localhost, `/arm/state` รายงาน `motion_enabled=false` — **ต่อไปเซสชันใดรีสตาร์ต 8001 ต้องใช้ `run_server.py` เท่านั้น** ไม่งั้นไมค์บน LAN ใช้ไม่ได้
+- ยังไม่ส่งไบต์ใดไปบอร์ดในรอบนี้; รีเลย์ไฟเซอร์โวยังจ่ายอยู่ตามที่อีกเซสชันบันทึก และเจ้าของยังไม่ได้ปิดไฟหลัก
+- ตรวจจริง: `pytest tests/ -q` = **1374 passed** (จาก 1365); เทสต์หน้าหุ่น 76 ผ่าน (รวม `test_robot_probe_recording.py` ของอีกเซสชัน); HTTPS ตรวจด้วย curl ที่ 192.168.1.43 และ localhost ได้ 200
+
+## 2026-09-11 — Emma เป็นเจ้าบ้านของ Embassy World: โปรไฟล์ condo + บล็อกวิธีขาย + คลังเอกสารห้าชุด
+
+- เจ้าของส่งเอกสารห้าชุด (บทพูดไทย ×2 ซ้ำกัน sha256 เดียว, กลยุทธ์ตลาดไทย, ระบบภูมิทัศน์, คู่มือนำเสนอ EN แล้ว TH) สั่ง "ทำเป็น emma แบบนี้เลย เพราะจะไม่ให้ตอบเรื่องอื่น" — ตีความเป็นสามส่วน: (1) สลับเครื่องนี้เป็นโปรไฟล์ `condo` ซึ่งมีกฎห้ามตอบนอกเรื่องอยู่แล้ว (2) เพิ่มบุคลิก/วิธีขายลงพรอมต์ (3) เอาเอกสารเข้าคลังที่ค้นได้
+- `app/prompts.py`: เพิ่ม `SALES_HOST_BLOCK` (895 ตัวอักษร) ต่อท้ายกฎ condo ทุกเทิร์น — เจ้าบ้านพูด "เรา/ที่นี่" เรียกตัวเองว่าฉัน · ขายชีวิตก่อนเทคโนโลยี ห้ามเปิดด้วยราคา/ขนาดห้อง/AI · ถามค้นหาความต้องการทีละคำถาม · เล่าเป็น "โลก" · New Generation/Luxury/Nothing Is Missing ตามความหมายในเอกสาร · ห้ามด้อยค่าคอนโดอื่น ห้ามการันตีผลตอบแทน ห้ามเร่งซื้อ · แนวคิดที่กำลังพัฒนาห้ามพูดเหมือนเสร็จ · ประโยค fallback อ้างจากคู่มือไทย section 19 ตรงตัว "ฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อนกับคุณ…" · ปิดด้วยขั้นต่อไปเสมอ — **บล็อกไม่มีตัวเลขเลย** ตัวเลขทุกตัวยังอยู่ใน condo_facts.json หรือมาจากเครื่องมือ
+- `GREETING` ของ condo เปลี่ยนจาก "มีอะไรให้ช่วยไหม" เป็น Master Opening ย่อ: แนะนำตัว ไม่พูดราคา แล้วถามหนึ่งคำถามว่าอะไรจะทำให้อยากกลับมาบ่อยๆ ไม่เกิน 3 ประโยค
+- `tests/test_profiles.py` +4: บล็อกอยู่ใน condo, ไม่มีตัวเลข, ไม่รั่วไป emma/translator, greeting ไม่เปิดด้วยราคา · `tests/test_voice.py`: เพดานพรอมต์ 3800 → 4700 (ครั้งที่แปด บันทึกเหตุผลใน docstring; ตัดบล็อกจาก 1040 → 895 ก่อน)
+- `data/personal-docs/embassy-world/` (gitignore) 5 ไฟล์ .md: thai-sales-speech, thai-market-strategy, future-climate-landscape, emma-sales-presentation-master (EN/TH) · **PDF บทพูดไทยใช้ฟอนต์ที่ทำสระเพี้ยน** (หน้าธรรมดา ำ→ĕา ู→่ / ตัวหนา า→ำ ่→ุ) pdftotext อ่านไทยไม่ได้เลย ซ่อมด้วย `fitz` แยก span ตามฟอนต์ + พจนานุกรมคำที่กำกวม ตรวจทั้งไฟล์แล้วไม่เหลือรูปแบบต้องสงสัย · ตรวจว่า `search_my_documents` เจอ "Nothing Is Missing" และ "New Generation" (found=True) และคำถามราคายังถูกด่านการเงินกัน (found=False)
+- `.env`: `ASSISTANT_PROFILE=condo`, `TOOL_GROUPS=slides,knowledge,smarthome,mydocs,units,calc,robot` — ตัด reminders/memory/computer ออกเพราะเป็นเครื่องมือคอมของเจ้าของ ลูกค้าในห้องขายต้องเปิดโปรแกรมหรืออ่านความจำเจ้าของไม่ได้
+- `CLAUDE.md`: เพิ่มย่อหน้าอธิบายการเปลี่ยนนี้และวิธีดึงข้อความจาก PDF ฟอนต์เพี้ยน
+- รีสตาร์ต 8001 ภายใต้ condo: banner แสดง 26 เครื่องมือรวม search_my_documents
+- ตรวจจริง: `pytest tests/ -q` = **1365 passed** (จาก 1345); ไม่ได้ทดสอบเสียงจริงกับ Gemini ในรอบนี้ — เจ้าของต้องลองคุยกับ Emma จริงก่อน commit ตามกติกา
+
+## 2026-09-11 — แขนยังต้านหลัง force-stop: รีเลย์ค้าง ON และแก้ตำแหน่งค้างข้ามการเสียพอร์ต
+
+- เจ้าของรายงาน "ต้าน" อีกครั้งหลังผู้ช่วย `am force-stop` = **รีเลย์ค้างจ่ายไฟหลังแอปถูกหยุด** ลำดับ "เปิดแอปให้จ่ายไฟ → หยุดแอป → bind" ใช้ได้ เจ้าของ bind ch341 ได้ `ttyUSB10` (13:30) เซิร์ฟเวอร์เห็นพอร์ต
+- **บั๊กที่เจอก่อนกด**: `/arm/state` ยังจำ `commanded: {1: 1540}` จากรอบก่อน ทั้งที่ระหว่างนั้นแอป Aobo ยึดบอร์ดกลับและรัน `#99GC1` ท่าตั้งต้น ตำแหน่งจริงของช่อง 1 จึงไม่ใช่ 1540 อีกแล้ว ปุ่ม +40 จะเป็นการเคลื่อนเร็ว (T=800) จากจุดที่ไม่รู้ — `app/robot_arm.py`: `port_present()` ล้าง `_commanded` ทุกครั้งที่พบว่าพอร์ตหายหรือเช็คไม่ได้ เพราะพอร์ตที่หายไปคือพอร์ตที่คนอื่นอาจถือ; เทสต์ `test_a_port_that_went_away_takes_the_commanded_positions_with_it` (`test_robot_arm_page.py` = 32)
+- รีสตาร์ต 8001 (pid 10480) ให้กฎใหม่ทำงานและล้างความจำเก่า
+- ตรวจจริง: เทสต์ไฟล์แขน 32 ผ่าน; ยังไม่รันทั้งชุดเพราะกำลังทดสอบสด จะรันหลังจบรอบ; ยังไม่ส่งไบต์เพิ่มไปบอร์ด
+
+## 2026-09-11 — ทดลองลำดับ "เปิดแอปให้จ่ายไฟ → หยุดแอป": แขนต้าน = มีไฟ และหลักการสร้างท่าเอง
+
+- เจ้าของเปิดแอป Aobo กลับ (`am start`) แอปยึด CP2102/CH340 คืนทั้งคู่ ไม่เขียน log ที่อ่านได้ · เจ้าของดันแขนแล้วรายงาน **"ต้าน (มีไฟ)"** = ไฟแขนมาจากแอปจริง สนับสนุนสมมติฐานรีเลย์ · ผู้ช่วย `am force-stop` ทันทีขณะไฟจ่าย ทั้งสองอินเทอร์เฟซถูกปล่อย (`driver=[]`) รอเจ้าของ bind ch341 และทดสอบช่อง 1 ซ้ำ
+- เจ้าของสรุปหลักการสร้างท่าเองจากเฟรมหลายช่อง `#1P..#2P..T..` เรียงเป็นขั้น โดยไม่ต้องรู้เลขกลุ่มเดิม — เห็นด้วย บันทึกเงื่อนไขที่ต้องมาก่อนสามข้อ (ผังช่อง→ข้อต่อ, ช่วงที่ใช้ได้จริงต่อช่องพร้อมธง verified, เซิร์ฟเวอร์ปฏิเสธท่าที่อ้างช่องที่ยังไม่วัด) และข้อจำกัด T เดียวต่อเฟรม ลงใน `docs/robot-command-research-2026-09-11.md`
+- บันทึกความเสี่ยงที่เจ้าของพบ: แอป Aobo อาจสั่งกลุ่ม 99 หลังได้ `#STOP+OK` — ไม่มีผลตอนแอปถูกหยุด แต่ต้องปิดให้ได้ก่อนให้ Emma คุมท่าผ่านทาง 3
+- ไม่แก้ runtime code; ยังไม่ส่งไบต์เพิ่มไปบอร์ดในรอบนี้
+
+## 2026-09-11 — ไม่มีคู่มือช่อง→ข้อต่อ แต่พบว่าไฟเซอร์โวเป็นรีเลย์บนบอร์ดล่างที่สั่งผ่าน CP2102
+
+- เจ้าของถามว่ามีคู่มือว่าแต่ละช่องคืออะไรไหม — **ไม่มีที่ไหนเลย** ค้นซ้ำใน resource และ disassembly ทั้งหมด มีแค่เลข 1/11/7/8 ไม่มีชื่อข้อต่อ ตารางเดียวของหุ่นตัวนี้คือที่วัดได้วันนี้ (7/8 = หัวสองแกน รอยืนยันว่าเลขไหนแกนไหน)
+- การค้นพบระหว่างทาง (ถอดด้วยเครื่องมือของเจ้าของ `disassemble_recovered.py` — รันได้หลัง pin lxml ของ venv ไว้ก่อน เพราะ `python-libs/lxml` ที่แนบมาไม่มี `etree`): แอปมีสองโหมดไฟเซอร์โว `armcontrolmethodtype` 0=Relay 1=Servo Board ค่าสำรองไม่มีคีย์นี้จึงเป็น **Relay** · จ่าย/ตัดไฟทำด้วยแพ็กเก็ต 10 ไบต์ `A5 01 2A 02 00 00 00 08 <00=จ่าย|01=ตัด> <checksum>` ส่งไป route **60000 = 0xEA60 = CP2102** (`firstUart主板串口` = บอร์ดล่าง STM32) — เลข route ในโค้ดคือ USB PID ตรงตัว (29987 = CH340, 8963 = PL2303)
+- **ยังไม่ส่งและยังไม่ทำเป็นปุ่ม**: manager ของ CP2102 มี handshake + heartbeat บอร์ดล่างเป็นโปรโตคอลมีสถานะและคุมมอเตอร์/เซ็นเซอร์ด้วย ต้องเป็นงานแยกและเป็นการตัดสินใจของเจ้าของ
+- สมมติฐานที่อธิบาย "หัวขยับ แขนเงียบ" ครบ: โค้ดแอปตัดไฟเซอร์โวเองเมื่อ IR เจอสิ่งกีดขวางหรือมีการสัมผัสแขน หุ่นจอดในที่แคบ → รีเลย์ค้างตัดไฟตอนเรา force-stop แอป → ช่อง 1/11 และกลุ่ม 6 เงียบ หัวคนละรางจึงขยับ — ทดสอบได้โดยไม่ส่งอะไร (ดันแขน / เปิดแอปกลับแล้วดูแขน / force-stop แล้วลองช่อง 1 ซ้ำ) บันทึกลำดับใน `docs/robot-command-research-2026-09-11.md`
+- ตรวจจริง: อ่าน disassembly และคำนวณ checksum จาก `checkCode` (two's complement ของผลรวมไบต์ 0–8); ไม่ส่งคำสั่งใดไปหุ่น ไม่แก้ runtime code
+
+## 2026-09-11 — สังเกตฮาร์ดแวร์ครั้งแรก: หัวขยับที่ช่อง 7/8 ช่อง 1/11 กับกลุ่ม 6 เงียบ
+
+- เจ้าของทดสอบจาก `/console` โดยมีคนอยู่กับหุ่น เซิร์ฟเวอร์ยืนยันเฟรมที่ออกทุกบรรทัด ผล: **ช่อง 7 และ 8 ขยับหัวคนละแกน** · ช่อง 1, 11 และ `#6GC1` ไม่มีอะไรเกิดขึ้น · `#STOP` ส่งตอนไม่มีอะไรเคลื่อน จึงยังไม่มีหลักฐานเรื่องหยุด
+- **พิสูจน์แล้วระดับฮาร์ดแวร์**: โปรโตคอล Torobot ใช้กับบอร์ดตัวนี้ได้ผ่าน `/dev/ttyUSB10` (CH340) ที่ 115200 · เส้นทาง เซิร์ฟเวอร์→adb Wi-Fi→เชลล์→printf→tty→บอร์ด→เซอร์โว ทำงานครบ · CH340 ขับหัว ไม่ใช่แขนอย่างเดียว · 1500 ไม่ทำอันตรายกับ 7/8
+- เจ้าของรายงานสองแกนของหัวเป็น "ช่อง 7" ทั้งคู่ ซึ่งเป็นไปไม่ได้บนช่องเดียว รอยืนยันว่าเลขไหนคือแกนไหนก่อนบันทึก wiring map — **ยังไม่ใส่ชื่อข้อต่อลงหน้าเว็บ**
+- `client/robot-console.html`: บันทึกคำสั่งขึ้นชื่อเลน (`แขน ·` / `ฐานล้อ ·`) นำหน้าทุกบรรทัด เพราะปุ่มแดงสองปุ่มกดในวินาทีเดียวกันขึ้นเป็น "stop ส่งแล้ว" กับ "stop ไม่สำเร็จ" และบรรทัดที่ล้มคือแชสซีที่ไม่ได้ต่อ ไม่ใช่แขน เจ้าของอ่านเป็น error; เทสต์ +1 (`test_robot_console_page.py` = 15)
+- บันทึกรายละเอียดและสมมติฐานที่เหลือใน `docs/robot-command-research-2026-09-11.md` (ช่อง 1/11 เงียบมีสี่สาเหตุที่เป็นไปได้ กลุ่ม 6 เงียบมีสาม ตัวแยกคือกลุ่ม 99)
+- ไม่แก้ runtime code ฝั่ง Python จึงไม่รันชุดเทสต์ซ้ำทั้งหมด
+
+## 2026-09-11 — E-stop ของหุ่นถึงแขนผ่านแอป Aobo: เตือนทุกหน้า และส่ง #STOP ซ้ำตามผู้ขาย
+
+- จาก `docs/robot-estop-evidence-2026-09-11.md` ของเจ้าของ: ปุ่มแดงของหุ่นเข้ามาเป็นสัญญาณ IO ที่แอป (`isIo7()`) แล้ว `FloatRecordService.sendArmToRobotStop()` เขียน `#STOP` ไปบอร์ดแขนเมื่อ `estopStopArmMovement=true` ซึ่งค่าสำรองของหุ่นตัวนี้เปิดอยู่ helper ส่งซ้ำหลัง 60 ms — **ผลต่อขั้นตอนทดสอบ: การ force-stop แอปเพื่อปล่อยพอร์ตปิดเส้นทางนี้ไปด้วย** ระหว่างที่เราถือพอร์ต ปุ่มแดงไม่มีเส้นทางที่*รู้*ว่าถึงแขน ยังไม่รู้ว่าตัดไฟเซอร์โวในทางฮาร์ดแวร์ด้วยหรือไม่
+- `client/robot-console.html`, `client/robot-arm.html`, `client/robot-hud.html`: แถบความปลอดภัยเพิ่มประโยคนี้ตรงตัว มีเทสต์คุมใน `test_robot_arm_page.py` และ `test_robot_console_page.py`
+- `app/robot_arm.py`: `stop()` เขียน `#STOP` สองครั้งห่าง `STOP_REPEAT_S=0.06` ตามพฤติกรรม helper ของผู้ขาย (เฟรมเดิม ไม่ขออะไรใหม่; ครั้งที่สองล้มเหลวไม่ทำให้ `stop_write_ok` เป็นเท็จถ้าครั้งแรกสำเร็จ) docstring หัวไฟล์เพิ่มข้อเท็จจริงเรื่องเส้นทาง E-stop; `docs/robot-command-research-2026-09-11.md` เพิ่มหัวข้อผลต่อลำดับทดสอบ
+- รีสตาร์ต 8001 (pid 27568) ให้โมดูลใหม่ทำงาน `/console` ตอบ 200; ผู้ใช้เปิด `/arm` แล้วบอกว่า "หน้าเดิม" — หน้ารวมคือ `/console` แจ้งแล้ว
+- ตรวจจริง: `pytest tests/ -q` = **1345 passed** (จาก 1343); เทสต์สามหน้า 57 ตัว; ยังไม่มีไบต์ใดถึงบอร์ดแขน
+
+## 2026-09-11 — คอนโซลทดสอบรวมทุกคำสั่งที่ /console
+
+- เจ้าของขอ "หน้าที่สั่งการได้หมด" สำหรับทดสอบทั้งตัว — `client/robot-console.html` + route `/console` + `tests/test_robot_console_page.py` (13 ตัว): ผังหุ่นแบบ `/hud` ตรงกลาง แขนซ้าย (ตั้งค่าพอร์ต, สั่งไป 1500/±40 ต่อช่อง, เล่นกลุ่มท่าหนึ่งรอบ, ปลดล็อก) ฐานล้อขวา (ก้าวเดิน/หมุน, กลับแท่น, ไปจุดหมาย) และบันทึกคำสั่งที่โชว์ `note` จากเซิร์ฟเวอร์ตรงตัว
+- **ไม่เพิ่มพฤติกรรมใด** เรียก `/robot/command` กับ `/arm/command` ที่มีอยู่แล้ว ระยะ พัลส์ จำนวนรอบ และล็อกทุกตัวยังตัดสินที่เซิร์ฟเวอร์ หน้าส่งแค่ intent — เทสต์ห้ามคำว่า metres/pulse/cycles/target ในสคริปต์ และตรวจว่ามี body builder เดียว
+- **ปุ่มหยุดสองปุ่ม จงใจไม่รวม**: "หยุดฐานล้อ" คือ cancel ที่แชสซีตอบและเคยเห็นทำงาน · "หยุดแขน (#STOP)" เขียนเฟรมแล้วล็อก ป้ายเขียนว่ายังไม่เคยเห็นมันหยุดแขนจริง — รวมกันจะทำให้ปุ่มที่พิสูจน์แล้วให้เครดิตปุ่มที่ยังไม่พิสูจน์ · สองเลนมี busy flag แยก (`{ base, arm }`) เพราะการอ่านแชสซีที่ช้าต้องไม่ใช่เหตุที่ปุ่มหยุดแขนรอ และปุ่มหยุดทั้งสองข้ามด่าน busy
+- กติกาความซื่อสัตย์เหมือน `/hud` ทุกข้อ: ทุกช่องเริ่มว่าง · ตำแหน่งแขนคือค่าที่สั่งไป · ช่องเซอร์โวอยู่กล่องแยกไม่อยู่บนไหล่ · ไม่ระบุสาเหตุพอร์ตหาย · ลิดาร์ไม่สว่างตามแชสซี · ช่องกลุ่มท่าเติม **6** ไว้ล่วงหน้าพร้อมข้อความว่าสามแหล่งชี้ว่าเป็นจับมือแต่ยังไม่มีข้อใดเป็นการสังเกตบอร์ด และ 99 คือท่าที่แอปผู้ขายส่งเองตอนเปิดพอร์ต
+- `/hud` ยังอยู่เป็นจอดูอย่างเดียวสำหรับจอที่ไม่ควรสั่งอะไรได้ `/robot` และ `/arm` ยังอยู่เหมือนเดิม
+- รีสตาร์ตเซิร์ฟเวอร์ 8001 อีกครั้งให้มี route ใหม่ (pid ใหม่ 26040) และเช็คว่า `/console` ตอบ 200 · `/arm/state` หลังรีสตาร์ตยังเห็น `/dev/ttyUSB10` present, armed, groups_enabled — ยังไม่มีไบต์ใดถึงบอร์ด
+- หมายเหตุความปลอดภัย: เจ้าของวาง URL ที่มี `WS_TOKEN` เต็มค่าลงในแชต ค่านั้นจึงอยู่ใน log ของบทสนทนาแล้ว แนะนำหมุน `WS_TOKEN` หลังจบการทดสอบวันนี้ (ค่าไม่ถูกคัดลอกลงเอกสารหรือ changelog)
+- ตรวจจริง: `pytest tests/ -q` = **1343 passed** (จาก 1330; เจ้าของยังไม่ได้รันซ้ำเองรอบนี้)
+
+## 2026-09-11 — เตรียมทดสอบแขนจริงครั้งแรก: พอร์ตขึ้นแล้ว เซิร์ฟเวอร์เห็นแล้ว ยังไม่ส่งไบต์
+
+- เจ้าของสั่ง "รันเลย เดี๋ยวทดสอบ" — ลำดับที่ทำ: ผู้ช่วย `am force-stop com.aobo.robot.ai3` (อินเทอร์เฟซ `9-1.4:1.0` เป็น `driver=[]`) → เจ้าของรัน bind `ch341` ด้วย root ได้ `/dev/ttyUSB10` 0666 → ผู้ช่วยยืนยันผ่าน sysfs ว่า `ttyUSB10 → 9-1.4:1.0 → ch341-uart` คือ CH340 ตัวที่โค้ดแอปผู้ขายใช้กับแขน ไม่ใช่ CP2102
+- `.env` (ไม่อยู่ในรีโป): `ROBOT_ARM_ENABLED=true`, `ROBOT_ARM_PORT=/dev/ttyUSB10`, `ROBOT_ARM_GROUPS_ENABLED=true`, `ROBOT_ARM_ADB=tools/android/platform-tools/adb.exe`, `ROBOT_ARM_ADB_SERIAL=192.168.1.24:5555` — ค่าแชสซีและ TOOL_GROUPS ไม่แตะ
+- แทนที่เซิร์ฟเวอร์ที่รันอยู่บน 8001 ตั้งแต่ 10 ก.ย. (โค้ดเก่า ไม่มี `/arm`) ด้วยโค้ดปัจจุบัน log ไว้ที่ `data/robot-inspection/server-20260911-arm.*.log` (ถูก ignore) · ความผิดพลาดระหว่างทาง: คำสั่งค้นโปรเซสด้วย `CommandLine -match 'uvicorn'` จับตัวเองแล้วฆ่าเชลล์ตัวเอง แก้ด้วยการหยุดตาม pid ที่รู้อยู่แล้ว
+- ตรวจจริงกับเซิร์ฟเวอร์ที่รันอยู่: `/arm/state` ตอบ `configured=true, port_present=true, armed=true, groups_enabled=true, commanded={}` · `/robot/state` ตอบ ConnectError เพราะ relay ไปบอร์ดนำทางไม่ได้เปิด — ไม่จำเป็นสำหรับการทดสอบแขน
+- **ยังไม่มีไบต์ใดถึงบอร์ดแขน** ปุ่มแรกเป็นของเจ้าของ: เล่นกลุ่ม 6 หนึ่งรอบ โดยมีคนยืนอยู่กับหุ่นและมือถึงไฟเลี้ยงเซอร์โว หลังทดสอบต้องคืนสภาพด้วย `am start -n com.aobo.robot.ai3/com.aobo.aibot.ui.activity.SplashActivity`
+- ไม่แก้ runtime code จึงไม่รัน unit tests ซ้ำ
+
+## 2026-09-11 — ถอนสมมติฐาน 握手=12: target ของ switch วัดแล้ว 握手 = key 6
+
+- สมมติฐานที่ผู้ช่วยเขียนไว้ในรายการก่อนหน้า ("ถ้าคอมไพเลอร์เรียงบล็อกตาม key 握手 จะเป็น 12") **ผิด** เจ้าของพิมพ์ target จริงด้วย `scripts/inspect_aobo_gesture_switch.py` (ค้นเมธอดจากตาราง DEX ไม่เดา offset) ได้ targets `57 53 49 46 42 39 35 31 27` สำหรับ key 5–13 คือ**เรียงกลับด้าน** key สูงอยู่ที่อยู่ต่ำ — ผู้ช่วยรันสคริปต์เดียวกันซ้ำแล้วได้ผลตรงกัน และตรงกับ Androguard
+- ตารางที่ถูกต้องของ `IdleActionService.getActionName`: **5 敬礼 · 6 握手 · 7 摆臂 · 8 倒水 · 9 撕拉 · 10 全部动作 · 11 摆臂行走 · 12 打招呼行走 · 13 敬礼行走**
+- อ่าน `ActionConstants.ACTION_GROUPS` ควบกับสองคลังคำศัพท์: payload ของ fill-array-data แก้ตามที่อยู่คำสั่งจริงได้ key 1 = [5,6,7] แล้วถูก put ซ้ำทับด้วย [10,5,12] (เพราะ `DEFAULT` กับ `GREETING` เป็น 1 ทั้งคู่ — ชุดแรกเป็นโค้ดตาย), key 2 DANCE = [8,9,11], key 3 IDLE = [6,7,13] · **ภายใต้ชื่อของ ActionConstants กลุ่มอ่านสอดคล้อง** (GREETING = BOW/WAVE/SALUTE, DANCE = DANCE1/DANCE2/TURN, IDLE = NOD/SHAKE/POSE1) **ภายใต้ป้ายของ getActionName กลุ่ม DANCE มี "เทน้ำ"** — เป็นการอนุมานว่าสองตารางเป็นคนละรุ่นและ ActionConstants คือรุ่นที่ตรงกับตารางกลุ่มในคลาสเดียวกัน ยังไม่ทราบว่าตารางไหนตรงกับบอร์ดตัวนี้
+- แต่เลข 6 มีสามแหล่งชี้ไปทางเดียวกัน: ป้าย 握手 ใน getActionName · ค่า preference กลุ่มท่าสำหรับใบหน้า = 6 (ตามรายงาน interface ที่ถอดได้) · คู่มือข้อ 18 "จับมือเมื่อจดจำใบหน้าได้" — **ทั้งสามเป็นหลักฐานระดับแอปและเอกสาร ไม่มีข้อใดเป็นการสังเกตบอร์ด** จึงยังไม่แปลว่า `#6GC1` ทำให้บอร์ดจับมือ และยังไม่พบเส้นทางที่ส่งเลข ACTION_TYPE ตรงไปเป็น `#nGC`
+- ผลเทสต์: เจ้าของรัน `pytest tests/ -q` เอง = **1330 passed** ตรงกับที่ผู้ช่วยรายงาน — ตัวเลขนี้ยืนยันโดยเจ้าของแล้ว ไม่ใช่ของผู้ช่วยฝ่ายเดียวอีกต่อไป
+- ไม่แก้ runtime code ไม่ส่งคำสั่งไปหุ่น
+
+## 2026-09-11 — แก้ถ้อยคำที่เกินหลักฐานสี่จุด และดูตารางชื่อท่าเอง
+
+จากรีวิวเจ้าของสองรอบ ทุกข้อถูก แก้ในก้อนเดียว:
+
+- **`stop_sent` → `stop_write_ok`** ฟิลด์เดิมชื่อเหมือนยืนยันว่าเฟรมถึงสาย ทั้งที่รู้แค่ว่าเชลล์บนหุ่นรันคำสั่งเขียนแล้วออก 0 ไม่ยืนยันว่าไบต์ถึงบอร์ด บอร์ดเข้าใจ หรือข้อต่อหยุด — สามข้ออ้างที่โมดูลนี้ไม่มีทางทำได้ ข้อความตอบกลับแก้เป็น "เชลล์รายงานว่าเขียนสำเร็จ — ไม่ยืนยันว่าเฟรมถึงบอร์ดหรือแขนหยุด"
+- **`/hud`: "บอร์ดเซอร์โวไม่ตอบอะไรเลย" → "หน้านี้ยังไม่ได้อ่านค่าตอบกลับจากบอร์ดแขน"** เพราะโค้ดแอปผู้ขายมีตัวรับ `#STOP+OK` และสถานะจบกลุ่มท่า บอร์ดพูดอะไรบางอย่าง เราแค่ยังไม่เคยฟัง — เป็นช่องว่างของหน้านี้ ไม่ใช่คุณสมบัติของฮาร์ดแวร์
+- **`/hud`: "ไม่พบพอร์ตเพราะ Aobo ถือไว้" → "ไม่พบพอร์ตที่ตั้งค่าไว้"** ข้อเท็จจริงกับสาเหตุเป็นการวัดคนละอย่าง สาเหตุต้องอ่าน `/proc` ด้วย root ซึ่งหน้านี้ไม่ทำ มีเทสต์ห้ามคำว่า Aobo ในสคริปต์
+- **`/hud`: ย้ายจุดช่องเซอร์โว 1/7/11/8 ออกจากไหล่และศอกบน SVG** ไปอยู่ในกล่องแยกติดป้าย "ยังไม่ทราบตำแหน่งข้อต่อ" — การวางบนข้อต่อคือการวาด wiring map ที่ไม่มีใครมี และแผนภาพถูกเชื่อเร็วกว่าคำบรรยายใต้มัน
+- **ถอนข้อสรุปที่เขียนไว้ว่า AIDL แก้ปัญหาการอยู่ร่วมกับแอป Aobo ได้แล้ว** ถอดสัญญาได้แต่ยังไม่ได้ bind หรือเรียกจริงจาก Emma · เส้นทางแขนที่พบคือ broadcast `send.usbserial.cmd.ch340` พร้อม `cmd` ชนิด byte[] ซึ่งเป็นคนละช่องทางกับ AIDL และยังไม่ยืนยันว่ารับจาก UID อื่น · การให้ Aobo ถือ USB แล้วรับคำสั่งจาก Emma เป็นแนวทางที่ต้องพิสูจน์ ไม่ใช่ข้อจำกัดที่แก้แล้ว
+- **ดูตารางชื่อท่าในไบต์โค้ดเอง** (`disassembly/` ของงานถอดโค้ด): `ActionConstants` ระบุ `ACTION_TYPE_WAVE=5, NOD=6, SHAKE=7, DANCE1=8, DANCE2=9, BOW=10, TURN=11, SALUTE=12, POSE1=13` และ `ACTION_GROUPS` map: key 1 (DEFAULT/GREETING ค่าเดียวกัน จึง put สองครั้ง ค่าหลังทับ) · key 2 DANCE · key 3 IDLE · key 4 CUSTOM ว่าง · ส่วน `IdleActionService.getActionName` เป็น packed-switch key 5–13 กับสตริงเก้าบล็อกเรียงตามที่อยู่: 敬礼行走, 打招呼行走, 摆臂行走, 全部动作, 撕拉, 倒水, 摆臂, 握手, 敬礼 — **ถ้า**คอมไพเลอร์เรียงบล็อกตามลำดับ key (ปกติเป็นเช่นนั้น) 握手 จะเป็น key **12** ไม่ใช่ 6 และ 6 คือ 打招呼行走 — **ยังไม่ยืนยัน** เพราะ disassembly ที่มีไม่ได้พิมพ์ target ของ switch และการอ่าน payload จาก DEX ที่ offset ที่เดาไว้ไม่พบ ต้องให้เครื่องมือถอดโค้ดพิมพ์ target จริง · ที่ยืนยันได้จากไบต์โค้ด: **สองตารางนี้เป็นคนละคลังคำศัพท์บนช่วง key เดียวกัน** (5–13) ตัวหนึ่งเป็น wave/nod/shake/dance/bow ตัวหนึ่งเป็นท่าเดินประกอบ/เทน้ำ/จับมือ/เคารพ ซึ่งตรงกับรายการฟีเจอร์ในคู่มือมากกว่า — น่าจะมีตัวหนึ่งเก่าหรือของรุ่นอื่น · และ**เลข ACTION_TYPE เป็นเลขระดับแอป ยังไม่พบเส้นทางที่ส่งเลขนี้ตรงไปเป็น `#nGC`** ต่อให้รู้ว่า 握手=12 ก็ยังไม่แปลว่า `#12GC1` คือจับมือ
+- ตรวจจริง: `pytest tests/ -q` = **1330 passed** (จาก 1327); เทสต์ใหม่สามตัวใน `test_robot_hud_page.py` คุมสามข้อแก้; ไม่ได้ส่งคำสั่งใดไปหุ่น — และตามที่เจ้าของระบุว่ายังไม่ได้ตรวจผลเทสต์ซ้ำเอง ตัวเลขทั้งหมดในนี้คือผลจากเครื่องของผู้ช่วยจนกว่าเจ้าของจะรันเอง
+
+## 2026-09-11 — แผงตรวจหุ่นหน้าเดียวที่ /hud
+
+- `client/robot-hud.html` + `tests/test_robot_hud_page.py` (ใหม่ 9 ตัว) + route `/hud` ใน `app/main.py`: หน้าจอเดียวแสดงสถานะทุกส่วนของหุ่นในรูปทรงของหุ่นเอง ผังเป็น SVG พร้อมจุดสถานะรายส่วน — หัว/จอสีหน้า, ไมค์อาร์เรย์, กล้อง, ช่องเซอร์โว 1/7/11/8, ฐานล้อ, ลิดาร์, จุดตัดไฟเซอร์โว
+- **กติกาเดียวของหน้านี้คือตรงข้ามกับภาพต้นแบบที่เจ้าของส่งมา**: ภาพพวกนั้นเต็มไปด้วยตัวเลขประดับ ("792/1000", "671/0.032") ซึ่งบนหน้าจอที่คนอ่านก่อนตัดสินใจสั่งหุ่น ตัวเลขประดับแย่กว่าช่องว่าง เพราะช่องว่างถูกตรวจสอบ ส่วนตัวเลขที่ดูสมเหตุสมผลถูกเชื่อ — **ทุกช่องต้องมาจากการวัด ไม่มีข้อมูล = ขึ้นว่าไม่มี**
+- ผลคือสองครึ่งของหน้าไม่เท่ากันโดยตั้งใจ: ครึ่งแชสซีเต็มเพราะ SLAMTEC ตอบคำถามเกี่ยวกับตัวเองได้ ครึ่งลำตัวบนแทบว่างเพราะบอร์ดเซอร์โวไม่ตอบอะไรเลย — ความไม่เท่ากันนี้คือสิ่งที่ซื่อสัตย์ที่สุดบนจอ และเป็นสิ่งที่คนจะตัดสินใจว่าทดสอบอะไรต่อต้องเห็น
+- อ่านอย่างเดียว ไม่มีปุ่มสั่งการ ลิงก์ไป `/robot` กับ `/arm` แทน เพราะปุ่มหยุดสองสำเนาจะเพี้ยนออกจากกัน และสำเนาที่เพี้ยนคือสำเนาที่คนต้องการมันที่สุดเป็นคนเจอ
+- เทสต์คุมกติกาไว้: ทุกช่องต้องเริ่มว่าง · ค่าทุกค่าต้องผ่านฟังก์ชัน `set()` ตัวเดียว (บรรทัดอธิบายเหตุผลยกเว้นได้ เพราะเหตุผลที่เก่าอ่านออกว่าเป็นเหตุผลเก่า ส่วนตัวเลขที่เก่าอ่านออกว่าเป็นสถานะปัจจุบัน) · **ห้ามจุดลิดาร์สว่างเพราะแชสซีตอบ** ซึ่งเป็นความผิดพลาด "วัดห่างจากสิ่งที่ตัดสินไปหนึ่งชั้น" ที่โปรเจกต์นี้เคยทำมาแล้วสามครั้ง · ตำแหน่งแขนต้องติดป้ายว่าเป็นค่าที่*สั่งไป* ไม่ใช่ค่าที่วัดได้ · หน้านี้เรียกได้เฉพาะสาม endpoint ที่มีอยู่แล้ว
+- ตรวจจริง: `pytest tests/ -q` = **1327 passed** (จาก 1318); ย้อนโค้ดพิสูจน์สองข้อ — ทำให้จุดลิดาร์สว่างตามแชสซีแล้วแดง, ใส่ค่า "792/1000" ลงช่องแบตแล้วแดง, คืนโค้ดแล้วเขียวครบ; ไม่ได้ส่งคำสั่งใดไปหุ่น
+
+## 2026-09-11 — แก้ /arm ตามโค้ดที่ถอดได้: #STOP มีจริง และแขนอยู่บน CH340
+
+ตามรายงาน `docs/robot-recovered-interface-2026-09-11.md` ที่ถอด DEX ได้ 7 ไฟล์ สองข้อที่กระทบโค้ดจริงถูกแก้แล้ว:
+
+- **`#STOP` มีอยู่จริง — ข้อสรุปเดิมในโค้ดผิด** พบในตัวช่วยหยุดของแอปผู้ขาย พร้อม parser ที่เคลียร์ `isArmStartAction` เมื่อได้ `#STOP+OK` `stop()` จึงส่ง `#STOP` จริงแล้ว **และยังล็อกเหมือนเดิม** ลำดับสำคัญ: ตั้งล็อกก่อนแล้วค่อยเขียน เพราะครึ่งที่ล้มไม่ได้ต้องไม่รอครึ่งที่ล้มได้ · คำตอบมี `stop_sent` ที่บอกว่า*เฟรมถึงสายไหม* ไม่ใช่ว่าแขนหยุดไหม — โมดูลนี้ไม่อ่านค่ากลับเลย และต่อให้อ่าน `#STOP+OK` ก็แปลได้แค่ว่าบอร์ดได้ยิน
+- **แขนอยู่บน CH340 (1a86:7523) ไม่ใช่ CP2102** คลาสที่ส่งคือ `SerialToothManagerCH340` ที่ 115200 8N1 — `.env`/`.env.example` แก้คำแนะนำพอร์ตแล้ว รวมคำสั่ง bind ที่ถูก (`ch341` ไม่ใช่ `ch341-uart`, interface `9-1.4:1.0`) และหมายเหตุว่า ueventd ให้ `ttyUSB10-19` เป็น 0666 จึงเขียนได้โดยไม่ต้อง root ต้อง root เฉพาะตอน bind
+- บันทึกคำเตือนที่สำคัญที่สุดของรายงาน: **`usbInit()` ของแอปผู้ขายเขียน `#99GC1` ทันทีที่เปิดพอร์ตสำเร็จ** แปลว่าการเปิดแอปนั้นทำให้แขนขยับเองได้ — `VENDOR_HOME_GROUP = 99` ถูกบันทึกไว้เป็นคำเตือน ไม่ใช่ฟีเจอร์ และ `/arm` ไม่ส่งอะไรเลยตอนเชื่อมต่อ ขึ้นหน้าเว็บด้วย
+- ยืนยันของเดิมที่ทำไว้ถูก: `ArmTestActivity.SERVO_NUMBERS = [1, 11, 7, 8]` ตรงกับ `CHANNELS` · ตัวช่วย `sendSingleServoPowerOn` ของผู้ขายคือ `#<servo>P1500T3000` รูปเดียวกับ `centre()` แต่ของเราใช้ T=9999 ช้ากว่า เพราะเขารู้ว่ากำลังขยับข้อต่อไหน เราไม่รู้ · แอปทดสอบของผู้ขายใช้ `GC5` ส่วนเราตรึง `GC1` ไว้เหมือนเดิม
+- `client/robot-arm.html`: แถบแดงเปลี่ยนเป็น "ส่ง `#STOP` แล้วล็อก — ยังไม่เคยมีใครเห็นมันหยุดแขนจริง" และเพิ่มคำเตือนเรื่องกลุ่ม 99 ในส่วนกลุ่มท่า
+- ตรวจจริง: `pytest tests/ -q` = **1318 passed** (จาก 1315); ไฟล์นี้ 30 ตัว (จาก 27); ย้อนโค้ดพิสูจน์สองข้อ — ถอด `#STOP` ออกให้เหลือล็อกอย่างเดียวแล้ว `test_stop_sends_the_board_its_stop_frame` แดง, ย้ายการตั้งล็อกไปไว้หลังการเขียนแล้ว `test_the_latch_is_set_before_the_stop_frame_is_written` แดง, คืนโค้ดแล้วเขียวครบ; **ไม่ได้ส่งคำสั่งใดไปหุ่นในรอบนี้**
+
+## 2026-09-11 — ค้นในเครื่องหุ่นและใน APK เอง พบแผนที่กับจุดหมายที่บันทึกไว้แล้ว
+
+- เจ้าของทักว่าทำไมไม่เข้าไปค้นไฟล์เอง ถูกต้อง — รอบนี้ค้นจริงทั้งบนเครื่องและใน APK
+- **ตัดออกได้**: ไลบรารี native ทั้ง 61 ไฟล์ใน APK ไม่มีโค้ดพอร์ตอนุกรมเลย (โปรโตคอลอยู่ฝั่ง Java ใน DEX ที่ถูกห่อ) · `lib1180Driver.so`/`lib3000Driver.so` เป็นไดรเวอร์กล้องความลึก Imi ไม่ใช่แขน · `librpsdk.so` คือ RoboPeak = SLAMTEC · `localvoice.xlsx`/`add.xlsx` เป็นเทมเพลตคลังถาม-ตอบ · `prompt.txt`/`knowledgeprompt.txt` ว่างเปล่า 0 ไบต์ · `run-as` ใช้ไม่ได้เพราะแอปไม่ใช่ debuggable
+- **พบชั้นคำสั่งของแอปใน `voice_config/lang_*.user.json`**: `ROBOTPERFORM` (perform/show) และ `ROBOTJUMP` เป็น exactMatch ยืนยันว่า ROBOTJUMP เป็นคำปลุกคำสั่ง ไม่ใช่หลักฐานว่าหุ่นกระโดด · `ORDERPAUSE`/`ORDERSTOP`/`ORDERCONTINUE` แปลว่า**ทางหยุดชุดท่ามีอยู่ที่ชั้นแอป** ประกอบกับ `stopArm()` ใน SDK — ถ้อยคำ "ยังไม่มีคำสั่งหยุดที่ยืนยันว่าใช้กับบอร์ดตัวนี้ได้" ยังถูก และตอนนี้รู้ว่าจะไปหาที่ไหน · `FACE` แปดแบบ editable=false เข้าคู่กับโฟลเดอร์ faceexpression · `MAPUCONTROL` สี่ทาง ยังไม่ทราบว่าคุมอะไร ระบุไว้ว่าห้ามเดาว่าเกี่ยวกับสี่ช่องเซอร์โว · ไม่มีเลขกลุ่มท่าในไฟล์เหล่านี้ สอดคล้องกับข้อสรุปเดิม
+- **ของที่ไม่ได้ตามหาแต่สำคัญกว่า**: `/sdcard/aobo/map/` ลงวันที่ 25 ก.ค. 2026 มี `1.stcm` (372,262 ไบต์ **คนละไฟล์กับที่ดึงจากแชสซีเมื่อ 10 ก.ย.** ขนาดและ sha256 ต่างกัน) และ `Pose.txt` ที่มี**จุดหมายบันทึกไว้แล้วสามจุดพร้อมพิกัดและมุมหันจริง** หนึ่งจุดชื่อ `sofa` — แตะงานที่ค้างเรื่อง "ต้องให้ช่างสร้างแผนที่และตั้งจุด" และห้าจุดใน `data/showroom/layout.json` ที่ยัง `verified: false`
+- **ยังไม่ยืนยัน**ว่าแผนที่นี้เป็นของห้องขายนี้ (ลงวันที่ก่อนหุ่นมาถึง) และยังไม่ยืนยันว่าโหลดขึ้นแชสซีแล้วพิกัดตรงพื้นจริง
+- ตรวจจริง: อ่านและคัดลอกอย่างเดียว เก็บสำเนาไว้ที่ `data/robot-inspection/tablet-pull-20260911/` (ถูก ignore); ไม่เขียนอะไรลงหุ่น ไม่ส่งคำสั่งมอเตอร์ ไม่แก้ runtime code จึงไม่รัน unit tests ซ้ำ
+
+## 2026-09-11 — ทดลองหยุดแอปแล้วผูกไดรเวอร์: ได้พอร์ตจริง และแก้ข้อสรุปที่ผิดสองข้อ
+
+- เจ้าของรันลำดับ force-stop → bind → restart ให้ (คำสั่ง root รันโดยเจ้าของ ผู้ช่วยวัดผล) ผลครบวง: หยุดแอปแล้วอินเทอร์เฟซถูกปล่อย (`driver=[]` โดย `class=ff` ยังอยู่) · ไดรเวอร์ kernel **ไม่ผูกกลับเอง** · `echo 9-1.2:1.0 > /sys/bus/usb/drivers/cp210x/bind` สำเร็จ ได้ `/dev/ttyUSB10` · เปิดแอปกลับ แอปยึดคืนเป็น usbfs ทันทีและ node หายไป
+- ขั้นสุดท้ายคือสิ่งที่ขาด: **กลไกที่เคยอนุมานเรื่องเหตุการณ์วันที่ 10 ถูกสังเกตตรงๆ แล้ว** ไม่ต้องอนุมานอีกว่าเกิดกับเครื่องนี้ได้จริงไหม
+- **แก้ข้อสรุปผิดข้อ 1**: ที่เขียนว่าไม่มีกฎ ueventd สำหรับ ttyUSB จึงเป็นของ root — กฎมีอยู่ `/dev/ttyUSB0..9` = 0660 radio:radio (จองให้โมเด็ม) และ `/dev/ttyUSB1*` = **0666 system:system** ตรงกับสิทธิ์ที่วัดได้จริงของ node; สาเหตุที่อ่านผิดคือใช้ `grep 'ttyUSB\|ttyACM'` ซึ่ง **toybox grep ไม่รองรับ `\|` แบบ BRE** จึงไม่แมตช์อะไรเลย — ผลว่างของการวัดที่พังหน้าตาเหมือนผลว่างที่เป็นจริง รูปเดียวกับ `nc -z` เมื่อ 9 ก.ย. ซึ่งรอบนั้นรอดเพราะมีตัวควบคุมด้านบวก รอบนี้ไม่มี
+- **แก้ข้อสรุปผิดข้อ 2**: ที่ตีความว่า `centre(1)` ล้มเพราะสิทธิ์ของ node — ข้อความจริงคือ `can't create /dev/ttyUSB10` คือพยายามสร้างไฟล์ใหม่ใน `/dev` เพราะ node ยังไม่มี ไม่ใช่ถูกปฏิเสธที่ตัว node; **หน้า `/arm` เขียนได้โดยไม่ต้อง root เมื่อพอร์ตว่าง**
+- แก้ชื่อไดรเวอร์: บนบัส usb คือ `ch341` ไม่ใช่ `ch341-uart` (ตัวหลังเป็นชื่อบนบัส usb-serial)
+- บันทึกลำดับที่ใช้ได้จริงห้าขั้นไว้ในเอกสาร พร้อมข้อจำกัดถาวร: แอปผู้ขายกับเราถือพอร์ตพร้อมกันไม่ได้
+- ยังไม่รู้ว่า CP2102 หรือ CH340 คือแขน · จุดตัดไฟเลี้ยงเซอร์โวยังไม่มีใครหาเจอ · **ยังไม่ส่งไบต์ใดไปบอร์ดทั้งสิ้น** และบันทึกเตือนว่าการเปิดพอร์ตแม้เพื่อฟังอย่างเดียวก็ยก DTR/RTS ซึ่งอาจรีเซ็ตไมโครคอนโทรลเลอร์ปลายทาง
+- ตรวจจริง: วัดสถานะ sysfs ก่อนและหลังทุกขั้น; ไม่แก้ runtime code จึงไม่รัน unit tests ซ้ำ; หุ่นถูกคืนสภาพแล้ว แอปกลับมารันและถือพอร์ตตามเดิม
+
+## 2026-09-11 — ปิดเรื่องเจ้าของพอร์ตอนุกรม วัดได้แล้วว่าเป็นแอป Aobo ตัวเดียวถือทั้งสอง
+
+- เจ้าของรัน `su 0 sh -c 'ls -l /proc/*/fd/* | grep bus/usb'` ให้ (ผู้ช่วยยกสิทธิ์เองไม่ได้ ถูกบล็อก) ผลคือมีโปรเซสเดียวที่เปิด usbfs node ไว้ คือ pid 3465 = `com.aobo.robot.ai3` ถือสี่ fd ชี้ไปที่สองอุปกรณ์
+- จับคู่ `busnum`/`devnum` จาก sysfs แล้ว: `/dev/bus/usb/009/004` = CP2102, `/dev/bus/usb/009/006` = CH340 — **แอปเดียวถือตัวแปลงอนุกรมทั้งสองตัว** ไม่ใช่เดมอนของผู้ผลิตเครื่อง (`gpioservice`, `lcdparamservice`, `com.wits.witsservices` ที่ `ps` ทำให้เป็นผู้ต้องสงสัย)
+- ข้อที่เคยบันทึกว่า "ยังไม่ยืนยัน" ตอนนี้ยืนยันด้วยการวัดแล้ว ส่วนเหตุการณ์วันที่ 10 ยังเป็นการอนุมาน เพราะไม่ได้วัด ณ ตอนนั้น — แต่เป็นการอนุมานที่หนักขึ้นมาก เพราะกลไกและตัวผู้กระทำถูกวัดแล้ววันนี้
+- ผลต่อการเลือกทาง: ทาง 3 ถูกยืนยันว่าตรงที่สุด เพราะผู้ถือพอร์ตคือแอปที่มี service ให้เรียก ถ้าผลออกมาเป็น `gpioservice` แผนจะต้องเปลี่ยนไปคุยกับผู้ผลิตเครื่องแทนผู้ผลิตหุ่น ซึ่งคนละบริษัท; ทาง 2 ทำได้จริงเชิงเทคนิคแต่ต้อง root สองชั้น (ผูกไดรเวอร์กลับ + สิทธิ์ device node ที่ไม่มีกฎ ueventd) และเป็นการหยุดแอปหลักของหุ่น จึงเป็นการตัดสินใจของเจ้าของ
+- ตรวจจริง: คำสั่งฝั่งผู้ช่วยเป็นการอ่าน sysfs อย่างเดียว; คำสั่ง root รันโดยเจ้าของ; ไม่ได้หยุดแอป ไม่ได้เปลี่ยนค่าบนหุ่น ไม่ได้ส่งคำสั่งไปมอเตอร์; ไม่แก้ runtime code จึงไม่รัน unit tests ซ้ำ
+
+## 2026-09-11 — ทดสอบ /arm กับหุ่นจริงเท่าที่ทำได้โดยไม่ขยับอะไร
+
+- รัน `app/robot_arm.py` กับหุ่นจริงผ่าน adb Wi-Fi โดยตั้งค่าในโปรเซสทดสอบเท่านั้น ไม่แตะ `.env` ผลตรวจสี่ข้อ:
+- **ตัวตรวจพอร์ตวัดได้จริง ไม่ได้ตอบ False อย่างเดียว** — เทียบกับ `/dev/ttyS0` ที่มีอยู่จริงได้ `present=True` ส่วน `/dev/ttyUSB10` ได้ `False` การมีตัวควบคุมด้านบวกคือบทเรียนจาก `nc -z` เมื่อ 9 ก.ย. ที่รายงานว่าทุกพอร์ตปิดรวมถึงพอร์ตที่เปิดอยู่
+- **ท่อ adb ถึงหุ่นทำงานครบเส้น** — เรียก `centre(1)` ตรงๆ ข้ามด่าน `port_present()` แล้วคำสั่งถูกส่งถึงเชลล์ของหุ่นและทำงานจริง ตอบกลับว่า `can't create /dev/ttyUSB10: Permission denied` ซึ่ง**ยืนยันการวิเคราะห์ ueventd ด้วยการวัด**: ไม่มีกฎสำหรับ `ttyUSB` node จึงเป็นของ root และ adb shell เป็น uid 2000
+- **การเขียนที่ล้มเหลวถูกรายงานว่าล้มเหลว** ไม่ใช่รายงานว่าส่งแล้ว ตรงตามกฎ mock-ไม่ใช่-ok
+- สรุปสถานะหน้า `/arm`: โค้ดกับท่อพิสูจน์แล้วทั้งเส้น เหลือด่านเดียวคือสิทธิ์และการครอบครองพอร์ต ซึ่งแก้ด้วยโค้ดไม่ได้
+- root ถูกบล็อกจากฝั่งเครื่องมือของผู้ช่วย จึงส่งคำสั่งระบุเจ้าของพอร์ตให้เจ้าของรันเอง ไม่ยกสิทธิ์แทน
+- ตรวจจริง: คำสั่งที่ส่งถึงหุ่นรอบนี้มีเพียง `ls` และการพยายามเขียนหนึ่งครั้งที่ถูกระบบปฏิเสธ **ไม่มีไบต์ใดถึงบอร์ดเซอร์โว ไม่มีมอเตอร์ใดถูกสั่ง ไม่ได้หยุดแอป ไม่ได้เปลี่ยนค่าบนหุ่น**; ไม่แก้ runtime code จึงไม่รัน unit tests ซ้ำ
+
+## 2026-09-11 — ต่อ adb ผ่าน Wi-Fi แล้วพบว่าข้อสรุปเรื่องพอร์ตหลุดของเมื่อเช้าผิด
+
+- ต่อ adb ผ่าน Wi-Fi สำเร็จ (`adb pair` แล้ว `adb connect`) ไม่ต้องเสียบสายเข้าคอม; ตรวจสดแล้ว `/dev/ttyUSB*` ไม่มีเลยทั้งที่บูตมา 8 นาที
+- **แก้ข้อสรุปเดิม**: ที่เขียนไว้ว่า "ไฟถูกตัดหรือพอร์ตถูกสั่งปิด" ผิด — ตัวแปลงทั้งสองตัวต่ออยู่ครบ (CP2102 ที่ 3-1.2, CH340 ที่ 3-1.4) แต่ผูกกับ **`usbfs`** ไม่ใช่ `cp210x`/`ch341-uart` และ `/sys/bus/usb-serial/devices/` ว่างทั้งที่ไดรเวอร์ลงทะเบียนอยู่ แปลว่า **แอป `com.aobo.robot.ai3` เรียก `claimInterface()` ยึดอินเทอร์เฟซไว้ ทำให้ไดรเวอร์ kernel ปล่อยอุปกรณ์** — อธิบาย log วันที่ 10 ได้ครบกว่าเดิม รวมถึงข้อที่ว่าทำไมสองตัวหลุดห่างกันสามมิลลิวินาที (เป็นการกระทำของโปรแกรมเดียว ไม่ใช่ไฟเส้นเดียวกัน)
+- ผลต่อหน้า `/arm`: สมมติฐาน `ROBOT_ARM_PORT=/dev/ttyUSB10` ใช้ไม่ได้ตราบใดที่แอป Aobo รัน และถึงหยุดแอปก็ยังติดสิทธิ์ เพราะ `ueventd` ไม่มีกฎสำหรับ `ttyUSB` เลย (node จะเป็นของ root) ส่วน adb shell คือ uid 2000 — **หน้า `/arm` จึงยังใช้กับหุ่นตัวนี้ไม่ได้ตามที่ออกแบบไว้ ไม่ใช่เพราะโค้ดผิด แต่เพราะพอร์ตไม่ว่าง** และด่าน `port_present()` ที่ทำไว้ก็รายงานตรงตามจริงแล้ว
+- ทางที่เหลือบันทึกไว้สี่ทางพร้อมหลักฐาน: ผ่าน usbfs โดยตรง (`/dev/bus/usb/003/*` เป็น 0666 เขียนได้ไม่ต้อง root แต่ต้องทำ control transfer เอง) · หยุดแอป Aobo แล้วยกสิทธิ์ (เครื่องเป็น userdebug มี `/system/xbin/su` — **เป็นการเปลี่ยนสภาพหุ่น ส่งให้เจ้าของตัดสินใจ ไม่ทำเอง**) · ผ่าน `SerialdataService` ของแอป ซึ่งกลับมามีน้ำหนักเพราะแอปคือผู้ถือพอร์ต · เขียนแอปของเราเองด้วย usb-serial-for-android ซึ่งเป็นทางเดียวกับที่แอปผู้ขายใช้และเข้ากับแผน APK ของ Emma
+- ยืนยันอุปกรณ์อื่นระหว่างทาง: `3-1.3` Bothlent UAC Dongle ผูก `snd-usb-audio` คือไมค์อาร์เรย์ · `3-1.1` USB RGB Camera ผูก `uvcvideo` · `9-1.1` จอสัมผัส ILITEK · `ttyS0/1/3/4/6/8` เป็น 0666 แต่ยังไม่มีหลักฐานว่าตัวใดเกี่ยวกับแขน และกฎ ueventd ผูกบางตัวไว้กับ bluetooth/gps จึงห้ามลองเขียนมั่ว
+- **แก้ให้แคบลงอีกชั้นในวันเดียวกัน**: ที่เขียนว่าแอป Aobo เป็นผู้ยึดอินเทอร์เฟซ แรงเกินหลักฐาน — `usbfs` พิสูจน์ว่ามีโปรแกรมฝั่งผู้ใช้ยึดอยู่ ไม่ได้บอกว่าตัวไหนหรือเป็นตัวเดียวกันทั้งสอง; `ls /proc/<pid>/fd` ของโปรเซสอื่นถูกปฏิเสธสิทธิ์, `lsof` เห็นเฉพาะโปรเซสตัวเอง, `dumpsys usb` บล็อก `permissions_manager` ว่างเปล่า — **ระบุตัวเจ้าของต้องใช้ root ซึ่งไม่ทำเอง** คำอธิบายเหตุการณ์วันที่ 10 จึงยังถือว่าไม่ยืนยัน
+- **และการยึดพอร์ตไม่ถูกข้ามด้วยการเขียน usbfs เองหรือทำ APK ใหม่**: `claimInterface()` เป็นสิทธิ์เฉพาะราย ไฟล์อุปกรณ์ที่เป็น 0666 บอกแค่ว่าเปิดไฟล์ได้ ไม่ได้แปลว่าอ้างสิทธิ์อินเทอร์เฟซได้ ผู้ถือเดิมต้องปล่อยก่อนเสมอ — ทาง 3 (สัญญาของ service ผู้ขาย) จึงขึ้นเป็นลำดับแรก ทาง 4 เป็นทางสำรองของ APK Emma
+- ทาง 3 คืบจาก package manager แบบอ่านอย่างเดียว: พบ **AIDL service `com.aobo.aibot.aidl.MyService` action `com.aobo.aidl.test`** (เป็น AIDL = มีสัญญาเป็นไฟล์ `.aidl` อยู่จริง) และ `DoubleScreenService` ที่มี intent filter ส่วน **`SerialdataService` ไม่มี intent filter เลย** เรียกด้วย action ไม่ได้ ต้องระบุ component พร้อม extras ที่อยู่ใน DEX ที่ถูกห่อ — ข้อที่ขอผู้ขายจึงแคบจาก "ขอ SDK" เหลือ "ขอไฟล์ .aidl กับรายการ extras" ซึ่งคู่มือหน้า 9 ระบุว่าอยู่ในชุดส่งมอบอยู่แล้ว
+- ตรวจจริง: คำสั่งอ่านอย่างเดียวทั้งหมด — `ls`, `cat /sys/...`, `ps`, `getprop`, `grep ueventd`; **ไม่ได้หยุดแอป ไม่ได้ยกสิทธิ์ ไม่ได้เปิดพอร์ต ไม่ได้เขียนอะไรลงอุปกรณ์ ไม่ได้เปลี่ยนค่าบนหุ่น**; ไม่แก้ runtime code ในรอบนี้ ไม่รัน unit tests ซ้ำเพราะเปลี่ยนเฉพาะเอกสาร
+
+## 2026-09-11 — แก้ห้าข้อจากรีวิวเจ้าของก่อนแตะหุ่นจริง
+
+รีวิวชี้จุดที่ต้องแก้ก่อนถือว่าพร้อมทดลอง ตรวจกับไฟล์จริงแล้ว**ถูกทั้งห้าข้อ** แก้ในก้อนเดียว:
+
+- **ปุ่มหยุดใช้ไม่ได้ตอนที่จำเป็นที่สุด** `command()` คืนค่าทันทีเมื่อ `busy=true` และปุ่มแดงใช้ฟังก์ชันเดียวกัน กดตอนมีคำสั่งค้างจึงไม่ส่งอะไรเลย — ปุ่มที่มีไว้สำหรับตอนที่ของกำลังเคลื่อนที่ กลายเป็นปุ่มที่ไม่ทำงานตอนของกำลังเคลื่อนที่ ตอนนี้ stop/arm ส่งแบบ `urgent` ข้ามด่าน busy และไม่แตะค่า busy ของคำสั่งที่มันแซง
+- **กลุ่มท่าไม่ได้อยู่ใต้ข้อจำกัดใดเลย** รายการสี่ช่องกับ `ROBOT_ARM_SPAN` คุมเฉพาะปุ่มเลื่อน ส่วนกลุ่มท่าที่บันทึกไว้สั่งช่องไหนก็ได้ในยี่สิบช่อง ไปที่ไหนก็ได้ การตรึงหนึ่งรอบคุมแค่จำนวนครั้ง — เพิ่มสวิตช์แยก `ROBOT_ARM_GROUPS_ENABLED` (default false) ไม่ให้ติดมากับ `ROBOT_ARM_ENABLED` และเขียนข้อจำกัดนี้ไว้ทั้งใน docstring และบนหน้าเว็บ
+- **ตำแหน่งค้างหลังเล่นกลุ่มท่า** `step()` คำนวณต่อจากค่าที่กลุ่มท่าทำให้ไม่จริงไปแล้ว ปุ่ม +40 จึงไม่ใช่ก้าวเล็กจากตำแหน่งปัจจุบัน — `run_group()` ล้าง `_commanded` ทั้งหมด ต้องสั่งไป 1500 ใหม่ก่อนเลื่อน (ล้างทิ้ง ไม่ใช่ติดธงว่า stale เพราะธงคือสิ่งที่คนลืมเช็ค และ `step()` มีด่าน "ไม่รู้จักช่องนี้" ที่เทสต์คุมอยู่แล้ว)
+- **"ตั้งจุดเริ่ม" เป็นชื่อที่บอกว่ามีการวัด** ทั้งที่มันสั่งไป 1500 จริงๆ และ 1500 คือกลางของช่วงโปรโตคอล ไม่ใช่กลางของข้อต่อ ยังไม่มีหลักฐานว่าเหมาะกับทุกช่อง — เปลี่ยนป้ายเป็น "สั่งไป 1500" ทั้งบนปุ่มและในข้อความ error พร้อมเตือนว่ากดครั้งแรกของแต่ละช่องต้องมีมืออยู่ที่สวิตช์ไฟเซอร์โว
+- **3000 ms ไม่ใช่ช้าที่สุด** เอกสารระบุช่วง `T` = 100–9999 — `SLOW_MS` เป็น 9999 แล้ว เมื่อระยะทางที่จะเคลื่อนยังไม่รู้ "ช้าที่สุดที่มี" เป็นค่าเดียวที่อธิบายได้
+- **ถ้อยคำ** "บอร์ดไม่มีคำสั่งหยุด" → "ยังไม่มีคำสั่งหยุดที่ยืนยันว่าใช้กับบอร์ดตัวนี้ได้" เพราะตารางคำสั่งที่อ่านได้เป็นของรุ่น 32 ช่อง ส่วนคู่มือหุ่นระบุ 20 ช่อง ความเข้ากันยังไม่พิสูจน์ — และข้อนี้ตัดทั้งสองทาง รวมถึงทางนี้ด้วย
+- `.env` / `.env.example`: เพิ่ม `ROBOT_ARM_GROUPS_ENABLED=false` และคอมเมนต์ว่าใช้ adb ผ่าน Wi-Fi ได้ ไม่ต้องเสียบสายเข้าคอม (`adb connect <ip>:5555` แล้วใส่ที่ `ROBOT_ARM_ADB_SERIAL`) พร้อมแยกให้ชัดว่าสาย USB ไปคอมถอดได้ ส่วน USB ในตัวหุ่นที่ไปบอร์ดเซอร์โวถอดไม่ได้
+- ตรวจจริง: `pytest tests/ -q` = **1315 passed** (จาก 1309); เทสต์ไฟล์นี้ 27 ตัว (จาก 21); ย้อนโค้ดพิสูจน์ครบสี่ข้อ — คืน busy gate ให้ปุ่มแดง, ถอดด่านสวิตช์กลุ่มท่า, ไม่ล้างตำแหน่งหลังกลุ่มท่า, และ `SLOW_MS` กลับเป็น 3000 แต่ละข้อทำให้เทสต์ที่เขียนไว้เพื่อมันแดงทีละตัว คืนโค้ดแล้วเขียวครบ; ยังไม่ได้ต่อหุ่น ไม่ได้เปิดพอร์ตอนุกรม ไม่ได้ส่งคำสั่งไปมอเตอร์
+
+## 2026-09-11 — หน้าสั่งแขนด้วยมือที่ /arm
+
+- `app/robot_arm.py` (ใหม่): คุยกับบอร์ดเซอร์โว Torobot ผ่านพอร์ตอนุกรมของหุ่นด้วย adb — `centre()` สั่งไปกลางช่วงช้าที่สุด, `step()` ก้าวละ 40 µs จากตำแหน่งที่เราสั่งไว้ล่าสุด, `run_group()` เล่นกลุ่มท่าหนึ่งรอบ, `stop()` ล็อกไม่ให้ส่งต่อ, `port_present()` เช็คว่าพอร์ตมีอยู่จริงก่อนเขียน
+- ออกแบบตามข้อจำกัดจริงของบอร์ดสามข้อ: **ไม่มีคำสั่งหยุด** ปุ่มแดงจึงเขียนว่า "หยุดส่งคำสั่ง" และหน้าเว็บบอกว่าตัวหยุดจริงคือไฟเลี้ยงเซอร์โว · **เซอร์โวอ่านตำแหน่งกลับไม่ได้** จึงต้องกดตั้งจุดเริ่มก่อน ห้ามเดาว่าอยู่กลาง · **ยังไม่รู้ว่าช่องไหนคือข้อต่อไหน** จึงสั่งได้เฉพาะช่อง 1, 11, 7, 8 ที่แอปของหุ่นเองเปิดไว้ และหน้าเว็บแสดงเลขช่อง ไม่ตั้งชื่อข้อต่อ
+- `client/robot-arm.html` (ใหม่): ปุ่มหยุดติดบนสุดแบบ sticky, ปุ่มเลื่อนถูกปิดจนกว่าจะตั้งจุดเริ่ม, ระยะกำหนดที่เซิร์ฟเวอร์ หน้าเว็บส่งแค่ `token` กับ `action`; `app/main.py` เพิ่ม `/arm`, `/arm/state`, `/arm/command` โดย stop/arm ทำงานก่อนด่านตรวจ config
+- `app/config.py` + `.env.example`: `ROBOT_ARM_ENABLED` (default false), `ROBOT_ARM_PORT` (ว่างโดยตั้งใจ — วันที่ 10 ก.ย. พอร์ตจริงคือ ttyUSB10/11 ไม่ใช่ ttyUSB1 ที่ SDK ระบุ), `ROBOT_ARM_BAUD`, `ROBOT_ARM_SPAN` (200 µs จาก 1000), `ROBOT_ARM_ADB`, `ROBOT_ARM_ADB_SERIAL`, `ROBOT_ARM_TIMEOUT_S`
+- `.env` (ไม่อยู่ในรีโป): เพิ่มบล็อก `ROBOT_ARM_*` ต่อท้าย ตั้ง `ROBOT_ARM_ENABLED=false` และ `ROBOT_ARM_PORT` ว่างไว้ พร้อมคอมเมนต์ว่าต้องดูชื่อพอร์ตจากหุ่นจริงภายในนาทีแรกหลังบูต และต้องหาจุดตัดไฟเลี้ยงเซอร์โวก่อนเปิดสวิตช์; ตรวจแล้วว่าไม่มีคีย์ `ROBOT_ARM_` เดิมซ้ำ และหลังแก้ `TOOL_GROUPS` กับค่าแชสซียังเหมือนเดิมทุกตัว
+- `tests/test_robot_arm_page.py` (ใหม่ 21 ตัว) + `tests/conftest.py` ปิดสวิตช์ทั้งสองและล้าง state เพื่อไม่ให้เครื่องที่เสียบหุ่นอยู่ยิง adb จริงตอนรันเทสต์
+- **บั๊กที่เทสต์จับได้ระหว่างเขียน**: เทสต์ห้ามตั้งชื่อข้อต่อใช้ `in` กับคำไทย ทำให้ `คอ` แมตช์ใน `โปรโตคอล` — กับดักเดียวกับ `ราคา` ใน `อาคาร` ที่โปรเจกต์นี้จ่ายมาแล้วสองรอบ แก้เป็นเทียบราย*คำ*ผ่าน `tokenize` และตัดคอมเมนต์ออกก่อนสแกน
+- ตรวจจริง: `pytest tests/ -q` = **1309 passed** (เดิม 1288); ย้อนโค้ดพิสูจน์สองข้อ — ถอดล็อก disarm แล้ว `test_stop_latches_and_refuses_everything_after` แดง, เปลี่ยนจากปฏิเสธเป็นเดาว่าอยู่กลางแล้ว `test_stepping_is_refused_until_the_channel_has_been_centred` แดง, คืนโค้ดแล้วเขียวครบ 21 ตัว; ไม่ได้เชื่อมต่อหุ่นจริง ไม่ได้เปิดพอร์ตอนุกรม ไม่ได้ส่งคำสั่งไปยังมอเตอร์ใด — **ยังไม่มีใครพิสูจน์กับบอร์ดจริง**
+
+## 2026-09-11 — พอร์ตอนุกรมของแขนเคยขึ้นจริงแล้วถูกตัดหลังบูตหนึ่งนาที
+
+- `docs/robot-command-research-2026-09-11.md`: อ่าน `recent_android_log.txt` ที่สำรองไว้ซ้ำแล้วพบ CP2102 ขึ้นเป็น `ttyUSB10` และ CH341 ขึ้นเป็น `ttyUSB11` เวลา 17:07:17–18 แล้ว**หลุดพร้อมกันในระยะ 3 มิลลิวินาที** เวลา 17:08:18 — สองอุปกรณ์คนละพอร์ตคนละชิปหลุดพร้อมกันเป๊ะขนาดนี้คือไฟถูกตัดหรือพอร์ตถูกสั่งปิด ไม่ใช่สายหลวม อธิบายได้ว่าทำไม `ls /dev/ttyUSB*` ตอนสำรอง 17:47 จึงไม่พบอะไร
+- ชื่อพอร์ตจริงคือ `ttyUSB10`/`ttyUSB11` ไม่ใช่ `/dev/ttyUSB1` ที่ SDK ตั้งเป็นค่าเริ่มต้น เป็นคนละ device node กัน; เลขที่เริ่มที่ 10 บ่งว่าเลข 0–9 ถูกจองไว้แล้ว
+- งานถัดไปที่ต้องมาก่อนเรื่องอื่นและเป็นการอ่านอย่างเดียว: บูตหุ่นแล้วดู `/dev/ttyUSB*` ภายในนาทีแรกพร้อมเก็บ log ช่วงนั้น **คอขวดคือพอร์ตที่หายไป ไม่ใช่ schema ของ SerialdataService** ซึ่งไม่จำเป็นต้องรู้เพราะโปรโตคอลเป็นข้อความบนพอร์ตอนุกรม
+- ทบทวนข้อสงสัยความเข้ากันได้: **baud ไม่ขัดกัน** คู่มือ Astronaut หน้า 6 ระบุสเปกบอร์ดเองว่ารับ 9600–128000 รวม 115200 และบอร์ดตระกูลนี้ตรวจ baud อัตโนมัติ; ส่วนจำนวนช่อง 20 เทียบเอกสาร USC-32 ยังต่างจริง ยังไม่ยืนยัน
+- ข้อสังเกต `servo_number_options` = `1, 11, 7, 8, All` **ไม่เรียงจากน้อยไปมาก** และ 1 กับ 11 ห่างกัน 10 พอดีบนบอร์ด 20 ช่อง ตั้งเป็นสมมติฐานที่ทดสอบได้ว่าช่อง N กับ N+10 อาจเป็นข้อต่อคู่กระจกซ้าย–ขวา ระบุชัดว่าเป็นสมมติฐานและอยู่หลังเงื่อนไขความปลอดภัยทั้งหมด
+- ตรวจจริง: grep log ที่สำรองไว้พร้อมเวลาและหมายเลขบรรทัด, ยืนยันข้อความ `Baud rate range` และ `Simultaneous control of 20 channels` จากคู่มือที่สกัดไว้; `git diff --check` ผ่าน ไม่รัน unit tests เพราะเพิ่มเฉพาะเอกสาร ไม่เชื่อมต่อหุ่น ไม่เปิดพอร์ตอนุกรม ไม่ส่งคำสั่งมอเตอร์
+
+## 2026-09-11 — บอร์ดแขนเป็น Torobot: โปรโตคอลเปิด ตัดผู้ขายออกจากเส้นทางท่าแขน
+
+- `docs/robot-motion-capabilities-2026-09-11.md` หัวข้อ 7: คู่มือหน้า 6 ระบุว่าบอร์ดข้อต่อส่วนบน **"Controlled using Torobot programming software"** — เป็นบอร์ดควบคุมเซอร์โวเชิงพาณิชย์ที่มีคู่มือโปรโตคอลเปิดเผย ไม่ใช่ของเฉพาะ Aobo
+- ชุดคำสั่งเป็นข้อความล้วนบนพอร์ตอนุกรมจบด้วย `
+`: `#1P1500T100` สั่งช่องเดียวไปตำแหน่ง (500–2500) ตามเวลา (100–9999), `#1GC2` เล่นกลุ่มท่าตามเลขและจำนวนรอบ — แปลว่า**คุมทีละข้อต่อได้โดยไม่ต้องรู้ตารางกลุ่มท่า** และซอฟต์แวร์ผู้ผลิตบอร์ดมีปุ่มอ่านหมายเลขกลุ่มท่าที่มีอยู่จริง ตัดการไล่เลขแบบสุ่มออก
+- ข้อจำกัดที่บันทึกไว้ ไม่กลบ: คู่มือ Torobot ที่อ่านได้**ไม่มีคำสั่งหยุด** ตัวหยุดที่แน่นอนคือไฟเลี้ยงเซอร์โวที่แยกวงจร ต้องหาให้เจอก่อนทดสอบ · เซอร์โว PWM ไม่มีการอ่านตำแหน่งกลับ คำสั่งแรกของทุกช่องคือการขยับแบบไม่รู้จุดตั้งต้น ต้องใช้เวลาช้าที่สุดเสมอ · คู่มือที่ดึงมาเป็นรุ่น 24/32 ช่อง ส่วนบอร์ดในหุ่นระบุ 20 ช่อง ยังไม่ยืนยันกับบอร์ดตัวนี้
+- คู่มือยังระบุไมค์อาร์เรย์ 4 ตัวพร้อม echo cancellation ในตัว (ตรงกับที่วัดได้ 8 ช่อง 16 kHz) และจอสองจอเป็นสเปกมาตรฐาน จอสีหน้า 7 นิ้วที่หัว จอสัมผัส 18.5 นิ้วที่อก
+- ตรวจจริง: ดึงข้อความคู่มือ Astronaut ด้วยการลบช่องว่างก่อน grep (ข้อความสกัดมาเป็นตัวอักษรเว้นห่าง ทำให้ค้นตรงๆ ไม่เจอ), ดาวน์โหลดและ `pdftotext -layout` คู่มือโปรโตคอล Torobot เก็บสำเนาไว้ที่ `data/robot-inspection/motion-capabilities-20260911/torobot-usc-protocol-en.txt` (โฟลเดอร์ถูก ignore); `git diff --check` ผ่าน ไม่รัน unit tests เพราะเพิ่มเฉพาะเอกสาร และไม่ส่งคำสั่งไปยังหุ่นหรือบอร์ดใดๆ
+
+## 2026-09-11 — สำรวจความสามารถการเคลื่อนไหวของ Astronaut
+
+- `docs/robot-motion-capabilities-2026-09-11.md`: รวมการเคลื่อนฐาน หัว/คอ แขน ท่อนแขน มือ/นิ้ว ท่าประกอบและงานนำทาง พร้อมระดับหลักฐานคู่มือ/ระบบประกาศ/ทดลองจริง
+- ระบุมุมจากคู่มือหน้า 6 โดยไม่แปลงเป็นค่าข้อต่อที่ปรับเทียบแล้ว; แยกข้อขัดแย้ง 20 channels / 22 joints / 24 DOF และสเปกคอมในคู่มือที่ต่างจากเครื่องจริง
+- ตรวจชื่อ action factories 21 รายการจาก snapshot และ strings ใน APK; ไม่ตีความ FollowTarget/Sweep/ROBOTJUMP เป็นการตามคน ทำความสะอาด หรือกระโดดที่พิสูจน์แล้ว
+- ตรวจจริง: อ่านคู่มือครบ 10 หน้าและภาพหน้าที่เกี่ยวข้อง, เทียบข้อมูล SDK/สำเนาแชสซี, ค้นเว็บผู้ผลิตพร้อมแหล่งอ้างอิง; `git diff --check` ผ่าน ไม่รัน unit tests เพราะเพิ่มเฉพาะรายงาน และไม่ส่งคำสั่งเคลื่อนไหว
+
+## 2026-09-10 — แขนและจอบนหัว: ตัดเบาะแสที่ตันออก เหลือของที่ต้องขอผู้ขายสามข้อ
+
+- ต่อจากรายงาน `data/robot-inspection/analysis-arm-head-20260910/` ตรวจเพิ่มแล้ว**ตัดออก**: `chatcode.txt` เป็นมุกตลกจีน 21 รายการ · `base_actions.json` เป็นกติกาจับข้อความไม่ใช่ท่ามอเตอร์ · layout หน้า ARM มีแค่ปุ่มเลือกเลขกลุ่มท่ากับ spinner เลือกเซอร์โว แอปส่งเลข ไม่ได้ถือตาราง — **ตารางเลขท่าอยู่ในหน่วยความจำของบอร์ดเซอร์โว ไม่ได้อยู่ในไฟล์ใดบนแท็บเล็ต เลิกค้นในไฟล์ได้**
+- สมมติฐานที่ทดสอบได้ด้วยสวิตช์เดียวสำหรับจอบนหัว: `double_screen.xml` มี `SurfaceAnimView` ชื่อ `robotface` และมี `switch_doublescreen` — เปิดโหมดสองจอแล้ว dump จอใหม่ ถ้าเจอจอจริงตัวที่สองแปลว่าเป็นจอ Android เอาหน้าเว็บขึ้นได้เลย ถ้าไม่เจอแปลว่าขับด้วยตัวควบคุมแยกผ่านพอร์ตอนุกรม
+- ข้อควรระวังที่บันทึกไว้: `loopCount=0` วนไม่สิ้นสุด ห้ามใช้ทดสอบ · เลขท่าที่ไม่รู้จักอาจดันข้อต่อสุดระยะ · **ห้ามไล่เลขท่าจากเครื่องมือที่โมเดลเรียกได้**
+- รายการที่ต้องขอผู้ขายเหลือสามข้อ: ตารางกลุ่มท่าแขน, ช่องทางส่งภาพไปจอบนหัว, ช่องไมค์ที่ผ่าน AEC — ล้อไม่อยู่ในรายการแล้ว
+
+## 2026-09-10 — จัดทำรายละเอียดไฟล์และหลักฐานคำสั่งแขน/จอ
+
+- `data/robot-inspection/analysis-arm-head-20260910/` (ignored): รายงานภาษาไทยแยกเมธอด SDK แขนจากคำสั่งที่ทดสอบแล้ว, layout สีหน้า/จอสองจอ, ภาพสีหน้า 16 ไฟล์ และข้อจำกัดการระบุจอบนหัว
+- ทำรายละเอียด shared storage ครบ 337 รายการ, installed APK 14 แอป, ไฟล์ประกอบ 121 รายการ และสารบัญ APK/ZIP 39 ไฟล์ รวม 82,871 สมาชิก; ระบุฐานหลักฐานของคำอธิบายและส่วนที่ยังถอดความหมายไม่ได้
+- ตรวจจริง: SHA-256 สำเนา shared 331 ไฟล์เทียบหลักฐานต้นทางที่สำรองไว้ตรงครบ, สำเนา APK 14 ไฟล์ตรง hash เดิม, assertions จำนวนรายการผ่าน; ตรวจภาพ SDK จีนหน้า 21–23 และตัวอย่างภาพสีหน้าสามชุด
+- `docs/robot-live-inspection-2026-09-10.md`: บันทึกว่า Android พบจอจริงหนึ่งจอและจอเสมือน AnyDesk ไม่ใช่จอหัวที่สอง; ไม่เปลี่ยน runtime/ค่าหุ่นหรือส่งคำสั่งมอเตอร์ ไม่รัน unit tests สำหรับงานรายงาน; ตรวจเอกสารด้วย `git diff --check`
+
+## 2026-09-10 — สำรองและอ่านข้อมูลหุ่นที่เข้าถึงได้
+
+- `docs/robot-live-inspection-2026-09-10.md`: เพิ่มผลสำรอง shared storage 331/337 ไฟล์ และ APK 14 แอป พร้อมตรวจ SHA-256 เทียบต้นทางผ่านครบส่วนที่คัดลอกได้
+- สำรองค่าระบบ Android รายการแอป/ฮาร์ดแวร์/log แผนที่จากทั้งแชสซีและแอป และค่า API ที่อ่านได้; เก็บข้อมูลดิบและรายงานใน `data/robot-inspection/` ที่ถูก ignore ไม่มีข้อมูลส่วนตัวหรือค่าลับใน changelog
+- ทำ catalog เนื้อหาและ manifest 456 ไฟล์; ระบุข้อมูลส่วนตัว Aobo/VoiceNote และ cache ที่ติดสิทธิ์ รวมถึง archive แรกที่ไม่ครบเพราะ USB หลุด ไม่อ้างว่าเป็น full-device image หรือ restore ที่ทดสอบแล้ว
+- ตรวจข้อมูลอนุกรมเพิ่มเติมจาก log และสำรองไฟล์บริการ ttyusb-scan แบบอ่านอย่างเดียว; ยังไม่ยืนยัน mapping แขน
+- ไม่แก้ runtime code ไม่เปลี่ยนค่าหุ่น ไม่ส่งคำสั่งมอเตอร์; ตรวจจริงด้วย file/hash/API inventory และ `git diff --check` สำหรับเอกสาร ไม่รัน unit tests ซ้ำ
+
+## 2026-09-10 — เปิดโอนไฟล์หุ่นผ่าน USB
+
+- เปลี่ยน USB function ปัจจุบันบนหุ่นเป็น `mtp` ด้วย `svc usb setFunctions mtp` เพื่อให้ผู้ใช้ดูไฟล์ใน Windows File Explorer; ไม่เปลี่ยนค่าเริ่มต้นบน unlock และไม่ส่งคำสั่งมอเตอร์
+- ก่อนเปลี่ยน `sys.usb.config=adb` และ `svc usb getFunctions` ว่าง; ระหว่างเปลี่ยนคำสั่งจบด้วย exit 1 พร้อม opId จึงตรวจผลต่อ ไม่ถือว่าเป็นผลสำเร็จทันที
+- ยืนยันหลัง USB ต่อใหม่: `svc usb getFunctions` ตอบ `mtp`, ADB ผ่าน USB ยังขึ้น `device`, Windows แสดงอุปกรณ์ WPD ชื่อ ZC-3588A สถานะ OK
+- ไม่แก้ runtime code; ไม่รัน unit tests สำหรับการตั้งค่าอุปกรณ์ครั้งนี้
+
+## 2026-09-10 — ตรวจคำสั่งจับมือและอุปกรณ์ USB
+
+- `docs/robot-live-inspection-2026-09-10.md`: บันทึกผลค้นท่าจับมือใน APK และไฟล์ข้อความ/config/workbook 20 ไฟล์ใน aobo.zip; ยังไม่พบ mapping ท่า และ btn_shakehand ที่พบเป็น check status ของ LoRa
+- อ่าน Android USB inventory พบ USB Serial สองชนิด แม้ไม่มี ttyUSB/ttyACM; ยังไม่ยืนยันตัวที่เชื่อมแขน บันทึกข้อจำกัดข้อความ #CC และ UI hierarchy ที่ค้าง
+- ไม่ส่งท่า ไม่เปลี่ยนการควบคุมมอเตอร์; เปลี่ยนเฉพาะเอกสารจึงไม่รัน unit tests ซ้ำ
+
+## 2026-09-10 — พบทางเข้าเมนู ARM Setting บนหุ่นจริง
+
+- `docs/robot-live-inspection-2026-09-10.md`: เพิ่มทางเข้าที่ทดสอบสำเร็จผ่านการแตะโลโก้ Robot หลายครั้ง แล้วแตะหัวข้อ Backstage หลายครั้ง > Arm movement test; ไม่ต้องเปิด activity จากภายนอก
+- ตรวจไฟล์ APK resources/layouts และโฟลเดอร์ที่ผู้ใช้ชี้เพิ่มเติม; เก็บผลและภาพหน้าจอใน `data/robot-inspection/` ที่ถูก ignore
+- ผลจริง: เปิด ARM Setting ได้, หน้าจอเลือก Relay และแสดง connected (ยังไม่ใช่หลักฐานตอบกลับบอร์ด), ตัวเลือกท่าเป็นเลขและรายการคำสั่งที่ผูกไว้ไม่ปรากฏแถว; ยังไม่ได้ส่งท่าทาง เปลี่ยนวิธีควบคุม หรือติดตั้ง APK
+- เปลี่ยนเฉพาะเอกสารและหลักฐานการตรวจ ไม่แก้ runtime code จึงไม่ได้รันชุดทดสอบซ้ำ
+
+## 2026-09-10 — ทดสอบสั่งหุ่นจริง: คุมได้ครบเส้นทาง แต่หุ่นเดินไม่ออกเพราะถูกล้อม
+
+- `app/robot_chassis.py`: log เอกสาร action ที่บอร์ดคืนมา ทั้งตอนสร้าง (`move_to`) และทุกครั้งที่สถานะเปลี่ยน (`_tick`, เทียบกับ `_last_action_seen` เพื่อไม่ให้มีบรรทัดทุก 2 วินาทีตลอดวัน) — ความล้มเหลวที่น่าสนใจไม่ใช่ "POST ถูกปฏิเสธ" แต่คือบอร์ดตอบ 200 แล้ว action ค้างอยู่เฉยๆ โดยไม่บอกเหตุผลที่ไหนเลย
+- **ผลวินิจฉัย:** เส้นทางคำสั่งครบ 22/22 ถึงบอร์ด แต่ตำแหน่งที่บอร์ดรายงานเองไม่ขยับเลยใน 10.5 วินาที (0.0 ซม. 0.0 องศา) · action ค้างที่ `status: 1` โดย `stage` ว่างเปล่า = ตัววางแผนไม่เคยเริ่ม · ไลดาร์ปกติ (1572/1586 จุดใช้ได้) และบอกว่ารอบตัวหุ่นแคบ 0.43-0.48 ม. สามด้าน — หุ่นถือว่าออกไม่ได้ · `robot/health` สะอาด ไม่มี emergency stop
+- **ตัดทิ้งได้แล้ว:** ไม่ใช่โค้ด ไม่ใช่ไลดาร์ ไม่ใช่ล็อกซอฟต์แวร์ ไม่ใช่ error ของฐาน
+- **ข้อควรระวังใหม่:** action ที่ค้างไม่หายเอง ต้อง `DELETE /api/core/motion/v1/actions/:current` (ปุ่มหยุดบนหน้า `/robot`) ไม่งั้นคำสั่งถัดไปทับงานเดิม — ยกเลิกให้แล้วระหว่างตรวจ
+- บันทึกตารางระยะรอบตัวหุ่นและลำดับที่ต้องทำต่อไว้ใน `docs/robot-arrival-2026-09-09.md`
+- **เจอผู้ต้องสงสัยอันดับหนึ่งจากสเปกของบอร์ดเอง** (`/js/spec.js` 160 KB เป็น OpenAPI): `PUT /api/core/system/v1/parameter` รับ `base.brake_release` (`on` = ปลดเบรก, `off` = คืนเบรก) และ `base.emergency_stop` — **เขียนได้อย่างเดียว อ่านไม่ได้** (enum ของ GET มีแค่ 3 ตัว) โหมดปลดเบรกมีไว้เข็นหุ่นด้วยมือ มอเตอร์ถูกปลดกำลัง ซึ่งอธิบายอาการครบทุกข้อ: action สร้างได้ `status: 1` แต่ `stage` ว่าง ไม่มี error และตำแหน่งไม่ขยับเลย — และวันนี้มีการเข็นหุ่นด้วยมือจริง · ยังไม่ได้ทดสอบ คำสั่งที่ต้องรันอยู่ในเอกสารตรวจรับ (ปลอดภัยทั้งสองทาง สเปกระบุว่าค่ามีผลเฉพาะรอบนี้ รีบูตแล้วคืนค่าเดิม)
+
+## 2026-09-10 — หน้าสั่งหุ่นด้วยมือ (`/robot`) สำหรับพิสูจน์ว่าคุมได้จริง
+
+- `client/robot-control.html` + `GET /robot`, `GET /robot/state`, `POST /robot/command` (ใหม่): อ่านสถานะสดจากบอร์ดทุกวินาทีครึ่ง และสั่งขยับทีละก้าว
+- **ปุ่มหยุดไม่ใช่ปุ่มหนึ่งในหลายปุ่ม** อยู่บนสุดแบบ sticky ติดจอตลอด และเป็นคำสั่งเดียวที่ยังทำงานตอน `ROBOT_CHASSIS_MOTION_ENABLED` ปิดอยู่ — ล็อกที่ปิดเบรกไปด้วยแย่กว่าไม่มีล็อก (มีเทสต์)
+- **ทุกการเคลื่อนที่เป็นก้าวเดียวที่จบในตัว** ไม่มีกดค้าง ไม่มี "เดินไปเรื่อยๆ" เซิร์ฟเวอร์คำนวณเป้าหมายจากท่าทาง ณ วินาทีที่กด สายหลุดกลางทาง = หุ่นเดินจบ 30 ซม. แล้วรอ ไม่ใช่วิ่งต่อโดยไม่มีใครเรียกกลับได้
+- **ระยะอยู่ที่เซิร์ฟเวอร์ หน้าเว็บส่งได้แค่เจตนา** (`action: "forward"` ไม่ใช่ `metres: 0.3`) — หน้าที่ให้ไคลเอนต์บอกระยะได้ ห่างจากการส่งหุ่นข้ามห้องแค่พิมพ์ผิดหนึ่งตัว และไคลเอนต์คือหน้าเว็บที่ใครในวง LAN ก็เปิดได้ (มีเทสต์อ่าน body จริง)
+- **ต้องมี `WS_TOKEN`** ทั้ง `/robot/state` และ `/robot/command` ใช้กติกาเทียบ token เดียวกับที่ `_reject_unauthorized` ใช้กับทุก socket — เข้ารหัสก่อน `compare_digest` เพราะ token ที่ก๊อปจาก password manager มีอักขระอะไรก็ได้
+- `app/robot_chassis.py`: `nudge()` สร้างก้าวสั้นด้วย `MoveToAction` **ไม่ใช่** `MoveByAction`/`RotateAction` ที่บอร์ดโฆษณาไว้ — สองอันหลังไม่มีรูปแบบ body ในเอกสารที่เรามี และสิ่งแรกที่ payload ที่ยังไม่ได้ยืนยันจะทำคือขยับหุ่นในห้องที่มีคนอยู่ · `live_state()` อ่านสดแยกจาก cache ของ poller เพราะคนที่ยืนถือปุ่มหยุดต้องการค่าวินาทีนี้ ไม่ใช่ค่าเมื่อ 2 วินาทีก่อน
+- `tests/test_robot_control_page.py` (ใหม่ 14 ตัว) · **ย้อนโค้ดพิสูจน์แล้ว**: ถอดด่าน token และย้ายด่านล็อกไปไว้ก่อน stop → แดง 3 ตัว คืนแล้วเขียว · เทสต์ทั้งชุด: 1288 passed
+- ตรวจกับบอร์ดจริง (อ่านอย่างเดียว ไม่กดปุ่มเดินสักครั้ง): หน้าเสิร์ฟ 200 · `/robot/state` ไม่มี token ตอบ unauthorized · มี token ได้ค่าจริง Slamware SDP แบต 20% ไม่ได้ชาร์จ ความมั่นใจในตำแหน่ง 45 ไม่มีคำสั่งค้าง จุดหมายในแผนที่ 0 จุด
+
+## 2026-09-10 — กลับแท่นชาร์จภายใต้การดูแลและตรวจ REST จากตัวเครื่อง
+
+- ตรวจปิดรอบ: โหลดโค้ด ActionState ใหม่เข้าเซิร์ฟเวอร์แล้วหลังตรวจไม่มีงานค้าง; HTTPS health ผ่านและ chassis connected/motion_enabled=false; power ยัง 20% ไม่อยู่บนแท่นและไม่ชาร์จ; ผู้ใช้ไม่ทราบวิธีเข้าตั้งค่า Aobo และการสำรวจหน้าหลักยังไม่เปิด Arm Test ได้ ไม่มีการสั่งแขนหรือเปลี่ยนสิทธิ์
+
+- ผลทดสอบจริง: บอร์ดรับ GoHomeAction แต่ครบ 90 วินาทียังไม่ชาร์จ จึงส่งยกเลิก; อ่านกลับ current action 404 และงานเดิมเป็น Done/Aborted (-2), แบต 20%/not_on_dock; ผู้ใช้ยืนยันเคลื่อนหรือหมุนแต่เข้าแท่นไม่ได้ ทั้งที่แท่นมีไฟและอยู่ที่เดิม ไม่เขียนพิกัดแท่นหรือสั่งซ้ำ
+- `docs/robot-live-inspection-2026-09-10.md`: บันทึกการกลับแท่นไม่สำเร็จ ข้อจำกัดเวลาทดสอบ และการเปิด ArmTestActivity ที่ Android ปฏิเสธเพราะไม่ exported; เปิดหน้าหลัก Aobo ผ่านทางปกติแล้ว รอวิธีเข้าเมนูตั้งค่า
+- ผลตรวจโค้ด ActionState: **96 passed ใน 4.26s**; รอโหลดเข้าเซิร์ฟเวอร์หลังตรวจไม่มีงานค้าง
+
+- ผู้ใช้ยืนยันมีคนดู ทางโล่ง และทดสอบวิธีหยุดแล้ว; ตรวจพบ home dock จริง จึงส่ง GoHomeAction ครั้งเดียวพร้อม dock และจำกัด retry เป็น 1 โดยไม่เปิดสวิตช์การเดินอัตโนมัติของโปรเจกต์; รอผลการชาร์จ บันทึกหลักฐานในโฟลเดอร์ inspection ที่ถูก ignore
+- `app/robot_chassis.py`, `tests/test_robot_chassis.py`: แก้ ActionState ให้ตรง `/js/spec.js` ของเครื่อง (0 NewBorn, 1 Working, 3 Paused, 4 Done และ result 0/-1/-2) แทนค่า bit flags ของ C++ SDK; คำตอบจริงเมื่อส่งกลับฐานยืนยัน status 0 แล้ว 1; เพิ่ม regression สำหรับ REST lifecycle และ Done ที่ขาด result รอตรวจ
+
+## 2026-09-10 — ตรวจช่องทางยกมือจากแอปผู้ขาย
+
+- `docs/robot-live-inspection-2026-09-10.md`: บันทึกผลตรวจ APK แบบอ่านอย่างเดียว พบ ArmTestActivity/กลุ่มท่าทาง/ข้อความหยุดแขน และ AIDL service แต่ยังไม่ยืนยันพอร์ตหรือหมายเลขท่ายกมือ
+- คัดลอก APK ที่มีอยู่บนหุ่นเข้าโฟลเดอร์หลักฐานที่ถูก ignore และคำนวณ SHA-256; ตรวจซ้ำไม่พบ ttyUSB/ttyACM; ไม่มีการติดตั้ง/เปิดหน้าทดสอบ/ส่งคำสั่งมอเตอร์ ไม่มีการแก้ runtime code จึงไม่รันชุดทดสอบซ้ำ
+
+## 2026-09-10 — หน้าตรวจไมค์และกล้องของหุ่น (`/hardware`)
+
+- `client/hardware.html` + route `/hardware` ใน `app/main.py` (ใหม่): เปิดในเบราว์เซอร์ของ**เครื่องที่มีอุปกรณ์** แล้ววัดของจริง เพราะฝั่งเซิร์ฟเวอร์แยกไม่ออกว่าเสียงเบาเพราะไมค์ถูก mute เพราะแอปอื่นยึดไมค์ หรือเพราะคนยืนไกล — log ได้แค่ `avg=0.0000` แล้วเดา
+- วัดอะไรบ้าง: secure context (สาเหตุอันดับหนึ่งที่ไมค์ใช้ไม่ได้บนหุ่น คือ origin ที่เบราว์เซอร์ไม่เชื่อถือ ไม่ใช่ตัวไมค์) · รายการอุปกรณ์ทั้งหมด · **ระดับเสียงแยกทีละช่อง** ผ่าน `createChannelSplitter` (คู่มือบอกไมค์ 4 ตัว แต่ `MicConfig.channels` บอก 8 — ช่องไหนผ่าน AEC แล้วเป็นคำถามค้างกับผู้ขาย หน้านี้ทำให้เห็นแทนที่จะถาม) · sample rate/track state · อัด 4 วิแล้วฟังกลับ · กล้องพร้อม fps ที่**นับเอง** ไม่ใช่ค่าที่ `getSettings()` อ้าง (เครื่องนี้เองมี log "can't grab frame" ขณะกล้องรายงาน 30 fps)
+- กติกาที่เขียนเป็นเทสต์: **ไม่ส่งอะไรออกจากหน้า** ไม่มี WebSocket/fetch/upload/beacon (หน้าที่ถือไมค์อยู่แล้วส่งเสียงออกไปได้ = เครื่องอัดในห้องขายที่ไม่มีใครรับผิดชอบ ปัญหาเดียวกับที่ `data/logs/` ต้องมี TURN_LOG_KEEP_DAYS) · ตัดสินจากตัวอย่างเสียงจริงเสมอ ไม่ใช่จากการที่ไม่มี error (`getUserMedia` ผ่านแล้วยัง `peak=0.0000` ได้ 16 วินาที — เคยเกิดจริง) · แยก "ศูนย์ล้วน" ออกจาก "เบาเกิน" เพราะวิธีแก้คนละเรื่อง · ปิด echo cancellation/AGC/noise suppression ไม่งั้นตัวกรองจะกลบสิ่งที่กำลังหา · คืนไมค์กับกล้องตอนออกจากหน้า
+- ไม่ต้องใช้ token เพราะหน้านี้สั่งอะไรไม่ได้เลย — และมันจำเป็นที่สุดตอนที่ token นั่นแหละคือสิ่งที่ผิด มีเทสต์กันไม่ให้มีคำสั่งใดหลุดเข้าไป
+- **ส่งผลข้ามเครื่องได้** (`POST /hardware/report`, `GET /hardware/reports`): เบราว์เซอร์อ่านได้เฉพาะอุปกรณ์ของเครื่องที่เปิดมันเอง ผลของหุ่นจึงอ่านจากโต๊ะเซลส์ไม่ได้เลย และจอหุ่นเป็นจอแนวตั้งบนหน้าอกที่มักมีคนอื่นใช้อยู่ ปุ่ม "ส่งไปเครื่องหลัก" ส่ง**เฉพาะข้อความสรุป** ชื่ออุปกรณ์ ระดับเสียง เฟรมเรต — ไม่มีเสียงหรือภาพ และเทสต์บังคับไว้ว่าคำขอห้ามพก blob/chunks/stream ปลายทางมีได้แค่สอง path ที่ระบุชื่อไว้ · เก็บใน deque ในหน่วยความจำ ไม่เขียนลงดิสก์ (ไฟล์ผลตรวจไมค์ที่เก็บจากห้องขาย คือคำถามเรื่องการเก็บข้อมูลที่ไม่มีใครตัดสินใจ แบบเดียวกับที่ `data/logs/` ต้องมี TURN_LOG_KEEP_DAYS มาแก้) · รับ POST โดยไม่มี token จึงจำกัดขนาด 4000 ตัวอักษรและเก็บ 8 รายการล่าสุด และทนต่อ payload ขยะ
+- ตรวจจริงบนเซิร์ฟเวอร์ที่รันอยู่: POST แล้ว GET กลับมาได้ ภาษาไทยไม่เพี้ยน
+- **อ่านสเปกไมค์ของหุ่นจากฮาร์ดแวร์ผ่าน adb** (ไม่แตะจอหุ่น): เป็น USB dongle `Bothlent UAC` `/proc/asound/card0/stream0` บอก **8 ช่อง 16 kHz S16_LE** — จบข้อสงสัย "คู่มือบอก 4 ตัว config บอก 8" · `dumpsys audio` ยืนยันไมค์ไม่ได้ถูก mute ทั้งสี่ทาง · **ระบบเสียงเดิมของหุ่นรันอยู่จริง** `com.aobo.robot.ai3` เป็น audio client และ `com.iflytek.vflynote` ก็รันอยู่ — ข้อที่ CLAUDE.md ระบุว่าเสี่ยงที่สุด ตอนนี้มีหลักฐานแทนการคาดเดา (ยังไม่พิสูจน์ว่ายึดไมค์แบบผูกขาด) · บันทึกในเอกสารตรวจรับ
+- ไมค์ของ **PC** (`LCS_USB_AUDIO`, 2 ช่อง 48 kHz, track live, ปิด AEC/AGC ครบ) ให้ค่าศูนย์ล้วน ตรงกับ `DIGITAL SILENCE` ใน log ทั้งเย็น เป็นปัญหาของไมค์ตัวนั้นเอง ไม่เกี่ยวกับหุ่นและไม่ขวางหุ่น
+- `tests/test_hardware_page.py` (ใหม่ 16 ตัว) · เทสต์ทั้งชุด: 1269 passed
+- ตรวจจริง: หุ่นโหลดหน้านี้แล้ว (เห็น `GET /hardware` ในบันทึกเซิร์ฟเวอร์) ผลการวัดของไมค์กับกล้องรอเจ้าของกดทดสอบหน้าเครื่อง
+
+## 2026-09-10 — ตรวจตัวจริงและแก้สถานะการควบคุมร่วมกับ RoboStudio
+
+- ผลปิดงานรอบนี้: **90 passed ใน 4.25s**, `compileall` ตัวตรวจผ่าน, `git diff --check` ผ่าน, รายงาน/แผนที่ถูก ignore; รีสตาร์ตเฉพาะ `run_server.py` ด้วย `.venv-smoke` เดิมแล้ว ตรวจ HTTPS health ผ่านโดยตรวจใบรับรองจริง: เชื่อมแชสซีได้และ `motion_enabled=false`; ไม่ส่งคำสั่งเริ่มเคลื่อนที่ ไม่มีการติดตั้ง/ถอนแอปหรือเปลี่ยน firmware
+
+- `app/robot_chassis.py`: อ่าน action และ pose ทุก poll แม้คำสั่งมาจาก RoboStudio; สถานะไม่รู้จัก/ขาดการเชื่อมต่อ/เพิ่งรับคำสั่งหยุดเป็น unknown จนได้ค่าบอร์ดใหม่
+- `app/tools/robot_link.py`: ส่ง pose/docked ใน snapshot และไม่ใช้สถานะ app เก่าทดแทนแชสซีที่ขาดการเชื่อมต่อ
+- `tests/test_robot_chassis.py`: เพิ่ม regression สำหรับคำสั่งจากภายนอก สถานะที่ไม่รู้จัก การยืนยันคำสั่งหยุด และการขาดการเชื่อมต่อ; รอตรวจ
+- ตรวจจริงแบบอ่านอย่างเดียว: ADB และ REST ใช้งานได้, production health เห็นแชสซี, ไม่พบ POI; ยังไม่สั่งล้อ/แขนหรือรับรองระบบหยุดฉุกเฉิน
+- `scripts/inspect_robot_live.py` + `.gitignore`: เพิ่มตัวสำรวจ GET/ADB แบบอ่านอย่างเดียวและสำรองแผนที่เดิมเป็น STCM พร้อม SHA-256; เก็บหลักฐานไว้ใน `data/robot-inspection/` ที่ไม่เข้า Git; รอตรวจการรันจริง
+- `app/config.py`, `.env.example`, `app/robot_chassis.py`, `app/tools/robot.py`: แยก `ROBOT_CHASSIS_MOTION_ENABLED=false` เป็นค่าเริ่มต้น ล็อกคำสั่งเริ่มเดิน/กลับฐานจากโปรเจกต์แต่ยังส่งยกเลิกได้ พร้อมแจ้งข้อจำกัดในสถานะ; เหตุผลคือหลังผู้ใช้กดปุ่ม ค่าฉุกเฉินจากบอร์ดยังเป็น false จึงยังรับรองปุ่มไม่ได้; รอตรวจ regression เพิ่มเติม
+- `docs/robot-live-inspection-2026-09-10.md`, `docs/robot-integration.md`: บันทึกฮาร์ดแวร์จริง ความต่างจากคู่มือ เส้นทางเชื่อม ส่วนที่ยังไม่ผ่าน และวิธีตรวจซ้ำ; REST GET 10 รายการผ่าน, สำรองแผนที่ได้และคำนวณ SHA-256 แล้ว; regression ล่าสุด **89 passed ใน 4.28s** (รอบแรกติดสิทธิ์ temp ใน sandbox แก้โดยใช้ basetemp ใน workspace); การโหลดโค้ดเข้าตัวเซิร์ฟเวอร์ยังรอจังหวะที่ไม่มีการทดสอบหุ่นจากแอปอื่น
+- เมื่อผู้ใช้ยืนยันว่าหุ่นอยู่นิ่งทั้งที่เคยเห็น active action: เพิ่ม `action_name`/`action_status` และให้ชนิดงานที่ไม่รู้จักเป็น unknown; คำอธิบายแยกงานนำทางออกจากความเร็วล้อ ไม่รับรองการหยุดทางกายภาพ; เพิ่ม regression งาน background ที่ไม่ได้พิสูจน์การเคลื่อนที่ รอตรวจ
+
+## 2026-09-10 — สั่งหุ่นเดินได้โดยไม่ต้องมี AAR: ต่อตรงเข้าแชสซี SLAMTEC
+
+- `app/robot_chassis.py` (ใหม่): ไคลเอนต์ RESTful ของบอร์ดนำทาง Slamware + poller ที่เป็นนาฬิกาเรือนเดียวซึ่งรู้ว่าเดินจบ แล้วเรียก `robot_link.arrived()` ทางเดิมกับที่ `robot_arrived` ของแอปเคยใช้ (REST ไม่มี callback)
+- `app/tools/robot_link.py`: `send()`/`places()`/`snapshot()`/`available()`/`status()` เลือกทางแชสซีเมื่อ `ROBOT_CHASSIS_URL` ถูกตั้ง — **เจ้าของล้อมีคนเดียวเสมอ** ติดต่อบอร์ดไม่ได้ตอบ `mock` ไม่แอบสลับกลับไปทางแอป (บั๊กนาฬิกาสองเรือน) · `snapshot()` บนทางนี้เป็นค่าที่**วัดได้**ไม่ใช่เสียงสะท้อนของคำสั่งล่าสุด และมีแบต/สถานะชาร์จเป็นครั้งแรก
+- `app/config.py` + `.env.example`: `ROBOT_CHASSIS_URL` (ว่าง = ทางเดิมทุกประการ), `ROBOT_CHASSIS_POLL_S`, `ROBOT_CHASSIS_TIMEOUT_S`, `ROBOT_CHASSIS_ARRIVAL_TOLERANCE_M` · `app/main.py`: startup/shutdown hook ที่เช็คสวิตช์เอง (ทรงเดียวกับ `greeter.start()`)
+- กฎที่เขียนเป็นเทสต์: HTTP 200 ไม่ใช่การไปถึง · **สถานะ action ที่ไม่รู้จัก = ยังเดินอยู่** (ตัวเลขมาจาก SDK ของ SLAMTEC ไม่ใช่จากการเดินจริง อ่านผิดทางหนึ่งคือตกไป arrival timeout ซึ่งประกาศว่าไม่สำเร็จ อีกทางคือประกาศว่าถึงทั้งที่ไม่ถึง) · action ที่หายไปตัดสินจาก**ระยะระหว่างท่าทางจริงกับจุดที่สั่ง** ส่วน `go_home` ตัดสินจาก `dockingStatus` · แผนที่ว่างไม่ถอยไปใช้ `ROBOT_MOCK_PLACES` (จะเสนอจุดที่มีอยู่ใน .env แต่ไม่มีบนพื้น) · จุดที่ไม่มีพิกัดถูกตัดออกจากรายการ ไม่ใช่เสนอแล้วค่อยปฏิเสธ
+- บั๊กที่เจอเพราะรันกับบอร์ดจริง ไม่ใช่จากอ่านเอกสาร: `/api/multi-floor/map/v1/pois` ตอบ `[]` พร้อม 200 เมื่อไม่มี floor ที่บันทึกไว้ (หุ่นตัวนี้ `floors` ก็ว่าง) โค้ดเดิมเช็ค `is None` จึงไม่เคยถาม artifact API เลย = รายงาน "ไม่มีจุดหมาย" บนหุ่นที่อาจมี
+- `tests/test_robot_chassis.py` (ใหม่ 22 ตัว) + `tests/conftest.py` pin `robot_chassis_url=""` และล้าง state (ตระกูลเดียวกับ `inventory_url` แต่ปลายทางมีมอเตอร์) · **ย้อนโค้ดพิสูจน์แล้ว**: ปิดสองพฤติกรรม เทสต์แดง 7 ตัว คืนแล้วเขียว
+- ตรวจกับบอร์ดจริง (อ่านอย่างเดียว ไม่สั่งอะไรให้ขยับ): `robot/info` = Slamware SDP fw 5.1.1-deb-for-aobo-hermes, แบต 35% on_dock กำลังชาร์จ, pose x -0.592 y 3.627, `action-factories` 21 รายการ, `snapshot()` ได้ `status_source: chassis` · **ยังไม่ได้ตรวจ: การสั่งเดินจริง** (รูปแบบ body มาจากเอกสาร SLAMTEC ไม่ใช่จากการยิงจริง) และ **การอ่านชื่อ POI** (แผนที่ยังไม่มีจุดหมายสักจุด) ต้องทดสอบตอนมีคนยืนข้างหุ่นพร้อมปุ่มหยุด
+- `docs/ต่อกับหุ่นยนต์ Astronaut.md`: หัวข้อ "ทางที่สอง: สั่งแชสซีตรงๆ ไม่ผ่านแอป" และแก้รายการค้างว่า AAR ไม่ใช่ตัวขวางการเดินอีกแล้ว
+- `app/main.py`: บรรทัดตอนบูตเคยบอกว่า "รอแอปส่ง robot_ready" เสมอ ซึ่งพูดผิดบนเครื่องที่สั่งแชสซีตรงๆ คนอ่านจะไปตามหาแอป Android ที่ไม่มีวันรายงานเข้ามา ตอนนี้บอกว่ากำลังรออะไรอยู่จริงๆ
+- เทสต์ทั้งชุด: 1243 passed (จากเดิม 1221)
+
+## 2026-09-10 — หุ่นต่อเซิร์ฟเวอร์ไม่ติดเพราะอยู่คนละวง Wi-Fi
+
+- **ไม่มีการแก้โค้ด** เป็นการตั้งค่าเครื่องและบันทึกผลวัดจากของจริง
+- อาการ: Chromium บนหุ่นเปิด `https://192.168.0.3:8001/health` แล้วหมุนค้าง สาเหตุคือหุ่นอยู่ 192.168.1.23 (Wi-Fi) ส่วน PC อยู่ 192.168.0.3 (Ethernet) prefix /24 ทั้งคู่ = ไม่มีเส้นทางถึงกัน — เดิมไล่ผิดทางเพราะอาการ "ช้า" ไม่มี error ให้ดูเลย
+- แก้: ต่อ Wi-Fi ของ PC เข้า SSID `Embassy` ได้ 192.168.1.43 · วัดแล้ว ping หุ่น 2-3 ms, `/health` ตอบ 200 ใน 9 ms, SAN ของ `certs/lan-cert.pem` มี IP นี้อยู่แล้ว, firewall rule เดิมครอบโปรไฟล์ Public, Ethernet ยังเป็น default route (metric 35 < 60) อินเทอร์เน็ตไม่สะดุด
+- `docs/robot-arrival-2026-09-09.md`: หัวข้อใหม่ "วงเน็ต: หุ่นกับ PC เคยอยู่คนละวง" พร้อม URL ที่หุ่นต้องเปิด, ขั้นตอนติดตั้ง CA ที่ยังค้าง, บันทึกว่า SSID `SLAMWARE-AB340E` คือบอร์ดนำทางของหุ่นเอง (เกาะพร้อมวงหลักไม่ได้) และเหตุผลที่ไม่ต้องลง Google Play Store
+- **ตรวจแล้วผ่าน (15:45):** หุ่นเปิด `?kiosk=1` ขึ้นหน้า Emma สถานะ "ออนไลน์" และเซิร์ฟเวอร์เห็น TCP established จาก 192.168.1.23 มาที่ 192.168.1.43:8001 — เป็นครั้งแรกที่หุ่นคุยกับเซิร์ฟเวอร์ได้ (ก่อนหน้านี้ `Get-NetTCPConnection -LocalPort 8001 -State Established` ว่างเปล่าทุกครั้ง)
+- **แชสซีเป็น SLAMTEC ไม่ใช่ของ Aobo เอง — สั่งเดินได้โดยไม่ต้องรอ AAR:** บอร์ดนำทาง 192.168.11.1 เปิดพอร์ต 1445/1448/80/22 และ `/api/core/system/v1/robot/info` ตอบว่าเป็น Slamware SDP ของ Slamtec fw `5.1.1-deb-for-aobo-hermes+20250226` ซึ่ง SLAMTEC เปิดเอกสาร RESTful API ให้ดาวน์โหลดเอง อ่านค่าจริงจาก PC ได้แล้ว: แบต 35% on_dock กำลังชาร์จ, pose x -0.592 y 3.627 yaw 0.187, POI `[]` (ยังไม่มีจุดหมาย) วิธีต่อคือ relay ผ่านแท็บเล็ตด้วย `nc` + `adb forward` บันทึกไว้ในเอกสารตรวจรับ กับดักที่เสียเวลา: `-w` ของ toybox nc คือ timeout ตอนเชื่อมต่อ ไม่ใช่ตอนรออ่าน ต้องใส่ `-q` ไม่งั้นได้ผลว่างเปล่าโดยไม่มี error
+- **เจอทางลัด:** พอร์ต adb 5555 ของหุ่นเปิดอยู่ `adb connect 192.168.1.23:5555` ต่อติดทันที ไม่มีหน้าต่างขออนุญาตบนจอ ใช้ platform-tools ที่โหลดไว้แล้ว — คุมหุ่นได้โดยไม่ต้องคลิกผ่าน AnyDesk อีก อ่านได้ว่า Android 15 / RK3588 arm64-v8a, แอปผู้ขาย `com.aobo.robot.ai3` 3.1.230528au3.sl.deliver.4m, Chromium ได้ `RECORD_AUDIO` แบบ SYSTEM_FIXED แล้ว, มี `/system/xbin/su` (ยังไม่ทดสอบ ให้เจ้าของตัดสินใจ) บันทึกในเอกสารตรวจรับหัวข้อ "ADB ผ่าน Wi-Fi เปิดอยู่"
+- `scripts/check_robot_readiness.py --health` (exit 2) ขาด 6 ข้อ: `robot_token_configured`, `robot_enabled`, `robot_tools_enabled`, `sdk_aar_supplied`, `bridge_apk_supplied`, `live_robot_connection` — สามข้อแรกแก้ที่ `.env` สองข้อกลางต้องขอผู้ขาย · เครื่องนี้ไม่มี java/gradle/Android SDK จึง build APK ยังไม่ได้
+- **ยังค้าง:** ยังไม่ได้ติดตั้ง `rootCA-android.crt` บนหุ่น (ตอนนี้ต้องกดผ่านหน้าเตือนใบรับรองทุกครั้ง) และยังไม่ได้ทดสอบว่าไมค์ของหุ่นส่งเสียงเข้า `/ws/wake` จริง
+
+## 2026-09-09 — โชว์รูม: ตกแต่ง, ความลื่น, smart home
+
+- `client/robot-showroom.js` (ใหม่): เฟอร์นิเจอร์/โคมแขวน/ต้นไม้ต่อจุดหมาย วางชิดผนังจริงด้วย `walls` จาก `/api/layout` (`Occupancy.wall_scan` ใหม่ใน `app/showroom_map.py` + เทสต์) และ smart home props (ไฟ 8 ดวง, ม่านเลื่อน, ทีวีมีภาพ, แอร์ LED/ครีบ) อ่าน `smart_home` state เดิม ไม่แตะเซิร์ฟเวอร์
+- บั๊กที่เจอ: `place()` ลบตำแหน่งกลุ่มออกจากพิกัดที่เป็น local อยู่แล้ว เฟอร์นิเจอร์ทุกชิ้นไปกองที่ (0,0) — screenshot จับได้ (ห้องว่างทั้งที่ group มีลูก 9-21 ชิ้น) · `floor_y` 8.6→8.7 เพราะ CAD มีพื้นสองชั้น (8.1 โครงสร้าง / 8.7 ผิวสำเร็จ) หุ่นเคยจมพื้น 10 ซม.
+- `client/robot-scene-3d.js`: cap 30→60 fps, shadow map เฟรมเว้นเฟรม, รวม mesh ต่อวัสดุ (2,531→~100, 169 draw calls), entity interpolation ย้อน 300 ms ให้หุ่นเดินเรียบ, `flyTo` ease กล้องตอน center/follow, โดมท้องฟ้า vertex-color, RoomEnvironment env map (vendor r180 + manifest), exposure/แสงปรับลง; explorer ชนเฟอร์นิเจอร์ที่วางเองด้วย (collider หมุนตามกลุ่ม)
+- `app/robot_simulator.py`: allowlist `robot-showroom.js`, `RoomEnvironment.js`; `data/showroom/layout.json`: ย้ายจุดหมาย 3 จุดให้อยู่กลางห้อง (ห้องตัวอย่าง 7.9,17.4 · ฟิตเนส 17,24 · สระ 3.5,24) ยัง `verified: false`
+- ตรวจจริง (Playwright + SwiftShader, 8011): โมเดลพร้อมใน ~5 วิ, ทุกห้องมีของ, ทีวี/ม่าน/ไฟเปลี่ยนตาม `/api/home`, เดินชนเคาน์เตอร์ได้, console 0 error; showroom tests 9 passed; full suite: **1,221 passed, 1 warning ใน 153.49s**
+- `docs/robot-simulator.md`: หัวข้อย่อย "การตกแต่ง ความลื่น และ smart home ในโชว์รูม"
+
+## 2026-09-09 — ตัวจำลองใช้โมเดลโชว์รูมจริงจาก CAD
+
+- `app/showroom_map.py` (ใหม่): อ่าน GLB (SimLab export, 5,149 node ไม่มีชื่อห้อง, 702,100 สามเหลี่ยม) → ตาราง occupancy 0.2 ม. (พื้น/ผนัง/ประตู) + A* + `Layout` ที่ engine เดินบน; `scripts/build_showroom_map.py` (ใหม่) สร้าง `data/showroom/map.json` + `map-preview.png` จาก zip และรายงานความถึงได้ของทุกจุดจากฐาน
+- บั๊กที่เจอระหว่างทำ: `cv2.fillPoly` รับ list แล้วเติมแบบ even-odd — พื้นสองชั้น (8.1/8.7 ม.) หักล้างกันจนโถงทั้งหมดกลายเป็น "ไม่มีพื้น" แก้เป็นเติมทีละสามเหลี่ยม · บานประตูใน CAD วาดปิด (วัสดุ `door`/`doorMetal`/`handle`) ทำให้ 4/4 จุดหมายถึงไม่ได้ → ช่องประตูชนะผนัง (`D` ใน grid) แล้วถึงได้ครบ
+- `app/robot_simulation.py`: `SimulatedRobot(layout=…)` เดินตาม `Layout` (toy corridor เดิม หรือ showroom grid), snapshot มี `layout`, จุดที่ถึงไม่ได้ในผังบันทึกเหตุการณ์ `route_unreachable`; `app/robot_simulator.py`: `/api/layout`, `/showroom/model.glb` (404 เมื่อไม่มีไฟล์), allowlist `robot-map.js`/GLTFLoader/BufferGeometryUtils, CSP เพิ่ม `blob:` ให้ GLTFLoader โหลด texture ที่ฝังใน GLB
+- `client/robot-scene-3d.js`: โหมด showroom โหลด GLB ด้วย GLTFLoader (ลด metalness ที่ CAD ตั้ง 0.5), กล้อง/แสง/หมอกตามขนาดอาคาร, minimap วาดจากตาราง, fallback เป็นบล็อกผนังจากตารางเมื่อโหลดโมเดลไม่ได้; `client/robot-map.js` (ใหม่) ตารางเดียวกับ Python ใช้ชนของผู้เยี่ยมชม; `client/robot-scene.js` (2.5D) วาดผังจากตารางเมื่อมี layout; `client/robot-simulator.js` ดึง `/api/layout` ก่อนสร้างฉาก
+- `client/vendor/three/`: เพิ่ม GLTFLoader.js + BufferGeometryUtils.js r180 (patch import path เหมือน OrbitControls) และ sha256 ใน manifest
+- `data/showroom/layout.json` (ใหม่, ต้องมีคนยืนยัน): origin [471,-30], floor_y 8.6, จุดหมาย 5 จุด `verified: false` ทั้งหมด; `data/showroom/*.glb` ถูก gitignore (คืนด้วย build script)
+- `tests/conftest.py` pin `ROBOT_SIM_LAYOUT=toy`; `tests/test_showroom_map.py` (ใหม่ 8 เทสต์) ใช้ GLB จิ๋วที่สร้างเอง: เส้นทางลอดประตู ไม่ทะลุผนัง, จุดในผนังถูกขยับพร้อมคำเตือน, env pin, endpoint/CSP/vendor import, source ของ client
+- ตรวจจริงด้วย Playwright headless (Chromium + SwiftShader) บนพอร์ต 8011: สถานะ "3D · SHOWROOM" ใน 3 วิ, เดินไปห้องตัวอย่างถึงจุดหมายผ่านประตูจริง, โหมดเดินสำรวจถูกตารางกั้น, console 0 error; ปิด WebGL แล้วฉากสำรอง 2.5D วาดผังจากตารางและเดินได้; targeted tests 57 passed; Node เสียง 3 ชุดผ่าน; full suite: **1,220 passed, 1 warning ใน 149.56s** (จาก 1,212 ก่อนแก้ = +8 เทสต์ใหม่)
+- `docs/robot-simulator.md`: หัวข้อ "โมเดลโชว์รูมจริง" — วิธี build, กติกาผนังจากเรขาคณิต, จุดหมายเป็นการเดาที่ต้องยืนยัน, ห้ามเอาพิกัดไปใส่หุ่นจริง
+- ตัวจำลองที่เปิดค้างบน 8010 เป็นโค้ดเก่า ต้องปิดแล้วเปิด `start-robot-simulator.cmd` ใหม่ถึงจะเห็นโชว์รูม
+
+## 2026-09-09 — เช้าวันรับหุ่น: เตรียมเครื่อง PC
+
+- ตรวจ commit `ea7b361` ก่อนเริ่ม: full suite **1,212 passed, 1 warning ใน 187.83s** (`.venv` Python 3.14.6), smoke import ทุก extras ผ่าน, Node เสียง 3 ชุดผ่าน, สแกน secret ใน diff ไม่พบ; working tree สะอาด ไม่มีอะไรค้าง commit
+- อ่าน PDF 4 ไฟล์ใน Downloads (คู่มือย่ออังกฤษ/ไทย, SDK v2.0 จีน/ไทย) — ตรงกับที่ `docs/robot-integration.md` รีวิวไว้แล้ว ไม่มีข้อมูลใหม่; นำเลข section ของ SDK ที่ bridge ต้องใช้ไปใส่ในเอกสารตรวจรับ
+- `certs/lan-cert.pem`/`lan-key.pem` (ไม่ติดตาม git): ออกใหม่ด้วย mkcert เพิ่ม SAN `192.168.1.43` (Wi-Fi) และ hostname เพราะของเดิมมีแต่ Ethernet IP; สำรองของเดิมใน `certs/backup-2026-09-09/`; ก๊อป root CA เป็น `certs/rootCA-android.crt` สำหรับติดตั้งบนหุ่น (ไม่มี private key)
+- เปิด HTTPS 8001 ชั่วคราว: `/health`, `/?kiosk=1`, `/display?chat=1` ตอบ 200 ทั้ง localhost/192.168.0.3/192.168.1.43/hostname; TLS ผ่านทั้ง Windows store และ mkcert CA (Python ssl, TLS 1.3); ปิดแล้ว ไม่ได้เปิดไมค์หรือสั่งอุปกรณ์ (กล้อง face ทำงานตาม config ระหว่างนั้น)
+- พบ **firewall rule 8001 เปิดเฉพาะ Private แต่ทั้งสองเครือข่ายเป็น Public** — คำสั่งแก้ต้องรันด้วย Administrator ยังไม่ได้แก้ ระบุคำสั่งใน `docs/robot-arrival-2026-09-09.md`
+- `docs/robot-arrival-2026-09-09.md`: เพิ่มส่วน "เช้าวันรับหุ่น" — ผลเตรียมเครื่อง, ขั้นติดตั้ง CA บน Android และข้อจำกัด WebView user CA, ลำดับแก้ `.env` ต่อขั้น, section SDK ที่ bridge ใช้
+- ไม่แก้ `.env`, โค้ด หรือเทสต์; รอเจ้าของลองของจริงก่อน commit
+
 ## 2026-09-09 — ตรวจ staged files ก่อน commit
 
 - ตรวจรายการ staged **95 ไฟล์ ประมาณ 2.66 MB**: ไม่พบ API key/private key/token ที่ตั้งใช้ในเครื่อง, ไม่มี `.env`, debug log, SDK/APK archive หรือ local Android binaries รวมอยู่

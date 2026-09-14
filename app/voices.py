@@ -22,39 +22,15 @@ class Voice:
     recommended: bool = False
 
 
-# --- Gemini Live: 30 native-audio voices. Descriptions follow Google's own
-# one-word characterisations where they publish them. ---
+# --- Gemini Live voices. Trimmed to two on 2026-09-14 by the owner's call
+# ("เหลือสองเสียงนี้พอ เอา Despina ตั้ง") — Despina (default, other languages)
+# and Zephyr (kept for Thai). Gemini Live sets one voice per session, so the
+# per-language split is a per-link choice (?voice=), not a mid-call switch.
+# The full 30-voice catalogue lives in git history if more are wanted again.
+# Descriptions follow Google's one-word characterisations. ---
 GEMINI_VOICES: list[Voice] = [
-    Voice("Kore", "Kore", "Firm", "หนักแน่น", ("#8ED0F5", "#1B6FE0"), recommended=True),
-    Voice("Sulafat", "Sulafat", "Warm", "อบอุ่น", ("#FFC2A8", "#E0603A"), recommended=True),
-    Voice("Leda", "Leda", "Youthful", "สดใส วัยรุ่น", ("#F3C6D8", "#B04A79")),
-    Voice("Aoede", "Aoede", "Breezy", "สบายๆ", ("#A8D5BA", "#2E7D57")),
-    Voice("Puck", "Puck", "Upbeat", "กระฉับกระเฉง", ("#FFE3A3", "#D9A02B")),
-    Voice("Charon", "Charon", "Informative", "ให้ข้อมูล", ("#BFD4DE", "#4C7A91")),
-    Voice("Fenrir", "Fenrir", "Excitable", "ตื่นเต้น", ("#FFB3B3", "#C23A3A")),
-    Voice("Orus", "Orus", "Firm", "หนักแน่น", ("#C9C2E8", "#5A4FA3")),
+    Voice("Despina", "Despina", "Smooth", "นุ่มนวล", ("#E3C9E8", "#8A4FA3"), recommended=True),
     Voice("Zephyr", "Zephyr", "Bright", "สดใส", ("#CBE0A8", "#5E8B32")),
-    Voice("Autonoe", "Autonoe", "Bright", "สดใส", ("#D8E9F5", "#3E7CA8")),
-    Voice("Callirrhoe", "Callirrhoe", "Easy-going", "สบายๆ ไม่เกร็ง", ("#E8D5C4", "#8B6B4A")),
-    Voice("Despina", "Despina", "Smooth", "นุ่มนวล", ("#E3C9E8", "#8A4FA3")),
-    Voice("Erinome", "Erinome", "Clear", "ชัดเจน", ("#D4D4D4", "#6B6B6B")),
-    Voice("Laomedeia", "Laomedeia", "Upbeat", "กระฉับกระเฉง", ("#FFD9A3", "#D98A2B")),
-    Voice("Achernar", "Achernar", "Soft", "นุ่ม", ("#F5D8E4", "#B0708A")),
-    Voice("Algieba", "Algieba", "Smooth", "นุ่มนวล", ("#C4DCE8", "#4A7E96")),
-    Voice("Alnilam", "Alnilam", "Firm", "หนักแน่น", ("#B8C4E8", "#3F4FA3")),
-    Voice("Enceladus", "Enceladus", "Breathy", "เสียงลม", ("#E0E8F0", "#7A8FA3")),
-    Voice("Iapetus", "Iapetus", "Clear", "ชัดเจน", ("#CFE3D4", "#4E8B62")),
-    Voice("Gacrux", "Gacrux", "Mature", "ผู้ใหญ่", ("#D4C4B0", "#7A6248")),
-    Voice("Rasalgethi", "Rasalgethi", "Informative", "ให้ข้อมูล", ("#C4D4E8", "#46689B")),
-    Voice("Schedar", "Schedar", "Even", "เรียบ นิ่ง", ("#D0D8DC", "#5F7078")),
-    Voice("Umbriel", "Umbriel", "Easy-going", "สบายๆ ไม่เกร็ง", ("#CCE0DC", "#4A8078")),
-    Voice("Vindemiatrix", "Vindemiatrix", "Gentle", "อ่อนโยน", ("#E8DCE8", "#8A6B96")),
-    Voice("Achird", "Achird", "Friendly", "เป็นมิตร", ("#FFD4C4", "#C2704A")),
-    Voice("Algenib", "Algenib", "Gravelly", "เสียงห้าว", ("#BFB5A8", "#6B5D4A")),
-    Voice("Pulcherrima", "Pulcherrima", "Forward", "ตรงไปตรงมา", ("#F5C4D0", "#B04A64")),
-    Voice("Sadachbia", "Sadachbia", "Lively", "มีชีวิตชีวา", ("#D8F0C4", "#6B9B32")),
-    Voice("Sadaltager", "Sadaltager", "Knowledgeable", "รอบรู้", ("#C4CCE8", "#464F9B")),
-    Voice("Zubenelgenubi", "Zubenelgenubi", "Casual", "เป็นกันเอง", ("#DCDCC4", "#7A7A4A")),
 ]
 
 # --- OpenAI Realtime. marin/cedar are OpenAI's recommended pair. ---

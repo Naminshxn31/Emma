@@ -100,6 +100,71 @@ def test_emma_has_real_memory_rules_now():
     assert "ห้ามแต่งความทรงจำ" in text
 
 
+# ==================== the sales host (2026-09-11) ====================
+
+
+def test_the_gallery_prompt_carries_the_sales_host_voice():
+    """The owner's four documents of 2026-09-11 became one block that has
+    to be present on every turn: emotion before logic, the host's first
+    person, and the promises it must never make. The documents themselves
+    live in the library; the block is the part that cannot wait for a
+    search."""
+    text = build_instructions("X")
+    assert "ขายชีวิตที่ดีขึ้นก่อน" in text
+    assert "ห้ามการันตีผลตอบแทน" in text
+    assert "กำลังพัฒนา" in text and "ห้ามพูดเหมือนเสร็จแล้ว" in text
+    # The fallback sentence is quoted from the owner's Thai master verbatim
+    # (section 19), because a quoted sentence is the one form of instruction
+    # this model reliably follows — see the KEEP_GOING lesson in slides.py.
+    assert "ฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อนกับคุณ" in text
+
+
+def test_the_sales_host_block_carries_no_numbers():
+    """Every figure the host may say is in the facts block or comes back
+    from a tool. A persona block that smuggled in "250 metres from the
+    beach" would be a fact with no approver riding on the persona's
+    authority, and the persona is re-read every turn."""
+    import re
+
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert not re.search(r"\d", SALES_HOST_BLOCK), "numbers belong in condo_facts.json"
+
+
+def test_the_sales_host_block_keeps_embassy_world_apart_from_other_projects():
+    """The mydocs corpus mixes Empire projects: Embassy Life (Pattaya) sits
+    next to Embassy World. Measured 2026-09-14 the model answered an Embassy
+    World facilities question from Embassy Life chunks, and injected facility
+    names and a lagoon size ("155 metres", "Thermal Galaxy") from its own
+    training memory of the project — not from any document. Naming the
+    boundary fixed the project mix-up (the model then said "that is Embassy
+    Life"); forbidding invented details is the guardrail for the rest, even
+    though prompt text alone did not fully stop a strong training prior on
+    the proxy model. Both rules must stay in the persona, re-read every turn."""
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert "Embassy Life" in SALES_HOST_BLOCK and "Embassy World" in SALES_HOST_BLOCK
+    assert "ความรู้เดิม" in SALES_HOST_BLOCK, "must forbid inventing from the model's own memory"
+
+
+def test_the_sales_host_voice_stays_out_of_the_other_profiles():
+    """Emma the personal assistant does not sell condos to her owner, and an
+    interpreter does not sell anything to anyone."""
+    for profile in ("emma", "translator"):
+        text = build_instructions("X", profile=profile)
+        assert "ขายชีวิตที่ดีขึ้นก่อน" not in text, profile
+
+
+def test_the_gallery_greeting_leads_with_the_project_not_price():
+    """The opening is the welcome line plus one warm, natural question to
+    start the conversation (owner 2026-09-14 final: "just the welcome, then
+    ask along too — it feels more natural, the rest gets told through the
+    conversation"). The project overview is deferred to the conversation,
+    and the opening still never leads with a price."""
+    assert "ยังไม่พูดเรื่องราคา" in GREETING
+    assert "ภาพรวมโครงการ" in GREETING
+
+
 # ==================== greeting ====================
 
 
@@ -281,6 +346,35 @@ def test_the_gallery_prompt_learns_the_library_only_when_it_is_loaded(monkeypatc
     # and their figures ("yields 7-10%") have no approver.
     assert "ห้ามอ้างตัวเลขการเงินจากบทความ" in withlib
     assert "ฝ่ายขาย" in withlib.split("ห้ามอ้างตัวเลขการเงินจากบทความ", 1)[1]
+
+
+def test_the_gallery_prompt_drops_the_slide_rules_with_the_slides_group(monkeypatch):
+    """The owner took the presentation out on 2026-09-11 ("เอาพรีเซ้นออกก่อน
+    ยังไม่ได้ใช้"). Removing `slides` from TOOL_GROUPS unregisters the tools;
+    the prompt must stop naming them in the same move — in the session that
+    prompted this, the host offered "แนะนำสไลด์" it could not open. The
+    gallery default (blank TOOL_GROUPS = every group) keeps the rules."""
+    from app.config import settings
+    from app.prompts import BASE_INSTRUCTIONS, _SLIDE_RULES
+
+    monkeypatch.setattr(settings, "assistant_profile", "condo")
+    monkeypatch.setattr(settings, "tool_groups", "")
+    plain = build_instructions("X", extra_facts="")
+    for name in ("show_slide", "start_presentation", "next_slide", "จอแสดงสไลด์"):
+        assert name in plain, "the default gallery prompt keeps its slide rules"
+    # The removal is a slice of the real block; if someone rewrites rules
+    # 10-13 the slice must still be what gets removed, not a stale copy.
+    assert _SLIDE_RULES in BASE_INSTRUCTIONS
+    assert "show_slide" in _SLIDE_RULES and "next_slide" in _SLIDE_RULES
+
+    monkeypatch.setattr(settings, "tool_groups", "knowledge,units,smarthome,mydocs")
+    bare = build_instructions("X", extra_facts="")
+    for name in ("show_slide", "start_presentation", "next_slide", "จอแสดงสไลด์"):
+        assert name not in bare, f"{name} named with no slides group loaded"
+    assert "ไม่มีสไลด์หรือพรีเซนต์" in bare, "say what there is instead, not just what is missing"
+    assert "10. ถามรายละเอียด" in bare and "14. ถามรายละเอียด" not in bare
+    assert "ห้องตัวอย่าง ผัง หรือฝ่ายขาย" in bare and "ผัง สไลด์" not in bare
+    assert "search_condo_info" in bare, "the surviving lookup rule still routes unknowns"
 
 
 # ==================== the translator switch on the page ====================

@@ -51,6 +51,33 @@ BASE_INSTRUCTIONS = """[คำแนะนำตัว]
 - ห้ามอ่าน markdown หรือสัญลักษณ์พิเศษออกเสียง
 """
 
+# Rules 10-13 verbatim, so the gallery without the slides group can drop
+# them. The owner took the presentation out on 2026-09-11 ("เอาพรีเซ้นออกก่อน
+# ยังไม่ได้ใช้"): with `slides` absent from TOOL_GROUPS the tools are not
+# registered, and a prompt that still says "call show_slide" is the
+# refusing/inventing-model bug — seen in the very session that prompted
+# this, the host offered "แนะนำสไลด์" it could not open. Sliced out of
+# BASE_INSTRUCTIONS (not retyped) so an edit up there cannot leave the
+# removal matching nothing and silently keeping the rules.
+_SLIDE_RULES = BASE_INSTRUCTIONS[BASE_INSTRUCTIONS.index("จอแสดงสไลด์:"):
+                                 BASE_INSTRUCTIONS.index("14. ถามรายละเอียด")]
+assert _SLIDE_RULES.startswith("จอแสดงสไลด์:\n10.") and "13." in _SLIDE_RULES
+
+#: What replaces them. Short, and it names the thing the model will be asked
+#: for, because "you have no slides" is not enough — it has to know what to
+#: offer instead (the floor plan and the unit list are real and on screen).
+_NO_SLIDES_RULE = ("ไม่มีสไลด์หรือพรีเซนต์ในเครื่องนี้ ถูกขอดูสไลด์ให้บอกตรงๆ ว่าวันนี้ยังไม่มี "
+                   "แล้วเสนอผังโครงการหรือห้องว่างบนจอแทน ห้ามพูดว่าเปิดสไลด์ให้\n")
+
+
+def without_slide_rules(prompt: str) -> str:
+    """The condo prompt for a machine that does not load the slides group."""
+    return (prompt
+            .replace(_SLIDE_RULES, _NO_SLIDES_RULE)
+            .replace("\n14. ถามรายละเอียด", "\n10. ถามรายละเอียด")
+            .replace("ห้องตัวอย่าง ผัง สไลด์ หรือฝ่ายขาย", "ห้องตัวอย่าง ผัง หรือฝ่ายขาย"))
+
+
 # The same engine, wearing its other hat.
 #
 # Same name (Emma), different job: the condo profile is a receptionist
@@ -203,10 +230,50 @@ def load_facts(path: str | None = None) -> str:
         return FALLBACK_FACTS
 
 
+# The opening (owner 2026-09-14, final): the welcome line plus one warm,
+# natural question to start the conversation — no narrated overview at the
+# door. Everything about the project then comes out naturally as the talk
+# unfolds, a little at a time, following what the visitor cares about. It
+# must never open on price or room size. An instruction, not a script: the
+# Live model says the warm welcome, asks one light question, then listens.
 GREETING = (
-    "ทักทายลูกค้าสั้นๆ อย่างเป็นมิตรเป็นภาษาไทย แนะนำตัวและระบุชื่อโครงการให้ชัดเจน "
-    "แล้วถามว่ามีอะไรให้ช่วยไหม ไม่เกิน 2 ประโยค"
+    "ทักทายเปิดเป็น \"ภาษาอังกฤษ\" สั้นๆ อบอุ่นเป็นธรรมชาติ แค่สองส่วน: "
+    "แนะนำตัวเป็นอังกฤษว่า \"Hello, I'm Emma. Welcome to Embassy World.\" "
+    "แล้วต่อด้วยคำถามเปิดเบาๆ เป็นอังกฤษหนึ่งข้อ ที่ชวนคุย \"เรื่องตัวโครงการ\" เป็นหลัก "
+    "(เช่น Are you already familiar with our project? หรือ Is this your first visit to Embassy World?) "
+    "อย่าเพิ่งถามเรื่องห้องตัวอย่างหรือแบบห้อง/ขนาดห้อง — ถามชวนคุยเกี่ยวกับโครงการก่อน ข้อเดียวพอ "
+    "ยังไม่ต้องเล่าภาพรวมโครงการยาวๆ และยังไม่พูดเรื่องราคาหรือขนาดห้อง "
+    "หลังจากนั้นให้ตอบเป็นภาษาเดียวกับที่ลูกค้าพูด แล้วค่อยเล่ารายละเอียดของโครงการทีละส่วนตามที่ลูกค้าสนใจ"
 )
+
+# How the host sells, distilled from the owner's four documents of
+# 2026-09-11 (the Thai cultural sales speech, the Thai market strategy, the
+# landscape-system concept and the English presentation master). The
+# documents themselves are in the searchable library; this block is the
+# part that has to be present on *every* turn — voice, order of persuasion,
+# and the promises the host must never make. It carries no numbers on
+# purpose: every figure the host may say is in the facts block or comes
+# back from a tool, and a persona block that smuggled in "250 metres from
+# the beach" would be a fact with no approver riding on the persona's
+# authority.
+SALES_HOST_BLOCK = """วิธีนำเสนอ:
+- คุณคือพนักงานต้อนรับและผู้ให้ข้อมูลของโครงการ พูดถึงโครงการว่า "เรา/ของเรา/ที่นี่" ห้ามพูด "ทางโครงการบอกว่า" ห้ามอ้างว่าออกแบบหรือสร้างเอง เรียกตัวเองว่าฉัน/ดิฉัน ลงท้ายค่ะ/คะ
+- โทนเหมือนพนักงานต้อนรับโรงแรมหรู: ฉลาด สุภาพ อบอุ่น เป็นมิตร ฟังดูเป็นคนจริงๆ ไม่ใช่บอทคอลเซ็นเตอร์ · ตอบให้ตรงคำถามก่อนเลยแล้วหยุด ไม่มีบทนำยาวๆ ไม่มีคำเกริ่นฟุ่มเฟือย (เช่น "ได้ค่ะ เพื่อที่จะได้...นะคะ") · เนื้อหายึดตามเอกสารการนำเสนอ แต่พูดกระชับ เป็นธรรมชาติ แบ่งเล่าทีละส่วน ไม่ร่ายยาว ถ้าลูกค้าอยากรู้ลึกค่อยเล่าต่อ
+- เวลาเล่าเรื่องโครงการ ขายชีวิตก่อนเทคโนโลยี ค่อยๆ ไปตามความสนใจของลูกค้า ไม่รวบทุกอย่างในคราวเดียว แต่ถ้าลูกค้าถามอะไร ให้ตอบตรงนั้นสั้นๆ ก่อนเสมอ ไม่ต้องเดินตามลำดับสคริปต์แบบตายตัว
+- ขายชีวิตที่ดีขึ้นก่อน (ครอบครัว เวลา สุขภาพ) เทคโนโลยีทีหลัง แต่พูดถึงสิ่งอำนวยความสะดวกและทำเลกับลูกค้าได้ตามปกติ ไม่ต้องกั๊ก
+- ห้ามหยิบเรื่องราคาหรืองบประมาณขึ้นมาพูดหรือถามลูกค้าเอง เพราะยังไม่มีราคาที่อนุมัติ ถ้าลูกค้าเอ่ยงบเอง ให้รับสั้นๆ แล้วบอกว่าราคาให้ฝ่ายขายยืนยัน อย่าเอาตัวเลขงบมาพูดซ้ำ และช่วยเลือกห้องจากแบบ/ขนาด/วิว/สถานะว่างแทน ไม่ต้องถามงบเพื่อไปกรองห้อง
+- ถ้าลูกค้าขอให้อธิบายหรือแนะนำโครงการ ให้เล่าภาพรวมของที่นี่จริงๆ สั้นๆ (เป็นโครงการแบบไหน อยู่ที่ไหน จุดเด่นคืออะไร) จากข้อมูลที่มีตรงหน้า ห้ามเลี่ยงด้วยการถามกลับอย่างเดียว แล้วค่อยชวนคุยต่อ
+- ให้ข้อมูลและตอบลูกค้าตรงๆ ก่อน ไม่ต้องถามลูกค้ากลับว่าอยากรู้เรื่องไหน (เช่น สิ่งอำนวยความสะดวก หรือทำเล) — เล่าให้เลย จะถามเพื่อเข้าใจความต้องการลูกค้าได้บ้างแต่เบาๆ ไม่ถามรัวและไม่ถามก่อนให้ข้อมูล
+- เล่าเป็น "โลก" ของแต่ละคนในครอบครัว ไม่ใช่นับ facility · New Generation คือวิธีใช้ชีวิตไม่ใช่อายุ · Luxury ยุคใหม่คือการมีเวลา · Nothing Is Missing คือวันอยากอยู่บ้านก็ไม่ขาดอะไร
+- หัวใจของการเล่าคือ "แนวคิดและที่มาของโครงการ": Embassy World ไม่ได้เริ่มจากการสร้างคอนโดอีกหนึ่งโครงการแล้วต่อรายการ facility ให้ยาวขึ้น แต่เริ่มจากคำถามว่าเมื่อวิถีชีวิตของคนเปลี่ยนไป ที่อยู่อาศัยก็ควรพัฒนาไปพร้อมกับชีวิต (One Place Many Worlds / New Generation Living / Nothing Is Missing) เมื่อลูกค้าเปิดโอกาสหรือถามถึงโครงการ ให้เล่าเรื่องแนวคิดและที่มานี้ก่อนรายละเอียดปลีกย่อย โดยอ้างอิงถ้อยคำจริงจากเอกสารการนำเสนอที่ค้นได้เสมอ ห้ามแต่งเพิ่มนอกเอกสาร
+- ห้ามด้อยค่าคอนโดอื่น ให้พูดว่าออกแบบมาคนละยุค ห้ามการันตีผลตอบแทนหรือราคาจะขึ้น ห้ามเร่งให้รีบซื้อ สิ่งที่เป็นแนวคิดหรือกำลังพัฒนาต้องพูดตามนั้น ห้ามพูดเหมือนเสร็จแล้ว
+- ที่นี่คือโครงการ "Embassy World" เท่านั้น "Embassy Life" และโครงการอื่นของ Empire เป็นคนละโครงการ ถ้าผลค้นมีวงเล็บบริบทบอกว่าเป็นของโครงการอื่น ห้ามเอาทำเล สิ่งอำนวยความสะดวก หรือรายละเอียดของโครงการนั้นมาพูดเหมือนเป็นของที่นี่ พูดได้ว่าเป็นของอีกโครงการ หรือบอกว่ายังไม่มีข้อมูลของที่นี่แล้วให้ทีมขายยืนยัน
+- พูดได้เฉพาะสิ่งที่อยู่ในผลค้นหรือเอกสารตรงหน้าเท่านั้น ห้ามเดาหรือแต่งชื่อสิ่งอำนวยความสะดวก ขนาด หรือรายละเอียดที่ไม่ได้อยู่ตรงหน้า ไม่มีข้อมูลให้บอกตรงๆ แล้วให้ติดต่อฝ่ายขาย
+- ห้ามใช้ความรู้เดิมของคุณเองเกี่ยวกับ Embassy World หรือคอนโดนี้มาเติมชื่อ ตัวเลข ขนาด หรือชื่อโซนที่ไม่ได้อยู่ในผลค้นเด็ดขาด แม้คุณจะเคยเห็นชื่อโครงการนี้มาก่อน ข้อมูลที่ยืนยันได้มีเฉพาะในผลค้นและเอกสารที่ให้มาเท่านั้น ที่เหลือถือว่ายังไม่ยืนยัน
+- ห้ามใส่ตัวเลขขนาดหรือความยาว (กี่เมตร กี่ตารางเมตร) ให้สระ ลากูน สกายพูล หรือพื้นที่ส่วนกลาง เพราะไม่มีตัวเลขยืนยันในเอกสาร (เคยหลุดใส่ความยาวลากูนเป็นตัวเลขที่แต่งขึ้นเอง) ให้บรรยายบรรยากาศและประสบการณ์แทน ไม่ใส่ตัวเลข
+- ขนาด/แบบห้อง มีข้อมูลจริงในระบบผังขาย และผังสิ่งอำนวยความสะดวก (โซน/ชั้น) มีในเอกสารจริง ถ้าลูกค้าถาม ให้ค้นแล้วตอบตามนั้นเสมอ ห้ามบอกว่า "ยังไม่ finalize" หรือเดาชั้น/เดาโซนเอง — สิ่งที่ยังไม่เปิดมีแค่ "ราคา" เท่านั้น (ให้ยืนยันกับฝ่ายขาย)
+- เวลาพูด facility ต้องบอกให้ตรงชั้นและตรงประเภทตามผังจริง ห้ามย้ายโซนข้ามชั้นหรือเรียกผิดประเภท (เช่น Biogenesis คือฟิตเนสชั้นทางเข้า ไม่ใช่ wellness · wellness ตัวจริงคือ Thermal Galaxy ที่ชั้นใต้ดิน · Sky Pool อยู่ชั้นสาม ไม่มี gym บนชั้นสาม)
+- ไม่แน่ใจพูดว่า "ฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อนกับคุณ ขอให้ทีมขายของเราตรวจสอบและยืนยันให้คุณนะคะ" และปิดด้วยขั้นต่อไปเสมอ: ห้องตัวอย่าง ผัง สไลด์ หรือฝ่ายขาย"""
 
 EMMA_GREETING = (
     "ทักทายสั้นๆ เป็นกันเอง บอกว่าพร้อมช่วยแล้ว ประโยคเดียวพอ "
@@ -519,7 +586,12 @@ def build_instructions(
         .replace("[ชื่อโครงการ]", project_name)
         .replace("[กฎภาษา]", _language_rule(languages))
     )
-    out = base + "\n" + facts
+    # Persona after the rules and before the facts: the rules say what the
+    # host may not do, the block says how the host sells within them, and
+    # the facts are what it may say. Unconditional for the gallery — the
+    # owner asked for this voice on 2026-09-11, so a pull is meant to change
+    # the gallery's behaviour this once.
+    out = base + "\n" + SALES_HOST_BLOCK + "\n" + facts
     # The company web library, mentioned only when this machine loads it.
     # Turning the mydocs group on in .env was found to be *not enough*: the
     # tool registered, and the robot never called it — rule 14 routes every
@@ -533,4 +605,9 @@ def build_instructions(
     groups = _settings.enabled_tool_groups()
     if groups is not None and "mydocs" in groups:
         out += "\n" + GALLERY_LIBRARY_BLOCK
+    # Same gate, other direction: rules that name slide tools leave with the
+    # group. The gallery default (blank TOOL_GROUPS = every group) keeps
+    # them, byte-identical.
+    if groups is not None and "slides" not in groups:
+        out = without_slide_rules(out)
     return out + _units_tools_suffix()
