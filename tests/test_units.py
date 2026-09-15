@@ -360,6 +360,45 @@ def test_find_units_defaults_to_available_and_never_widens(monkeypatch):
     assert off["ok"] is False and "ห้ามแต่งรายการเอง" in off["instruction"]
 
 
+def test_find_units_filters_two_bedrooms_without_inventing_a_building_or_view(monkeypatch):
+    row = dict(LIVE_ROW)
+    row["unit_no"] = "D-401"
+    row["unit_types"] = {"name": "2 Bedroom"}
+    calls = _live_on(monkeypatch, [row])
+
+    out = units.find_units(bedrooms=2)
+
+    params = calls[0]
+    assert params["unit_types.name"] == "eq.2 Bedroom"
+    assert "unit_types!inner(name)" in params["select"]
+    assert "unit_no" not in params, "no customer building means no building filter"
+    assert "view" not in params, "no customer view means no view filter"
+    assert {item["type"] for item in out["units"]} == {"2 Bedroom"}
+
+
+def test_find_units_schema_tells_the_model_not_to_invent_filters():
+    from app.tools import load_tools
+
+    entry = next(t for t in load_tools() if t.name == "find_units")
+    bedrooms = entry.parameters["properties"]["bedrooms"]
+    assert bedrooms["type"] == "integer" and bedrooms["minimum"] == 0
+    assert "ห้ามอนุมานหรือเติม building/view เอง" in entry.description
+    assert "ใส่เมื่อคำพูดลูกค้าระบุตึกเท่านั้น" in entry.parameters["properties"]["building"]["description"]
+    assert "ใส่เมื่อคำพูดลูกค้าระบุวิวเท่านั้น" in entry.parameters["properties"]["view_contains"]["description"]
+
+
+def test_compare_unit_types_result_leads_with_use_not_inventory_numbers(monkeypatch):
+    _live_on(monkeypatch, [LIVE_ROW])
+
+    out = units.compare_unit_types()
+
+    assert "เริ่มคำตอบด้วยความแตกต่างด้านการใช้งาน" in out["instruction"]
+    assert "เป็นข้อมูลประกอบเมื่อเกี่ยวข้อง" in out["instruction"]
+    assert "ห้ามสรุปว่าแบบใดเหมาะลงทุนหรืออยู่เอง" in out["instruction"]
+    assert "ห้ามถามคำถามต่อท้าย" in out["instruction"]
+    assert "เทียบให้ฟังสั้นๆ จากตัวเลข" not in out["instruction"]
+
+
 def test_pasted_annotation_junk_does_not_take_the_link_down(monkeypatch):
     """The first live outage of this link: the setup note's annotation arrow
     pasted into .env along with the value, and show_unit reported the sales
@@ -533,13 +572,12 @@ def test_a_short_budget_answer_reports_its_exact_total(monkeypatch):
 
 
 def test_no_budget_keeps_the_cheapest_first_default(monkeypatch):
-    """The showroom default is untouched: no cap, ascending, eight rows,
-    the old phrasing — a pull must not change what the walk-in flow shows."""
+    """No cap keeps the query order but does not make price part of speech."""
     calls = _live_on(monkeypatch, [LIVE_ROW] * 8)
     out = units.find_units(building="a")
     assert calls[0]["order"] == "promo_price.asc"
     assert calls[0]["limit"] == "8"
-    assert "ราคาต่ำสุด" in out["instruction"]
+    assert "ราคา" not in out["instruction"], "a non-budget request must not introduce price"
     assert out["total"] is None
 
 
@@ -642,3 +680,63 @@ def test_the_reveal_buttons_never_reach_the_kiosk():
     assert "classList.contains('kiosk')" in fn
     assert "/unit_price?room=" in fn
     assert "u.source === 'live'" in fn
+
+
+# ============ one project, not the whole inventory ============
+
+
+def test_every_live_read_is_scoped_to_our_project(monkeypatch):
+    """The sales team's inventory holds three projects since 2026-09-03
+    (Embassy World, Embassy Life, Embassy One) with the same building codes
+    and overlapping unit numbers. Measured 2026-09-11: the gallery screen
+    listed A-1405 as one of ours — an Embassy Life unit. Every read carries
+    the project filter, and the select embeds the path `!inner` at each hop
+    (a filter on a left embed keeps the row and nulls the embed instead of
+    dropping it — the floor-filter lesson, one level deeper)."""
+    calls = []
+
+    def fake_get(params, table="units"):
+        calls.append((table, dict(params)))
+        return []
+
+    monkeypatch.setattr(settings, "inventory_url", "https://x.supabase.co")
+    monkeypatch.setattr(settings, "inventory_key", "k")
+    monkeypatch.setattr(settings, "inventory_project", "embassy-world")
+    monkeypatch.setattr(units, "_live_get", fake_get)
+    units._live_cache.clear()
+
+    units.show_unit("A1405")
+    units.find_units()
+    units.find_units(max_price_thb=5_000_000)
+    units.show_plan(1)
+    units.compare_unit_types()
+    units.list_promotions()
+    units.price_pair("A1405")
+    units._active_promotion("A-1405")
+    assert len(calls) >= 8, "every live entry point above must reach the DB"
+    for table, params in calls:
+        via = "units." if table == "pricing_unit_promotions" else ""
+        assert params.get(via + "floors.buildings.projects.slug") == "eq.embassy-world", \
+            (table, params)
+        sel = params["select"]
+        assert "floors!inner(" in sel and "buildings!inner(" in sel \
+            and "projects!inner(slug)" in sel, (table, sel)
+
+
+def test_a_blank_project_setting_means_ours_not_everything():
+    """An unset knob must narrow, never widen (WS_TOKEN="" once meant "no
+    door"). Blank INVENTORY_PROJECT is Embassy World. A subprocess, because
+    Settings reads the environment at import and reloading app.config in
+    this process would hand every other test a second `settings` object."""
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, "INVENTORY_PROJECT": "   "}
+    out = subprocess.run(
+        [sys.executable, "-c",
+         "from app.config import settings; print(settings.inventory_project)"],
+        env=env, capture_output=True, text=True, encoding="utf-8", timeout=60,
+        cwd=str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+    assert out.returncode == 0, out.stderr[-800:]
+    assert out.stdout.strip() == "embassy-world"

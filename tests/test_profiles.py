@@ -147,6 +147,101 @@ def test_the_sales_host_block_keeps_embassy_world_apart_from_other_projects():
     assert "ความรู้เดิม" in SALES_HOST_BLOCK, "must forbid inventing from the model's own memory"
 
 
+def test_sales_host_answers_customer_intent_before_the_story():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert "ตอบสิ่งที่ลูกค้าพูดก่อนเสมอ" in SALES_HOST_BLOCK
+    assert "ห้ามดึงบทสนทนากลับไป" in SALES_HOST_BLOCK
+    assert "ตอบเฉพาะสิ่งที่จำเป็นต่อ intent นั้นก่อน" in SALES_HOST_BLOCK
+
+
+def test_sales_host_does_not_require_a_follow_up_question():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert "ค่าเริ่มต้นคือไม่ถามต่อ" in SALES_HOST_BLOCK
+    assert "ให้จบคำตอบทันที" in SALES_HOST_BLOCK
+    assert "ถามต่อได้เฉพาะเมื่อขาดข้อมูลที่จำเป็น" in SALES_HOST_BLOCK
+    for tail in (
+        "มีอะไรให้ช่วยเพิ่มเติมไหมคะ",
+        "สนใจดู...ไหมคะ",
+        "อยากให้เปิด...ไหมคะ",
+    ):
+        assert tail in SALES_HOST_BLOCK
+
+
+def test_sales_host_does_not_offer_after_a_complete_answer():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert "ห้ามเติมคำถามหรือข้อเสนอเพื่อกันความเงียบ" in SALES_HOST_BLOCK
+    assert "ขาดข้อมูลที่จำเป็นต่อการทำสิ่งที่ลูกค้าขออยู่ตอนนี้" in SALES_HOST_BLOCK
+
+
+def test_sales_host_stops_when_the_customer_closes_the_conversation():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert "ลูกค้าปิดเรื่อง ปฏิเสธ หรือชะลอการตัดสินใจ" in SALES_HOST_BLOCK
+    assert "ให้หยุดทันที" in SALES_HOST_BLOCK
+    assert 'ผิด: "ได้ค่ะ เดี๋ยวเปิดผังหรือห้องอื่นให้ดูเพิ่มเติมได้ค่ะ"' in SALES_HOST_BLOCK
+    assert 'ถูก: "ได้เลยค่ะ"' in SALES_HOST_BLOCK
+
+
+def test_sales_host_speaks_unconfirmed_status_out_loud():
+    from app.prompts import SALES_HOST_BLOCK
+
+    for status in ("draft", "concept", "rendering", "proposed", "developing"):
+        assert status in SALES_HOST_BLOCK
+    assert "ต้องพูดสถานะนั้นออกมาด้วย" in SALES_HOST_BLOCK
+    assert "ห้ามตัดคำสถานะทิ้ง" in SALES_HOST_BLOCK
+
+
+def test_sales_host_offers_only_actions_available_in_the_session():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert "การกระทำต้องเกิดจริงก่อนพูดว่าเกิดแล้ว" in SALES_HOST_BLOCK
+    assert "รอผลสำเร็จในเทิร์นนั้น" in SALES_HOST_BLOCK
+    assert "ถ้าไม่มีเครื่องมือสำหรับการกระทำนั้น ห้ามเสนอเหมือนว่าทำได้" in SALES_HOST_BLOCK
+    for fabricated_action in ("เปิดแล้ว", "กำลังเปิด", "เดี๋ยวเปิด", "พาไป", "พาชม"):
+        assert fabricated_action in SALES_HOST_BLOCK
+
+
+def test_gallery_cannot_claim_physical_tour_without_navigation():
+    text = build_instructions("X")
+
+    assert "navigation" in text
+    for physical_action in ("พาชม", "พาไปดู", "เดินไป", "นำไป", "ตามฉันมา", "เดี๋ยวพาไป"):
+        assert physical_action in text
+    assert "ข้อความเชิง sales ในเอกสารไม่ได้แปลว่ามีความสามารถนี้" in text
+    assert "ต้องบอกตรงๆ ว่าตอนนี้ไม่สามารถพาเดินไปได้" in text
+    assert 'ห้ามหลบคำถามด้วยการตอบเพียงว่าสถานที่นั้น "มีให้ชม"' in text
+    assert 'ผิดเมื่อไม่มีผล navigation: "เดี๋ยวเอ็มม่าพาไปชมห้องตัวอย่างนะคะ"' in text
+    assert 'ถูก: "มีห้องตัวอย่างให้ชมค่ะ แต่ตอนนี้เอ็มม่ายังไม่สามารถพาเดินไปยังห้องตัวอย่างได้ค่ะ"' in text
+    assert "ตอบรับว่าเดี๋ยวจะพาไป" not in text
+
+
+def test_sales_host_does_not_narrate_every_tool_result():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert "ผลเครื่องมืออาจมีข้อมูลมากกว่าที่ถาม" in SALES_HOST_BLOCK
+    assert "ใช้เฉพาะข้อมูลที่จำเป็นต่อคำถามตรงหน้า" in SALES_HOST_BLOCK
+    assert "ห้ามนำข้อมูลข้างเคียงมาต่อเติม" in SALES_HOST_BLOCK
+
+
+def test_sales_host_compares_room_use_before_numbers():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert "อธิบายความต่างด้านพื้นที่และการใช้งานก่อน" in SALES_HOST_BLOCK
+    assert "ตัวเลขเป็นข้อมูลประกอบเมื่อจำเป็น ไม่ใช่คำตอบหลัก" in SALES_HOST_BLOCK
+
+
+def test_sales_host_has_explicit_price_and_pool_stop_examples():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert 'ลูกค้าถาม "ห้องนี้ราคาเท่าไหร่"' in SALES_HOST_BLOCK
+    assert '"ราคาขอให้ทีมขายยืนยันนะคะ ดิฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อน" แล้วหยุด' in SALES_HOST_BLOCK
+    assert 'ลูกค้าถาม "สระอยู่ตรงไหน"' in SALES_HOST_BLOCK
+    assert "ตอบเฉพาะตำแหน่งสระ แล้วหยุด" in SALES_HOST_BLOCK
+
+
 def test_the_sales_host_voice_stays_out_of_the_other_profiles():
     """Emma the personal assistant does not sell condos to her owner, and an
     interpreter does not sell anything to anyone."""
@@ -373,7 +468,8 @@ def test_the_gallery_prompt_drops_the_slide_rules_with_the_slides_group(monkeypa
         assert name not in bare, f"{name} named with no slides group loaded"
     assert "ไม่มีสไลด์หรือพรีเซนต์" in bare, "say what there is instead, not just what is missing"
     assert "10. ถามรายละเอียด" in bare and "14. ถามรายละเอียด" not in bare
-    assert "ห้องตัวอย่าง ผัง หรือฝ่ายขาย" in bare and "ผัง สไลด์" not in bare
+    from app.prompts import SALES_HOST_BLOCK
+    assert "สไลด์" not in SALES_HOST_BLOCK, "the host block must not offer a slide it cannot open"
     assert "search_condo_info" in bare, "the surviving lookup rule still routes unknowns"
 
 

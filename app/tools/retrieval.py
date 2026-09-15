@@ -55,6 +55,34 @@ from typing import Any
 
 logger = logging.getLogger("condo_voice.retrieval")
 
+# Customer-facing knowledge has a narrower policy than the source library.
+# Floor numbers remain useful ("Sky Pool is on floor 3"), but dimensions of
+# pools, lagoons and common areas are deliberately not spoken. Strip those
+# measurements before either static facts or retrieval results reach a model;
+# a value absent from its context cannot leak through a weaker instruction.
+_COMMON_AREA = re.compile(
+    r"สระ|ลากูน|ส่วนกลาง|ฟิตเนส|ซาวน่า|สปา|สนาม|สวน|"
+    r"pool|lagoon|common\s*area|facilit(?:y|ies)|gym|sauna|spa|garden",
+    re.IGNORECASE,
+)
+_DIMENSION = re.compile(
+    r"(?:(?:ความยาว|ยาว|ขนาด|พื้นที่)\s*)?"
+    r"\d[\d,]*(?:\.\d+)?\s*"
+    r"(?:ตาราง\s*เมตร|ตร\.?\s*ม\.?|เมตร|ม\.|sqm|sq\.?\s*m\.?|m(?:etre|eter)s?)",
+    re.IGNORECASE,
+)
+
+
+def sanitize_common_area_dimensions(text: str | None) -> str:
+    """Hide prohibited common-area measurements while preserving locations."""
+    value = str(text or "")
+    if not value or not _COMMON_AREA.search(value):
+        return value
+    value = _DIMENSION.sub("", value)
+    value = re.sub(r"\s+([,.;:])", r"\1", value)
+    value = re.sub(r"[ \t]{2,}", " ", value)
+    return value.strip(" ,;")
+
 # ============================ tokenisation ============================
 
 _THAI = re.compile(r"[฀-๿]")
@@ -790,6 +818,20 @@ COMMERCIAL_TERMS = (
     "ต่างชาติ", "ชาวต่างชาติ", "foreigner", "foreign buyer", "freehold",
     "leasehold", "กรรมสิทธิ์", "โอน", "handover", "transfer", "完工", "过户",
     "เสร็จเมื่อไหร่", "สร้างเสร็จ", "completion",
+
+    # --- Yield / return / rent, added 2026-09-12 after measuring mydocs ---
+    #
+    # The guard listed ราคา/งบ/ดอกเบี้ย/กี่บาท but had no word for *yield* or
+    # *return*, so "ผลตอบแทนการลงทุนกี่เปอร์เซ็นต์" walked straight past it and
+    # search_my_documents answered found=True from the marketing web dump —
+    # which is the file this comment (and the one at the top of this block)
+    # names as full of "yields 7-10%". A return question is the money question
+    # that library answers with the most confident unsigned numbers. Measured
+    # against the innocent phrases the docstring protects (ผ่อนคลาย, น่าลงทุน,
+    # ยังไงบ้าง): none of these matches them. "ลงทุน" alone is left out on
+    # purpose — "ทำไมพัทยาน่าลงทุน" is the market-strategy doc's own story.
+    "ผลตอบแทน", "เปอร์เซ็นต์", "ค่าเช่า", "ปล่อยเช่า",
+    "roi", "yield", "rental", "return on", "percent",
 )
 
 
@@ -843,5 +885,4 @@ def is_commercial(query: str) -> bool:
         if needle in haystack:
             return True
     return False
-
 

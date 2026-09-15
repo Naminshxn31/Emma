@@ -49,6 +49,13 @@ def test_slide_index_is_present_and_shaped(slides):
     assert required <= set(library[0])
 
 
+def test_slide_presentation_does_not_claim_a_physical_tour(slides):
+    description = registry.get("start_presentation").description
+
+    assert "ดูภาพรวมบนจอ" in description
+    assert "พาชม" not in description
+
+
 def test_every_slide_file_exists(slides):
     """A broken path shows an empty screen next to a talking robot."""
     from pathlib import Path

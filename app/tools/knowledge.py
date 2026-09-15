@@ -52,14 +52,33 @@ MAX_RESULTS = 4
 # as a side effect, so a machine whose TOOL_GROUPS excludes `knowledge`
 # would have sprouted `search_condo_info` just by using the web library.
 # retrieval is the one shared module with no @tool in it.
-from app.tools.retrieval import is_commercial as _is_commercial  # noqa: E402
+from app.tools.retrieval import (  # noqa: E402
+    is_commercial as _is_commercial,
+    sanitize_common_area_dimensions,
+)
+
+
+_BROAD_QUERY_TERMS = (
+    "อะไรบ้าง", "มีอะไร", "ทั้งหมด", "ภาพรวม", "สิ่งอำนวยความสะดวก",
+    "overview", "all facilities", "what facilities",
+)
+
+
+def _result_limit(query: str) -> int:
+    """Specific questions get one answer; explicit overviews may get several."""
+    lowered = (query or "").strip().lower()
+    return MAX_RESULTS if any(term in lowered for term in _BROAD_QUERY_TERMS) else 1
 
 
 def _entry(slide: dict) -> dict:
     """One search hit, trimmed to what's useful to speak from."""
     out = {
-        "title": slide.get("title_th") or slide.get("title_en"),
-        "detail": slide.get("summary_th") or slide.get("summary_en") or "",
+        "title": sanitize_common_area_dimensions(
+            slide.get("title_th") or slide.get("title_en")
+        ),
+        "detail": sanitize_common_area_dimensions(
+            slide.get("summary_th") or slide.get("summary_en") or ""
+        ),
         "topic": slide.get("type"),
         # Two extra fields with different standing, kept apart on purpose:
         #
@@ -71,21 +90,38 @@ def _entry(slide: dict) -> dict:
         # Collapsing them would let a generated sentence be quoted with the
         # authority of the deck.
         # So the model can offer to show it: "อยากดูภาพไหมคะ"
-        "slide_query": slide.get("title_th") or slide.get("title_en"),
+        "slide_query": sanitize_common_area_dimensions(
+            slide.get("title_th") or slide.get("title_en")
+        ),
     }
     slide_text = slide.get("transcript_th") or slide.get("transcript_en")
     if slide_text:
-        out["slide_text"] = slide_text[:400]
+        out["slide_text"] = sanitize_common_area_dimensions(slide_text[:400])
     description = slide.get("detail_th") or slide.get("detail_en")
     if description:
-        out["description"] = description[:600]
+        out["description"] = sanitize_common_area_dimensions(description[:600])
     script = slide.get("script_th") or slide.get("script_en")
     if script:
         if slide.get("script_approved"):
-            out["approved_script"] = script
+            out["approved_script"] = sanitize_common_area_dimensions(script)
         else:
-            out["draft_script"] = script
+            # Preserve the status, not unapproved marketing copy. The copy is
+            # often broader than the question and was being repeated as fact.
             out["script_is_draft"] = True
+            out["content_status"] = "draft"
+    return out
+
+
+def _sanitize_now_showing(value: dict | None) -> dict | None:
+    if not value:
+        return value
+    out = dict(value)
+    for key in ("title_th", "title_en", "summary_th", "summary_en", "script"):
+        if out.get(key):
+            out[key] = sanitize_common_area_dimensions(out[key])
+    if out.get("script_is_draft"):
+        out.pop("script", None)
+        out["content_status"] = "draft"
     return out
 
 
@@ -95,6 +131,8 @@ def _entry(slide: dict) -> dict:
         "ค้นหาข้อมูลเกี่ยวกับโครงการเพื่อใช้ตอบคำถามลูกค้า โดยไม่ต้องเปิดภาพ "
         "ใช้เมื่อลูกค้าถามว่าโครงการมีอะไรบ้าง มีสิ่งอำนวยความสะดวกอะไร อยู่ชั้นไหน "
         "หรือถามรายละเอียดที่คุณยังไม่รู้ ให้เรียกเครื่องมือนี้ก่อนตอบเสมอ "
+        "ส่ง intent ของคำถามให้ครบ โดยเฉพาะคำว่าอยู่ตรงไหนหรืออยู่ชั้นไหน "
+        "ห้ามย่อเหลือเพียงชื่อสถานที่จน intent ตำแหน่งหาย "
         "ห้ามเดาเอง ถ้าไม่พบข้อมูลให้บอกลูกค้าตรงๆ"
     ),
     parameters={
@@ -102,7 +140,11 @@ def _entry(slide: dict) -> dict:
         "properties": {
             "query": {
                 "type": "string",
-                "description": "สิ่งที่ต้องการค้นหา เช่น 'ฟิตเนส', 'สระว่ายน้ำอยู่ชั้นไหน', 'facilities'",
+                "description": (
+                    "คำถามที่คง intent ของลูกค้าครบ เช่น 'ฟิตเนส', "
+                    "'สระว่ายน้ำอยู่ชั้นไหน', 'facilities'; ถ้าถามตำแหน่ง "
+                    "ต้องคงคำว่าอยู่ตรงไหน/อยู่ชั้นไหน ห้ามส่งเพียงชื่อสถานที่"
+                ),
             }
         },
         "required": ["query"],
@@ -157,7 +199,7 @@ def search_condo_info(query: str) -> dict:
     if not ranked or not ranked[0].found:
         hits = []
     else:
-        hits = [h.slide for h in ranked if h.found][:MAX_RESULTS]
+        hits = [h.slide for h in ranked if h.found][:_result_limit(query)]
 
     if not hits:
         # The single most useful line in the log.
@@ -193,7 +235,17 @@ def search_condo_info(query: str) -> dict:
         "found": True,
         "results": [_entry(s) for s in hits],
         "note": "ข้อมูลนี้เป็นคำบรรยายภาพ ห้ามใช้อ้างอิงราคาหรือโปรโมชั่น",
+        "instruction": (
+            "ตอบเฉพาะข้อมูลที่ตรงคำถามจากผลลัพธ์นี้ ห้ามนำข้อมูลข้างเคียงมาต่อเติม"
+        ),
     }
+    if any(item.get("script_is_draft") for item in result["results"]):
+        result["content_status"] = "draft"
+        result["must_preserve_status"] = True
+        result["instruction"] += (
+            " ข้อมูลมีสถานะ draft ต้องพูดสถานะนี้อย่างชัดเจน "
+            "ห้ามพูดเหมือนสร้างเสร็จหรือเปิดใช้งานแล้ว"
+        )
 
     # Put the best match on screen as part of answering — but only when it's
     # clearly the right picture. Leaving the display to a separate show_slide
@@ -225,7 +277,9 @@ def search_condo_info(query: str) -> dict:
         return result
     from app.tool_io import on_loop
 
-    result["now_showing"] = on_loop(slides_mod.show_current, hits[0])
+    result["now_showing"] = _sanitize_now_showing(
+        on_loop(slides_mod.show_current, hits[0])
+    )
     resume = on_loop(slides_mod.resume_hint)
     if resume:
         result["presentation"] = resume

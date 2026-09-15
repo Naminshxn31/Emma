@@ -222,9 +222,32 @@ def _live_get(params: dict, table: str = "units") -> list[dict]:
     return r.json()
 
 
+#: The join path from a unit to its project, `!inner` at every hop. The
+#: inventory holds three projects (Embassy World / Life / One) with the same
+#: building codes and overlapping unit numbers, so every read below is
+#: scoped to settings.inventory_project — and a filter on a *left* embed does
+#: not drop the parent row, it nulls the embed and keeps the unit: without
+#: `!inner` the scope would be decorative. Measured 2026-09-11 before this:
+#: the unit list on the gallery screen showed A-1405, an Embassy Life unit.
+_SCOPE_EMBED = "floors!inner(floor_number,buildings!inner(code,projects!inner(slug)))"
+_SCOPE_KEY = "floors.buildings.projects.slug"
+
+
+def _scoped(params: dict, *, via: str = "") -> dict:
+    """Add the project filter to one PostgREST query (mutates and returns).
+
+    `via` is the embed prefix when the table is reached *through* units
+    (promotions: "units."). The select must embed _SCOPE_EMBED on that same
+    path or PostgREST rejects the filter — the test that checks every live
+    read carries both is what keeps a new query from quietly widening.
+    """
+    params[f"{via}{_SCOPE_KEY}"] = f"eq.{settings.inventory_project}"
+    return params
+
+
 _LIVE_SELECT = ("id,unit_no,size_sqm,msize,view,side,collection,unit_option,"
                 "base_price,promo_price,status,note,updated_at,"
-                "floors(floor_number,buildings(code)),unit_types(name)")
+                + _SCOPE_EMBED + ",unit_types(name)")
 
 #: The sales team's per-unit promotions (condo-inventory, 27 Aug 2026):
 #: `pricing_unit_promotions` is a separate table — a promotion never
@@ -234,7 +257,7 @@ _LIVE_SELECT = ("id,unit_no,size_sqm,msize,view,side,collection,unit_option,"
 _PROMO_SELECT = ("unit_id,thai_price,foreign_price,note,updated_at,"
                  "units!inner(id,unit_no,status,msize,size_sqm,view,side,unit_option,"
                  "collection,base_price,promo_price,updated_at,"
-                 "floors!inner(floor_number,buildings!inner(code)),unit_types(name))")
+                 + _SCOPE_EMBED + ",unit_types(name))")
 
 
 def _card_from_live(row: dict) -> dict:
@@ -276,8 +299,8 @@ def _live_find(room: str) -> dict | None:
     hit = _live_cache.get(unit_no)
     if hit and now - hit[0] < settings.inventory_cache_s:
         return hit[1]
-    rows = _live_get({"select": _LIVE_SELECT, "unit_no": f"eq.{unit_no}",
-                      "limit": "1"})
+    rows = _live_get(_scoped({"select": _LIVE_SELECT, "unit_no": f"eq.{unit_no}",
+                              "limit": "1"}))
     if not rows:
         return None
     card = _card_from_live(rows[0])
@@ -306,8 +329,9 @@ def price_pair(room: str) -> dict | None:
     if unit_no is None:
         return None
     try:
-        rows = _live_get({"select": "unit_no,promo_price,base_price,msize",
-                          "unit_no": f"eq.{unit_no}", "limit": "1"})
+        rows = _live_get(_scoped({"select": "unit_no,promo_price,base_price,msize,"
+                                            + _SCOPE_EMBED,
+                                  "unit_no": f"eq.{unit_no}", "limit": "1"}))
     except Exception:
         logger.exception("price_pair: live inventory unreachable")
         return None
@@ -335,10 +359,11 @@ def _active_promotion(unit_no: str | None) -> dict | None:
     """The active row of `pricing_unit_promotions` for one unit, or None."""
     if not unit_no or not live_configured():
         return None
-    rows = _live_get({"select": "unit_id,thai_price,foreign_price,note,updated_at,"
-                                "units!inner(unit_no)",
-                      "active": "eq.true", "units.unit_no": f"eq.{unit_no}",
-                      "limit": "1"}, table="pricing_unit_promotions")
+    rows = _live_get(_scoped({"select": "unit_id,thai_price,foreign_price,note,updated_at,"
+                                        "units!inner(unit_no," + _SCOPE_EMBED + ")",
+                              "active": "eq.true", "units.unit_no": f"eq.{unit_no}",
+                              "limit": "1"}, via="units."),
+                     table="pricing_unit_promotions")
     return rows[0] if rows else None
 
 
@@ -417,8 +442,9 @@ def show_unit_live(room: str) -> dict:
 @tool(
     name="find_units",
     description=(
-        "ค้นห้องว่างจากระบบผังขายตามเงื่อนไข เช่น ราคาไม่เกินสี่ล้าน ขอห้องวิวสระ "
-        "ตึก A มีอะไรว่าง ใส่เฉพาะเงื่อนไขที่ลูกค้าพูดเอง "
+        "ค้นห้องว่างจากระบบผังขายตามเงื่อนไข เช่น ขอห้อง 2 ห้องนอน ราคาไม่เกินสี่ล้าน "
+        "ขอห้องวิวสระ หรือตึก A มีอะไรว่าง ใส่เฉพาะเงื่อนไขที่ลูกค้าพูดเองเท่านั้น "
+        "ห้ามอนุมานหรือเติม building/view เอง ถ้าลูกค้าบอกเพียงจำนวนห้องนอนให้ใส่ bedrooms อย่างเดียว "
         "ผลลัพธ์คือรายการจริงจากระบบ ให้อ่านจากรายการเท่านั้น "
         "ห้ามแต่งห้องหรือราคาเพิ่ม ถ้ารายการว่างให้บอกตรงๆ ว่าไม่พบตามเงื่อนไข"
     ),
@@ -427,9 +453,18 @@ def show_unit_live(room: str) -> dict:
         "properties": {
             "max_price_thb": {"type": "number", "description": "ราคาไม่เกิน (บาท)"},
             "min_price_thb": {"type": "number", "description": "ราคาตั้งแต่ (บาท)"},
-            "building": {"type": "string", "description": "รหัสตึก เช่น A"},
+            "bedrooms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4,
+                "description": "จำนวนห้องนอนที่ลูกค้าระบุเอง: 0 คือ Studio, 1 คือ 1 Bedroom, 2 คือ 2 Bedroom",
+            },
+            "building": {
+                "type": "string",
+                "description": "รหัสตึก เช่น A; ใส่เมื่อคำพูดลูกค้าระบุตึกเท่านั้น ห้ามเดาหรือใส่ค่าเริ่มต้น",
+            },
             "view_contains": {"type": "string",
-                              "description": "คำในชื่อวิว เช่น POOL, LAGOON"},
+                              "description": "คำในชื่อวิว เช่น POOL, LAGOON; ใส่เมื่อคำพูดลูกค้าระบุวิวเท่านั้น ห้ามเดา"},
         },
     },
     tags=["units"],
@@ -437,6 +472,7 @@ def show_unit_live(room: str) -> dict:
 )
 def find_units(max_price_thb: float | None = None,
                min_price_thb: float | None = None,
+               bedrooms: int | None = None,
                building: str | None = None,
                view_contains: str | None = None) -> dict:
     """Item 11 on the sales list, running against the real inventory.
@@ -456,10 +492,16 @@ def find_units(max_price_thb: float | None = None,
     # a cap, descending; without one, the cheapest entry point stays the
     # honest default and that path is byte-identical to before.
     descending = bool(max_price_thb)
-    params: dict = {"select": _LIVE_SELECT, "status": "eq.available",
-                    "order": ("promo_price.desc" if descending
-                              else "promo_price.asc"),
-                    "limit": "48" if descending else "8"}
+    budget_filtered = min_price_thb is not None or max_price_thb is not None
+    if bedrooms is not None and (isinstance(bedrooms, bool) or bedrooms not in range(5)):
+        return {"ok": False, "error": "invalid bedroom count",
+                "instruction": "จำนวนห้องนอนต้องเป็นศูนย์ถึงสี่ ให้ถามลูกค้าใหม่ ห้ามเดา"}
+    select = (_LIVE_SELECT.replace("unit_types(name)", "unit_types!inner(name)")
+              if bedrooms is not None else _LIVE_SELECT)
+    params: dict = _scoped({"select": select, "status": "eq.available",
+                            "order": ("promo_price.desc" if descending
+                                      else "promo_price.asc"),
+                            "limit": "48" if descending else "8"})
     price_parts = []
     if min_price_thb:
         price_parts.append(f"promo_price.gte.{int(min_price_thb)}")
@@ -474,6 +516,10 @@ def find_units(max_price_thb: float | None = None,
         params["view"] = f"ilike.*{view_contains.strip()}*"
     if building:
         params["unit_no"] = f"like.{building.strip().upper()}-*"
+    if bedrooms is not None:
+        params["unit_types.name"] = (
+            "eq.Studio" if bedrooms == 0 else f"eq.{bedrooms} Bedroom"
+        )
     try:
         rows = _live_get(params)
     except Exception:
@@ -524,23 +570,33 @@ def find_units(max_price_thb: float | None = None,
                         "ห้องคละขนาด เรียงจากราคาสูงในงบลงมา อาจมีมากกว่านี้)")
     else:
         capped = len(rows) >= 8
-        count_phrase = (f"อย่างน้อย {len(units_found)} ห้อง (แสดง {len(units_found)} "
-                        "รายการราคาต่ำสุด อาจมีมากกว่านี้)"
+        count_phrase = (f"อย่างน้อย {len(units_found)} ห้อง (แสดงตัวอย่าง "
+                        f"{len(units_found)} รายการ อาจมีมากกว่านี้)"
                         if capped else f"{len(units_found)} ห้อง")
     turnlog.record("find_units", count=len(units_found), capped=capped,
-                   max_price=max_price_thb, building=building)
+                   max_price=max_price_thb, bedrooms=bedrooms, building=building)
+    if settings.units_show_price:
+        instruction = (
+            f"พบ{count_phrase} อ่านจากรายการเท่านั้น ไล่สองถึงสามห้องแรกสั้นๆ "
+            "เลขห้อง ขนาด ราคา ห้ามแต่งห้องเพิ่ม "
+            "รายการนี้เป็นห้องว่างจริง ณ ตอนนี้จากระบบผังขาย"
+        )
+    else:
+        instruction = (
+            f"พบ{count_phrase} อ่านจากรายการเท่านั้น ไล่เลขห้องกับขนาด "
+            "สองถึงสามห้องแรกสั้นๆ ห้ามแต่งห้องเพิ่ม "
+            "รายการนี้เป็นห้องว่างจริง ณ ตอนนี้จากระบบผังขาย"
+        )
+        if budget_filtered:
+            instruction += (
+                " ทุกห้องในรายการอยู่ในงบที่ถาม แต่นโยบายคือไม่เปิดเผยตัวเลขราคา "
+                "ห้ามพูดหรือเดาราคา ให้บอกว่าราคาแน่นอนคุยกับฝ่ายขายโดยตรง"
+            )
     return {"ok": True, "screen": "unitlist", "units": units_found,
             "count": len(units_found),
             "total": total,          # known exact total, or None when capped
             "capped": capped,
-            "instruction": ((f"พบ{count_phrase} " "อ่านจากรายการเท่านั้น ไล่ 2-3 ห้องแรก "
-                             "สั้นๆ เลขห้อง ขนาด ราคา ห้ามแต่งห้องเพิ่ม "
-                             "รายการนี้เป็นห้องว่างจริง ณ ตอนนี้จากระบบผังขาย")
-                            if settings.units_show_price else
-                            (f"พบ{count_phrase} " "อ่านจากรายการเท่านั้น ไล่เลขห้องกับขนาด "
-                             "2-3 ห้องแรกสั้นๆ ห้ามแต่งห้องเพิ่ม ทุกห้องในรายการอยู่ในงบที่ถาม "
-                             "แต่นโยบายคือไม่เปิดเผยตัวเลขราคา ห้ามพูดหรือเดาราคา "
-                             "ให้บอกว่าราคาแน่นอนคุยกับฝ่ายขายโดยตรง"))}
+            "instruction": instruction}
 
 # ==================== the live floor plan ====================
 #
@@ -602,12 +658,11 @@ def show_plan(floor: int = 1, building: str | None = None) -> dict:
                 "instruction": ("ไม่มีภาพผังของชั้นนี้ (มีชั้น %s) ให้บอกลูกค้าตรงๆ"
                                 % ", ".join(str(k) for k in sorted(_plan_paths())))}
     try:
-        rows = _live_get({
-            "select": ("unit_no,status,pos_x,pos_y,width,height,poly,"
-                       "floors!inner(floor_number,buildings(code))"),
+        rows = _live_get(_scoped({
+            "select": "unit_no,status,pos_x,pos_y,width,height,poly," + _SCOPE_EMBED,
             "floors.floor_number": f"eq.{int(floor)}",
             "limit": "500",
-        })
+        }))
     except Exception:
         logger.exception("live inventory unreachable")
         return {"ok": False, "error": "inventory unreachable",
@@ -655,14 +710,18 @@ def live_probe() -> tuple[bool, str]:
         import httpx
 
         r = httpx.get(f"{settings.inventory_url}/rest/v1/units",
-                      params={"select": "id", "limit": "1"},
+                      # Scoped like every read: the banner once said "2540
+                      # units" — three projects' worth — for a gallery that
+                      # may show one of them.
+                      params=_scoped({"select": "id," + _SCOPE_EMBED, "limit": "1"}),
                       headers={"apikey": settings.inventory_key,
                                "Authorization": f"Bearer {settings.inventory_key}",
                                "Prefer": "count=exact"},
                       timeout=4)
         r.raise_for_status()
         total = (r.headers.get("content-range") or "?/?").split("/")[-1]
-        return True, f"unit inventory: LIVE ({total} units at {settings.inventory_url.split('//')[-1]})"
+        return True, (f"unit inventory: LIVE ({total} units of {settings.inventory_project} "
+                      f"at {settings.inventory_url.split('//')[-1]})")
     except Exception as exc:
         return False, ("unit inventory: CONFIGURED BUT UNREACHABLE (%s) — "
                        "show_unit will refuse honestly; check the URL/key in .env"
@@ -702,8 +761,9 @@ def list_promotions(building: str | None = None) -> dict:
         return {"ok": False, "error": "no live inventory",
                 "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกลูกค้าว่า "
                                 "โปรโมชั่นล่าสุดสอบถามฝ่ายขาย ห้ามแต่งโปรเอง")}
-    params = {"select": _PROMO_SELECT, "active": "eq.true",
-              "units.status": "neq.sold", "order": "updated_at.desc", "limit": "24"}
+    params = _scoped({"select": _PROMO_SELECT, "active": "eq.true",
+                      "units.status": "neq.sold", "order": "updated_at.desc",
+                      "limit": "24"}, via="units.")
     if building:
         params["units.unit_no"] = f"like.{building.strip().upper()}-*"
     try:
@@ -759,9 +819,9 @@ def compare_unit_types(building: str | None = None) -> dict:
         return {"ok": False, "error": "no live inventory",
                 "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกลูกค้าว่า "
                                 "ขอเช็คแบบห้องกับฝ่ายขาย ห้ามแต่งข้อมูลเอง")}
-    params = {"select": ("unit_no,msize,size_sqm,view,side,unit_option,collection,"
-                         "floors(floor_number,buildings(code)),unit_types(name)"),
-              "status": "eq.available", "limit": "2000"}
+    params = _scoped({"select": ("unit_no,msize,size_sqm,view,side,unit_option,collection,"
+                                 + _SCOPE_EMBED + ",unit_types(name)"),
+                      "status": "eq.available", "limit": "2000"})
     if building:
         params["unit_no"] = f"like.{building.strip().upper()}-*"
     try:
@@ -813,8 +873,10 @@ def compare_unit_types(building: str | None = None) -> dict:
     return {"ok": True, "screen": "unittypes", "types": types, "building": building,
             "total_available": len(rows),
             "instruction": (f"ห้องว่างทั้งหมด {len(rows)} ห้อง แบ่งเป็น {len(types)} แบบ ขึ้นจอแล้ว "
-                            "เทียบให้ฟังสั้นๆ จากตัวเลขในรายการ: จำนวนว่าง ขนาด ชั้น วิว/ทิศที่มี "
-                            "ห้ามแต่งขนาดหรือวิว "
+                            "เริ่มคำตอบด้วยความแตกต่างด้านการใช้งานอย่างน้อยหนึ่งประโยคก่อนพูดตัวเลข "
+                            "จากนั้นใช้จำนวน ขนาด ชั้น และวิว/ทิศเป็นข้อมูลประกอบเมื่อเกี่ยวข้อง "
+                            "ห้ามสรุปว่าแบบใดเหมาะลงทุนหรืออยู่เองโดยไม่มีข้อมูลจากลูกค้า "
+                            "ห้ามแต่งขนาดหรือวิว ตอบความแตกต่างแล้วจบทันที ห้ามถามคำถามต่อท้าย "
                             + ("" if settings.units_show_price else
                                "ไม่พูดตัวเลขราคา ถ้าลูกค้าบอกงบให้ใช้ find_units แทน"))}
 

@@ -32,6 +32,13 @@ def test_the_tool_is_declared_to_the_model(loaded):
     assert "search_condo_info" in names
 
 
+def test_the_tool_keeps_location_intent_in_its_query(loaded):
+    entry = registry.get("search_condo_info")
+    assert "ห้ามย่อเหลือเพียงชื่อสถานที่จน intent ตำแหน่งหาย" in entry.description
+    query_help = entry.parameters["properties"]["query"]["description"]
+    assert "ต้องคงคำว่าอยู่ตรงไหน/อยู่ชั้นไหน" in query_help
+
+
 @pytest.mark.parametrize("question", [
     "มีฟิตเนสไหม",
     "สระว่ายน้ำอยู่ชั้นไหน",
@@ -157,6 +164,53 @@ def test_returns_several_results_to_choose_from(loaded):
     out = run(registry.dispatch("search_condo_info", {"query": "สิ่งอำนวยความสะดวก"}))
     assert out["found"] is True
     assert 1 <= len(out["results"]) <= 4
+
+
+def test_a_specific_pool_location_returns_only_the_best_chunk(loaded):
+    out = run(registry.dispatch(
+        "search_condo_info", {"query": "สระว่ายน้ำอยู่ตรงไหน"}
+    ))
+
+    assert out["found"] is True
+    assert len(out["results"]) == 1
+    assert out["results"][0]["title"] == "ชั้น 3 — ผัง Sky Pool"
+    spoken_surface = str(out["results"])
+    assert "Aqua Cinema" not in spoken_surface
+    assert "ลากูน" not in spoken_surface
+    assert "ตอบเฉพาะข้อมูลที่ตรงคำถาม" in out["instruction"]
+
+
+def test_unapproved_marketing_copy_keeps_status_but_not_the_copy(loaded):
+    out = run(registry.dispatch(
+        "search_condo_info", {"query": "สระว่ายน้ำอยู่ตรงไหน"}
+    ))
+
+    top = out["results"][0]
+    assert top["script_is_draft"] is True
+    assert top["content_status"] == "draft"
+    assert "draft_script" not in top
+    assert out["content_status"] == "draft"
+    assert out["must_preserve_status"] is True
+    assert "ต้องพูดสถานะนี้อย่างชัดเจน" in out["instruction"]
+
+
+def test_common_area_dimensions_never_reach_customer_facing_knowledge(loaded):
+    from app.prompts import load_facts
+    from app.tools.knowledge import _entry
+
+    facts = load_facts()
+    assert "ลากูน" in facts and "155" not in facts
+    assert "16 โครงการ" in facts, "non-facility figures remain available"
+
+    entry = _entry({
+        "title_th": "สระลากูน",
+        "summary_th": "สระลากูนยาว 155 เมตร อยู่หน้าอาคาร",
+        "detail_th": "พื้นที่ส่วนกลาง 4,000 ตร.ม. พร้อมสวน",
+        "script_th": "ลากูน 155ม. พร้อมพื้นที่พักผ่อน",
+    })
+    surface = str(entry)
+    assert "155" not in surface and "4,000" not in surface
+    assert "script_is_draft" in entry and "draft_script" not in entry
 
 
 def test_results_carry_a_way_to_show_the_slide(loaded):
@@ -296,7 +350,7 @@ def test_a_slide_ranked_eighth_cannot_answer_on_its_own(loaded, monkeypatch):
     assert "ห้ามเดา" in out["instruction"]
 
 
-def test_the_top_hit_still_brings_its_neighbours(loaded, monkeypatch):
+def test_an_explicit_overview_still_brings_the_top_hits(loaded, monkeypatch):
     """The other half: when the closest slide *is* close enough, the other
     qualifying ones still come along. Narrowing the rule must not turn every
     answer into a single slide."""
@@ -311,7 +365,9 @@ def test_the_top_hit_still_brings_its_neighbours(loaded, monkeypatch):
     ]
     monkeypatch.setattr(slides_mod, "search_slides", lambda q: ranked)
 
-    out = run(registry.dispatch("search_condo_info", {"query": "ขอดูสระว่ายน้ำ"}))
+    out = run(registry.dispatch(
+        "search_condo_info", {"query": "ภาพรวมสิ่งอำนวยความสะดวกมีอะไรบ้าง"}
+    ))
     assert out["found"] is True
     assert len(out["results"]) > 1, "narrowed the rule into a single-slide answer"
 
@@ -347,6 +403,34 @@ def test_ordinary_questions_are_not_swept_up_by_that_list():
     for query in ("มีฟิตเนสไหม", "สระว่ายน้ำอยู่ชั้นไหน", "ขอดูห้องนอน",
                   "ไปสนามบินยังไง", "ชั้น 3 มีอะไร", "where is the lobby",
                   "ขอดูผังโครงการ", "มีที่ให้เด็กเล่นไหม", "ทำเลอยู่ตรงไหน"):
+        assert not _is_commercial(query), query
+
+
+def test_a_yield_question_is_a_money_question():
+    """Found by measuring, 2026-09-12: running the guard the way
+    `search_my_documents` does showed "ผลตอบแทนการลงทุนกี่เปอร์เซ็นต์" walking
+    straight past it and answering found=True from the marketing web dump —
+    the library the guard's own comment names as full of "yields 7-10%". The
+    list had ราคา/งบ/ดอกเบี้ย but no word for *yield* or *return*, which is the
+    money question that copy answers with its most confident unsigned numbers.
+    """
+    from app.tools.knowledge import _is_commercial
+
+    for query in ("ผลตอบแทนการลงทุนกี่เปอร์เซ็นต์",
+                  "ซื้อปล่อยเช่าได้ผลตอบแทนเท่าไหร่",
+                  "ค่าเช่าเดือนละเท่าไหร่", "rental yield ที่นี่เท่าไหร่",
+                  "what is the ROI", "expected return on investment"):
+        assert _is_commercial(query), query
+
+
+def test_investing_as_a_reason_to_live_here_is_not_a_price_question():
+    """The cost of the yield words is refusing the market-strategy doc's own
+    story. "ทำไมพัทยาน่าลงทุน" asks why the place is worth choosing, not for a
+    number — so ลงทุน is deliberately left out of the guard."""
+    from app.tools.knowledge import _is_commercial
+
+    for query in ("ทำไมพัทยาน่าลงทุน", "โครงการนี้น่าอยู่ไหม",
+                  "ทำไมคนสนใจลงทุนที่นี่"):
         assert not _is_commercial(query), query
 
 
