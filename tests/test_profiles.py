@@ -155,6 +155,26 @@ def test_sales_host_answers_customer_intent_before_the_story():
     assert "ตอบเฉพาะสิ่งที่จำเป็นต่อ intent นั้นก่อน" in SALES_HOST_BLOCK
 
 
+def test_sales_host_keeps_a_no_intent_opening_brief():
+    from app.prompts import SALES_HOST_BLOCK
+
+    assert 'ลูกค้าบอกว่า "ยังไม่รู้อะไรเลย"' in SALES_HOST_BLOCK
+    assert '"ยินดีต้อนรับค่ะ ที่นี่คือ Embassy World ค่ะ" เท่านั้นแล้วหยุด' in SALES_HOST_BLOCK
+    assert "ห้ามถามเรื่องแบบห้อง" in SALES_HOST_BLOCK
+    assert "ห้าม" in SALES_HOST_BLOCK and "ทำเล แนวคิด facility" in SALES_HOST_BLOCK
+
+
+def test_sales_host_uses_a_personal_clue_once_then_stops():
+    from app.prompts import SALES_HOST_BLOCK
+
+    for clue in ("ครอบครัว", "เวลา", "การมาใช้"):
+        assert clue in SALES_HOST_BLOCK
+    assert "ถือว่า intent ชัด" in SALES_HOST_BLOCK
+    assert 'ตอบว่า "เหมาะกับการใช้เวลาพักผ่อนร่วมกันทั้งครอบครัวในวันหยุดค่ะ" เท่านั้น' in SALES_HOST_BLOCK
+    assert "ห้ามเอ่ย facility/ห้อง" in SALES_HOST_BLOCK
+    assert "เติมคำถามและข้อเสนอท้าย" in SALES_HOST_BLOCK
+
+
 def test_sales_host_does_not_require_a_follow_up_question():
     from app.prompts import SALES_HOST_BLOCK
 
