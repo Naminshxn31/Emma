@@ -76,3 +76,6 @@ data/personal-docs/
 # owner's data, like data/memory.json, not the repo's.
 #   python scripts/fetch_face_model.py
 data/faces/
+
+# Showroom CAD model retained as a local reference, not used by the voice server.
+data/showroom/*.glb

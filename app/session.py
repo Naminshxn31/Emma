@@ -29,9 +29,22 @@ from app import display, heard, turnlog, voices
 from app.config import settings
 from app.prompts import build_instructions, greeting_for
 from app.providers import ProviderError, default_voice_for, get_provider
-from app.robot_backend import active as simulation_backend
 
 logger = logging.getLogger("condo_voice.session")
+
+
+def _provider_failure_kind(exc: Exception) -> str:
+    """Classify provider failures without logging URLs, tokens, or messages."""
+    value = str(exc).lower()
+    if "winerror 5" in value or "access is denied" in value or "permission" in value:
+        return "permission"
+    if any(word in value for word in ("quota", "429", "resource_exhausted")):
+        return "quota"
+    if any(word in value for word in ("api key", "api_key", "401", "403", "unauthorized")):
+        return "auth"
+    if any(word in value for word in ("connect", "timeout", "network")):
+        return "network"
+    return "provider"
 
 
 class VoiceSession:
@@ -95,8 +108,7 @@ class VoiceSession:
         # A public mode URL cannot unlock the machine owner's private persona.
         if self.profile not in {"condo", "emma", "translator"}:
             self.profile = "condo"
-        if (self.profile == "emma" and settings.assistant_profile != "emma"
-                and simulation_backend.get() is None):
+        if self.profile == "emma" and settings.assistant_profile != "emma":
             self.profile = "condo"
         #: Translator mode's Thai->X target (?lang=es on the page URL).
         self.lang = (lang or "en").strip().lower()
@@ -188,14 +200,12 @@ class VoiceSession:
                 turnlog.record("voice_ready")
                 await self._send_json({
                     "type": "ready",
-                    "diagnostic_session_id": turnlog.session_id.get() if simulation_backend.get() is not None else None,
                     "provider": self.provider_name,
                     # Which persona this session actually opened with — shown
                     # in the header, because "ไม่เห็นแปลภาษาเลย" turned out to
                     # mean a translator URL served by a pre-translator server,
                     # and nothing on screen said which mode was really running.
                     "profile": self.profile,
-                    "robot_simulator": simulation_backend.get() is not None,
                     "voice": self.voice,
                     "input_rate": provider.input_sample_rate,
                     "output_rate": provider.output_sample_rate,
@@ -228,12 +238,7 @@ class VoiceSession:
                 # machine's, and N testers' sessions each polling and
                 # narrating one shared window is the two-clocks bug times N.
                 if settings.canva_url and settings.canva_poll_s > 0 and not settings.multi_session:
-                    if simulation_backend.get() is None:
-                        jobs.add(asyncio.create_task(self._follow_canva()))
-                if backend := simulation_backend.get():
-                    from app.robot_voice import watch_robot
-
-                    jobs.add(asyncio.create_task(watch_robot(self, backend)))
+                    jobs.add(asyncio.create_task(self._follow_canva()))
                 if settings.idle_timeout_s or self.summoned:
                     jobs.add(asyncio.create_task(self._close_when_nobody_is_there()))
                 _done, pending = await asyncio.wait(
@@ -244,8 +249,7 @@ class VoiceSession:
                 await asyncio.gather(*pending, return_exceptions=True)
 
         except ProviderError as exc:
-            from app.robot_diagnostics import failure_kind
-            turnlog.record("provider_error", category=failure_kind(exc))
+            turnlog.record("provider_error", category=_provider_failure_kind(exc))
             await self._send_json({"type": "error", "code": "provider_error", "message": str(exc)})
         except Exception as exc:
             logger.exception("voice session failed")
@@ -400,11 +404,6 @@ class VoiceSession:
                     except json.JSONDecodeError:
                         continue
                     if not isinstance(event, dict) or not isinstance(event.get("type"), str):
-                        continue
-                    if (simulation_backend.get() is not None
-                            and event.get("type") in {"robot_ready", "robot_arrived"}):
-                        # Only the simulator engine can report its navigation.
-                        # Even a valid hardware token cannot attach a real robot.
                         continue
                     if event.get("type") == "stop":
                         return
@@ -634,8 +633,6 @@ class VoiceSession:
                     await self._send_json({"type": "tool_call", "name": event.text or ""})
 
                 elif event.kind == "tool_result":
-                    if backend := simulation_backend.get():
-                        backend._event("tool_result", tool=event.text or "", result=event.data or {})
                     # Failures get a line of their own. 2026-08-26 16:26:
                     # play_youtube failed live ("มีข้อผิดพลาดนิดหน่อยค่ะ"),
                     # the same call worked from a fresh process minutes
@@ -908,8 +905,6 @@ class VoiceSession:
         to move for the nudge to repeat freely, and MAX_TOUR_NUDGES caps how
         long we lean on a model that keeps ignoring it.
         """
-        if simulation_backend.get() is not None:
-            return
         from app.tools import slides
 
         if not slides.should_continue_tour():
@@ -1045,7 +1040,7 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
     # firing. The machine-bound tool groups are already stripped in
     # `enabled_tool_groups`, so the shared state the takeover exists to
     # clear (slides.STATE, the calc sheet) can never be written here.
-    single_session = not settings.multi_session or simulation_backend.get() is not None
+    single_session = not settings.multi_session
     previous = _active if single_session else None
     if previous is not None:
         logger.info("a new voice session took over — closing the previous one")

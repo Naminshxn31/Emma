@@ -2,10 +2,8 @@
 
 Current delivery checklist and verified limitations: [9 September readiness review](robot-arrival-2026-09-09.md). No Android bridge APK/AAR is bundled; software tests do not certify hardware readiness.
 
-Interactive command rehearsal is now available at `http://127.0.0.1:8010`
-after running `start-robot-simulator.cmd`. See [the simulator guide](robot-simulator.md)
-for source PDF page references, command lifecycle tests, and the remaining
-Android/AAR work. This is our simulator, not the vendor's SDK MOCK runtime.
+The pre-arrival interactive simulator has been retired. This document describes
+the hardware integration path; software tests alone do not verify physical motion.
 
 Source documents reviewed:
 

@@ -2,7 +2,7 @@
 
 Same rule as `smarthome`: handlers return **facts**, not sentences, so the
 model phrases the confirmation in whatever language the guest is speaking.
-Every result carries `hardware` ("ok" / "mock" / "simulated" / "failed") so it can tell
+Every result carries `hardware` ("ok" / "mock" / "failed") so it can tell
 somebody the robot didn't actually move, instead of announcing a journey that
 never happened.
 
@@ -81,9 +81,6 @@ async def go_to_place(place: str) -> dict:
             "ส่งคำสั่งไปจุดหมายแล้ว ยังไม่ได้ยืนยันว่าหุ่นเริ่มเดิน ชวนคุยระหว่างรอได้ "
             "ห้ามบอกว่าถึงแล้ว รอจนกว่าจะมีข้อความแจ้งว่าถึง"
             if hardware == "ok" else
-            "กำลังเดินในตัวจำลองเท่านั้น ห้ามบอกว่าหุ่นจริงกำลังเดิน "
-            "ห้ามบอกว่าถึงแล้ว รอผลการจำลอง"
-            if hardware == "simulated" else
             "ยังไม่ได้เชื่อมต่อหุ่นยนต์จริง ให้บอกลูกค้าตรงๆ ว่ายังพาไปไม่ได้ "
             "ห้ามบอกว่ากำลังเดินไป"
         ),
@@ -122,8 +119,6 @@ async def stop_moving() -> dict:
         "instruction": (
             "ส่งคำสั่งหยุดแล้ว แต่ยังไม่ได้ยืนยันว่าหุ่นหยุดจริง ตอบรับสั้นๆ"
             if hardware == "ok" else
-            "หยุดในตัวจำลองแล้ว ไม่มีการสั่งหุ่นจริง"
-            if hardware == "simulated" else
             "ยังยืนยันการหยุดไม่ได้ ห้ามบอกว่าหยุดแล้ว ให้แจ้งเจ้าหน้าที่ตรวจสอบหุ่น"
         ),
     }
@@ -153,8 +148,6 @@ async def return_to_base() -> dict:
         "instruction": (
             "ส่งคำสั่งกลับจุดจอดแล้ว รอหุ่นรายงานว่าถึงก่อนยืนยันการชาร์จ"
             if hardware == "ok" else
-            "กำลังกลับฐานในตัวจำลองเท่านั้น ห้ามอ้างว่าหุ่นจริงกำลังกลับหรือชาร์จ"
-            if hardware == "simulated" else
             "ยังสั่งกลับจุดจอดจริงไม่ได้ ให้บอกตรงๆ ห้ามบอกว่ากำลังกลับหรือชาร์จ"
         ),
     }
@@ -172,15 +165,28 @@ async def return_to_base() -> dict:
 def get_robot_status() -> dict:
     state = robot_link.snapshot()
     state["places"] = list(robot_link.places())
-    state["hardware"] = ("simulated" if robot_link.is_simulated() else
-                         "ok" if robot_link.available() else "mock")
-    if robot_link.is_simulated():
-        state["instruction"] = "ทั้งหมดเป็นสถานะจำลอง ไม่ใช่ข้อมูลจากหุ่นจริง"
-    elif not robot_link.available():
+    state["hardware"] = "ok" if robot_link.available() else "mock"
+    if not robot_link.available():
         state["instruction"] = (
             "ยังไม่ได้เชื่อมต่อหุ่นยนต์จริง ถ้าลูกค้าถามเรื่องการพาไป "
             "ให้บอกตรงๆ ว่ายังพาไปไม่ได้"
         )
+    elif state.get("status_source") == "chassis":
+        # The one path where these numbers are readings rather than echoes of
+        # the last command. Telling the model "there is no telemetry" here
+        # would have it hedge about a battery level it was just handed, and
+        # the guest hears a robot that does not know its own state. The
+        # hedge that stays is about the *map*: an empty `places` is why
+        # `go_to_place` refuses, and that is worth saying out loud.
+        state["instruction"] = (
+            "แบตเตอรี่และการชาร์จมาจากการอ่านค่าหุ่นจริง ส่วน moving อ้างอิงสถานะงานนำทาง "
+            "ไม่ใช่การวัดความเร็วล้อ และ null คือยังไม่ทราบ ห้ามรับรองการหยุดทางกายภาพจากค่านี้ "
+            + ("แต่แผนที่ยังไม่มีจุดหมายสักจุด ถ้าลูกค้าขอให้พาไป ให้บอกตรงๆ ว่ายังพาไปไม่ได้"
+               if not state["places"] else
+               "จุดที่พาไปได้คือรายการใน places เท่านั้น ห้ามเสนอจุดนอกรายการ")
+        )
+        if state.get("motion_enabled") is False:
+            state["instruction"] += " ขณะนี้ล็อกการเริ่มเดินไว้เพื่อรอตรวจระบบหยุด ห้ามบอกว่าพาเดินได้"
     else:
         state["instruction"] = (
             "สถานะอ้างอิงคำสั่งล่าสุดหรือรายงานถึงจุดหมายเท่านั้น ยังไม่มี telemetry "

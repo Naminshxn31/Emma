@@ -8,9 +8,6 @@
      otherwise 404 on every page load and clutter the server log). -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='g' cx='32%25' cy='28%25'%3E%3Cstop offset='0' stop-color='%238ED0F5'/%3E%3Cstop offset='0.78' stop-color='%231B6FE0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23g)'/%3E%3C/svg%3E" />
 <style>
-  #robotSimBanner { width:100%; max-width:1200px; background:#e7f3ea; color:#245b3e; border:1px solid #bcd5c2; border-radius:10px; padding:12px 16px; margin-bottom:12px; font-size:13px; line-height:1.6; }
-  #robotSimBanner a { color:inherit; font-weight:600; }
-  body.robot-simulation #callScreen { height:calc(100vh - 8rem); }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
          background: #fff; color: #0d0d0d; min-height: 100vh; display: flex; flex-direction: column;
@@ -607,8 +604,6 @@
 </head>
 <body>
 
-<aside id="robotSimBanner" hidden>Emma · โหมดสั่งหุ่นจำลองเท่านั้น · ใช้ API เสียงที่ตั้งไว้เดิม<br>ลองพูด “พาไปห้องตัวอย่าง” “หยุดก่อน” หรือ “กลับฐาน” · <a href="/" target="_blank" rel="noopener">ดูแผนที่จำลอง ↗</a></aside>
-
 <section class="screen active" id="pickerScreen">
   <h1>Choose a voice</h1>
   <p class="sub" id="providerLine">…</p>
@@ -932,17 +927,7 @@ function kioskSay(text) {
 Promise.all([
   fetch('/voices').then((r) => r.json()),
   fetch('/health').then((r) => r.json()),
-]).then(async ([vd, health]) => {
-  if (health.robot_simulator) {
-    document.body.classList.add('robot-simulation');
-    $('robotSimBanner').hidden = false;
-    $('translatorBtn').hidden = true;
-    document.title = 'Emma · Robot Simulator';
-    const script = document.createElement('script');
-    script.src = '/simulator-voice.js';
-    await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.append(script); });
-    await window.simulatorVoice.init(health);
-  }
+]).then(([vd, health]) => {
   voices = vd.voices;
   providerName = health.provider;
   idx = Math.max(0, voices.findIndex((v) => v.id === vd.default));
@@ -2059,12 +2044,7 @@ function scheduleTranscriptWipe() {
 }
 
 function startCall() {
-  if (window.simulatorVoice && !window.simulatorVoice.ownsAudio) {
-    window.simulatorVoice.acquire().then(ok => { if (ok) startCall(); });
-    return;
-  }
   manualEnd = false;
-  window.simulatorVoice?.connecting();
   idleParked = false;
   superseded = false;
   standDown = false; standDownReason = '';
@@ -2141,7 +2121,6 @@ function startCall() {
   ws.onerror = () => { if (ws !== callSocket) return; setState('error'); systemLine('เชื่อมต่อไม่สำเร็จ · connection error'); };
   ws.onclose = () => {
     if (ws !== callSocket) return;
-    window.simulatorVoice?.closed();
     // Before any branch, because the branches are where this keeps getting
     // lost. The socket closing *is* the call ending, whatever the reason,
     // and a call that has ended has no business still holding the machine's
@@ -2384,7 +2363,6 @@ function onMessage(msg) {
       metricPlaybackSent = false;
       break;
     case 'ready':
-      window.simulatorVoice?.ready(evt);
       redialDelay = 2000;
       inputRate = evt.input_rate;
       outputRate = evt.output_rate;
@@ -2515,12 +2493,6 @@ function onMessage(msg) {
       break;
 
     case 'error':
-      window.simulatorVoice?.failed(evt);
-      if (evt.code === 'simulator_busy') {
-        standDown = true; standDownReason = 'superseded';
-        systemLine(evt.message || 'มีอีกหน้ากำลังคุยอยู่');
-        break;
-      }
       if (evt.code === 'unauthorized') {
         // Wrong/missing token: stand down completely. Redialing an auth
         // failure every two seconds is a polite little brute-force loop.
@@ -2725,7 +2697,6 @@ let summonedDial = false;
 let micFailure = null;
 
 async function startWakeMode() {
-  if (window.simulatorVoice && !window.simulatorVoice.ownsAudio) return;
   if (ws && [WebSocket.CONNECTING, WebSocket.OPEN].includes(ws.readyState)) return;
   if (!wakeAvailable || wakeWs) return;
   // Chrome only exposes getUserMedia on localhost or a trusted HTTPS
@@ -2801,7 +2772,7 @@ async function startWakeMode() {
     } else if (evt.type === 'wake_unavailable') {
       wakeAvailable = false;
       stopWakeMode();
-    } else if (evt.type === 'error' && ['unauthorized', 'simulator_busy'].includes(evt.code)) {
+    } else if (evt.type === 'error' && evt.code === 'unauthorized') {
       // The same stand-down the call socket does, and it has to be repeated
       // here because the guard there only ever protected /ws. Without it the
       // onclose handler below rearms two seconds later — for ever, with the

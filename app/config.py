@@ -800,12 +800,6 @@ class Settings:
         """
         if not self.tools_enabled:
             return set()
-        from app.robot_backend import active as simulation_backend
-
-        if simulation_backend.get() is not None:
-            # This context is set only by the isolated simulator process.
-            # No private Emma tools, gallery equipment or host controls.
-            return {"robot"}
         groups = {g.strip() for g in self.tool_groups.split(",") if g.strip()}
         base: set[str] | None
         if groups:

@@ -362,9 +362,7 @@ class GeminiProvider(VoiceProvider):
             gemini_tool = tools.as_gemini_tool()
             if gemini_tool is not None:
                 config["tools"] = [gemini_tool]
-        from app.robot_backend import active as simulation_backend
-
-        if settings.web_search and simulation_backend.get() is None:
+        if settings.web_search:
             # Native grounding: Google runs the search, the model reads the
             # results. Behind a default-off flag because it has never been
             # verified against this live model — see WEB_SEARCH in config.

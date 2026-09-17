@@ -1,8 +1,0 @@
-#voiceReadiness{width:100%;max-width:1200px;border:1px solid #b8d2c4;border-radius:12px;background:#edf6f0;color:#254939;padding:12px 15px;margin-bottom:12px;font:12px/1.6 system-ui,"Leelawadee UI",sans-serif}
-.voice-checks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.voice-checks span{display:flex;flex-direction:column}.voice-checks b{font-size:12px}.voice-check-actions{display:flex;gap:12px;align-items:center;margin-top:9px}.voice-check-actions button{cursor:pointer;background:white;border:1px solid #aac3b5;border-radius:8px;padding:7px 10px;white-space:nowrap;color:#254939}.voice-check-actions span{font-size:11px}
-body.sim-embedded{padding:12px!important;min-height:100vh;background:#faf9f6!important;justify-content:flex-start!important;overflow-x:hidden}
-body.sim-embedded::before{display:none!important}
-body.sim-embedded #robotSimBanner{display:none!important}body.sim-embedded #callScreen{height:calc(100vh - 165px)!important;min-height:330px;max-width:none!important;padding:15px!important;border-radius:15px!important;box-shadow:none!important}
-body.sim-embedded .callbar{padding-bottom:12px!important;margin-bottom:12px!important}body.sim-embedded .callbar .orb{width:48px!important;height:48px!important}body.sim-embedded #callNote{font-size:10px!important}
-body.sim-embedded #convo{padding:12px!important}body.sim-embedded .bubble{font-size:13px!important}body.sim-embedded .actions{gap:7px!important}body.sim-embedded .actions button{font-size:12px!important;padding:10px!important}
-@media(max-width:460px){.voice-checks{grid-template-columns:repeat(2,minmax(0,1fr))}.voice-check-actions{align-items:flex-start}body.sim-embedded #callScreen{height:calc(100vh - 200px)!important}}

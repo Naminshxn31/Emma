@@ -112,14 +112,6 @@ def _handle():
 
 def record(event: str, **fields: Any) -> None:
     """Append one event. Never raises: this is instrumentation, not the job."""
-    from app.robot_backend import active as simulation_backend
-
-    if simulation_backend.get() is not None:
-        # A strict allowlist keeps rehearsal metrics separate from transcripts.
-        recorder = getattr(simulation_backend.get(), "record_diagnostic", None)
-        if recorder is not None:
-            recorder(event, fields, session_id.get())
-        return
     # Worker tools may finish together. Protect opening/rotation and writing
     # as one operation so the first two events cannot overwrite the handle.
     with _write_lock:

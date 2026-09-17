@@ -1,19 +1,8 @@
 # Condo Voice Assistant
 
-Robot rehearsal before hardware arrives: run `start-robot-simulator.cmd`, then
-open **http://127.0.0.1:8010**. The [Thai simulator guide](docs/robot-simulator.md)
-explains controls, fault scenarios, SDK mapping, and what still needs a real robot.
-The main page opens a third-person visitor view alongside Emma voice controls.
-Click the scene, walk with WASD/arrows, and drag to look around. Press V for the
-overview, F to follow Emma, or use the on-screen movement buttons.
-Ask Emma to switch virtual lights, AC, curtains or TV, or use the smart-home panel;
-these commands change the simulated room and never send IR to real devices.
-The scene uses local Three.js assets and falls back to 2.5D if WebGL is unavailable.
-Allow the microphone,
-then call Emma when standby is ready; use Start if needed. Readiness indicators,
-a speaker test, and JSON rehearsal export are available on the same page.
-The standalone voice page remains at **http://127.0.0.1:8010/voice**; keep one
-voice page open at a time. Voice uses the existing provider configuration and API quota.
+The pre-arrival robot simulator has been retired. The voice server and real
+hardware controls remain separate; see [robot integration](docs/robot-integration.md)
+for the current hardware boundary.
 
 Development history: every code, configuration, test, or documentation change
 must be recorded in [CHANGELOG.md](CHANGELOG.md), as required by
@@ -931,9 +920,9 @@ for verified prerequisites, vendor questions and physical acceptance tests.
   whether the robot's own built-in voice assistant can be turned off. If it
   can't, it will fight this one for the microphone, and that is an
   architecture problem rather than a code one.
-- **Guiding a guest on real hardware.** The isolated 3D simulator can rehearse
-  successful and failed trips with Emma. Real navigation still requires the
-  Android bridge, vendor SDK and physical tests. Production command ACKs,
+- **Guiding a guest on real hardware.** The pre-arrival simulator has been
+  retired. Real navigation requires the Android bridge or direct chassis path
+  and physical tests. Production command ACKs,
   command IDs, heartbeat and battery/charging telemetry are not implemented.
 - **The robot's audio path is unverified.** Nothing here has been tested
   against the robot's microphone array or its echo cancellation, and that —

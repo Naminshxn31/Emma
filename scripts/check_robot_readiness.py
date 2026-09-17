@@ -26,7 +26,6 @@ def health(url: str) -> dict:
             return {"reachable": True, "ok": False}
         robot = value.get("robot", {})
         return {"reachable": True, "ok": True,
-                "simulator": value.get("robot_simulator") is True,
                 "robot_connected": isinstance(robot, dict) and robot.get("app_connected") is True}
     except Exception as error:
         # Exception messages/health bodies may contain private paths or credentials.
@@ -74,10 +73,9 @@ def report(sdk: Path | None = None, apk: Path | None = None, probe: bool = False
         scheme = "https" if cert and key else "http"
         result["health"] = {
             "production": health(f"{scheme}://localhost:{settings.port}/health"),
-            "simulator": health("http://127.0.0.1:8010/health"),
         }
         production = result["health"]["production"]
-        if not production.get("ok") or production.get("simulator"):
+        if not production.get("ok"):
             result["missing_prerequisites"].append("production_health")
         if not production.get("robot_connected"):
             result["missing_prerequisites"].append("live_robot_connection")

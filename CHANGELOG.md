@@ -1,5 +1,12 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-17 — ปลดชุดตัวจำลองหุ่นก่อนรับเครื่อง
+
+- ลบ `app/robot_backend.py`, `app/robot_diagnostics.py`, `app/robot_home.py`, `app/robot_simulation.py`, `app/robot_simulator.py`, `app/robot_voice.py`, `app/tools/simulation_home.py`, หน้า `client/robot-simulator.*`, ฉาก `robot-scene*`, `robot-explorer.js`, `robot-interior.js`, `robot-showroom.js`, `simulator-voice.*`, `robot-drive-sim.html`, ชุด Three.js ที่ใช้เฉพาะตัวจำลอง, `start-robot-simulator.cmd`, `scripts/build_showroom_map.py` และการทดสอบเฉพาะตัวจำลอง เพราะหน้าและ runtime ซ้อมก่อนหุ่นมาถูกเลิกใช้แล้ว; คง adapter/หน้าควบคุมหุ่นจริงและไฟล์ CAD ใน `data/showroom/` ไว้เป็นข้อมูลอ้างอิงที่ยังไม่ยืนยันสำหรับการเดินจริง
+- เก็บจุดเรียกตัวจำลองที่ค้างใน `app/config.py`, `app/prompts.py`, `app/providers/gemini.py`, `app/session.py`, `app/tools/{__init__,registry,robot,robot_link}.py`, `app/turnlog.py`, `client/index.html`, `scripts/check_robot_readiness.py`, `tests/conftest.py`; ย้ายการจัดหมวด provider error ไป `app/session.py` เพื่อไม่ต้องพึ่งโมดูล diagnostics ของตัวจำลอง
+- ปรับ `README.md`, `.gitignore`, `docs/robot-integration.md`, `docs/robot-arrival-2026-09-09.md`, `docs/ต่อกับหุ่นยนต์ Astronaut.md` และหมายเหตุใน `docs/research/emma-robot-next-steps-2026-09-08.md` ให้ลิงก์/คำแนะนำปัจจุบันไม่ชี้ไปบริการพอร์ต 8010 ที่ลบแล้ว โดยเก็บรายงานเก่าไว้เป็นประวัติ ไม่เปลี่ยนข้อมูล draft เป็น approved
+- ตรวจสอบจริง: `pytest -q --basetemp=.pytest_cleanup_20260917 -p no:cacheprovider` ได้ **1,527 ผ่าน / 5 ล้ม / 1 warning** โดยทั้ง 5 เคสล้มเรื่อง `draft_script` (4) และความยาว prompt (1) เหมือนรอบรีวิวก่อนลบตัวจำลอง; `python -m compileall -q app scripts`, `git diff --check` และ `node tests/client_metrics.cjs` ผ่าน; `node tests/client_audio_start.cjs` กับ `node tests/client_voice_lifecycle.cjs` ยังล้มเพราะ test harness เรียก `getUserMedia` ตรง แต่หน้าเว็บปัจจุบันใช้ `openPreferredMic` จากงานค้างเดิม ไม่ใช่ผลการถอดตัวจำลอง
+
 ## 2026-09-15 — Conversation brevity เฉพาะ walk-in และ family/weekend clue
 
 - `app/prompts.py`: จูนเฉพาะกฎ adaptive/storytelling เดิม—เคส “ยังไม่รู้อะไรเลย” ให้ต้อนรับและบอกชื่อโครงการหนึ่งประโยคแล้วหยุด ไม่แตกเป็น mini-presentation หรือรีบถามแบบห้อง; เมื่อมี clue เรื่องครอบครัว เวลา หรือรูปแบบการมาใช้ ให้ตอบด้วยประโยชน์ที่เกี่ยวที่สุดเพียงเรื่องเดียวแล้วหยุด ไม่ไล่ facility/ห้องหรือถามต่อ

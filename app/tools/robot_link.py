@@ -30,8 +30,6 @@ import asyncio
 import logging
 from typing import Any
 
-from app.robot_backend import active as simulation_backend
-
 logger = logging.getLogger("condo_voice.robot")
 
 #: Points of interest the robot knows, mirrored from the robot's own map.
@@ -69,8 +67,6 @@ def places() -> list[str]:
     so `send()` still answers "mock" and the result still tells the model to
     say the robot cannot go anywhere yet.
     """
-    if backend := simulation_backend.get():
-        return list(backend.places)
     if STATE["connected"] or KNOWN_PLACES:
         return KNOWN_PLACES
     from app.config import settings
@@ -79,16 +75,10 @@ def places() -> list[str]:
 
 
 def snapshot() -> dict:
-    if backend := simulation_backend.get():
-        return dict(backend.state)
     state = dict(STATE)
     if state["status_source"] in {"unknown", "stop_requested", "timeout", "disconnected", "transport_failed"}:
         state["moving"] = None
     return state
-
-
-def is_simulated() -> bool:
-    return simulation_backend.get() is not None
 
 
 def available() -> bool:
@@ -215,9 +205,6 @@ async def send(action: str, **args: Any) -> str:
     later through `arrived()` as its own turn — the same shape as the
     `resumed` event and `follow_canva`.
     """
-    if backend := simulation_backend.get():
-        return await backend.send(action, **args)
-
     from app.config import settings
 
     if not settings.robot_enabled:

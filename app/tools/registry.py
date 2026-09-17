@@ -138,12 +138,6 @@ def allowed(entry: Tool) -> bool:
 
     if not settings.tools_enabled:
         return False
-    from app.robot_backend import active as simulation_backend, SIMULATION_TOOLS
-
-    if simulation_backend.get() is not None:
-        return entry.group in {"robot", "simulation_home"} and entry.name in SIMULATION_TOOLS
-    if entry.group == "simulation_home":
-        return False
     groups = settings.enabled_tool_groups()
     if entry.group is None:
         return True
