@@ -1,5 +1,10 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-17 — ลดไฟล์สร้างอัตโนมัติใน Source Control
+
+- `.gitignore`: ไม่แสดงแคช Gradle และผล build ใต้ `apps/emma-ai-voice/` ใน Git เพราะสร้างใหม่ได้และไม่ใช่ซอร์ส; ไม่ลบไฟล์ในเครื่องหรือซ่อนซอร์สแอป
+- ตรวจสอบจริง: ก่อนแก้ `git status --porcelain=v1 -uall` แสดง 295 ไฟล์ โดย 144 ไฟล์เป็นสองโฟลเดอร์ดังกล่าว; โฟลเดอร์ `.tmp/` ราว 15,458 ไฟล์ถูก ignore อยู่แล้ว; หลังแก้ `git status` เหลือ 151 ไฟล์ และ `git check-ignore -v` ยืนยันกฎทั้งสอง โดยซอร์สแอป 16 ไฟล์ยังปรากฏตามเดิม
+
 ## 2026-09-17 — ปลดชุดตัวจำลองหุ่นก่อนรับเครื่อง
 
 - ลบ `app/robot_backend.py`, `app/robot_diagnostics.py`, `app/robot_home.py`, `app/robot_simulation.py`, `app/robot_simulator.py`, `app/robot_voice.py`, `app/tools/simulation_home.py`, หน้า `client/robot-simulator.*`, ฉาก `robot-scene*`, `robot-explorer.js`, `robot-interior.js`, `robot-showroom.js`, `simulator-voice.*`, `robot-drive-sim.html`, ชุด Three.js ที่ใช้เฉพาะตัวจำลอง, `start-robot-simulator.cmd`, `scripts/build_showroom_map.py` และการทดสอบเฉพาะตัวจำลอง เพราะหน้าและ runtime ซ้อมก่อนหุ่นมาถูกเลิกใช้แล้ว; คง adapter/หน้าควบคุมหุ่นจริงและไฟล์ CAD ใน `data/showroom/` ไว้เป็นข้อมูลอ้างอิงที่ยังไม่ยืนยันสำหรับการเดินจริง
