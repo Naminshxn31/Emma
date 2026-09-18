@@ -22,10 +22,19 @@ def catalogue(monkeypatch, tmp_path):
 
     (tmp_path / "brochure.pdf").write_bytes(b"%PDF-1.4 brochure")
     (tmp_path / "booking.pdf").write_bytes(b"%PDF-1.4 booking")
+    approved = {
+        "source_id": "printable_documents", "project_id": settings.project_id,
+        "approval_status": "approved", "approved_by": "test_reviewer",
+        "approved_at": "2026-01-01T00:00:00+07:00",
+        "effective_at": "2026-01-01T00:00:00+07:00",
+        "disclosure_scope": "customer", "content_state": "existing",
+        "approval_unit": "entire_document",
+    }
     (tmp_path / "catalogue.json").write_text(json.dumps({"documents": [
         {"name": "โบรชัวร์โครงการ", "file": "brochure.pdf",
-         "aliases": ["โบรชัวร์", "brochure"]},
-        {"name": "ใบจอง", "file": "booking.pdf", "aliases": ["ฟอร์มจอง"]},
+         "aliases": ["โบรชัวร์", "brochure"], **approved},
+        {"name": "ใบจอง", "file": "booking.pdf", "aliases": ["ฟอร์มจอง"],
+         **approved},
     ]}, ensure_ascii=False), encoding="utf-8")
 
     monkeypatch.setattr(settings, "documents_dir", str(tmp_path))

@@ -1,9 +1,9 @@
 """
-The search index over the slide library.
+The separate image-discovery and disclosed-text indexes over the slide library.
 
-Holds the BM25 index, the embeddings, and the rule for deciding whether a
-result is good enough to say out loud or to put on the screen. Built lazily
-on first use and rebuilt whenever the deck changes.
+Image discovery is lexical-only so unreviewed copy never reaches an external
+embedding service or a model reranker. Customer answers index approved text
+only. Both are rebuilt when their source set changes.
 """
 from __future__ import annotations
 
@@ -172,11 +172,12 @@ def _rerank(query: str, indices: list[int], slides: list[dict]) -> list[int]:
 
 
 class SlideSearch:
-    def __init__(self) -> None:
+    def __init__(self, *, customer_text: bool = False) -> None:
         self.slides: list[dict] = []
         self.bm25: BM25 | None = None
         self.semantic: SemanticIndex | None = None
         self._embedding_failed = False
+        self.customer_text = customer_text
 
     # ---- building ----
 
@@ -198,7 +199,12 @@ class SlideSearch:
         self.bm25 = BM25(documents)
         logger.info("indexed %d slides for lexical search", len(slides))
 
-        self._build_semantic(slides)
+        if self.customer_text:
+            self._build_semantic(slides)
+        else:
+            # Asset discovery may index draft labels locally, but must never
+            # send them to an embedding service or model-based reranker.
+            self.semantic = None
 
     def _build_semantic(self, slides: list[dict]) -> None:
         if not settings.search_semantic or not settings.gemini_api_key:
@@ -335,7 +341,7 @@ class SlideSearch:
             order = sorted(fused, key=lambda i: -fused[i])[:candidate_count]
 
         candidates = order[:candidate_count]
-        if settings.search_reranker_model.strip() and not preferred_ids:
+        if self.customer_text and settings.search_reranker_model.strip() and not preferred_ids:
             order = _rerank(query, candidates, self.slides)[:limit]
         else:
             order = order[:limit]
@@ -361,19 +367,41 @@ class SlideSearch:
 
 
 _index: SlideSearch | None = None
+_text_index: SlideSearch | None = None
+_text_index_key: tuple | None = None
 
 
 def get_index(slides: list[dict]) -> SlideSearch:
     global _index
     if _index is None or _index.slides is not slides:
-        _index = SlideSearch()
+        _index = SlideSearch(customer_text=False)
         _index.build(slides)
     return _index
 
 
+def get_text_index(disclosed_slides: list[dict]) -> SlideSearch:
+    """Separate index so draft text never enters customer-answer ranking.
+
+    The key changes when approval is revoked or a different project's source
+    objects are loaded; the caller filters *before* this method is invoked.
+    """
+    global _text_index, _text_index_key
+    key = tuple((slide.get("id"), slide.get("project_id"), slide.get("source_id"),
+                 slide.get("approval_status"), slide.get("effective_at"),
+                 slide.get("expires_at"), fingerprint_of([_document_text(slide)]))
+                for slide in disclosed_slides)
+    if _text_index is None or _text_index_key != key:
+        _text_index = SlideSearch(customer_text=True)
+        _text_index.build(disclosed_slides)
+        _text_index_key = key
+    return _text_index
+
+
 def reset() -> None:
-    global _index, _reranker, _reranker_failed
+    global _index, _text_index, _text_index_key, _reranker, _reranker_failed
     _index = None
+    _text_index = None
+    _text_index_key = None
     _reranker = None
     _reranker_failed = False
     project_knowledge.reset()

@@ -385,7 +385,12 @@ def test_a_wedged_canva_window_does_not_stop_a_tour(monkeypatch):
     load_tools()
     slides.reload_slides()
     monkeypatch.setattr(slides, "_slides", approved_slides(slides.load_slides()))
-    monkeypatch.setattr(settings, "canva_url", "https://canva.test/x/view")
+    from pathlib import Path
+
+    registered = json.loads((Path(settings.slides_dir) / "canva_pages.json").read_text(
+        encoding="utf-8"))["deck_url"]
+    monkeypatch.setattr(settings, "canva_url", "https://canva.test/design/%s/view"
+                        % canva_display._design_id(registered))
     monkeypatch.setattr(settings, "canva_arrival_timeout_s", 0.5)
 
     async def never_ready(**_kw):

@@ -65,6 +65,12 @@ def _base_url() -> str:
 #: below is still reachable. See `_page_number`.
 _PAGE_MAP: dict[str, int] | None = None
 _PAGE_MAP_TOTAL: int | None = None
+_PAGE_MAP_SCOPE: tuple | None = None
+
+
+def _design_id(url: str) -> str | None:
+    match = re.search(r"/design/([A-Za-z0-9_-]+)/", url or "")
+    return match.group(1) if match else None
 
 
 def _page_map_path():
@@ -73,31 +79,57 @@ def _page_map_path():
 
 
 def load_page_map(force: bool = False) -> dict[str, int]:
-    """Read the measured mapping, once. Missing file = empty mapping."""
-    global _PAGE_MAP, _PAGE_MAP_TOTAL
-    if _PAGE_MAP is not None and not force:
-        return _PAGE_MAP
+    """Read only this project's measured design, invalidating by content hash."""
+    global _PAGE_MAP, _PAGE_MAP_TOTAL, _PAGE_MAP_SCOPE
+    import hashlib
     import json
+
     path = _page_map_path()
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        data = path.read_bytes()
+        stamp = hashlib.sha256(data).digest()
+    except OSError:
+        data = None
+        stamp = None
+    scope = (settings.project_id, str(path.resolve()), _design_id(settings.canva_url), stamp)
+    if _PAGE_MAP is not None and _PAGE_MAP_SCOPE == scope and not force:
+        return _PAGE_MAP
+    try:
+        if data is None:
+            raise FileNotFoundError(path)
+        raw = json.loads(data)
     except FileNotFoundError:
-        _PAGE_MAP, _PAGE_MAP_TOTAL = {}, None
+        _PAGE_MAP, _PAGE_MAP_TOTAL, _PAGE_MAP_SCOPE = {}, None, scope
         return _PAGE_MAP
     except (OSError, ValueError):
-        logger.warning("could not read %s — falling back to id arithmetic", path)
-        _PAGE_MAP, _PAGE_MAP_TOTAL = {}, None
+        logger.warning("could not read %s — refusing unmeasured Canva pages", path)
+        _PAGE_MAP, _PAGE_MAP_TOTAL, _PAGE_MAP_SCOPE = {}, None, scope
         return _PAGE_MAP
     from app.data_sources import require_project_payload
 
     try:
+        if not isinstance(raw, dict):
+            raise ValueError("invalid Canva page mapping")
         require_project_payload(raw, "canva_page_mapping", settings.project_id)
+        configured = _design_id(settings.canva_url)
+        registered = _design_id(raw.get("deck_url", ""))
+        if not registered or (settings.canva_url and configured != registered):
+            raise ValueError("Canva design is not registered for this project")
+        pages = raw.get("pages")
+        total = raw.get("total")
+        if (not isinstance(pages, dict) or not isinstance(total, int) or total < 1
+                or any(not isinstance(key, str) or not isinstance(value, int)
+                       or isinstance(value, bool) or not 1 <= value <= total
+                       for key, value in pages.items())
+                or len(set(pages.values())) != len(pages)):
+            raise ValueError("invalid Canva page mapping")
     except ValueError:
-        logger.error("canva page map belongs to a different project: %s", path)
-        _PAGE_MAP, _PAGE_MAP_TOTAL = {}, -1
+        logger.error("canva page map is not scoped to this project/design: %s", path)
+        _PAGE_MAP, _PAGE_MAP_TOTAL, _PAGE_MAP_SCOPE = {}, -1, scope
         return _PAGE_MAP
-    _PAGE_MAP = {str(k): int(v) for k, v in (raw.get("pages") or {}).items()}
-    _PAGE_MAP_TOTAL = raw.get("total")
+    _PAGE_MAP = dict(pages)
+    _PAGE_MAP_TOTAL = total
+    _PAGE_MAP_SCOPE = scope
     logger.info("canva page map: %d slides -> a deck of %s pages",
                 len(_PAGE_MAP), _PAGE_MAP_TOTAL)
     return _PAGE_MAP
@@ -120,17 +152,22 @@ def _page_number(slide_id: str) -> int | None:
     showing the wrong room while the robot describes this one is a lie told
     to a customer.
 
-    The old arithmetic survives only for a deck that has never been
-    measured, so an unconfigured install behaves as before.
+    An unmeasured or mismatched design is now unavailable; numeric IDs are
+    not evidence of a page in a different Canva design.
     """
     match = re.match(rf"^{re.escape(settings.canva_deck_prefix)}-(\d+)$", slide_id)
     if not match:
         return None
     mapping = load_page_map()
-    if _PAGE_MAP_TOTAL == -1:
-        return None
     if not mapping:
-        return int(match.group(1))
+        return None
+    from app.tools import slides
+
+    if not any(slide.get("id") == slide_id
+               and slide.get("source_id") == "slide_catalog"
+               and slide.get("project_id") == settings.project_id
+               for slide in slides.load_slides()):
+        return None
     page = mapping.get(slide_id)
     if page is None:
         logger.info("slide %s is not in the canva page map — not moving the "

@@ -37,9 +37,6 @@ from app.tools.registry import tool
 
 logger = logging.getLogger("condo_voice.documents")
 
-_catalogue: list[dict] | None = None
-
-
 def _dir() -> Path:
     return Path(settings.documents_dir).expanduser()
 
@@ -47,24 +44,31 @@ def _dir() -> Path:
 def load_catalogue() -> list[dict]:
     """Documents the team has made available, from catalogue.json.
 
-    A manifest rather than a directory listing: the file carries the spoken
-    name a guest would use, which a filename does not, and it means dropping a
-    PDF into the folder is not by itself enough to make the robot hand it out.
+    A manifest rather than a directory listing: dropping a PDF into the
+    folder is not enough. In a customer session every document must carry
+    source-level project and disclosure approval; no chunk-level guessing.
     """
-    global _catalogue
-    if _catalogue is not None:
-        return _catalogue
     path = _dir() / "catalogue.json"
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         entries = raw["documents"] if isinstance(raw, dict) else raw
     except Exception:
         logger.info("no document catalogue at %s — printing is unavailable", path)
-        _catalogue = []
-        return _catalogue
+        return []
 
+    from app.knowledge_policy import evaluate_claim
     ready = []
     for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if settings.assistant_profile == "condo":
+            decision = evaluate_claim(entry, settings.project_id)
+            if (entry.get("source_id") != "printable_documents"
+                    or entry.get("approval_unit") != "entire_document"
+                    or entry.get("mixed_status") is True
+                    or not decision.allowed):
+                logger.info("document policy %s", decision.trace())
+                continue
         file = _dir() / (entry.get("file") or "")
         # Resolve and confirm it is really inside the folder. A catalogue is
         # data, and data can be edited by anyone with the folder open.
@@ -72,25 +76,27 @@ def load_catalogue() -> list[dict]:
             inside = file.resolve().is_relative_to(_dir().resolve())
         except Exception:
             inside = False
-        if not inside:
+        if not inside or file.suffix.lower() != ".pdf":
             logger.warning("catalogue entry %r points outside the documents folder — ignored",
                            entry.get("name"))
             continue
         if not file.exists():
             logger.warning("catalogue lists %r but %s is missing", entry.get("name"), file)
             continue
-        entry["_path"] = file
-        ready.append(entry)
+        ready.append({"name": entry.get("name", ""),
+                      "about": entry.get("about", ""),
+                      "aliases": entry.get("aliases", []),
+                      "source_id": entry.get("source_id"),
+                      "project_id": entry.get("project_id"),
+                      "_path": file})
 
-    _catalogue = ready
     logger.info("documents available to print: %s",
                 ", ".join(e.get("name", "?") for e in ready) or "(none)")
-    return _catalogue
+    return ready
 
 
 def reload_catalogue() -> None:
-    global _catalogue
-    _catalogue = None
+    """Compatibility hook; the small catalogue is checked afresh each call."""
 
 
 def find(request: str) -> dict | None:

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
+import shutil
 
 import pytest
 
@@ -22,6 +24,10 @@ from app.tools import canva_display
 def run(coro):
     """No pytest-asyncio in this project; the other suites do the same."""
     return asyncio.run(coro)
+
+
+def _catalog_for_mapping(tmp_path):
+    shutil.copy(Path(settings.slides_dir) / "index.json", tmp_path / "index.json")
 
 
 @pytest.fixture(autouse=True)
@@ -55,7 +61,13 @@ def _reset(monkeypatch):
     # number it never set. Third leak of this shape in this fixture.
     monkeypatch.setattr(canva_display, "_at_page", None)
     monkeypatch.setattr(canva_display, "_warmed", False)
-    monkeypatch.setattr(settings, "canva_url", "https://canva.test/design/x/view")
+    import json as _json
+    from pathlib import Path
+
+    registered = _json.loads((Path(settings.slides_dir) / "canva_pages.json").read_text(
+        encoding="utf-8"))["deck_url"]
+    design = canva_display._design_id(registered)
+    monkeypatch.setattr(settings, "canva_url", f"https://canva.test/design/{design}/view")
     monkeypatch.setattr(settings, "canva_deck_prefix", "ew")
 
 
@@ -188,16 +200,14 @@ def test_slides_outside_the_deck_are_ignored(monkeypatch, slide_id):
     run(canva_display.goto(slide_id))
 
 
-def test_the_page_number_falls_back_to_the_id_when_nothing_was_measured(
+def test_an_unmeasured_page_is_not_guessed_from_the_id(
         monkeypatch, tmp_path):
-    """An install that has never run `scripts/canva_pages.py` behaves as
-    before: id 42 means page 42. That is a guess, but it is the guess the
-    deck was imported under, and it is right for a deck that was never
-    edited after export."""
+    """A missing map cannot authorize a Canva page by numeric coincidence."""
+    _catalog_for_mapping(tmp_path)
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
-    assert canva_display._page_number("ew-042") == 42
-    assert canva_display._page_number("ew-001") == 1
+    assert canva_display._page_number("ew-042") is None
+    assert canva_display._page_number("ew-001") is None
     assert canva_display._page_number("picture-42") is None
 
 
@@ -205,8 +215,10 @@ def test_a_measured_mapping_beats_the_arithmetic(monkeypatch, tmp_path):
     """The whole point. Our export has 59 frames, the live deck has fewer
     pages, so `ew-047` is not page 47 — and only a measurement can say what
     it is."""
+    _catalog_for_mapping(tmp_path)
     (tmp_path / "canva_pages.json").write_text(json.dumps(
         {"source_id": "canva_page_mapping", "project_id": settings.project_id,
+         "deck_url": settings.canva_url,
          "total": 50, "pages": {"ew-001": 1, "ew-047": 40}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
@@ -215,9 +227,10 @@ def test_a_measured_mapping_beats_the_arithmetic(monkeypatch, tmp_path):
 
 
 def test_a_foreign_project_mapping_never_moves_the_canva_window(monkeypatch, tmp_path):
+    _catalog_for_mapping(tmp_path)
     (tmp_path / "canva_pages.json").write_text(json.dumps({
         "source_id": "canva_page_mapping", "project_id": "embassy_life",
-        "total": 50, "pages": {"ew-001": 1},
+        "deck_url": settings.canva_url, "total": 50, "pages": {"ew-001": 1},
     }), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
@@ -232,8 +245,10 @@ def test_a_slide_missing_from_the_measured_mapping_moves_nothing(
     Returning the id number here is what put the window on somebody else's
     slide, and past page 50 on nothing at all: the blank screen. Not moving
     is worse than lagging and better than lying."""
+    _catalog_for_mapping(tmp_path)
     (tmp_path / "canva_pages.json").write_text(json.dumps(
         {"source_id": "canva_page_mapping", "project_id": settings.project_id,
+         "deck_url": settings.canva_url,
          "total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
@@ -243,11 +258,12 @@ def test_a_slide_missing_from_the_measured_mapping_moves_nothing(
 
 def test_a_slide_with_no_canva_page_never_opens_the_window(monkeypatch, tmp_path):
     """`goto` has to act on that None, not just receive it."""
+    _catalog_for_mapping(tmp_path)
     (tmp_path / "canva_pages.json").write_text(json.dumps(
         {"source_id": "canva_page_mapping", "project_id": settings.project_id,
+         "deck_url": settings.canva_url,
          "total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
-    monkeypatch.setattr(settings, "canva_url", "https://canva.test/deck/view")
     canva_display.load_page_map(force=True)
 
     def explode(**_kw):

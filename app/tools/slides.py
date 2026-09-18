@@ -85,6 +85,7 @@ KEEP_GOING = (
 )
 
 _slides: list[dict] | None = None
+_slides_scope: tuple | None = None
 
 #: Current presentation position. `deck` is the list of slide ids being shown.
 #:
@@ -149,12 +150,22 @@ def _slides_dir() -> Path:
 
 
 def load_slides() -> list[dict]:
-    global _slides
-    if _slides is not None:
-        return _slides
+    global _slides, _slides_scope
+    import hashlib
+
     path = _slides_dir() / "index.json"
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        data = path.read_bytes()
+        digest = hashlib.sha256(data).digest()
+    except OSError:
+        data, digest = None, None
+    scope = (settings.project_id, str(path.resolve()), digest)
+    if _slides is not None and _slides_scope == scope:
+        return _slides
+    try:
+        if data is None:
+            raise FileNotFoundError(path)
+        raw = json.loads(data)
         require_project_payload(raw, "slide_catalog", settings.project_id)
         images = raw["images"]
         if not isinstance(images, list) or any(
@@ -168,26 +179,40 @@ def load_slides() -> list[dict]:
     except Exception:
         logger.warning("no slide index at %s — presentation tools will be empty", path)
         _slides = []
+    _slides_scope = scope
     return _slides
 
 
 def search_slides(query: str, limit: int = 8):
     """Rank the library against a question.
 
-    BM25 over word-tokenised Thai, plus embeddings for meaning, fused by
-    rank — see app/tools/slide_search.py and app/tools/retrieval.py.
+    Image discovery uses local lexical ranking only; draft slide copy must
+    not be sent to an embedding service or model-based reranker. Customer
+    answers use the separate disclosed-text index below.
     """
     from app.tools import slide_search
 
     return slide_search.get_index(load_slides()).search(query, limit=limit)
 
 
+def search_disclosed_slide_text(query: str, limit: int = 8):
+    """Filter sources before indexing, reranking or forming model context."""
+    from app.knowledge_policy import evaluate_claim
+    from app.tools import slide_search
+
+    approved = [slide for slide in load_slides()
+                if slide.get("source_id") == "slide_catalog"
+                and evaluate_claim(slide, settings.project_id).allowed]
+    return slide_search.get_text_index(approved).search(query, limit=limit)
+
+
 def reload_slides() -> None:
     """Drop the cache so a re-indexed deck is picked up without a restart."""
-    global _slides
+    global _slides, _slides_scope
     from app.tools import slide_search
 
     _slides = None
+    _slides_scope = None
     slide_search.reset()   # the index is built from the deck, so it goes too
 
 
@@ -213,25 +238,42 @@ def confident_enough_to_show(hits, query: str = "") -> bool:
 def _public(slide: dict, position: dict | None = None) -> dict:
     """What the model and the display window get. Deliberately excludes the
     raw index entry so a schema change here doesn't leak into prompts."""
+    from app.data_sources import ROOT
     from app.knowledge_policy import evaluate_claim, state_instruction
+    from app.presentation_policy import authorize_slide, customer_slide_trace
 
+    try:
+        manifest = json.loads((ROOT / "data/registry/external_asset_manifest.json").read_text(
+            encoding="utf-8"))
+    except (OSError, ValueError):
+        manifest = {}
+    asset = authorize_slide(slide, project_id=settings.project_id,
+                            asset_manifest=manifest)
+    logger.info("presentation policy %s", asset.trace())
+    if not asset.display:
+        return {"policy_trace": asset.trace(), "capabilities": asset.trace()["capabilities"],
+                "instruction": "ภาพสไลด์นี้ไม่อยู่ในขอบเขตโครงการหรือไม่มี asset ที่ลงทะเบียน ห้ามแสดงหรือบรรยาย"}
     decision = evaluate_claim(slide, settings.project_id)
     logger.info("knowledge policy %s", decision.trace())
+    public_trace = customer_slide_trace(decision, settings.project_id)
     out = {
-        "id": slide["id"],
-        "project_id": slide["project_id"],
-        "type": slide.get("type"),
+        "id": asset.asset["id"],
+        "project_id": settings.project_id,
+        "source_id": "slide_catalog",
+        "capabilities": asset.trace()["capabilities"],
         # A display identifier is not authority to narrate words on an image.
         "title_th": slide.get("title_th") if decision.allowed else "ภาพประกอบ",
         "title_en": slide.get("title_en") if decision.allowed else "Presentation image",
-        "url": f"/slides/{slide['file']}",
-        "policy_trace": decision.trace(),
+        "url": asset.asset["url"],
+        "asset_policy_trace": asset.trace(),
+        "policy_trace": public_trace,
     }
     if not decision.allowed:
         out["instruction"] = "แสดงภาพประกอบได้ แต่ข้อความในภาพยังไม่อนุมัติให้กล่าวเป็นข้อเท็จจริง ห้ามบรรยายหรืออนุมานจากภาพ"
         if position:
             out.update(position)
         return out
+    out["type"] = slide.get("type")
     out["summary_th"] = slide.get("summary_th")
     out["summary_en"] = slide.get("summary_en")
     out["content_state"] = decision.content_state
@@ -278,11 +320,30 @@ def _public(slide: dict, position: dict | None = None) -> dict:
 
 
 def _set_current(slide: dict | None, position: dict | None = None) -> dict | None:
-    STATE["current"] = _public(slide, position) if slide else None
+    shown = _public(slide, position) if slide else None
+    if slide and not shown.get("url"):
+        return shown
+    STATE["current"] = shown
     return STATE["current"]
 
 
 def current_slide() -> dict | None:
+    """Reauthorize cached display state before it is reused as model context.
+
+    A catalogue can be revoked or the active project changed while the image
+    remains on screen. The previous public dict is not a durable permission.
+    """
+    cached = STATE["current"]
+    if not cached:
+        return None
+    slide = _by_id(cached.get("id"))
+    if slide is None:
+        STATE["current"] = None
+        return None
+    position = {key: cached[key] for key in ("position", "total")
+                if isinstance(cached.get(key), int) and not isinstance(cached[key], bool)}
+    refreshed = _public(slide, position)
+    STATE["current"] = refreshed if refreshed.get("url") else None
     return STATE["current"]
 
 
@@ -294,8 +355,10 @@ def show_current(slide: dict) -> dict:
     A running presentation is *paused*, not thrown away: the guest asked a
     question, they didn't cancel the tour.
     """
-    STATE["detour"] = True
-    return _set_current(slide)
+    shown = _set_current(slide)
+    if shown and shown.get("url"):
+        STATE["detour"] = True
+    return shown
 
 
 async def _point_canva_at(slide_id: str, *, hold: bool = False) -> None:
@@ -439,6 +502,8 @@ def move_to_deck_page(page_number: int) -> dict | None:
                 or "%s-%03d" % (settings.canva_deck_prefix, page_number))
     slide = _by_id(slide_id)
     if slide is None:
+        return None
+    if not _public(slide).get("url"):
         return None
 
     deck = STATE["deck"] or _build_deck(DEFAULT_TOUR)
@@ -682,7 +747,8 @@ def _build_deck(tour: str) -> list[str]:
         ordered = [sid for sid in canva_display.deck_order() if sid in known]
         if ordered:
             return ordered
-        # Never measured. Present the export in its own order, as before.
+        # No measured Canva page: local image tour only. Canva will not guess
+        # a page number from the slide ID.
     wanted = TOURS.get(tour, [])
     deck: list[str] = []
     for slide_type in wanted:
@@ -734,7 +800,12 @@ def show_slide(query: str) -> dict:
     from app.tool_io import on_loop
 
     shown = on_loop(show_current, hits[0].slide)
-    alternatives = [h.slide["id"] for h in hits[1:4] if h.found]
+    if not shown or not shown.get("url"):
+        return {"ok": False, "error": "slide display policy blocked",
+                "policy_trace": (shown or {}).get("policy_trace"),
+                "instruction": "ยังไม่มีภาพในขอบเขตโครงการที่อนุญาตให้แสดง ห้ามบรรยายจากผลที่ถูกบล็อก"}
+    alternatives = [h.slide["id"] for h in hits[1:4]
+                    if h.found and _public(h.slide).get("url")]
     out = {"ok": True, "slide": shown, "alternatives": alternatives}
     if shown.get("script"):
         out["instruction"] = SPEAK_SCRIPT
@@ -782,7 +853,7 @@ async def start_presentation(tour: str = DEFAULT_TOUR) -> dict:
     from app.knowledge_policy import evaluate_claim
 
     if any(not evaluate_claim(_by_id(slide_id), settings.project_id).allowed
-           for slide_id in deck):
+           or not _public(_by_id(slide_id)).get("url") for slide_id in deck):
         return {"ok": False, "error": "presentation copy not approved",
                 "instruction": "ยังไม่มีบทพรีเซนต์ที่อนุมัติครบชุด ให้บอกลูกค้าตรงๆ ห้ามบรรยายจาก draft"}
 

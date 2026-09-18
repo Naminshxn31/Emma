@@ -23,6 +23,7 @@ from app import turnlog
 from app.tools.slides import confident_enough_to_show, load_slides
 from app.config import settings
 from app.knowledge_policy import evaluate_claim, state_instruction
+from app.presentation_policy import customer_slide_trace
 
 logger = logging.getLogger("condo_voice.knowledge")
 
@@ -70,12 +71,14 @@ def _result_limit(query: str) -> int:
 def _entry(slide: dict) -> dict:
     """One search hit, trimmed to what's useful to speak from."""
     decision = evaluate_claim(slide, settings.project_id)
-    if not decision.allowed:
-        return {"policy_trace": decision.trace()}
+    if not decision.allowed or slide.get("source_id") != "slide_catalog":
+        return {"policy_trace": customer_slide_trace(
+            decision, settings.project_id,
+            valid_source=slide.get("source_id") == "slide_catalog")}
     out = {
         "source_id": slide["source_id"],
         "project_id": slide["project_id"],
-        "policy_trace": decision.trace(),
+        "policy_trace": customer_slide_trace(decision, settings.project_id),
         "content_state": decision.content_state,
         "title": sanitize_common_area_dimensions(
             slide.get("title_th") or slide.get("title_en")
@@ -178,7 +181,9 @@ def search_condo_info(query: str) -> dict:
 
     from app.tools import slides as slides_mod
 
-    ranked = slides_mod.search_slides(query)
+    # An undisclosed slide must not influence BM25, embeddings or the optional
+    # reranker for a customer answer. Image-only search has a separate index.
+    ranked = slides_mod.search_disclosed_slide_text(query)
     # **The top hit decides whether anything is answered at all.**
     #
     # The line above used to read `[h.slide for h in ranked if h.found]`, which
@@ -201,8 +206,13 @@ def search_condo_info(query: str) -> dict:
     else:
         hits = [h.slide for h in ranked if h.found][:_result_limit(query)]
 
-    rejected = [evaluate_claim(slide, settings.project_id).trace() for slide in hits]
-    hits = [slide for slide in hits if evaluate_claim(slide, settings.project_id).allowed]
+    rejected = [customer_slide_trace(evaluate_claim(slide, settings.project_id),
+                                     settings.project_id,
+                                     valid_source=slide.get("source_id") == "slide_catalog")
+                for slide in slides if slide.get("source_id") != "slide_catalog"
+                or not evaluate_claim(slide, settings.project_id).allowed][:1]
+    hits = [slide for slide in hits if slide.get("source_id") == "slide_catalog"
+            and evaluate_claim(slide, settings.project_id).allowed]
     for trace in rejected:
         logger.info("knowledge policy %s", trace)
 
@@ -277,9 +287,10 @@ def search_condo_info(query: str) -> dict:
         return result
     from app.tool_io import on_loop
 
-    result["now_showing"] = _sanitize_now_showing(
-        on_loop(slides_mod.show_current, hits[0])
-    )
+    shown = _sanitize_now_showing(on_loop(slides_mod.show_current, hits[0]))
+    if not shown or not shown.get("url"):
+        return result
+    result["now_showing"] = shown
     resume = on_loop(slides_mod.resume_hint)
     if resume:
         result["presentation"] = resume

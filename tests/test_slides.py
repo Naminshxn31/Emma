@@ -77,6 +77,9 @@ def test_every_slide_file_exists(slides):
 
 def test_asset_test_skip_applies_only_to_a_completely_absent_bundle(slides, tmp_path, monkeypatch):
     first_file = slides.load_slides()[0]["file"]
+    import shutil
+
+    shutil.copy(Path(settings.slides_dir) / "index.json", tmp_path / "index.json")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     with pytest.raises(pytest.skip.Exception):
         _skip_when_bundle_not_materialized(slides)
@@ -180,7 +183,7 @@ def test_approval_is_recorded_with_a_name(slides):
 
     source = dict(slides.load_slides()[0])
     approved = _public({**source,
-        "id": "x", "file": "x.jpg", "script_th": "...",
+        "script_th": "...",
         "project_id": settings.project_id,
         "script_approved": True, "script_approved_by": "ฝ่ายขาย Empire Group",
     })
@@ -1894,9 +1897,12 @@ def _measured(tmp_path, monkeypatch, pages: dict, total: int = 50):
 
     src = __import__("pathlib").Path(settings.slides_dir)
     shutil.copy(src / "index.json", tmp_path / "index.json")
+    registered_url = json.loads((src / "canva_pages.json").read_text(
+        encoding="utf-8"))["deck_url"]
     (tmp_path / "canva_pages.json").write_text(
         json.dumps({"source_id": "canva_page_mapping", "project_id": settings.project_id,
-                    "total": total, "pages": pages}), encoding="utf-8")
+                    "deck_url": registered_url, "total": total, "pages": pages}),
+        encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
     monkeypatch.setattr(canva_display, "_PAGE_MAP_TOTAL", None)

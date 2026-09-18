@@ -80,15 +80,15 @@ def test_approved_developing_fact_is_qualified_in_prompt(tmp_path):
 
 
 def test_slide_asset_can_be_displayed_without_releasing_draft_copy():
-    from app.tools.slides import _public
+    from app.tools.slides import _public, load_slides
     from app.tools.knowledge import _entry
 
-    slide = {"id": "test", "file": "test.jpg", "source_id": "slide_catalog",
-             "project_id": ACTIVE_PROJECT_ID, "title_th": "คำอ้างที่ยังไม่อนุมัติ",
+    slide = {**load_slides()[0], "title_th": "คำอ้างที่ยังไม่อนุมัติ",
              "summary_th": "รายละเอียดที่ยังไม่อนุมัติ", "script_th": "บท draft"}
     shown = _public(slide)
-    assert shown["url"] == "/slides/test.jpg"
+    assert shown["url"] == "/slides/" + slide["file"]
     assert not shown["policy_trace"]["allowed"]
+    assert shown["capabilities"] == {"display": True, "model_text": False}
     assert not any(word in str(shown) for word in ("คำอ้างที่ยังไม่อนุมัติ", "รายละเอียดที่ยังไม่อนุมัติ", "บท draft"))
     assert _entry(slide) == {"policy_trace": shown["policy_trace"]}
 
