@@ -1,5 +1,12 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-18 — M1a verified floor-plan render acknowledgement
+
+- `app/tools/units.py`, `app/plan_display.py`, `app/tools/registry.py`: เปลี่ยน `show_plan` ให้คืนสถานะเตรียมแสดงแทนการอ้างว่าสำเร็จ; เก็บ byte ภาพที่ตรวจ SHA-256 แล้วแบบมีอายุและผูก project, ส่ง command เฉพาะ session, รอ ACK ที่ตรง command/asset/hash ก่อนคืน `ok: true` ให้ provider; timeout/ภาพผิด/จอไม่ตอบไม่มีภาพหรือ overlay ในผลล้มเหลว
+- `app/main.py`, `app/session.py`, `client/index.html`: เพิ่ม endpoint byte ภาพที่ตรวจแล้วแบบ content-addressed และตรวจ token; รับ ACK บน socket เดิม; หน้าเว็บตรวจ hash ของ byte ที่ดาวน์โหลด (รวม fallback สำหรับ HTTP LAN), decode/paint ก่อน ACK และไม่โหลดภาพซ้ำจาก `tool_result`; timeout ส่ง cancel ให้หยุดคำสั่งจอที่มาช้า
+- `tests/test_plan_action_integrity.py`, `tests/test_plan_runtime_policy.py`, `docs/display-action-integrity.md`: เพิ่ม regression ของ endpoint, ข้าม project/session, mismatch, timeout, direct handler ที่ยังไม่สำเร็จ, provider result ไม่มี raw image/overlay, และ SHA-256 fallback; บันทึกขอบเขตการพิสูจน์ระดับ browser กับงานทดสอบ kiosk จริง
+- ผลตรวจจริง: ชุด plan action + plan policy + units + sales หลังเพิ่ม cancel และ bounded send **72 ผ่าน / 1 warning**; ชุดเต็มหลังเพิ่ม bounded-send test **1,607 ผ่าน / 1 known failure / 1 warning** (`tests/test_voice.py::test_system_instruction_stays_short` 6,460 เทียบเกณฑ์ 4,700 เดิม), ไม่มี failure ใหม่; audit CI **0 errors / 3 warnings** ที่เป็นข้อมูลยังไม่อนุมัติ; `compileall` และ `git diff --check` ผ่าน. ยังไม่ได้ทดสอบจอ kiosk, Supabase asset หรือ provider live session; pytest บน Windows มีข้อความ pending asyncio accept task ตอนปิดกระบวนการ
+
 ## 2026-09-18 — M0.3c code-path egress / bypass sweep
 
 - `app/display.py`, `app/tools/slides.py`, `app/tools/canva_display.py`, `app/slide_assets.py`: ปิด direct display/broadcast/Canva/HTTP bypass; ก่อน broadcast, Canva side effect หรือ serve URL ต้อง resolve สไลด์จาก catalog และ asset manifest ของ project ปัจจุบันซ้ำ แม้คำสั่งรอเสียงหรือมี public dict เก่าอยู่; ไม่คืน raw title/metadata จากผู้เรียก

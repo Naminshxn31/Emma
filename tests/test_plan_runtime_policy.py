@@ -131,7 +131,8 @@ def test_plan_overlay_denies_foreign_floor_status_and_unbounded_coordinates(monk
         {"path": "/fpg1.webp", "floor": floor}, "plan_asset_runtime_v1"))
     rows = [[ROW]]
     monkeypatch.setattr(units, "_live_get", lambda *args, **kwargs: rows[0])
-    assert units.show_plan(1)["ok"] is True
+    prepared = units.show_plan(1)
+    assert prepared["pending_display"] is True and prepared["ok"] is False
 
     cases = [
         ({**ROW, "floors": {"floor_number": 1, "buildings": {

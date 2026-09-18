@@ -401,6 +401,27 @@ async def unit_price(room: str, token: str | None = None):
     return pair
 
 
+@app.get("/verified-plan/{sha256}")
+async def verified_plan(sha256: str, token: str | None = None):
+    """Serve the exact, short-lived image bytes checked by the plan policy."""
+    import hmac
+    import re
+    from fastapi import Response
+
+    if settings.ws_token and not hmac.compare_digest(
+            (token or "").encode(), settings.ws_token.encode()):
+        return Response(status_code=403)
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+        return Response(status_code=404)
+    from app.tools import units
+
+    body = units.verified_plan_body(sha256)
+    if body is None:
+        return Response(status_code=404)
+    return Response(content=body, media_type="image/webp",
+                    headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+
 @app.get("/health")
 async def health() -> dict:
     from app.tools import robot_link

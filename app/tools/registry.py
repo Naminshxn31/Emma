@@ -309,6 +309,13 @@ async def _dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
     if any(tag in entry.tags for tag in ("units", "knowledge", "slides")):
         result.setdefault("project_id", settings.project_id)
 
+    # The handler only prepares verified content. Provider success must wait
+    # for a render acknowledgement from the same browser session.
+    if name == "show_plan" and result.get("pending_display") is True:
+        from app.plan_display import confirm_plan
+
+        result = await confirm_plan(result)
+
     # A tool that changed what's on screen has to reach the display windows.
     # Doing it here rather than inside each slide tool keeps the handlers
     # synchronous and free of transport concerns.

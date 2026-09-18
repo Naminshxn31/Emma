@@ -657,7 +657,50 @@ def find_units(max_price_thb: float | None = None,
 # the stage: the same picture the sales desk stares at, colored by what is
 # actually sold *right now*, with no prices anywhere on it (policy).
 
-_PLAN_VERIFIED: dict[tuple[str, str], tuple[float, str, str]] = {}
+_PLAN_VERIFIED: dict[tuple[str, str, str], tuple[float, str, str, bytes]] = {}
+
+
+def _still_allowed_plan(url: str, digest: str, media_type: str) -> bool:
+    """A cached byte sequence is not permission after manifest revocation."""
+    from app.data_sources import source_path
+
+    try:
+        source = json.loads(source_path("floor_plan_assets", settings.project_id).read_text(
+            encoding="utf-8"))
+        for entry in source.get("floors", []):
+            if (isinstance(entry, dict) and isinstance(entry.get("display_path"), str)
+                    and settings.inventory_plan_base.rstrip("/") + entry["display_path"] == url):
+                return prepare_plan_asset(
+                    source, entry, expected_project_id=settings.project_id,
+                    observed_sha256=digest, content_type=media_type).allowed
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        pass
+    return False
+
+
+def verified_plan_bytes(image_url: str | None) -> tuple[str, bytes] | None:
+    """Serve only bytes actually verified for this project's current image."""
+    if not isinstance(image_url, str):
+        return None
+    now = _time.monotonic()
+    for (project_id, url, expected), (checked, digest, mime, body) in list(_PLAN_VERIFIED.items()):
+        if (project_id == settings.project_id and url == image_url
+                and expected == digest and now - checked < 300
+                and _still_allowed_plan(url, digest, mime)):
+            return digest, body
+    return None
+
+
+def verified_plan_body(sha256: str) -> bytes | None:
+    """Content-addressed HTTP read, bounded by the verifier's five-minute TTL."""
+    if not isinstance(sha256, str) or len(sha256) != 64:
+        return None
+    now = _time.monotonic()
+    for (project_id, url, expected), (checked, digest, mime, body) in list(_PLAN_VERIFIED.items()):
+        if (project_id == settings.project_id and expected == digest == sha256
+                and now - checked < 300 and _still_allowed_plan(url, digest, mime)):
+            return body
+    return None
 
 
 def _plan_paths() -> dict[int, str]:
@@ -698,7 +741,7 @@ def _verified_plan_asset(floor: int) -> RuntimeResult:
         if not metadata.allowed:
             return metadata
         url = settings.inventory_plan_base.rstrip("/") + path
-        key = (url, expected)
+        key = (settings.project_id, url, expected)
         now = _time.monotonic()
         cached = _PLAN_VERIFIED.get(key)
         if cached and now - cached[0] < 300:
@@ -706,6 +749,7 @@ def _verified_plan_asset(floor: int) -> RuntimeResult:
         else:
             digest_state = hashlib.sha256()
             count = 0
+            chunks = []
             with httpx.stream("GET", url, timeout=8, follow_redirects=False) as response:
                 response.raise_for_status()
                 media_type = response.headers.get("content-type", "")
@@ -714,12 +758,17 @@ def _verified_plan_asset(floor: int) -> RuntimeResult:
                     if count > 20 * 1024 * 1024:
                         raise ValueError("plan asset exceeds size limit")
                     digest_state.update(chunk)
+                    chunks.append(chunk)
             digest = digest_state.hexdigest()
         result = prepare_plan_asset(
             source, entry, expected_project_id=settings.project_id,
             observed_sha256=digest, content_type=media_type)
         if result.allowed:
-            _PLAN_VERIFIED[key] = (now, digest, media_type)
+            if not cached or now - cached[0] >= 300:
+                _PLAN_VERIFIED[key] = (now, digest, media_type, b"".join(chunks))
+                # A floor plan is at most 20 MiB. Keep only a small recent set.
+                while len(_PLAN_VERIFIED) > 8:
+                    _PLAN_VERIFIED.pop(next(iter(_PLAN_VERIFIED)))
         return result
     except Exception:
         logger.exception("plan asset could not be verified for floor %s", floor)
@@ -830,7 +879,8 @@ def show_plan(floor: int = 1, building: str | None = None) -> dict:
     turnlog.record("show_plan", floor=floor, building=want or None,
                    units=len(marks))
     scope = f"ตึก {want} " if want else ""
-    return {"ok": True, "screen": "plan", "project_id": settings.project_id,
+    return {"ok": False, "pending_display": True, "action_state": "REQUESTED",
+            "screen": "plan", "project_id": settings.project_id,
             "image": settings.inventory_plan_base.rstrip("/") + asset.payload["path"],
             "floor": floor_number, "building": want or None,
             "units": marks, "counts": counts,
@@ -838,7 +888,8 @@ def show_plan(floor: int = 1, building: str | None = None) -> dict:
                 prepared_rows[0] if prepared_rows else RuntimeResult(
                     True, settings.project_id, INVENTORY_SOURCE_ID,
                     "fresh_scoped_inventory_empty", {})).trace()},
-            "instruction": (f"ผังชั้น {floor} {scope}ขึ้นจอแล้ว สถานะสดจากระบบผังขาย: "
+            "instruction": (f"ผังชั้น {floor} {scope}ผ่านการตรวจข้อมูลแล้ว แต่ยังไม่ยืนยันว่าขึ้นจอ "
+                            "ห้ามพูดว่าเปิดแล้วจนกว่าจะได้รับ render ACK; สถานะสด: "
                             f"ว่าง {counts['available']} จอง {counts['reserved']} "
                             f"ขายแล้ว {counts['sold']} ห้อง "
                             "พูดจากตัวเลขนี้สั้นๆ ห้ามพูดราคา ห้ามบรรยายห้องรายห้องที่ไม่ได้ถูกถาม")}

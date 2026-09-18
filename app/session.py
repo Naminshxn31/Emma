@@ -410,6 +410,13 @@ class VoiceSession:
                         continue
                     if event.get("type") == "stop":
                         return
+                    if event.get("type") == "display.render_ack":
+                        from app import plan_display
+
+                        session_id = turnlog.session_id.get()
+                        if session_id:
+                            plan_display.receive_ack(session_id, event)
+                        continue
                     if event.get("type") == "client_metric":
                         self.metrics.client(event)
                         continue
@@ -1093,6 +1100,10 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
     import uuid
 
     log_token = turnlog.session_id.set(uuid.uuid4().hex)
+    from app import plan_display
+
+    plan_display.register(turnlog.session_id.get(),
+                          lambda command: ws.send_text(json.dumps(command, ensure_ascii=False)))
     turnlog.record("session_start", provider=session.provider_name, voice=session.voice)
     try:
         await session.run()
@@ -1107,4 +1118,5 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
                 await display.set_phase("idle")
             turnlog.record("session_end")
         finally:
+            plan_display.unregister(turnlog.session_id.get())
             turnlog.session_id.reset(log_token)
