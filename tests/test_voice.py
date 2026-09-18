@@ -1046,7 +1046,7 @@ def test_rejected_session_update_is_reported_as_unguarded(client, fake_openai):
     assert err is not None, "a rejected session.update must surface an error"
     assert "REJECTED" in err["message"]
     assert "guardrails" in err["message"]
-    assert "output.format.rate" in err["message"]  # keeps the real cause
+    assert "output.format.rate" not in err["message"], "raw provider error reached the browser"
 
 
 def test_accepted_session_update_marks_provider_configured(client, fake_openai):
@@ -1767,7 +1767,7 @@ def test_blank_facts_are_named_in_the_prompt_not_omitted(tmp_path):
 
     path = tmp_path / "facts.json"
     path.write_text(json.dumps({
-        "source_id": "test.facts", "project_id": "embassy_world",
+        "source_id": "project_facts", "project_id": "embassy_world",
         "approval_status": "approved", "approved_by": "test_reviewer",
         "approved_at": "2026-01-01T00:00:00+07:00",
         "effective_at": "2026-01-01T00:00:00+07:00",

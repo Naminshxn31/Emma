@@ -258,9 +258,12 @@ def test_slide_metadata_is_never_served_and_images_require_token(tmp_path, monke
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
     from app.slide_assets import SlideAssets
+    from app.tools import slides
 
+    registered = slides.load_slides()[0]["file"]
     for filename in ("index.json", "embeddings.npz", "backup.json", "sample.png"):
         (tmp_path / filename).write_bytes(b"fixture")
+    (tmp_path / registered).write_bytes(b"fixture")
     app = FastAPI()
     app.mount("/slides", SlideAssets(directory=str(tmp_path)))
     monkeypatch.setattr(settings, "ws_token", "review-secret")
@@ -270,12 +273,15 @@ def test_slide_metadata_is_never_served_and_images_require_token(tmp_path, monke
         assert client.get(f"/slides/{filename}?token=review-secret").status_code == 404
     assert client.get("/slides/sample.png").status_code == 403
     assert client.get("/slides/sample.png?token=wrong").status_code == 403
-    response = client.get("/slides/sample.png?token=review-secret")
+    assert client.get("/slides/sample.png?token=review-secret").status_code == 404
+    response = client.get(f"/slides/{registered}?token=review-secret")
     assert response.status_code == 200 and response.content == b"fixture"
     assert response.headers["cache-control"] == "private, no-store"
     assert client.get("/slides/%2e%2e/secret.png?token=review-secret").status_code == 404
     monkeypatch.setattr(settings, "ws_token", "")
-    assert client.get("/slides/sample.png").status_code == 200
+    assert client.get(f"/slides/{registered}").status_code == 200
+    monkeypatch.setattr(settings, "project_id", "embassy_life")
+    assert client.get(f"/slides/{registered}").status_code == 404
 
 
 @pytest.mark.parametrize("provider_name", ["gemini", "openai"])

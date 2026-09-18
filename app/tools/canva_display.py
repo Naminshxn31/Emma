@@ -163,10 +163,8 @@ def _page_number(slide_id: str) -> int | None:
         return None
     from app.tools import slides
 
-    if not any(slide.get("id") == slide_id
-               and slide.get("source_id") == "slide_catalog"
-               and slide.get("project_id") == settings.project_id
-               for slide in slides.load_slides()):
+    if slides.display_payload({"id": slide_id, "source_id": "slide_catalog",
+                               "project_id": settings.project_id}) is None:
         return None
     page = mapping.get(slide_id)
     if page is None:

@@ -27,6 +27,7 @@ even when the development switch is on.
 from __future__ import annotations
 
 import re
+import hashlib
 
 import json
 import logging
@@ -45,7 +46,8 @@ logger = logging.getLogger("condo_voice.units")
 
 _cache: dict | None = None
 _cache_path: str | None = None
-_cache_stamp: tuple[int, int] | None = None
+_cache_stamp: bytes | None = None
+_cache_project: str | None = None
 
 
 def _table_path() -> tuple[Path | None, bool]:
@@ -71,21 +73,22 @@ def _load() -> dict:
     half from invented ones is worse than either, because nothing on it says
     which half you are looking at.
     """
-    global _cache, _cache_path, _cache_stamp
+    global _cache, _cache_path, _cache_stamp, _cache_project
 
     path, fell_back = _table_path()
     if path is None:
         return {}
 
     try:
-        stat = path.stat()
+        content = path.read_bytes()
     except OSError:
         return {}
-    stamp = (stat.st_mtime_ns, stat.st_size)
-    if _cache is not None and _cache_path == str(path) and _cache_stamp == stamp:
+    stamp = hashlib.sha256(content).digest()
+    if (_cache is not None and _cache_path == str(path)
+            and _cache_stamp == stamp and _cache_project == settings.project_id):
         return _cache
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(content)
     except (OSError, ValueError):
         logger.exception("could not read %s", path)
         return {}
@@ -105,27 +108,17 @@ def _load() -> dict:
     # hand-written — is still treated as one. The flag is a courtesy; the
     # path is the fact.
     data["sample"] = bool(data.get("sample")) or fell_back
-    _cache, _cache_path, _cache_stamp = data, str(path), stamp
+    _cache, _cache_path, _cache_stamp, _cache_project = (
+        data, str(path), stamp, settings.project_id)
     return data
 
 
 def reset() -> None:
     """Tests and a reload after the sales team drops the real file in."""
-    global _cache, _cache_path, _cache_stamp, _PLAN_ASSETS
-    _cache = _cache_path = _cache_stamp = None
+    global _cache, _cache_path, _cache_stamp, _cache_project
+    _cache = _cache_path = _cache_stamp = _cache_project = None
     _live_cache.clear()
-    _PLAN_ASSETS = None
     _PLAN_VERIFIED.clear()
-
-
-def find(room: str) -> dict | None:
-    room = (room or "").strip().upper().replace(" ", "")
-    if not room:
-        return None
-    for unit in _load().get("units", []):
-        if str(unit.get("room", "")).strip().upper() == room:
-            return unit
-    return None
 
 
 _STATUS_TH = {"available": "ว่าง", "reserved": "จอง", "sold": "ขายแล้ว"}
@@ -211,7 +204,7 @@ def show_unit(room: str) -> dict:
 import time as _time
 
 #: room -> (monotonic stamp, card). Short TTL; see settings.inventory_cache_s.
-_live_cache: dict[str, tuple[float, dict]] = {}
+_live_cache: dict[tuple[str, str], tuple[float, dict]] = {}
 
 
 def live_configured() -> bool:
@@ -331,7 +324,8 @@ def _live_find(room: str) -> dict | None:
     if unit_no is None:
         return None
     now = _time.monotonic()
-    hit = _live_cache.get(unit_no)
+    key = (settings.project_id, unit_no)
+    hit = _live_cache.get(key)
     if hit and now - hit[0] < settings.inventory_cache_s:
         return hit[1]
     rows = _live_get(_scoped({"select": _LIVE_SELECT, "unit_no": f"eq.{unit_no}",
@@ -339,7 +333,7 @@ def _live_find(room: str) -> dict | None:
     if not rows:
         return None
     card = _card_from_live(rows[0])
-    _live_cache[unit_no] = (now, card)
+    _live_cache[key] = (now, card)
     return card
 
 
@@ -663,29 +657,21 @@ def find_units(max_price_thb: float | None = None,
 # the stage: the same picture the sales desk stares at, colored by what is
 # actually sold *right now*, with no prices anywhere on it (policy).
 
-_PLAN_ASSETS: dict | None = None
 _PLAN_VERIFIED: dict[tuple[str, str], tuple[float, str, str]] = {}
 
 
 def _plan_paths() -> dict[int, str]:
     """floor number -> image path, from the copied assets manifest."""
-    global _PLAN_ASSETS
-    if _PLAN_ASSETS is None:
-        import json
-        from pathlib import Path
-
-        from app.data_sources import require_project_payload, source_path
-
+    from app.data_sources import require_project_payload, source_path
+    try:
         path = source_path("floor_plan_assets", settings.project_id)
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-            require_project_payload(raw, "floor_plan_assets", settings.project_id)
-            _PLAN_ASSETS = {int(f["floor"]): f["display_path"]
-                            for f in raw.get("floors", []) if f.get("display_path")}
-        except (OSError, ValueError):
-            logger.exception("could not read floor-plan-assets.json")
-            _PLAN_ASSETS = {}
-    return _PLAN_ASSETS
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        require_project_payload(raw, "floor_plan_assets", settings.project_id)
+        return {int(f["floor"]): f["display_path"]
+                for f in raw.get("floors", []) if f.get("display_path")}
+    except (OSError, ValueError, KeyError, TypeError):
+        logger.warning("could not load a floor-plan manifest for the active project")
+        return {}
 
 
 def _verified_plan_asset(floor: int) -> RuntimeResult:

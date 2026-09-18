@@ -95,7 +95,7 @@ def test_handler_exception_becomes_a_result(clean_registry):
         raise RuntimeError("hub on fire")
 
     out = run(clean_registry.dispatch("boom", {}))
-    assert out["ok"] is False and "hub on fire" in out["error"]
+    assert out == {"ok": False, "error": "tool unavailable"}
 
 
 def test_bad_arguments_are_reported(clean_registry):

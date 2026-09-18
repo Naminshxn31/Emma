@@ -18,12 +18,22 @@ def _path() -> Path:
     return Path(configured).expanduser()
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=8)
+def _parsed(project_id: str, path: str, content: bytes) -> list[dict]:
+    payload = json.loads(content)
+    require_project_payload(payload, "project_vocabulary", project_id)
+    entries = payload.get("entities", [])
+    if not isinstance(entries, list) or any(not isinstance(item, dict) for item in entries):
+        raise ValueError("invalid project vocabulary")
+    return entries
+
+
 def entities() -> list[dict]:
+    """Scope routing hints by project and bytes, including in a warm process."""
     try:
-        payload = json.loads(_path().read_text(encoding="utf-8"))
-        require_project_payload(payload, "project_vocabulary", settings.project_id)
-        return payload.get("entities", [])
+        path = _path().resolve()
+        content = path.read_bytes()
+        return _parsed(settings.project_id, str(path), content)
     except Exception:
         logger.warning("could not load project knowledge from %s", _path(), exc_info=True)
         return []
@@ -66,4 +76,4 @@ def preferred_slide_ids(query: str) -> list[str]:
 
 
 def reset() -> None:
-    entities.cache_clear()
+    _parsed.cache_clear()

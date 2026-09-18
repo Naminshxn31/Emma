@@ -71,6 +71,10 @@ def _searxng(query: str) -> list[dict]:
 def search_web(query: str) -> dict:
     from app.config import settings
 
+    if settings.assistant_profile == "condo":
+        return {"ok": False, "error": "web search unavailable for this project",
+                "instruction": "ข้อมูลโครงการจากเว็บยังไม่ผ่านการอนุมัติ ห้ามใช้อ้างอิง ให้ติดต่อฝ่ายขาย"}
+
     # Backend order: the machine's own SearXNG when configured, the ddgs
     # scraper otherwise (and as the safety net when SearXNG is down — a
     # stopped Docker container must degrade the search, not remove it).

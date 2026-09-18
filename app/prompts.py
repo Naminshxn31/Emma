@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 
-from app.config import ACTIVE_PROJECT_ID
+from app.config import ACTIVE_PROJECT_ID, settings
 from app.data_sources import require_project_payload, source_path
 from app.knowledge_policy import evaluate_claim, state_instruction
 
@@ -194,7 +194,7 @@ def _render_facts(data: dict) -> str:
     """
     from app.tools.retrieval import sanitize_common_area_dimensions
 
-    source_decision = evaluate_claim(data, ACTIVE_PROJECT_ID)
+    source_decision = evaluate_claim(data, settings.project_id)
     logger.info("knowledge policy %s", source_decision.trace())
     if not source_decision.allowed:
         return FALLBACK_FACTS
@@ -206,7 +206,7 @@ def _render_facts(data: dict) -> str:
                              if key in ("approval_status", "approved_by", "approved_at",
                                         "effective_at", "expires_at", "disclosure_scope",
                                         "content_state")}}
-        decision = evaluate_claim(metadata, ACTIVE_PROJECT_ID)
+        decision = evaluate_claim(metadata, settings.project_id)
         logger.info("knowledge policy %s", decision.trace())
         if not decision.allowed:
             continue
@@ -239,8 +239,9 @@ def load_facts(path: str | None = None) -> str:
     target = Path(path or CONDO_FACTS_FILE).expanduser()
     try:
         data = json.loads(target.read_text(encoding="utf-8"))
-        if target.resolve() == source_path("project_facts", ACTIVE_PROJECT_ID):
-            require_project_payload(data, "project_facts", ACTIVE_PROJECT_ID)
+        # Explicit paths are useful for tests, not a way to turn a different
+        # approved source into project facts. Scope and kind are mandatory.
+        require_project_payload(data, "project_facts", settings.project_id)
         return _render_facts(data)
     except Exception:
         logger.warning(
@@ -258,17 +259,17 @@ def load_sales_context() -> dict[str, str]:
         "story_rule": "- เล่าเรื่องจากข้อมูลโครงการที่ผ่านการอนุมัติให้ลูกค้าเท่านั้น ห้ามแต่งเพิ่ม",
         "scope_rule": "- ห้ามนำข้อมูลจากโครงการอื่นมาเป็นข้อมูลของโครงการนี้",
     }
-    path = source_path("project_sales_context", ACTIVE_PROJECT_ID)
     try:
+        path = source_path("project_sales_context", settings.project_id)
         data = json.loads(path.read_text(encoding="utf-8"))
-        require_project_payload(data, "project_sales_context", ACTIVE_PROJECT_ID)
-        decision = evaluate_claim(data, ACTIVE_PROJECT_ID)
+        require_project_payload(data, "project_sales_context", settings.project_id)
+        decision = evaluate_claim(data, settings.project_id)
         logger.info("knowledge policy %s", decision.trace())
         if not decision.allowed:
             return fallback
         return {key: str(data[key]) for key in ("story_rule", "scope_rule")}
     except Exception:
-        logger.warning("could not load project sales context from %s", path, exc_info=True)
+        logger.warning("could not load customer sales context", exc_info=True)
         return fallback
 
 

@@ -682,8 +682,16 @@ class VoiceSession:
                     await self._send_json(payload)
 
                 elif event.kind == "error":
+                    # A rejected session is safety-critical: preserve that
+                    # warning, but never echo the provider's raw error body
+                    # (which may contain request contents or source text).
+                    rejected = "REJECTED" in (event.text or "")
                     await self._send_json({
-                        "type": "error", "code": "upstream", "message": event.text or "",
+                        "type": "error", "code": "upstream",
+                        "message": (
+                            "Session setup REJECTED; guardrails unavailable. Stop this customer session."
+                            if rejected else "การเชื่อมต่อผู้ช่วยขัดข้องชั่วคราว"
+                        ),
                     })
         except asyncio.CancelledError:
             raise

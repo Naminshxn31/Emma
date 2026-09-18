@@ -172,6 +172,19 @@ def test_a_failed_print_is_never_reported_as_success(catalogue, monkeypatch):
     assert "ห้ามบอกลูกค้าว่าพิมพ์ให้แล้ว" in out["instruction"]
 
 
+def test_printer_diagnostics_do_not_leave_as_provider_result_or_turnlog(catalogue, monkeypatch):
+    from app import turnlog
+    from app.tools import documents
+
+    hidden = "BLOCKED_PRINTER_PATH_AND_NOTE"
+    records = []
+    monkeypatch.setattr(documents, "send_to_printer", lambda path, copies: (False, hidden))
+    monkeypatch.setattr(turnlog, "record", lambda kind, **fields: records.append((kind, fields)))
+    result = documents._print_document("โบรชัวร์")
+    assert hidden not in json.dumps(result, ensure_ascii=False)
+    assert hidden not in json.dumps(records, ensure_ascii=False)
+
+
 def test_printing_disabled_does_not_raise(catalogue, monkeypatch):
     from app.tools import documents
 

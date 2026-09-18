@@ -19,6 +19,9 @@ from app.tools import computer, websearch
 
 @pytest.fixture(autouse=True)
 def _enable_tested_tools(monkeypatch):
+    # Personal/web tools are an Emma-profile capability, never a fallback
+    # knowledge source for the condo sales host.
+    monkeypatch.setattr(settings, "assistant_profile", "emma")
     monkeypatch.setattr(settings, "tool_groups", "computer,websearch")
 
 

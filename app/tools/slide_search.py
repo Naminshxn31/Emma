@@ -252,7 +252,11 @@ class SlideSearch:
         # particles are dropped from both — a slide deck contains none, so
         # scoring them buries the one word that mattered.
         words = content_tokens(tokenize(query))
-        lexical = self.bm25.scores(content_tokens(robust_tokens(project_knowledge.expand(query))))
+        # Routing hints are operational metadata, not approved customer
+        # claims. Keep them local to image discovery; only approved source
+        # text and the guest's question may influence customer-answer rankers.
+        lexical_query = query if self.customer_text else project_knowledge.expand(query)
+        lexical = self.bm25.scores(content_tokens(robust_tokens(lexical_query)))
         preferred_ids = project_knowledge.preferred_slide_ids(query)
         preferred_rank = {slide_id: rank for rank, slide_id in enumerate(preferred_ids)}
         if preferred_ids:

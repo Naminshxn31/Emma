@@ -27,9 +27,9 @@ Two rules that matter for a *voice* assistant:
    `"เปิดไฟให้แล้วค่ะ"` forces Thai and a fixed phrasing; returning
    `{"ok": True, "lights": True}` lets the model say it naturally in Thai,
    English or anything else.
-2. **Never raise.** An exception mid-conversation leaves the guest in
-   silence. `dispatch()` converts failures into `{"ok": false, "error": ...}`
-   so the model can apologise and carry on.
+2. **Never raise into a provider.** An exception mid-conversation leaves the
+   guest in silence; its raw text can also contain a source path or draft
+   content. `dispatch()` logs it locally and sends a generic error.
 """
 from __future__ import annotations
 
@@ -103,7 +103,7 @@ def _has_foreign_project(value: object, expected: str) -> bool:
         if "project_id" in value and value["project_id"] != expected:
             return True
         return any(_has_foreign_project(item, expected) for item in value.values())
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         return any(_has_foreign_project(item, expected) for item in value)
     return False
 
@@ -147,6 +147,12 @@ def allowed(entry: Tool) -> bool:
     from app.tools import _OPT_IN
 
     if not settings.tools_enabled:
+        return False
+    # Optional personal/web/computer tools have no condo source-approval
+    # contract. TOOL_GROUPS may not turn them into an alternate knowledge or
+    # file/display path for a sales session.
+    if settings.assistant_profile == "condo" and entry.group in {
+            "memory", "mydocs", "websearch", "computer"}:
         return False
     groups = settings.enabled_tool_groups()
     if entry.group is None:
@@ -281,24 +287,26 @@ async def _dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
     except asyncio.CancelledError:
         abandoned.set()
         raise
-    except TypeError as exc:
+    except TypeError:
         # Wrong/missing arguments from the model — recoverable, tell it so.
-        logger.warning("bad arguments for %s: %s", name, exc)
-        return {"ok": False, "error": f"invalid arguments: {exc}"}
+        logger.warning("bad arguments for %s", name)
+        return {"ok": False, "error": "invalid arguments"}
     except Exception as exc:
-        logger.exception("tool %s failed", name)
-        return {"ok": False, "error": str(exc)}
+        logger.warning("tool %s failed (%s)", name, type(exc).__name__)
+        return {"ok": False, "error": "tool unavailable"}
 
     if not isinstance(result, dict):
         result = {"ok": True, "result": result}
     result.setdefault("ok", True)
 
-    if any(tag in entry.tags for tag in ("units", "knowledge", "slides")):
-        from app.config import settings
+    from app.config import settings
 
-        if _has_foreign_project(result, settings.project_id):
-            logger.error("tool %s returned a foreign-project result", name)
-            return {"ok": False, "error": "project scope mismatch"}
+    # The final tool-result boundary applies even to an optional adapter or
+    # a future tool whose author forgot the expected tags.
+    if _has_foreign_project(result, settings.project_id):
+        logger.error("tool %s returned a foreign-project result", name)
+        return {"ok": False, "error": "project scope mismatch"}
+    if any(tag in entry.tags for tag in ("units", "knowledge", "slides")):
         result.setdefault("project_id", settings.project_id)
 
     # A tool that changed what's on screen has to reach the display windows.

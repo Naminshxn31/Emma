@@ -347,6 +347,25 @@ def current_slide() -> dict | None:
     return STATE["current"]
 
 
+def display_payload(candidate: dict) -> dict | None:
+    """Resolve a display command from the active catalogue, not caller data.
+
+    Also used by the last-mile display adapter after any audio delay, so an
+    old approved dict cannot outlive an approval revocation or project switch.
+    """
+    if (not isinstance(candidate, dict)
+            or candidate.get("source_id") != "slide_catalog"
+            or candidate.get("project_id") != settings.project_id):
+        return None
+    slide = _by_id(candidate.get("id"))
+    if slide is None:
+        return None
+    position = {key: candidate[key] for key in ("position", "total")
+                if isinstance(candidate.get(key), int) and not isinstance(candidate[key], bool)}
+    public = _public(slide, position)
+    return public if public.get("url") else None
+
+
 def show_current(slide: dict) -> dict:
     """Put a slide on screen from outside the slide tools.
 

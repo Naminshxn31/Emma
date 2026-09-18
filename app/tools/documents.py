@@ -329,14 +329,14 @@ def _print_document(document: str, copies: int = 1) -> dict:
 
     from app import turnlog
 
-    worked, detail = send_to_printer(entry["_path"], capped)
+    worked, _detail = send_to_printer(entry["_path"], capped)
     turnlog.record("print", document=entry.get("name"), copies=capped,
-                   worked=worked, detail=detail)
-    logger.info("print %r x%d: %s", entry.get("name"), capped, detail)
+                   worked=worked)
+    logger.info("print %r x%d: worked=%s", entry.get("name"), capped, worked)
 
     if not worked:
         return {
-            "ok": False, "error": "printer", "detail": detail,
+            "ok": False, "error": "printer",
             "instruction": (
                 "พิมพ์ไม่สำเร็จ ห้ามบอกลูกค้าว่าพิมพ์ให้แล้ว "
                 "ให้บอกตรงๆ ว่าเครื่องพิมพ์มีปัญหา แล้วแนะนำให้ติดต่อเจ้าหน้าที่"

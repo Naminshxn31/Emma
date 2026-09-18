@@ -62,7 +62,7 @@ def test_existing_draft_facts_and_sales_context_do_not_enter_prompt():
 def test_individual_claim_cannot_override_draft_source(tmp_path):
     from app.prompts import load_facts
 
-    source = claim(approval_status="draft", facts=[dict(
+    source = claim(source_id="project_facts", approval_status="draft", facts=[dict(
         claim(), label="ทดสอบ", value="ห้ามแสดง")])
     path = tmp_path / "facts.json"
     path.write_text(json.dumps(source, ensure_ascii=False), encoding="utf-8")
@@ -72,7 +72,7 @@ def test_individual_claim_cannot_override_draft_source(tmp_path):
 def test_approved_developing_fact_is_qualified_in_prompt(tmp_path):
     from app.prompts import load_facts
 
-    source = claim(content_state="developing", facts=[{"label": "ตัวอย่าง", "value": "พื้นที่ทดสอบ"}])
+    source = claim(source_id="project_facts", content_state="developing", facts=[{"label": "ตัวอย่าง", "value": "พื้นที่ทดสอบ"}])
     path = tmp_path / "facts.json"
     path.write_text(json.dumps(source, ensure_ascii=False), encoding="utf-8")
     rendered = load_facts(str(path))

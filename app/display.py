@@ -46,6 +46,15 @@ def client_count() -> int:
 
 async def broadcast(payload: dict) -> None:
     """Push a state change to every display, dropping any that have gone."""
+    if payload.get("type") == "slide" and payload.get("slide") is not None:
+        # Protect the transport itself, not only show()/_reveal(): callers
+        # using broadcast directly must not bypass source resolution.
+        from app.tools import slides
+
+        safe = slides.display_payload(payload["slide"])
+        if safe is None:
+            return
+        payload = {"type": "slide", "slide": safe}
     if not _clients:
         return
     message = json.dumps(payload, ensure_ascii=False)
@@ -188,6 +197,16 @@ async def _reveal_later(slide: dict | None, seq: int, delay: float) -> None:
 async def _reveal(slide: dict | None) -> None:
     if not _machine_owned():
         return
+    if slide is not None:
+        # This is the final UI/Canva egress, including delayed reveals. Do
+        # not trust a dict handed directly to display.show(), or a public
+        # result cached before approval/project scope changed.
+        from app.tools import slides
+
+        slide = slides.display_payload(slide)
+        if slide is None:
+            logger.warning("blocked an unscoped or revoked slide at display egress")
+            return
     await broadcast({"type": "slide", "slide": slide})
     # Opt-in mirror onto a real Canva window — no-op unless CANVA_URL is set.
     # Imported here (not at module load) so a machine without `playwright`
