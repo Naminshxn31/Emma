@@ -198,11 +198,22 @@ def test_a_measured_mapping_beats_the_arithmetic(monkeypatch, tmp_path):
     pages, so `ew-047` is not page 47 — and only a measurement can say what
     it is."""
     (tmp_path / "canva_pages.json").write_text(json.dumps(
-        {"total": 50, "pages": {"ew-001": 1, "ew-047": 40}}), encoding="utf-8")
+        {"source_id": "canva_page_mapping", "project_id": settings.project_id,
+         "total": 50, "pages": {"ew-001": 1, "ew-047": 40}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
     assert canva_display._page_number("ew-047") == 40
     assert canva_display._page_number("ew-001") == 1
+
+
+def test_a_foreign_project_mapping_never_moves_the_canva_window(monkeypatch, tmp_path):
+    (tmp_path / "canva_pages.json").write_text(json.dumps({
+        "source_id": "canva_page_mapping", "project_id": "embassy_life",
+        "total": 50, "pages": {"ew-001": 1},
+    }), encoding="utf-8")
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    canva_display.load_page_map(force=True)
+    assert canva_display._page_number("ew-001") is None
 
 
 def test_a_slide_missing_from_the_measured_mapping_moves_nothing(
@@ -214,7 +225,8 @@ def test_a_slide_missing_from_the_measured_mapping_moves_nothing(
     slide, and past page 50 on nothing at all: the blank screen. Not moving
     is worse than lagging and better than lying."""
     (tmp_path / "canva_pages.json").write_text(json.dumps(
-        {"total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
+        {"source_id": "canva_page_mapping", "project_id": settings.project_id,
+         "total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
     assert canva_display._page_number("ew-059") is None
@@ -224,7 +236,8 @@ def test_a_slide_missing_from_the_measured_mapping_moves_nothing(
 def test_a_slide_with_no_canva_page_never_opens_the_window(monkeypatch, tmp_path):
     """`goto` has to act on that None, not just receive it."""
     (tmp_path / "canva_pages.json").write_text(json.dumps(
-        {"total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
+        {"source_id": "canva_page_mapping", "project_id": settings.project_id,
+         "total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     monkeypatch.setattr(settings, "canva_url", "https://canva.test/deck/view")
     canva_display.load_page_map(force=True)

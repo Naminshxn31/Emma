@@ -82,7 +82,8 @@ def test_url_cannot_unlock_emma_on_a_condo_machine(monkeypatch):
 def test_retrieval_preserves_script_approval(approved, language):
     from app.tools.knowledge import _entry
 
-    slide = {f"script_{language}": "REVIEW_SCRIPT"}
+    slide = {f"script_{language}": "REVIEW_SCRIPT",
+             "source_id": "slide_catalog", "project_id": settings.project_id}
     if approved is not None:
         slide["script_approved"] = approved
     out = _entry(slide)
@@ -99,7 +100,8 @@ def test_shared_knowledge_does_not_mutate_presentation(monkeypatch):
 
     monkeypatch.setattr(settings, "multi_session", True)
     monkeypatch.setattr(settings, "web_stage", True)
-    slide = {"id": "review", "title_en": "pool", "file": "review.jpg"}
+    slide = {"id": "review", "title_en": "pool", "file": "review.jpg",
+             "source_id": "slide_catalog", "project_id": settings.project_id}
     monkeypatch.setattr(slides, "search_slides", lambda _: [SimpleNamespace(slide=slide, found=True)])
     monkeypatch.setattr(knowledge, "confident_enough_to_show", lambda *_: True)
     def refuse(*_):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build data/slides/embeddings.npz once, patiently.
+"""Build the active project's slide embeddings cache once, patiently.
 
 Semantic search had never run in this project, and the cause was not the code
 that uses it. The free tier caps the embedding model at 100 requests a minute;

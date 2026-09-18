@@ -71,6 +71,28 @@ def test_slide_ids_are_unique(slides):
     assert len(ids) == len(set(ids))
 
 
+def test_default_catalog_contains_only_its_project(slides):
+    library = slides.load_slides()
+    assert len(library) == 135
+    assert all(s["project_id"] == settings.project_id for s in library)
+    assert not any(s["type"] == "other-project" for s in library)
+
+
+def test_foreign_slide_in_catalog_fails_closed(slides, tmp_path, monkeypatch):
+    source = Path(settings.slides_dir) / "index.json"
+    catalog = json.loads(source.read_text(encoding="utf-8"))
+    catalog["images"].append({
+        "id": "foreign", "file": "foreign.jpg", "source_id": "slide_catalog",
+        "project_id": "embassy_life",
+    })
+    (tmp_path / "index.json").write_text(
+        json.dumps(catalog, ensure_ascii=False), encoding="utf-8",
+    )
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    slides.reload_slides()
+    assert slides.load_slides() == []
+
+
 # ==================== search ====================
 
 
@@ -143,6 +165,7 @@ def test_approval_is_recorded_with_a_name(slides):
 
     approved = _public({
         "id": "x", "file": "x.jpg", "script_th": "...",
+        "project_id": settings.project_id,
         "script_approved": True, "script_approved_by": "ฝ่ายขาย Empire Group",
     })
     assert approved["script_is_approved_copy"] is True
@@ -1855,7 +1878,8 @@ def _measured(tmp_path, monkeypatch, pages: dict, total: int = 50):
     src = __import__("pathlib").Path(settings.slides_dir)
     shutil.copy(src / "index.json", tmp_path / "index.json")
     (tmp_path / "canva_pages.json").write_text(
-        json.dumps({"total": total, "pages": pages}), encoding="utf-8")
+        json.dumps({"source_id": "canva_page_mapping", "project_id": settings.project_id,
+                    "total": total, "pages": pages}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
     monkeypatch.setattr(canva_display, "_PAGE_MAP_TOTAL", None)

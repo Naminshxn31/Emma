@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import logging
 
+from app.config import ACTIVE_PROJECT_ID
+from app.data_sources import require_project_payload, source_path
+
 logger = logging.getLogger("condo_voice.prompts")
 
 # Kept deliberately tight. The Live API re-processes the whole system
@@ -156,7 +159,7 @@ TRANSLATOR_GREETING = (
 PROFILES = ("condo", "emma", "translator")
 
 
-# Facts the assistant is allowed to state, loaded from data/condo_facts.json.
+# Facts the assistant is allowed to state, resolved by project/source ID.
 #
 # These used to be a string literal here, which put the highest-risk content
 # in the system in the one place that needed a developer and a deploy to
@@ -164,12 +167,12 @@ PROFILES = ("condo", "emma", "translator")
 # promotions — the things that get a company in trouble if they are wrong, and
 # the things most likely to change without warning — carried nothing.
 #
-# So they get the same treatment: a data file, with who signed it off and when
+# So they get the same treatment: a project data file, with who signed it off and when
 # it takes effect. A `null` value means "no data yet", and renders as an
 # explicit blank rather than being dropped, because a *missing* line reads to
 # the model like a fact that simply wasn't mentioned, while an explicit
 # "(ยังไม่มีข้อมูล)" is an instruction not to invent one.
-CONDO_FACTS_FILE = "data/condo_facts.json"
+CONDO_FACTS_FILE = str(source_path("project_facts", ACTIVE_PROJECT_ID))
 
 #: Used when the file is missing or unreadable. Deliberately contains no
 #: numbers at all: if the facts can't be loaded, the safe failure is a robot
@@ -223,13 +226,33 @@ def load_facts(path: str | None = None) -> str:
 
     target = Path(path or CONDO_FACTS_FILE).expanduser()
     try:
-        return _render_facts(json.loads(target.read_text(encoding="utf-8")))
+        data = json.loads(target.read_text(encoding="utf-8"))
+        if target.resolve() == source_path("project_facts", ACTIVE_PROJECT_ID):
+            require_project_payload(data, "project_facts", ACTIVE_PROJECT_ID)
+        return _render_facts(data)
     except Exception:
         logger.warning(
             "could not read %s — the assistant will say it has no project "
             "information rather than fall back on anything stale", target,
         )
         return FALLBACK_FACTS
+
+
+def load_sales_context() -> dict[str, str]:
+    """Existing project-specific sales copy, kept outside the style prompt."""
+    import json
+
+    path = source_path("project_sales_context", ACTIVE_PROJECT_ID)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        require_project_payload(data, "project_sales_context", ACTIVE_PROJECT_ID)
+        return {key: str(data[key]) for key in ("story_rule", "scope_rule")}
+    except Exception:
+        logger.warning("could not load project sales context from %s", path, exc_info=True)
+        return {
+            "story_rule": "- เล่าเรื่องจากข้อมูลโครงการที่ค้นพบเท่านั้น ห้ามแต่งเพิ่ม",
+            "scope_rule": "- ห้ามนำข้อมูลจากโครงการอื่นมาเป็นข้อมูลของโครงการนี้",
+        }
 
 
 # The opening (owner 2026-09-14, final): the welcome line plus one warm,
@@ -262,11 +285,11 @@ SALES_HOST_BLOCK = """วิธีนำเสนอ:
 - ตัวตนและน้ำเสียง: คุณคือเจ้าบ้านผู้ต้อนรับของโครงการ พูดว่า "เรา/ของเรา/ที่นี่" ไม่พูด "ทางโครงการบอกว่า" และไม่อ้างว่าออกแบบหรือสร้างเอง เรียกตัวเองว่าฉัน/ดิฉัน ลงท้ายค่ะ/คะ สุภาพ อบอุ่น เป็นคนจริง · ตอบตรง ไม่มีบทนำหรือคำน้ำ ปกติหนึ่งหรือสองประโยค ไม่ไล่ตัวเลือกและไม่ลงท้าย "เลยนะคะ/เลยค่ะ/นะคะ" ซ้ำๆ · เมื่อ intent ชัด ตอบเฉพาะสิ่งที่จำเป็นต่อ intent นั้นก่อน โดยปกติหนึ่งประโยค แล้วเรียกเครื่องมือถ้าจำเป็น
 - ค่าเริ่มต้นคือไม่ถามต่อ: เมื่อตอบคำถามหรือทำสิ่งที่ลูกค้าขอครบแล้ว ให้จบคำตอบทันที ห้ามเติมคำถามหรือข้อเสนอเพื่อกันความเงียบ ห้ามลงท้ายอัตโนมัติด้วย "มีอะไรให้ช่วยเพิ่มเติมไหมคะ" "สนใจดู...ไหมคะ" "อยากให้เปิด...ไหมคะ" หรือคำถามลักษณะเดียวกัน · ถามต่อได้เฉพาะเมื่อขาดข้อมูลที่จำเป็นต่อการทำสิ่งที่ลูกค้าขออยู่ตอนนี้ และถามครั้งละข้อ · ถ้าลูกค้าปิดเรื่อง ปฏิเสธ หรือชะลอการตัดสินใจ ให้หยุดทันที ลูกค้าพูด "ขอกลับไปคิดดูก่อน" ผิด: "ได้ค่ะ เดี๋ยวเปิดผังหรือห้องอื่นให้ดูเพิ่มเติมได้ค่ะ" ถูก: "ได้เลยค่ะ"
 - การกระทำต้องเกิดจริงก่อนพูดว่าเกิดแล้ว: ถ้าลูกค้าขอให้เปิด ดู เช็ก แสดง หรือทำสิ่งที่มีเครื่องมือรองรับ ให้เรียกเครื่องมือนั้นก่อนและรอผลสำเร็จในเทิร์นนั้น ห้ามพูดว่า "เปิดแล้ว" "กำลังเปิด" "เดี๋ยวเปิด" "พาไป" "พาชม" หรือ "จัดให้แล้ว" หากยังไม่มีผลเครื่องมือที่สำเร็จ ถ้าไม่มีเครื่องมือสำหรับการกระทำนั้น ห้ามเสนอเหมือนว่าทำได้ · ลูกค้าพูด "อยากดูสองห้องนอน" ถ้ายังไม่ได้เรียกเครื่องมือ ห้ามพูดว่า "เปิดผังให้แล้ว" หรือ "กำลังเปิด"
-- ตอบสิ่งที่ลูกค้าพูดก่อนเสมอ: ให้ตอบ intent ทันที ห้ามดึงบทสนทนากลับไปเล่าตามลำดับที่เตรียมไว้ · ผลเครื่องมืออาจมีข้อมูลมากกว่าที่ถาม ใช้เฉพาะข้อมูลที่จำเป็นต่อคำถามตรงหน้า ห้ามนำข้อมูลข้างเคียงมาต่อเติมเพียงเพราะอยู่ในผลค้น · ลูกค้าบอกว่า "ยังไม่รู้อะไรเลย" ให้พูด "ยินดีต้อนรับค่ะ ที่นี่คือ Embassy World ค่ะ" เท่านั้นแล้วหยุด ห้ามถามเรื่องแบบห้องหรือเล่าทำเล แนวคิด facility และคำขายอื่นในเทิร์นนี้
-- เล่าเรื่องเมื่อเกี่ยวข้อง: ขายชีวิตที่ดีขึ้นก่อน เทคโนโลยีทีหลัง · clue เรื่องครอบครัว เวลา หรือการมาใช้ถือว่า intent ชัด ให้ตอบว่า "เหมาะกับการใช้เวลาพักผ่อนร่วมกันทั้งครอบครัวในวันหยุดค่ะ" เท่านั้น แล้วหยุด ห้ามเอ่ย facility/ห้อง หรือเติมคำถามและข้อเสนอท้าย · เมื่อลูกค้าเปิดโอกาส ค่อยเล่าแนวคิดจริง One Place Many Worlds / New Generation / Luxury ยุคใหม่คือการมีเวลา / Nothing Is Missing จากเอกสาร ห้ามแต่งเพิ่ม · ถ้าถามว่าแบบห้องต่างกันอย่างไร ให้อธิบายความต่างด้านพื้นที่และการใช้งานก่อน ตัวเลขเป็นข้อมูลประกอบเมื่อจำเป็น ไม่ใช่คำตอบหลัก และไม่เหมาว่าแบบไหนไว้ลงทุนหรืออยู่เอง
+- ตอบสิ่งที่ลูกค้าพูดก่อนเสมอ: ให้ตอบ intent ทันที ห้ามดึงบทสนทนากลับไปเล่าตามลำดับที่เตรียมไว้ · ผลเครื่องมืออาจมีข้อมูลมากกว่าที่ถาม ใช้เฉพาะข้อมูลที่จำเป็นต่อคำถามตรงหน้า ห้ามนำข้อมูลข้างเคียงมาต่อเติมเพียงเพราะอยู่ในผลค้น · ลูกค้าบอกว่า "ยังไม่รู้อะไรเลย" ให้พูด "ยินดีต้อนรับค่ะ ที่นี่คือ [ชื่อโครงการ] ค่ะ" เท่านั้นแล้วหยุด ห้ามถามเรื่องแบบห้องหรือเล่าทำเล แนวคิด facility และคำขายอื่นในเทิร์นนี้
+[PROJECT_STORY_RULE]
 - ราคาเป็นสิ่งเดียวที่ยังไม่เปิด: ห้ามหยิบราคาหรืองบขึ้นมาพูดหรือถามเอง ถ้าลูกค้าเอ่ยงบ ให้รับสั้นๆ ไม่ทวนตัวเลข และช่วยเลือกจากแบบ/ขนาด/วิว/สถานะว่างโดยไม่ถามงบเพื่อกรอง · ลูกค้าถาม "ห้องนี้ราคาเท่าไหร่" ให้ตอบ "ราคาขอให้ทีมขายยืนยันนะคะ ดิฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อน" แล้วหยุด
 - ยึดข้อมูลตรงหน้า: พูดเฉพาะผลค้นหรือเอกสาร ห้ามเดาหรือใช้ความรู้เดิมเติมชื่อ ขนาด โซน หรือรายละเอียด · ห้ามใส่ตัวเลขขนาดหรือความยาวให้สระ ลากูน สกายพูล หรือพื้นที่ส่วนกลาง; ขนาด/แบบห้องและโซน/ชั้นให้ค้นแล้วตอบตามผลจริง · สิ่งที่เป็นแนวคิดหรือกำลังพัฒนาห้ามพูดเหมือนเสร็จแล้ว ถ้าผลเครื่องมือระบุ draft, concept, rendering, proposed, developing หรือยังไม่ยืนยัน ต้องพูดสถานะนั้นออกมาด้วย ห้ามตัดคำสถานะทิ้ง · ลูกค้าถาม "สระอยู่ตรงไหน" ถ้าผลค้นเป็น draft ให้บอกว่าเป็นข้อมูล draft ก่อนตอบเฉพาะตำแหน่งสระ แล้วหยุด ห้ามลากไปเรื่องลากูนหรือ facility อื่น
-- ตรงชั้น ประเภท และโครงการ: ห้ามย้าย facility ข้ามชั้นหรือเรียกผิดประเภท (Biogenesis คือฟิตเนสชั้นทางเข้า; Thermal Galaxy คือ wellness ชั้นใต้ดิน; Sky Pool อยู่ชั้นสาม) · ที่นี่คือ "Embassy World" เท่านั้น "Embassy Life" และโครงการอื่นเป็นคนละโครงการ ห้ามนำข้อมูลของที่อื่นมาเป็นของที่นี่ · ห้ามด้อยค่าคอนโดอื่น ห้ามการันตีผลตอบแทนหรือราคาจะขึ้น ห้ามเร่งซื้อ · ไม่แน่ใจให้พูดว่า "ฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อนกับคุณ ขอให้ทีมขายของเราตรวจสอบและยืนยันให้คุณนะคะ"""
+[PROJECT_SCOPE_RULE]"""
 
 EMMA_GREETING = (
     "ทักทายสั้นๆ เป็นกันเอง บอกว่าพร้อมช่วยแล้ว ประโยคเดียวพอ "
@@ -560,7 +583,12 @@ def build_instructions(
     # the facts are what it may say. Unconditional for the gallery — the
     # owner asked for this voice on 2026-09-11, so a pull is meant to change
     # the gallery's behaviour this once.
-    out = base + "\n" + SALES_HOST_BLOCK + "\n" + facts
+    context = load_sales_context()
+    sales_block = (SALES_HOST_BLOCK
+                   .replace("[PROJECT_STORY_RULE]", context["story_rule"])
+                   .replace("[PROJECT_SCOPE_RULE]", context["scope_rule"])
+                   .replace("[ชื่อโครงการ]", project_name))
+    out = base + "\n" + sales_block + "\n" + facts
     # The company web library, mentioned only when this machine loads it.
     # Turning the mydocs group on in .env was found to be *not enough*: the
     # tool registered, and the robot never called it — rule 14 routes every

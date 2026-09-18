@@ -1,5 +1,5 @@
 """
-Import a slide deck (PDF export, or a folder of images) into data/slides/.
+Import a slide deck (PDF export, or a folder of images) into the Embassy World slide directory.
 
 Canva "view" links can't be read programmatically — export the deck from
 Canva as **PDF** (Share → Download → PDF Standard) and point this at the
@@ -10,7 +10,7 @@ file:
 Each page becomes one slide. Any text on the page is pulled out and used as
 the title/summary, which is what the assistant searches when a guest asks to
 see something. That extraction is a starting point, not a finished index —
-open `data/slides/index.json` afterwards and fix the titles and keywords for
+open `data/projects/embassy_world/presentations/slides/index.json` afterwards and fix the titles and keywords for
 the slides that matter. A slide the model can't find is a slide it will
 never show.
 
@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUT = ROOT / "data" / "slides"
+DEFAULT_OUT = ROOT / "data" / "projects" / "embassy_world" / "presentations" / "slides"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
 
@@ -187,7 +187,7 @@ def from_folder(folder: Path, out_dir: Path, prefix: str) -> list[dict]:
     print(f"copied {len(slides)} images")
     print(
         "NOTE: image imports have no text to extract. Edit "
-        "data/slides/index.json and give each slide a real title and "
+        "the project slide index and give each slide a real title and "
         "keywords, or the assistant won't be able to find them."
     )
     return slides
@@ -246,9 +246,13 @@ def main() -> None:
         except Exception:
             print("warning: existing index unreadable — replacing it")
 
+    for slide in slides:
+        slide["source_id"] = "slide_catalog"
+        slide["project_id"] = "embassy_world"
     combined = existing + slides
     index_path.write_text(
-        json.dumps({"images": combined}, ensure_ascii=False, indent=1),
+        json.dumps({"source_id": "slide_catalog", "project_id": "embassy_world",
+                    "images": combined}, ensure_ascii=False, indent=1),
         encoding="utf-8",
     )
     print(f"wrote {index_path} ({len(combined)} slides total)")

@@ -114,6 +114,11 @@ def _fresh_async_state():
     # fatal inside a test that drives `_ensure_page` for real — which
     # `test_a_fullscreen_failure_does_not_cost_us_the_window` does.
     _settings.embed_provider = "off"
+    # Same family as tool_groups below: the gallery's .env scopes the library
+    # to Embassy World (MYDOCS_INCLUDE), which would filter out every temp doc
+    # a mydocs test drops in a tmp folder and turn the suite red on that one
+    # machine. Blank = every file, what the tests were written against.
+    _settings.mydocs_include = ""
     _settings.canva_warm_deck = False
     # And the biggest one of the family, found the hard way: the owner added
     # TOOL_GROUPS to .env to switch on the unit card, and nineteen robot and

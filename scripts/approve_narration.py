@@ -43,7 +43,8 @@ def load(path: Path):
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("ids", nargs="*", help="slide ids to approve")
-    parser.add_argument("--index", type=Path, default=Path("data/slides/index.json"))
+    from app.config import settings
+    parser.add_argument("--index", type=Path, default=Path(settings.slides_dir) / "index.json")
     parser.add_argument("--by", default="", help="who is approving")
     parser.add_argument("--all", action="store_true", help="approve every draft")
     parser.add_argument("--revoke", nargs="+", metavar="ID", help="withdraw approval")

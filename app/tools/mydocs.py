@@ -111,11 +111,33 @@ def _doc_files(d: Path) -> list[Path]:
     """Every document under the folder, subfolders included. iterdir()
     here once made a whole rendered corpus (personal-docs/corpus/, 54
     files) silently invisible: search still said found=True — from the
-    handful of top-level web pages — so nothing looked broken."""
-    return sorted(
-        p for p in d.rglob("*")
-        if p.is_file() and p.suffix.lower() in (".txt", ".md", ".pdf")
-    )
+    handful of top-level web pages — so nothing looked broken.
+
+    `MYDOCS_INCLUDE` narrows the library: when set, a file
+    counts only if its path (relative to the folder) contains one of the
+    comma-separated fragments. The check is on the *relative* path so a
+    fragment like "embassy-world" matches the subfolder, not the machine's
+    home directory. Empty setting keeps every file — the default everywhere
+    but the sales gallery, so no other caller changes behaviour."""
+    scope = [s.strip().lower() for s in settings.mydocs_include.split(",") if s.strip()]
+    gallery_project = None
+    if settings.assistant_profile == "condo":
+        from app.data_sources import inventory_slug
+
+        gallery_project = inventory_slug(settings.project_id)
+    out = []
+    for p in d.rglob("*"):
+        if not (p.is_file() and p.suffix.lower() in (".txt", ".md", ".pdf")):
+            continue
+        rel_path = p.relative_to(d)
+        if gallery_project and (not rel_path.parts or rel_path.parts[0].lower() != gallery_project):
+            continue
+        if scope:
+            rel = rel_path.as_posix().lower()
+            if not any(frag in rel for frag in scope):
+                continue
+        out.append(p)
+    return sorted(out)
 
 
 def _fingerprint() -> tuple:

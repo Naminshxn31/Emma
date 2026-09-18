@@ -9,6 +9,12 @@ must be recorded in [CHANGELOG.md](CHANGELOG.md), as required by
 [AGENTS.md](AGENTS.md). The September review and its follow-up validation are
 linked there.
 
+Project boundaries and data ownership are documented in
+[project structure and data sources](docs/project-structure-and-data-sources.md).
+The machine-readable registry is [`data/registry/source_registry.json`](data/registry/source_registry.json);
+run `python scripts/audit_data_sources.py` to see missing approvals, files, and
+unverified derived data without reading secrets or private document contents.
+
 A ChatGPT-style voice assistant for a condo sales gallery robot: pick a
 voice, then just talk. Natural-sounding speech, interruptible mid-sentence,
 Thai and English without switching modes.
@@ -98,7 +104,7 @@ about a third fewer bytes and no encode/decode per chunk.
 | `app/providers/base.py` | Provider interface + the protocol spec |
 | `app/providers/gemini.py` | Gemini Live |
 | `app/providers/openai_realtime.py` | OpenAI Realtime |
-| `app/prompts.py` | System instructions; facts loaded from `data/condo_facts.json` |
+| `app/prompts.py` | System instructions; facts loaded from `data/projects/embassy_world/facts/condo_facts.json` |
 | `app/voices.py` | Voice catalogues per provider |
 | `app/tools/` | The 19 callable tools, the search, and the Canva window |
 | `app/turnlog.py` | One JSON line per turn to `data/logs/`, deleted after 30 days |
@@ -358,7 +364,7 @@ python scripts/import_slides.py "Embassy World Present V.3.pdf"
 ```
 
 Each page becomes a slide, and any text on the page seeds the title and
-keywords. **Then open `data/slides/index.json` and fix the titles and
+keywords. **Then open `data/projects/embassy_world/presentations/slides/index.json` and fix the titles and
 keywords for the slides that matter** — search is what decides whether the
 assistant can find a slide, and auto-extracted text is a starting point, not
 a finished index. A slide it can't find is one it will never show.
@@ -443,8 +449,8 @@ failure was specific enough to be worth keeping in mind: `ราคา` matched
 `อาคาร`, because they share the run `าคา`. Overlapping letters are not
 overlapping meaning.
 
-The semantic half embeds all 144 slides once with `gemini-embedding-001`
-(768-dim, L2-normalised) and caches them to `data/slides/embeddings.npz`. This
+The semantic half embeds the 135 Embassy World slides once with `gemini-embedding-001`
+(768-dim, L2-normalised) and caches them beside the project slide index. This
 is what lets a question find a slide sharing none of its words — สระว่ายน้ำ
 finding "SKY POOL", or a Chinese guest's 游泳池 finding anything at all. It
 degrades rather than fails: with no cache the search is keyword-only and
@@ -454,8 +460,8 @@ of being left to be discovered.
 RRF combines the two rankings without needing their scores to be comparable,
 which they aren't — BM25 is unbounded, cosine is [-1, 1].
 
-Slides tagged `other-project` are scored down so a competitor's pool doesn't
-answer "show me the pool". Queries below `SEARCH_MIN_SIMILARITY` return
+The 15 `other-project` entries are kept in `data/review/other_projects/` and
+are not indexed for a normal Embassy World session. Queries below `SEARCH_MIN_SIMILARITY` return
 "no match" rather than something unrelated: a wrong floor plan on a large
 screen is worse than a blank one. `SEARCH_SHOW_SIMILARITY` is the higher bar a
 match must clear before it may take over the screen.
@@ -554,7 +560,7 @@ The prompt states the project name twice and explicitly forbids renaming,
 abbreviating, translating or guessing it. That rule exists because the model
 was answering as "Ambassador World": the name appeared once, so when the
 audio was unclear it treated it as something to guess at rather than a fixed
-fact. If it still drifts, add the name to `data/condo_facts.json` as well.
+fact. If it still drifts, add the name to `data/projects/embassy_world/facts/condo_facts.json` as well.
 
 It's also told to refuse unrelated work. Without that it drifted into
 offering English lessons and translation, which is what a general assistant
@@ -566,7 +572,7 @@ Three separate sources, and the difference matters:
 
 | Source | Reaches the model | Use for |
 | --- | --- | --- |
-| `data/condo_facts.json` | **Always** — in every turn's instructions | Prices, promotions, unit sizes. Authored, with `approved_by` and `effective_from`. Blank fields render as an explicit "no data" line rather than being dropped: a *missing* line reads to the model like a fact nobody mentioned. |
+| `data/projects/embassy_world/facts/condo_facts.json` | **Always** — in every turn's instructions | Prices, promotions, unit sizes. Authored, with `approved_by` and `effective_from`. Blank fields render as an explicit "no data" line rather than being dropped: a *missing* line reads to the model like a fact nobody mentioned. |
 | Slide summaries (144 of them) | **Only when it looks them up** via `search_condo_info` or `show_slide` | Facilities, floors, what the project contains |
 | Narration scripts | With the slide being presented | Approved wording for a specific slide |
 
@@ -583,7 +589,7 @@ never mention the project.
 so it's returned with a note telling the model not to quote it as pricing,
 and `search_condo_info` refuses commercial questions **before** searching, in
 every language it has been given words for. Those answers come from
-`data/condo_facts.json` — see below.
+`data/projects/embassy_world/facts/condo_facts.json` — see below.
 
 That guard matches Thai terms as *words*, not substrings. Thai is written
 without spaces, so `term in text` finds a word inside an unrelated one
@@ -596,8 +602,8 @@ where a wrong refusal costs more than a wrong picture.
 
 ## The Canva window is the deck
 
-The presentation the sales team maintains lives in Canva. `data/slides/` is
-an *export* of it, and the two drifted: 59 exported frames against a shorter
+The presentation the sales team maintains lives in Canva. `data/projects/embassy_world/presentations/slides/` is
+an *export* of it, and the two drifted in an earlier version: 59 exported frames against a shorter
 live deck, several of the frames caught mid-transition between two pages.
 
 `canva_display` used to work out the Canva page from our own filename —
@@ -615,7 +621,7 @@ python scripts/canva_pages.py --write                          # then commit to 
 ```
 
 It opens the real deck, walks every page, screenshots each one and matches
-it against the exported images, then writes `data/slides/canva_pages.json`.
+it against the exported images, then writes `data/projects/embassy_world/presentations/slides/canva_pages.json`.
 `--keep-shots` saves each page beside its matched image so the mapping can
 be checked by eye — the similarity scores can say two pictures are alike,
 they cannot say the matching is *right*, and fifty side-by-side pictures can.
@@ -657,7 +663,7 @@ the project claims. It writes no content of its own.
 
 Afterwards the images *are* the deck: page number and slide id agree by
 construction and `canva_pages.json` is an identity, so there is nothing left
-to drift. `--apply` backs up `data/slides/` first.
+to drift. `--apply` backs up the configured project slide directory first.
 
 ### Why the deck gets walked at startup
 
@@ -683,7 +689,7 @@ went wrong.
 
 ## Before using this with real customers
 
-**Four fields in `data/condo_facts.json` are still blank** — starting price,
+**Four fields in `data/projects/embassy_world/facts/condo_facts.json` are still blank** — starting price,
 unit types and sizes, promotions, and the sales office's opening hours. They
 are blank on purpose. The project owner's instruction was *"it isn't in the
 presentation, I'm not comfortable making it up"*, and the assistant is

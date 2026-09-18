@@ -143,7 +143,9 @@ def test_the_sales_host_block_keeps_embassy_world_apart_from_other_projects():
     the proxy model. Both rules must stay in the persona, re-read every turn."""
     from app.prompts import SALES_HOST_BLOCK
 
-    assert "Embassy Life" in SALES_HOST_BLOCK and "Embassy World" in SALES_HOST_BLOCK
+    text = build_instructions("Embassy World")
+    assert "Embassy Life" in text and "Embassy World" in text
+    assert "Biogenesis" not in SALES_HOST_BLOCK, "project facts belong in project data"
     assert "ความรู้เดิม" in SALES_HOST_BLOCK, "must forbid inventing from the model's own memory"
 
 
@@ -159,20 +161,20 @@ def test_sales_host_keeps_a_no_intent_opening_brief():
     from app.prompts import SALES_HOST_BLOCK
 
     assert 'ลูกค้าบอกว่า "ยังไม่รู้อะไรเลย"' in SALES_HOST_BLOCK
-    assert '"ยินดีต้อนรับค่ะ ที่นี่คือ Embassy World ค่ะ" เท่านั้นแล้วหยุด' in SALES_HOST_BLOCK
+    assert '"ยินดีต้อนรับค่ะ ที่นี่คือ Embassy World ค่ะ" เท่านั้นแล้วหยุด' in build_instructions("Embassy World")
     assert "ห้ามถามเรื่องแบบห้อง" in SALES_HOST_BLOCK
     assert "ห้าม" in SALES_HOST_BLOCK and "ทำเล แนวคิด facility" in SALES_HOST_BLOCK
 
 
 def test_sales_host_uses_a_personal_clue_once_then_stops():
-    from app.prompts import SALES_HOST_BLOCK
+    text = build_instructions("Embassy World")
 
     for clue in ("ครอบครัว", "เวลา", "การมาใช้"):
-        assert clue in SALES_HOST_BLOCK
-    assert "ถือว่า intent ชัด" in SALES_HOST_BLOCK
-    assert 'ตอบว่า "เหมาะกับการใช้เวลาพักผ่อนร่วมกันทั้งครอบครัวในวันหยุดค่ะ" เท่านั้น' in SALES_HOST_BLOCK
-    assert "ห้ามเอ่ย facility/ห้อง" in SALES_HOST_BLOCK
-    assert "เติมคำถามและข้อเสนอท้าย" in SALES_HOST_BLOCK
+        assert clue in text
+    assert "ถือว่า intent ชัด" in text
+    assert 'ตอบว่า "เหมาะกับการใช้เวลาพักผ่อนร่วมกันทั้งครอบครัวในวันหยุดค่ะ" เท่านั้น' in text
+    assert "ห้ามเอ่ย facility/ห้อง" in text
+    assert "เติมคำถามและข้อเสนอท้าย" in text
 
 
 def test_sales_host_does_not_require_a_follow_up_question():
@@ -247,10 +249,10 @@ def test_sales_host_does_not_narrate_every_tool_result():
 
 
 def test_sales_host_compares_room_use_before_numbers():
-    from app.prompts import SALES_HOST_BLOCK
+    text = build_instructions("Embassy World")
 
-    assert "อธิบายความต่างด้านพื้นที่และการใช้งานก่อน" in SALES_HOST_BLOCK
-    assert "ตัวเลขเป็นข้อมูลประกอบเมื่อจำเป็น ไม่ใช่คำตอบหลัก" in SALES_HOST_BLOCK
+    assert "อธิบายความต่างด้านพื้นที่และการใช้งานก่อน" in text
+    assert "ตัวเลขเป็นข้อมูลประกอบเมื่อจำเป็น ไม่ใช่คำตอบหลัก" in text
 
 
 def test_sales_host_has_explicit_price_and_pool_stop_examples():

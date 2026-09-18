@@ -15,7 +15,7 @@ the prompt would make every reply slower and more expensive, including the
 ones that never mention the project.
 
 What it is not: a source of prices or promotions. Those live in
-the approved facts file (data/condo_facts.json). Slide summaries are
+the project facts file (which still needs owner approval). Slide summaries are
 descriptive, and the prompt forbids quoting numbers that aren't in
 that file.
 """
@@ -41,7 +41,7 @@ MAX_RESULTS = 4
 #: No amount of scoring tuning fixes that, because the match is real; it's
 #: the *question* that has no answer here. Cheaper and far more predictable
 #: to state which questions those are. Prices, promotions and payment terms
-#: live in data/condo_facts.json, where a human signs them off.
+#: live in the project facts source, where a human signs them off.
 #: A gallery in Thailand gets Chinese, Russian, Japanese and Korean buyers,
 #: and the first thing any of them asks is the price. Listing only Thai and
 #: English words meant 价格是多少 and "цена" walked straight past the
@@ -73,6 +73,8 @@ def _result_limit(query: str) -> int:
 def _entry(slide: dict) -> dict:
     """One search hit, trimmed to what's useful to speak from."""
     out = {
+        "source_id": slide["source_id"],
+        "project_id": slide["project_id"],
         "title": sanitize_common_area_dimensions(
             slide.get("title_th") or slide.get("title_en")
         ),

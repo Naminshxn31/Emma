@@ -8,12 +8,13 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.config import settings
+from app.data_sources import require_project_payload
 
 logger = logging.getLogger("condo_voice.project_knowledge")
 
 
 def _path() -> Path:
-    configured = getattr(settings, "project_knowledge_file", "data/project_knowledge.json")
+    configured = settings.project_knowledge_file
     return Path(configured).expanduser()
 
 
@@ -21,6 +22,7 @@ def _path() -> Path:
 def entities() -> list[dict]:
     try:
         payload = json.loads(_path().read_text(encoding="utf-8"))
+        require_project_payload(payload, "project_vocabulary", settings.project_id)
         return payload.get("entities", [])
     except Exception:
         logger.warning("could not load project knowledge from %s", _path(), exc_info=True)

@@ -98,6 +98,16 @@ _REGISTRY: dict[str, Tool] = {}
 _inflight: dict[object, asyncio.Task] = {}
 
 
+def _has_foreign_project(value: object, expected: str) -> bool:
+    if isinstance(value, dict):
+        if "project_id" in value and value["project_id"] != expected:
+            return True
+        return any(_has_foreign_project(item, expected) for item in value.values())
+    if isinstance(value, list):
+        return any(_has_foreign_project(item, expected) for item in value)
+    return False
+
+
 def tool(
     name: str,
     description: str,
@@ -282,6 +292,14 @@ async def _dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(result, dict):
         result = {"ok": True, "result": result}
     result.setdefault("ok", True)
+
+    if any(tag in entry.tags for tag in ("units", "knowledge", "slides")):
+        from app.config import settings
+
+        if _has_foreign_project(result, settings.project_id):
+            logger.error("tool %s returned a foreign-project result", name)
+            return {"ok": False, "error": "project scope mismatch"}
+        result.setdefault("project_id", settings.project_id)
 
     # A tool that changed what's on screen has to reach the display windows.
     # Doing it here rather than inside each slide tool keeps the handlers

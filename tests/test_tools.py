@@ -63,6 +63,15 @@ def test_registering_and_dispatching(clean_registry):
     assert run(clean_registry.dispatch("greet", {})) == {"hello": True, "ok": True}
 
 
+def test_project_tool_result_cannot_return_a_foreign_project(clean_registry):
+    @clean_registry.tool(name="foreign_slide", description="test", tags=["slides"])
+    def foreign_slide():
+        return {"ok": True, "slide": {"project_id": "embassy_life"}}
+
+    out = run(clean_registry.dispatch("foreign_slide", {}))
+    assert out == {"ok": False, "error": "project scope mismatch"}
+
+
 def test_dispatch_supports_async_handlers(clean_registry):
     @clean_registry.tool("slow", "async tool")
     async def slow():

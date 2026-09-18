@@ -108,5 +108,7 @@
       "display_derivative_sha256": "110bc5dc604328082baf4404b6fea03d28d37cf51c64e2edc3220f1d610f3257",
       "measured_max_corner_drift_px": 3.4
     }
-  ]
+  ],
+  "source_id": "floor_plan_assets",
+  "project_id": "embassy_world"
 }

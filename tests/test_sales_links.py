@@ -220,7 +220,8 @@ def test_the_inventory_page_accepts_the_currency_parameter():
 
 def test_no_confirmed_map_link_means_no_map_and_no_guessing(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
-    facts.write_text(json.dumps({"map": {"url": None}}), encoding="utf-8")
+    facts.write_text(json.dumps({"source_id": "project_facts", "project_id": settings.project_id,
+                                 "map": {"url": None}}), encoding="utf-8")
     monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
     out = units.show_map()
     assert out["ok"] is False and stage == []
@@ -229,7 +230,8 @@ def test_no_confirmed_map_link_means_no_map_and_no_guessing(monkeypatch, tmp_pat
 
 def test_a_confirmed_map_link_goes_on_the_stage(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
-    facts.write_text(json.dumps({"map": {"url": "https://maps.app.goo.gl/abc123"}}), encoding="utf-8")
+    facts.write_text(json.dumps({"source_id": "project_facts", "project_id": settings.project_id,
+                                 "map": {"url": "https://maps.app.goo.gl/abc123"}}), encoding="utf-8")
     monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
     out = units.show_map()
     assert out["ok"] and stage == ["https://maps.app.goo.gl/abc123"]
@@ -237,7 +239,8 @@ def test_a_confirmed_map_link_goes_on_the_stage(monkeypatch, tmp_path, stage):
 
 def test_only_a_google_maps_link_counts_as_the_map(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
-    facts.write_text(json.dumps({"map": {"url": "https://evil.example/x"}}), encoding="utf-8")
+    facts.write_text(json.dumps({"source_id": "project_facts", "project_id": settings.project_id,
+                                 "map": {"url": "https://evil.example/x"}}), encoding="utf-8")
     monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
     assert units.show_map()["ok"] is False and stage == []
 
@@ -246,7 +249,7 @@ def test_the_facts_file_map_slot_is_empty_or_a_confirmed_google_maps_link():
     """Filled by the owner on 2026-09-01 (resolves to "Embassy World
     Pattaya", 12.8848 N 100.8862 E). Empty is also a valid state; a link
     to anywhere but Google Maps is not."""
-    facts = json.loads(Path("data/condo_facts.json").read_text(encoding="utf-8"))
+    facts = json.loads(Path(prompts.CONDO_FACTS_FILE).read_text(encoding="utf-8"))
     assert "map" in facts
     url = facts["map"].get("url")
     assert url in (None, "") or url.startswith(("https://maps.app.goo.gl/", "https://www.google.com/maps"))

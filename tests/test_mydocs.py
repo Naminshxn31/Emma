@@ -17,6 +17,7 @@ from app.tools import mydocs
 @pytest.fixture(autouse=True)
 def _own_folder(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "personal_docs_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "assistant_profile", "emma")
     mydocs.reset()
     yield tmp_path
     mydocs.reset()
@@ -36,6 +37,33 @@ def test_a_thai_question_finds_the_right_file(_own_folder):
     assert out["found"] is True
     assert out["results"][0]["file"] == "รถ.txt"
     assert "ตุลาคม" in out["results"][0]["text"]
+
+
+def test_the_library_can_be_scoped_to_one_project(_own_folder, monkeypatch):
+    """MYDOCS_INCLUDE fences the sales host to one project's files, so an
+    Embassy Life brochure sitting in the same corpus cannot answer a question
+    about Embassy World (measured 2026-09-14: it did, and the model invented
+    specifics on top). The filter is on the path relative to the folder;
+    empty means every file, which conftest pins for the rest of the suite."""
+    (_own_folder / "embassy-world").mkdir()
+    (_own_folder / "embassy-life").mkdir()
+    _write(_own_folder / "embassy-world", "world.md",
+           "ที่นี่มีลากูนและสวนสำหรับครอบครัว")
+    _write(_own_folder / "embassy-life", "life.md",
+           "ที่นี่มีจากุซซี่ Crystal Maze สุดหรูริมทะเล")
+
+    monkeypatch.setattr(settings, "mydocs_include", "embassy-world")
+    monkeypatch.setattr(settings, "assistant_profile", "condo")
+    mydocs.reset()
+    scoped = mydocs.search_my_documents("จากุซซี่ Crystal Maze")
+    assert not any("life.md" in r["file"] for r in scoped.get("results", [])), \
+        "Embassy Life doc leaked past the scope"
+
+    monkeypatch.setattr(settings, "mydocs_include", "")
+    mydocs.reset()
+    still_scoped = mydocs.search_my_documents("จากุซซี่ Crystal Maze")
+    assert not any("life.md" in r["file"] for r in still_scoped.get("results", [])), \
+        "empty include cannot widen a gallery session"
 
 
 def test_nothing_relevant_is_a_refusal_not_the_closest_chunk(_own_folder):

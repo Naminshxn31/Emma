@@ -90,6 +90,7 @@ def test_a_real_table_stops_being_a_sample_without_anyone_flipping_anything(
 
     real = tmp_path / "units.json"
     real.write_text(json.dumps({
+        "source_id": "local_unit_inventory", "project_id": settings.project_id,
         "approved_by": "คุณเอ", "effective_from": "2026-09-01",
         "units": [{"room": "A801", "price_thb": 3100000, "status": "available"}],
     }, ensure_ascii=False), encoding="utf-8")
@@ -109,6 +110,7 @@ def test_an_unapproved_real_table_still_asks_for_confirmation(monkeypatch, tmp_p
 
     real = tmp_path / "units.json"
     real.write_text(json.dumps({
+        "source_id": "local_unit_inventory", "project_id": settings.project_id,
         "units": [{"room": "A801", "price_thb": 3100000}],
     }, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setattr(settings, "units_file", str(real))
@@ -721,6 +723,12 @@ def test_every_live_read_is_scoped_to_our_project(monkeypatch):
         sel = params["select"]
         assert "floors!inner(" in sel and "buildings!inner(" in sel \
             and "projects!inner(slug)" in sel, (table, sel)
+
+
+def test_inventory_setting_cannot_cross_the_active_project(monkeypatch):
+    monkeypatch.setattr(settings, "inventory_project", "embassy-life")
+    with pytest.raises(ValueError, match="does not match"):
+        units._scoped({"select": "id"})
 
 
 def test_a_blank_project_setting_means_ours_not_everything():

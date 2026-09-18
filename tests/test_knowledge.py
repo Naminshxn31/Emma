@@ -132,12 +132,12 @@ def test_nonsense_finds_nothing(loaded):
 
 
 def test_page_documents_reached_the_index(loaded):
-    """85 slides carry per-page documents from the emma project. The Canva
+    """70 project-scoped slides carry per-page documents. The Canva
     deck's 59 pages do not — those still need narration from the sales
     team, which no generated description can substitute for."""
     slides = loaded.load_slides()
     with_detail = [s for s in slides if s.get("detail_th")]
-    assert len(with_detail) == 85
+    assert len(with_detail) == 70
     assert not any(s["id"].startswith("ew-") for s in with_detail)
 
 
@@ -203,6 +203,8 @@ def test_common_area_dimensions_never_reach_customer_facing_knowledge(loaded):
     assert "16 โครงการ" in facts, "non-facility figures remain available"
 
     entry = _entry({
+        "source_id": "slide_catalog",
+        "project_id": "embassy_world",
         "title_th": "สระลากูน",
         "summary_th": "สระลากูนยาว 155 เมตร อยู่หน้าอาคาร",
         "detail_th": "พื้นที่ส่วนกลาง 4,000 ตร.ม. พร้อมสวน",

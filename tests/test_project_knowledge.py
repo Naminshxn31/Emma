@@ -1,4 +1,5 @@
 from app.tools import project_knowledge
+from app.config import settings
 
 
 def test_project_vocabulary_is_data_driven_and_multilingual():
@@ -36,7 +37,7 @@ def test_every_routed_slide_id_still_exists():
     library = {
         image["id"]
         for image in json.loads(
-            Path("data/slides/index.json").read_text(encoding="utf-8")
+            (Path(settings.slides_dir) / "index.json").read_text(encoding="utf-8")
         )["images"]
     }
     assert library, "the slide library is empty — this test proves nothing"
@@ -59,7 +60,7 @@ def test_every_routed_slide_can_actually_be_put_on_screen():
     from pathlib import Path
 
     pages = json.loads(
-        Path("data/slides/canva_pages.json").read_text(encoding="utf-8")
+        (Path(settings.slides_dir) / "canva_pages.json").read_text(encoding="utf-8")
     )["pages"]
     assert pages, "the canva page map is empty — this test proves nothing"
 

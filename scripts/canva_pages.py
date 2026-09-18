@@ -18,7 +18,7 @@ that came up blank.
 Nobody can fix that by counting slides by hand and hoping. This opens the
 real deck, walks every page, screenshots each one, and matches it against
 our images, so the mapping is *observed*. What it writes to
-`data/slides/canva_pages.json` is the answer to "which page of the live deck
+The active project's `canva_pages.json` is the answer to "which page of the live deck
 actually shows this picture".
 
 Matching is a coarse greyscale thumbnail comparison, which is enough because
@@ -428,7 +428,8 @@ async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
     if write:
         path = Path(settings.slides_dir) / "canva_pages.json"
         path.write_text(json.dumps(
-            {"total": total, "deck_url": settings.canva_url.split("#", 1)[0],
+            {"source_id": "canva_page_mapping", "project_id": settings.project_id,
+             "total": total, "deck_url": settings.canva_url.split("#", 1)[0],
              "pages": mapping}, ensure_ascii=False, indent=2), encoding="utf-8")
         print("เขียนแล้ว: %s" % path)
     else:
@@ -439,7 +440,7 @@ async def run(write: bool, keep: Path | None, forced_total: int | None) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--write", action="store_true",
-                    help="save data/slides/canva_pages.json")
+                    help="save the active project's canva_pages.json")
     ap.add_argument("--keep-shots", metavar="DIR",
                     help="save every canva page beside its match, to check by eye")
     ap.add_argument("--total", type=int,

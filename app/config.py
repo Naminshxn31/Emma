@@ -18,7 +18,13 @@ from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
+from app.data_sources import project_identity, source_path
+
 load_dotenv()
+
+# One gallery server serves one project. A second project needs its own
+# registered sources and server process before it can be selected here.
+ACTIVE_PROJECT_ID = os.getenv("PROJECT_ID", "embassy_world").strip() or "embassy_world"
 
 
 def _get_list(name: str, default: list[str]) -> list[str]:
@@ -79,6 +85,7 @@ MULTI_SESSION_DEFAULT = frozenset({"units", "knowledge"})
 
 @dataclass
 class Settings:
+    project_id: str = ACTIVE_PROJECT_ID
     # Which persona this server runs: "condo" (the gallery receptionist,
     # default) or "emma" (the owner's personal assistant). One repo, two
     # hats — forking was rejected on purpose, because twenty-plus fixed bugs
@@ -120,6 +127,13 @@ class Settings:
     memory_file: str = os.getenv("MEMORY_FILE", "data/memory.json")
     # Folder of the owner's own files (.txt .md .pdf) that Emma may search.
     personal_docs_dir: str = os.getenv("PERSONAL_DOCS_DIR", "data/personal-docs")
+    # Scope the library to one project. Comma-separated path fragments; a file
+    # is searchable only if its path (relative to personal_docs_dir) contains
+    # one of them. Empty = every file, the old behaviour. Set to "embassy-world"
+    # so the sales host answers about Embassy World alone and cannot pull an
+    # Embassy Life brochure sitting in the same corpus into a "what do we have
+    # here" answer (measured 2026-09-14: it did, and invented specifics too).
+    mydocs_include: str = os.getenv("MYDOCS_INCLUDE", "")
     # Gemini's native google_search grounding for the live session.
     # Measured 2026-08-22: a bare session connects fine while the same
     # session with this tool gets 1011 — grounding has its own quota and
@@ -368,11 +382,15 @@ class Settings:
 
     # Slide deck shown on the robot's screen. `index.json` alongside the
     # images maps each file to titles/summaries/keywords in both languages.
-    slides_dir: str = os.getenv("SLIDES_DIR", "data/slides")
+    slides_dir: str = os.getenv(
+        "SLIDES_DIR", str(source_path("slide_catalog", ACTIVE_PROJECT_ID).parent)
+    )
     #: The unit table the sales team owns: room, size, view, price, status,
     #: plus approved_by and effective_from. Item 8 on their list, and the
     #: one that unblocks five others.
-    units_file: str = os.getenv("UNITS_FILE", "data/units.json")
+    units_file: str = os.getenv(
+        "UNITS_FILE", str(source_path("local_unit_inventory", ACTIVE_PROJECT_ID))
+    )
     #: Show the sample table when the real one is missing.
     #:
     #: Off by default and it must stay that way on any machine a customer can
@@ -404,6 +422,16 @@ class Settings:
     #: Seconds a fetched unit stays fresh. Short on purpose: the whole point
     #: of the live link is that "ว่าง" means now, not yesterday.
     inventory_cache_s: float = float(os.getenv("INVENTORY_CACHE_S", "30"))
+    #: Which project's units this gallery may show. The sales team's
+    #: inventory holds three Empire projects since 2026-09-03 (Embassy
+    #: World, Embassy Life, Embassy One) and all three have buildings
+    #: A/B/C — the same `unit_no` exists in more than one. Measured
+    #: 2026-09-11: find_units put "A-1405" on the gallery screen as one of
+    #: ours; it is an Embassy Life unit. Blank falls back to ours rather
+    #: than "every project" — an unset knob must not widen what a customer
+    #: sees (the WS_TOKEN="" lesson).
+    inventory_project: str = (os.getenv("INVENTORY_PROJECT", "").strip()
+                              or "embassy-world")
     #: Whether exact prices may appear on screen / in the model's hands.
     #:
     #: Off by default at the owner's instruction: the pricelist is the sales
@@ -415,7 +443,7 @@ class Settings:
     units_show_price: bool = _get_bool("UNITS_SHOW_PRICE", False)
     #: Where the floor-plan images live. The sales app serves them as public
     #: static files on its Vercel deployment; floor->path comes from
-    #: data/floor-plan-assets.json (copied from condo-inventory — recopy when
+    #: project sales/floor-plan-assets.json (copied from condo-inventory — recopy when
     #: their plans change). Not a secret, just an address.
     inventory_plan_base: str = _get_token("INVENTORY_PLAN_BASE") or "https://condo-inventory.vercel.app"
     #: One JSON line per turn — see app/turnlog.py. Records what guests say,
@@ -777,12 +805,21 @@ class Settings:
         os.getenv("SEARCH_LOCAL_MIN_COVERAGE", "0.34")
     )
     project_knowledge_file: str = os.getenv(
-        "PROJECT_KNOWLEDGE_FILE", "data/project_knowledge.json"
+        "PROJECT_KNOWLEDGE_FILE", str(source_path("project_vocabulary", ACTIVE_PROJECT_ID))
     )
     # Optional cross-encoder second stage. Empty keeps startup light; set this
     # after benchmarking the target robot's CPU/RAM.
     search_reranker_model: str = os.getenv("SEARCH_RERANKER_MODEL", "")
     search_reranker_candidates: int = int(os.getenv("SEARCH_RERANKER_CANDIDATES", "8"))
+
+    def __post_init__(self) -> None:
+        if self.assistant_profile != "condo":
+            return
+        identity = project_identity(self.project_id)
+        if self.project_name != identity["display_name"]:
+            raise ValueError("PROJECT_NAME does not match PROJECT_ID")
+        if self.inventory_project != identity["inventory_slug"]:
+            raise ValueError("INVENTORY_PROJECT does not match PROJECT_ID")
 
     def api_key_for(self, provider: str | None = None) -> str | None:
         return self.gemini_api_key if (provider or self.provider) == "gemini" else self.openai_api_key

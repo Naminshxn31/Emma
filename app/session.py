@@ -99,6 +99,9 @@ class VoiceSession:
         self.turn_idle = asyncio.Event()
         self.turn_idle.set()
         self.provider_name = provider_name or settings.provider
+        # Fixed by this server's configuration, never supplied by the model
+        # or a visitor URL. All project data loaders use the same ID.
+        self.project_id = settings.project_id
         #: Per-connection persona. The URL can ask for one (?profile=
         #: translator) so the sales room flips into interpreter mode with a
         #: bookmark instead of an .env edit and a restart. Falls back to the

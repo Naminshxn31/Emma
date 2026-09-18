@@ -80,6 +80,14 @@ def _load() -> dict:
     except (OSError, ValueError):
         logger.exception("could not read %s", path)
         return {}
+    if not fell_back:
+        from app.data_sources import require_project_payload
+
+        try:
+            require_project_payload(data, "local_unit_inventory", settings.project_id)
+        except ValueError:
+            logger.error("local unit table has wrong project/source metadata: %s", path)
+            return {}
     # Sample-ness is a property of *where the file came from*, not of a flag
     # inside it and not of the setting that allowed it. Two consequences,
     # both deliberate: a real table dropped into place stops being a sample
@@ -150,6 +158,7 @@ def show_unit(room: str) -> dict:
 
     sample = bool(data.get("sample"))
     card = dict(unit)
+    card["project_id"] = settings.project_id
     card["status_th"] = _STATUS_TH.get(str(unit.get("status", "")).lower(), "")
     card["sample"] = sample
     card["approved_by"] = data.get("approved_by") or ""
@@ -241,7 +250,12 @@ def _scoped(params: dict, *, via: str = "") -> dict:
     path or PostgREST rejects the filter — the test that checks every live
     read carries both is what keeps a new query from quietly widening.
     """
-    params[f"{via}{_SCOPE_KEY}"] = f"eq.{settings.inventory_project}"
+    from app.data_sources import inventory_slug
+
+    expected = inventory_slug(settings.project_id)
+    if settings.inventory_project != expected:
+        raise ValueError("inventory project does not match the active project")
+    params[f"{via}{_SCOPE_KEY}"] = f"eq.{expected}"
     return params
 
 
@@ -272,6 +286,7 @@ def _card_from_live(row: dict) -> dict:
     unit_type = (row.get("unit_types") or {}).get("name") or ""
     price = row.get("promo_price") or row.get("base_price")
     return {
+        "project_id": settings.project_id,
         "id": row.get("id"),
         "room": row.get("unit_no"),
         "building": building,
@@ -616,9 +631,12 @@ def _plan_paths() -> dict[int, str]:
         import json
         from pathlib import Path
 
-        path = Path(__file__).resolve().parent.parent.parent / "data" / "floor-plan-assets.json"
+        from app.data_sources import require_project_payload, source_path
+
+        path = source_path("floor_plan_assets", settings.project_id)
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
+            require_project_payload(raw, "floor_plan_assets", settings.project_id)
             _PLAN_ASSETS = {int(f["floor"]): f["display_path"]
                             for f in raw.get("floors", []) if f.get("display_path")}
         except (OSError, ValueError):
@@ -685,7 +703,7 @@ def show_plan(floor: int = 1, building: str | None = None) -> dict:
     turnlog.record("show_plan", floor=floor, building=want or None,
                    units=len(marks))
     scope = f"ตึก {want} " if want else ""
-    return {"ok": True, "screen": "plan",
+    return {"ok": True, "screen": "plan", "project_id": settings.project_id,
             "image": settings.inventory_plan_base + image_path,
             "floor": int(floor), "building": want or None,
             "units": marks, "counts": counts,
@@ -982,6 +1000,9 @@ def show_map() -> dict:
     # map in, with the owner's link sitting in condo_facts.json).
     try:
         facts = json.loads(Path(prompts.CONDO_FACTS_FILE).read_text(encoding="utf-8"))
+        from app.data_sources import require_project_payload
+
+        require_project_payload(facts, "project_facts", settings.project_id)
     except Exception:
         facts = {}
     link = ((facts.get("map") or {}).get("url") or "").strip()
@@ -995,6 +1016,6 @@ def show_map() -> dict:
                 "instruction": "เครื่องนี้ไม่ได้เปิดจอเว็บ ให้บอกทำเลด้วยคำพูดตามข้อมูลโครงการ"}
     webstage.request(link)
     turnlog.record("show_map")
-    return {"ok": True, "screen": "web",
+    return {"ok": True, "screen": "web", "project_id": settings.project_id,
             "instruction": ("แผนที่โครงการกำลังขึ้นจอ บอกสั้นๆ ว่าขึ้นจอแล้ว "
                             "อธิบายทำเลได้เฉพาะตามข้อมูลโครงการ ห้ามเดาระยะทางหรือนาที")}

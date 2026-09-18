@@ -25,6 +25,7 @@ data/broadlink_device.json
 
 # Cached slide embeddings — rebuilt from the deck on first run
 data/slides/embeddings.npz
+data/projects/*/presentations/slides/embeddings.npz
 
 # Turn logs contain what visitors said out loud — never commit them.
 data/logs/
@@ -43,6 +44,14 @@ data/slides/*.jpg
 data/slides/*.jpeg
 data/slides/*.png
 data/slides/index.json.bak
+data/projects/*/presentations/slides/*.jpg
+data/projects/*/presentations/slides/*.jpeg
+data/projects/*/presentations/slides/*.png
+data/projects/*/presentations/slides/index.json.bak
+data/review/other_projects/presentations/slides/*.jpg
+data/review/other_projects/presentations/slides/*.jpeg
+data/review/other_projects/presentations/slides/*.png
+data/review/unindexed_slides/
 
 # Aggregate counts kept past the raw logs. No guest speech in them, but they
 # are this gallery's numbers, not the project's.
@@ -57,6 +66,8 @@ data/eval_query_cache.npz
 data/slides-backup/
 data/canva-render/
 data/canva-shots/
+data/projects/*/presentations/slides-backup/
+data/projects/*/presentations/canva-render/
 
 # Wake-word model — 30MB of ONNX weights, restored with one command:
 #   python scripts/fetch_wake_model.py

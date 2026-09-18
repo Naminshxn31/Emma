@@ -125,7 +125,7 @@ def main() -> int:
                     help="only this range of the PDF, e.g. 67-107. Canva files "
                          "often hold two versions of a deck back to back")
     ap.add_argument("--apply", action="store_true",
-                    help="actually replace data/slides (keeps a backup)")
+                    help="actually replace the active project slide directory (keeps a backup)")
     args = ap.parse_args()
 
     source = Path(args.source).expanduser()
@@ -172,6 +172,8 @@ def main() -> int:
             "id": "%s-%03d" % (prefix, number),
             "file": "%s_%03d.jpg" % (prefix, number),
             "type": "deck",
+            "source_id": "slide_catalog",
+            "project_id": settings.project_id,
         }
         if carried:
             carried_from.add(best["id"])
@@ -250,7 +252,8 @@ def main() -> int:
     # Page number and id now agree by construction. Written out rather than
     # left to the fallback, so the deck order is a stated fact either way.
     (slides_dir / "canva_pages.json").write_text(json.dumps(
-        {"total": len(pages),
+        {"source_id": "canva_page_mapping", "project_id": settings.project_id,
+         "total": len(pages),
          "deck_url": settings.canva_url.split("#", 1)[0],
          "note": "rebuilt from a canva export — id and page agree",
          "pages": {"%s-%03d" % (prefix, n): n for n in range(1, len(pages) + 1)}},

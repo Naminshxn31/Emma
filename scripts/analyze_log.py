@@ -34,7 +34,7 @@ What to look for, and what each thing would mean:
 
   Commercial        How often visitors ask about price, room types, promotions
                     and opening hours. This is the business case for filling in
-                    data/condo_facts.json, in numbers rather than opinions.
+                    the project facts source, in numbers rather than opinions.
 """
 from __future__ import annotations
 
@@ -188,7 +188,7 @@ def main() -> int:
             print("    %-40s %d" % ((q or "")[:40], n))
         print()
         print("  → นี่คือคำถามที่ลูกค้าอยากรู้ที่สุดและหุ่นยนต์ตอบไม่ได้เลย")
-        print("    เป็นตัวเลขไว้คุยกับฝ่ายขายว่าควรกรอก data/condo_facts.json แค่ไหน")
+        print("    เป็นตัวเลขไว้คุยกับฝ่ายขายว่าควรกรอกไฟล์ facts ของโครงการแค่ไหน")
 
     # ---- the phone remote -------------------------------------------------
     # Separated from the tool counts on purpose. A tool called because a

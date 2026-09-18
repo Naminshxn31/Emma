@@ -60,7 +60,7 @@ def _base_url() -> str:
     return settings.canva_url.split("#", 1)[0]
 
 
-#: Measured `slide id -> Canva page`, loaded from `data/slides/canva_pages.json`.
+#: Measured `slide id -> Canva page`, loaded from the active project's slide directory.
 #: `None` means "never measured", which is the only reason the arithmetic
 #: below is still reachable. See `_page_number`.
 _PAGE_MAP: dict[str, int] | None = None
@@ -87,6 +87,14 @@ def load_page_map(force: bool = False) -> dict[str, int]:
     except (OSError, ValueError):
         logger.warning("could not read %s — falling back to id arithmetic", path)
         _PAGE_MAP, _PAGE_MAP_TOTAL = {}, None
+        return _PAGE_MAP
+    from app.data_sources import require_project_payload
+
+    try:
+        require_project_payload(raw, "canva_page_mapping", settings.project_id)
+    except ValueError:
+        logger.error("canva page map belongs to a different project: %s", path)
+        _PAGE_MAP, _PAGE_MAP_TOTAL = {}, -1
         return _PAGE_MAP
     _PAGE_MAP = {str(k): int(v) for k, v in (raw.get("pages") or {}).items()}
     _PAGE_MAP_TOTAL = raw.get("total")
@@ -119,6 +127,8 @@ def _page_number(slide_id: str) -> int | None:
     if not match:
         return None
     mapping = load_page_map()
+    if _PAGE_MAP_TOTAL == -1:
+        return None
     if not mapping:
         return int(match.group(1))
     page = mapping.get(slide_id)

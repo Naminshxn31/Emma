@@ -127,7 +127,8 @@ def _drop_boilerplate(text: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("pages", type=Path, help="emma/knowledge/pages")
-    parser.add_argument("--index", type=Path, default=Path("data/slides/index.json"))
+    from app.config import settings
+    parser.add_argument("--index", type=Path, default=Path(settings.slides_dir) / "index.json")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

@@ -10,7 +10,7 @@ Two modes, because a sales gallery needs both:
   guest can interrupt at any point and the conversation just carries on —
   no separate "presentation mode" the robot has to be pulled out of.
 
-Slides live in `data/slides/` with an index carrying Thai *and* English
+Slides live under the active project's `presentations/slides/` with an index carrying Thai *and* English
 titles, summaries and keywords (ported from `emma`, which had already
 catalogued 85 of them). Search matches against all of it, so either language
 finds the same slide.
@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.data_sources import require_project_payload
 from app.tools.registry import tool
 
 logger = logging.getLogger("condo_voice.slides")
@@ -154,7 +155,16 @@ def load_slides() -> list[dict]:
     path = _slides_dir() / "index.json"
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-        _slides = raw["images"] if isinstance(raw, dict) else raw
+        require_project_payload(raw, "slide_catalog", settings.project_id)
+        images = raw["images"]
+        if not isinstance(images, list) or any(
+            not isinstance(slide, dict)
+            or slide.get("project_id") != settings.project_id
+            or slide.get("source_id") != "slide_catalog"
+            for slide in images
+        ):
+            raise ValueError("slide catalog contains an unscoped or foreign-project entry")
+        _slides = images
     except Exception:
         logger.warning("no slide index at %s — presentation tools will be empty", path)
         _slides = []
@@ -205,6 +215,7 @@ def _public(slide: dict, position: dict | None = None) -> dict:
     raw index entry so a schema change here doesn't leak into prompts."""
     out = {
         "id": slide["id"],
+        "project_id": slide["project_id"],
         "type": slide.get("type"),
         "title_th": slide.get("title_th"),
         "title_en": slide.get("title_en"),
