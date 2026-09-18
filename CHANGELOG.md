@@ -1,5 +1,17 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-18 — M0.3.1 ต่อ runtime policy กับ inventory (ยังไม่ปิด M0.3)
+
+- `app/runtime_policy.py`, `app/knowledge_policy.py`, `app/tools/units.py`, `data/registry/source_registry.json`: เพิ่ม `RuntimeResult`/allowlist ฟิลด์ และบังคับ live inventory ด้วย trusted source, project slug ในแถวจริง, เวลา fetch/cache และ disclosure ก่อนส่งการ์ด/รายการ/ผลรวมให้ Emma; blocked result ไม่มี payload; static sample และ local export ที่ไม่มี approval metadata ถูกปิดก่อนคืนการ์ด; cache ไฟล์ตรวจ mtime/size เพื่อรับการถอนอนุมัติ; promotion free text/ราคาโปรไม่ส่งผ่านเครื่องมือโดยอัตโนมัติ; `price_pair`/quotation ตรวจ scope ก่อนเปิดเผยข้อมูลหรือจอ; registry ของ local export ใช้ approval metadata ชุดเดียวกับ runtime
+- `tests/test_units.py`, `tests/test_sales_links.py`, `tests/test_knowledge_policy.py`, `tests/test_inventory_runtime_policy.py`, `docs/runtime-inventory-policy.md`: ปรับ fixture ให้มี project slug จริงและเพิ่ม direct-adapter bypass tests (ผิดโครงการ, ขาด slug/เวลา fetch, stale, ฟิลด์ไม่อนุญาต, mixed list, สถานะขัด query, promotion, quotation และถอน approval ของ static file); บันทึกความต่างระหว่าง `updated_at` ของแถวกับเวลา fetch และระบุว่า plan/slide/provider ยังเป็นงาน M0.3 ถัดไป
+- ตรวจจริง: ชุด inventory/sales/knowledge policy **78 ผ่าน / 1 warning**; ชุดเต็มหลังต่อ inventory **1,565 ผ่าน / 1 ล้มเดิม / 1 warning** (`test_system_instruction_stays_short`; รันก่อนเก็บ dead code และปรับ registry ล่าสุด); ยังไม่ทดสอบกับ Supabase production หรือจอจริง
+
+## 2026-09-18 — M0.3.2 ต่อ policy กับผังและปิด bypass แผนที่ (ยังไม่ปิด M0.3)
+
+- `app/runtime_policy.py`, `app/tools/units.py`: เพิ่ม route `plan_asset_runtime_v1` แยกจาก inventory/claim; `show_plan` ตรวจ source/project, manifest, ชนิดไฟล์, MIME และ SHA-256 ของภาพที่อ่านจริงก่อนส่ง URL, และตรวจทุก overlay ด้วย live inventory scope/freshness, floor/status/พิกัด ก่อนคืนภาพหรือจำนวนห้อง; blocked result ไม่ส่งภาพ/overlay. การ์ด inventory ไม่ส่ง `photo`/`floorplan` URL ที่ยังไม่ตรวจ asset. `show_map` จาก `project_facts` ต้องผ่าน approval/disclosure ก่อนเปิดจอ และตรวจ HTTPS hostname จริงแทนการเทียบ prefix
+- `tests/test_plan_runtime_policy.py`, `tests/test_units.py`, `tests/test_sales_links.py`, `docs/runtime-inventory-policy.md`, `docs/runtime-plan-policy.md`: เพิ่มกรณีตรงเข้าตัว router/adapter สำหรับ metadata ขาด, ต่างโครงการ, checksum/MIME ผิด, asset ไม่พร้อม, overlay ต่างชั้น/สถานะผิด/พิกัดนอกช่วง, draft map และ hostname ปลอม; บันทึกข้อจำกัดว่าจอยังดาวน์โหลด URL ภาพซ้ำหลัง verifier ตรวจ จึงยังไม่ใช่ byte-integrity end-to-end
+- ตรวจจริง: ชุด plan+units **41 ผ่าน / 1 warning**; ชุด sales+plan+inventory **36 ผ่าน**; หลังตัด URL การ์ดที่ไม่ตรวจ asset ชุด inventory+plan+units+sales **75 ผ่าน / 1 warning** และชุดเต็มรอบสุดท้าย **1,572 ผ่าน / 1 ล้มเดิม / 1 warning** (`tests/test_voice.py::test_system_instruction_stays_short`, ความยาว 6,460 เทียบเพดาน 4,700); `git diff --check` ผ่าน. ยังไม่ทดสอบกับ Supabase, endpoint ภาพ หรือจอ production และ slide/document/provider routes ยังไม่ผ่าน audit M0.3 ทั้งหมด
+
 ## 2026-09-18 — M0.2 gate ข้อมูลโครงการสำหรับลูกค้า
 
 - `app/knowledge_policy.py`, `data/projects/embassy_world/{facts/condo_facts.json,presentations/sales_context.json}`: นิยาม metadata approval/disclosure/content state และ deny-by-default พร้อม trace ที่ไม่มีเนื้อหา claim; ติดป้าย source เดิมเป็น draft/internal โดยไม่อนุมัติหรือแก้ข้อเท็จจริง; live inventory มี policy แยกตาม trusted source/project/fetch freshness/disclosure ไม่บังคับผู้อนุมัติรายห้อง

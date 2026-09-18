@@ -240,8 +240,8 @@
       "authority": "curated",
       "customer_facing": "conditional",
       "uses": ["fallback unit cards when live inventory is not configured"],
-      "not_for": ["use without approved_by and effective_from"],
-      "approval_fields": ["approved_by", "effective_from"]
+      "not_for": ["use without customer disclosure approval", "sample fallback"],
+      "approval_fields": ["approval_status", "approved_by", "approved_at", "effective_at", "disclosure_scope", "content_state"]
     },
     {
       "id": "sample_unit_inventory",

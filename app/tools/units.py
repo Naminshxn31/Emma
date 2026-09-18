@@ -20,11 +20,9 @@ So the tool takes a room number, looks it up, and fails when it is not
 there. A room that is not in the file has no price, and no price is the
 correct answer.
 
-Sample data exists (`data/units.sample.json`) because the real table has not
-arrived yet and the card cannot be designed against nothing. It is off by
-default, it is stamped `sample: true` all the way to the screen, and the
-model is told in the tool result to say so out loud. A showroom must never
-be one forgotten setting away from quoting invented prices.
+Sample data exists (`data/units.sample.json`) for UI development. It is off
+by default and the customer-facing tool now refuses to return its contents,
+even when the development switch is on.
 """
 from __future__ import annotations
 
@@ -33,15 +31,21 @@ import re
 import json
 import logging
 from pathlib import Path
+from datetime import datetime, timezone
 
 from app import turnlog
 from app.config import settings
+from app.runtime_policy import (
+    INVENTORY_SOURCE_ID, RuntimeResult, prepare_inventory_card,
+    prepare_plan_asset, prepare_static_inventory_card,
+)
 from app.tools.registry import tool
 
 logger = logging.getLogger("condo_voice.units")
 
 _cache: dict | None = None
 _cache_path: str | None = None
+_cache_stamp: tuple[int, int] | None = None
 
 
 def _table_path() -> tuple[Path | None, bool]:
@@ -61,19 +65,24 @@ def _table_path() -> tuple[Path | None, bool]:
 
 
 def _load() -> dict:
-    """The approved table if it exists, else the sample if it is allowed.
+    """Load the local table if it exists, else the development sample.
 
     Never both, and never a merge: a card built half from signed prices and
     half from invented ones is worse than either, because nothing on it says
     which half you are looking at.
     """
-    global _cache, _cache_path
+    global _cache, _cache_path, _cache_stamp
 
     path, fell_back = _table_path()
     if path is None:
         return {}
 
-    if _cache is not None and _cache_path == str(path):
+    try:
+        stat = path.stat()
+    except OSError:
+        return {}
+    stamp = (stat.st_mtime_ns, stat.st_size)
+    if _cache is not None and _cache_path == str(path) and _cache_stamp == stamp:
         return _cache
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -96,16 +105,17 @@ def _load() -> dict:
     # hand-written — is still treated as one. The flag is a courtesy; the
     # path is the fact.
     data["sample"] = bool(data.get("sample")) or fell_back
-    _cache, _cache_path = data, str(path)
+    _cache, _cache_path, _cache_stamp = data, str(path), stamp
     return data
 
 
 def reset() -> None:
     """Tests and a reload after the sales team drops the real file in."""
-    global _cache, _cache_path, _PLAN_ASSETS
-    _cache = _cache_path = None
+    global _cache, _cache_path, _cache_stamp, _PLAN_ASSETS
+    _cache = _cache_path = _cache_stamp = None
     _live_cache.clear()
     _PLAN_ASSETS = None
+    _PLAN_VERIFIED.clear()
 
 
 def find(room: str) -> dict | None:
@@ -148,7 +158,19 @@ def show_unit(room: str) -> dict:
         return {"ok": False, "error": "no unit table",
                 "instruction": ("ยังไม่มีตารางยูนิตในระบบ ให้บอกลูกค้าตรงๆ ว่ายังไม่มีข้อมูล "
                                 "และให้ติดต่อฝ่ายขาย ห้ามเดาราคาหรือขนาดห้อง")}
-    unit = find(room)
+    # Never hand a sample or an unsigned static export to a customer-facing
+    # model, even when a development switch makes that file loadable.
+    source_probe = prepare_static_inventory_card(
+        data, {}, expected_project_id=settings.project_id,
+        allow_price=settings.units_show_price)
+    if not source_probe.allowed:
+        logger.info("runtime inventory policy %s", source_probe.trace())
+        return {"ok": False, "error": "inventory not disclosable",
+                "policy_trace": source_probe.trace(),
+                "instruction": "ข้อมูลห้องชุดนี้ยังไม่อนุญาตให้แจ้งลูกค้า ให้ติดต่อฝ่ายขาย ห้ามใช้ข้อมูลตัวอย่างหรือข้อมูลที่ยังไม่อนุมัติ"}
+    normalized = (room or "").strip().upper().replace(" ", "")
+    unit = next((u for u in data.get("units", [])
+                 if str(u.get("room", "")).strip().upper() == normalized), None)
     if unit is None:
         rooms = [u.get("room") for u in data.get("units", [])][:8]
         return {"ok": False, "error": "unknown room", "asked": room,
@@ -165,22 +187,16 @@ def show_unit(room: str) -> dict:
     card["effective_from"] = data.get("effective_from") or ""
     turnlog.record("show_unit", room=card.get("room"), sample=sample)
 
-    if sample:
-        # Said to the model every single time, not once at the start of the
-        # conversation: an instruction that has to be remembered across
-        # turns is one that gets dropped, and the thing being dropped here
-        # is "these numbers are made up".
-        note = ("นี่คือข้อมูล**ตัวอย่าง** ยังไม่ใช่ราคาจริง ต้องบอกลูกค้าทุกครั้งว่า "
-                "ตัวเลขบนจอเป็นตัวอย่างสำหรับดูหน้าตาระบบ ยังไม่ใช่ราคาจริง "
-                "ให้ติดต่อฝ่ายขายเพื่อขอราคาที่ใช้ได้จริง ห้ามพูดเหมือนเป็นราคาจริงเด็ดขาด")
-    elif not card["approved_by"]:
-        note = ("ตารางนี้ยังไม่มีผู้อนุมัติกำกับ ให้บอกราคาได้แต่ต้องเสริมว่า "
-                "ขอให้ยืนยันกับฝ่ายขายอีกครั้ง")
-    else:
-        note = "บอกข้อมูลตามการ์ดสั้นๆ ไม่ต้องอ่านทุกฟิลด์"
-
-    return {"ok": True, "screen": "unit", "unit": _apply_price_policy(card),
-            "sample": sample, "instruction": note}
+    prepared = prepare_static_inventory_card(
+        data, card, expected_project_id=settings.project_id,
+        allow_price=settings.units_show_price)
+    logger.info("runtime inventory policy %s", prepared.trace())
+    if not prepared.allowed:
+        return {"ok": False, "error": "inventory not disclosable",
+                "policy_trace": prepared.trace()}
+    return {"ok": True, "screen": "unit", "unit": prepared.payload,
+            "sample": False, "policy_trace": prepared.trace(),
+            "instruction": "บอกข้อมูลที่อนุมัติแล้วตามการ์ดสั้นๆ ไม่ต้องอ่านทุกฟิลด์"}
 
 
 # ==================== the live inventory link ====================
@@ -268,7 +284,7 @@ _LIVE_SELECT = ("id,unit_no,size_sqm,msize,view,side,collection,unit_option,"
 #: overwrites the master prices — applied by an admin, lately from the
 #: promo inbox (Gmail → local model → review → apply). Emma reads the
 #: *result* of that workflow and nothing upstream of it.
-_PROMO_SELECT = ("unit_id,thai_price,foreign_price,note,updated_at,"
+_PROMO_SELECT = ("unit_id,active,thai_price,foreign_price,note,updated_at,"
                  "units!inner(id,unit_no,status,msize,size_sqm,view,side,unit_option,"
                  "collection,base_price,promo_price,updated_at,"
                  + _SCOPE_EMBED + ",unit_types(name))")
@@ -282,11 +298,15 @@ def _card_from_live(row: dict) -> dict:
     the model is told the promo price is *the* price.
     """
     floors = row.get("floors") or {}
+    project_slug = ((floors.get("buildings") or {}).get("projects") or {}).get("slug")
     building = (floors.get("buildings") or {}).get("code") or ""
     unit_type = (row.get("unit_types") or {}).get("name") or ""
     price = row.get("promo_price") or row.get("base_price")
     return {
         "project_id": settings.project_id,
+        "source_id": "live_unit_inventory",
+        "_project_slug": project_slug,
+        "_fetched_at": datetime.now(timezone.utc),
         "id": row.get("id"),
         "room": row.get("unit_no"),
         "building": building,
@@ -329,7 +349,7 @@ def price_pair(room: str) -> dict | None:
     Deliberately a plain function, NOT a @tool: the standing order is that
     prices never pass through the model, and this path honours it — the
     numbers travel HTTP endpoint → browser on a human's tap, while the tool
-    results Gemini reads stay stripped by _apply_price_policy. (Do not move
+    results Gemini reads stay stripped by runtime policy. (Do not move
     this between a @tool decorator and its def — the decorator-twin bug.)
 
     Field naming decoded from the pricing engine (condo-inventory
@@ -353,6 +373,10 @@ def price_pair(room: str) -> dict | None:
     if not rows:
         return None
     r = rows[0]
+    prepared = _prepared_live_card(_card_from_live(r), allow_price=False)
+    if not prepared.allowed:
+        logger.warning("price_pair blocked by inventory policy %s", prepared.trace())
+        return None
     pair = {"room": r.get("unit_no"), "thai": r.get("promo_price"),
             "foreign": r.get("base_price"), "sqm": r.get("msize")}
     # The active promotion rides along on the same tap: the person who
@@ -365,8 +389,7 @@ def price_pair(room: str) -> dict | None:
         promo = None
     if promo:
         pair.update(promo_thai=promo.get("thai_price"),
-                    promo_foreign=promo.get("foreign_price"),
-                    promo_note=promo.get("note") or "")
+                    promo_foreign=promo.get("foreign_price"))
     return pair
 
 
@@ -374,30 +397,42 @@ def _active_promotion(unit_no: str | None) -> dict | None:
     """The active row of `pricing_unit_promotions` for one unit, or None."""
     if not unit_no or not live_configured():
         return None
-    rows = _live_get(_scoped({"select": "unit_id,thai_price,foreign_price,note,updated_at,"
-                                        "units!inner(unit_no," + _SCOPE_EMBED + ")",
+    rows = _live_get(_scoped({"select": "unit_id,active,thai_price,foreign_price,note,updated_at,"
+                                        "units!inner(unit_no,status," + _SCOPE_EMBED + ")",
                               "active": "eq.true", "units.unit_no": f"eq.{unit_no}",
                               "limit": "1"}, via="units."),
                      table="pricing_unit_promotions")
-    return rows[0] if rows else None
+    if not rows:
+        return None
+    if rows[0].get("active") is not True:
+        return None
+    unit = rows[0].get("units") or {}
+    if unit.get("status") == "sold":
+        return None
+    prepared = _prepared_live_card(_card_from_live(unit), allow_price=False)
+    return rows[0] if prepared.allowed else None
 
 
-def _apply_price_policy(card: dict) -> dict:
-    """Remove the numbers, keep the filterability.
+def _prepared_live_card(card: dict, *, allow_price: bool | None = None):
+    prepared = prepare_inventory_card(
+        card, expected_project_id=settings.project_id,
+        max_age_seconds=settings.inventory_cache_s,
+        allow_price=(settings.units_show_price if allow_price is None else allow_price),
+    )
+    logger.info("runtime inventory policy %s", prepared.trace())
+    return prepared
 
-    Stripping at the tool boundary rather than hiding in the UI is the
-    point: a field that is not in the payload cannot be leaked by a CSS
-    mistake, and the model cannot read a price aloud that it never
-    received. The DB still has the numbers, and find_units still filters on
-    them server-side — "งบสามล้านซื้อห้องไหนได้" works without a single baht
-    figure leaving this function.
-    """
-    if settings.units_show_price:
-        return card
-    card = dict(card)
-    card.pop("price_thb", None)
-    card.pop("base_price_thb", None)
-    return card
+
+def _blocked_inventory(prepared) -> dict:
+    # The rejected card never enters the tool result, even as a debug field.
+    return {"ok": False, "error": "inventory policy blocked",
+            "policy_trace": prepared.trace(),
+            "instruction": "ข้อมูลห้องจากระบบขายยังตรวจขอบเขตหรือความสดไม่ได้ ให้ตรวจสอบกับฝ่ายขาย ห้ามตอบจากข้อมูลที่ถูกบล็อก"}
+
+
+def _blocked_inventory_state(reason: str) -> dict:
+    return _blocked_inventory(RuntimeResult(
+        False, settings.project_id, INVENTORY_SOURCE_ID, reason, {}))
 
 
 def show_unit_live(room: str) -> dict:
@@ -421,22 +456,21 @@ def show_unit_live(room: str) -> dict:
         return {"ok": False, "error": "unknown room", "asked": room,
                 "instruction": ("ไม่พบเลขห้องนี้ในระบบผังขาย ให้ทวนเลขห้องกับลูกค้า "
                                 "อีกครั้ง ห้ามแต่งข้อมูลห้องขึ้นมาเอง")}
+    prepared = _prepared_live_card(card)
+    if not prepared.allowed:
+        return _blocked_inventory(prepared)
     turnlog.record("show_unit", room=card["room"], sample=False, source="live")
     try:
         promo = _active_promotion(card["room"])
     except Exception:
         logger.exception("promotion lookup failed — card goes out without it")
         promo = None
-    card = _apply_price_policy(card)
+    card = prepared.payload
     if promo:
-        # The note is the sales team's own words (an admin applied it), so
-        # it goes on the card. The figures follow the price policy: they
-        # appear on the tap, never in what the model reads.
-        card["promo_note"] = promo.get("note") or ""
+        # A live promotion flag is operational data; its free-text note and
+        # monetary figures need their own disclosure contract, not the unit
+        # status policy. Do not hand either to Emma in this slice.
         card["promo"] = True
-        if settings.units_show_price:
-            card["promo_thai_thb"] = promo.get("thai_price")
-            card["promo_foreign_thb"] = promo.get("foreign_price")
     if settings.units_show_price:
         note = ("ข้อมูลสดจากระบบผังขาย ณ ตอนนี้ สถานะ %s เป็นสถานะจริง "
                 "ราคาที่แสดงคือราคาขายจริง บอกข้อมูลสั้นๆ ห้ามคำนวณหรือปัดราคาเอง"
@@ -447,11 +481,9 @@ def show_unit_live(room: str) -> dict:
                 "ราคาและโปรโมชั่นล่าสุดขอให้คุยกับฝ่ายขายโดยตรง ห้ามพูดหรือเดาตัวเลขราคา"
                 % (card.get("status_th") or card.get("status")))
     if promo:
-        note += (" ห้องนี้มีโปรโมชั่นอยู่ตอนนี้ (บอกลูกค้าว่ามีโปรโมชั่น "
-                 + ("รายละเอียด: %s " % card["promo_note"] if card.get("promo_note") else "")
-                 + "ตัวเลขให้ดูบนจอหรือคุยกับฝ่ายขาย)")
+        note += " ห้องนี้มีโปรโมชั่นในระบบ รายละเอียดและตัวเลขให้ฝ่ายขายยืนยัน"
     return {"ok": True, "screen": "unit", "unit": card, "sample": False,
-            "instruction": note}
+            "policy_trace": prepared.trace(), "instruction": note}
 
 
 @tool(
@@ -572,7 +604,16 @@ def find_units(max_price_thb: float | None = None,
                 picked.append(r)
         picked.sort(key=lambda r: -(r.get("promo_price") or r.get("base_price") or 0))
         rows = picked
-    units_found = [_apply_price_policy(_card_from_live(r)) for r in rows]
+    if any(row.get("status") != "available" for row in rows):
+        return _blocked_inventory_state("unexpected_inventory_status")
+    prepared_cards = [_prepared_live_card(_card_from_live(r)) for r in rows]
+    blocked = next((item for item in prepared_cards if not item.allowed), None)
+    if blocked:
+        return _blocked_inventory(blocked)
+    units_found = [item.payload for item in prepared_cards]
+    trace = (prepared_cards[0] if prepared_cards else RuntimeResult(
+        True, settings.project_id, INVENTORY_SOURCE_ID,
+        "fresh_scoped_inventory_empty", {})).trace()
     # The query is capped, and "ทั้งหมด 8 ห้อง" was once said on screen
     # about a budget that actually fits 105 — the cap spoken as the total.
     # A full count costs a second request; honesty costs a word.
@@ -611,6 +652,7 @@ def find_units(max_price_thb: float | None = None,
             "count": len(units_found),
             "total": total,          # known exact total, or None when capped
             "capped": capped,
+            "policy_trace": trace,
             "instruction": instruction}
 
 # ==================== the live floor plan ====================
@@ -622,6 +664,7 @@ def find_units(max_price_thb: float | None = None,
 # actually sold *right now*, with no prices anywhere on it (policy).
 
 _PLAN_ASSETS: dict | None = None
+_PLAN_VERIFIED: dict[tuple[str, str], tuple[float, str, str]] = {}
 
 
 def _plan_paths() -> dict[int, str]:
@@ -643,6 +686,83 @@ def _plan_paths() -> dict[int, str]:
             logger.exception("could not read floor-plan-assets.json")
             _PLAN_ASSETS = {}
     return _PLAN_ASSETS
+
+
+def _verified_plan_asset(floor: int) -> RuntimeResult:
+    """Verify a deployed derivative against the project manifest before use."""
+    import hashlib
+    import httpx
+
+    from app.data_sources import source_path
+
+    try:
+        source = json.loads(source_path("floor_plan_assets", settings.project_id).read_text(
+            encoding="utf-8"))
+        entry = next((item for item in source.get("floors", [])
+                      if item.get("floor") == floor), None)
+        if not isinstance(entry, dict):
+            raise ValueError("floor not present in asset manifest")
+        path = entry.get("display_path")
+        expected = entry.get("display_derivative_sha256")
+        # Validate metadata before using its path in a request.
+        metadata = prepare_plan_asset(
+            source, entry, expected_project_id=settings.project_id,
+            observed_sha256=expected if isinstance(expected, str) else "",
+            content_type="image/webp")
+        if not metadata.allowed:
+            return metadata
+        url = settings.inventory_plan_base.rstrip("/") + path
+        key = (url, expected)
+        now = _time.monotonic()
+        cached = _PLAN_VERIFIED.get(key)
+        if cached and now - cached[0] < 300:
+            digest, media_type = cached[1], cached[2]
+        else:
+            digest_state = hashlib.sha256()
+            count = 0
+            with httpx.stream("GET", url, timeout=8, follow_redirects=False) as response:
+                response.raise_for_status()
+                media_type = response.headers.get("content-type", "")
+                for chunk in response.iter_bytes():
+                    count += len(chunk)
+                    if count > 20 * 1024 * 1024:
+                        raise ValueError("plan asset exceeds size limit")
+                    digest_state.update(chunk)
+            digest = digest_state.hexdigest()
+        result = prepare_plan_asset(
+            source, entry, expected_project_id=settings.project_id,
+            observed_sha256=digest, content_type=media_type)
+        if result.allowed:
+            _PLAN_VERIFIED[key] = (now, digest, media_type)
+        return result
+    except Exception:
+        logger.exception("plan asset could not be verified for floor %s", floor)
+        return RuntimeResult(False, settings.project_id, "floor_plan_assets",
+                             "plan_asset_unavailable", {})
+
+
+def _valid_plan_shape(row: dict) -> bool:
+    """Only bounded numeric coordinates may pass to the screen/model."""
+    import math
+
+    def coordinate(value, *, positive=False) -> bool:
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and math.isfinite(value) and (0 < value <= 100 if positive
+                                              else 0 <= value <= 100))
+
+    if row.get("pos_x") is None:
+        return True
+    if not (coordinate(row.get("pos_x")) and coordinate(row.get("pos_y"))
+            and coordinate(row.get("width"), positive=True)
+            and coordinate(row.get("height"), positive=True)):
+        return False
+    polygon = row.get("poly")
+    if polygon is None:
+        return True
+    return (isinstance(polygon, list) and 3 <= len(polygon) <= 100
+            and all(isinstance(point, list) and len(point) == 2
+                    and all(coordinate(value) for value in point)
+                    for point in polygon))
 
 
 @tool(
@@ -670,15 +790,25 @@ def show_plan(floor: int = 1, building: str | None = None) -> dict:
         return {"ok": False, "error": "no live inventory",
                 "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกลูกค้าว่า "
                                 "ดูผังกับฝ่ายขายได้โดยตรง ห้ามบรรยายผังจากความจำ")}
-    image_path = _plan_paths().get(int(floor))
+    try:
+        floor_number = int(floor)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "invalid floor"}
+    image_path = _plan_paths().get(floor_number)
     if not image_path:
         return {"ok": False, "error": "no plan image", "floor": floor,
                 "instruction": ("ไม่มีภาพผังของชั้นนี้ (มีชั้น %s) ให้บอกลูกค้าตรงๆ"
                                 % ", ".join(str(k) for k in sorted(_plan_paths())))}
+    asset = _verified_plan_asset(floor_number)
+    logger.info("runtime plan policy %s", asset.trace())
+    if not asset.allowed:
+        return {"ok": False, "error": "plan asset policy blocked",
+                "policy_trace": asset.trace(),
+                "instruction": "ยังตรวจภาพผังชั้นนี้ไม่ได้ ให้ฝ่ายขายเปิดผังที่ยืนยันแล้ว ห้ามบรรยายจากภาพที่ถูกบล็อก"}
     try:
         rows = _live_get(_scoped({
             "select": "unit_no,status,pos_x,pos_y,width,height,poly," + _SCOPE_EMBED,
-            "floors.floor_number": f"eq.{int(floor)}",
+            "floors.floor_number": f"eq.{floor_number}",
             "limit": "500",
         }))
     except Exception:
@@ -687,6 +817,17 @@ def show_plan(floor: int = 1, building: str | None = None) -> dict:
                 "instruction": ("เช็คระบบผังขายไม่ได้ตอนนี้ ให้บอกลูกค้าตรงๆ "
                                 "ว่าขอเปิดผังกับฝ่ายขาย ห้ามบรรยายผังจากความจำ")}
     want = (building or "").strip().upper()
+    prepared_rows = [_prepared_live_card(_card_from_live(row), allow_price=False)
+                     for row in rows]
+    blocked = next((item for item in prepared_rows if not item.allowed), None)
+    if blocked:
+        return _blocked_inventory(blocked)
+    if any((row.get("floors") or {}).get("floor_number") != floor_number
+           for row in rows):
+        return _blocked_inventory_state("wrong_plan_floor")
+    if any(str(row.get("status", "")).lower() not in {"available", "reserved", "sold"}
+           or not _valid_plan_shape(row) for row in rows):
+        return _blocked_inventory_state("invalid_plan_overlay")
     marks, counts = [], {"available": 0, "reserved": 0, "sold": 0}
     for r in rows:
         st = str(r.get("status", "")).lower()
@@ -704,9 +845,13 @@ def show_plan(floor: int = 1, building: str | None = None) -> dict:
                    units=len(marks))
     scope = f"ตึก {want} " if want else ""
     return {"ok": True, "screen": "plan", "project_id": settings.project_id,
-            "image": settings.inventory_plan_base + image_path,
-            "floor": int(floor), "building": want or None,
+            "image": settings.inventory_plan_base.rstrip("/") + asset.payload["path"],
+            "floor": floor_number, "building": want or None,
             "units": marks, "counts": counts,
+            "policy_trace": {"asset": asset.trace(), "inventory": (
+                prepared_rows[0] if prepared_rows else RuntimeResult(
+                    True, settings.project_id, INVENTORY_SOURCE_ID,
+                    "fresh_scoped_inventory_empty", {})).trace()},
             "instruction": (f"ผังชั้น {floor} {scope}ขึ้นจอแล้ว สถานะสดจากระบบผังขาย: "
                             f"ว่าง {counts['available']} จอง {counts['reserved']} "
                             f"ขายแล้ว {counts['sold']} ห้อง "
@@ -794,25 +939,28 @@ def list_promotions(building: str | None = None) -> dict:
     items = []
     for row in rows:
         unit = row.get("units") or {}
-        card = _apply_price_policy(_card_from_live(unit))
+        if row.get("active") is not True or unit.get("status") == "sold":
+            return _blocked_inventory_state("unexpected_promotion_state")
+        prepared = _prepared_live_card(_card_from_live(unit), allow_price=False)
+        if not prepared.allowed:
+            return _blocked_inventory(prepared)
+        card = prepared.payload
         card["promo"] = True
-        card["promo_note"] = row.get("note") or ""
-        if settings.units_show_price:
-            card["promo_thai_thb"] = row.get("thai_price")
-            card["promo_foreign_thb"] = row.get("foreign_price")
-        card["promo_updated"] = (row.get("updated_at") or "")[:10]
         items.append(card)
+    trace = (prepared if items else RuntimeResult(
+        True, settings.project_id, INVENTORY_SOURCE_ID,
+        "fresh_scoped_inventory_empty", {})).trace()
     turnlog.record("list_promotions", count=len(items), building=building)
     if not items:
         return {"ok": True, "screen": "promotions", "promotions": [], "count": 0,
+                "policy_trace": trace,
                 "instruction": ("ตอนนี้ยังไม่มีโปรโมชั่นเปิดอยู่ในระบบผังขาย ให้บอกลูกค้าตรงๆ "
                                 "และแนะนำให้สอบถามฝ่ายขายเผื่อมีโปรที่ยังไม่ลงระบบ")}
     return {"ok": True, "screen": "promotions", "promotions": items, "count": len(items),
-            "instruction": (f"มีโปรโมชั่น {len(items)} ห้อง ขึ้นจอแล้ว อ่านจากรายการเท่านั้น "
-                            "ไล่เลขห้องกับรายละเอียดโปร 2-3 รายการแรกสั้นๆ "
-                            + ("" if settings.units_show_price else
-                               "นโยบายคือไม่พูดตัวเลขราคา ราคาโปรให้ดูบนจอหรือคุยกับฝ่ายขาย ")
-                            + "ห้ามแต่งโปรหรือเงื่อนไขเพิ่ม")}
+            "policy_trace": trace,
+            "instruction": (f"มีห้องที่ติดธงโปรโมชั่น {len(items)} ห้องในระบบ "
+                            "บอกได้เฉพาะเลขห้องและการมีโปรโมชั่น "
+                            "รายละเอียด เงื่อนไข และตัวเลขให้ฝ่ายขายยืนยัน ห้ามแต่งเพิ่ม")}
 
 
 @tool(
@@ -838,7 +986,7 @@ def compare_unit_types(building: str | None = None) -> dict:
                 "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกลูกค้าว่า "
                                 "ขอเช็คแบบห้องกับฝ่ายขาย ห้ามแต่งข้อมูลเอง")}
     params = _scoped({"select": ("unit_no,msize,size_sqm,view,side,unit_option,collection,"
-                                 + _SCOPE_EMBED + ",unit_types(name)"),
+                                 "status," + _SCOPE_EMBED + ",unit_types(name)"),
                       "status": "eq.available", "limit": "2000"})
     if building:
         params["unit_no"] = f"like.{building.strip().upper()}-*"
@@ -849,6 +997,13 @@ def compare_unit_types(building: str | None = None) -> dict:
         return {"ok": False, "error": "inventory unreachable",
                 "instruction": ("เช็คระบบผังขายไม่ได้ตอนนี้ ให้บอกลูกค้าตรงๆ "
                                 "ว่าขอตรวจสอบกับฝ่ายขาย ห้ามแต่งข้อมูลเอง")}
+    if any(row.get("status") != "available" for row in rows):
+        return _blocked_inventory_state("unexpected_inventory_status")
+    prepared_rows = [_prepared_live_card(_card_from_live(row), allow_price=False)
+                     for row in rows]
+    blocked = next((item for item in prepared_rows if not item.allowed), None)
+    if blocked:
+        return _blocked_inventory(blocked)
     groups: dict[str, dict] = {}
     for r in rows:
         kind = (r.get("unit_types") or {}).get("name") or "ไม่ระบุแบบ"
@@ -887,8 +1042,12 @@ def compare_unit_types(building: str | None = None) -> dict:
     turnlog.record("compare_unit_types", types=len(types), units=len(rows), building=building)
     if not types:
         return {"ok": True, "screen": "unittypes", "types": [], "building": building,
+                "policy_trace": RuntimeResult(True, settings.project_id,
+                                               INVENTORY_SOURCE_ID,
+                                               "fresh_scoped_inventory_empty", {}).trace(),
                 "instruction": "ไม่พบห้องว่างตามเงื่อนไข ให้บอกลูกค้าตรงๆ"}
     return {"ok": True, "screen": "unittypes", "types": types, "building": building,
+            "policy_trace": prepared_rows[0].trace(),
             "total_available": len(rows),
             "instruction": (f"ห้องว่างทั้งหมด {len(rows)} ห้อง แบ่งเป็น {len(types)} แบบ ขึ้นจอแล้ว "
                             "เริ่มคำตอบด้วยความแตกต่างด้านการใช้งานอย่างน้อยหนึ่งประโยคก่อนพูดตัวเลข "
@@ -959,6 +1118,9 @@ def show_quotation(room: str, ownership: str = "thai", currency: str | None = No
     if card is None or not card.get("id"):
         return {"ok": False, "error": "unknown room", "asked": room,
                 "instruction": "ไม่พบเลขห้องนี้ในระบบผังขาย ให้ทวนเลขห้องกับลูกค้า"}
+    prepared = _prepared_live_card(card, allow_price=False)
+    if not prepared.allowed:
+        return _blocked_inventory(prepared)
     if card.get("status") == "sold":
         return {"ok": False, "error": "sold", "room": card["room"],
                 "instruction": "ห้องนี้ขายแล้ว ออกใบเสนอราคาไม่ได้ ให้เสนอห้องอื่นด้วย find_units"}
@@ -1005,9 +1167,29 @@ def show_map() -> dict:
         require_project_payload(facts, "project_facts", settings.project_id)
     except Exception:
         facts = {}
+    from app.knowledge_policy import evaluate_claim
+
+    decision = evaluate_claim(facts, settings.project_id)
+    logger.info("runtime map knowledge policy %s", decision.trace())
+    if not decision.allowed:
+        return {"ok": False, "error": "map source policy blocked",
+                "policy_trace": decision.trace(),
+                "instruction": "ยังไม่มีลิงก์แผนที่ที่อนุมัติให้แสดง กรุณาให้ฝ่ายขายยืนยัน"}
     link = ((facts.get("map") or {}).get("url") or "").strip()
-    if not link.startswith(("https://www.google.com/maps", "https://maps.app.goo.gl",
-                            "https://goo.gl/maps", "https://maps.google.com")):
+    from urllib.parse import urlsplit
+
+    try:
+        parsed = urlsplit(link)
+        allowed_host = parsed.hostname in {"www.google.com", "maps.app.goo.gl",
+                                           "goo.gl", "maps.google.com"}
+        allowed_path = (parsed.hostname != "www.google.com"
+                        or parsed.path.startswith("/maps"))
+        valid_link = (parsed.scheme == "https" and allowed_host and allowed_path
+                      and parsed.port in (None, 443)
+                      and not parsed.username and not parsed.password)
+    except ValueError:
+        valid_link = False
+    if not valid_link:
         return {"ok": False, "error": "no confirmed map link",
                 "instruction": ("ยังไม่มีลิงก์แผนที่ที่ฝ่ายขายยืนยันในระบบ ให้บอกทำเลด้วยคำพูด "
                                 "ตามข้อมูลโครงการที่มี ห้ามเดาพิกัด ระยะทาง หรือเวลาเดินทาง")}

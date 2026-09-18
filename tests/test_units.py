@@ -36,11 +36,23 @@ def test_the_model_picks_the_room_never_the_price(monkeypatch):
     assert "ห้ามเดาราคา" in entry.description
 
 
-def test_an_unknown_room_has_no_price_and_that_is_the_answer(monkeypatch):
+def test_an_unknown_room_has_no_price_and_that_is_the_answer(monkeypatch, tmp_path):
     """A room that is not in the table has no price. Returning an error is
     the correct behaviour, and the instruction has to stop the model
     smoothing it over."""
-    monkeypatch.setattr(settings, "units_sample", True)
+    import json
+
+    source = {
+        "source_id": "local_unit_inventory", "project_id": settings.project_id,
+        "approval_status": "approved", "approved_by": "test_reviewer",
+        "approved_at": "2026-01-01T00:00:00+07:00",
+        "effective_at": "2026-01-01T00:00:00+07:00",
+        "disclosure_scope": "customer", "content_state": "existing",
+        "units": [{"room": "A801", "status": "available"}],
+    }
+    path = tmp_path / "units.json"
+    path.write_text(json.dumps(source), encoding="utf-8")
+    monkeypatch.setattr(settings, "units_file", str(path))
     out = units.show_unit("Z999")
     assert out["ok"] is False and out["error"] == "unknown room"
     assert "ห้ามแต่งข้อมูลห้องขึ้นมาเอง" in out["instruction"]
@@ -67,18 +79,13 @@ def test_with_no_table_at_all_it_says_so(monkeypatch, tmp_path):
     assert "ติดต่อฝ่ายขาย" in out["instruction"]
 
 
-def test_sample_data_is_marked_all_the_way_to_the_screen(monkeypatch):
-    """Stamped on the payload, not just in a log. The model is told to say it
-    *every time* rather than once at the start of the conversation: an
-    instruction that has to be remembered across turns is one that gets
-    dropped, and the thing being dropped here is "these numbers are made
-    up"."""
+def test_sample_data_is_blocked_before_reaching_emma(monkeypatch):
+    """A development sample may load, but it is not customer data."""
     monkeypatch.setattr(settings, "units_sample", True)
     out = units.show_unit("A801")
-    assert out["ok"] is True
-    assert out["sample"] is True and out["unit"]["sample"] is True
-    assert "ตัวอย่าง" in out["instruction"]
-    assert "ห้ามพูดเหมือนเป็นราคาจริงเด็ดขาด" in out["instruction"]
+    assert out["ok"] is False and out["error"] == "inventory not disclosable"
+    assert out["policy_trace"]["reason"] == "sample_inventory"
+    assert "unit" not in out and "price_thb" not in str(out)
 
 
 def test_a_real_table_stops_being_a_sample_without_anyone_flipping_anything(
@@ -91,7 +98,10 @@ def test_a_real_table_stops_being_a_sample_without_anyone_flipping_anything(
     real = tmp_path / "units.json"
     real.write_text(json.dumps({
         "source_id": "local_unit_inventory", "project_id": settings.project_id,
-        "approved_by": "คุณเอ", "effective_from": "2026-09-01",
+        "approval_status": "approved", "approved_by": "test_reviewer",
+        "approved_at": "2026-01-01T00:00:00+07:00",
+        "effective_at": "2026-01-01T00:00:00+07:00",
+        "disclosure_scope": "customer", "content_state": "existing",
         "units": [{"room": "A801", "price_thb": 3100000, "status": "available"}],
     }, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setattr(settings, "units_file", str(real))
@@ -99,13 +109,13 @@ def test_a_real_table_stops_being_a_sample_without_anyone_flipping_anything(
 
     out = units.show_unit("A801")
     assert out["sample"] is False
-    assert out["unit"]["approved_by"] == "คุณเอ"
+    assert out["unit"]["source_id"] == "local_unit_inventory"
+    assert "approved_by" not in out["unit"]
     assert "ตัวอย่าง" not in out["instruction"]
 
 
-def test_an_unapproved_real_table_still_asks_for_confirmation(monkeypatch, tmp_path):
-    """`approved_by` empty is the state condo_facts.json has been in from the
-    beginning, and it means the same thing here."""
+def test_an_unapproved_real_table_does_not_reach_emma(monkeypatch, tmp_path):
+    """A confirmation warning is not a disclosure gate."""
     import json
 
     real = tmp_path / "units.json"
@@ -115,8 +125,8 @@ def test_an_unapproved_real_table_still_asks_for_confirmation(monkeypatch, tmp_p
     }, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setattr(settings, "units_file", str(real))
     out = units.show_unit("A801")
-    assert out["sample"] is False
-    assert "ยืนยันกับฝ่ายขาย" in out["instruction"]
+    assert out["ok"] is False and "unit" not in out
+    assert out["policy_trace"]["reason"] == "missing_metadata"
 
 
 def test_the_card_labels_what_is_missing_instead_of_hiding_it():
@@ -155,8 +165,8 @@ def test_a_fallback_file_is_a_sample_even_without_saying_so(monkeypatch, tmp_pat
     monkeypatch.setattr(units, "_table_path", lambda: (Path(plain), True))
 
     out = units.show_unit("A801")
-    assert out["sample"] is True, "a fallback table is a sample whatever it says"
-    assert "ตัวอย่าง" in out["instruction"]
+    assert out["ok"] is False and "unit" not in out
+    assert out["policy_trace"]["reason"] == "sample_inventory"
 
 
 def test_the_card_is_its_own_group_not_part_of_the_slide_deck(monkeypatch):
@@ -230,7 +240,8 @@ LIVE_ROW = {
     "side": None, "collection": "LAGOON", "unit_option": None,
     "base_price": 3690000.0, "promo_price": 3290000.0, "status": "available",
     "note": None, "updated_at": "2026-08-22T03:45:47.222261+00:00",
-    "floors": {"floor_number": 2, "buildings": {"code": "A"}},
+    "floors": {"floor_number": 2, "buildings": {
+        "code": "A", "projects": {"slug": "embassy-world"}}},
     "unit_types": {"name": "1BR"},
 }
 
@@ -426,6 +437,14 @@ def test_pasted_annotation_junk_does_not_take_the_link_down(monkeypatch):
 # ============ the live floor plan ============
 
 
+def _verified_plan(monkeypatch):
+    from app.runtime_policy import RuntimeResult
+
+    monkeypatch.setattr(units, "_verified_plan_asset", lambda floor: RuntimeResult(
+        True, settings.project_id, "floor_plan_assets",
+        "verified_scoped_plan_asset", {"floor": floor, "path": "/fpg1.webp"}))
+
+
 def test_the_plan_filters_by_floor_and_counts_only_the_asked_building(monkeypatch):
     """The image is a per-floor composite of every building, so the query
     filters by floor via the joined table — and when the guest asked about
@@ -434,11 +453,14 @@ def test_the_plan_filters_by_floor_and_counts_only_the_asked_building(monkeypatc
     rows = [
         {"unit_no": "F-101", "status": "available", "pos_x": 10, "pos_y": 10,
          "width": 2, "height": 3, "poly": None,
-         "floors": {"floor_number": 1, "buildings": {"code": "F"}}},
+         "floors": {"floor_number": 1, "buildings": {
+             "code": "F", "projects": {"slug": "embassy-world"}}}},
         {"unit_no": "A-101", "status": "sold", "pos_x": 50, "pos_y": 10,
          "width": 2, "height": 3, "poly": [[1, 2], [3, 4], [5, 6]],
-         "floors": {"floor_number": 1, "buildings": {"code": "A"}}},
+         "floors": {"floor_number": 1, "buildings": {
+             "code": "A", "projects": {"slug": "embassy-world"}}}},
     ]
+    _verified_plan(monkeypatch)
     calls = _live_on(monkeypatch, rows)
     out = units.show_plan(1, building="f")
     assert calls[0]["floors.floor_number"] == "eq.1"
@@ -616,7 +638,8 @@ def test_price_pair_maps_the_pricelist_columns_correctly(monkeypatch):
     the wrong nationality, so the mapping is pinned."""
     calls = _live_on(monkeypatch, [
         {"unit_no": "A-801", "promo_price": 2_790_000, "base_price": 3_190_000,
-         "msize": 33.5},
+         "msize": 33.5, "floors": {"buildings": {
+             "code": "A", "projects": {"slug": "embassy-world"}}}},
     ])
     out = units.price_pair("A801")
     assert out == {"room": "A-801", "thai": 2_790_000,
@@ -705,6 +728,7 @@ def test_every_live_read_is_scoped_to_our_project(monkeypatch):
     monkeypatch.setattr(settings, "inventory_key", "k")
     monkeypatch.setattr(settings, "inventory_project", "embassy-world")
     monkeypatch.setattr(units, "_live_get", fake_get)
+    _verified_plan(monkeypatch)
     units._live_cache.clear()
 
     units.show_unit("A1405")

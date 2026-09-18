@@ -119,7 +119,7 @@ def test_customer_document_search_denies_unreviewed_text(monkeypatch):
 
 
 def test_live_inventory_uses_freshness_and_disclosure_not_human_approval():
-    base = dict(source_id="live_inventory", project_id=ACTIVE_PROJECT_ID,
+    base = dict(source_id="live_unit_inventory", project_id=ACTIVE_PROJECT_ID,
                 expected_project_id=ACTIVE_PROJECT_ID, fetched_at=NOW - timedelta(seconds=2),
                 max_age_seconds=10, customer_visible=True, now=NOW)
     assert evaluate_live_inventory(**base).allowed

@@ -100,7 +100,7 @@ def evaluate_live_inventory(
     def result(allowed: bool, reason: str) -> Decision:
         return Decision(allowed, reason, source_id, project_id, "live")
 
-    if source_id != "live_inventory" or project_id != expected_project_id:
+    if source_id != "live_unit_inventory" or project_id != expected_project_id:
         return result(False, "untrusted_or_wrong_project")
     if not customer_visible:
         return result(False, "not_customer_visible")

@@ -34,11 +34,13 @@ UNIT = {
     "view": "POOLABC", "side": "SOUTH", "collection": "LAGOON", "unit_option": None,
     "base_price": 3690000.0, "promo_price": 3290000.0, "status": "available",
     "note": None, "updated_at": "2026-08-22T03:45:47.222261+00:00",
-    "floors": {"floor_number": 2, "buildings": {"code": "A"}},
+    "floors": {"floor_number": 2, "buildings": {
+        "code": "A", "projects": {"slug": "embassy-world"}}},
     "unit_types": {"name": "1BR"},
 }
 PROMO_ROW = {
     "unit_id": "8f1c-unit-a203", "thai_price": 3100000.0, "foreign_price": 3500000.0,
+    "active": True,
     "note": "ราคาพิเศษเดือนกันยายน ฟรีค่าโอน", "updated_at": "2026-09-01T02:00:00+00:00",
     "units": UNIT,
 }
@@ -79,18 +81,19 @@ def test_promotions_come_from_the_applied_rows_only(live):
     assert params["units.status"] == "neq.sold", "a sold unit's promotion is not an offer"
     p = out["promotions"][0]
     assert p["room"] == "A-203" and p["promo"] is True
-    assert p["promo_note"] == "ราคาพิเศษเดือนกันยายน ฟรีค่าโอน"
+    assert "promo_note" not in p and "ฟรีค่าโอน" not in str(out)
+    assert out["policy_trace"]["allowed"] is True
 
 
 def test_promotion_prices_follow_the_price_policy(live, monkeypatch):
     out = units.list_promotions()
     p = out["promotions"][0]
     assert "promo_thai_thb" not in p and "price_thb" not in p
-    assert "ไม่พูดตัวเลขราคา" in out["instruction"]
+    assert "ตัวเลขให้ฝ่ายขายยืนยัน" in out["instruction"]
 
     monkeypatch.setattr(settings, "units_show_price", True)
     shown = units.list_promotions()["promotions"][0]
-    assert shown["promo_thai_thb"] == 3100000.0 and shown["promo_foreign_thb"] == 3500000.0
+    assert "promo_thai_thb" not in shown and "promo_foreign_thb" not in shown
 
 
 def test_no_promotions_is_said_not_invented(live):
@@ -108,7 +111,7 @@ def test_promotions_by_building_filter_the_joined_unit(live):
 def test_the_unit_card_carries_its_promotion(live):
     out = units.show_unit("A203")
     card = out["unit"]
-    assert card["promo"] is True and "ฟรีค่าโอน" in card["promo_note"]
+    assert card["promo"] is True and "promo_note" not in card
     assert "promo_thai_thb" not in card, "the figure waits for the tap"
     assert "มีโปรโมชั่น" in out["instruction"]
 
@@ -116,7 +119,7 @@ def test_the_unit_card_carries_its_promotion(live):
 def test_the_tap_reveals_the_promotion_figure_too(live):
     pair = units.price_pair("A203")
     assert pair["thai"] == 3290000.0 and pair["promo_thai"] == 3100000.0
-    assert pair["promo_note"].startswith("ราคาพิเศษ")
+    assert "promo_note" not in pair
 
 
 def test_a_promotion_lookup_failure_does_not_take_the_card_down(live, monkeypatch):
@@ -137,13 +140,16 @@ def test_a_promotion_lookup_failure_does_not_take_the_card_down(live, monkeypatc
 
 def test_unit_types_are_compared_by_counts_sizes_floors_and_views(live):
     studio = dict(UNIT, id="u2", unit_no="A-305", msize=25.0, view="LAGOON", side="NORTH",
-                  unit_option="Corner", floors={"floor_number": 3, "buildings": {"code": "A"}},
+                  unit_option="Corner", floors={"floor_number": 3, "buildings": {
+                      "code": "A", "projects": {"slug": "embassy-world"}}},
                   unit_types={"name": "STUDIO"})
     two = dict(UNIT, id="u3", unit_no="B-801", msize=52.0, view="SEA", side=None,
-               floors={"floor_number": 8, "buildings": {"code": "B"}},
+               floors={"floor_number": 8, "buildings": {
+                   "code": "B", "projects": {"slug": "embassy-world"}}},
                unit_types={"name": "2BR"})
     live.answers["units"] = [UNIT, studio, dict(studio, id="u4", unit_no="A-405",
-                                                 floors={"floor_number": 4, "buildings": {"code": "A"}}), two]
+                                                 floors={"floor_number": 4, "buildings": {
+                                                     "code": "A", "projects": {"slug": "embassy-world"}}}), two]
     out = units.compare_unit_types()
     assert out["ok"] and out["screen"] == "unittypes" and out["total_available"] == 4
     assert live[-1][1]["status"] == "eq.available"
@@ -218,10 +224,17 @@ def test_the_inventory_page_accepts_the_currency_parameter():
 
 # ==================== 17. the map ====================
 
+MAP_APPROVAL = {
+    "approval_status": "approved", "approved_by": "test_reviewer",
+    "approved_at": "2026-01-01T00:00:00+07:00",
+    "effective_at": "2026-01-01T00:00:00+07:00",
+    "disclosure_scope": "customer", "content_state": "existing",
+}
+
 def test_no_confirmed_map_link_means_no_map_and_no_guessing(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
     facts.write_text(json.dumps({"source_id": "project_facts", "project_id": settings.project_id,
-                                 "map": {"url": None}}), encoding="utf-8")
+                                 "map": {"url": None}, **MAP_APPROVAL}), encoding="utf-8")
     monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
     out = units.show_map()
     assert out["ok"] is False and stage == []
@@ -231,7 +244,8 @@ def test_no_confirmed_map_link_means_no_map_and_no_guessing(monkeypatch, tmp_pat
 def test_a_confirmed_map_link_goes_on_the_stage(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
     facts.write_text(json.dumps({"source_id": "project_facts", "project_id": settings.project_id,
-                                 "map": {"url": "https://maps.app.goo.gl/abc123"}}), encoding="utf-8")
+                                 "map": {"url": "https://maps.app.goo.gl/abc123"},
+                                 **MAP_APPROVAL}), encoding="utf-8")
     monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
     out = units.show_map()
     assert out["ok"] and stage == ["https://maps.app.goo.gl/abc123"]
@@ -240,8 +254,26 @@ def test_a_confirmed_map_link_goes_on_the_stage(monkeypatch, tmp_path, stage):
 def test_only_a_google_maps_link_counts_as_the_map(monkeypatch, tmp_path, stage):
     facts = tmp_path / "facts.json"
     facts.write_text(json.dumps({"source_id": "project_facts", "project_id": settings.project_id,
-                                 "map": {"url": "https://evil.example/x"}}), encoding="utf-8")
+                                 "map": {"url": "https://evil.example/x"},
+                                 **MAP_APPROVAL}), encoding="utf-8")
     monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
+    assert units.show_map()["ok"] is False and stage == []
+
+
+def test_draft_map_and_host_prefix_spoof_never_open_the_stage(monkeypatch, tmp_path, stage):
+    facts = tmp_path / "facts.json"
+    monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(facts))
+    source = {"source_id": "project_facts", "project_id": settings.project_id,
+              "map": {"url": "https://maps.app.goo.gl/abc123"}}
+    facts.write_text(json.dumps(source), encoding="utf-8")
+    blocked = units.show_map()
+    assert blocked["error"] == "map source policy blocked"
+    assert blocked["policy_trace"]["reason"] == "missing_metadata"
+    assert stage == []
+
+    source.update(MAP_APPROVAL)
+    source["map"]["url"] = "https://maps.app.goo.gl.evil.example/abc123"
+    facts.write_text(json.dumps(source), encoding="utf-8")
     assert units.show_map()["ok"] is False and stage == []
 
 
