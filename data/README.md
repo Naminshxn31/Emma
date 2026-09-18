@@ -8,6 +8,8 @@
 python scripts/audit_data_sources.py
 ```
 
+สัญญาว่าไฟล์ใดต้องอยู่ใน Git และไฟล์ใดต้องเตรียมจากภายนอก พร้อมวิธีตรวจ `ci` / `runtime` / `full` อยู่ที่ [Source Availability & CI Contract](../docs/source-availability-contract.md) สำหรับ clean checkout ใช้ `python scripts/audit_data_sources.py --mode ci`; ก่อนเปิดจอนำเสนอจริงใช้ `--mode runtime` เพื่อตรวจ asset ภายนอกและ SHA-256
+
 หลักที่ใช้คือ:
 
 1. ราคา โปรโมชั่น ขนาดห้อง และคำสัญญาเชิงพาณิชย์ต้องมาจากแหล่งที่ทะเบียนอนุญาตและมีสถานะอนุมัติครบ

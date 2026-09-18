@@ -38,7 +38,9 @@ def source_path(source_id: str, project_id: str) -> Path:
     if source.get("project_id") != project_id:
         raise ValueError(f"{source_id} does not belong to {project_id}")
     location = source.get("location")
-    if not isinstance(location, str) or not location or "\\" in location:
+    if (not isinstance(location, str) or not location or "\\" in location
+            or Path(location).is_absolute()
+            or (len(location) > 1 and location[0].isalpha() and location[1] == ":")):
         raise ValueError(f"{source_id} has no local path")
     path = (ROOT / location).resolve()
     if not path.is_relative_to(ROOT):

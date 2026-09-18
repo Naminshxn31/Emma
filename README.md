@@ -14,6 +14,9 @@ Project boundaries and data ownership are documented in
 The machine-readable registry is [`data/registry/source_registry.json`](data/registry/source_registry.json);
 run `python scripts/audit_data_sources.py` to see missing approvals, files, and
 unverified derived data without reading secrets or private document contents.
+For clean checkout versus deployment checks, see the
+[source availability contract](docs/source-availability-contract.md) and run
+`python scripts/audit_data_sources.py --mode ci` or `--mode runtime`.
 
 A ChatGPT-style voice assistant for a condo sales gallery robot: pick a
 voice, then just talk. Natural-sounding speech, interruptible mid-sentence,

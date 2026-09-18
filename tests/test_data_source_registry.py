@@ -64,12 +64,12 @@ def test_sample_and_private_sources_cannot_become_customer_truth():
     assert sources["private_runtime_state"]["customer_facing"] == "forbidden"
 
 
-def test_required_registered_paths_exist_and_registry_has_no_errors():
-    issues = audit_registry()
+def test_ci_requires_only_tracked_sources_and_valid_external_manifests():
+    issues = audit_registry(mode="ci")
 
     assert summary(issues)["error"] == 0, issues
     for source in _registry()["sources"]:
-        if source.get("required") and source.get("location"):
+        if source.get("availability") == "tracked" and source.get("location"):
             assert (ROOT / source["location"]).exists()
 
 
@@ -79,13 +79,17 @@ def test_known_incomplete_inputs_stay_visible_as_warnings():
 
     assert any(source == "project_facts" and "approval metadata" in message
                for source, message in warnings)
-    assert any(source == "showroom_layout" and "unverified" in message
-               for source, message in warnings)
+    if (ROOT / "data/showroom/layout.json").exists():
+        assert any(source == "showroom_layout" and "unverified" in message
+                   for source, message in warnings)
+    else:
+        assert any(source == "showroom_layout" and "missing review_only" in message
+                   for source, message in warnings)
 
 
 def test_cli_emits_utf8_json_on_windows():
     result = subprocess.run(
-        [sys.executable, "scripts/audit_data_sources.py", "--json"],
+        [sys.executable, "scripts/audit_data_sources.py", "--mode", "ci", "--json"],
         cwd=ROOT,
         capture_output=True,
         encoding="utf-8",

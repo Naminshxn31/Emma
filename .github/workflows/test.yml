@@ -24,6 +24,8 @@ jobs:
         run: uv pip check
       - name: Import smoke (no devices or model downloads)
         run: uv run --locked --all-extras python scripts/smoke_install.py --all-extras
+      - name: Source contract (clean checkout, no private assets)
+        run: uv run --locked --all-extras python scripts/audit_data_sources.py --mode ci
       - name: Tests with fake providers
         run: uv run --locked --all-extras python -m pytest -q
       - name: Browser JavaScript
