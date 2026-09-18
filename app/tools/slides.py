@@ -213,16 +213,30 @@ def confident_enough_to_show(hits, query: str = "") -> bool:
 def _public(slide: dict, position: dict | None = None) -> dict:
     """What the model and the display window get. Deliberately excludes the
     raw index entry so a schema change here doesn't leak into prompts."""
+    from app.knowledge_policy import evaluate_claim, state_instruction
+
+    decision = evaluate_claim(slide, settings.project_id)
+    logger.info("knowledge policy %s", decision.trace())
     out = {
         "id": slide["id"],
         "project_id": slide["project_id"],
         "type": slide.get("type"),
-        "title_th": slide.get("title_th"),
-        "title_en": slide.get("title_en"),
-        "summary_th": slide.get("summary_th"),
-        "summary_en": slide.get("summary_en"),
+        # A display identifier is not authority to narrate words on an image.
+        "title_th": slide.get("title_th") if decision.allowed else "ภาพประกอบ",
+        "title_en": slide.get("title_en") if decision.allowed else "Presentation image",
         "url": f"/slides/{slide['file']}",
+        "policy_trace": decision.trace(),
     }
+    if not decision.allowed:
+        out["instruction"] = "แสดงภาพประกอบได้ แต่ข้อความในภาพยังไม่อนุมัติให้กล่าวเป็นข้อเท็จจริง ห้ามบรรยายหรืออนุมานจากภาพ"
+        if position:
+            out.update(position)
+        return out
+    out["summary_th"] = slide.get("summary_th")
+    out["summary_en"] = slide.get("summary_en")
+    out["content_state"] = decision.content_state
+    if state_instruction(decision.content_state):
+        out["content_state_instruction"] = state_instruction(decision.content_state)
     if slide.get("silent"):
         # Said out loud in the payload as well as in the instruction. The
         # model reads both, and "there is nothing to say here" is easier to
@@ -239,18 +253,15 @@ def _public(slide: dict, position: dict | None = None) -> dict:
     # model "a human signed off on these exact words, say them", and it was
     # saying that about words no human had read.
     #
-    # A draft is still worth speaking: it keeps the robot on the deck's own
-    # material instead of improvising. It just must not be presented as
-    # something it isn't, and a person must be able to see what still needs
-    # review. `scripts/approve_narration.py` flips the flag after sign-off.
+    # Legacy script_approved is not disclosure authorization by itself. Both
+    # source metadata and script-level sign-off are mandatory.
     script = slide.get("script_th") or slide.get("script_en")
-    if script:
+    if script and slide.get("script_approved") and slide.get("script_approved_by"):
         out["script"] = script
-        if slide.get("script_approved"):
-            out["script_is_approved_copy"] = True
-            out["script_approved_by"] = slide.get("script_approved_by", "")
-        else:
-            out["script_is_draft"] = True
+        out["script_is_approved_copy"] = True
+        out["script_approved_by"] = slide["script_approved_by"]
+    elif script:
+        out["script_is_draft"] = True
     # An invitation for the guest to say something back, written per slide.
     #
     # Not generated: a robot inventing its own small talk in a sales gallery
@@ -468,7 +479,7 @@ def follow_external_page(page_number: int) -> dict | None:
     if shown is None:
         return None
     slide = _by_id(shown["id"])
-    script = slide.get("script_th") or slide.get("script_en") or ""
+    script = shown.get("script") or ""
     if not script:
         return None
     return {
@@ -587,9 +598,16 @@ def _narration_instruction(slide: dict | None) -> str:
     that is never asked at all — the guest learns the robot sometimes waits
     and sometimes talks over them.
     """
-    _arm_question(slide)
     if is_silent(slide):
+        _arm_question(None)
         return PASS_THROUGH
+    if slide and not _public(slide)["policy_trace"]["allowed"]:
+        _arm_question(None)
+        return "สไลด์นี้ยังไม่มีเนื้อหาที่อนุมัติให้ลูกค้าฟัง ห้ามบรรยายหรือเดาจากภาพ"
+    if slide and not _public(slide).get("script"):
+        _arm_question(None)
+        return "สไลด์นี้ไม่มีบทที่อนุมัติให้พูด ห้ามบรรยายหรือเดาจากภาพ"
+    _arm_question(slide)
     if slide and (slide.get("ask_th") or slide.get("ask_en")):
         return ASK_AND_WAIT
     return KEEP_GOING
@@ -720,6 +738,8 @@ def show_slide(query: str) -> dict:
     out = {"ok": True, "slide": shown, "alternatives": alternatives}
     if shown.get("script"):
         out["instruction"] = SPEAK_SCRIPT
+    else:
+        out["instruction"] = shown.get("instruction", "ภาพนี้ไม่มีบทที่อนุมัติ ห้ามเดารายละเอียดจากภาพ")
     resume = on_loop(resume_hint)
     if resume:
         out["presentation"] = resume
@@ -757,6 +777,14 @@ async def start_presentation(tour: str = DEFAULT_TOUR) -> dict:
         deck = _build_deck(chosen)
     if not deck:
         return {"ok": False, "error": f"no slides for tour '{chosen}'"}
+    # A tour inherently narrates the deck. Showing an individual image is
+    # different; an unapproved catalog cannot become an automatic sales talk.
+    from app.knowledge_policy import evaluate_claim
+
+    if any(not evaluate_claim(_by_id(slide_id), settings.project_id).allowed
+           for slide_id in deck):
+        return {"ok": False, "error": "presentation copy not approved",
+                "instruction": "ยังไม่มีบทพรีเซนต์ที่อนุมัติครบชุด ให้บอกลูกค้าตรงๆ ห้ามบรรยายจาก draft"}
 
     # `parked` goes too: starting from the cover is an explicit decision to
     # abandon wherever the last tour stopped, and leaving it behind would let
@@ -927,7 +955,8 @@ async def go_to_page(page: int) -> dict:
     # slide 50: the model answered the question and then kept going, page
     # after page, because the answer carried the instruction to.
     STATE["manual"] = True
-    out["instruction"] = SPEAK_SCRIPT if shown.get("script") else SPEAK_SCRIPT
+    out["instruction"] = SPEAK_SCRIPT if shown.get("script") else shown.get(
+        "instruction", "ภาพนี้ไม่มีบทที่อนุมัติ ห้ามเดารายละเอียดจากภาพ")
     ask = shown.get("ask")
     if ask:
         out["instruction"] += " ถามคำถามในฟิลด์ ask ต่อท้ายด้วย แล้วรอคำตอบ"

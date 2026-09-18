@@ -22,12 +22,15 @@ def run(coro):
 
 
 @pytest.fixture
-def slides():
+def slides(monkeypatch):
     import app.tools as tools_pkg
     from app.tools import slides as sl
 
     tools_pkg.load_tools()
     sl.reload_slides()
+    from tests.approval_fixture import approved_slides
+
+    monkeypatch.setattr(sl, "_slides", approved_slides(sl.load_slides()))
     sl.reset_state()
     return sl
 
@@ -159,17 +162,14 @@ def test_generated_narration_is_not_labelled_approved(slides):
     slide images — so the robot was reciting unreviewed sentences about a
     multi-million-baht property while the system vouched for them.
 
-    Drafts are still spoken, which keeps the narration on the deck's own
-    material. They are simply not passed off as approved.
+    Drafts must not be supplied to the model, even when the catalog itself
+    has synthetic source approval in this presentation-mechanics fixture.
     """
     from app.tools.slides import _public, load_slides
 
-    drafts = [s for s in load_slides()
-              if (s.get("script_th") or s.get("script_en")) and not s.get("script_approved")]
-    assert drafts, "fixture should contain unapproved narration"
-
-    shown = _public(drafts[0])
-    assert shown.get("script"), "a draft is still worth speaking"
+    draft = next(s for s in load_slides() if s.get("script_th") or s.get("script_en"))
+    shown = _public({**draft, "script_approved": False})
+    assert not shown.get("script"), "draft narration must not be supplied to the model"
     assert shown.get("script_is_draft") is True
     assert "script_is_approved_copy" not in shown
 
@@ -178,7 +178,8 @@ def test_approval_is_recorded_with_a_name(slides):
     """An approval nobody's name is attached to isn't one."""
     from app.tools.slides import _public
 
-    approved = _public({
+    source = dict(slides.load_slides()[0])
+    approved = _public({**source,
         "id": "x", "file": "x.jpg", "script_th": "...",
         "project_id": settings.project_id,
         "script_approved": True, "script_approved_by": "ฝ่ายขาย Empire Group",
@@ -388,7 +389,7 @@ def test_a_slide_with_no_script_is_not_told_to_read_one(slides):
                 if not (s.get("script_th") or s.get("script_en")))
     out = run(registry.dispatch("show_slide", {"query": bare["title_th"]}))
     if out.get("ok") and not out["slide"].get("script"):
-        assert "instruction" not in out
+        assert "ห้ามเดา" in out["instruction"]
 
 
 @pytest.mark.parametrize("page,expected_position", [(1, 1), (5, 5), (24, 24)])

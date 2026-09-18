@@ -13,6 +13,7 @@ import logging
 
 from app.config import ACTIVE_PROJECT_ID
 from app.data_sources import require_project_payload, source_path
+from app.knowledge_policy import evaluate_claim, state_instruction
 
 logger = logging.getLogger("condo_voice.prompts")
 
@@ -193,15 +194,29 @@ def _render_facts(data: dict) -> str:
     """
     from app.tools.retrieval import sanitize_common_area_dimensions
 
+    source_decision = evaluate_claim(data, ACTIVE_PROJECT_ID)
+    logger.info("knowledge policy %s", source_decision.trace())
+    if not source_decision.allowed:
+        return FALLBACK_FACTS
     lines = ["## ข้อมูลโครงการ"]
     missing: list[str] = []
     for item in data.get("facts", []):
+        # A claim can narrow the source's approval, never silently bypass it.
+        metadata = {**data, **{key: value for key, value in item.items()
+                             if key in ("approval_status", "approved_by", "approved_at",
+                                        "effective_at", "expires_at", "disclosure_scope",
+                                        "content_state")}}
+        decision = evaluate_claim(metadata, ACTIVE_PROJECT_ID)
+        logger.info("knowledge policy %s", decision.trace())
+        if not decision.allowed:
+            continue
         label = item.get("label", "").strip()
         if not label:
             continue
         if item.get("value"):
             value = sanitize_common_area_dimensions(item["value"])
-            lines.append(f"- {label}: {value}")
+            caution = state_instruction(decision.content_state)
+            lines.append(f"- {label}: {value}" + (f" ({caution})" if caution else ""))
         else:
             missing.append(label)
     if missing:
@@ -209,13 +224,10 @@ def _render_facts(data: dict) -> str:
             "- ยังไม่มีข้อมูล: %s — ถูกถามให้บอกตรงๆ แล้วแนะนำติดต่อฝ่ายขาย ห้ามแต่งเอง"
             % " / ".join(missing)
         )
+    if len(lines) == 1 and not missing:
+        return FALLBACK_FACTS
     if data.get("disclaimer"):
         lines.append(data["disclaimer"])
-    if not data.get("approved_by"):
-        # Visible in the prompt on purpose. The narration scripts have a
-        # draft/approved split for exactly this reason, and it is the facts,
-        # not the prose, where being unreviewed actually costs something.
-        lines.append("(ข้อมูลชุดนี้ยังไม่ผ่านการอนุมัติ ห้ามขยายความเกินที่เขียนไว้)")
     return "\n".join(lines) + "\n"
 
 
@@ -239,20 +251,25 @@ def load_facts(path: str | None = None) -> str:
 
 
 def load_sales_context() -> dict[str, str]:
-    """Existing project-specific sales copy, kept outside the style prompt."""
+    """Only approved customer-facing sales copy may enter the style prompt."""
     import json
 
+    fallback = {
+        "story_rule": "- เล่าเรื่องจากข้อมูลโครงการที่ผ่านการอนุมัติให้ลูกค้าเท่านั้น ห้ามแต่งเพิ่ม",
+        "scope_rule": "- ห้ามนำข้อมูลจากโครงการอื่นมาเป็นข้อมูลของโครงการนี้",
+    }
     path = source_path("project_sales_context", ACTIVE_PROJECT_ID)
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         require_project_payload(data, "project_sales_context", ACTIVE_PROJECT_ID)
+        decision = evaluate_claim(data, ACTIVE_PROJECT_ID)
+        logger.info("knowledge policy %s", decision.trace())
+        if not decision.allowed:
+            return fallback
         return {key: str(data[key]) for key in ("story_rule", "scope_rule")}
     except Exception:
         logger.warning("could not load project sales context from %s", path, exc_info=True)
-        return {
-            "story_rule": "- เล่าเรื่องจากข้อมูลโครงการที่ค้นพบเท่านั้น ห้ามแต่งเพิ่ม",
-            "scope_rule": "- ห้ามนำข้อมูลจากโครงการอื่นมาเป็นข้อมูลของโครงการนี้",
-        }
+        return fallback
 
 
 # The opening (owner 2026-09-14, final): the welcome line plus one warm,
@@ -287,8 +304,8 @@ SALES_HOST_BLOCK = """วิธีนำเสนอ:
 - การกระทำต้องเกิดจริงก่อนพูดว่าเกิดแล้ว: ถ้าลูกค้าขอให้เปิด ดู เช็ก แสดง หรือทำสิ่งที่มีเครื่องมือรองรับ ให้เรียกเครื่องมือนั้นก่อนและรอผลสำเร็จในเทิร์นนั้น ห้ามพูดว่า "เปิดแล้ว" "กำลังเปิด" "เดี๋ยวเปิด" "พาไป" "พาชม" หรือ "จัดให้แล้ว" หากยังไม่มีผลเครื่องมือที่สำเร็จ ถ้าไม่มีเครื่องมือสำหรับการกระทำนั้น ห้ามเสนอเหมือนว่าทำได้ · ลูกค้าพูด "อยากดูสองห้องนอน" ถ้ายังไม่ได้เรียกเครื่องมือ ห้ามพูดว่า "เปิดผังให้แล้ว" หรือ "กำลังเปิด"
 - ตอบสิ่งที่ลูกค้าพูดก่อนเสมอ: ให้ตอบ intent ทันที ห้ามดึงบทสนทนากลับไปเล่าตามลำดับที่เตรียมไว้ · ผลเครื่องมืออาจมีข้อมูลมากกว่าที่ถาม ใช้เฉพาะข้อมูลที่จำเป็นต่อคำถามตรงหน้า ห้ามนำข้อมูลข้างเคียงมาต่อเติมเพียงเพราะอยู่ในผลค้น · ลูกค้าบอกว่า "ยังไม่รู้อะไรเลย" ให้พูด "ยินดีต้อนรับค่ะ ที่นี่คือ [ชื่อโครงการ] ค่ะ" เท่านั้นแล้วหยุด ห้ามถามเรื่องแบบห้องหรือเล่าทำเล แนวคิด facility และคำขายอื่นในเทิร์นนี้
 [PROJECT_STORY_RULE]
-- ราคาเป็นสิ่งเดียวที่ยังไม่เปิด: ห้ามหยิบราคาหรืองบขึ้นมาพูดหรือถามเอง ถ้าลูกค้าเอ่ยงบ ให้รับสั้นๆ ไม่ทวนตัวเลข และช่วยเลือกจากแบบ/ขนาด/วิว/สถานะว่างโดยไม่ถามงบเพื่อกรอง · ลูกค้าถาม "ห้องนี้ราคาเท่าไหร่" ให้ตอบ "ราคาขอให้ทีมขายยืนยันนะคะ ดิฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อน" แล้วหยุด
-- ยึดข้อมูลตรงหน้า: พูดเฉพาะผลค้นหรือเอกสาร ห้ามเดาหรือใช้ความรู้เดิมเติมชื่อ ขนาด โซน หรือรายละเอียด · ห้ามใส่ตัวเลขขนาดหรือความยาวให้สระ ลากูน สกายพูล หรือพื้นที่ส่วนกลาง; ขนาด/แบบห้องและโซน/ชั้นให้ค้นแล้วตอบตามผลจริง · สิ่งที่เป็นแนวคิดหรือกำลังพัฒนาห้ามพูดเหมือนเสร็จแล้ว ถ้าผลเครื่องมือระบุ draft, concept, rendering, proposed, developing หรือยังไม่ยืนยัน ต้องพูดสถานะนั้นออกมาด้วย ห้ามตัดคำสถานะทิ้ง · ลูกค้าถาม "สระอยู่ตรงไหน" ถ้าผลค้นเป็น draft ให้บอกว่าเป็นข้อมูล draft ก่อนตอบเฉพาะตำแหน่งสระ แล้วหยุด ห้ามลากไปเรื่องลากูนหรือ facility อื่น
+- ราคาไม่เปิดในบทสนทนา: ห้ามหยิบราคาหรืองบขึ้นมาพูดหรือถามเอง ถ้าลูกค้าเอ่ยงบ ให้รับสั้นๆ ไม่ทวนตัวเลข และช่วยเลือกจากแบบ/ขนาด/วิว/สถานะว่างที่ผ่าน policy โดยไม่ถามงบเพื่อกรอง · ลูกค้าถาม "ห้องนี้ราคาเท่าไหร่" ให้ตอบ "ราคาขอให้ทีมขายยืนยันนะคะ ดิฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อน" แล้วหยุด
+- ยึดข้อมูลตรงหน้า: พูดเฉพาะผลค้นที่ผ่าน policy อนุมัติให้ลูกค้า ห้ามเดาหรือใช้ความรู้เดิมเติมชื่อ ขนาด โซน หรือรายละเอียด · ห้ามใส่ตัวเลขขนาดหรือความยาวให้พื้นที่ส่วนกลาง; ขนาด/แบบห้องและโซน/ชั้นให้ค้นแล้วตอบตามผลจริง · สิ่งที่เป็นแนวคิดหรือกำลังพัฒนาต้องคงสถานะตามผล policy ห้ามพูดเหมือนเสร็จแล้ว · ผลที่ระบุ draft, missing metadata หรือ expired ใช้ตอบข้อเท็จจริงไม่ได้ แม้จะมีภาพประกอบอยู่บนจอ
 [PROJECT_SCOPE_RULE]"""
 
 EMMA_GREETING = (
@@ -450,15 +467,6 @@ UNITS_TOOLS_BLOCK = ("ขอดูผัง/ห้อง/ห้องว่า�
                      "ห้ามตอบว่าไม่มีเครื่องมือ ข้อมูลสดจากระบบผังขาย ไม่ใช่สไลด์")
 
 
-GALLERY_LIBRARY_BLOCK = """คลังบทความของบริษัท: มีบทความจากเว็บบริษัทให้ค้นด้วย search_my_documents
-ใช้เมื่อลูกค้าถามเรื่องผู้พัฒนา ความน่าเชื่อถือของบริษัท ทำเลและย่านนี้ เหตุผลการลงทุน
-หรือข้อดีของการซื้อช่วง pre-sale แล้ว search_condo_info ไม่พบคำตอบ — ค้นก่อนตอบ
-ห้ามตอบเรื่องพวกนี้จากความรู้ทั่วไปโดยไม่ค้น
-ห้ามอ้างตัวเลขการเงินจากบทความ (yield เปอร์เซ็นต์ผลตอบแทน ราคา ดอกเบี้ย) เป็นข้อเท็จจริง
-บทความเป็นเนื้อหาการตลาดที่ไม่มีผู้อนุมัติตัวเลข ให้อธิบายเหตุผลได้ แต่ตัวเลขจริง
-ต้องบอกให้สอบถามฝ่ายขาย"""
-
-
 def _units_tools_suffix() -> str:
     """The unit-card/plan tools' paragraph, present exactly when they are.
 
@@ -589,19 +597,13 @@ def build_instructions(
                    .replace("[PROJECT_SCOPE_RULE]", context["scope_rule"])
                    .replace("[ชื่อโครงการ]", project_name))
     out = base + "\n" + sales_block + "\n" + facts
-    # The company web library, mentioned only when this machine loads it.
-    # Turning the mydocs group on in .env was found to be *not enough*: the
-    # tool registered, and the robot never called it — rule 14 routes every
-    # unknown to search_condo_info and nothing in the prompt said the
-    # library existed. A tool the model has no reason to reach for is the
-    # same as no tool. Gated on the group so the gallery default (blank
-    # TOOL_GROUPS, mydocs opt-in and absent) keeps its prompt byte-identical
-    # on a pull.
+    # The document library is not a customer-facing fact source until it
+    # carries approval metadata. Keep the tool unadvertised even if enabled.
     from app.config import settings as _settings
 
     groups = _settings.enabled_tool_groups()
-    if groups is not None and "mydocs" in groups:
-        out += "\n" + GALLERY_LIBRARY_BLOCK
+    # No customer-facing document carries approval metadata yet. Do not
+    # advertise this fallback as a fact source even if the tool is enabled.
     # Same gate, other direction: rules that name slide tools leave with the
     # group. The gallery default (blank TOOL_GROUPS = every group) keeps
     # them, byte-identical.

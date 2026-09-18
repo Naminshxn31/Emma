@@ -104,19 +104,12 @@ def test_emma_has_real_memory_rules_now():
 
 
 def test_the_gallery_prompt_carries_the_sales_host_voice():
-    """The owner's four documents of 2026-09-11 became one block that has
-    to be present on every turn: emotion before logic, the host's first
-    person, and the promises it must never make. The documents themselves
-    live in the library; the block is the part that cannot wait for a
-    search."""
+    """Keep generic host style while draft sales copy stays outside prompt."""
     text = build_instructions("X")
-    assert "ขายชีวิตที่ดีขึ้นก่อน" in text
-    assert "ห้ามการันตีผลตอบแทน" in text
+    assert "ตัวตนและน้ำเสียง" in text
+    assert "ขายชีวิตที่ดีขึ้นก่อน" not in text
     assert "กำลังพัฒนา" in text and "ห้ามพูดเหมือนเสร็จแล้ว" in text
-    # The fallback sentence is quoted from the owner's Thai master verbatim
-    # (section 19), because a quoted sentence is the one form of instruction
-    # this model reliably follows — see the KEEP_GOING lesson in slides.py.
-    assert "ฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อนกับคุณ" in text
+    assert "ห้ามนำข้อมูลจากโครงการอื่น" in text
 
 
 def test_the_sales_host_block_carries_no_numbers():
@@ -144,7 +137,7 @@ def test_the_sales_host_block_keeps_embassy_world_apart_from_other_projects():
     from app.prompts import SALES_HOST_BLOCK
 
     text = build_instructions("Embassy World")
-    assert "Embassy Life" in text and "Embassy World" in text
+    assert "Embassy Life" not in text and "Embassy World" in text
     assert "Biogenesis" not in SALES_HOST_BLOCK, "project facts belong in project data"
     assert "ความรู้เดิม" in SALES_HOST_BLOCK, "must forbid inventing from the model's own memory"
 
@@ -168,13 +161,8 @@ def test_sales_host_keeps_a_no_intent_opening_brief():
 
 def test_sales_host_uses_a_personal_clue_once_then_stops():
     text = build_instructions("Embassy World")
-
-    for clue in ("ครอบครัว", "เวลา", "การมาใช้"):
-        assert clue in text
-    assert "ถือว่า intent ชัด" in text
-    assert 'ตอบว่า "เหมาะกับการใช้เวลาพักผ่อนร่วมกันทั้งครอบครัวในวันหยุดค่ะ" เท่านั้น' in text
-    assert "ห้ามเอ่ย facility/ห้อง" in text
-    assert "เติมคำถามและข้อเสนอท้าย" in text
+    assert "เหมาะกับการใช้เวลาพักผ่อนร่วมกันทั้งครอบครัว" not in text
+    assert "ตอบสิ่งที่ลูกค้าพูดก่อนเสมอ" in text
 
 
 def test_sales_host_does_not_require_a_follow_up_question():
@@ -210,10 +198,10 @@ def test_sales_host_stops_when_the_customer_closes_the_conversation():
 def test_sales_host_speaks_unconfirmed_status_out_loud():
     from app.prompts import SALES_HOST_BLOCK
 
-    for status in ("draft", "concept", "rendering", "proposed", "developing"):
-        assert status in SALES_HOST_BLOCK
-    assert "ต้องพูดสถานะนั้นออกมาด้วย" in SALES_HOST_BLOCK
-    assert "ห้ามตัดคำสถานะทิ้ง" in SALES_HOST_BLOCK
+    assert "draft" in SALES_HOST_BLOCK and "expired" in SALES_HOST_BLOCK
+    assert "ใช้ตอบข้อเท็จจริงไม่ได้" in SALES_HOST_BLOCK
+    from app.knowledge_policy import state_instruction
+    assert "กำลังพัฒนา" in state_instruction("developing")
 
 
 def test_sales_host_offers_only_actions_available_in_the_session():
@@ -250,9 +238,8 @@ def test_sales_host_does_not_narrate_every_tool_result():
 
 def test_sales_host_compares_room_use_before_numbers():
     text = build_instructions("Embassy World")
-
-    assert "อธิบายความต่างด้านพื้นที่และการใช้งานก่อน" in text
-    assert "ตัวเลขเป็นข้อมูลประกอบเมื่อจำเป็น ไม่ใช่คำตอบหลัก" in text
+    assert "อธิบายความต่างด้านพื้นที่และการใช้งานก่อน" not in text
+    assert "ขนาด/แบบห้องและโซน/ชั้นให้ค้นแล้วตอบตามผลจริง" in text
 
 
 def test_sales_host_has_explicit_price_and_pool_stop_examples():
@@ -260,8 +247,8 @@ def test_sales_host_has_explicit_price_and_pool_stop_examples():
 
     assert 'ลูกค้าถาม "ห้องนี้ราคาเท่าไหร่"' in SALES_HOST_BLOCK
     assert '"ราคาขอให้ทีมขายยืนยันนะคะ ดิฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อน" แล้วหยุด' in SALES_HOST_BLOCK
-    assert 'ลูกค้าถาม "สระอยู่ตรงไหน"' in SALES_HOST_BLOCK
-    assert "ตอบเฉพาะตำแหน่งสระ แล้วหยุด" in SALES_HOST_BLOCK
+    assert 'ลูกค้าถาม "สระอยู่ตรงไหน"' not in SALES_HOST_BLOCK
+    assert "ผลที่ระบุ draft" in SALES_HOST_BLOCK
 
 
 def test_the_sales_host_voice_stays_out_of_the_other_profiles():
@@ -458,11 +445,7 @@ def test_the_gallery_prompt_learns_the_library_only_when_it_is_loaded(monkeypatc
 
     monkeypatch.setattr(settings, "tool_groups", "smarthome,slides,knowledge,mydocs")
     withlib = build_instructions("X", extra_facts="")
-    assert "search_my_documents" in withlib
-    # The half that keeps the numbers honest: articles are marketing copy,
-    # and their figures ("yields 7-10%") have no approver.
-    assert "ห้ามอ้างตัวเลขการเงินจากบทความ" in withlib
-    assert "ฝ่ายขาย" in withlib.split("ห้ามอ้างตัวเลขการเงินจากบทความ", 1)[1]
+    assert "search_my_documents" not in withlib, "unapproved library must not be suggested"
 
 
 def test_the_gallery_prompt_drops_the_slide_rules_with_the_slides_group(monkeypatch):

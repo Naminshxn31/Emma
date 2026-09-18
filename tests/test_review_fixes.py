@@ -83,16 +83,23 @@ def test_retrieval_preserves_script_approval(approved, language):
     from app.tools.knowledge import _entry
 
     slide = {f"script_{language}": "REVIEW_SCRIPT",
-             "source_id": "slide_catalog", "project_id": settings.project_id}
+             "source_id": "slide_catalog", "project_id": settings.project_id,
+             "approval_status": "approved", "approved_by": "test_reviewer",
+             "approved_at": "2026-01-01T00:00:00+07:00",
+             "effective_at": "2026-01-01T00:00:00+07:00",
+             "disclosure_scope": "customer", "content_state": "existing"}
     if approved is not None:
         slide["script_approved"] = approved
+    if approved:
+        slide["script_approved_by"] = "test_reviewer"
     out = _entry(slide)
     if approved:
         assert out["approved_script"] == "REVIEW_SCRIPT"
         assert "draft_script" not in out
     else:
         assert "approved_script" not in out
-        assert out["draft_script"] == "REVIEW_SCRIPT" and out["script_is_draft"]
+        assert "draft_script" not in out and out["script_is_draft"]
+        assert "REVIEW_SCRIPT" not in str(out)
 
 
 def test_shared_knowledge_does_not_mutate_presentation(monkeypatch):

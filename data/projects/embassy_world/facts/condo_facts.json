@@ -1,5 +1,11 @@
 {
-  "_comment": "ข้อมูลโครงการที่หุ่นยนต์พูดได้ — ทุกอย่างที่เป็นตัวเลข ราคา หรือคำสัญญาต้องมาจากไฟล์นี้เท่านั้น หุ่นยนต์ถูกสั่งห้ามแต่งเองเด็ดขาด ฟิลด์ที่เป็น null คือยังไม่มีข้อมูล หุ่นยนต์จะบอกลูกค้าตรงๆ แล้วให้ติดต่อฝ่ายขาย",
+  "_comment": "ข้อมูลรออนุมัติ ไม่ส่งเนื้อหานี้ให้ Emma พูดกับลูกค้าจนกว่าจะมี metadata อนุมัติครบ ฟิลด์ null คือยังไม่มีข้อมูล ห้ามเดา",
+  "approval_status": "draft",
+  "approved_at": null,
+  "effective_at": null,
+  "expires_at": null,
+  "disclosure_scope": "internal",
+  "content_state": "preliminary_concept",
   "approved_by": "",
   "effective_from": "",
   "facts": [

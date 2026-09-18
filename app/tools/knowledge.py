@@ -1,12 +1,9 @@
 """
 Look things up about the project — retrieval, without showing a picture.
 
-The slide library is already a body of project knowledge: 144 entries with
-Thai and English titles, summaries and (once written) narration scripts. But
-until now it was only reachable through `show_slide`, which puts an image on
-the screen. A guest who just asks "มีฟิตเนสไหม" doesn't want a picture, and
-the model had nothing to answer from — the whole library was invisible to it
-unless it decided to display something.
+The slide catalog is a search index for presentation assets, not an approved
+fact database. Only records with customer disclosure metadata may contribute
+text to a response. An unreviewed image can still be displayed separately.
 
 This is the retrieval half of RAG over data that already exists. It is
 deliberately *not* stuffed into the system instructions: the Live API
@@ -14,10 +11,8 @@ re-processes and re-bills those on every single turn, so 144 summaries in
 the prompt would make every reply slower and more expensive, including the
 ones that never mention the project.
 
-What it is not: a source of prices or promotions. Those live in
-the project facts file (which still needs owner approval). Slide summaries are
-descriptive, and the prompt forbids quoting numbers that aren't in
-that file.
+It is never a source of prices or promotions. Those need a separately
+approved source; a description inferred from an image is not approval.
 """
 from __future__ import annotations
 
@@ -26,6 +21,8 @@ import logging
 from app.tools.registry import tool
 from app import turnlog
 from app.tools.slides import confident_enough_to_show, load_slides
+from app.config import settings
+from app.knowledge_policy import evaluate_claim, state_instruction
 
 logger = logging.getLogger("condo_voice.knowledge")
 
@@ -72,9 +69,14 @@ def _result_limit(query: str) -> int:
 
 def _entry(slide: dict) -> dict:
     """One search hit, trimmed to what's useful to speak from."""
+    decision = evaluate_claim(slide, settings.project_id)
+    if not decision.allowed:
+        return {"policy_trace": decision.trace()}
     out = {
         "source_id": slide["source_id"],
         "project_id": slide["project_id"],
+        "policy_trace": decision.trace(),
+        "content_state": decision.content_state,
         "title": sanitize_common_area_dimensions(
             slide.get("title_th") or slide.get("title_en")
         ),
@@ -84,8 +86,8 @@ def _entry(slide: dict) -> dict:
         "topic": slide.get("type"),
         # Two extra fields with different standing, kept apart on purpose:
         #
-        #   slide_text — every word printed on the slide. The developer's own
-        #     copy, as approved as the picture the guest is looking at.
+        #   slide_text — words printed on a slide whose source metadata
+        #     explicitly passed customer disclosure above.
         #   description — written by a model looking at the image. Good for
         #     describing a room out loud, never a source for a number.
         #
@@ -103,14 +105,13 @@ def _entry(slide: dict) -> dict:
     if description:
         out["description"] = sanitize_common_area_dimensions(description[:600])
     script = slide.get("script_th") or slide.get("script_en")
-    if script:
-        if slide.get("script_approved"):
-            out["approved_script"] = sanitize_common_area_dimensions(script)
-        else:
-            # Preserve the status, not unapproved marketing copy. The copy is
-            # often broader than the question and was being repeated as fact.
-            out["script_is_draft"] = True
-            out["content_status"] = "draft"
+    if script and slide.get("script_approved") and slide.get("script_approved_by"):
+        out["approved_script"] = sanitize_common_area_dimensions(script)
+    elif script:
+        out["script_is_draft"] = True
+    caution = state_instruction(decision.content_state)
+    if caution:
+        out["content_state_instruction"] = caution
     return out
 
 
@@ -121,9 +122,6 @@ def _sanitize_now_showing(value: dict | None) -> dict | None:
     for key in ("title_th", "title_en", "summary_th", "summary_en", "script"):
         if out.get(key):
             out[key] = sanitize_common_area_dimensions(out[key])
-    if out.get("script_is_draft"):
-        out.pop("script", None)
-        out["content_status"] = "draft"
     return out
 
 
@@ -203,6 +201,11 @@ def search_condo_info(query: str) -> dict:
     else:
         hits = [h.slide for h in ranked if h.found][:_result_limit(query)]
 
+    rejected = [evaluate_claim(slide, settings.project_id).trace() for slide in hits]
+    hits = [slide for slide in hits if evaluate_claim(slide, settings.project_id).allowed]
+    for trace in rejected:
+        logger.info("knowledge policy %s", trace)
+
     if not hits:
         # The single most useful line in the log.
         #
@@ -226,6 +229,7 @@ def search_condo_info(query: str) -> dict:
             "ok": True,
             "found": False,
             "results": [],
+            "policy_trace": rejected,
             # Spelled out so the model doesn't fill the silence with a guess.
             "instruction": "ไม่พบข้อมูลนี้ ให้บอกลูกค้าตรงๆ ว่าไม่มีข้อมูล และแนะนำให้ติดต่อเจ้าหน้าที่ฝ่ายขาย ห้ามเดา",
         }
@@ -241,13 +245,9 @@ def search_condo_info(query: str) -> dict:
             "ตอบเฉพาะข้อมูลที่ตรงคำถามจากผลลัพธ์นี้ ห้ามนำข้อมูลข้างเคียงมาต่อเติม"
         ),
     }
-    if any(item.get("script_is_draft") for item in result["results"]):
-        result["content_status"] = "draft"
-        result["must_preserve_status"] = True
-        result["instruction"] += (
-            " ข้อมูลมีสถานะ draft ต้องพูดสถานะนี้อย่างชัดเจน "
-            "ห้ามพูดเหมือนสร้างเสร็จหรือเปิดใช้งานแล้ว"
-        )
+    for item in result["results"]:
+        if item.get("content_state_instruction"):
+            result["instruction"] += " " + item["content_state_instruction"]
 
     # Put the best match on screen as part of answering — but only when it's
     # clearly the right picture. Leaving the display to a separate show_slide
@@ -273,8 +273,6 @@ def search_condo_info(query: str) -> dict:
         title=hits[0].get("title_th"),
         runners_up=[h.get("id") for h in hits[1:4]],
     )
-    from app.config import settings
-
     if settings.multi_session:
         return result
     from app.tool_io import on_loop

@@ -16,12 +16,15 @@ def run(coro):
 
 
 @pytest.fixture
-def loaded():
+def loaded(monkeypatch):
     import app.tools as tools_pkg
     from app.tools import slides as sl
 
     tools_pkg.load_tools()
     sl.reload_slides()
+    from tests.approval_fixture import approved_slides
+
+    monkeypatch.setattr(sl, "_slides", approved_slides(sl.load_slides()))
     return sl
 
 
@@ -181,17 +184,15 @@ def test_a_specific_pool_location_returns_only_the_best_chunk(loaded):
 
 
 def test_unapproved_marketing_copy_keeps_status_but_not_the_copy(loaded):
-    out = run(registry.dispatch(
-        "search_condo_info", {"query": "สระว่ายน้ำอยู่ตรงไหน"}
-    ))
-
-    top = out["results"][0]
+    from app.tools.knowledge import _entry
+    slide = dict(loaded.load_slides()[0], script_th="บทที่ยังไม่อนุมัติ",
+                 script_approved=False)
+    top = _entry(slide)
     assert top["script_is_draft"] is True
-    assert top["content_status"] == "draft"
+    assert top["content_state"] == "preliminary_concept"
     assert "draft_script" not in top
-    assert out["content_status"] == "draft"
-    assert out["must_preserve_status"] is True
-    assert "ต้องพูดสถานะนี้อย่างชัดเจน" in out["instruction"]
+    assert "approved_script" not in top
+    assert "บทที่ยังไม่อนุมัติ" not in str(top)
 
 
 def test_common_area_dimensions_never_reach_customer_facing_knowledge(loaded):
@@ -199,8 +200,8 @@ def test_common_area_dimensions_never_reach_customer_facing_knowledge(loaded):
     from app.tools.knowledge import _entry
 
     facts = load_facts()
-    assert "ลากูน" in facts and "155" not in facts
-    assert "16 โครงการ" in facts, "non-facility figures remain available"
+    assert "ลากูน" not in facts and "155" not in facts
+    assert "16 โครงการ" not in facts, "unapproved figures must not reach the model"
 
     entry = _entry({
         "source_id": "slide_catalog",
@@ -212,7 +213,8 @@ def test_common_area_dimensions_never_reach_customer_facing_knowledge(loaded):
     })
     surface = str(entry)
     assert "155" not in surface and "4,000" not in surface
-    assert "script_is_draft" in entry and "draft_script" not in entry
+    assert not entry["policy_trace"]["allowed"]
+    assert "script_is_draft" not in entry and "draft_script" not in entry
 
 
 def test_results_carry_a_way_to_show_the_slide(loaded):
@@ -250,6 +252,7 @@ def test_narration_script_is_offered_as_approved_copy(loaded, monkeypatch):
     target = dict(library[0])
     target["script_th"] = "บทที่อนุมัติแล้ว"
     target["script_approved"] = True
+    target["script_approved_by"] = "test_reviewer"
     monkeypatch.setattr(loaded, "_slides", [target] + library[1:])
 
     out = run(registry.dispatch("search_condo_info", {"query": target["title_th"]}))

@@ -79,6 +79,12 @@ def test_known_incomplete_inputs_stay_visible_as_warnings():
 
     assert any(source == "project_facts" and "approval metadata" in message
                for source, message in warnings)
+    assert any(source == "project_facts" and "policy=customer_claim_v1" in message
+               and "reason=not_approved" in message for source, message in warnings)
+    assert any(source == "slide_catalog" and "blocked=135" in message
+               for source, message in warnings)
+    assert any(source == "project_sales_context" and "reason=not_approved" in message
+               for source, message in warnings)
     if (ROOT / "data/showroom/layout.json").exists():
         assert any(source == "showroom_layout" and "unverified" in message
                    for source, message in warnings)

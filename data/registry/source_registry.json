@@ -65,9 +65,9 @@
       "tracked": true,
       "authority": "curated",
       "customer_facing": "conditional",
-      "uses": ["project facts", "commercial guardrail", "confirmed map link"],
-      "not_for": ["live unit availability", "robot state", "invented values for null fields"],
-      "approval_fields": ["approved_by", "effective_from"]
+      "uses": ["project facts after customer disclosure approval", "commercial guardrail", "confirmed map link"],
+      "not_for": ["draft customer claims", "live unit availability", "robot state", "invented values for null fields"],
+      "approval_fields": ["approval_status", "approved_by", "approved_at", "effective_at", "disclosure_scope", "content_state"]
     },
     {
       "id": "project_vocabulary",
@@ -98,8 +98,8 @@
       "tracked": true,
       "authority": "reference",
       "customer_facing": "conditional",
-      "uses": ["slide search", "descriptive narration", "screen presentation"],
-      "not_for": ["price", "promotion", "unit availability", "claiming a preliminary concept is complete"],
+      "uses": ["slide search for presentation assets", "approved narration only", "screen presentation"],
+      "not_for": ["automatic project facts", "price", "promotion", "unit availability", "claiming a preliminary concept is complete"],
       "count_field": "images"
     },
     {
@@ -151,8 +151,9 @@
       "tracked": true,
       "authority": "reference",
       "customer_facing": "conditional",
-      "uses": ["existing sales-host wording"],
-      "not_for": ["automatic content approval", "commercial numbers", "other projects"]
+      "uses": ["sales-host wording after customer disclosure approval"],
+      "not_for": ["draft prompt injection", "automatic content approval", "commercial numbers", "other projects"],
+      "approval_fields": ["approval_status", "approved_by", "approved_at", "effective_at", "disclosure_scope", "content_state"]
     },
     {
       "id": "other_project_slide_review",

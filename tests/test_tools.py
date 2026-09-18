@@ -379,9 +379,12 @@ def test_a_wedged_canva_window_does_not_stop_a_tour(monkeypatch):
     import asyncio
 
     from app.config import settings
-    from app.tools import canva_display, load_tools, registry
+    from app.tools import canva_display, load_tools, registry, slides
+    from tests.approval_fixture import approved_slides
 
     load_tools()
+    slides.reload_slides()
+    monkeypatch.setattr(slides, "_slides", approved_slides(slides.load_slides()))
     monkeypatch.setattr(settings, "canva_url", "https://canva.test/x/view")
     monkeypatch.setattr(settings, "canva_arrival_timeout_s", 0.5)
 

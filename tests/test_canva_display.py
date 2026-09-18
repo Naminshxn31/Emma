@@ -26,6 +26,14 @@ def run(coro):
 
 @pytest.fixture(autouse=True)
 def _reset(monkeypatch):
+    # Exercise display timing with hypothetical approved copy; production
+    # slide records remain draft and are tested by test_knowledge_policy.
+    from app.tools import slides
+    from tests.approval_fixture import approved_slides
+
+    slides.reload_slides()
+    monkeypatch.setattr(slides, "_slides", approved_slides(slides.load_slides()))
+    slides.reset_state()
     monkeypatch.setattr(canva_display, "_wanted", None)
     monkeypatch.setattr(canva_display, "_task", None)
     monkeypatch.setattr(canva_display, "_page", None)
@@ -702,6 +710,8 @@ def test_the_page_the_tour_is_already_on_is_not_re_narrated():
 
     load_tools()
     slides.reload_slides()
+    from tests.approval_fixture import approved_slides
+    slides._slides = approved_slides(slides.load_slides())
     assert slides.follow_external_page(5) is not None
     assert slides.follow_external_page(5) is None, "same page, nothing to say"
     assert slides.follow_external_page(9) is not None, "a real move still works"
@@ -721,6 +731,8 @@ def test_following_a_page_hands_over_that_page_s_script():
 
     load_tools()
     slides.reload_slides()
+    from tests.approval_fixture import approved_slides
+    slides._slides = approved_slides(slides.load_slides())
     order = slides.follow_external_page(5)
     assert order is not None
     assert order["slide"]["position"] == 5

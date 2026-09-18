@@ -1,5 +1,13 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-18 — M0.2 gate ข้อมูลโครงการสำหรับลูกค้า
+
+- `app/knowledge_policy.py`, `data/projects/embassy_world/{facts/condo_facts.json,presentations/sales_context.json}`: นิยาม metadata approval/disclosure/content state และ deny-by-default พร้อม trace ที่ไม่มีเนื้อหา claim; ติดป้าย source เดิมเป็น draft/internal โดยไม่อนุมัติหรือแก้ข้อเท็จจริง; live inventory มี policy แยกตาม trusted source/project/fetch freshness/disclosure ไม่บังคับผู้อนุมัติรายห้อง
+- `app/prompts.py`, `app/tools/{knowledge,slides,mydocs}.py`: ไม่ inject draft facts/sales context/เอกสารเข้า prompt หรือคำตอบ; slide ยังแสดงภาพได้แต่ไม่ส่ง draft text/script ให้โมเดล, tour ที่มีเนื้อหาไม่อนุมัติจะไม่เริ่ม; แยก script approval จาก source approval และคงสถานะ developing/concept ในคำสั่งตอบ
+- `data/registry/source_registry.json`, `scripts/audit_data_sources.py`, `tests/test_data_source_registry.py`: เปลี่ยนฟิลด์ audit ของ facts เป็น schema ใหม่ เพิ่ม sales context และสรุป policy trace/source ID/จำนวนสไลด์ที่ถูกปิดใน CI โดยไม่เปิดข้อความ draft; CI ยังไม่ fail เพราะการรออนุมัติเป็นสถานะจริง ไม่ใช่ไฟล์เสีย
+- `tests/{test_knowledge_policy,test_knowledge,test_slides,test_voice,test_review_fixes,test_profiles,test_canva_display,test_tools,approval_fixture}.py`, `docs/knowledge-approval-contract.md`: เพิ่มกรณี approved/draft/missing/expired/wrong-project/concept, แยก fixture อนุมัติสมมติสำหรับทดสอบกลไกสไลด์จาก catalog จริง, บันทึกขอบเขตที่ยังต้องบังคับทั่ว runtime ใน M0.3; ไม่แตะ Gemini/Android/เสียง
+- ตรวจจริง: ชุดเต็มหลังปรับสัญญา **1,555 ผ่าน / 1 ล้มเดิม / 1 warning** (`test_system_instruction_stays_short` เป็น prompt-length failure เดิม; รันก่อนเพิ่ม trace ใน audit); ชุด registry/source/policy และเคส draft หลังแก้ audit/decision ล่าสุด **26 ผ่าน / 1 warning**; หลังแก้ถ้อยคำราคาใน prompt รันเคสตรงประเด็น **2 ผ่าน**; audit `ci`/`runtime` ได้ **0 errors / 3 warnings** (facts draft, slide catalog 135 รายการไม่อนุมัติเป็น claim, sales context draft), `full` ได้ **0 errors / 5 warnings** (รวม local unit file กับ navigation points ที่ยังไม่ยืนยัน); `git diff --check` ผ่านในไฟล์งานรอบนี้โดยมีเพียงคำเตือน LF/CRLF จาก Git; ยังไม่ได้ทดสอบเสียงหรือ deployment จริง
+
 ## 2026-09-18 — M0.1.1 ระบุความพร้อมของ source และสัญญา CI
 
 - `data/registry/source_registry.json`, `data/registry/external_asset_manifest.json`: ระบุ `availability`/`required_for` ของทุก source และแยกภาพสไลด์ 135 ไฟล์กับ PDF 3 ไฟล์ที่ต้องจัดหานอก Git; manifest ตรึงชื่อ ขนาด และ SHA-256 จากไฟล์บนเครื่องปัจจุบันเพื่อกันวาง bundle ผิดชุด ไม่ถือเป็นการอนุมัติเนื้อหา; แหล่ง showroom/หลักฐานหุ่น/ภาพเก่าที่ไม่ได้เป็น input production จัดเป็น `review_only` โดยไม่ลบข้อมูล

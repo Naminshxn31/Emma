@@ -11,6 +11,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from app.knowledge_policy import evaluate_claim  # noqa: E402
+
 DEFAULT_REGISTRY = ROOT / "data" / "registry" / "source_registry.json"
 VALID_AUTHORITIES = {
     "curated", "operational", "reference", "derived", "sample",
@@ -234,10 +238,28 @@ def audit_registry(path: Path = DEFAULT_REGISTRY, *, mode: str = "full",
             approval_fields = source.get("approval_fields", [])
             missing_approval = [field for field in approval_fields if not payload.get(field)]
             if missing_approval:
+                trace = (evaluate_claim(payload, source["project_id"]).trace()
+                         if source_id in {"project_facts", "project_sales_context"}
+                         else None)
                 issues.append(Issue(
                     "warning", source_id,
-                    "approval metadata is blank: " + ", ".join(missing_approval),
+                    "approval metadata is blank: " + ", ".join(missing_approval)
+                    + ("; policy=%s allowed=%s reason=%s source_id=%s" % (
+                        trace["policy"], str(trace["allowed"]).lower(),
+                        trace["reason"], trace["source_id"]
+                    ) if trace else ""),
                 ))
+            if source_id == "slide_catalog":
+                decisions = [evaluate_claim(item, source["project_id"])
+                             for item in payload.get("images", [])]
+                blocked = [decision for decision in decisions if not decision.allowed]
+                if blocked:
+                    issues.append(Issue(
+                        "warning", source_id,
+                        "policy=customer_claim_v1 allowed=%d blocked=%d source_id=%s "
+                        "(presentation assets are not approved facts)" % (
+                            len(decisions) - len(blocked), len(blocked), source_id),
+                    ))
 
             sample_field = source.get("sample_field")
             if sample_field and payload.get(sample_field) is not True:

@@ -1767,7 +1767,11 @@ def test_blank_facts_are_named_in_the_prompt_not_omitted(tmp_path):
 
     path = tmp_path / "facts.json"
     path.write_text(json.dumps({
-        "approved_by": "คุณเอ",
+        "source_id": "test.facts", "project_id": "embassy_world",
+        "approval_status": "approved", "approved_by": "test_reviewer",
+        "approved_at": "2026-01-01T00:00:00+07:00",
+        "effective_at": "2026-01-01T00:00:00+07:00",
+        "disclosure_scope": "customer", "content_state": "existing",
         "facts": [
             {"label": "ทำเล", "value": "จอมเทียน"},
             {"label": "ราคาเริ่มต้น", "value": None},
@@ -1789,13 +1793,14 @@ def test_unapproved_facts_say_so_in_the_prompt(tmp_path):
     from app.prompts import load_facts
 
     path = tmp_path / "facts.json"
-    base = {"facts": [{"label": "ทำเล", "value": "จอมเทียน"}]}
+    base = {"source_id": "test.facts", "project_id": "embassy_world",
+            "facts": [{"label": "ทำเล", "value": "จอมเทียน"}]}
 
     path.write_text(json.dumps(base, ensure_ascii=False), encoding="utf-8")
-    assert "ยังไม่ผ่านการอนุมัติ" in load_facts(str(path))
+    assert "จอมเทียน" not in load_facts(str(path))
 
-    path.write_text(json.dumps({**base, "approved_by": "คุณเอ"}, ensure_ascii=False), encoding="utf-8")
-    assert "ยังไม่ผ่านการอนุมัติ" not in load_facts(str(path))
+    path.write_text(json.dumps({**base, "approved_by": "test_reviewer"}, ensure_ascii=False), encoding="utf-8")
+    assert "จอมเทียน" not in load_facts(str(path)), "a name alone is not approval"
 
 
 def test_unreadable_facts_leave_the_robot_knowing_nothing(tmp_path):

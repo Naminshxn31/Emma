@@ -203,6 +203,18 @@ def _get_index() -> dict:
 def search_my_documents(query: str) -> dict:
     from app.tools.retrieval import is_commercial
 
+    if settings.assistant_profile == "condo":
+        # These filesystem documents have no per-document approval metadata.
+        # Owner-private Emma may search them; a customer-facing host may not.
+        from app.knowledge_policy import evaluate_claim
+
+        decision = evaluate_claim({"source_id": "mydocs", "project_id": settings.project_id},
+                                  settings.project_id)
+        logger.info("knowledge policy %s", decision.trace())
+        return {"ok": True, "found": False, "results": [],
+                "policy_trace": [decision.trace()],
+                "instruction": "คลังเอกสารยังไม่ผ่านการอนุมัติสำหรับลูกค้า ห้ามนำข้อความไปตอบหรือเดาจากความจำ"}
+
     if is_commercial(query):
         # The library is marketing copy, and marketing copy contains numbers
         # nobody signed: "yields 7-10%" sits in the pre-sale articles today.
