@@ -210,7 +210,7 @@ def test_voice_preview_packages_and_drives_the_rive_mascot():
         'class="mascot-rive"',
         'src="/assets/vendor/rive/rive.js"',
         "RuntimeLoader.setWasmUrl('/assets/vendor/rive/rive.wasm')",
-        "src: '/assets/emma/emma.riv'",
+        "src: '/assets/emma/emma.riv?v=20260921-blink1'",
         "stateMachine: 'EmmaVoice'",
         "stateMachineInputs('EmmaVoice')",
         "setRiveInput('mode'",
@@ -276,6 +276,19 @@ def test_rive_idle_matches_the_approved_front_pose_without_extra_overlays():
     assert '<Image x="362" y="705" scaleX="0.68" scaleY="0.68"' in source
     assert 'originX="0.78" originY="0.17" assetId="0:1102"' in source
     assert 'originX="0.22" originY="0.17" assetId="0:1103"' in source
+
+
+def test_rive_blink_compresses_the_chrome_eyes_without_white_discs():
+    source = (ROOT / "client" / "rive" / "emma" / "scene.rml").read_text(encoding="utf-8")
+    blink = source.split('name="blink" id="0:270">', 1)[1].split("</LinearAnimation>", 1)[0]
+
+    assert 'objectId="0:34"' in blink
+    assert 'objectId="0:35"' in blink
+    assert 'objectId="0:36"' not in blink
+    assert 'objectId="0:37"' not in blink
+    assert '<KeyFrameDouble value="0.08" frame="156"/>' in blink
+    assert '<Shape x="-87" y="-17" scaleY="0.02" opacity="0" name="Left Eyelid"' in source
+    assert '<Shape x="87" y="-17" scaleY="0.02" opacity="0" name="Right Eyelid"' in source
 
     # The eyes are the one exception to the shared scale: the atlas eye cell is
     # flatter than the eyes in the approved render, so scaleY is measured off

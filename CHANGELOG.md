@@ -1,5 +1,13 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-21 — แก้ blink ของ Emma ไม่ให้ตากลายเป็นวงรีขาว
+
+- `client/rive/emma/scene.rml`: เปลี่ยน blink จากการเปิดแผ่นเปลือกตาวงรีสีขาวทับหน้า เป็นการย่อ artwork ตาโครเมียมตามแกน Y ชั่วครู่ จึงอ่านเป็นตาปิดและไม่มีเฟรมที่ตาหายเป็นช่องขาว
+- `client/assets/emma/emma.riv`, `client/voice-preview.html`: build ใหม่จาก RML ที่แก้แล้วและเพิ่ม asset version ใน URL เพื่อให้ browser/WebView โหลดไฟล์ใหม่ทันทีแทน cache รุ่นตาวงรีขาว
+- `tests/test_voice_preview_page.py`: เพิ่ม regression ยืนยันว่า blink ขยับ node ตาจริง `0:34/0:35` และไม่ขยับแผ่นวงรี `0:36/0:37`
+- เหตุผล: ภาพหน้าแอปจับจังหวะ blink แล้วเห็นวงรีขาวสองข้างเด่นบนหน้า ทำให้ลักษณะตาไม่ตรง artwork ที่อนุมัติ
+- ผลตรวจจริง: Rive verify ผ่าน **0 errors / 0 warnings**, inspect ผ่าน **0 problems / 1 artboard**, build `emma.riv` ขนาด **793,906 bytes**; render ตรวจทั้งเฟรมลืมตาและเฟรมกะพริบที่ frame 158 แล้วตาปิดเป็นเส้นบางโดยไม่มีวงรีขาว; ชุด preview + Android app ผ่าน **30 tests / 1 warning** และ JavaScript parse ผ่าน **1 test**
+
 ## 2026-09-21 — กันผลรันทดสอบเฉพาะเครื่องออกจาก Git
 
 - `.gitignore`: เพิ่ม `.pytest-*/` ให้ครอบคลุมโฟลเดอร์ `--basetemp` ที่ตั้งชื่อด้วยขีดกลาง ซึ่งเดิมไม่ตรงกับกฎ `.pytest_*/`; ละเว้น `data/showroom/` ทั้งโฟลเดอร์เพื่อไม่ส่ง CAD และแผนที่เฉพาะสถานที่ขึ้น repository สาธารณะ
