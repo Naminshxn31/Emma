@@ -131,6 +131,7 @@ async def _greet(sighting) -> None:
         greeting_for(sighting),
         source="face_known" if sighting.kind == "known" else "face_stranger",
         summon=True,
+        arm_greeting=True,
     )
 
 

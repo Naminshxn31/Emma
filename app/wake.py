@@ -210,6 +210,32 @@ def _encode_keyword(word: str, threshold: float | None = None) -> str | None:
     )
 
 
+#: The most recent microphone RMS the standby stream measured, for a live
+#: level meter on the control page. Module-level and best-effort: the last
+#: frame any /ws/wake connection reported, with the monotonic time it landed,
+#: so a reader can tell a quiet room (recent, low) from a mic that stopped
+#: streaming (stale). Written by WakeStream._report, read by /mic/level. Never
+#: the wake decision — just "is a voice arriving".
+_LAST_LEVEL = 0.0
+_LAST_LEVEL_AT = 0.0
+
+
+def mic_level() -> dict:
+    """Best-effort snapshot of what the standby microphone is sending. Fresh
+    only if a frame arrived in the last ~2 s; otherwise the mic is not
+    streaming here (a call took it, or the page is not in standby)."""
+    import time
+
+    age = (time.monotonic() - _LAST_LEVEL_AT) if _LAST_LEVEL_AT else None
+    return {
+        "level": round(_LAST_LEVEL, 5),
+        "age_s": None if age is None else round(age, 2),
+        "speech_floor": WakeStream.SPEECH,
+        "quiet_floor": WakeStream.QUIET,
+        "streaming": age is not None and age < 2.0,
+    }
+
+
 def available() -> bool:
     """Can this machine hear its name? Cheap after the first call."""
     return _get_spotter() is not None
@@ -409,6 +435,13 @@ class WakeStream:
             # happening to be on (it was, on the machine this was built on,
             # which is exactly how that coupling would have shipped unseen).
             self._report(samples)
+        # The cockpit's mic meter (/mic/level) needs the level on every
+        # window, not only when WAKE_DEBUG is on: a meter that reads zero
+        # unless a debug flag is set is the same "is the mic even on?" blind
+        # spot it was added to remove, and the sales-floor machine runs with
+        # neither WAKE_DEBUG nor WAKE_ENROLL. Cheap RMS, always; the verbose
+        # verdict inside _report stays gated because only a log reader needs it.
+        self._publish_level(samples)
         if self._shadow_stream is not None:
             shadow_hit = None
             self._shadow_stream.accept_waveform(16000, samples)
@@ -438,6 +471,26 @@ class WakeStream:
         if hit:
             logger.info("wake word heard: %r", hit)
         return hit
+
+    def _publish_level(self, samples) -> None:
+        """The standby mic's level for the cockpit meter (/mic/level).
+
+        Split out of `_report` because that only runs under WAKE_DEBUG /
+        WAKE_ENROLL, and the meter has to read a live level on the sales-floor
+        machine where neither is set — which is exactly where "พูด emma แล้ว
+        เหมือนไม่ได้ยิน" cannot otherwise be told apart from a dead mic.
+        Module-level, best-effort, cheap RMS.
+        """
+        import math
+        import time
+
+        n = len(samples)
+        if not n:
+            return
+        rms = math.sqrt(float((samples * samples).sum()) / n)
+        global _LAST_LEVEL, _LAST_LEVEL_AT
+        _LAST_LEVEL = rms
+        _LAST_LEVEL_AT = time.monotonic()
 
     def _report(self, samples) -> None:
         """Say what the microphone is sending, roughly twice a minute.

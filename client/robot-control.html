@@ -1,0 +1,210 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>สั่งหุ่นด้วยมือ — Emma</title>
+<!--
+  Manual control, for answering one question: does this robot answer us at all.
+
+  Everything here is shaped by the fact that the thing on the other end has
+  wheels and a room with people in it.
+
+  * **Stop is not a button among buttons.** It sits above everything, stays on
+    screen while the page scrolls, and is the only control that still works
+    when motion is locked. A lock that also disabled the brake would be worse
+    than no lock.
+  * **Every movement is one bounded step.** No hold-to-drive, no "go until I
+    say stop". The server computes each target from the pose at the moment of
+    the press, so the failure mode of a dropped connection is a robot that
+    finishes 30 cm and waits — not one that keeps going while the page that
+    was steering it is gone.
+  * **The distances live on the server.** This page names an intent
+    ("forward"), never a number. A control surface that lets the client say
+    how far is one typo away from sending a robot across a gallery, and this
+    client is a web page.
+  * **Nothing here is the real stop.** The physical button on the robot is,
+    and the page says so where it cannot be missed. Software that promises to
+    stop a machine is making a promise it cannot keep on its own.
+-->
+<style>
+  :root {
+    --bg: #0e0f13; --card: #171921; --line: #262a36;
+    --ink: #eef1f7; --dim: #9aa3b5;
+    --ok: #38d39f; --warn: #f2c14e; --bad: #ef5f6b; --accent: #c8a86b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 system-ui, "Segoe UI", Roboto, "Noto Sans Thai", sans-serif;
+    padding: 0 16px 40px; max-width: 760px; margin-inline: auto;
+  }
+  h1 { font-size: 20px; margin: 14px 0 2px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 12px; }
+  #stopWrap { position: sticky; top: 0; z-index: 9; padding: 10px 0;
+              background: linear-gradient(var(--bg) 78%, transparent); }
+  #stop { width: 100%; min-height: 76px; font-size: 22px; font-weight: 800;
+          color: #fff; background: #c22c3a; border: 0; border-radius: 14px;
+          cursor: pointer; letter-spacing: .04em; }
+  #stop:active { background: #9d222e; }
+  section { background: var(--card); border: 1px solid var(--line);
+            border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  h2 { font-size: 14px; margin: 0 0 10px; color: var(--accent);
+       text-transform: uppercase; letter-spacing: .08em; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  td { padding: 5px 0; border-bottom: 1px solid var(--line); }
+  td:first-child { color: var(--dim); width: 46%; }
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .pad button, .wide {
+    font: inherit; font-weight: 700; color: #10121a; background: var(--accent);
+    border: 0; border-radius: 11px; min-height: 66px; cursor: pointer;
+  }
+  .wide { width: 100%; min-height: 52px; margin-top: 10px; }
+  .pad .blank { visibility: hidden; }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  .banner { border-radius: 10px; padding: 11px 13px; margin-bottom: 12px;
+            font-size: 13.5px; font-weight: 600; }
+  .b-bad { background: rgba(239,95,107,.14); color: var(--bad); }
+  .b-warn { background: rgba(242,193,78,.14); color: var(--warn); }
+  .b-ok { background: rgba(56,211,159,.13); color: var(--ok); }
+  .note { color: var(--dim); font-size: 12.5px; margin-top: 9px; }
+  #log { font: 12px/1.6 ui-monospace, Consolas, monospace; color: var(--dim);
+         max-height: 170px; overflow: auto; white-space: pre-wrap; }
+  .places button { font: inherit; font-weight: 600; color: #10121a;
+                   background: var(--accent); border: 0; border-radius: 9px;
+                   padding: 10px 14px; margin: 0 8px 8px 0; min-height: 44px;
+                   cursor: pointer; }
+</style>
+
+<h1>สั่งหุ่นด้วยมือ</h1>
+<div class="sub">สำหรับพิสูจน์ว่าเราคุมหุ่นได้จริง ไม่ใช่หน้าใช้งานประจำวัน</div>
+
+<div id="stopWrap"><button id="stop">หยุด</button></div>
+
+<div class="banner b-bad">
+  ปุ่มนี้ไม่ใช่ปุ่มหยุดฉุกเฉิน ปุ่มจริงอยู่ที่ตัวหุ่น
+  ทดสอบตอนมีคนยืนอยู่ข้างหุ่นและมือถึงปุ่มนั้นเสมอ
+</div>
+
+<div id="lock" class="banner b-warn" hidden></div>
+
+<section>
+  <h2>สถานะตอนนี้</h2>
+  <table id="state"><tr><td>กำลังอ่าน...</td><td></td></tr></table>
+</section>
+
+<section>
+  <h2>ขยับทีละก้าว</h2>
+  <div class="pad">
+    <button class="blank"></button>
+    <button data-cmd="forward">เดินหน้า<br><small>30 ซม.</small></button>
+    <button class="blank"></button>
+    <button data-cmd="left">หมุนซ้าย<br><small>15°</small></button>
+    <button data-cmd="back">ถอยหลัง<br><small>30 ซม.</small></button>
+    <button data-cmd="right">หมุนขวา<br><small>15°</small></button>
+  </div>
+  <button class="wide" data-cmd="home">กลับแท่นชาร์จ</button>
+  <div class="note">
+    หนึ่งครั้งที่กด เท่ากับหนึ่งก้าวที่จบในตัว ระยะกำหนดไว้ที่เซิร์ฟเวอร์ หน้านี้เปลี่ยนไม่ได้
+    ถ้าสายหลุดกลางทาง หุ่นจะเดินจบก้าวนั้นแล้วหยุด
+  </div>
+</section>
+
+<section>
+  <h2>ไปจุดหมายในแผนที่</h2>
+  <div id="places" class="places">กำลังอ่าน...</div>
+</section>
+
+<section>
+  <h2>บันทึกคำสั่ง</h2>
+  <div id="log">ยังไม่ได้สั่งอะไร</div>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = new URLSearchParams(location.search).get('token') || '';
+const q = token ? '?token=' + encodeURIComponent(token) : '';
+
+function say(line) {
+  const at = new Date().toLocaleTimeString('th-TH');
+  $('log').textContent = at + '  ' + line + '\n' + $('log').textContent;
+}
+
+async function command(action, place) {
+  // Buttons are disabled while a command is in flight. Two presses racing
+  // each other is two targets computed from two different poses, and the
+  // second one wins by arriving later — which is not what the person who
+  // pressed first was watching for.
+  setBusy(true);
+  try {
+    const res = await fetch('/robot/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, action, place }),
+    });
+    const out = await res.json();
+    say(out.ok ? `${action} — ส่งแล้ว` : `${action} — ไม่สำเร็จ: ${out.error}${out.hint ? ' · ' + out.hint : ''}`);
+  } catch (err) {
+    say(`${action} — ส่งไม่ถึงเซิร์ฟเวอร์: ${err.message}`);
+  }
+  setBusy(false);
+  refresh();
+}
+
+function setBusy(busy) {
+  document.querySelectorAll('[data-cmd], .places button')
+    .forEach((b) => { b.disabled = busy || (locked && b.dataset.cmd !== 'stop'); });
+}
+
+let locked = false;
+
+const STATUS_NAMES = { 1: 'รอเริ่ม', 2: 'กำลังเดิน', 4: 'จบแล้ว', 8: 'พัก', 16: 'ถูกสั่งหยุด', 32: 'ผิดพลาด' };
+
+async function refresh() {
+  let out;
+  try {
+    out = await (await fetch('/robot/state' + q)).json();
+  } catch (err) {
+    $('state').innerHTML = `<tr><td>อ่านไม่ได้</td><td>${err.message}</td></tr>`;
+    return;
+  }
+  if (!out.ok) {
+    $('state').innerHTML = `<tr><td>อ่านไม่ได้</td><td>${out.error}</td></tr>`;
+    return;
+  }
+  const s = out.state;
+  locked = !s.motion_enabled;
+  const lock = $('lock');
+  lock.hidden = !locked;
+  if (locked) {
+    lock.textContent = 'การเคลื่อนที่ถูกล็อกอยู่ — ตั้ง ROBOT_CHASSIS_MOTION_ENABLED=true '
+      + 'ใน .env แล้วรีสตาร์ตเซิร์ฟเวอร์ ปุ่มหยุดยังใช้ได้ตามปกติ';
+  }
+  const pose = s.pose || {};
+  const act = s.action;
+  $('state').innerHTML = [
+    ['รุ่น', s.model || '—'],
+    ['แบตเตอรี่', s.battery == null ? '—' : s.battery + '%'],
+    ['แท่นชาร์จ', (s.docking === 'on_dock' ? 'จอดอยู่' : 'ไม่ได้จอด')
+      + (s.charging ? ' · กำลังชาร์จ' : ' · ไม่ได้ชาร์จ')],
+    ['ตำแหน่ง', `x ${num(pose.x)}  y ${num(pose.y)}  หัน ${num(pose.yaw)}`],
+    ['ความมั่นใจในตำแหน่ง', s.localization_quality == null ? '—' : s.localization_quality],
+    ['กำลังทำอะไร', act ? `${(act.name || '').split('.').pop()} · ${STATUS_NAMES[act.status] || act.status || '—'}` : 'ไม่มีคำสั่งค้าง'],
+    ['การเคลื่อนที่', locked ? 'ล็อกอยู่' : 'ปลดล็อกแล้ว'],
+  ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+
+  $('places').innerHTML = (s.places || []).length
+    ? s.places.map((p) => `<button data-place="${p}">${p}</button>`).join('')
+    : 'แผนที่ยังไม่มีจุดหมายสักจุด ต้องให้ช่างสร้างแผนที่และตั้งจุดก่อน';
+  $('places').querySelectorAll('button')
+    .forEach((b) => (b.onclick = () => command('goto', b.dataset.place)));
+  setBusy(false);
+}
+
+const num = (v) => (v == null ? '—' : Number(v).toFixed(2));
+
+$('stop').onclick = () => command('stop');
+document.querySelectorAll('[data-cmd]')
+  .forEach((b) => (b.onclick = () => command(b.dataset.cmd)));
+
+refresh();
+setInterval(refresh, 1500);
+</script>

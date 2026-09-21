@@ -85,6 +85,7 @@ async def announce(
     max_wait: float = DEFAULT_MAX_WAIT,
     then_pause: float = DEFAULT_PAUSE,
     summon: bool = False,
+    arm_greeting: bool = False,
 ) -> bool:
     """Say something the guest didn't ask for, once they can hear it.
 
@@ -194,6 +195,15 @@ async def announce(
             turnlog.record("announce", source=source, sent=False,
                            reason="send failed", waited=round(waited, 1))
             return False
+
+        # Start after the text is accepted, so a disconnected provider never
+        # produces a silent gesture. Failure is deliberately non-fatal:
+        # robot_arm.greet() preserves every hardware gate and the voice is
+        # already on its way while the serial request is attempted.
+        if arm_greeting:
+            from app import robot_arm
+
+            await robot_arm.greet()
 
     logger.info("announced %s after waiting %.1fs for audio", source, waited)
     turnlog.record("announce", source=source, sent=True, waited=round(waited, 1))

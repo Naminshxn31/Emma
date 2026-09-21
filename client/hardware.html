@@ -1,0 +1,504 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ตรวจไมค์และกล้อง — Emma</title>
+<!--
+  A bench for the robot's own microphone and camera, opened in the robot's
+  browser rather than described from the outside.
+
+  It exists because three completely different faults look identical from the
+  server: a microphone that is muted, a microphone another app is holding, and
+  a person standing too far away all arrive as quiet audio. The session log can
+  only say "avg=0.0000" and guess. Here the page can say which device it opened,
+  how many channels came back, and whether the samples are literally zero.
+
+  Two rules this page keeps:
+
+  * **Nothing leaves it.** No WebSocket, no fetch, no upload. The recording is
+    played back from memory and dropped. A diagnostic page that shipped audio
+    somewhere would be a microphone in a showroom with no one accountable for
+    the recordings, which is the thing `data/logs/` had to be given a retention
+    policy for.
+  * **It never claims hardware works from the absence of an error.** Every
+    verdict is a measurement with the number next to it, for the same reason
+    the movement tools carry `hardware:` — "no exception" is not "it works".
+
+  The per-channel meters are the point on this robot specifically. The manual
+  says four microphones; `MicConfig.channels` says eight. Which channel carries
+  the echo-cancelled mix is an open question with the vendor, and sending the
+  wrong one to Gemini means sending raw audio with the robot's own voice still
+  in it. This page shows every channel at once, so the answer is visible rather
+  than asked for.
+-->
+<style>
+  :root {
+    --bg: #0e0f13; --card: #171921; --line: #262a36;
+    --ink: #eef1f7; --dim: #9aa3b5;
+    --ok: #38d39f; --warn: #f2c14e; --bad: #ef5f6b; --accent: #c8a86b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 system-ui, "Segoe UI", Roboto, "Noto Sans Thai", sans-serif;
+    padding: 16px; max-width: 900px; margin-inline: auto;
+  }
+  h1 { font-size: 20px; margin: 4px 0 2px; letter-spacing: .2px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
+  section { background: var(--card); border: 1px solid var(--line);
+            border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  h2 { font-size: 15px; margin: 0 0 10px; color: var(--accent);
+       text-transform: uppercase; letter-spacing: .08em; }
+  button {
+    font: inherit; font-weight: 600; color: #10121a; background: var(--accent);
+    border: 0; border-radius: 9px; padding: 11px 16px; cursor: pointer;
+    margin: 0 8px 8px 0; min-height: 44px;
+  }
+  button.ghost { background: transparent; color: var(--ink);
+                 border: 1px solid var(--line); }
+  button:disabled { opacity: .45; cursor: default; }
+  select, input { font: inherit; color: var(--ink); background: #10121a;
+           border: 1px solid var(--line); border-radius: 8px;
+           padding: 9px; width: 100%; margin-bottom: 10px; min-height: 44px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 5px 0; vertical-align: top; border-bottom: 1px solid var(--line); }
+  td:first-child { color: var(--dim); width: 42%; padding-right: 10px; }
+  .verdict { font-weight: 700; padding: 9px 11px; border-radius: 8px;
+             margin-top: 10px; font-size: 14px; }
+  .v-ok { background: rgba(56,211,159,.13); color: var(--ok); }
+  .v-warn { background: rgba(242,193,78,.13); color: var(--warn); }
+  .v-bad { background: rgba(239,95,107,.13); color: var(--bad); }
+  .v-idle { background: #10121a; color: var(--dim); }
+  .ch { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+  .ch b { width: 74px; font-weight: 600; font-size: 12px; color: var(--dim); }
+  .bar { flex: 1; height: 15px; background: #10121a; border-radius: 7px;
+         overflow: hidden; position: relative; }
+  .bar i { position: absolute; inset: 0 auto 0 0; width: 0;
+           background: linear-gradient(90deg, var(--ok), var(--accent));
+           transition: width .06s linear; }
+  .bar u { position: absolute; top: 0; bottom: 0; width: 2px;
+           background: var(--bad); left: 0; }
+  .ch span { width: 92px; text-align: right; font-variant-numeric: tabular-nums;
+             font-size: 12px; color: var(--dim); }
+  video { width: 100%; border-radius: 10px; background: #000;
+          aspect-ratio: 4/3; object-fit: contain; }
+  audio { width: 100%; margin-top: 10px; }
+  .note { color: var(--dim); font-size: 12.5px; margin-top: 9px; }
+  .devs { font-size: 12.5px; color: var(--dim); }
+  .devs div { padding: 3px 0; border-bottom: 1px solid var(--line);
+              word-break: break-word; }
+  #report { width: 100%; height: 190px; background: #10121a; color: var(--ink);
+            border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+            font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre; }
+</style>
+
+<h1>ตรวจไมค์และกล้องของเครื่องที่เปิดหน้านี้</h1>
+<div class="sub">เปิดบนหุ่นจึงวัดหุ่น · เปิดบนคอมจึงวัดคอม · ไม่มีการส่งเสียงหรือภาพออกไปที่ไหน</div>
+
+<section>
+  <h2>สภาพแวดล้อม</h2>
+  <table id="env"></table>
+</section>
+
+<section>
+  <h2>ไมโครโฟน</h2>
+  <select id="micPick"><option>ยังไม่ได้ขออนุญาต</option></select>
+  <button id="micBtn">เริ่มฟัง</button>
+  <button id="micStop" class="ghost" disabled>หยุด</button>
+  <div id="meters"></div>
+  <div id="micVerdict" class="verdict v-idle">ยังไม่ได้เริ่ม</div>
+  <table id="micInfo"></table>
+  <div class="note">
+    เกณฑ์เดียวกับเซิร์ฟเวอร์ ถือว่าเป็นเสียงพูดเมื่อค่าสูงสุดถึง 0.02
+    ถ้าทุกช่องเป็นศูนย์เป๊ะแปลว่าไม่มีสัญญาณจริง ไม่ใช่แค่เบา
+    หุ่นมีไมค์เป็นชุด แถบหลายเส้นคือคนละช่องของชุดเดียวกัน
+    ช่องที่ผ่านการตัดเสียงสะท้อนแล้วคือช่องที่เงียบตอนหุ่นพูดเอง
+  </div>
+</section>
+
+<section>
+  <h2>อัดแล้วฟังกลับ</h2>
+  <button id="recBtn" disabled>อัด 4 วินาที</button>
+  <div id="recVerdict" class="verdict v-idle">ต้องเริ่มฟังก่อน</div>
+  <audio id="playback" controls></audio>
+  <div class="note">เสียงอยู่ในหน่วยความจำของหน้านี้เท่านั้น ปิดหน้าแล้วหาย</div>
+</section>
+
+<section>
+  <h2>กล้อง</h2>
+  <select id="camPick"><option>ยังไม่ได้ขออนุญาต</option></select>
+  <button id="camBtn">เปิดกล้อง</button>
+  <button id="camStop" class="ghost" disabled>ปิด</button>
+  <video id="preview" playsinline muted autoplay></video>
+  <div id="camVerdict" class="verdict v-idle">ยังไม่ได้เปิด</div>
+  <table id="camInfo"></table>
+</section>
+
+<section>
+  <h2>อุปกรณ์ทั้งหมดที่เครื่องนี้มี</h2>
+  <div id="devs" class="devs">กดเริ่มฟังหรือเปิดกล้องก่อน ชื่ออุปกรณ์จะขึ้นหลังได้รับอนุญาต</div>
+</section>
+
+<section>
+  <h2>สรุปสำหรับส่งต่อ</h2>
+  <textarea id="report" readonly></textarea>
+  <input id="label" placeholder="ตั้งชื่อเครื่องนี้ เช่น หุ่น หรือ โต๊ะเซลส์">
+  <button id="sendBtn">ส่งไปเครื่องหลัก</button>
+  <button id="copyBtn" class="ghost">คัดลอก</button>
+  <div id="sendState" class="note">ส่งเฉพาะข้อความสรุปด้านบน ไม่มีเสียงหรือภาพ</div>
+</section>
+
+<section>
+  <h2>ผลจากเครื่องอื่น</h2>
+  <div id="inbox" class="devs">ยังไม่มีเครื่องไหนส่งมา</div>
+  <div class="note">
+    เบราว์เซอร์อ่านได้เฉพาะไมค์กับกล้องของเครื่องที่เปิดมันเอง
+    ผลของหุ่นจึงต้องวัดบนหุ่นแล้วส่งมาที่นี่ เก็บในหน่วยความจำของเซิร์ฟเวอร์เท่านั้น
+    ปิดเซิร์ฟเวอร์แล้วหาย
+  </div>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (v, n = 4) => Number(v).toFixed(n);
+
+function rows(table, pairs) {
+  table.innerHTML = pairs
+    .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+}
+function verdict(el, cls, text) {
+  el.className = 'verdict ' + cls;
+  el.textContent = text;
+}
+
+// ---------------------------------------------------------------- environment
+// Written before anything is opened, because the most common reason a
+// microphone "does not work" on this robot is not the microphone: an origin
+// the browser does not consider secure has no getUserMedia at all, and the
+// certificate warning that causes it is easy to click past and forget.
+const secure = window.isSecureContext;
+rows($('env'), [
+  ['ที่อยู่หน้านี้', location.origin],
+  ['secure context', secure
+    ? '<b style="color:var(--ok)">ใช่</b>'
+    : '<b style="color:var(--bad)">ไม่ใช่ — เบราว์เซอร์จะไม่ให้ใช้ไมค์และกล้องเลย</b>'],
+  ['getUserMedia', navigator.mediaDevices?.getUserMedia ? 'มี' : 'ไม่มี'],
+  ['MediaRecorder', window.MediaRecorder ? 'มี' : 'ไม่มี'],
+  ['ขนาดหน้าจอ', `${screen.width}x${screen.height} · หน้าต่าง ${innerWidth}x${innerHeight}`],
+]);
+
+async function listDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const all = await navigator.mediaDevices.enumerateDevices();
+  $('devs').innerHTML = all.map((d) =>
+    `<div>${d.kind} · ${d.label || '(ชื่อยังไม่เปิดเผย)'} · ${d.deviceId.slice(0, 12)}</div>`
+  ).join('') || 'ไม่พบอุปกรณ์';
+  fill($('micPick'), all.filter((d) => d.kind === 'audioinput'));
+  fill($('camPick'), all.filter((d) => d.kind === 'videoinput'));
+  state.devices = all.map((d) => `${d.kind}:${d.label || 'unnamed'}`);
+  writeReport();
+}
+function fill(select, devices) {
+  const chosen = select.value;
+  select.innerHTML = devices.length
+    ? devices.map((d, i) =>
+        `<option value="${d.deviceId}">${d.label || 'อุปกรณ์ ' + (i + 1)}</option>`).join('')
+    : '<option value="">ไม่พบอุปกรณ์</option>';
+  if (chosen) select.value = chosen;
+}
+listDevices();
+navigator.mediaDevices?.addEventListener?.('devicechange', listDevices);
+
+const state = { devices: [], mic: null, cam: null, rec: null };
+
+// ----------------------------------------------------------------- microphone
+let audioCtx = null, micStream = null, analysers = [], raf = 0;
+let zeroFrames = 0, everHeard = 0;
+
+async function startMic() {
+  stopMic();
+  try {
+    // Every processing stage off, and channelCount asked for explicitly.
+    // The browser's own echo cancellation and gain control would hide the
+    // very thing this page is for: if a channel is silent, we need to know
+    // that it is silent at the device, not that a filter emptied it.
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: $('micPick').value ? { exact: $('micPick').value } : undefined,
+        channelCount: { ideal: 8 },
+        echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+      },
+    });
+  } catch (err) {
+    verdict($('micVerdict'), 'v-bad', 'เปิดไมค์ไม่ได้ — ' + err.name + ': ' + err.message);
+    state.mic = 'error ' + err.name;
+    writeReport();
+    return;
+  }
+  await listDevices();
+
+  const track = micStream.getAudioTracks()[0];
+  const settings = track.getSettings();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await audioCtx.resume();
+  const source = audioCtx.createMediaStreamSource(micStream);
+  const channels = Math.max(1, source.channelCount || settings.channelCount || 1);
+
+  rows($('micInfo'), [
+    ['อุปกรณ์', track.label || '(ไม่มีชื่อ)'],
+    ['จำนวนช่อง', channels],
+    ['sample rate', (settings.sampleRate || audioCtx.sampleRate) + ' Hz'],
+    ['echo cancellation', String(settings.echoCancellation)],
+    ['noise suppression', String(settings.noiseSuppression)],
+    ['auto gain', String(settings.autoGainControl)],
+    ['track state', track.readyState + (track.muted ? ' · muted โดยระบบ' : '')],
+  ]);
+
+  const splitter = audioCtx.createChannelSplitter(channels);
+  source.connect(splitter);
+  analysers = [];
+  $('meters').innerHTML = '';
+  for (let c = 0; c < channels; c++) {
+    const node = audioCtx.createAnalyser();
+    node.fftSize = 2048;
+    splitter.connect(node, c);
+    analysers.push({ node, buf: new Float32Array(node.fftSize), peakHold: 0 });
+    $('meters').insertAdjacentHTML('beforeend',
+      `<div class="ch"><b>ช่อง ${c + 1}</b>
+         <div class="bar"><i id="bar${c}"></i><u id="hold${c}"></u></div>
+         <span id="num${c}">—</span></div>`);
+  }
+  zeroFrames = 0; everHeard = 0;
+  $('micStop').disabled = false;
+  $('recBtn').disabled = !window.MediaRecorder;
+  $('recVerdict').className = 'verdict v-idle';
+  $('recVerdict').textContent = 'พร้อมอัด';
+  tick();
+}
+
+function tick() {
+  let loudest = 0, allZero = true;
+  analysers.forEach((a, c) => {
+    a.node.getFloatTimeDomainData(a.buf);
+    let sum = 0, peak = 0;
+    for (let i = 0; i < a.buf.length; i++) {
+      const s = a.buf[i];
+      sum += s * s;
+      const abs = s < 0 ? -s : s;
+      if (abs > peak) peak = abs;
+    }
+    const rms = Math.sqrt(sum / a.buf.length);
+    if (peak !== 0) allZero = false;
+    if (peak > loudest) loudest = peak;
+    a.peakHold = Math.max(peak, a.peakHold * 0.97);
+    // 0.3 full scale is a shout at arm's length; scaling to it keeps normal
+    // speech in the middle of the bar instead of pinned at either end.
+    $('bar' + c).style.width = Math.min(100, (rms / 0.3) * 100) + '%';
+    $('hold' + c).style.left = Math.min(99, (a.peakHold / 0.3) * 100) + '%';
+    $('num' + c).textContent = fmt(rms) + ' / ' + fmt(peak);
+  });
+
+  // The verdicts the server can only guess at, said plainly.
+  if (allZero) {
+    zeroFrames++;
+    if (zeroFrames > 25) {
+      verdict($('micVerdict'), 'v-bad',
+        'ศูนย์ล้วนทุกช่อง — ไม่มีสัญญาณจริง ไม่ใช่เบาเกิน '
+        + 'ให้ดูปุ่มปิดไมค์ที่ตัวหุ่น หรือแอปอื่นที่กำลังยึดไมค์อยู่');
+      state.mic = 'digital silence';
+    }
+  } else {
+    zeroFrames = 0;
+    if (loudest >= 0.02) {
+      everHeard++;
+      verdict($('micVerdict'), 'v-ok', 'ได้ยินเสียงพูดแล้ว ค่าสูงสุด ' + fmt(loudest));
+      state.mic = 'speech ' + fmt(loudest);
+    } else {
+      verdict($('micVerdict'), 'v-warn',
+        'มีสัญญาณแต่เบากว่าระดับเสียงพูด ค่าสูงสุด ' + fmt(loudest)
+        + (everHeard ? '' : ' — ลองพูดใกล้ขึ้น'));
+      if (!everHeard) state.mic = 'quiet ' + fmt(loudest);
+    }
+  }
+  writeReport();
+  raf = requestAnimationFrame(tick);
+}
+
+function stopMic() {
+  cancelAnimationFrame(raf);
+  micStream?.getTracks().forEach((t) => t.stop());
+  audioCtx?.close();
+  micStream = null; audioCtx = null; analysers = [];
+  $('micStop').disabled = true;
+  $('recBtn').disabled = true;
+}
+
+// ------------------------------------------------------------------ recording
+// Round trip through the whole path, because a level meter proves samples
+// arrive and nothing more. Hearing your own voice come back proves capture,
+// encoding and playback all work on this device.
+$('recBtn').onclick = async () => {
+  if (!micStream) return;
+  const chunks = [];
+  let recorder;
+  try {
+    recorder = new MediaRecorder(micStream);
+  } catch (err) {
+    verdict($('recVerdict'), 'v-bad', 'อัดไม่ได้ — ' + err.name);
+    return;
+  }
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+    $('playback').src = URL.createObjectURL(blob);
+    const kb = Math.round(blob.size / 1024);
+    // A codec emits a header even for pure silence, so size alone is not
+    // proof. The meter above is what says whether anything was in it.
+    verdict($('recVerdict'), kb > 4 ? 'v-ok' : 'v-warn',
+      `อัดได้ ${kb} KB · ${recorder.mimeType || 'unknown'} — กดเล่นเพื่อฟังกลับ`
+      + (kb > 4 ? '' : ' (เล็กผิดปกติ อาจไม่มีเสียงจริง)'));
+    state.rec = kb + 'KB';
+    writeReport();
+  };
+  verdict($('recVerdict'), 'v-idle', 'กำลังอัด 4 วินาที พูดใส่ไมค์ได้เลย');
+  recorder.start();
+  setTimeout(() => recorder.state !== 'inactive' && recorder.stop(), 4000);
+};
+
+// --------------------------------------------------------------------- camera
+let camStream = null, frames = 0, fpsTimer = 0;
+
+async function startCam() {
+  stopCam();
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        deviceId: $('camPick').value ? { exact: $('camPick').value } : undefined,
+        width: { ideal: 1280 }, height: { ideal: 720 },
+      },
+    });
+  } catch (err) {
+    verdict($('camVerdict'), 'v-bad', 'เปิดกล้องไม่ได้ — ' + err.name + ': ' + err.message);
+    state.cam = 'error ' + err.name;
+    writeReport();
+    return;
+  }
+  await listDevices();
+  const video = $('preview');
+  video.srcObject = camStream;
+  const track = camStream.getVideoTracks()[0];
+  const settings = track.getSettings();
+  rows($('camInfo'), [
+    ['อุปกรณ์', track.label || '(ไม่มีชื่อ)'],
+    ['ความละเอียด', (settings.width || '?') + 'x' + (settings.height || '?')],
+    ['frame rate ที่ขอได้', settings.frameRate ? fmt(settings.frameRate, 1) : '?'],
+    ['facing', settings.facingMode || '—'],
+    ['track state', track.readyState + (track.muted ? ' · muted' : '')],
+  ]);
+  $('camStop').disabled = false;
+
+  // Counted, not read from getSettings(): a camera can advertise 30 fps and
+  // deliver two, which is the shape of the "can't grab frame" errors the
+  // server's own face camera logs on this machine.
+  frames = 0;
+  const count = () => {
+    frames++;
+    if (camStream) video.requestVideoFrameCallback
+      ? video.requestVideoFrameCallback(count)
+      : requestAnimationFrame(count);
+  };
+  video.requestVideoFrameCallback ? video.requestVideoFrameCallback(count) : count();
+  clearInterval(fpsTimer);
+  fpsTimer = setInterval(() => {
+    const fps = frames; frames = 0;
+    if (!camStream) return;
+    verdict($('camVerdict'), fps >= 5 ? 'v-ok' : 'v-bad',
+      fps >= 5 ? `ภาพมาจริง ${fps} เฟรมต่อวินาที`
+               : `ได้ภาพแค่ ${fps} เฟรมต่อวินาที — กล้องเปิดได้แต่ส่งภาพไม่ทัน`);
+    state.cam = fps + 'fps';
+    writeReport();
+  }, 1000);
+}
+
+function stopCam() {
+  clearInterval(fpsTimer);
+  camStream?.getTracks().forEach((t) => t.stop());
+  camStream = null;
+  $('preview').srcObject = null;
+  $('camStop').disabled = true;
+}
+
+// ---------------------------------------------------------------- the summary
+function writeReport() {
+  $('report').value = [
+    'ตรวจไมค์และกล้อง — ' + new Date().toLocaleString('th-TH'),
+    'origin: ' + location.origin + '  secure: ' + secure,
+    'mic: ' + (state.mic || 'ยังไม่ได้ทดสอบ'),
+    'cam: ' + (state.cam || 'ยังไม่ได้ทดสอบ'),
+    'rec: ' + (state.rec || 'ยังไม่ได้อัด'),
+    'devices:',
+    ...state.devices.map((d) => '  ' + d),
+  ].join('\n');
+}
+writeReport();
+
+$('micBtn').onclick = startMic;
+$('micStop').onclick = () => { stopMic(); verdict($('micVerdict'), 'v-idle', 'หยุดแล้ว'); };
+$('camBtn').onclick = startCam;
+$('camStop').onclick = () => { stopCam(); verdict($('camVerdict'), 'v-idle', 'ปิดแล้ว'); };
+$('micPick').onchange = () => micStream && startMic();
+$('camPick').onchange = () => camStream && startCam();
+$('copyBtn').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($('report').value);
+    $('copyBtn').textContent = 'คัดลอกแล้ว';
+  } catch {
+    $('report').select();
+    $('copyBtn').textContent = 'เลือกไว้แล้ว กด Ctrl+C';
+  }
+  setTimeout(() => ($('copyBtn').textContent = 'คัดลอก'), 2000);
+};
+// -------------------------------------------------- carrying the answer over
+// A browser can only measure the devices of the machine it runs on, so the
+// robot's own readings are unreachable from the sales desk — which is exactly
+// where the person who needs to read them is standing, and where the robot's
+// screen is not. These two calls carry the *verdicts* across and nothing else:
+// the text in the box above, never a sample of audio or a frame of video.
+// `tests/test_hardware_page.py` checks that this stays true.
+$('sendBtn').onclick = async () => {
+  $('sendState').textContent = 'กำลังส่ง...';
+  try {
+    const res = await fetch('/hardware/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: $('label').value, report: $('report').value }),
+    });
+    const out = await res.json();
+    $('sendState').textContent = out.ok
+      ? 'ส่งแล้ว เครื่องอื่นเปิดหน้านี้จะเห็นในหัวข้อถัดไป'
+      : 'ส่งไม่สำเร็จ — ' + (out.error || 'ไม่ทราบสาเหตุ');
+  } catch (err) {
+    $('sendState').textContent = 'ส่งไม่สำเร็จ — ' + err.message;
+  }
+};
+
+async function readInbox() {
+  try {
+    const res = await fetch('/hardware/reports');
+    const out = await res.json();
+    const items = out.reports || [];
+    $('inbox').innerHTML = items.length
+      ? items.map((r) =>
+          `<div><b>${r.label || r.from}</b> · ${r.at}<br>` +
+          `<span style="white-space:pre-wrap">${r.report}</span></div>`).join('')
+      : 'ยังไม่มีเครื่องไหนส่งมา';
+  } catch {
+    $('inbox').textContent = 'อ่านจากเซิร์ฟเวอร์ไม่ได้';
+  }
+}
+readInbox();
+setInterval(readInbox, 4000);
+
+// Let go of the camera and microphone when the page is left. A held device
+// keeps its light on and stops the next page (or the voice client) opening it.
+addEventListener('pagehide', () => { stopMic(); stopCam(); });
+</script>

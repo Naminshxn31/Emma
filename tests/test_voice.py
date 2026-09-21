@@ -256,6 +256,7 @@ def test_transcription_hints_the_languages_actually_spoken():
     assert codes != "auto" and codes.split(",")[0].startswith("th")
     cfg = _transcription_config().model_dump(exclude_none=True)
     assert cfg["language_codes"][0].startswith("th")
+    assert str(cfg["mode"]).endswith("SMART")
 
 
 def test_transcription_can_be_pinned_to_a_language_list(monkeypatch):
@@ -264,6 +265,22 @@ def test_transcription_can_be_pinned_to_a_language_list(monkeypatch):
     monkeypatch.setattr(settings, "transcribe_languages", "th-TH,en-US")
     cfg = _transcription_config().model_dump(exclude_none=True)
     assert cfg["language_codes"] == ["th-TH", "en-US"]
+
+
+def test_transcription_can_keep_verbatim_speech_for_diagnosis(monkeypatch):
+    from app.providers.gemini import _transcription_config
+
+    monkeypatch.setattr(settings, "transcribe_mode", "VERBATIM")
+    cfg = _transcription_config().model_dump(exclude_none=True)
+    assert str(cfg["mode"]).endswith("VERBATIM")
+
+
+def test_unknown_transcription_mode_falls_back_to_smart(monkeypatch):
+    from app.providers.gemini import _transcription_config
+
+    monkeypatch.setattr(settings, "transcribe_mode", "guess-what-emma-heard")
+    cfg = _transcription_config().model_dump(exclude_none=True)
+    assert str(cfg["mode"]).endswith("SMART")
 
 
 def test_vocabulary_hints_apply_in_auto_mode_too(monkeypatch):
@@ -340,7 +357,7 @@ def test_gemini_disables_thinking_by_default(monkeypatch):
 
 
 def test_gemini_3x_uses_thinking_level_not_budget(monkeypatch):
-    """Gemini 3.x Live rejects thinking_budget — it wants a level."""
+    """Gemini 3.1 Live rejects thinking_budget — it wants a level."""
     from app.providers.gemini import GeminiProvider
 
     monkeypatch.setattr(settings, "gemini_model", "gemini-3.1-flash-live-preview")
@@ -349,6 +366,29 @@ def test_gemini_3x_uses_thinking_level_not_budget(monkeypatch):
     # The SDK coerces the string to a ThinkingLevel enum ("MINIMAL").
     assert str(cfg["thinking_config"].thinking_level.value).lower() == "minimal"
     assert cfg["thinking_config"].thinking_budget is None
+
+
+@pytest.mark.parametrize("model", ["gemini-3.8-live", "models/gemini-3.8-live"])
+def test_gemini_38_live_omits_thinking_config(monkeypatch, model):
+    """Standard Gemini 3.8 Live rejects thinking_config in session setup."""
+    from app.providers.gemini import GeminiProvider
+
+    monkeypatch.setattr(settings, "gemini_model", model)
+    cfg = GeminiProvider("Despina", "x")._build_config()
+    assert "thinking_config" not in cfg
+
+
+def test_gemini_38_extended_thinking_uses_a_supported_level(monkeypatch, caplog):
+    """The extended model supports low/medium/high, but not minimal."""
+    from app.providers.gemini import GeminiProvider
+
+    monkeypatch.setattr(settings, "gemini_model", "gemini-3.8-live-extended-thinking")
+    monkeypatch.setattr(settings, "gemini_thinking_level", "minimal")
+    with caplog.at_level("WARNING"):
+        cfg = GeminiProvider("Despina", "x")._build_config()
+
+    assert str(cfg["thinking_config"].thinking_level.value).lower() == "low"
+    assert any("not supported" in record.message for record in caplog.records)
 
 
 # ==================== model capabilities ====================
@@ -362,6 +402,9 @@ def test_gemini_3x_uses_thinking_level_not_budget(monkeypatch):
     ("gemini-2.5-flash-native-audio-preview-12-2025", True, True),
     ("gemini-2.5-flash-live-001", False, True),
     ("gemini-3.1-flash-live-preview", False, False),
+    ("gemini-3.8-live", False, True),
+    ("models/gemini-3.8-live", False, True),
+    ("gemini-3.8-live-extended-thinking", False, True),
 ])
 def test_model_capabilities_are_stated_not_assumed(model, extras, async_fc):
     from app.providers.gemini import supports_native_audio_extras, supports_non_blocking
@@ -389,14 +432,12 @@ def test_an_unsupported_setting_is_reported_not_swallowed(monkeypatch, caplog):
 
 
 def test_a_long_running_tool_warns_on_a_model_that_blocks(monkeypatch, caplog):
-    """The bug that is already in the repository and hasn't bitten yet.
+    """A blocking model must warn before a slow tool is registered.
 
     `Behavior.NON_BLOCKING` lets the model keep talking while a tool runs.
-    Gemini 3.x Live does not support it and blocks until the tool returns.
-    Every tool here answers in milliseconds, so today it is invisible. The
-    day a `navigate_to` is added, a guest stands in silence for thirty
-    seconds in front of a robot that stopped mid-sentence — and nothing in
-    the code would have hinted at why.
+    Gemini 3.1 Live does not support it and blocks until the tool returns;
+    Gemini 3.8 Live does. A future slow tool on 3.1 must still produce the
+    warning rather than leave a guest waiting without an explanation.
     """
     from app.tools import registry
 
@@ -503,9 +544,9 @@ def test_system_instruction_stays_short():
     # with price, and the promises never to make (returns, urgency,
     # "finished" for what the material calls a concept). The documents went
     # into the searchable library; the block is only what cannot wait for a
-    # search because it shapes every sentence. Trimmed from ~1040 to ~850
-    # characters first — every rule that could live in a tool description
-    # or the facts block already does.
+    # search because it shapes every sentence. Later additions grew the full
+    # prompt to 6,460 characters; the 2026-09-21 compaction brought the
+    # all-tools form to 4,375 while retaining the regression clauses below.
     text = build_instructions("Test Condo")
     assert len(text) < 4700, "system instruction grew to %d chars" % len(text)
 

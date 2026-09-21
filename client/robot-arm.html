@@ -1,0 +1,267 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>สั่งแขนหุ่นด้วยมือ — Emma</title>
+<!--
+  The upper body, one servo channel at a time.
+
+  This page is shaped by three things the Torobot board cannot do, and the
+  design of every control on it is an answer to one of them:
+
+  * **It has no stop command.** So the red button here says "หยุดส่งคำสั่ง",
+    not "หยุด". It latches the server disarmed and stops the page sending —
+    it does not and cannot halt a servo that is mid-travel. The real stop is
+    the servo power supply, which the manual puts on its own circuit, and the
+    banner says so above everything else. A button that looks like a stop but
+    is not one is worse than no button: somebody reaches for it instead of
+    the switch.
+  * **A PWM servo cannot be asked where it is.** So the first press for any
+    channel has to be "ตั้งจุดเริ่ม", which is the one command that may swing
+    the joint by an unknown amount — slowly, and only because somebody chose
+    it. The step buttons stay disabled until then, rather than assuming.
+  * **Nobody knows which channel is which joint.** So the page shows numbers,
+    not joint names. Writing "ไหล่ซ้าย" next to channel 1 would be inventing
+    the wiring map this whole exercise exists to discover, and the label would
+    outlive the guess.
+
+  Distances live on the server, as on /robot: this page names a channel and a
+  direction, never a pulse width.
+-->
+<style>
+  :root {
+    --bg: #0e0f13; --card: #171921; --line: #262a36;
+    --ink: #eef1f7; --dim: #9aa3b5;
+    --ok: #38d39f; --warn: #f2c14e; --bad: #ef5f6b; --accent: #c8a86b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 system-ui, "Segoe UI", Roboto, "Noto Sans Thai", sans-serif;
+    padding: 0 16px 40px; max-width: 760px; margin-inline: auto;
+  }
+  h1 { font-size: 20px; margin: 14px 0 2px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 12px; }
+  #stopWrap { position: sticky; top: 0; z-index: 9; padding: 10px 0;
+              background: linear-gradient(var(--bg) 78%, transparent); }
+  #stop { width: 100%; min-height: 76px; font-size: 20px; font-weight: 800;
+          color: #fff; background: #c22c3a; border: 0; border-radius: 14px;
+          cursor: pointer; letter-spacing: .03em; }
+  #stop:active { background: #9d222e; }
+  section { background: var(--card); border: 1px solid var(--line);
+            border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  h2 { font-size: 14px; margin: 0 0 10px; color: var(--accent);
+       text-transform: uppercase; letter-spacing: .08em; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  td { padding: 5px 0; border-bottom: 1px solid var(--line); }
+  td:first-child { color: var(--dim); width: 46%; }
+  .banner { border-radius: 10px; padding: 11px 13px; margin-bottom: 12px;
+            font-size: 13.5px; font-weight: 600; }
+  .b-bad { background: rgba(239,95,107,.14); color: var(--bad); }
+  .b-warn { background: rgba(242,193,78,.14); color: var(--warn); }
+  .b-ok { background: rgba(56,211,159,.13); color: var(--ok); }
+  .ch { display: grid; grid-template-columns: 84px 1fr 1fr 1fr; gap: 9px;
+        align-items: center; margin-bottom: 9px; }
+  .ch .name { font-weight: 800; font-size: 16px; }
+  .ch .name small { display: block; font-weight: 400; color: var(--dim);
+                    font-size: 11.5px; }
+  button.act { font: inherit; font-weight: 700; color: #10121a;
+               background: var(--accent); border: 0; border-radius: 10px;
+               min-height: 54px; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--ink);
+                 border: 1px solid var(--line); }
+  button:disabled { opacity: .3; cursor: not-allowed; }
+  .note { color: var(--dim); font-size: 12.5px; margin-top: 9px; }
+  #log { font: 12px/1.6 ui-monospace, Consolas, monospace; color: var(--dim);
+         max-height: 180px; overflow: auto; white-space: pre-wrap; }
+  input[type=number] { font: inherit; background: #0b0c10; color: var(--ink);
+                       border: 1px solid var(--line); border-radius: 9px;
+                       padding: 12px; width: 110px; }
+</style>
+
+<h1>สั่งแขนหุ่นด้วยมือ</h1>
+<div class="sub">เครื่องมือหน้าโต๊ะสำหรับหาว่าช่องไหนคือข้อต่อไหน ไม่ใช่หน้าใช้งานประจำวัน</div>
+
+<div id="stopWrap"><button id="stop">หยุดส่งคำสั่ง</button></div>
+
+<div class="banner b-bad">
+  ปุ่มนี้ส่ง <code>#STOP</code> ไปที่บอร์ด แล้วล็อกไม่ให้ส่งคำสั่งอื่นต่อ
+  คำสั่งนี้ถอดได้จากโค้ดของแอปผู้ขายเอง <strong>พบแขนขยับต่อหลังส่ง #STOP ในการทดสอบช่อง 5 จึงใช้แทนสวิตช์ตัดไฟไม่ได้</strong>
+  และหน้านี้ไม่อ่านค่าตอบกลับ จึงบอกได้แค่ว่าส่งถึงสายแล้ว ไม่ใช่ว่าแขนหยุดแล้ว<br>
+  <strong>ตัวหยุดที่แน่นอนคือไฟเลี้ยงเซอร์โว</strong> ซึ่งคู่มือระบุว่าแยกวงจรจากบอร์ดควบคุม
+  ต้องรู้ว่าตัดตรงไหนและมีคนมือถึงตลอดเวลาที่ทดสอบ<br>
+  <strong>ปุ่มแดงของหุ่นสั่งหยุดแขนผ่านแอป Aobo</strong> ตอนที่แอปถูกหยุดเพื่อปล่อยพอร์ตให้หน้านี้
+  <strong>เส้นทางนั้นไม่ทำงาน</strong> ยังไม่รู้ว่าปุ่มตัดไฟเซอร์โวในทางฮาร์ดแวร์ด้วยหรือไม่
+</div>
+
+<div id="alert" class="banner b-warn" hidden></div>
+
+<section>
+  <h2>สถานะ</h2>
+  <table id="state"><tr><td>กำลังอ่าน...</td><td></td></tr></table>
+  <button class="act ghost" id="prepare" style="width:100%;margin-top:10px">ตั้งค่าพอร์ต (stty raw)</button>
+</section>
+
+<section>
+  <h2>ขยับทีละช่อง</h2>
+  <div id="channels"></div>
+  <div class="note">
+    ต้องกด <strong>สั่งไป 1500</strong> ก่อนจึงจะกดเลื่อนได้ เพราะเซอร์โวบอกตำแหน่งตัวเองกลับมาไม่ได้
+    ปุ่มนั้น<strong>ไม่ได้อ่านหรือหาจุดเริ่ม มันสั่งไปที่ 1500 จริงๆ</strong>
+    ซึ่งเป็นกลางของช่วง 500–2500 ตามโปรโตคอล <strong>ไม่ใช่กลางของข้อต่อ</strong>
+    และยังไม่มีหลักฐานว่าเหมาะกับทุกช่อง ข้อต่ออาจสวิงไกลและไปทางไหนยังไม่มีใครรู้
+    จึงเคลื่อนช้าที่สุดเท่าที่โปรโตคอลทำได้ (9999 ms) <strong>กดครั้งแรกของแต่ละช่อง
+    ต้องมีมืออยู่ที่สวิตช์ไฟเซอร์โว</strong> หลังจากนั้นแต่ละครั้งที่กดคือก้าวเล็กที่กำหนดไว้ที่เซิร์ฟเวอร์
+    <br><br>
+    หน้านี้แสดงเป็น<strong>หมายเลขช่อง</strong>ไม่ใช่ชื่อข้อต่อ เพราะยังไม่มีใครยืนยันว่าช่องไหนคือข้อต่อใด
+    ถ้าจดได้แล้วค่อยเขียนลงเอกสาร ไม่ใช่ลงหน้านี้
+  </div>
+</section>
+
+<section>
+  <h2>เล่นกลุ่มท่าที่บันทึกไว้ในบอร์ด</h2>
+  <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+    <input type="number" id="group" min="0" max="255" value="0" step="1">
+    <button class="act" id="runGroup" style="flex:1;min-width:160px">เล่นหนึ่งรอบ</button>
+  </div>
+  <div class="note">
+    <strong>ข้อจำกัดทุกข้อข้างบนไม่คุมส่วนนี้</strong> รายการสี่ช่องกับระยะ ±200
+    คุมเฉพาะปุ่มเลื่อน กลุ่มท่าที่บันทึกไว้อาจสั่งช่องไหนก็ได้ในยี่สิบช่อง
+    ไปที่ไหนก็ได้ในช่วงของมัน ด้วยความเร็วที่บันทึกมา
+    การตรึงหนึ่งรอบคุมแค่<strong>จำนวนครั้ง</strong> ไม่ได้คุมขอบเขตการเคลื่อนไหว
+    จึงต้องเปิดสวิตช์แยก <code>ROBOT_ARM_GROUPS_ENABLED</code> ต่างหาก
+    <br><br>
+    หลังเล่นกลุ่มท่า ตำแหน่งที่จำไว้ของทุกช่องจะถูกล้าง ต้องกดสั่งไป 1500 ใหม่ก่อนเลื่อน
+    เพราะกลุ่มท่าขยับของไปแล้วและเราถามไม่ได้ว่าไปอยู่ตรงไหน
+    <br><br>
+    <strong>ยังไม่มีใครรู้ว่าเลขไหนคือท่าอะไร</strong> ถ่ายคลิปไว้ทุกครั้งแล้วจด
+    ยกเว้นเลข <strong>99</strong> ซึ่งโค้ดของแอปผู้ขายใช้เป็นท่ากลับตำแหน่งตั้งต้น
+    และแอปนั้น<strong>ส่งมันทันทีที่เปิดพอร์ตสำเร็จ</strong> — แปลว่าการเปิดแอปผู้ขาย
+    ทำให้แขนขยับได้เอง หน้านี้ไม่ทำแบบนั้น ไม่ส่งอะไรเลยจนกว่าจะมีคนกดปุ่ม
+  </div>
+</section>
+
+<section>
+  <h2>บรรทัดที่ส่งไปจริง</h2>
+  <div id="log">ยังไม่ได้ส่งอะไร</div>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = new URLSearchParams(location.search).get('token') || '';
+const q = token ? '?token=' + encodeURIComponent(token) : '';
+
+function say(line) {
+  const at = new Date().toLocaleTimeString('th-TH');
+  $('log').textContent = at + '  ' + line + '\n' + $('log').textContent;
+}
+
+let busy = false;
+
+async function command(action, extra, urgent) {
+  // One command in flight at a time. Two presses racing means two lines on a
+  // wire in an order nobody chose, on a board that will act on both.
+  //
+  // Except the red button, which is `urgent` and skips this entirely. The
+  // first version of this page did not, and so the one control that exists
+  // for the moment something is already moving was the one control that did
+  // nothing while something was already moving. An urgent command also leaves
+  // `busy` alone, so it cannot clear the flag out from under the request it
+  // overtook.
+  if (busy && !urgent) return;
+  if (!urgent) { busy = true; paint(); }
+  try {
+    const res = await fetch('/arm/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ token, action }, extra || {})),
+    });
+    const out = await res.json();
+    say(out.ok
+      ? `${action} — ส่งแล้ว${out.at != null ? ' → ' + out.at : ''}${out.note ? ' · ' + out.note : ''}`
+      : `${action} — ไม่สำเร็จ: ${out.error}${out.hint ? ' · ' + out.hint : ''}`);
+  } catch (err) {
+    say(`${action} — ส่งไม่ถึงเซิร์ฟเวอร์: ${err.message}`);
+  }
+  if (!urgent) busy = false;
+  refresh();
+}
+
+let state = null;
+
+function paint() {
+  const s = state;
+  if (!s) return;
+  const blocked = busy || !s.armed || !s.configured || !s.port_present || !s.motion_enabled;
+  $('channels').innerHTML = s.channels.map((c) => {
+    const known = s.commanded[c] != null;
+    return `<div class="ch">
+      <div class="name">ช่อง ${c}<small>${known ? s.commanded[c] : 'ยังไม่รู้'}</small></div>
+      <button class="act ghost" data-centre="${c}">สั่งไป 1500</button>
+      <button class="act" data-up="${c}" ${known ? '' : 'disabled'}>+${s.limits.step}</button>
+      <button class="act" data-down="${c}" ${known ? '' : 'disabled'}>−${s.limits.step}</button>
+    </div>`;
+  }).join('');
+  $('channels').querySelectorAll('button').forEach((b) => {
+    const d = b.dataset;
+    if (blocked) b.disabled = true;
+    b.onclick = () => {
+      if (d.centre) command('centre', { channel: +d.centre });
+      else if (d.up) command('up', { channel: +d.up });
+      else command('down', { channel: +d.down });
+    };
+  });
+  $('runGroup').disabled = blocked || !s.groups_enabled;
+  $('runGroup').textContent = s.groups_enabled
+    ? 'เล่นหนึ่งรอบ' : 'ล็อกอยู่ (ROBOT_ARM_GROUPS_ENABLED)';
+  $('prepare').disabled = busy || !s.configured || !s.port_present;
+  $('stop').textContent = s.armed ? 'หยุดส่งคำสั่ง' : 'กดอีกครั้งเพื่อพร้อมสั่งงาน';
+}
+
+async function refresh() {
+  let out;
+  try {
+    out = await (await fetch('/arm/state' + q)).json();
+  } catch (err) {
+    $('state').innerHTML = `<tr><td>อ่านไม่ได้</td><td>${err.message}</td></tr>`;
+    return;
+  }
+  if (!out.ok) {
+    $('state').innerHTML = `<tr><td>อ่านไม่ได้</td><td>${out.error}</td></tr>`;
+    return;
+  }
+  state = out.state;
+  const s = state;
+  const alert = $('alert');
+  let msg = '';
+  if (!s.configured) {
+    msg = 'ยังไม่ได้เปิดใช้งาน — ตั้ง ROBOT_ARM_ENABLED=true และ ROBOT_ARM_PORT ใน .env แล้วรีสตาร์ตเซิร์ฟเวอร์';
+  } else if (!s.port_present) {
+    msg = 'ไม่พบพอร์ต ' + s.port + ' บนหุ่นตอนนี้ — วันที่ 10 ก.ย. ตัวแปลงทั้งสองตัวหลุดหลังบูตหนึ่งนาที '
+        + 'บูตใหม่แล้วเช็คภายในนาทีแรก';
+  } else if (!s.armed) {
+    msg = 'หยุดส่งคำสั่งอยู่ — กดปุ่มแดงอีกครั้งเพื่อกลับมาพร้อมสั่งงาน';
+  }
+  alert.hidden = !msg;
+  alert.textContent = msg;
+  alert.className = 'banner ' + (s.port_present && s.configured ? 'b-warn' : 'b-bad');
+
+  $('state').innerHTML = [
+    ['เปิดใช้งาน', s.enabled ? 'เปิด' : 'ปิด (ROBOT_ARM_ENABLED)'],
+    ['พอร์ต', s.port || '— ยังไม่ได้ตั้ง'],
+    ['พอร์ตมีอยู่ตอนนี้', s.port_present ? 'พบ' : 'ไม่พบ'],
+    ['สถานะการส่ง', s.armed ? 'พร้อมสั่งงาน' : 'หยุดส่งคำสั่งอยู่'],
+    ['การขยับ', s.motion_enabled ? 'ปลดล็อก' : 'ล็อกอยู่ (ROBOT_ARM_MOTION_ENABLED)'],
+    ['ช่องที่สั่งได้', s.channels.join(', ')],
+    ['ระยะที่อนุญาต', `${s.limits.low} – ${s.limits.high} (กลาง ${s.limits.centre})`],
+  ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  paint();
+}
+
+$('stop').onclick = () =>
+  command(state && state.armed === false ? 'arm' : 'stop', null, true);
+$('prepare').onclick = () => command('prepare');
+$('runGroup').onclick = () => command('group', { group: +$('group').value });
+
+refresh();
+setInterval(() => { if (!busy) refresh(); }, 3000);
+</script>

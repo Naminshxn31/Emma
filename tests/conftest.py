@@ -134,6 +134,11 @@ def _fresh_async_state():
     # Pin to the mode the tests were written against; VAD tests set "local"
     # themselves with a scripted detector.
     _settings.vad_mode = "gemini"
+    # CALL_DEBUG writes call audio to disk; the machine chasing a mic problem
+    # has it on in .env, and a session test that fed audio would then drop a
+    # wav into the repo's data/. Off in the suite, like every pin here.
+    _settings.call_debug = False
+    _settings.transcribe_mode = "SMART"
     # The live inventory link would send every unit test's show_unit call to
     # the real Supabase — network in unit tests, and results that change
     # when the sales team sells a room. Same family as every pin above.
@@ -154,6 +159,28 @@ def _fresh_async_state():
     # and the LAN gate, for the same reason: the suite must not change
     # colour because of a value some other test set.
     _settings.web_stage = False
+    # A machine that has been pointed at the robot's navigation board would
+    # otherwise send every movement test's command down a real socket to real
+    # motors, and `available()` would flip to True in tests written for a
+    # robot that is not there. Same family as `inventory_url` above, with a
+    # heavier object on the end of it. Tests that mean the chassis path set
+    # the URL themselves and patch the transport.
+    _settings.robot_chassis_url = ""
+    from app import robot_chassis
+
+    robot_chassis.reset_state()
+    # And the arm, for a reason the chassis pin does not cover: this one
+    # shells out to adb, so a developer machine with a robot plugged in could
+    # run `adb shell printf ... > /dev/ttyUSB10` from a unit test. Two
+    # switches off, and the module's memory of what it last commanded cleared
+    # so no test inherits another test's idea of where a joint is.
+    _settings.robot_arm_enabled = False
+    _settings.robot_arm_port = ""
+    _settings.robot_arm_motion_enabled = False
+    _settings.robot_greeting_gesture_enabled = False
+    from app import robot_arm
+
+    robot_arm.reset_state()
     display._reveal_task = None
     canva_display._task = None
     display._audio_lead_ms = 0.0
@@ -308,6 +335,7 @@ def _no_real_face_models(monkeypatch, request):
     # A greeter loop that reconnects forever never ends; tests hand it a
     # camera with N frames and expect the run to return when they are gone.
     monkeypatch.setattr(settings, "face_camera_retry_s", 0.0)
+    monkeypatch.setattr(settings, "face_camera_source", "local")
     monkeypatch.setattr(settings, "face_threshold", 0.50)
     monkeypatch.setattr(settings, "face_confirm_frames", 3)
     monkeypatch.setattr(settings, "face_cooldown_s", 600.0)

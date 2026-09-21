@@ -218,6 +218,14 @@ def test_the_floor_stands_down_for_the_opening_seconds():
         "the wake tail was distance-filtered at the door"
 
 
+def test_zero_grace_applies_the_near_field_floor_from_the_first_frame():
+    gate = VadGate(ScriptedDetector([True]), prefix_padding_ms=100,
+                   min_rms=0.03, floor_grace_s=0)
+
+    assert gate.feed(QUIET_CHUNK) == []
+    assert gate.segments == 0
+
+
 def test_stand_down_switches_the_floor_off_for_the_session():
     """A session the machine opened itself (camera at the door) greets a
     person who is far away by construction. 2026-08-31: อาซู่ answered the

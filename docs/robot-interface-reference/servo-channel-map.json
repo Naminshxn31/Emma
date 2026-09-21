@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "robot": "Astronaut ZC-3588A",
+  "board": "CH340 1a86:7523 at 115200 8N1",
+  "position_feedback_available": false,
+  "manual_axis_inventory": {
+    "status": "mechanical_inventory_inferred_from_spec_arithmetic_not_channel_order",
+    "control_channels": 20,
+    "axes": {
+      "head_yaw_pitch": 2,
+      "left_right_upper_arm_two_axes_each": 4,
+      "left_right_forearm_two_axes_each": 4,
+      "ten_fingers": 10
+    },
+    "total": 20,
+    "caveat": "The manual's 20-channel count matches these listed controllable axes exactly, but it does not assign channel numbers. A separate line says 22 upper-body joints, so joint count and control-channel count may use different definitions."
+  },
+  "channels": [
+    {"channel": 1, "status": "tested_no_clear_visual_change", "part": null},
+    {"channel": 2, "status": "tested_no_clear_visual_change", "part": null},
+    {"channel": 3, "status": "tested_no_clear_visual_change", "part": null},
+    {"channel": 4, "status": "tested_no_clear_visual_change", "part": null},
+    {"channel": 5, "status": "visual_motion_confirmed", "part": "arm_unknown_side_and_joint"},
+    {"channel": 6, "status": "untested", "part": null},
+    {"channel": 7, "status": "visual_mapping_confirmed", "part": "head_yaw"},
+    {"channel": 8, "status": "visual_mapping_confirmed", "part": "head_pitch"},
+    {"channel": 9, "status": "untested", "part": null},
+    {"channel": 10, "status": "untested", "part": null},
+    {"channel": 11, "status": "tested_no_clear_visual_change", "part": null},
+    {"channel": 12, "status": "untested", "part": null},
+    {"channel": 13, "status": "untested", "part": null},
+    {"channel": 14, "status": "untested", "part": null},
+    {"channel": 15, "status": "untested", "part": null},
+    {"channel": 16, "status": "untested", "part": null},
+    {"channel": 17, "status": "untested", "part": null},
+    {"channel": 18, "status": "untested", "part": null},
+    {"channel": 19, "status": "untested", "part": null},
+    {"channel": 20, "status": "untested", "part": null}
+  ],
+  "caveat": "Values are commanded pulse widths, not measured joint positions. A missing visual change does not prove the channel is unused."
+}

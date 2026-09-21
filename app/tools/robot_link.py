@@ -17,6 +17,16 @@ changing address. A second channel would be a second thing to authenticate,
 reconnect and debug, and it would be able to disagree with the first about
 which robot it is talking to.
 
+**There is now a second way, and it wins when it is configured.** On
+2026-09-10 the navigation board answered `/api/core/system/v1/robot/info`
+with "Slamware SDP" by Slamtec: the chassis is a SLAMTEC unit with a
+published RESTful API, and the vendor AAR is a wrapper around it. When
+`ROBOT_CHASSIS_URL` is set, `send()` goes to `app/robot_chassis.py` instead
+and the app on the chest screen is only a voice client again. The paragraphs
+above still describe every machine where that setting is empty, which is the
+default. What does *not* change: one owner of the wheels at a time, and an
+unreachable chassis reports "mock" rather than falling back to the app.
+
 **Mock is the default, and says so.** Same rule as `broadlink_ir`: with no
 robot connected, commands succeed logically and change nothing physically, and
 every result carries `hardware: "mock"` so the model can tell a guest the truth
@@ -67,6 +77,15 @@ def places() -> list[str]:
     so `send()` still answers "mock" and the result still tells the model to
     say the robot cannot go anywhere yet.
     """
+    from app import robot_chassis
+
+    if robot_chassis.connected():
+        # Driving the chassis directly makes *it* the authority, and an empty
+        # answer is a real one — the gallery's map had no saved points at all
+        # on 2026-09-10. Falling through to `ROBOT_MOCK_PLACES` here would
+        # offer a guest destinations that exist in a .env file and nowhere on
+        # the floor, which is the opposite of what the mock list is for.
+        return robot_chassis.places()
     if STATE["connected"] or KNOWN_PLACES:
         return KNOWN_PLACES
     from app.config import settings
@@ -75,29 +94,63 @@ def places() -> list[str]:
 
 
 def snapshot() -> dict:
+    from app import robot_chassis
+
     state = dict(STATE)
+    if robot_chassis.connected():
+        # Measured, not remembered. Everywhere else in this module `moving`
+        # is an echo of the last command we sent, which is why `snapshot()`
+        # blanks it to None so often. The chassis is polled, so here it is a
+        # reading — and battery and charging exist at all, which they never
+        # did on the app path.
+        chassis = robot_chassis.STATE
+        state.update({
+            "connected": True,
+            "moving": chassis["moving"],
+            "battery": chassis["battery"],
+            "charging": chassis["charging"],
+            "pose": chassis["pose"],
+            "docked": chassis["docked"],
+            "motion_enabled": robot_chassis.status()["motion_enabled"],
+            "action_name": chassis["action_name"],
+            "action_status": chassis["action_status"],
+            "status_source": "chassis",
+        })
+        return state
+    if robot_chassis.configured():
+        # A configured chassis is the authority even after its link fails.
+        # A cached app connection must not make an unreachable robot usable.
+        state.update(connected=False, moving=None, battery=None, charging=None,
+                     pose=None, docked=None, action_name=None, action_status=None,
+                     status_source="disconnected")
+        return state
     if state["status_source"] in {"unknown", "stop_requested", "timeout", "disconnected", "transport_failed"}:
         state["moving"] = None
     return state
 
 
 def available() -> bool:
-    """True only when a real robot app is connected and has said it is ready.
+    """True when something that actually has wheels is reachable.
 
     Deliberately not "is a websocket open". The voice client in a browser is
-    also on that socket, and it has no arms.
+    also on that socket, and it has no arms. Two things now qualify: the
+    robot app having sent `robot_ready`, or the chassis answering our polls
+    directly — `snapshot()` folds both into `connected`.
     """
     return bool(snapshot()["connected"])
 
 
 def status() -> dict:
     """Why the robot is or isn't usable — for /health and startup logging."""
+    from app import robot_chassis
     from app.config import settings
 
     return {
         "enabled": settings.robot_enabled,
         "app_connected": bool(STATE["connected"]),
-        "places_known": len(KNOWN_PLACES),
+        "chassis": robot_chassis.status(),
+        "places_known": len(robot_chassis.places()) if robot_chassis.connected()
+                        else len(KNOWN_PLACES),
         "usable": settings.robot_enabled and available(),
     }
 
@@ -209,6 +262,22 @@ async def send(action: str, **args: Any) -> str:
 
     if not settings.robot_enabled:
         return "mock"
+
+    from app import robot_chassis
+
+    if robot_chassis.configured():
+        # One owner of the wheels, always. When a chassis is configured it
+        # keeps movement even while it is unreachable, rather than quietly
+        # handing the job back to the app path: two routes to the same motors,
+        # each with its own idea of where the robot is going, is the "two
+        # clocks" bug this project has paid for three times already (Canva's
+        # position, the tour nudge, the audio lead). Unreachable answers
+        # "mock", which is true — nothing moved — and the tool descriptions
+        # already turn that into "I can't take you there yet".
+        if not robot_chassis.connected():
+            logger.info("robot command %r ran in mock mode — chassis not answering", action)
+            return "mock"
+        return await robot_chassis.send(action, **args)
 
     from app import session as session_module
 

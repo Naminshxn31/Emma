@@ -1,0 +1,408 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>แผงตรวจหุ่น — Emma</title>
+<!--
+  One screen showing what is actually known about the robot, in the shape of
+  the robot.
+
+  The look comes from the diagnostic posters the owner sent. The *content*
+  rule is the opposite of those posters, and it is the whole reason this file
+  is worth having rather than being a picture:
+
+  **A number appears here only if something measured it.** The reference art
+  is dense with readouts that are decoration — "792/1000", "671/0.032" — and
+  on a real console a decorative readout is worse than a blank one, because
+  somebody will act on it. Every field on this page is either a value that
+  came back from the robot this second, or a dash with the reason it is a
+  dash. There is no third state and nothing is filled in to make the layout
+  look complete.
+
+  So the panels are deliberately uneven: the chassis half is full because
+  SLAMTEC answers questions about itself over HTTP, and the upper body half is
+  mostly unknown because nothing here reads the arm board back. That is a gap
+  in this page, not a property of the board — the vendor's code contains a
+  parser for `#STOP+OK` and for an action-group-finished state, so the board
+  does say something; we have simply never listened, and no result of doing so
+  has been observed. The asymmetry is the most honest thing on the screen, and
+  it is what somebody deciding what to test next needs to see.
+
+  Read-only by design. The controls live at /robot and /arm, and this links to
+  them rather than repeating them: two copies of a stop button drift apart,
+  and the copy that drifts is found by whoever needed it most.
+-->
+<style>
+  :root {
+    --bg: #05080f; --panel: rgba(10,22,38,.72); --line: #16436b;
+    --ink: #cfe8ff; --dim: #5d87ad; --key: #7fdcff;
+    --ok: #3ff0a8; --warn: #ffc24e; --bad: #ff5f74; --none: #46607a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 13px/1.5 ui-monospace, Consolas, "Segoe UI", "Noto Sans Thai", monospace;
+    min-height: 100vh;
+    background-image:
+      linear-gradient(rgba(22,67,107,.13) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(22,67,107,.13) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 10px 14px 28px; }
+
+  .topbar, .botbar {
+    display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+    border: 1px solid var(--line); background: var(--panel);
+    padding: 9px 13px; clip-path: polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));
+  }
+  .topbar { margin-bottom: 12px; }
+  .botbar { margin-top: 12px; font-size: 12px; }
+  .brand { font-weight: 700; letter-spacing: .18em; color: var(--key); }
+  .spacer { flex: 1; }
+  .chip { border: 1px solid var(--line); padding: 3px 9px; color: var(--dim);
+          letter-spacing: .1em; font-size: 11px; }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 12px; align-items: start; }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { border: 1px solid var(--line); background: var(--panel); margin-bottom: 12px;
+           clip-path: polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px)); }
+  .panel > h2 {
+    margin: 0; font-size: 11px; letter-spacing: .16em; color: var(--key);
+    padding: 8px 12px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel > h2 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--none); }
+  .panel .body { padding: 9px 12px 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 4px 0; vertical-align: top; }
+  td.k { color: var(--dim); width: 52%; padding-right: 8px; }
+  td.v { text-align: right; font-variant-numeric: tabular-nums; }
+  .v.none { color: var(--none); }
+  .v.ok { color: var(--ok); } .v.warn { color: var(--warn); } .v.bad { color: var(--bad); }
+  .why { color: var(--none); font-size: 11px; text-align: right; padding-bottom: 6px; }
+
+  figure { margin: 0; border: 1px solid var(--line); background: var(--panel);
+           padding: 6px; clip-path: polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px)); }
+  svg { width: 100%; height: auto; display: block; }
+  .stroke { fill: none; stroke: #2e7fb5; stroke-width: 1.2; }
+  .stroke.dim { stroke: #1d4f76; }
+  .glow { fill: none; stroke: var(--key); stroke-width: 1.4; }
+  .lead { stroke: #2a6b9c; stroke-width: .9; stroke-dasharray: 3 3; fill: none; }
+  .tag { fill: var(--dim); font: 9px ui-monospace, monospace; letter-spacing: .12em; }
+  .node { fill: #05080f; stroke: var(--key); stroke-width: 1.2; }
+  .node.unknown { stroke: var(--none); }
+  .node.live { fill: var(--key); }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--dim);
+            padding: 7px 12px; border-top: 1px solid var(--line); }
+  .legend span::before { content: "■ "; }
+  .legend .m::before { color: var(--ok); }
+  .legend .u::before { color: var(--none); }
+  .legend .f::before { color: var(--bad); }
+
+  a.jump { color: var(--key); text-decoration: none; border: 1px solid var(--line);
+           padding: 5px 11px; letter-spacing: .1em; font-size: 11px; }
+  a.jump:hover { background: rgba(127,220,255,.1); }
+  .note { color: var(--none); font-size: 11px; margin-top: 7px; line-height: 1.45; }
+  .alarm { color: var(--bad); border-color: var(--bad); }
+</style>
+
+<div class="wrap">
+
+<div class="topbar">
+  <span class="brand">ASTRONAUT / แผงตรวจ</span>
+  <span class="chip">รุ่น <b id="tModel">—</b></span>
+  <span class="chip">แชสซี <b id="tChassis">—</b></span>
+  <span class="chip">บอร์ดแขน <b id="tArm">—</b></span>
+  <span class="spacer"></span>
+  <span class="chip">อ่านเมื่อ <b id="tClock">—</b></span>
+  <a class="jump" href="/robot">สั่งฐานล้อ</a>
+  <a class="jump" href="/arm">สั่งแขน</a>
+  <a class="jump" href="/hardware">ไมค์ / กล้อง</a>
+</div>
+
+<div class="grid">
+
+  <div>
+    <div class="panel">
+      <h2><span class="dot" id="dHead"></span>หัว · จอสีหน้า</h2>
+      <div class="body">
+        <table>
+          <tr><td class="k">จอบนหัว</td><td class="v none" id="fHeadScreen">ยังไม่ได้ตรวจ</td></tr>
+          <tr><td class="k">ช่องส่งภาพ</td><td class="v none" id="fHeadPath">ยังไม่ยืนยัน</td></tr>
+          <tr><td class="k">มอเตอร์คอ</td><td class="v none" id="fNeck">ยังไม่ทดลอง</td></tr>
+        </table>
+        <div class="note">
+          แอปผู้ขายวาดภาพสีหน้าลง <code>getDisplays()[1]</code>
+          แต่ยังไม่มีใครยืนยันว่าจอที่ index นั้นคือจอบนหัวของตัวนี้
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="dot" id="dArm"></span>แขน · บอร์ดเซอร์โว</h2>
+      <div class="body">
+        <table>
+          <tr><td class="k">พอร์ต</td><td class="v none" id="aPort">—</td></tr>
+          <tr><td class="k">พอร์ตมีอยู่</td><td class="v none" id="aPresent">—</td></tr>
+          <tr><td class="k">สถานะการส่ง</td><td class="v none" id="aArmed">—</td></tr>
+          <tr><td class="k">กลุ่มท่า</td><td class="v none" id="aGroups">—</td></tr>
+          <tr><td class="k">ระยะที่อนุญาต</td><td class="v none" id="aSpan">—</td></tr>
+        </table>
+        <div class="why" id="aWhy"></div>
+        <table id="aChannels"></table>
+        <div class="note">
+          ตัวเลขที่ขึ้นคือค่าที่เรา<b>สั่งไป</b> ไม่ใช่ค่าที่วัดจากข้อต่อ
+          <b>ยังไม่ทราบว่าช่องใดขยับข้อต่อไหน</b> จนกว่าจะมีผังการเดินสาย
+          และหน้านี้<b>ยังไม่ได้อ่านค่าตอบกลับจากบอร์ดแขนเลย</b> —
+          ในโค้ดของแอปผู้ขายมีตัวรับ <code>#STOP+OK</code> และสถานะจบกลุ่มท่าอยู่
+          แปลว่าบอร์ดพูดอะไรบางอย่าง เราแค่ยังไม่เคยฟัง
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 420 620" role="img" aria-label="แผนผังหุ่นพร้อมสถานะแต่ละส่วน">
+      <!-- head -->
+      <rect class="stroke" x="178" y="26" width="64" height="50" rx="7"/>
+      <rect class="stroke dim" x="190" y="38" width="40" height="24" rx="3"/>
+      <circle class="node unknown" id="nHead" cx="210" cy="22" r="4"/>
+      <path class="lead" d="M178 50 H96"/><text class="tag" x="18" y="47">HEAD / FACE</text>
+      <!-- neck + shoulders -->
+      <path class="stroke" d="M210 76 V96 M140 108 H280"/>
+      <!-- chest screen -->
+      <rect class="stroke" x="150" y="96" width="120" height="150" rx="6"/>
+      <rect class="stroke dim" x="162" y="110" width="96" height="122" rx="3"/>
+      <circle class="node unknown" id="nChest" cx="210" cy="168" r="4"/>
+      <path class="lead" d="M270 168 H352"/><text class="tag" x="300" y="163">CHEST 18.5"</text>
+      <!-- mic array + camera -->
+      <circle class="node unknown" id="nMic" cx="186" cy="88" r="3.4"/>
+      <circle class="node unknown" id="nCam" cx="234" cy="88" r="3.4"/>
+      <path class="lead" d="M186 88 L120 84"/><text class="tag" x="44" y="82">MIC x4</text>
+      <path class="lead" d="M234 88 L300 84"/><text class="tag" x="306" y="82">CAMERA</text>
+      <!-- Arms drawn without joint markers on purpose. Putting the four
+           addressable channels on shoulders and elbows would draw a wiring
+           map nobody has, and a diagram is believed faster than a caption.
+           They sit in their own box instead, attached to the upper body as a
+           whole, until something measures which joint each one moves. -->
+      <path class="stroke" d="M140 108 L112 150 L104 214 L108 262"/>
+      <path class="stroke" d="M280 108 L308 150 L316 214 L312 262"/>
+      <rect class="stroke dim" x="12" y="150" width="76" height="76" rx="4"/>
+      <text class="tag" x="18" y="144">SERVO CHANNELS</text>
+      <circle class="node unknown" id="nCh1" cx="34" cy="174" r="4.6"/>
+      <circle class="node unknown" id="nCh11" cx="68" cy="174" r="4.6"/>
+      <circle class="node unknown" id="nCh7" cx="34" cy="206" r="4.6"/>
+      <circle class="node unknown" id="nCh8" cx="68" cy="206" r="4.6"/>
+      <text class="tag" x="28" y="192">1</text>
+      <text class="tag" x="62" y="192">11</text>
+      <text class="tag" x="28" y="224">7</text>
+      <text class="tag" x="62" y="224">8</text>
+      <path class="lead" d="M88 188 H150"/>
+      <text class="tag" x="12" y="244">ยังไม่ทราบตำแหน่งข้อต่อ</text>
+      <!-- hands -->
+      <rect class="stroke dim" x="98" y="262" width="22" height="30" rx="4"/>
+      <rect class="stroke dim" x="300" y="262" width="22" height="30" rx="4"/>
+      <!-- body / base -->
+      <path class="stroke" d="M150 246 L142 380 H278 L270 246"/>
+      <path class="stroke" d="M142 380 L126 470 H294 L278 380"/>
+      <ellipse class="stroke" cx="210" cy="492" rx="92" ry="22"/>
+      <circle class="node unknown" id="nBase" cx="210" cy="492" r="5"/>
+      <path class="lead" d="M302 492 H360"/><text class="tag" x="300" y="524">DRIVE BASE</text>
+      <!-- lidar ring -->
+      <ellipse class="stroke dim" cx="210" cy="452" rx="78" ry="16"/>
+      <circle class="node unknown" id="nLidar" cx="132" cy="452" r="3.6"/>
+      <path class="lead" d="M132 452 H62"/><text class="tag" x="16" y="449">LIDAR</text>
+      <!-- power cutoff marker -->
+      <rect class="stroke dim" x="186" y="396" width="48" height="20" rx="3"/>
+      <circle class="node unknown" id="nPower" cx="210" cy="406" r="4"/>
+      <path class="lead" d="M234 406 H352"/><text class="tag" x="286" y="402">SERVO POWER</text>
+      <!-- floor -->
+      <path class="stroke dim" d="M60 540 H360" stroke-dasharray="4 6"/>
+    </svg>
+    <div class="legend">
+      <span class="m">วัดแล้วตอนนี้</span>
+      <span class="u">ยังไม่ได้วัด / ไม่มีทางวัด</span>
+      <span class="f">วัดแล้วและผิดปกติ</span>
+    </div>
+  </figure>
+
+  <div>
+    <div class="panel">
+      <h2><span class="dot" id="dChassis"></span>ฐานล้อ · SLAMTEC</h2>
+      <div class="body">
+        <table>
+          <tr><td class="k">แบตเตอรี่</td><td class="v none" id="cBatt">—</td></tr>
+          <tr><td class="k">แท่นชาร์จ</td><td class="v none" id="cDock">—</td></tr>
+          <tr><td class="k">ตำแหน่ง x / y</td><td class="v none" id="cPose">—</td></tr>
+          <tr><td class="k">มุมหัน</td><td class="v none" id="cYaw">—</td></tr>
+          <tr><td class="k">ความมั่นใจตำแหน่ง</td><td class="v none" id="cQual">—</td></tr>
+          <tr><td class="k">คำสั่งที่ค้างอยู่</td><td class="v none" id="cAction">—</td></tr>
+          <tr><td class="k">การเคลื่อนที่</td><td class="v none" id="cMotion">—</td></tr>
+          <tr><td class="k">จุดหมายในแผนที่</td><td class="v none" id="cPlaces">—</td></tr>
+        </table>
+        <div class="why" id="cWhy"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="dot" id="dHw"></span>ไมค์ · กล้อง</h2>
+      <div class="body">
+        <table>
+          <tr><td class="k">รายงานที่ส่งเข้ามา</td><td class="v none" id="hCount">—</td></tr>
+          <tr><td class="k">ล่าสุดเมื่อ</td><td class="v none" id="hLast">—</td></tr>
+        </table>
+        <div class="note">
+          หน้านี้ไม่วัดไมค์เอง ต้องเปิด <code>/hardware</code> บนเครื่องที่มีไมค์นั้นแล้วกดส่งรายงาน
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="botbar alarm" id="safety">
+  <span>ยังไม่มีใครระบุจุดตัดไฟเลี้ยงเซอร์โว — นั่นคือตัวหยุดแขนที่แน่นอนเพียงอย่างเดียว
+  ปุ่มแดงของหุ่นสั่งหยุดแขนผ่านแอป Aobo ซึ่งไม่ทำงานตอนแอปถูกหยุดเพื่อปล่อยพอร์ต
+  ห้ามสั่งแขนตอนไม่มีคนยืนอยู่กับหุ่น</span>
+</div>
+
+<div class="botbar">
+  <span id="fresh">—</span>
+  <span class="spacer"></span>
+  <span>ทุกช่องบนหน้านี้มาจากการวัด ช่องที่ไม่มีข้อมูลจะขึ้นว่าไม่มี ไม่มีตัวเลขประดับ</span>
+</div>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = new URLSearchParams(location.search).get('token') || '';
+const q = token ? '?token=' + encodeURIComponent(token) : '';
+
+// Three states, and only three. `set` is the only way a value reaches the
+// screen, so "unknown" cannot be forgotten in one place and shown as a stale
+// number in another.
+function set(id, value, kind) {
+  const el = $(id);
+  if (!el) return;
+  const missing = value === null || value === undefined || value === '';
+  el.textContent = missing ? '—' : value;
+  el.className = 'v ' + (missing ? 'none' : (kind || ''));
+}
+
+function node(id, state) {
+  const el = $(id);
+  if (!el) return;
+  el.setAttribute('class', 'node ' + (state === 'live' ? 'live' : state === 'bad' ? '' : 'unknown'));
+  if (state === 'bad') el.style.stroke = 'var(--bad)';
+  else el.style.stroke = '';
+}
+
+function dot(id, colour) { $(id).style.background = 'var(--' + colour + ')'; }
+
+const num = (v, d) => (v === null || v === undefined ? null : Number(v).toFixed(d === undefined ? 2 : d));
+
+async function readChassis() {
+  let out;
+  try {
+    out = await (await fetch('/robot/state' + q)).json();
+  } catch (err) {
+    $('cWhy').textContent = 'อ่านไม่ได้: ' + err.message;
+    return null;
+  }
+  if (!out.ok) {
+    $('cWhy').textContent = out.error || 'อ่านไม่ได้';
+    ['cBatt','cDock','cPose','cYaw','cQual','cAction','cMotion','cPlaces'].forEach((k) => set(k, null));
+    dot('dChassis', 'none'); node('nBase', 'unknown'); node('nLidar', 'unknown');
+    set('tChassis', null);
+    return null;
+  }
+  const s = out.state;
+  $('cWhy').textContent = '';
+  set('cBatt', s.battery === null || s.battery === undefined ? null : s.battery + '%',
+      s.battery === null || s.battery === undefined ? '' : (s.battery < 20 ? 'bad' : s.battery < 40 ? 'warn' : 'ok'));
+  set('cDock', s.docking === 'on_dock' ? 'จอดอยู่' + (s.charging ? ' · ชาร์จ' : '') : (s.docking ? 'ไม่ได้จอด' : null));
+  const p = s.pose || {};
+  set('cPose', p.x === null || p.x === undefined ? null : num(p.x) + ' / ' + num(p.y));
+  set('cYaw', num(p.yaw));
+  set('cQual', s.localization_quality);
+  set('cAction', s.action ? (s.action.name || '').split('.').pop() : 'ไม่มี');
+  set('cMotion', s.motion_enabled ? 'ปลดล็อก' : 'ล็อกอยู่', s.motion_enabled ? 'ok' : 'warn');
+  set('cPlaces', (s.places || []).length ? s.places.length + ' จุด' : 'ยังไม่มีจุดในแผนที่');
+  set('tModel', s.model);
+  set('tChassis', 'ตอบ', 'ok');
+  dot('dChassis', 'ok');
+  node('nBase', 'live');
+  // The lidar is not read by this page. Saying "ok" because the chassis
+  // answered would be inferring a sensor from a different sensor.
+  node('nLidar', 'unknown');
+  return s;
+}
+
+async function readArm() {
+  let out;
+  try {
+    out = await (await fetch('/arm/state' + q)).json();
+  } catch (err) {
+    $('aWhy').textContent = 'อ่านไม่ได้: ' + err.message;
+    return null;
+  }
+  if (!out.ok) { $('aWhy').textContent = out.error || 'อ่านไม่ได้'; return null; }
+  const s = out.state;
+
+  set('aPort', s.port || null);
+  set('aPresent', s.configured ? (s.port_present ? 'พบ' : 'ไม่พบ') : null,
+      s.port_present ? 'ok' : 'bad');
+  set('aArmed', s.configured ? (s.armed ? 'พร้อมสั่งงาน' : 'ล็อกอยู่') : null,
+      s.armed ? 'ok' : 'warn');
+  set('aGroups', s.configured ? (s.groups_enabled ? 'ปลดล็อก' : 'ล็อกอยู่') : null,
+      s.groups_enabled ? 'warn' : 'ok');
+  set('aSpan', s.limits ? s.limits.low + ' – ' + s.limits.high : null);
+  set('tArm', s.configured ? (s.port_present ? 'พร้อม' : 'ไม่พบพอร์ต') : 'ปิดอยู่',
+      s.port_present ? 'ok' : '');
+  dot('dArm', s.port_present ? 'ok' : s.configured ? 'bad' : 'none');
+
+  // The fact and the cause are two measurements. "not found" is what this
+  // page checked; "because something else holds it" is a claim that needs a
+  // root read of /proc, which nothing here does.
+  $('aWhy').textContent = s.configured
+    ? (s.port_present ? '' : 'ไม่พบพอร์ตที่ตั้งค่าไว้')
+    : 'ยังไม่ได้ตั้ง ROBOT_ARM_ENABLED / ROBOT_ARM_PORT';
+
+  const map = { 1: 'nCh1', 7: 'nCh7', 11: 'nCh11', 8: 'nCh8' };
+  $('aChannels').innerHTML = (s.channels || []).map((c) => {
+    const at = s.commanded && s.commanded[c];
+    return `<tr><td class="k">ช่อง ${c}</td><td class="v ${at ? '' : 'none'}">`
+      + (at ? 'สั่งไว้ที่ ' + at : 'ยังไม่รู้ตำแหน่ง') + '</td></tr>';
+  }).join('');
+  (s.channels || []).forEach((c) => {
+    if (map[c]) node(map[c], s.commanded && s.commanded[c] ? 'live' : 'unknown');
+  });
+  return s;
+}
+
+async function readHardware() {
+  try {
+    const out = await (await fetch('/hardware/reports')).json();
+    const list = out.reports || [];
+    set('hCount', list.length ? list.length : 'ยังไม่มี');
+    set('hLast', list.length ? new Date(list[list.length - 1].at).toLocaleString('th-TH') : null);
+    dot('dHw', list.length ? 'ok' : 'none');
+    node('nMic', list.length ? 'live' : 'unknown');
+    node('nCam', list.length ? 'live' : 'unknown');
+  } catch (err) {
+    set('hCount', null); set('hLast', null);
+  }
+}
+
+async function refresh() {
+  await Promise.all([readChassis(), readArm(), readHardware()]);
+  const now = new Date().toLocaleTimeString('th-TH');
+  set('tClock', now);
+  $('fresh').textContent = 'อ่านครั้งล่าสุด ' + now + ' · รีเฟรชทุก 2 วินาที';
+}
+
+refresh();
+setInterval(refresh, 2000);
+</script>

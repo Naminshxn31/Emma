@@ -106,7 +106,8 @@ def _run_with(monkeypatch, sightings, frames=3, **conf):
     announced = []
 
     async def fake_announce(text, *, source, **kw):
-        announced.append((source, text, kw.get("summon")))
+        announced.append((source, text, kw.get("summon"),
+                          kw.get("arm_greeting")))
         return True
 
     seen = list(sightings)
@@ -140,9 +141,10 @@ def test_seeing_somebody_known_summons_a_session(monkeypatch):
     announced, _ = _run_with(monkeypatch, [_sighting()])
 
     assert len(announced) == 1
-    source, text, summon = announced[0]
+    source, text, summon, arm_greeting = announced[0]
     assert source == "face_known"
     assert summon is True
+    assert arm_greeting is True
     assert "ต้า" in text
 
 
@@ -300,7 +302,7 @@ def test_the_page_holds_the_socket_without_opening_a_microphone():
     assert "if (!wakeListens) {" in page
     # And the mic is opened after that gate, not before it.
     body = page.split("async function startWakeMode")[1]
-    assert body.index("if (!wakeListens) {") < body.index("getUserMedia({")
+    assert body.index("if (!wakeListens) {") < body.index("openPreferredMic(")
 
 
 def test_somebody_enrolled_but_not_built_is_named_at_boot(monkeypatch, caplog, tmp_path):
@@ -355,6 +357,27 @@ def test_the_launcher_opens_the_origin_the_microphone_was_granted_to():
     source = Path("run_server.py").read_text(encoding="utf-8")
     assert '_open_when_up(f"{scheme}://localhost:{settings.port}/{q}")' in source
     assert '_open_when_up(f"{scheme}://127.0.0.1' not in source
+
+
+def test_the_server_never_prints_or_access_logs_url_tokens():
+    from pathlib import Path
+
+    source = Path("run_server.py").read_text(encoding="utf-8")
+    assert "access_log=False" in source
+    assert 'print(f"  robot kiosk' not in source
+    assert 'print(f"  robot screen' not in source
+    assert 'print(f"  talk to Emma : {base}/{q}")' not in source
+
+
+def test_websocket_logging_redacts_a_query_token():
+    import logging
+    import run_server
+
+    record = logging.LogRecord("uvicorn.error", logging.INFO, __file__, 1,
+        '%s - "WebSocket %s"', ("client", "/ws/wake?token=secret-value&x=1"), None)
+    assert run_server._TokenRedactionFilter().filter(record) is True
+    assert "secret-value" not in record.getMessage()
+    assert "token=***&x=1" in record.getMessage()
 
 
 # -- why nothing was heard --------------------------------------------------
@@ -657,6 +680,8 @@ def test_a_summoned_session_has_no_opening_line_of_its_own():
 
     src = inspect.getsource(session_module.VoiceSession.run)
     assert "greeting=None if self.summoned else greeting_for(self.profile)" in src
+    assert "if not self.summoned:" in src
+    assert "await robot_arm.greet()" in src
 
 
 def test_the_page_tells_the_server_when_a_dial_was_rung():
@@ -807,7 +832,7 @@ def test_turn_complete_is_what_ends_the_hold():
     assert "self._greeting_turn_done()" in branch.split('await self._send_json({"type": "turn_complete"})', 1)[0]
 
 
-def test_a_summoned_session_stands_the_near_field_floor_down():
+def test_a_summoned_session_only_bypasses_the_floor_when_configured():
     """The floor exists to ignore people not talking to us. A session the
     camera opened just greeted, by name, somebody standing at the door —
     exactly where the floor says nobody worth hearing stands. 2026-08-31:
@@ -820,7 +845,7 @@ def test_a_summoned_session_stands_the_near_field_floor_down():
 
     src = inspect.getsource(session_module.VoiceSession.run)
     after = src.split("self.provider = provider", 1)[1]
-    assert "if self.summoned:" in after[:400]
+    assert "if self.summoned and settings.vad_summoned_bypass:" in after[:500]
     assert "provider.stand_down_floor()" in after[:600]
 
 
@@ -920,7 +945,7 @@ def test_a_handover_hands_the_standby_stream_to_the_call():
     assert "micStream = wakeMicStream;" in handed
     assert "wakeMicStream = null;" in handed
     # The fresh open is the fallback, taken only when there is nothing to hand over.
-    assert handed.index("micStream = wakeMicStream;") < handed.index("getUserMedia(")
+    assert handed.index("micStream = wakeMicStream;") < handed.index("openPreferredMic(")
     # And the earlier attempt is gone: no stopping standby tracks at the ring.
     ring = page.split("summonedDial = !!evt.reason;", 1)[1].split("startCall();", 1)[0]
     assert "getTracks().forEach((t) => t.stop())" not in ring

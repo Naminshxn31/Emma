@@ -117,9 +117,9 @@ google-auth==2.57.1 ; platform_machine == 'AMD64' and sys_platform == 'win32' \
     --hash=sha256:ab439dee60a6856412bc058f13a68eb6a59c5b81526bb89cfdcf89ce9c0a48c9 \
     --hash=sha256:eb47b230fc6707eed4aee1c9cef55ec05bc1785eecba74ff8b572d531e921b1e
     # via google-genai
-google-genai==2.16.0 ; platform_machine == 'AMD64' and sys_platform == 'win32' \
-    --hash=sha256:c4c2524926001b18073db927a5d75bb7c8be7b5fd13ab507d599f51fff2284c5 \
-    --hash=sha256:f9eda6a7a3dd4491a0d2253c4bdd4536462d63838ed3f1b0e4fb9a0eb8f43331
+google-genai==2.24.0 ; platform_machine == 'AMD64' and sys_platform == 'win32' \
+    --hash=sha256:59e5f2d88bc2d6ed04aa1aa14cb5629090cfe9458401745e620b24d1fe9893d7 \
+    --hash=sha256:814b63d05dca4776c5a322699eb30c565040cf8d5fd77c38714076535fb2e019
     # via condo-voice
 greenlet==3.5.5 ; platform_machine == 'AMD64' and sys_platform == 'win32' \
     --hash=sha256:7805655781fb8f28a55d05fe57ed61f5f10f1892fb587673e3bb5264f28041f0 \

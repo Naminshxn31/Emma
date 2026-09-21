@@ -690,6 +690,7 @@
   </div>
 </section>
 
+<script src="/plan-display-protocol.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 
@@ -768,13 +769,84 @@ const robotCamToken = new URLSearchParams(location.search).get('token');
 const ROBOT_CAM_FPS = Math.min(10, Math.max(1,
   Number(new URLSearchParams(location.search).get('camfps')) || 4));
 let robotCamSock = null, robotCamDelay = 2000, robotCamDown = false;
+let robotMicLabel = '', robotMicReportAt = 0, robotMicProbeBusy = false;
 
-//: Which of the robot's cameras: `?camdev=N` = the Nth video input Chrome
-//: lists (default 0). Both of this robot's lenses report "facing back", so
-//: facingMode cannot pick the one that looks at the visitor; only a person
-//: standing in front of it can, by trying N=0 and N=1.
+function reportRobotMicLevel(level) {
+  const now = Date.now();
+  if (!kioskMode || now - robotMicReportAt < 200) return;
+  const sock = robotCamSock;
+  if (!sock || sock.readyState !== WebSocket.OPEN) return;
+  robotMicReportAt = now;
+  try { sock.send(JSON.stringify({ type: 'mic_level', level, label: robotMicLabel })); } catch {}
+}
+
+async function runRobotMicProbe(seconds) {
+  if (!kioskMode || robotMicProbeBusy) return;
+  // An active conversation or wake listener already reports its own real
+  // input through onMicLevel; a second getUserMedia would compete for it.
+  if ((micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live')) ||
+      (wakeMicStream && wakeMicStream.getAudioTracks().some((t) => t.readyState === 'live'))) return;
+  robotMicProbeBusy = true;
+  let stream = null, ctx = null, timer = null;
+  try {
+    stream = await openPreferredMic({ channelCount: 1, echoCancellation: true,
+      noiseSuppression: micNS, autoGainControl: micAGC });
+    robotMicLabel = stream.getAudioTracks()[0]?.label || 'Default';
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    const samples = new Float32Array(analyser.fftSize);
+    timer = setInterval(() => {
+      analyser.getFloatTimeDomainData(samples);
+      let sum = 0; for (const sample of samples) sum += sample * sample;
+      reportRobotMicLevel(Math.sqrt(sum / samples.length));
+    }, 100);
+    await new Promise((resolve) => setTimeout(resolve,
+      Math.max(1, Math.min(5, Number(seconds) || 5)) * 1000));
+  } catch (e) {
+    console.warn('robot mic probe failed', e);
+  } finally {
+    if (timer) clearInterval(timer);
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    if (ctx) ctx.close().catch(() => {});
+    robotMicProbeBusy = false;
+  }
+}
+
+//: Which logical camera entry: `?camdev=N` = the Nth video input Chrome lists
+//: (default 0). Android reported its entries as "facing back", so facingMode
+//: cannot map them to the physical USB module; only a lens-occlusion check can.
 const ROBOT_CAM_DEV = Math.max(0, Number(new URLSearchParams(location.search).get('camdev')) || 0);
 let robotCamTries = 0, robotCamGen = 0;
+
+// Prefer Bothlent by its name on browsers that expose physical input labels.
+// This robot's Android Chrome exposes only "Default" and "Speakerphone" even
+// while AudioPolicy has routed that Default stream to USB card 0 (Bothlent).
+// In that exact abstract-label case, keep Default and let Android's automatic
+// USB routing do its job; rejecting it would make both wake and calls deaf.
+const ROBOT_MIC_LABEL = kioskMode ? 'bothlent' : '';
+const ABSTRACT_AUDIO_LABELS = new Set(['', 'default', 'speakerphone']);
+async function openPreferredMic(audio) {
+  const opened = await navigator.mediaDevices.getUserMedia({ audio });
+  if (!ROBOT_MIC_LABEL) return opened;
+  const track = opened.getAudioTracks()[0];
+  if ((track?.label || '').toLowerCase().includes(ROBOT_MIC_LABEL)) return opened;
+  const devices = (await navigator.mediaDevices.enumerateDevices())
+    .filter((d) => d.kind === 'audioinput');
+  const pick = devices.find((d) => (d.label || '').toLowerCase().includes(ROBOT_MIC_LABEL));
+  if (!pick?.deviceId) {
+    const labelsAreAbstract = devices.every((d) =>
+      ABSTRACT_AUDIO_LABELS.has((d.label || '').trim().toLowerCase()));
+    if (labelsAreAbstract) return opened;
+    opened.getTracks().forEach((t) => t.stop());
+    throw new Error('Bothlent microphone not found');
+  }
+  if (track?.getSettings?.().deviceId === pick.deviceId) return opened;
+  opened.getTracks().forEach((t) => t.stop());
+  return navigator.mediaDevices.getUserMedia({
+    audio: { ...audio, deviceId: { exact: pick.deviceId } },
+  });
+}
 
 async function startRobotCamera() {
   if (!robotCamWanted || robotCamDown || robotCamSock) return;
@@ -842,6 +914,7 @@ async function startRobotCamera() {
           }
           if (Object.keys(adv).length) track.applyConstraints({ advanced: [adv] }).catch(() => {});
         } catch (e) {}
+        if (evt.mic_probe_s) runRobotMicProbe(evt.mic_probe_s);
       }
     };
     sock.onclose = () => {
@@ -1007,7 +1080,10 @@ Promise.all([
 // bubble currently being appended to, per role.
 
 const liveTurn = { user: null, bot: null };
-const LABEL = { user: 'คุณ · You', bot: 'ผู้ช่วย · Assistant' };
+const LABEL = {
+  user: 'คำถอดเสียงอัตโนมัติ · Auto transcript',
+  bot: 'ผู้ช่วย · Assistant'
+};
 const TOOL_LABELS = {
   go_to_place: 'ไปจุดหมาย · robot',
   stop_moving: 'หยุด · robot',
@@ -1374,128 +1450,16 @@ function showPlan(r, verifiedImageUrl) {
   return img;
 }
 
-let renderedPlanBlobUrl = null;
-let renderedPlanCommandId = null;
-const pendingPlanCommands = new Map();
-function cancelPlanDisplayCommand(commandId) {
-  const pending = pendingPlanCommands.get(commandId);
-  if (pending) { pending.cancelled = true; pending.controller.abort(); }
-  if (renderedPlanCommandId === commandId) {
-    clearFrame();
-    if (renderedPlanBlobUrl) URL.revokeObjectURL(renderedPlanBlobUrl);
-    renderedPlanBlobUrl = null;
-    renderedPlanCommandId = null;
-  }
-}
-// Web Crypto is unavailable on plain HTTP LAN origins. Keep the showroom
-// verifier usable there too; the native implementation wins on HTTPS/localhost.
-async function planSha256Hex(buffer) {
-  if (globalThis.crypto?.subtle) {
-    return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buffer)),
-      byte => byte.toString(16).padStart(2, '0')).join('');
-  }
-  const k = [
-    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
-  ];
-  const input = new Uint8Array(buffer);
-  const padded = new Uint8Array(Math.ceil((input.length + 9) / 64) * 64);
-  padded.set(input);
-  padded[input.length] = 0x80;
-  const data = new DataView(padded.buffer);
-  const bits = input.length * 8;
-  data.setUint32(padded.length - 8, Math.floor(bits / 0x100000000));
-  data.setUint32(padded.length - 4, bits >>> 0);
-  const h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
-             0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
-  const rotr = (n, count) => (n >>> count) | (n << (32 - count));
-  const w = new Uint32Array(64);
-  for (let offset = 0; offset < padded.length; offset += 64) {
-    for (let i = 0; i < 16; i++) w[i] = data.getUint32(offset + i * 4);
-    for (let i = 16; i < 64; i++) {
-      const x = w[i - 15], y = w[i - 2];
-      const s0 = rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3);
-      const s1 = rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10);
-      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
-    }
-    let [a,b,c,d,e,f,g,z] = h;
-    for (let i = 0; i < 64; i++) {
-      const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
-      const choose = (e & f) ^ (~e & g);
-      const t1 = (z + s1 + choose + k[i] + w[i]) >>> 0;
-      const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
-      const majority = (a & b) ^ (a & c) ^ (b & c);
-      const t2 = (s0 + majority) >>> 0;
-      z = g; g = f; f = e; e = (d + t1) >>> 0;
-      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
-    }
-    for (const [i, value] of [a,b,c,d,e,f,g,z].entries()) h[i] = (h[i] + value) >>> 0;
-  }
-  return h.map(value => value.toString(16).padStart(8, '0')).join('');
-}
-
-async function handlePlanDisplayCommand(command, callSocket) {
-  const ack = { type: 'display.render_ack', command_id: command.command_id,
-    project_id: command.project_id, asset_id: command.asset_id,
-    sha256: '', status: 'load_failed' };
-  let blobUrl = null;
-  let shown = null;
-  const pending = { cancelled: false, controller: new AbortController() };
-  pendingPlanCommands.set(command.command_id, pending);
-  try {
-    if (!command.expected_sha256 || !/^[0-9a-f]{64}$/.test(command.expected_sha256)
-        || typeof command.project_id !== 'string' || !command.project_id
-        || !command.plan) throw Error('invalid command');
-    const assetUrl = new URL(command.url, location.origin);
-    if (assetUrl.origin !== location.origin
-        || assetUrl.pathname !== '/verified-plan/' + command.expected_sha256) {
-      throw Error('foreign asset');
-    }
-    const token = new URLSearchParams(location.search).get('token');
-    if (token) assetUrl.searchParams.set('token', token);
-    const response = await fetch(assetUrl, { cache: 'no-store', signal: pending.controller.signal });
-    if (!response.ok || !response.headers.get('content-type')?.startsWith('image/webp')) {
-      throw Error('asset unavailable');
-    }
-    const blob = await response.blob();
-    const digest = await planSha256Hex(await blob.arrayBuffer());
-    ack.sha256 = digest;
-    if (digest !== command.expected_sha256) {
-      ack.status = 'hash_mismatch';
-      throw Error('asset hash mismatch');
-    }
-    if (pending.cancelled || callSocket !== ws || callSocket.readyState !== WebSocket.OPEN
-        || document.visibilityState !== 'visible') throw Error('display not visible');
-    blobUrl = URL.createObjectURL(blob);
-    const decoded = new Image();
-    decoded.src = blobUrl;
-    await decoded.decode();
-    shown = showPlan(command.plan, blobUrl);
-    await shown.decode();
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    if (pending.cancelled || callSocket !== ws || callSocket.readyState !== WebSocket.OPEN
-        || document.visibilityState !== 'visible' || !shown.isConnected
-        || !shown.naturalWidth) throw Error('render not visible');
-    if (renderedPlanBlobUrl) URL.revokeObjectURL(renderedPlanBlobUrl);
-    renderedPlanBlobUrl = blobUrl;
-    renderedPlanCommandId = command.command_id;
-    blobUrl = null;
-    ack.status = 'rendered';
-  } catch {
-    if (shown && shown.isConnected && $('unitCard').contains(shown)) clearFrame();
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-    if (ack.status !== 'hash_mismatch') ack.status = 'load_failed';
-  }
-  pendingPlanCommands.delete(command.command_id);
-  if (!pending.cancelled && callSocket.readyState === WebSocket.OPEN) {
-    callSocket.send(JSON.stringify(ack));
-  }
+const planDisplay = PlanDisplayProtocol.create({
+  currentSocket: () => ws,
+  renderPlan: (plan, blobUrl) => showPlan(plan, blobUrl),
+  clearPlan: shown => {
+    if ($('unitCard').contains(shown)) clearFrame();
+  },
+});
+function cancelPlanDisplayCommand(commandId) { planDisplay.cancel(commandId); }
+function handlePlanDisplayCommand(command, callSocket) {
+  return planDisplay.handle(command, callSocket);
 }
 
 //: The available-units list — find_units' answer, on the same card
@@ -1944,6 +1908,7 @@ let lastLoudAt = 0;
 let quietTimer = null;
 
 function onMicLevel(rms) {
+  reportRobotMicLevel(rms);
   const pct = Math.min(100, Math.round(rms * 400));
   $('levelBar').style.width = pct + '%';
   // Asleep the bar moves and nothing else does. Driving the state off the
@@ -2367,9 +2332,8 @@ async function startMic() {
     wakeMicStream = null;
   } else {
     try {
-      const openedStream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
-      });
+      const openedStream = await openPreferredMic(
+        { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC });
       if (audioCtx !== callCtx) {
         openedStream.getTracks().forEach((t) => t.stop());
         return;
@@ -2935,9 +2899,8 @@ async function startWakeMode() {
     return;
   }
   try {
-    const openedStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
-    });
+    const openedStream = await openPreferredMic(
+      { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC });
     if (wakeWs !== sock || wakeStopping) { openedStream.getTracks().forEach(t => t.stop()); return; }
     wakeMicStream = openedStream;
   } catch (e) {

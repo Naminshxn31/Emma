@@ -1,5 +1,11 @@
 # Robot integration notes
 
+Latest hardware evidence and limits: [10 September live inspection](robot-live-inspection-2026-09-10.md).
+The delivered unit supports the direct SLAMTEC REST path. Its new-navigation
+gate defaults to `ROBOT_CHASSIS_MOTION_ENABLED=false` pending physical stop
+verification. The Android AAR path below remains relevant to SDK-based
+integration and the arms, but is not required merely to read the chassis.
+
 Current delivery checklist and verified limitations: [9 September readiness review](robot-arrival-2026-09-09.md). No Android bridge APK/AAR is bundled; software tests do not certify hardware readiness.
 
 The pre-arrival interactive simulator has been retired. This document describes

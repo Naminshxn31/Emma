@@ -174,6 +174,32 @@ def test_a_provider_that_fails_does_not_take_the_caller_down(live):
     asyncio.run(body())
 
 
+def test_only_a_greeting_announcement_requests_the_arm_gesture(live, monkeypatch):
+    from app import robot_arm
+
+    gestures = []
+
+    async def greet():
+        gestures.append("greet")
+        return True
+
+    monkeypatch.setattr(robot_arm, "greet", greet)
+
+    async def body():
+        display.set_audio_lead(0)
+        assert await events.announce(
+            "สวัสดีค่ะ", source="face_known", arm_greeting=True,
+            max_wait=5, then_pause=0,
+        ) is True
+        assert await events.announce(
+            "ถึงเวลาแล้วค่ะ", source="reminder", max_wait=5, then_pause=0,
+        ) is True
+
+    asyncio.run(body())
+    assert gestures == ["greet"]
+    assert live.provider.said == ["สวัสดีค่ะ", "ถึงเวลาแล้วค่ะ"]
+
+
 def test_a_summoning_announcement_rings_the_standby_browser(monkeypatch):
     """Hybrid mode means an alarm usually rings into a *parked* line: no
     session, but a standby browser listening for its name. The server can

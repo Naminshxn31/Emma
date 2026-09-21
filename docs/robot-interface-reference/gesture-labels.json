@@ -1,0 +1,40 @@
+{
+  "status": "research_reference_only",
+  "hardware_verified": false,
+  "joint_channel_map": null,
+  "source": {
+    "package": "com.aobo.robot.ai3",
+    "version_code": 278,
+    "dex_sha256": "1587455af53aa343415fe9ddbe2b24159b3130995bfc6e6ea7ae47357ed3cf00",
+    "class": "com.aobo.aibot.services.IdleActionService",
+    "method": "getActionName(int)",
+    "code_offset": 3820232,
+    "callers_found_in_recovered_aobo_bole_bytecode": 0
+  },
+  "caveat": "Method labels conflict with ActionConstants names. IDs are not validated board gestures or servo channels. Native/reflection callers were not ruled out.",
+  "machine_specific_group_evidence": [
+    {
+      "id": 3,
+      "status": "hardware_observed",
+      "result": "arm_on_left_side_of_camera_raised_and_elbow_bent_while_head_turned",
+      "name_confirmed": false
+    },
+    {
+      "id": 99,
+      "status": "vendor_command_path_confirmed",
+      "result": "reset_home_group_used_by_vendor_demo_and_initialization",
+      "hardware_observed_after_new_button": false
+    }
+  ],
+  "labels": [
+    {"id": 5, "label_zh": "敬礼", "label_th": "ทำความเคารพ", "conflicting_constant": "ACTION_TYPE_WAVE"},
+    {"id": 6, "label_zh": "握手", "label_th": "จับมือ", "conflicting_constant": "ACTION_TYPE_NOD"},
+    {"id": 7, "label_zh": "摆臂", "label_th": "แกว่งแขน", "conflicting_constant": "ACTION_TYPE_SHAKE"},
+    {"id": 8, "label_zh": "倒水", "label_th": "เทน้ำ", "conflicting_constant": "ACTION_TYPE_DANCE1"},
+    {"id": 9, "label_zh": "撕拉", "label_th": "ฉีก/ดึง", "conflicting_constant": "ACTION_TYPE_DANCE2"},
+    {"id": 10, "label_zh": "全部动作", "label_th": "ท่าทั้งหมด", "conflicting_constant": "ACTION_TYPE_BOW"},
+    {"id": 11, "label_zh": "摆臂行走", "label_th": "แกว่งแขนขณะเดิน", "conflicting_constant": "ACTION_TYPE_TURN"},
+    {"id": 12, "label_zh": "打招呼行走", "label_th": "ทักทายขณะเดิน", "conflicting_constant": "ACTION_TYPE_SALUTE"},
+    {"id": 13, "label_zh": "敬礼行走", "label_th": "ทำความเคารพขณะเดิน", "conflicting_constant": "ACTION_TYPE_POSE1"}
+  ]
+}

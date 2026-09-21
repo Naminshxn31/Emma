@@ -186,6 +186,16 @@ class Settings:
     #: until something reaches its target level — and the only thing there
     #: is the noise floor. Same failure as the compressor, different agent.
     mic_agc: bool = _get_bool("MIC_AGC", True)
+    #: Record the *call* microphone to data/call_debug/ for a listen-back,
+    #: off by default. The call path otherwise writes no audio (turnlog is
+    #: numbers only, by design); this is the WAKE_DEBUG equivalent for a live
+    #: call, so near-field / VAD_MIN_RMS can be tuned by ear against
+    #: front-vs-side recordings. Sensitive — customer speech on disk
+    #: (data/call_debug is gitignored). On only while chasing a mic problem.
+    call_debug: bool = _get_bool("CALL_DEBUG", False)
+    #: Seconds of the most recent call audio to keep (rolling buffer, so a
+    #: short controlled test call is captured whole).
+    call_debug_max_s: int = int(os.getenv("CALL_DEBUG_MAX_S", "180"))
 
     @property
     def call_mic_boost(self) -> float:
@@ -278,6 +288,14 @@ class Settings:
     # of its own logo, and index 1 is the real Facecam. Set the number here
     # once it is known so nothing has to search at startup.
     face_camera: int = int(os.getenv("FACE_CAMERA", "-1"))
+    #: Where frames come from: `local` = a lens on this machine via OpenCV
+    #: (FACE_CAMERA picks which); `robot` = JPEG frames the robot's kiosk
+    #: page sends to /ws/camera (`?cam=1`). The robot's cameras are on the
+    #: robot, an Android machine the server cannot open a device on - the
+    #: page it already runs is the only thing there that can. Anything
+    #: else is `local`: a typo must not silently turn the camera off.
+    face_camera_source: str = (
+        "robot" if os.getenv("FACE_CAMERA_SOURCE", "").strip().lower() == "robot" else "local")
     # How many CPU cores onnxruntime may use. Left to itself it takes every
     # one of them, and a 16-core showroom PC sat at 100% the moment the
     # camera came on — while also running a live voice session. Measured
@@ -630,6 +648,111 @@ class Settings:
     robot_mock_places: list[str] = field(default_factory=lambda: _get_list(
         "ROBOT_MOCK_PLACES", []))
 
+    # --- The chassis underneath the Aobo badge (SLAMTEC Slamware REST) ---
+    #
+    # Empty by default, which is every machine that has ever run this code:
+    # movement then takes the Android-app path `robot_link` was written for.
+    # Set it and the server drives the chassis itself and the app is only a
+    # voice client again — see `app/robot_chassis.py` for what that costs.
+    #
+    # The address is *not* the robot's Wi-Fi address. The navigation board
+    # lives on the robot's own internal network (192.168.11.1), reachable
+    # from the robot's tablet but not from the gallery LAN, so this is
+    # normally the near end of a tunnel rather than the board itself.
+    robot_chassis_url: str = os.getenv("ROBOT_CHASSIS_URL", "")
+    # Connection permits inspection; motion needs a separate deliberate opt-in
+    # after the physical stop and local operating area have been verified.
+    robot_chassis_motion_enabled: bool = _get_bool("ROBOT_CHASSIS_MOTION_ENABLED", False)
+    #: How often to ask the chassis what it is doing. This is the only clock
+    #: that ends a walk: REST has no callback, so nothing reports an arrival
+    #: unless somebody asks. Two seconds is well inside the guest's patience
+    #: and nowhere near the board's rate limits.
+    robot_chassis_poll_s: float = float(os.getenv("ROBOT_CHASSIS_POLL_S", "2.0"))
+    #: Per-request timeout. Short on purpose: a hung read must become
+    #: "unreachable" quickly, because the honest state while we cannot see
+    #: the robot is "unknown", and `snapshot()` reports that rather than
+    #: leaving a stale `moving` on screen.
+    robot_chassis_timeout_s: float = float(os.getenv("ROBOT_CHASSIS_TIMEOUT_S", "5.0"))
+    #: How close counts as arrived when the action ends without a status.
+    #: The vendor documentation says a finished action simply disappears, so
+    #: the fallback is the robot's own reported pose against where it was
+    #: sent — a measurement, not an assumption that HTTP 200 meant arrival.
+    robot_chassis_arrival_tolerance_m: float = float(
+        os.getenv("ROBOT_CHASSIS_ARRIVAL_TOLERANCE_M", "0.6"))
+    #: Hold-to-drive deadman. The joystick page re-sends its direction every
+    #: ~150 ms while a button is held; if the server hears nothing for this
+    #: long it cancels the chassis action itself. The board's own MoveByAction
+    #: is documented to stop when not re-sent, but how long *that* takes has
+    #: not been measured, and a robot must not depend on an unmeasured timer.
+    robot_drive_timeout_ms: int = int(os.getenv("ROBOT_DRIVE_TIMEOUT_MS", "400"))
+    #: Hold-to-drive will not push the robot toward anything the lidar sees
+    #: closer than this, in the direction of travel (metres from the lidar,
+    #: not from the shell). Owner's number, 2026-09-12. Turning in place and
+    #: driving *away* from the obstacle are never blocked — a robot that
+    #: cannot back out of a corner is stuck, not safe.
+    robot_drive_min_clearance_m: float = float(os.getenv("ROBOT_DRIVE_MIN_CLEARANCE_M", "0.3"))
+    #: "Save this spot" needs the robot to know where the spot is. Below this
+    #: `localization_quality` (0..100) the pose is odometry drift — on
+    #: 2026-09-12 that was (0, 0) for a robot really at (3.0, -4.1) — and a
+    #: destination saved from it would send every future guest to nowhere.
+    robot_poi_min_quality: int = int(os.getenv("ROBOT_POI_MIN_QUALITY", "50"))
+
+    # --- The upper body: a Torobot servo board on a serial port ---
+    #
+    # Separate from the chassis in every way that matters. The chassis is a
+    # navigation computer that answers questions about itself over HTTP; this
+    # is a servo controller that takes text on a wire, says nothing back, and
+    # has no stop command. Sharing one switch between them would mean turning
+    # on the half nobody has stood next to yet.
+    #
+    # Off by default and staying that way until somebody has found the servo
+    # power supply the manual says is on its own circuit, because that supply
+    # is the only real stop this hardware has.
+    robot_arm_enabled: bool = _get_bool("ROBOT_ARM_ENABLED", False)
+    #: The device node on the *robot*, not on this machine. On 2026-09-10 the
+    #: two USB-serial converters came up as ttyUSB10 and ttyUSB11 rather than
+    #: the SDK's documented default of ttyUSB1, so this is left empty: a
+    #: guessed path is a write into whatever else is on that port.
+    robot_arm_port: str = os.getenv("ROBOT_ARM_PORT", "")
+    #: Within the 9600-128000 the Astronaut manual lists for this board, and
+    #: matching the SDK default. The board detects the rate itself; this sets
+    #: the host end.
+    robot_arm_baud: int = int(os.getenv("ROBOT_ARM_BAUD", "115200"))
+    #: How far from centre a joint may be driven, in microseconds of pulse
+    #: width. 200 of a possible 1000 — deliberately a fraction of the travel,
+    #: to be widened by somebody who has watched the joint move and knows
+    #: which way it goes.
+    robot_arm_span: int = int(os.getenv("ROBOT_ARM_SPAN", "200"))
+    #: Playing a stored action group is the one control here whose extent
+    #: cannot be stated: the recording may drive any of the board's twenty
+    #: channels anywhere in their range. `ROBOT_ARM_SPAN` and the four-channel
+    #: list bound the stepping controls and do not touch it, so it gets its
+    #: own switch rather than riding in on `ROBOT_ARM_ENABLED`.
+    robot_arm_groups_enabled: bool = _get_bool("ROBOT_ARM_GROUPS_ENABLED", False)
+    #: Let Emma accompany a spoken greeting with one stored arm gesture.
+    #: This opt-in never bypasses the arm, motion, group, or disarm gates;
+    #: it only asks `robot_arm.run_group()` after the greeting has reached
+    #: the voice provider. Group 6 is the vendor face-recognition binding
+    #: (`faceregroupaction=6`, labelled handshake/greeting), but it has not
+    #: yet been physically confirmed on this robot.
+    robot_greeting_gesture_enabled: bool = _get_bool(
+        "ROBOT_GREETING_GESTURE_ENABLED", False
+    )
+    robot_greeting_arm_group: int = int(os.getenv("ROBOT_GREETING_ARM_GROUP", "6"))
+    #: The arm's motion interlock, mirroring `robot_chassis_motion_enabled`.
+    #: Off by default and switched off again on 2026-09-11 after the owner's
+    #: probe showed `#STOP` acknowledged (`#STOP+OK`) while channel 5 kept
+    #: moving to its target. Until a stop that has been *seen* to halt a
+    #: joint exists, nothing here may start one. Stop, prepare and state stay
+    #: available with this off — a lock that also disabled the brake would
+    #: be worse than no lock.
+    robot_arm_motion_enabled: bool = _get_bool("ROBOT_ARM_MOTION_ENABLED", False)
+    #: The bridge to the robot's shell. There is no route from this server to
+    #: that serial port except through the tablet the port is plugged into.
+    robot_arm_adb: str = os.getenv("ROBOT_ARM_ADB", "adb")
+    robot_arm_adb_serial: str = os.getenv("ROBOT_ARM_ADB_SERIAL", "")
+    robot_arm_timeout_s: float = float(os.getenv("ROBOT_ARM_TIMEOUT_S", "8.0"))
+
     # --- Server ---
     host: str = os.getenv("HOST", "0.0.0.0")
     port: int = int(os.getenv("PORT", "8000"))
@@ -650,15 +773,14 @@ class Settings:
 
     # --- Gemini Live (free tier available) ---
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-native-audio-preview-12-2025")
-    gemini_voice: str = os.getenv("GEMINI_VOICE", "Kore")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.8-live")
+    gemini_voice: str = os.getenv("GEMINI_VOICE", "Despina")
     #: Model to use if GEMINI_MODEL cannot be opened. Blank disables it.
     #:
-    #: The gallery runs a `-preview` model, and preview means Google may
-    #: withdraw it, rename it, or tighten its limits without much notice. On
-    #: the day that happens the robot goes silent for the whole day and the
-    #: only trace is a traceback nobody is watching. A slightly older voice is
-    #: a much smaller problem than a receptionist that does not answer.
+    #: Even a stable model can be unavailable for a key, region, or quota. On
+    #: the day that happens the assistant goes silent and the only trace may
+    #: be a traceback nobody is watching. A slightly older voice is a much
+    #: smaller problem than an assistant that does not answer.
     #:
     #: Only used for errors that say the *model* is unavailable — see
     #: `_model_is_unavailable`. A dropped connection still fails loudly.
@@ -666,7 +788,7 @@ class Settings:
         "GEMINI_MODEL_FALLBACK", "gemini-2.5-flash-native-audio-preview-12-2025")
     # Adapts the reply's tone to the guest's tone. Native-audio 2.5 only, and
     # needs the v1beta endpoint — ignored automatically on models without it.
-    gemini_affective_dialog: bool = _get_bool("GEMINI_AFFECTIVE_DIALOG", True)
+    gemini_affective_dialog: bool = _get_bool("GEMINI_AFFECTIVE_DIALOG", False)
     # Lets the model stay quiet when speech clearly isn't aimed at it — useful
     # for a robot standing in a busy gallery. Native-audio 2.5 only.
     gemini_proactive_audio: bool = _get_bool("GEMINI_PROACTIVE_AUDIO", False)
@@ -676,8 +798,9 @@ class Settings:
     # answering from a fixed fact sheet doesn't need it, so default to 0
     # (off). Raise it if answers start feeling shallow.
     gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
-    # Gemini 3.x Live uses levels instead of a token budget.
-    gemini_thinking_level: str = os.getenv("GEMINI_THINKING_LEVEL", "minimal")
+    # Gemini 3.1 and Gemini 3.8 Extended Thinking use levels. The standard
+    # Gemini 3.8 Live model rejects thinking_config, so the provider omits it.
+    gemini_thinking_level: str = os.getenv("GEMINI_THINKING_LEVEL", "low")
 
     # --- OpenAI Realtime (paid) ---
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
@@ -733,6 +856,12 @@ class Settings:
     #: Tune from the "vad floor: ... rms=X" log lines, not from theory —
     #: the first guess here was wrong by 3x for exactly this reason.
     vad_min_rms: float = float(os.getenv("VAD_MIN_RMS", "0"))
+    #: Near-field floor exceptions. Grace preserves a wake word tail while a
+    #: session opens; summoned bypass lets a camera-opened conversation hear
+    #: a reply from the doorway. A robot intended to hear only nearby people
+    #: sets both to 0/false after measuring its own mic.
+    vad_floor_grace_s: float = float(os.getenv("VAD_FLOOR_GRACE_S", "3"))
+    vad_summoned_bypass: bool = _get_bool("VAD_SUMMONED_BYPASS", True)
     # OpenAI only: semantic_vad waits on whether the sentence sounds finished.
     openai_turn_detection: str = os.getenv("OPENAI_TURN_DETECTION", "semantic_vad")
     openai_vad_eagerness: str = os.getenv("OPENAI_VAD_EAGERNESS", "medium")
@@ -766,6 +895,13 @@ class Settings:
     # their captions come out wrong; the reply language is unaffected either
     # way. "auto" restores full detection.
     transcribe_languages: str = os.getenv("TRANSCRIBE_LANGUAGES", "th-TH,en-US,zh-CN")
+
+    # `SMART` removes filler/repeated false starts, applies light cleanup and
+    # resolves an inline self-correction before the automatic transcript is
+    # shown. It remains a separate ASR result, not the native-audio model's
+    # private interpretation of the sound. `VERBATIM` keeps every hesitation
+    # when an operator needs the raw recogniser output for diagnosis.
+    transcribe_mode: str = os.getenv("TRANSCRIBE_MODE", "SMART").strip().upper()
 
     # Opt-in. The recogniser puts spaces between Thai words ("เอา ทุก คน
     # เลย"); Thai isn't written that way. Turning this on collapses a space

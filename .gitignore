@@ -2,9 +2,13 @@
 # Local diagnostics and proprietary robot delivery files
 debug.log
 vendor/aobo/incoming/
+# Scratch extractions — Android SDK/Gradle/toolchain + robot SDK dumps (~15k files,
+# hundreds of MB). Never tracked; this is what made the SCM show "10000 changes".
+.tmp/
 tools/android/platform-tools/
 tools/android/*.zip
 tools/android/download-receipt.json
+tools/android/xbox-direct/
 # Local HTTPS private key and certificate (regenerate with mkcert per machine)
 certs/
 __pycache__/
@@ -18,6 +22,7 @@ venv/
 # Scratch run directories from `pytest --basetemp=...`. Seven of them had
 # collected at the repo root; none are worth a line in anyone's diff.
 .pytest_*/
+.pytest-*/
 .pytest-tmp-*/
 
 # Hub identity (MAC/IP of the Broadlink device on your network)
@@ -74,6 +79,7 @@ data/projects/*/presentations/canva-render/
 data/wake/
 data/wake_debug/
 data/wake_enroll/
+data/call_debug/
 data/emma-corpus/
 
 # Emma's timers, reminders and memory — the owner's own data, not the repo's
@@ -88,8 +94,11 @@ data/personal-docs/
 #   python scripts/fetch_face_model.py
 data/faces/
 
-# Showroom CAD model retained as a local reference, not used by the voice server.
-data/showroom/*.glb
+# Showroom CAD model and derived maps are site-specific local references.
+data/showroom/
+
+# Hardware inspection and maps contain site-specific information.
+data/robot-inspection/
 
 # Generated Gradle state and Android build output for the Emma voice app.
 apps/emma-ai-voice/.gradle/

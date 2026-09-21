@@ -25,9 +25,15 @@ def test_31_greeting_and_arrival_use_realtime_text(model):
     provider._session.send_client_content.assert_not_awaited()
 
 
-def test_25_keeps_complete_user_turn():
+@pytest.mark.parametrize("model", [
+    "gemini-2.5-flash-native-audio-preview-12-2025",
+    "gemini-3.8-live",
+    "models/gemini-3.8-live",
+    "gemini-3.8-live-extended-thinking",
+])
+def test_models_other_than_31_keep_complete_user_turn(model):
     provider = GeminiProvider.__new__(GeminiProvider)
-    provider.model = "gemini-2.5-flash-native-audio-preview-12-2025"
+    provider.model = model
     provider._session = AsyncMock()
     asyncio.run(provider.send_text("ทักทายสั้นๆ"))
     call = provider._session.send_client_content.await_args.kwargs

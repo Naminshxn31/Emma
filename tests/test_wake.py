@@ -101,7 +101,53 @@ def test_an_unencodable_custom_word_disables_cleanly(monkeypatch, tmp_path):
     assert wake.available() is False
 
 
+def test_the_meter_level_is_published_without_wake_debug():
+    """The cockpit's mic meter reads a live level even with WAKE_DEBUG off.
+
+    The bug this guards, found on the robot 2026-09-12: the level publish sat
+    inside `_report`, which only runs under WAKE_DEBUG / WAKE_ENROLL, so on the
+    sales-floor machine (neither set) /mic/level read `streaming=false` while
+    the microphone was in fact sending 128 frames a second. A meter that is
+    dark unless a debug flag is on is the same "is the mic even on?" blind spot
+    the meter exists to remove. No model needed — this is the publish, not the
+    detector.
+    """
+    import numpy as np
+
+    wake._LAST_LEVEL = 0.0
+    wake._LAST_LEVEL_AT = 0.0
+    assert wake.mic_level()["age_s"] is None  # baseline: never reported
+
+    stream = wake.WakeStream.__new__(wake.WakeStream)
+    stream._publish_level(np.full(320, 0.1, dtype="float32"))
+
+    out = wake.mic_level()
+    assert out["streaming"] is True
+    assert out["age_s"] is not None and out["age_s"] < 1.0
+    assert abs(out["level"] - 0.1) < 1e-3
+
+
 # ==================== detection: needs the real model ====================
+
+
+@needs_model
+def test_the_meter_updates_from_feed_with_wake_debug_off(monkeypatch):
+    """End to end: feeding audio publishes the meter level even when neither
+    diagnostic flag is set — i.e. `feed` calls the publish unconditionally,
+    not from behind the WAKE_DEBUG gate that hid it on the robot."""
+    monkeypatch.setattr(settings, "wake_enabled", True)
+    monkeypatch.setattr(settings, "wake_debug", False)
+    monkeypatch.setattr(settings, "wake_enroll", False)
+    wake._LAST_LEVEL_AT = 0.0
+
+    stream = wake.WakeStream()
+    assert stream.ok
+    pcm = _pcm("emma.wav")
+    for i in range(0, min(len(pcm), 3200 * 4), 3200):
+        stream.feed(pcm[i:i + 3200])
+
+    out = wake.mic_level()
+    assert out["streaming"] is True and out["age_s"] is not None
 
 
 @needs_model

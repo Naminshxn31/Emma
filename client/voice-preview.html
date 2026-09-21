@@ -1,0 +1,2613 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090b10">
+<title>Emma Voice — Preview</title>
+<script>
+  if (new URLSearchParams(location.search).get('app') === '1') {
+    document.documentElement.classList.add('app-shell');
+  }
+</script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #090b10;
+    --surface: rgba(255,255,255,.065);
+    --surface-strong: rgba(255,255,255,.105);
+    --line: rgba(255,255,255,.11);
+    --ink: #f7f7f4;
+    --muted: #969ba7;
+    --soft: #cfd2d9;
+    --accent: #78e1ad;
+    --accent-strong: #34ca83;
+    --danger: #ff8193;
+    --shadow: 0 24px 80px rgba(0,0,0,.38);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; margin: 0; }
+  button { font: inherit; }
+
+  body {
+    min-height: 100dvh;
+    color: var(--ink);
+    font: 16px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* Flat dark, no ambient glow (owner, 2026-09-14 "เอาพื้นหลังออก"). */
+    background: linear-gradient(160deg, #0e1219 0%, var(--bg) 55%, #07080b 100%);
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: .18;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.14'/%3E%3C/svg%3E");
+  }
+
+  .shell {
+    position: relative;
+    isolation: isolate;
+    width: min(100%, 520px);
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: clamp(18px, 3vh, 28px);
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    color: var(--ink);
+    font-size: clamp(1.05rem, 4.5vw, 1.24rem);
+    font-weight: 650;
+    letter-spacing: -.015em;
+  }
+
+  .hero {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: clamp(6px, 1.5vh, 16px);
+  }
+
+  .mascot-wrap {
+    /* Emma sits centre by default. She only steps aside to the bottom-right
+       corner while a card / plan / photo is on the stage (owner, 2026-09-14
+       "ปกติก็เอาไว้ตรงกลาง ย้ายตอนให้แสดงรูปแทนหุ่น") — see body.emma-staging. */
+    position: relative;
+    width: min(88vw, 360px);
+    aspect-ratio: 720 / 860;
+    display: grid;
+    place-items: center;
+    perspective: 760px;
+    transform-style: preserve-3d;
+    --tilt-x: 0deg;
+    --tilt-y: 0deg;
+    --light-x: 50%;
+    --light-y: 30%;
+    --head-x: 0px;
+    --head-y: 0px;
+    --head-rotate: 0deg;
+    --head-scale: 1;
+    --body-x: 0px;
+    --body-y: 0px;
+    --body-rotate: 0deg;
+    --body-scale: 1;
+    --arm-left: 5deg;
+    --arm-right: -5deg;
+    --mouth-scale: .18;
+    --gaze-x: 0px;
+    --gaze-y: 0px;
+    --state-accent: #7cecff;
+    --state-rgb: 124, 236, 255;
+    --user-x: 0px;
+    --user-y: 0px;
+    --user-scale: 1;
+    cursor: grab;
+    touch-action: none;
+    outline: none;
+  }
+
+  /* No focus ring on the mascot. It was drawn on .mascot-wrap, which stays at
+     its home position while only the inner rig is dragged — so focusing the
+     mascot (a pointer-drag calls scene.focus()) left a green circle floating
+     at centre with nothing in it (owner, 2026-09-14 "วงกลมเขียวๆ...ไม่หาย").
+     The wrap keeps outline:none; keyboard users still move/resize with the
+     arrow keys and it stays reachable via tabindex. */
+
+  .mascot-wrap.is-dragging { cursor: grabbing; }
+
+  /* The .mascot-wrap::before/::after halo decorations were deleted outright
+     (owner, 2026-09-14 "เอาวงกลม...ออก"): they lived on the wrap, not the
+     dragged rig, and stayed centred as a ghost ring when Emma moved. The
+     mascot keeps its own SVG floor-ring halo, inside the rig. */
+
+  .orbit {
+    /* Removed on the owner's call (2026-09-14 "เอาวงกลม...ออก"): the orbit
+       rings sit outside the drag transform, so they stayed centred when Emma
+       moved to the corner — a circle floating with nothing in it. Markup and
+       keyframes kept so the design reference is intact if they return. */
+    display: none;
+    position: absolute;
+    width: 69%;
+    aspect-ratio: 1;
+    border: 1px solid rgba(171,204,225,.15);
+    border-radius: 50%;
+    pointer-events: none;
+    transform-style: preserve-3d;
+  }
+
+  .orbit.one {
+    animation: orbit-one 10s linear infinite;
+    box-shadow: 0 0 22px rgba(119,164,194,.08);
+  }
+
+  .orbit.two {
+    width: 63%;
+    border-color: rgba(120,225,173,.12);
+    animation: orbit-two 13s linear infinite reverse;
+  }
+
+  .mascot-rig {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    transform-style: preserve-3d;
+    transform:
+      translate(var(--user-x), var(--user-y))
+      scale(var(--user-scale))
+      rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    transition: transform .12s ease-out, opacity .24s ease;
+    will-change: transform;
+  }
+
+  .mascot-rive {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transform:
+      translate(var(--user-x), var(--user-y))
+      scale(var(--user-scale))
+      rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    filter: drop-shadow(0 30px 30px rgba(0,0,0,.42));
+    transition: transform .12s ease-out, opacity .24s ease;
+    pointer-events: none;
+  }
+
+  .mascot-wrap.rive-ready .mascot-rive { opacity: 1; }
+  .mascot-wrap.rive-ready .mascot-rig {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .mascot-float {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    animation: float-3d 5.2s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  .mascot-turn {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    animation: ambient-turn 6.4s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  .mascot-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    transform: translateZ(34px);
+    filter: drop-shadow(0 30px 30px rgba(0,0,0,.42));
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .rig-character,
+  .puppet-part,
+  .face-part {
+    transform-box: view-box;
+    will-change: transform;
+  }
+
+  .rig-character {
+    transform-origin: 50% 64%;
+    animation: robot-alive 3.4s ease-in-out infinite;
+  }
+
+  .puppet-part,
+  .face-part {
+    transition:
+      transform .72s cubic-bezier(.2,.86,.25,1),
+      opacity .28s ease;
+  }
+
+  .puppet-part > svg,
+  .face-part > svg { overflow: hidden; }
+
+  .limb-sprite {
+    opacity: 0;
+    transition: opacity .24s ease, transform .72s cubic-bezier(.2,.86,.25,1);
+  }
+  [data-emma-left-hand="relaxed"] .puppet-arm-left .limb-relaxed,
+  [data-emma-left-hand="open"] .puppet-arm-left .limb-open,
+  [data-emma-right-hand="relaxed"] .puppet-arm-right .limb-relaxed,
+  [data-emma-right-hand="open"] .puppet-arm-right .limb-open { opacity: 1; }
+
+  .puppet-head {
+    transform-origin: 611px 510px;
+    transform:
+      translate(var(--head-x), var(--head-y))
+      rotate(var(--head-rotate))
+      scale(var(--head-scale));
+  }
+
+  .puppet-body {
+    transform-origin: 611px 770px;
+    transform:
+      translate(var(--body-x), var(--body-y))
+      rotate(var(--body-rotate))
+      scale(var(--body-scale));
+  }
+
+  .puppet-arm-left {
+    transform-origin: 478px 680px;
+    transform: rotate(var(--arm-left));
+  }
+
+  .puppet-arm-right {
+    transform-origin: 744px 680px;
+    transform: rotate(var(--arm-right));
+  }
+
+  .puppet-wai-hands {
+    opacity: 0;
+    transform-origin: 611px 780px;
+    transform: translateY(28px) scale(.82);
+  }
+
+  .puppet-floor-ring {
+    transform-origin: 611px 1015px;
+    animation: puppet-ring-pulse 2.1s ease-in-out infinite;
+    color: var(--state-accent);
+  }
+
+  .emma-data-orbit,
+  .face-display {
+    transform-box: view-box;
+    transform-origin: center;
+  }
+
+  .emma-data-orbit {
+    color: var(--state-accent);
+    opacity: .72;
+    transform-origin: 611px 1030px;
+    animation: emma-data-spin 8s linear infinite;
+  }
+
+  .face-display {
+    transform: translate(var(--gaze-x), var(--gaze-y));
+    transition: transform .18s ease-out;
+  }
+
+  .mascot-wrap[data-emma-state="idle"] {
+    --state-accent: #77e8ff;
+    --state-rgb: 119, 232, 255;
+  }
+  .mascot-wrap[data-emma-state="listening"] {
+    --state-accent: #69edba;
+    --state-rgb: 105, 237, 186;
+  }
+  .mascot-wrap[data-emma-state="thinking"],
+  .mascot-wrap[data-emma-state="loading"] {
+    --state-accent: #b69cff;
+    --state-rgb: 182, 156, 255;
+  }
+  .mascot-wrap[data-emma-state="speaking"],
+  .mascot-wrap[data-emma-state="greeting"],
+  .mascot-wrap[data-emma-state="happy"],
+  .mascot-wrap[data-emma-state="grateful"] {
+    --state-accent: #63dcff;
+    --state-rgb: 99, 220, 255;
+  }
+  .mascot-wrap[data-emma-state="error"],
+  .mascot-wrap[data-emma-state="frustrated"] {
+    --state-accent: #ff8193;
+    --state-rgb: 255, 129, 147;
+  }
+
+  .mascot-wrap[data-emma-state="listening"] .puppet-floor-ring {
+    animation-duration: 1.25s;
+  }
+  .mascot-wrap[data-emma-state="thinking"] .emma-data-orbit,
+  .mascot-wrap[data-emma-state="loading"] .emma-data-orbit {
+    opacity: 1;
+    animation-duration: 2.2s;
+  }
+
+  .puppet-aura {
+    opacity: 0;
+    transform-origin: 611px 390px;
+    transition: opacity .36s ease;
+  }
+
+  [data-emma-pose="pose-10"] .puppet-aura {
+    opacity: .86;
+    animation: puppet-aura-breathe 2.1s ease-in-out infinite;
+  }
+
+  .face-part { opacity: 0; }
+  [data-emma-eyes="smile"] .eyes-smile,
+  [data-emma-eyes="sad"] .eyes-sad,
+  [data-emma-eyes="squeeze"] .eyes-squeeze,
+  [data-emma-mouth="smile"] .mouth-smile,
+  [data-emma-mouth="small"] .mouth-small,
+  [data-emma-mouth="wide"] .mouth-wide,
+  [data-emma-mouth="sad"] .mouth-sad { opacity: 1; }
+
+  .eyes-smile {
+    transform-origin: 611px 368px;
+    animation: puppet-blink 4.6s ease-in-out infinite;
+  }
+
+  .eyes-sad { transform: rotate(180deg) translateY(-20px); transform-origin: 611px 368px; }
+  .eyes-squeeze { transform: scaleY(.62); transform-origin: 611px 368px; }
+  .mouth-small,
+  .mouth-wide { transform-origin: 611px 535px; transform: scaleY(var(--mouth-scale)); }
+  /* The silver head already contains its chrome smile plate. A second smile
+     sprite on top reads as two mouths, so neutral/happy poses use that plate
+     alone. Live speech is clipped to the small centre aperture; the sad mouth
+     sits above the plate on the white face. */
+  .mouth-smile { display: none; }
+  .mouth-sad {
+    transform: translateY(-72px);
+    transform-origin: 611px 455px;
+  }
+
+  .mascot-wrap.has-live-mouth .mouth-small,
+  .mascot-wrap.has-live-mouth .mouth-wide {
+    transition-duration: .08s;
+  }
+
+  [data-emma-pose="wai"] .puppet-arm-left,
+  [data-emma-pose="wai"] .puppet-arm-right,
+  [data-emma-pose="pose-07"] .puppet-arm-left,
+  [data-emma-pose="pose-07"] .puppet-arm-right,
+  [data-emma-pose="pose-09"] .puppet-arm-left,
+  [data-emma-pose="pose-09"] .puppet-arm-right,
+  [data-emma-pose="pose-10"] .puppet-arm-left,
+  [data-emma-pose="pose-10"] .puppet-arm-right { opacity: 0; }
+  [data-emma-pose="wai"] .puppet-wai-hands,
+  [data-emma-pose="pose-07"] .puppet-wai-hands,
+  [data-emma-pose="pose-09"] .puppet-wai-hands,
+  [data-emma-pose="pose-10"] .puppet-wai-hands {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  [data-emma-pose="wai"] .puppet-wai-hands {
+    animation: puppet-wai-hands 2.2s ease-in-out infinite .72s;
+  }
+
+  [data-emma-pose="pose-05"] .puppet-arm-right {
+    animation: puppet-wave .72s ease-in-out infinite .72s;
+  }
+  [data-emma-pose="pose-06"] .puppet-body {
+    animation: puppet-celebrate 1.05s ease-in-out infinite .72s;
+  }
+  [data-emma-pose="pose-08"] .puppet-head {
+    animation: puppet-frustrated .48s ease-in-out 3 .72s;
+  }
+  [data-emma-pose="pose-10"] .puppet-floor-ring {
+    animation: puppet-ring-loading 1.05s linear infinite;
+  }
+
+  /* State motion uses short anticipation / action / settle loops, mirroring
+     the timing language in the supplied Rive references. The selected silver
+     artwork stays mounted; only its puppet joints and lightweight props move. */
+  .mascot-wrap[data-emma-state="idle"] .puppet-head {
+    animation: emma-idle-look 5.6s cubic-bezier(.45,0,.25,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="listening"] .puppet-head {
+    animation: emma-listen-lean 2.6s cubic-bezier(.22,.8,.28,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="listening"] .puppet-body {
+    animation: emma-listen-body 2.6s cubic-bezier(.22,.8,.28,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="thinking"] .puppet-head {
+    animation: emma-search-head 2.6s cubic-bezier(.4,0,.2,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="thinking"] .puppet-arm-right {
+    animation: emma-search-hand 2.6s cubic-bezier(.4,0,.2,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="speaking"] .puppet-head {
+    animation: emma-talk-head 1.7s cubic-bezier(.3,0,.2,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="speaking"] .puppet-body {
+    animation: emma-talk-body 1.7s cubic-bezier(.3,0,.2,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="speaking"] .puppet-arm-left {
+    animation: emma-talk-left 3.4s cubic-bezier(.22,.8,.28,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="speaking"] .puppet-arm-right {
+    animation: emma-talk-right 3.4s cubic-bezier(.22,.8,.28,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="greeting"] .puppet-arm-right {
+    animation: emma-greeting-wave 1.55s cubic-bezier(.22,.8,.28,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="happy"] .rig-character {
+    animation: emma-happy-bounce 1.85s cubic-bezier(.22,.9,.24,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="happy"] .puppet-arm-left {
+    animation: emma-happy-left 1.85s cubic-bezier(.22,.9,.24,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="happy"] .puppet-arm-right {
+    animation: emma-happy-right 1.85s cubic-bezier(.22,.9,.24,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="error"] .puppet-head {
+    animation: emma-error-drop 2.2s cubic-bezier(.22,.8,.28,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="frustrated"] .puppet-head {
+    animation: emma-frustrated-shake .62s cubic-bezier(.36,.07,.19,.97) infinite;
+  }
+  .mascot-wrap[data-emma-state="frustrated"] .puppet-arm-left {
+    animation: emma-frustrated-left 1.24s ease-in-out infinite;
+  }
+  .mascot-wrap[data-emma-state="frustrated"] .puppet-arm-right {
+    animation: emma-frustrated-right 1.24s ease-in-out infinite;
+  }
+  .mascot-wrap[data-emma-state="grateful"] .puppet-head {
+    animation: emma-thank-bow 2.2s cubic-bezier(.22,.8,.28,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="loading"] .puppet-head {
+    animation: emma-scan-look 2.6s cubic-bezier(.4,0,.2,1) infinite;
+  }
+
+  .emma-motion-prop {
+    opacity: 0;
+    color: var(--state-accent);
+    transform-box: fill-box;
+    transform-origin: center;
+    pointer-events: none;
+    transition: opacity .22s ease;
+  }
+  .mascot-wrap[data-emma-state="thinking"] .prop-search {
+    opacity: .92;
+    animation: emma-prop-search 2.6s cubic-bezier(.4,0,.2,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="error"] .prop-alert,
+  .mascot-wrap[data-emma-state="frustrated"] .prop-alert {
+    opacity: .95;
+    animation: emma-prop-alert 1.1s ease-in-out infinite;
+  }
+  .mascot-wrap[data-emma-state="happy"] .prop-heart,
+  .mascot-wrap[data-emma-state="grateful"] .prop-heart {
+    opacity: .95;
+    animation: emma-prop-heart 1.7s cubic-bezier(.22,.9,.24,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="loading"] .prop-scan {
+    opacity: .86;
+    animation: emma-prop-scan 2.6s cubic-bezier(.4,0,.2,1) infinite;
+  }
+  .mascot-wrap[data-emma-state="loading"] .prop-scan-line {
+    animation: emma-scan-line 1.35s ease-in-out infinite;
+  }
+
+  .mascot-glint {
+    position: absolute;
+    inset: 8% 25% 48%;
+    z-index: 2;
+    pointer-events: none;
+    opacity: .24;
+    transform: translateZ(46px);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at var(--light-x) var(--light-y), rgba(255,255,255,.9), transparent 16%),
+      linear-gradient(112deg, transparent 30%, rgba(255,255,255,.46) 47%, transparent 61%);
+    background-size: 100% 100%, 230% 100%;
+    mix-blend-mode: screen;
+    animation: glint 4.8s ease-in-out infinite;
+  }
+
+  .reply {
+    width: min(100%, 430px);
+    padding: 0 10px;
+    text-align: center;
+  }
+
+  .reply-text {
+    min-height: 4.8em;
+    margin: 0;
+    color: #e3e5e9;
+    font-size: clamp(1rem, 4.3vw, 1.14rem);
+    line-height: 1.58;
+    text-wrap: pretty;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 20px;
+  }
+
+  .control {
+    min-width: 74px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #b5bac4;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .control-icon {
+    width: 54px;
+    height: 54px;
+    display: grid;
+    place-items: center;
+    color: #eef0f3;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    box-shadow: 0 10px 26px rgba(0,0,0,.22);
+    backdrop-filter: blur(12px);
+    transition: transform .18s ease, background .18s ease, border-color .18s ease;
+  }
+
+  .control svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .control-label {
+    font-size: .7rem;
+    font-weight: 600;
+  }
+
+  .control:hover .control-icon {
+    transform: translateY(-2px);
+    background: var(--surface-strong);
+    border-color: rgba(255,255,255,.2);
+  }
+
+  .control:active .control-icon { transform: scale(.94); }
+  .control:focus-visible { outline: none; }
+  .control:focus-visible .control-icon { outline: 3px solid rgba(120,225,173,.35); outline-offset: 4px; }
+
+  .control.mic { color: #dff9ec; }
+  .control.mic .control-icon {
+    width: 76px;
+    height: 76px;
+    color: #07150f;
+    background: radial-gradient(circle at 36% 28%, #dff9ec 0%, var(--accent) 48%, var(--accent-strong) 100%);
+    border: 0;
+    box-shadow: 0 18px 38px rgba(52,202,131,.28), 0 0 0 7px rgba(120,225,173,.07);
+  }
+  .control.mic svg { width: 28px; height: 28px; stroke-width: 2.15; }
+
+  .control.end { justify-self: end; color: #d3a4ac; }
+  .control.end .control-icon { color: var(--danger); }
+  .control.message { justify-self: start; }
+
+  @keyframes halo {
+    0%, 100% { transform: scale(.96); opacity: .78; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+  @keyframes halo-ring {
+    0%, 100% { transform: translateX(-50%) rotateX(62deg) scale(.92); opacity: .62; }
+    50% { transform: translateX(-50%) rotateX(68deg) scale(1.08); opacity: 1; }
+  }
+  @keyframes orbit-one {
+    from { transform: rotateX(68deg) rotateY(18deg) rotateZ(0deg); }
+    to { transform: rotateX(68deg) rotateY(18deg) rotateZ(360deg); }
+  }
+  @keyframes orbit-two {
+    from { transform: rotateX(76deg) rotateY(-22deg) rotateZ(0deg); }
+    to { transform: rotateX(76deg) rotateY(-22deg) rotateZ(360deg); }
+  }
+  @keyframes float-3d {
+    0%, 100% { transform: translate3d(0, 4px, 0) rotateZ(-.8deg) scale(1); }
+    35% { transform: translate3d(0, -9px, 10px) rotateZ(.9deg) scale(1.018); }
+    68% { transform: translate3d(0, -4px, 18px) rotateZ(-.25deg) scale(1.008); }
+  }
+  @keyframes ambient-turn {
+    0%, 100% { transform: rotateX(-3deg) rotateY(-7deg); }
+    28% { transform: rotateX(3deg) rotateY(5deg); }
+    56% { transform: rotateX(-1deg) rotateY(8deg); }
+    78% { transform: rotateX(4deg) rotateY(-3deg); }
+  }
+  @keyframes robot-alive {
+    0%, 100% { transform: translateY(5px) scale(1); }
+    38% { transform: translateY(-8px) scale(.985, 1.025); }
+    66% { transform: translateY(-1px) scale(1.018, .982); }
+  }
+  @keyframes puppet-blink {
+    0%, 43%, 47%, 100% { transform: scaleY(1); }
+    45% { transform: scaleY(.06); }
+  }
+  @keyframes puppet-wave {
+    0%, 100% { transform: rotate(var(--arm-right)); }
+    35% { transform: rotate(calc(var(--arm-right) - 18deg)); }
+    70% { transform: rotate(calc(var(--arm-right) + 12deg)); }
+  }
+  @keyframes puppet-celebrate {
+    0%, 100% {
+      transform: translate(var(--body-x), var(--body-y)) rotate(var(--body-rotate)) scale(var(--body-scale));
+    }
+    45% {
+      transform: translate(var(--body-x), calc(var(--body-y) - 15px)) rotate(var(--body-rotate)) scale(1.045, .97);
+    }
+  }
+  @keyframes puppet-frustrated {
+    0%, 100% {
+      transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale));
+    }
+    35% {
+      transform: translate(calc(var(--head-x) - 8px), var(--head-y)) rotate(calc(var(--head-rotate) - 2deg)) scale(var(--head-scale));
+    }
+    70% {
+      transform: translate(calc(var(--head-x) + 8px), var(--head-y)) rotate(calc(var(--head-rotate) + 2deg)) scale(var(--head-scale));
+    }
+  }
+  @keyframes puppet-wai-hands {
+    0%, 100% { transform: translateY(0) scale(1); }
+    45% { transform: translateY(8px) scale(.985); }
+  }
+  @keyframes puppet-ring-pulse {
+    0%, 100% { transform: scale(.92); opacity: .58; }
+    50% { transform: scale(1.07); opacity: 1; }
+  }
+  @keyframes puppet-ring-loading {
+    0%, 100% { transform: scale(.9); opacity: .48; }
+    50% { transform: scale(1.12); opacity: 1; }
+  }
+  @keyframes emma-data-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes emma-idle-look {
+    0%, 18%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+    34% { transform: translate(calc(var(--head-x) - 5px), calc(var(--head-y) - 2px)) rotate(calc(var(--head-rotate) - 1.8deg)) scale(var(--head-scale)); }
+    57% { transform: translate(calc(var(--head-x) + 4px), calc(var(--head-y) - 4px)) rotate(calc(var(--head-rotate) + 1.4deg)) scale(var(--head-scale)); }
+    76% { transform: translate(var(--head-x), calc(var(--head-y) + 1px)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+  }
+  @keyframes emma-listen-lean {
+    0%, 12%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+    30%, 55% { transform: translate(calc(var(--head-x) + 9px), calc(var(--head-y) - 7px)) rotate(calc(var(--head-rotate) + 4.2deg)) scale(calc(var(--head-scale) * 1.012)); }
+    72% { transform: translate(calc(var(--head-x) - 2px), calc(var(--head-y) - 2px)) rotate(calc(var(--head-rotate) - .8deg)) scale(var(--head-scale)); }
+  }
+  @keyframes emma-listen-body {
+    0%, 12%, 100% { transform: translate(var(--body-x), var(--body-y)) rotate(var(--body-rotate)) scale(var(--body-scale)); }
+    34%, 58% { transform: translate(calc(var(--body-x) + 3px), calc(var(--body-y) + 2px)) rotate(calc(var(--body-rotate) + 1.8deg)) scale(var(--body-scale)); }
+  }
+  @keyframes emma-search-head {
+    0%, 10%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+    28% { transform: translate(calc(var(--head-x) - 11px), calc(var(--head-y) - 5px)) rotate(calc(var(--head-rotate) - 4deg)) scale(calc(var(--head-scale) * 1.01)); }
+    58% { transform: translate(calc(var(--head-x) + 10px), calc(var(--head-y) - 6px)) rotate(calc(var(--head-rotate) + 4deg)) scale(calc(var(--head-scale) * 1.01)); }
+    78% { transform: translate(var(--head-x), calc(var(--head-y) - 3px)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+  }
+  @keyframes emma-search-hand {
+    0%, 10%, 100% { transform: rotate(var(--arm-right)); }
+    28%, 64% { transform: rotate(calc(var(--arm-right) - 12deg)); }
+    80% { transform: rotate(calc(var(--arm-right) + 4deg)); }
+  }
+  @keyframes emma-talk-head {
+    0%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(calc(var(--head-rotate) - 1deg)) scale(var(--head-scale)); }
+    38% { transform: translate(var(--head-x), calc(var(--head-y) - 7px)) rotate(calc(var(--head-rotate) + 1.6deg)) scale(calc(var(--head-scale) * 1.012)); }
+    68% { transform: translate(var(--head-x), calc(var(--head-y) - 2px)) rotate(calc(var(--head-rotate) - .4deg)) scale(var(--head-scale)); }
+  }
+  @keyframes emma-talk-body {
+    0%, 100% { transform: translate(var(--body-x), var(--body-y)) rotate(var(--body-rotate)) scale(var(--body-scale)); }
+    42% { transform: translate(var(--body-x), calc(var(--body-y) - 5px)) rotate(calc(var(--body-rotate) + 1deg)) scale(calc(var(--body-scale) * 1.012)); }
+  }
+  @keyframes emma-talk-left {
+    0%, 12%, 48%, 100% { transform: rotate(var(--arm-left)); }
+    23% { transform: rotate(calc(var(--arm-left) + 18deg)); }
+    36% { transform: rotate(calc(var(--arm-left) - 8deg)); }
+  }
+  @keyframes emma-talk-right {
+    0%, 50%, 100% { transform: rotate(var(--arm-right)); }
+    62% { transform: rotate(calc(var(--arm-right) - 18deg)); }
+    76% { transform: rotate(calc(var(--arm-right) + 10deg)); }
+    90% { transform: rotate(calc(var(--arm-right) - 6deg)); }
+  }
+  @keyframes emma-greeting-wave {
+    0%, 12%, 100% { transform: rotate(var(--arm-right)); }
+    27% { transform: rotate(calc(var(--arm-right) - 23deg)); }
+    43% { transform: rotate(calc(var(--arm-right) + 15deg)); }
+    59% { transform: rotate(calc(var(--arm-right) - 18deg)); }
+    75% { transform: rotate(calc(var(--arm-right) + 9deg)); }
+  }
+  @keyframes emma-happy-bounce {
+    0%, 14%, 100% { transform: translateY(4px) scale(1); }
+    34% { transform: translateY(-18px) scale(1.025, .98); }
+    52% { transform: translateY(-7px) scale(.99, 1.018); }
+    68% { transform: translateY(-12px) scale(1.012, .99); }
+    82% { transform: translateY(1px) scale(1); }
+  }
+  @keyframes emma-happy-left {
+    0%, 100% { transform: rotate(var(--arm-left)); }
+    35%, 62% { transform: rotate(calc(var(--arm-left) + 20deg)); }
+  }
+  @keyframes emma-happy-right {
+    0%, 100% { transform: rotate(var(--arm-right)); }
+    35%, 62% { transform: rotate(calc(var(--arm-right) - 20deg)); }
+  }
+  @keyframes emma-error-drop {
+    0%, 12%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+    35%, 70% { transform: translate(var(--head-x), calc(var(--head-y) + 13px)) rotate(calc(var(--head-rotate) - 2deg)) scale(calc(var(--head-scale) * .98)); }
+    82% { transform: translate(var(--head-x), calc(var(--head-y) + 5px)) rotate(calc(var(--head-rotate) + 1deg)) scale(var(--head-scale)); }
+  }
+  @keyframes emma-frustrated-shake {
+    0%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+    25% { transform: translate(calc(var(--head-x) - 8px), var(--head-y)) rotate(calc(var(--head-rotate) - 3deg)) scale(var(--head-scale)); }
+    75% { transform: translate(calc(var(--head-x) + 8px), var(--head-y)) rotate(calc(var(--head-rotate) + 3deg)) scale(var(--head-scale)); }
+  }
+  @keyframes emma-frustrated-left {
+    0%, 100% { transform: rotate(var(--arm-left)); }
+    50% { transform: rotate(calc(var(--arm-left) + 13deg)); }
+  }
+  @keyframes emma-frustrated-right {
+    0%, 100% { transform: rotate(var(--arm-right)); }
+    50% { transform: rotate(calc(var(--arm-right) - 13deg)); }
+  }
+  @keyframes emma-thank-bow {
+    0%, 16%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+    38%, 66% { transform: translate(var(--head-x), calc(var(--head-y) + 18px)) rotate(var(--head-rotate)) scale(calc(var(--head-scale) * .975)); }
+    82% { transform: translate(var(--head-x), calc(var(--head-y) + 5px)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
+  }
+  @keyframes emma-scan-look {
+    0%, 100% { transform: translate(calc(var(--head-x) - 7px), var(--head-y)) rotate(calc(var(--head-rotate) - 2deg)) scale(var(--head-scale)); }
+    50% { transform: translate(calc(var(--head-x) + 7px), var(--head-y)) rotate(calc(var(--head-rotate) + 2deg)) scale(var(--head-scale)); }
+  }
+  @keyframes emma-prop-search {
+    0%, 10%, 100% { transform: translate(-12px, 10px) rotate(-7deg) scale(.82); opacity: 0; }
+    24%, 72% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: .92; }
+    46% { transform: translate(-18px, 3px) rotate(-4deg) scale(1.03); opacity: 1; }
+    82% { transform: translate(10px, 8px) rotate(5deg) scale(.9); opacity: .45; }
+  }
+  @keyframes emma-prop-alert {
+    0%, 100% { transform: translateY(4px) scale(.92); filter: drop-shadow(0 0 7px rgba(var(--state-rgb), .45)); }
+    50% { transform: translateY(-6px) scale(1.08); filter: drop-shadow(0 0 18px rgba(var(--state-rgb), .95)); }
+  }
+  @keyframes emma-prop-heart {
+    0%, 18%, 100% { transform: translateY(8px) scale(.75); opacity: 0; }
+    34% { transform: translateY(-8px) scale(1.12); opacity: 1; }
+    48%, 72% { transform: translateY(-2px) scale(.96); opacity: .95; }
+    86% { transform: translateY(-15px) scale(.82); opacity: .25; }
+  }
+  @keyframes emma-prop-scan {
+    0%, 10%, 100% { transform: translateY(18px) scale(.94); opacity: 0; }
+    24%, 78% { transform: translateY(0) scale(1); opacity: .86; }
+    90% { transform: translateY(-8px) scale(.98); opacity: .28; }
+  }
+  @keyframes emma-scan-line {
+    0%, 100% { transform: translateY(-92px); opacity: .28; }
+    50% { transform: translateY(92px); opacity: 1; }
+  }
+  @keyframes puppet-aura-breathe {
+    0%, 100% { transform: scale(.96); opacity: .52; }
+    50% { transform: scale(1.045); opacity: 1; }
+  }
+  @keyframes body-idle {
+    0%, 100% { transform: rotate(-.8deg); }
+    50% { transform: rotate(1deg); }
+  }
+  @keyframes arm-idle-left {
+    0%, 100% { transform: translateY(2px) rotate(1deg); }
+    50% { transform: translateY(-4px) rotate(-3deg); }
+  }
+  @keyframes arm-idle-right {
+    0%, 100% { transform: translateY(2px) rotate(-1deg); }
+    50% { transform: translateY(-4px) rotate(3deg); }
+  }
+  @keyframes body-listening {
+    0%, 100% { transform: translateY(2px) rotate(-1.8deg); }
+    50% { transform: translateY(-3px) rotate(1.2deg); }
+  }
+  @keyframes arm-listening {
+    0%, 100% { transform: translate(54px, -248px) rotate(-34deg); }
+    50% { transform: translate(66px, -264px) rotate(-24deg); }
+  }
+  @keyframes arm-listening-balance {
+    0%, 100% { transform: translate(-4px, 7px) rotate(-2deg); }
+    50% { transform: translate(-10px, -2px) rotate(4deg); }
+  }
+  @keyframes body-thinking {
+    0%, 100% { transform: translateY(5px) rotate(-3.2deg); }
+    50% { transform: translateY(0) rotate(-1.4deg); }
+  }
+  @keyframes arm-thinking-balance {
+    0%, 100% { transform: translate(24px, 20px) rotate(10deg); }
+    50% { transform: translate(30px, 14px) rotate(6deg); }
+  }
+  @keyframes arm-thinking {
+    0%, 100% { transform: translate(-182px, -122px) rotate(-31deg); }
+    50% { transform: translate(-194px, -138px) rotate(-25deg); }
+  }
+  @keyframes body-speaking {
+    0%, 100% { transform: translateY(2px) rotate(-1deg) scale(1); }
+    50% { transform: translateY(-7px) rotate(1deg) scale(1.018); }
+  }
+  @keyframes robot-wave {
+    0%, 12%, 48%, 100% { transform: rotate(0deg) translateY(0); }
+    18% { transform: rotate(-18deg) translateY(-8px); }
+    25% { transform: rotate(16deg) translateY(-12px); }
+    32% { transform: rotate(-15deg) translateY(-8px); }
+    39% { transform: rotate(11deg) translateY(-4px); }
+    45% { transform: rotate(0deg) translateY(0); }
+  }
+  @keyframes robot-gesture {
+    0%, 12%, 48%, 100% { transform: rotate(0deg) translateY(0); }
+    20% { transform: rotate(8deg) translateY(-5px); }
+    29% { transform: rotate(-10deg) translateY(-10px); }
+    39% { transform: rotate(5deg) translateY(-3px); }
+    46% { transform: rotate(0deg) translateY(0); }
+  }
+  @keyframes character-error {
+    0%, 100% { transform: translateY(20px) scale(.975); }
+    50% { transform: translateY(24px) scale(.968); }
+  }
+  @keyframes body-error {
+    0%, 100% { transform: rotate(-1deg); }
+    50% { transform: rotate(1deg); }
+  }
+  @keyframes arm-error-left {
+    0%, 100% { transform: translate(20px, 48px) rotate(20deg); }
+    50% { transform: translate(24px, 54px) rotate(24deg); }
+  }
+  @keyframes arm-error-right {
+    0%, 100% { transform: translate(-20px, 48px) rotate(-20deg); }
+    50% { transform: translate(-24px, 54px) rotate(-24deg); }
+  }
+  @keyframes character-greeting {
+    0%, 100% { transform: translateY(2px) scale(1); }
+    50% { transform: translateY(-11px) scale(1.025); }
+  }
+  @keyframes body-greeting {
+    0%, 100% { transform: rotate(-2deg); }
+    50% { transform: rotate(2.4deg); }
+  }
+  @keyframes greeting-wai {
+    0%, 100% { transform: translateY(2px) rotateX(0deg) scale(1); }
+    45% { transform: translateY(10px) rotateX(4deg) scale(.988); }
+    70% { transform: translateY(4px) rotateX(1deg) scale(.997); }
+  }
+  @keyframes character-happy {
+    0%, 100% { transform: translateY(1px) scale(1); }
+    45% { transform: translateY(-16px) scale(1.035); }
+    72% { transform: translateY(-6px) scale(1.015); }
+  }
+  @keyframes body-happy {
+    0%, 100% { transform: rotate(-2deg); }
+    50% { transform: rotate(2deg); }
+  }
+  @keyframes arm-happy-left {
+    0%, 100% { transform: translate(24px, -72px) rotate(-15deg); }
+    50% { transform: translate(42px, -105px) rotate(-28deg); }
+  }
+  @keyframes arm-happy-right {
+    0%, 100% { transform: translate(-24px, -72px) rotate(15deg); }
+    50% { transform: translate(-42px, -105px) rotate(28deg); }
+  }
+  @keyframes character-frustrated {
+    0%, 100% { transform: translateX(-3px) rotate(-.5deg); }
+    50% { transform: translateX(3px) rotate(.5deg); }
+  }
+  @keyframes body-frustrated {
+    0%, 100% { transform: translateY(10px) rotate(-2deg); }
+    50% { transform: translateY(13px) rotate(2deg); }
+  }
+  @keyframes arm-frustrated-left {
+    0%, 100% { transform: translate(34px, -112px) rotate(-25deg); }
+    50% { transform: translate(46px, -128px) rotate(-35deg); }
+  }
+  @keyframes arm-frustrated-right {
+    0%, 100% { transform: translate(-34px, -112px) rotate(25deg); }
+    50% { transform: translate(-46px, -128px) rotate(35deg); }
+  }
+  @keyframes body-grateful {
+    0%, 100% { transform: translateY(8px) rotate(-1deg) scale(.99); }
+    50% { transform: translateY(14px) rotate(1deg) scale(.98); }
+  }
+  @keyframes arm-grateful-left {
+    0%, 100% { transform: translate(166px, -64px) rotate(29deg); }
+    50% { transform: translate(174px, -72px) rotate(34deg); }
+  }
+  @keyframes arm-grateful-right {
+    0%, 100% { transform: translate(-166px, -64px) rotate(-29deg); }
+    50% { transform: translate(-174px, -72px) rotate(-34deg); }
+  }
+  @keyframes character-loading {
+    0%, 100% { transform: translateY(12px) rotateY(-8deg) scale(.98); }
+    50% { transform: translateY(4px) rotateY(8deg) scale(1); }
+  }
+  @keyframes body-loading {
+    0%, 100% { transform: rotate(-2deg); }
+    50% { transform: rotate(2deg); }
+  }
+  @keyframes loading-ring {
+    from { transform: translateX(-50%) rotateX(64deg) rotateZ(0deg); }
+    to { transform: translateX(-50%) rotateX(64deg) rotateZ(360deg); }
+  }
+  @keyframes mouth-talk {
+    0%, 100% { transform: scale(.96, .32); }
+    35% { transform: scale(1.04, 1); }
+    68% { transform: scale(.92, .58); }
+  }
+  @keyframes glint {
+    0%, 18% { background-position: 50% 50%, 115% 0; opacity: .18; }
+    52% { background-position: 50% 50%, 42% 0; opacity: .5; }
+    82%, 100% { background-position: 50% 50%, -25% 0; opacity: .2; }
+  }
+  @media (max-height: 760px) {
+    .shell { gap: 16px; }
+    .mascot-wrap { width: min(70vw, 285px); }
+    body.emma-staging .mascot-wrap { width: min(26vw, 130px); }
+    .reply-text { min-height: 3.2em; }
+  }
+
+  @media (min-width: 700px) {
+    /* No outer card — the mascot sits straight on the full-bleed background
+       (owner, 2026-09-14 "เอากรอบนอกออก"). Kept centred, just without the
+       frame/border/panel the shell used to draw at this width. */
+    body { display: grid; place-items: center; padding: 24px; }
+    .shell { min-height: min(880px, calc(100dvh - 48px)); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orbit { display: none; }
+    .mascot-turn { animation-duration: 14s; }
+    .mascot-float, .rig-character { animation-duration: 9s; }
+    .puppet-part, .face-part { transition-duration: 1.3s; }
+    .puppet-arm-left, .puppet-arm-right { animation-duration: 5s; }
+    .mascot-glint { animation: none; opacity: .16; }
+    .emma-data-orbit { animation: none !important; }
+  }
+
+  /* ---- stage: cards / plans / photos take the centre; Emma steps to the
+         bottom-right corner while they show (body.emma-staging) ---- */
+  body.emma-staging .mascot-wrap {
+    /* Tight into the bottom-right corner (owner arrow, 2026-09-14): the
+       controls hide while staging, so nothing sits below her. */
+    position: fixed;
+    right: clamp(6px, 1.5vw, 20px);
+    bottom: clamp(8px, 2vh, 28px);
+    z-index: 30;
+    width: min(30vw, 150px);
+  }
+  /* With a display up, the bottom controls hide so nothing covers the content
+     — a press-and-hold on the mascot brings them back (body.controls-peek).
+     (owner, 2026-09-14 "เอาพวกด้านล่างไปซ่อน กดค้างที่หุ่นก็จะขึ้นมา") */
+  .controls { transition: opacity .25s ease, visibility .25s ease; }
+  body.emma-staging .controls { opacity: 0; visibility: hidden; pointer-events: none; }
+  /* Revealed by a hold, the controls pop up as a compact panel just above
+     Emma's head in the corner (owner, 2026-09-14 "ปุ่มขึ้นมาส่วนหัวของหุ่น"),
+     not back on the bottom bar. */
+  body.emma-staging.controls-peek .controls {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    position: fixed;
+    left: auto;
+    right: clamp(6px, 1.5vw, 20px);
+    bottom: calc(clamp(8px, 2vh, 28px) + min(30vw, 150px) + 12px);
+    width: auto;
+    grid-template-columns: repeat(3, auto);
+    gap: 16px;
+    padding: 12px 16px;
+    background: rgba(14,18,24,.92);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 16px;
+    box-shadow: 0 18px 44px rgba(0,0,0,.55);
+    z-index: 40;
+  }
+  .vp-stage {
+    position: fixed;
+    /* Fill most of the panel — the display is the point when it is up
+       (owner, 2026-09-14 "จอเล็กจัง"). Tight side margins; leave room only
+       for the status line above and a little breathing space below. */
+    inset: clamp(40px, 7vh, 76px) clamp(10px, 2vw, 28px) clamp(24px, 5vh, 56px);
+    z-index: 20;
+    display: none;
+    place-items: center;
+    overflow: auto;
+    /* The stage covers most of the screen but is transparent except for the
+       card. Let its empty areas pass clicks through to the mascot beneath
+       (which lives in .shell's own stacking context, below this body-level
+       overlay) — otherwise the mascot can't be dragged or held while a
+       display is up (owner, 2026-09-14 "ตอนเปิดจอขยับหุ่นไม่ได้ / กดค้างไม่ขึ้น"). */
+    pointer-events: none;
+  }
+  .vp-stage-inner { pointer-events: auto; }
+  body.emma-staging .vp-stage { display: grid; }
+  /* While a card/plan is up, Emma's reply moves out of the centre (where it
+     overlapped the card) to a caption band at the top that scrolls as it
+     streams (owner, 2026-09-14 "ข้อความไปอยู่ด้านบน...ขึ้นทีละบรรทัดแล้วเลื่อน"). */
+  body.emma-staging .reply {
+    position: fixed;
+    top: clamp(68px, 10vh, 104px);   /* below the status line, never over it */
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92%, 920px);
+    z-index: 25;
+    padding: 8px 16px;
+    border-radius: 12px;
+    background: rgba(9,12,17,.74);
+  }
+  .vp-stage-inner {
+    width: min(100%, 1200px);
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .vp-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 14px; display: block; }
+  .vp-stage iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 14px; background: #000; }
+  .vp-stage-close {
+    position: fixed;
+    top: clamp(10px, 2vh, 22px);
+    right: clamp(12px, 3vw, 30px);
+    z-index: 31;
+    width: 40px; height: 40px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(20,26,34,.85); color: #e7edf3;
+    font-size: 20px; line-height: 1; cursor: pointer;
+    display: none;
+  }
+  body.emma-staging .vp-stage-close { display: block; }
+  /* Unit / plan card, dark to sit on the same ground as the page. */
+  .vp-card {
+    width: min(100%, 1000px);
+    background: rgba(12,16,22,.92);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 16px;
+    padding: 16px 18px 18px;
+    color: #e7edf3;
+    box-shadow: 0 26px 70px rgba(0,0,0,.5);
+  }
+  .vp-card .u-top { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .vp-card .u-shot, .vp-card .u-plan {
+    aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    display: grid; place-items: center; text-align: center;
+    color: #8b97a5; font-size: 12px; padding: 8px;
+  }
+  .vp-card .u-shot img, .vp-card .u-plan img { width: 100%; height: 100%; object-fit: cover; }
+  .vp-card .u-room { font-size: 20px; font-weight: 700; margin-top: 12px; }
+  .vp-card .u-meta { color: #b7c0cb; font-size: 14px; margin-top: 2px; }
+  .vp-card .u-badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+    font-size: 13px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.06); }
+  .vp-card .u-badge i { width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+  .vp-card .u-badge.available { color: #33d17a; }
+  .vp-card .u-badge.reserved { color: #e0a33a; }
+  .vp-card .u-badge.sold { color: #e06b6b; }
+  .vp-card .u-price { margin-top: 12px; font-size: 15px; color: #f0dca0; }
+  .vp-card .u-who { margin-top: 10px; color: #8b97a5; font-size: 12px; }
+  .vp-card .u-planwrap { position: relative; margin-top: 6px; }
+  .vp-card .u-planwrap img { width: 100%; display: block; border-radius: 10px; }
+  .vp-card .u-head { display: flex; justify-content: space-between; align-items: baseline;
+    gap: 10px; margin-bottom: 8px; font-size: 14px; }
+  .vp-card .u-head b { color: #f0e4c8; }
+  .vp-card .u-head span { color: #b7c0cb; font-size: 12px; }
+
+  /* Android shell: the same voice engine and mascot, arranged as the native
+     Emma AI Voice home screen. The app passes ?app=1; browser /preview keeps
+     its existing operator layout. */
+  html.app-shell body {
+    display: block;
+    padding: 0;
+    min-height: 100dvh;
+    background:
+      radial-gradient(ellipse 95% 58% at 22% -2%, rgba(72,111,154,.28), transparent 62%),
+      radial-gradient(ellipse 72% 48% at 48% 70%, rgba(35,92,118,.13), transparent 72%),
+      linear-gradient(170deg, #07111d 0%, #050b12 56%, #03070c 100%);
+  }
+
+  html.app-shell body::before {
+    opacity: .09;
+    mix-blend-mode: soft-light;
+  }
+
+  html.app-shell body::after {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    width: 142vmax;
+    height: 142vmax;
+    left: -91vmax;
+    top: -53vmax;
+    border: 1px solid rgba(124,181,230,.13);
+    border-radius: 50%;
+    box-shadow:
+      0 0 70px rgba(62,119,166,.10),
+      inset -60px -40px 150px rgba(71,131,179,.06);
+    pointer-events: none;
+  }
+
+  html.app-shell .shell {
+    width: 100%;
+    max-width: none;
+    min-height: 100dvh;
+    padding:
+      max(18px, env(safe-area-inset-top))
+      clamp(28px, 6vw, 72px)
+      max(30px, env(safe-area-inset-bottom));
+    gap: 0;
+    grid-template-rows: 54px minmax(0, 1fr) auto;
+  }
+
+  html.app-shell .topbar {
+    min-height: 54px;
+    opacity: 1;
+    transition: opacity .25s ease;
+  }
+
+  html.app-shell body[data-emma-state="idle"] .topbar { opacity: 0; }
+  html.app-shell .status {
+    padding: 8px 16px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 999px;
+    color: #c7d6e0;
+    background: rgba(8,17,28,.52);
+    backdrop-filter: blur(12px);
+    font-size: clamp(.86rem, 2.4vw, 1rem);
+  }
+
+  html.app-shell .hero {
+    justify-content: center;
+    gap: 0;
+    padding-bottom: clamp(8px, 3vh, 46px);
+  }
+
+  html.app-shell .mascot-wrap {
+    width: min(72vw, 610px);
+  }
+
+  html.app-shell .reply {
+    width: min(88vw, 720px);
+    margin-top: clamp(-12px, -1vh, 0px);
+  }
+
+  html.app-shell .reply-text {
+    min-height: 0;
+    color: #eef7f4;
+    font-size: clamp(1rem, 2.8vw, 1.32rem);
+  }
+
+  html.app-shell .controls {
+    width: min(100%, 820px);
+    margin: 0 auto;
+    align-items: end;
+    gap: clamp(24px, 7vw, 92px);
+  }
+
+  html.app-shell .control {
+    min-width: clamp(88px, 18vw, 152px);
+    gap: 13px;
+  }
+
+  html.app-shell .control-icon {
+    width: clamp(74px, 10vw, 104px);
+    height: clamp(74px, 10vw, 104px);
+    color: #f4f8fb;
+    background: rgba(255,255,255,.055);
+    border-color: rgba(255,255,255,.14);
+    box-shadow: 0 18px 38px rgba(0,0,0,.34);
+  }
+
+  html.app-shell .control svg {
+    width: clamp(29px, 4vw, 42px);
+    height: clamp(29px, 4vw, 42px);
+  }
+
+  html.app-shell .control.mic .control-icon {
+    width: clamp(96px, 13vw, 134px);
+    height: clamp(96px, 13vw, 134px);
+    background: radial-gradient(circle at 36% 25%, #caffee 0%, #69edba 42%, #32d998 100%);
+    box-shadow:
+      0 22px 48px rgba(48,218,153,.34),
+      0 0 0 12px rgba(78,231,174,.08),
+      0 0 48px rgba(68,225,167,.16);
+  }
+
+  html.app-shell .control.mic svg {
+    width: clamp(38px, 5vw, 52px);
+    height: clamp(38px, 5vw, 52px);
+  }
+
+  html.app-shell .control-label {
+    color: #d7e0e6;
+    font-size: clamp(.95rem, 2.5vw, 1.24rem);
+    font-weight: 600;
+  }
+
+  html.app-shell .control.mic .control-label { color: #bff7df; }
+  html.app-shell .control.end .control-label { color: #e3a7b0; }
+
+  @media (max-width: 520px) {
+    html.app-shell .shell { padding-left: 20px; padding-right: 20px; }
+    html.app-shell .mascot-wrap { width: min(88vw, 410px); }
+    html.app-shell .controls { gap: 10px; }
+    html.app-shell .control { min-width: 74px; }
+    html.app-shell .control-icon { width: 64px; height: 64px; }
+    html.app-shell .control.mic .control-icon { width: 88px; height: 88px; }
+    html.app-shell .control-label { font-size: .86rem; }
+  }
+</style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="status" data-emma-status role="status" aria-live="polite">
+        Listening...
+      </div>
+    </header>
+
+    <section class="hero" aria-label="Emma voice assistant">
+      <div class="mascot-wrap" data-emma-state="listening" data-emma-pose="pose-01" data-emma-eyes="smile" data-emma-mouth="none" data-emma-hands="relaxed" data-emma-left-hand="relaxed" data-emma-right-hand="relaxed" tabindex="0" role="img" aria-label="Emma animated assistant. Drag to move, pinch or use mouse wheel to resize, and press Home to reset.">
+        <canvas class="mascot-rive" data-emma-rive width="720" height="860" aria-hidden="true"></canvas>
+        <div class="mascot-rig" aria-hidden="true">
+          <div class="mascot-turn">
+            <div class="mascot-float">
+              <svg class="mascot-art" viewBox="0 0 1222 1120" focusable="false">
+                <defs>
+                  <filter id="emma-ring-glow" x="-60%" y="-200%" width="220%" height="500%">
+                    <feGaussianBlur stdDeviation="11" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                  </filter>
+                  <clipPath id="emma-mouth-slot">
+                    <rect x="532" y="428" width="158" height="110" rx="52"/>
+                  </clipPath>
+                </defs>
+                <g class="rig-character">
+                  <g class="puppet-floor-ring puppet-part">
+                    <ellipse cx="611" cy="1030" rx="176" ry="32" fill="none" stroke="currentColor" stroke-width="13" filter="url(#emma-ring-glow)"/>
+                    <ellipse cx="611" cy="1030" rx="248" ry="50" fill="none" stroke="currentColor" stroke-opacity=".42" stroke-width="5" stroke-dasharray="11 17"/>
+                    <ellipse class="emma-data-orbit" cx="611" cy="1030" rx="214" ry="41" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="3 20"/>
+                  </g>
+                  <g class="puppet-aura puppet-part">
+                    <circle cx="611" cy="390" r="325" fill="none" stroke="rgba(231,246,255,.86)" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 28" filter="url(#emma-ring-glow)"/>
+                  </g>
+
+                  <g class="puppet-arm-left puppet-part">
+                    <g class="limb-sprite limb-relaxed">
+                      <svg x="320" y="630" width="180" height="235" viewBox="20 580 180 235">
+                        <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                      </svg>
+                    </g>
+                    <g class="limb-sprite limb-open">
+                      <svg x="289" y="520" width="220" height="210" viewBox="640 570 210 200">
+                        <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                      </svg>
+                    </g>
+                  </g>
+                  <g class="puppet-arm-right puppet-part">
+                    <g class="limb-sprite limb-relaxed">
+                      <svg x="722" y="630" width="180" height="235" viewBox="465 580 180 235">
+                        <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                      </svg>
+                    </g>
+                    <g class="limb-sprite limb-open" transform="translate(1222 0) scale(-1 1)">
+                      <svg x="289" y="520" width="220" height="210" viewBox="640 570 210 200">
+                        <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                      </svg>
+                    </g>
+                  </g>
+
+                  <g class="puppet-body puppet-part">
+                    <svg x="461" y="615" width="300" height="300" viewBox="175 570 315 315">
+                      <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                    </svg>
+                  </g>
+
+                  <g class="puppet-head puppet-part">
+                    <svg x="286" y="50" width="650" height="610" viewBox="20 45 585 550">
+                      <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                    </svg>
+
+                    <g class="face-display">
+                      <g class="eyes-smile face-part">
+                        <svg x="430" y="300" width="360" height="130" viewBox="610 165 290 105">
+                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                        </svg>
+                      </g>
+                      <g class="eyes-sad face-part">
+                        <svg x="425" y="300" width="370" height="110" viewBox="1255 200 270 80">
+                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                        </svg>
+                      </g>
+                      <g class="eyes-squeeze face-part">
+                        <svg x="445" y="295" width="330" height="124" viewBox="945 175 280 105">
+                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                        </svg>
+                      </g>
+
+                      <g class="mouth-smile face-part">
+                        <svg x="515" y="465" width="190" height="103" viewBox="650 380 165 90">
+                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                        </svg>
+                      </g>
+                      <g class="mouth-small face-part" clip-path="url(#emma-mouth-slot)">
+                        <svg x="535" y="458" width="160" height="108" viewBox="870 365 170 115">
+                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                        </svg>
+                      </g>
+                      <g class="mouth-wide face-part" clip-path="url(#emma-mouth-slot)">
+                        <svg x="511" y="450" width="200" height="123" viewBox="1085 360 220 135">
+                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                        </svg>
+                      </g>
+                      <g class="mouth-sad face-part">
+                        <svg x="523" y="470" width="175" height="102" viewBox="1340 385 155 90">
+                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                        </svg>
+                      </g>
+                    </g>
+                  </g>
+
+                  <g class="puppet-wai-hands puppet-part">
+                    <svg x="491" y="650" width="240" height="246" viewBox="1310 550 205 210">
+                      <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
+                    </svg>
+                  </g>
+
+                  <g class="emma-motion-props">
+                    <g class="emma-motion-prop prop-search" filter="url(#emma-ring-glow)">
+                      <circle cx="775" cy="386" r="72" fill="rgba(8,28,52,.72)" stroke="currentColor" stroke-width="10"/>
+                      <circle cx="775" cy="386" r="51" fill="none" stroke="currentColor" stroke-opacity=".42" stroke-width="4" stroke-dasharray="8 11"/>
+                      <path d="M826 437 L883 494" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round"/>
+                    </g>
+                    <g class="emma-motion-prop prop-alert" filter="url(#emma-ring-glow)">
+                      <path d="M611 102 L654 174 H568Z" fill="rgba(18,22,34,.9)" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/>
+                      <path d="M611 126 V150 M611 163 V164" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
+                    </g>
+                    <g class="emma-motion-prop prop-heart" filter="url(#emma-ring-glow)">
+                      <path d="M611 166 C579 143 557 120 566 96 C575 72 604 80 611 100 C618 80 647 72 656 96 C665 120 643 143 611 166Z" fill="currentColor"/>
+                    </g>
+                    <g class="emma-motion-prop prop-scan">
+                      <rect x="391" y="565" width="440" height="286" rx="36" fill="rgba(8,33,62,.68)" stroke="currentColor" stroke-width="7" filter="url(#emma-ring-glow)"/>
+                      <path d="M538 623 H684 M538 665 H684 M538 707 H650 M538 749 H674" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" opacity=".7"/>
+                      <path class="prop-scan-line" d="M416 708 H806" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" filter="url(#emma-ring-glow)"/>
+                    </g>
+                  </g>
+                </g>
+              </svg>
+              <span class="mascot-glint"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <section class="reply" aria-label="Emma's latest reply" aria-live="polite">
+        <p class="reply-text" data-emma-reply>Hi, I'm Emma — the concierge for Embassy World. How can I help you today?</p>
+      </section>
+    </section>
+
+    <nav class="controls" aria-label="Conversation controls">
+      <button class="control message" type="button" aria-label="Open transcript" title="Open transcript">
+        <span class="control-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+        </span>
+        <span class="control-label">Message</span>
+      </button>
+
+      <button class="control mic" type="button" aria-label="Mute microphone" title="Mute microphone" aria-pressed="false">
+        <span class="control-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </span>
+        <span class="control-label">Listening</span>
+      </button>
+
+      <button class="control end" type="button" aria-label="End conversation" title="End conversation">
+        <span class="control-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </span>
+        <span class="control-label">End</span>
+      </button>
+    </nav>
+  </main>
+
+  <script src="/assets/vendor/rive/rive.js"></script>
+  <script>
+    // State copy and visual pose are intentionally independent. The host can
+    // decide later which numbered reference pose belongs to each voice state.
+    (function () {
+      var scene = document.querySelector('.mascot-wrap');
+      if (!scene) return;
+
+      var statusNode = document.querySelector('[data-emma-status]');
+      var replyNode = document.querySelector('[data-emma-reply]');
+      var riveCanvas = document.querySelector('[data-emma-rive]');
+      var riveController = null;
+      var riveInputs = Object.create(null);
+      var rigPoses = {
+        'pose-01': { headX: 0, headY: 0, headRotate: 0, headScale: 1, bodyX: 0, bodyY: 0, bodyRotate: 0, bodyScale: 1, armLeft: 5, armRight: -5, eyes: 'smile', mouth: 'none', hands: 'relaxed', leftHand: 'relaxed', rightHand: 'relaxed' },
+        'pose-02': { headX: 8, headY: -7, headRotate: 4, headScale: 1.015, bodyX: 2, bodyY: 0, bodyRotate: 2, bodyScale: 1, armLeft: -8, armRight: 8, eyes: 'smile', mouth: 'none', hands: 'mixed', leftHand: 'open', rightHand: 'relaxed' },
+        'pose-03': { headX: -7, headY: 3, headRotate: -5, headScale: 1, bodyX: -2, bodyY: 3, bodyRotate: -2, bodyScale: .99, armLeft: 5, armRight: -18, eyes: 'smile', mouth: 'none', hands: 'mixed', leftHand: 'relaxed', rightHand: 'open' },
+        'pose-04': { headX: 0, headY: -6, headRotate: 0, headScale: 1.02, bodyX: 0, bodyY: -2, bodyRotate: 0, bodyScale: 1.02, armLeft: -18, armRight: 18, eyes: 'smile', mouth: 'none', hands: 'open' },
+        'pose-05': { headX: -4, headY: -5, headRotate: -3, headScale: 1.01, bodyX: -3, bodyY: 0, bodyRotate: -2, bodyScale: 1, armLeft: 5, armRight: -25, eyes: 'smile', mouth: 'none', hands: 'mixed', leftHand: 'relaxed', rightHand: 'open' },
+        'pose-06': { headX: 0, headY: -14, headRotate: 0, headScale: 1.035, bodyX: 0, bodyY: -8, bodyRotate: 0, bodyScale: 1.035, armLeft: -18, armRight: 18, eyes: 'smile', mouth: 'none', hands: 'open' },
+        'pose-07': { headX: 0, headY: 18, headRotate: -2, headScale: .975, bodyX: 0, bodyY: 8, bodyRotate: 0, bodyScale: .97, armLeft: -66, armRight: 66, eyes: 'sad', mouth: 'sad', hands: 'relaxed' },
+        'pose-08': { headX: 0, headY: 3, headRotate: 0, headScale: 1.01, bodyX: 0, bodyY: 2, bodyRotate: 0, bodyScale: 1, armLeft: -5, armRight: 5, eyes: 'squeeze', mouth: 'none', hands: 'open' },
+        'pose-09': { headX: 0, headY: 8, headRotate: 0, headScale: .995, bodyX: 0, bodyY: 7, bodyRotate: 0, bodyScale: .985, armLeft: -66, armRight: 66, eyes: 'smile', mouth: 'none', hands: 'relaxed' },
+        'pose-10': { headX: 0, headY: 12, headRotate: 0, headScale: .97, bodyX: 0, bodyY: 7, bodyRotate: 0, bodyScale: .97, armLeft: -64, armRight: 64, eyes: 'sad', mouth: 'sad', hands: 'relaxed' },
+        wai: { headX: 0, headY: 10, headRotate: 0, headScale: .99, bodyX: 0, bodyY: 8, bodyRotate: 0, bodyScale: .98, armLeft: -66, armRight: 66, eyes: 'smile', mouth: 'none', hands: 'relaxed' }
+      };
+      var poses = Object.keys(rigPoses);
+      var poseDemoTimer = 0;
+      var poseDemoRunning = false;
+      var poseTransitionTimer = 0;
+      var statePoses = {
+        idle: 'pose-01', listening: 'pose-01', thinking: 'pose-03',
+        speaking: 'pose-05', error: 'pose-07', greeting: 'pose-05',
+        happy: 'pose-06', frustrated: 'pose-08', grateful: 'pose-09',
+        loading: 'pose-10'
+      };
+      var states = {
+        idle: {
+          status: 'Ready',
+          reply: "Whenever you're ready, I'm here to help."
+        },
+        listening: {
+          status: 'Listening...',
+          reply: "Hi, I'm Emma — the concierge for Embassy World. How can I help you today?"
+        },
+        thinking: {
+          status: 'Thinking...',
+          reply: 'Let me check that for you.'
+        },
+        speaking: {
+          status: 'Speaking...',
+          reply: "Here's what I found for you."
+        },
+        error: {
+          status: 'Something went wrong',
+          reply: "I'm sorry, I couldn't complete that. Please try again."
+        },
+        greeting: {
+          status: 'Hello!',
+          reply: "Hello! Welcome to Embassy World. I'm Emma — how can I help?"
+        },
+        happy: {
+          status: 'Happy',
+          reply: "Wonderful — I'm happy to help!"
+        },
+        frustrated: {
+          status: 'Let me try again',
+          reply: "I didn't quite catch that. Let me try once more."
+        },
+        grateful: {
+          status: 'Thank you',
+          reply: "Thank you. I'm always here when you need me."
+        },
+        loading: {
+          status: 'Loading...',
+          reply: 'Just a moment while I get that ready.'
+        }
+      };
+
+      var riveModeValues = {
+        idle: 0, greeting: 1, listening: 2, thinking: 3, loading: 3,
+        speaking: 4, happy: 5, grateful: 5, error: 6, frustrated: 6
+      };
+
+      function setRiveInput(name, value) {
+        var input = riveInputs[name];
+        if (!input) return false;
+        input.value = value;
+        return true;
+      }
+
+      function syncRiveState() {
+        var state = scene.dataset.emmaState || 'listening';
+        setRiveInput('mode', riveModeValues[state] == null ? 0 : riveModeValues[state]);
+        setRiveInput('speechLevel', 0);
+        setRiveInput('lookX', 50);
+        setRiveInput('lookY', 50);
+      }
+
+      function initRiveRenderer() {
+        if (riveController) return true;
+        if (!riveCanvas || !window.rive || !window.rive.Rive) return false;
+        try {
+          window.rive.RuntimeLoader.setWasmUrl('/assets/vendor/rive/rive.wasm');
+          riveController = new window.rive.Rive({
+            src: '/assets/emma/emma.riv',
+            canvas: riveCanvas,
+            artboard: 'Emma',
+            stateMachine: 'EmmaVoice',
+            autoplay: true,
+            layout: new window.rive.Layout({
+              fit: window.rive.Fit.Contain,
+              alignment: window.rive.Alignment.Center
+            }),
+            onLoad: function () {
+              riveController.resizeDrawingSurfaceToCanvas();
+              (riveController.stateMachineInputs('EmmaVoice') || []).forEach(function (input) {
+                riveInputs[input.name] = input;
+              });
+              syncRiveState();
+              scene.classList.add('rive-ready');
+              scene.dispatchEvent(new CustomEvent('emma-rive-ready'));
+            },
+            onLoadError: function () {
+              scene.classList.remove('rive-ready');
+            }
+          });
+          if ('ResizeObserver' in window) {
+            new ResizeObserver(function () {
+              if (riveController) riveController.resizeDrawingSurfaceToCanvas();
+            }).observe(riveCanvas);
+          }
+          return true;
+        } catch (error) {
+          scene.classList.remove('rive-ready');
+          return false;
+        }
+      }
+
+      function clearMouthLevel() {
+        setRiveInput('speechLevel', 0);
+        scene.dispatchEvent(new CustomEvent('emma-mouth-level', { detail: { level: 0 } }));
+        scene.classList.remove('has-live-mouth');
+        scene.style.removeProperty('--mouth-scale');
+        var pose = rigPoses[scene.dataset.emmaPose];
+        if (pose) scene.dataset.emmaMouth = pose.mouth;
+      }
+
+      function stopPoseDemo() {
+        poseDemoRunning = false;
+        clearTimeout(poseDemoTimer);
+      }
+
+      function setPose(name, fromDemo) {
+        var pose = rigPoses[name];
+        if (!pose) return false;
+        if (!fromDemo) stopPoseDemo();
+        clearTimeout(poseTransitionTimer);
+        scene.classList.add('is-transitioning');
+        scene.style.setProperty('--head-x', pose.headX + 'px');
+        scene.style.setProperty('--head-y', pose.headY + 'px');
+        scene.style.setProperty('--head-rotate', pose.headRotate + 'deg');
+        scene.style.setProperty('--head-scale', pose.headScale);
+        scene.style.setProperty('--body-x', pose.bodyX + 'px');
+        scene.style.setProperty('--body-y', pose.bodyY + 'px');
+        scene.style.setProperty('--body-rotate', pose.bodyRotate + 'deg');
+        scene.style.setProperty('--body-scale', pose.bodyScale);
+        scene.style.setProperty('--arm-left', pose.armLeft + 'deg');
+        scene.style.setProperty('--arm-right', pose.armRight + 'deg');
+        scene.dataset.emmaEyes = pose.eyes;
+        scene.dataset.emmaMouth = pose.mouth;
+        scene.dataset.emmaHands = pose.hands;
+        scene.dataset.emmaLeftHand = pose.leftHand || pose.hands;
+        scene.dataset.emmaRightHand = pose.rightHand || pose.hands;
+        scene.dataset.emmaPose = name;
+        poseTransitionTimer = setTimeout(function () {
+          scene.classList.remove('is-transitioning');
+        }, 760);
+        scene.dispatchEvent(new CustomEvent('emma-pose-change', { detail: { pose: name, duration: 720 } }));
+        return true;
+      }
+
+      function startPoseDemo(delay) {
+        var interval = Math.max(900, Number(delay) || 2200);
+        var poseIndex = Math.max(0, poses.indexOf(scene.dataset.emmaPose));
+        stopPoseDemo();
+        poseDemoRunning = true;
+
+        function nextPose() {
+          if (!poseDemoRunning) return;
+          poseIndex = (poseIndex + 1) % poses.length;
+          setPose(poses[poseIndex], true);
+          poseDemoTimer = setTimeout(nextPose, interval);
+        }
+
+        poseDemoTimer = setTimeout(nextPose, interval);
+        return true;
+      }
+
+      function setMouthLevel(level) {
+        var amount = Math.max(0, Math.min(1, Number(level) || 0));
+        setRiveInput('speechLevel', amount * 100);
+        scene.dispatchEvent(new CustomEvent('emma-mouth-level', { detail: { level: amount } }));
+        scene.style.setProperty('--mouth-scale', (.18 + amount * .95).toFixed(3));
+        scene.dataset.emmaMouth = amount > .52 ? 'wide' : 'small';
+        scene.classList.add('has-live-mouth');
+        return amount;
+      }
+
+      var userTransform = { x: 0, y: 0, scale: 1 };
+      function applyUserTransform() {
+        scene.style.setProperty('--user-x', userTransform.x.toFixed(1) + 'px');
+        scene.style.setProperty('--user-y', userTransform.y.toFixed(1) + 'px');
+        scene.style.setProperty('--user-scale', userTransform.scale.toFixed(3));
+        scene.dispatchEvent(new CustomEvent('emma-transform-change', { detail: Object.assign({}, userTransform) }));
+      }
+      function setMascotScale(value) {
+        userTransform.scale = Math.max(.65, Math.min(1.35, Number(value) || 1));
+        applyUserTransform();
+        return userTransform.scale;
+      }
+      function moveMascot(x, y) {
+        // Draggable across the whole page, not just a small area around its
+        // home position (owner, 2026-09-14 "ขยับ...เป็นทั้งหน้า"). During
+        // staging the rig is pinned bottom-right, so half-width travel only
+        // reached centre — the left side was unreachable (owner, 2026-09-15
+        // "เอาไปอีกฝั่งไม่ได้"). Allow near-full-viewport travel both axes.
+        var mx = Math.max(160, innerWidth - 100);
+        var my = Math.max(160, innerHeight - 100);
+        userTransform.x = Math.max(-mx, Math.min(mx, Number(x) || 0));
+        userTransform.y = Math.max(-my, Math.min(my, Number(y) || 0));
+        applyUserTransform();
+        return { x: userTransform.x, y: userTransform.y };
+      }
+      function resetMascotTransform() {
+        userTransform.x = 0;
+        userTransform.y = 0;
+        userTransform.scale = 1;
+        applyUserTransform();
+      }
+
+      var activePointers = new Map();
+      var dragOrigin = null;
+      var pinchOrigin = null;
+      scene.addEventListener('pointerdown', function (event) {
+        scene.focus({ preventScroll: true });
+        scene.setPointerCapture(event.pointerId);
+        activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        scene.classList.add('is-dragging');
+        dragOrigin = { pointerX: event.clientX, pointerY: event.clientY, x: userTransform.x, y: userTransform.y };
+        if (activePointers.size === 2) {
+          var points = Array.from(activePointers.values());
+          pinchOrigin = { distance: Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y), scale: userTransform.scale };
+        }
+      });
+      scene.addEventListener('pointermove', function (event) {
+        if (!activePointers.has(event.pointerId)) return;
+        activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (activePointers.size === 2 && pinchOrigin) {
+          var points = Array.from(activePointers.values());
+          var distance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+          setMascotScale(pinchOrigin.scale * distance / Math.max(1, pinchOrigin.distance));
+        } else if (dragOrigin) {
+          moveMascot(dragOrigin.x + event.clientX - dragOrigin.pointerX, dragOrigin.y + event.clientY - dragOrigin.pointerY);
+        }
+      });
+      function releasePointer(event) {
+        activePointers.delete(event.pointerId);
+        if (!activePointers.size) {
+          scene.classList.remove('is-dragging');
+          dragOrigin = null;
+          pinchOrigin = null;
+        }
+      }
+      scene.addEventListener('pointerup', releasePointer);
+      scene.addEventListener('pointercancel', releasePointer);
+      // A captured pointer that ends without a pointerup (the double-click
+      // sequence does this) otherwise stays in activePointers, and the next
+      // press reads as a two-finger pinch instead of a drag.
+      scene.addEventListener('lostpointercapture', releasePointer);
+      scene.addEventListener('wheel', function (event) {
+        event.preventDefault();
+        setMascotScale(userTransform.scale + (event.deltaY < 0 ? .06 : -.06));
+      }, { passive: false });
+      // Double-click no longer recentres the mascot (owner, 2026-09-14
+      // "เอาออก") — it kept firing by accident. Recentre is still on the Home
+      // key and the resetTransform() API.
+      scene.addEventListener('keydown', function (event) {
+        var step = event.shiftKey ? 18 : 8;
+        if (event.key === 'ArrowLeft') moveMascot(userTransform.x - step, userTransform.y);
+        else if (event.key === 'ArrowRight') moveMascot(userTransform.x + step, userTransform.y);
+        else if (event.key === 'ArrowUp') moveMascot(userTransform.x, userTransform.y - step);
+        else if (event.key === 'ArrowDown') moveMascot(userTransform.x, userTransform.y + step);
+        else if (event.key === '+' || event.key === '=') setMascotScale(userTransform.scale + .06);
+        else if (event.key === '-' || event.key === '_') setMascotScale(userTransform.scale - .06);
+        else if (event.key === 'Home') resetMascotTransform();
+        else return;
+        event.preventDefault();
+      });
+
+      function setState(name) {
+        if (!Object.prototype.hasOwnProperty.call(states, name)) return false;
+        if (name !== 'speaking') clearMouthLevel();
+        if (!poseDemoRunning && statePoses[name] && scene.dataset.emmaPose !== statePoses[name]) {
+          setPose(statePoses[name], true);
+        }
+        if (name !== 'idle' && name !== 'listening') {
+          scene.style.setProperty('--gaze-x', '0px');
+          scene.style.setProperty('--gaze-y', '0px');
+        }
+        scene.dataset.emmaState = name;
+        document.body.dataset.emmaState = name;
+        setRiveInput('mode', riveModeValues[name] == null ? 0 : riveModeValues[name]);
+        statusNode.textContent = states[name].status;
+        replyNode.textContent = states[name].reply;
+        scene.dispatchEvent(new CustomEvent('emma-state-change', { detail: { state: name } }));
+        return true;
+      }
+
+      window.EmmaVoicePreview = Object.freeze({
+        states: Object.freeze(Object.keys(states)),
+        poses: Object.freeze(poses.slice()),
+        setState: setState,
+        getState: function () { return scene.dataset.emmaState; },
+        setPose: setPose,
+        getPose: function () { return scene.dataset.emmaPose; },
+        startPoseDemo: startPoseDemo,
+        stopPoseDemo: stopPoseDemo,
+        setMouthLevel: setMouthLevel,
+        clearMouthLevel: clearMouthLevel,
+        triggerGesture: function () {
+          var input = riveInputs.gesture;
+          if (input && typeof input.fire === 'function') input.fire();
+          return !!input;
+        },
+        setScale: setMascotScale,
+        moveTo: moveMascot,
+        resetTransform: resetMascotTransform,
+        getTransform: function () { return Object.assign({}, userTransform); }
+      });
+
+      var query = new URLSearchParams(location.search);
+      initRiveRenderer();
+
+      var requestedState = query.get('state');
+      if (requestedState) setState(requestedState);
+      var requestedPose = query.get('pose');
+      if (requestedPose) setPose(requestedPose);
+
+      // This is a preview page, so it demonstrates every approved pose by
+      // default. An integration can opt out with ?autoPose=0 or by calling
+      // setPose(), which stops the loop and hands pose control to the host.
+      if (query.get('poseDemo') === '1' || query.get('autoPose') !== '0') {
+        startPoseDemo(2200);
+      }
+
+      // Add ?demo=1 to preview every state. This changes rig timelines only;
+      // the PNG source and SVG parts remain mounted throughout the sequence.
+      if (query.get('demo') === '1') {
+        var demoOrder = ['greeting', 'idle', 'listening', 'thinking', 'speaking', 'happy', 'grateful', 'frustrated', 'error', 'loading'];
+        var demoIndex = 0;
+        function nextDemoState() {
+          setState(demoOrder[demoIndex % demoOrder.length]);
+          demoIndex += 1;
+          setTimeout(nextDemoState, 2600);
+        }
+        nextDemoState();
+      }
+
+      var reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+      if (reduceMotion.matches) return;
+
+      var targetX = 0, targetY = 0, currentX = 0, currentY = 0;
+      function aim(event) {
+        targetY = ((event.clientX / innerWidth) - .5) * 15;
+        targetX = (.5 - (event.clientY / innerHeight)) * 11;
+        scene.style.setProperty('--light-x', (event.clientX / innerWidth * 100).toFixed(1) + '%');
+        scene.style.setProperty('--light-y', (event.clientY / innerHeight * 100).toFixed(1) + '%');
+        if (scene.dataset.emmaState === 'idle' || scene.dataset.emmaState === 'listening') {
+          setRiveInput('lookX', event.clientX / innerWidth * 100);
+          setRiveInput('lookY', event.clientY / innerHeight * 100);
+          scene.style.setProperty('--gaze-x', (((event.clientX / innerWidth) - .5) * 16).toFixed(1) + 'px');
+          scene.style.setProperty('--gaze-y', (((event.clientY / innerHeight) - .5) * 10).toFixed(1) + 'px');
+        }
+      }
+      function centre() {
+        targetX = 0; targetY = 0;
+        setRiveInput('lookX', 50);
+        setRiveInput('lookY', 50);
+        scene.style.setProperty('--gaze-x', '0px');
+        scene.style.setProperty('--gaze-y', '0px');
+      }
+      function render() {
+        currentX += (targetX - currentX) * .075;
+        currentY += (targetY - currentY) * .075;
+        scene.style.setProperty('--tilt-x', currentX.toFixed(2) + 'deg');
+        scene.style.setProperty('--tilt-y', currentY.toFixed(2) + 'deg');
+        requestAnimationFrame(render);
+      }
+
+      addEventListener('pointermove', aim, { passive: true });
+      document.documentElement.addEventListener('pointerleave', centre);
+      requestAnimationFrame(render);
+    })();
+  </script>
+  <!-- ==================== real voice engine ====================
+       The visual layer above stays a pure renderer, driven only through
+       window.EmmaVoicePreview (setState / setMouthLevel / setPose). This
+       block is the real speech-to-speech client: it opens /ws, streams the
+       mic up and plays the reply down, and maps every server event onto that
+       renderer. The audio pipeline (the `cap` worklet, playback scheduling,
+       the far-field mic chain) is copied verbatim from client/index.html —
+       that code is where two dozen measured bugs were already paid for, and
+       re-deriving it here would buy them all a second time. Kept a separate
+       page on purpose: production `/` (index.html) is untouched until this
+       one is signed off. -->
+  <script src="/plan-display-protocol.js"></script>
+  <script>
+  (function () {
+    var Emma = window.EmmaVoicePreview;
+    if (!Emma) return;
+
+    var q = new URLSearchParams(location.search);
+    // Design-only preview (?demo=1 cycles every pose/state) keeps the old
+    // behaviour: don't hijack it with a live call.
+    var designOnly = q.get('demo') === '1';
+    var appShell = q.get('app') === '1';
+
+    var statusNode = document.querySelector('[data-emma-status]');
+    var replyNode  = document.querySelector('[data-emma-reply]');
+    var replySection = document.querySelector('.reply');
+    var micBtn = document.querySelector('.control.mic');
+    var endBtn = document.querySelector('.control.end');
+    var msgBtn = document.querySelector('.control.message');
+    var micLabel = micBtn ? micBtn.querySelector('.control-label') : null;
+    if (appShell) {
+      var messageLabel = msgBtn && msgBtn.querySelector('.control-label');
+      var endLabel = endBtn && endBtn.querySelector('.control-label');
+      if (messageLabel) messageLabel.textContent = 'ข้อความ';
+      if (endLabel) endLabel.textContent = 'จบ';
+    }
+
+    // ---- renderer bridge ----
+    // The engine talks in the call's own vocabulary; this is the only place
+    // that vocabulary is translated to the renderer's fixed state names.
+    function show(state) { try { Emma.setState(state); } catch (e) {} paintReply(); }
+    var appStatus = {
+      'Tap the mic to talk': 'แตะไมค์เพื่อเริ่มพูด',
+      'Connecting...': 'กำลังเชื่อมต่อ Emma…',
+      'Listening...': 'กำลังฟัง…',
+      'Speaking...': 'Emma กำลังพูด…',
+      'Muted': 'ปิดไมโครโฟนแล้ว',
+      'Connection error': 'เชื่อมต่อ Emma ไม่สำเร็จ',
+      'Disconnected — tap the mic to try again': 'การเชื่อมต่อสิ้นสุด · แตะไมค์เพื่อลองใหม่'
+    };
+    function status(text) {
+      if (statusNode) statusNode.textContent = appShell && appStatus[text] ? appStatus[text] : text;
+    }
+    // The reply line shows ONLY while Emma is actually speaking (owner,
+    // 2026-09-14 "ค่อยโชว์ตอน emma พูด") — never the resting greeting under an
+    // idle mascot. It follows the live transcript of the turn being spoken and
+    // clears when playback ends. Called after every show() so the renderer's
+    // own canned per-state copy never leaks onto the screen. display:none via
+    // inline style, because .reply sets its own display and would beat [hidden].
+    function paintReply() {
+      var visible = !!(playing && curBot);
+      if (replyNode) replyNode.textContent = visible ? curBot : '';
+      if (replySection) replySection.style.display = visible ? '' : 'none';
+    }
+
+    // ---- engine globals (mirror index.html) ----
+    var ws = null, audioCtx = null, micStream = null, micSource = null, worklet = null;
+    var playbackGainNode = null, playbackLimiterNode = null, playbackOutputContext = null;
+    var muted = false, playHead = 0, sources = [], playing = false;
+    var inputRate = 16000, outputRate = 24000, halfDuplex = false, providerName = 'gemini';
+    var sentMs = 0;
+    var voices = [], selectedVoice = null;
+    var micCallBoost = 1, micNS = false, micAGC = true, micCompressor = true;
+    var inCall = false, manualEnd = false, apiKeyOK = true;
+    var curBot = '';               // assistant transcript building this turn
+    var curUser = '';              // ASR chunks building this utterance
+    var userLine = null;           // stays editable if Emma's line arrives first
+    var transcript = [];           // [{who,text}] for the Message drawer
+
+    // ---- mic capture worklet (verbatim from index.html) ----
+    var WORKLET_SRC = `
+    class Cap extends AudioWorkletProcessor {
+      constructor(o) {
+        super();
+        const p = (o && o.processorOptions) || {};
+        this.target = p.targetRate || 16000;
+        this.ratio = sampleRate / this.target;
+        this.acc = 0; this.pending = [];
+        this.chunk = Math.round(this.target * 0.02);
+      }
+      process(inputs) {
+        const ch = inputs[0] && inputs[0][0];
+        if (ch) {
+          for (let i = 0; i < ch.length; i++) {
+            this.acc += 1;
+            if (this.acc >= this.ratio) {
+              this.acc -= this.ratio;
+              const s = Math.max(-1, Math.min(1, ch[i]));
+              this.pending.push(s < 0 ? s * 0x8000 : s * 0x7fff);
+            }
+          }
+          let sum = 0;
+          for (let i = 0; i < ch.length; i++) sum += ch[i] * ch[i];
+          this.port.postMessage({ level: Math.sqrt(sum / ch.length) });
+          while (this.pending.length >= this.chunk) {
+            const f = this.pending.splice(0, this.chunk);
+            const a = new Int16Array(f.length);
+            for (let i = 0; i < f.length; i++) a[i] = f[i];
+            this.port.postMessage(a.buffer, [a.buffer]);
+          }
+        }
+        return true;
+      }
+    }
+    registerProcessor('cap', Cap);
+    `;
+
+    // ---- far-field mic chain (verbatim from index.html) ----
+    function buildMicChain(ctx, source, boost) {
+      if (boost === 1) return source;
+      var gain = ctx.createGain();
+      gain.gain.value = boost;
+      if (!micCompressor) { source.connect(gain); return gain; }
+      var comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -45;
+      comp.knee.value = 30;
+      comp.ratio.value = 8;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.25;
+      source.connect(comp);
+      comp.connect(gain);
+      return gain;
+    }
+
+    // ---- playback (scheduling math verbatim; drives the mascot mouth) ----
+    function playbackOutput(ctx) {
+      if (!appShell) return ctx.destination;
+      if (playbackOutputContext === ctx && playbackGainNode) return playbackGainNode;
+
+      // The robot display and Android Emulator both expose WebView audio as
+      // media. Emma's raw PCM is intentionally conservative, so the dedicated
+      // voice app raises quiet speech while a limiter catches loud syllables.
+      // Keep the ordinary /preview page at unity gain.
+      playbackGainNode = ctx.createGain();
+      playbackGainNode.gain.value = 1.75;
+      playbackLimiterNode = ctx.createDynamicsCompressor();
+      playbackLimiterNode.threshold.value = -4;
+      playbackLimiterNode.knee.value = 3;
+      playbackLimiterNode.ratio.value = 12;
+      playbackLimiterNode.attack.value = 0.003;
+      playbackLimiterNode.release.value = 0.15;
+      playbackGainNode.connect(playbackLimiterNode);
+      playbackLimiterNode.connect(ctx.destination);
+      playbackOutputContext = ctx;
+      return playbackGainNode;
+    }
+
+    function playChunk(arrayBuffer) {
+      if (!audioCtx || arrayBuffer.byteLength < 2) return;
+      if (audioCtx.state !== 'running') audioCtx.resume().catch(function () {});
+      var i16 = new Int16Array(arrayBuffer);
+      var f32 = new Float32Array(i16.length);
+      var sum = 0;
+      for (var i = 0; i < i16.length; i++) {
+        f32[i] = i16[i] / (i16[i] < 0 ? 0x8000 : 0x7fff);
+        sum += f32[i] * f32[i];
+      }
+      var buf = audioCtx.createBuffer(1, f32.length, outputRate);
+      buf.copyToChannel(f32, 0);
+      var src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(playbackOutput(audioCtx));
+      // playHead ahead of currentTime is required: the model outruns
+      // realtime and chunks queue back-to-back. Never snap it back to now.
+      var at = Math.max(audioCtx.currentTime, playHead);
+      src.start(at);
+      playHead = at + buf.duration;
+      var playbackContext = audioCtx;
+      sources.push(src);
+      playing = true;
+      show('speaking');
+      // Lip-sync: the renderer's mouth follows the reply's own loudness.
+      try { Emma.setMouthLevel(Math.min(1, Math.sqrt(sum / f32.length) * 3.2)); } catch (e) {}
+      src.onended = function () {
+        if (audioCtx !== playbackContext) return;
+        sources = sources.filter(function (s) { return s !== src; });
+        if (!sources.length) {
+          playing = false;
+          try { Emma.clearMouthLevel(); } catch (e) {}
+          curBot = '';                       // reply line clears when she stops
+          if (inCall) show('listening'); else paintReply();
+        }
+      };
+    }
+
+    function stopPlayback() {
+      var queuedMs = audioCtx ? Math.max(0, (playHead - audioCtx.currentTime) * 1000) : 0;
+      sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
+      sources = [];
+      playing = false;
+      if (audioCtx) playHead = audioCtx.currentTime;
+      try { Emma.clearMouthLevel(); } catch (e) {}
+      return Math.max(0, Math.round(sentMs - queuedMs));
+    }
+
+    // ---- teardown (verbatim shape from index.html) ----
+    function releaseCallHardware() {
+      try { worklet && (worklet.port.onmessage = null, worklet.disconnect()); } catch (e) {}
+      try { micSource && micSource.disconnect(); } catch (e) {}
+      micStream && micStream.getTracks().forEach(function (t) { t.stop(); });
+      sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
+      sources = []; playing = false;
+      audioCtx && audioCtx.close().catch(function () {});
+      playbackGainNode = playbackLimiterNode = playbackOutputContext = null;
+      audioCtx = micStream = micSource = worklet = null;
+    }
+
+    function stopFailedCall() {
+      // A call without an input device cannot serve the guest. Close the
+      // provider session immediately and leave the mic button ready to retry.
+      var failedSocket = ws;
+      ws = null;
+      inCall = false;
+      manualEnd = true;
+      releaseCallHardware();
+      try { failedSocket && failedSocket.close(); } catch (e) {}
+    }
+
+    function armAudioUnlock(ctx) {
+      if (!ctx || ctx.state !== 'suspended') return;
+      var prev = statusNode ? statusNode.textContent : '';
+      status('Tap once to enable audio');
+      var unlock = function () {
+        document.removeEventListener('pointerdown', unlock);
+        document.removeEventListener('keydown', unlock);
+        if (ctx.state === 'closed') return;
+        ctx.resume().then(function () {
+          if (statusNode && statusNode.textContent.indexOf('enable audio') >= 0) status(prev);
+        }).catch(function () {});
+      };
+      document.addEventListener('pointerdown', unlock);
+      document.addEventListener('keydown', unlock);
+    }
+
+    // ---- mic: open, resample, stream up (wake handover stripped: this
+    //      page is button-start only, like the kiosk default) ----
+    async function startMic() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
+      var callCtx = audioCtx;
+      armAudioUnlock(audioCtx);
+      audioCtx.resume().catch(function () {});
+      audioCtx.onstatechange = function () {
+        if (audioCtx === callCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+      };
+      var micFailure = null;
+      try {
+        var openedStream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: micAGC },
+        });
+        if (audioCtx !== callCtx) { openedStream.getTracks().forEach(function (t) { t.stop(); }); return; }
+        micStream = openedStream;
+      } catch (e) {
+        if (audioCtx !== callCtx) return;
+        micStream = null; micFailure = e;
+      }
+
+      var url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+      try { await callCtx.audioWorklet.addModule(url); }
+      finally { URL.revokeObjectURL(url); }
+      if (audioCtx !== callCtx) return;
+
+      if (!micStream) {
+        stopFailedCall();
+        show('error');
+        var why = micFailure ? (micFailure.name || 'Error') : 'Error';
+        var advice = appShell ? ({
+          NotAllowedError: 'ไม่ได้รับอนุญาตใช้ไมค์ · เปิดสิทธิ์ไมโครโฟนแล้วลองใหม่',
+          NotFoundError: 'ไม่พบไมโครโฟน · ตรวจอุปกรณ์เสียงแล้วลองใหม่',
+          NotReadableError: 'เปิดไมโครโฟนไม่ได้ · ระบบเสียงยังไม่พร้อมหรือมีแอปอื่นกำลังใช้งาน',
+          SecurityError: 'เปิดไมโครโฟนไม่ได้ · ต้องเชื่อมผ่าน HTTPS หรือ localhost',
+        }[why] || ('เปิดไมโครโฟนไม่ได้ · ' + (micFailure && micFailure.message || why))) : ({
+          NotAllowedError: 'Microphone blocked — allow it in the address bar and refresh',
+          NotFoundError: 'No microphone found — check it is plugged in',
+          NotReadableError: 'Could not open microphone — audio system unavailable or another app is using it',
+          SecurityError: 'Not a secure origin — open over https or localhost',
+        }[why] || ('Could not open mic: ' + (micFailure && micFailure.message || why)));
+        setMicLabel('Mic unavailable');
+        status(appShell ? advice : ('Mic unavailable · ' + advice));
+        return;
+      }
+
+      micSource = audioCtx.createMediaStreamSource(micStream);
+      var shaped = buildMicChain(audioCtx, micSource, micCallBoost);
+      worklet = new AudioWorkletNode(audioCtx, 'cap', { processorOptions: { targetRate: inputRate } });
+      worklet.port.onmessage = function (e) {
+        if (e.data && e.data.level !== undefined) return;   // level meter unused here
+        if (muted || !ws || ws.readyState !== WebSocket.OPEN) return;
+        // Half-duplex: don't feed the mic up while Emma speaks, so her own
+        // voice through the speakers can't be read as an interruption.
+        if (halfDuplex && playing) return;
+        ws.send(e.data);
+      };
+      shaped.connect(worklet);   // never connect to destination: never echo the mic
+      setMicLabel('Listening');
+      show(playing ? 'speaking' : 'listening');
+      status(playing ? 'Speaking...' : 'Listening...');
+    }
+
+    // ---- server -> client (slimmed: no slides / stage / camera here) ----
+    function onMessage(msg) {
+      if (msg.data instanceof ArrayBuffer) {
+        if (sentMs === 0) curBot = '';
+        sentMs += (msg.data.byteLength / 2 / outputRate) * 1000;
+        playChunk(msg.data);
+        return;
+      }
+      var evt;
+      try { evt = JSON.parse(msg.data); } catch (e) { return; }
+      switch (evt.type) {
+        case 'display_command':
+          if (evt.action === 'show_plan') void planDisplay.handle(evt, ws);
+          break;
+        case 'display_cancel':
+          planDisplay.cancel(evt.command_id);
+          break;
+        case 'ready':
+          inputRate = evt.input_rate || inputRate;
+          outputRate = evt.output_rate || outputRate;
+          providerName = evt.provider || providerName;
+          halfDuplex = !!evt.half_duplex;
+          startMic();
+          break;
+        case 'speech_started':
+          curUser = '';
+          userLine = null;
+          if (playing) {
+            var heard = stopPlayback();
+            sentMs = 0;
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'played', heard_ms: heard }));
+          }
+          curBot = '';                       // a reply talked over is gone
+          if (inCall) { show('listening'); status('Listening...'); } else paintReply();
+          break;
+        case 'interrupted': {
+          var h = stopPlayback();
+          sentMs = 0;
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'played', heard_ms: h }));
+          curBot = '';
+          if (inCall) show('listening'); else paintReply();
+          break;
+        }
+        case 'user_transcript':
+          // Gemini can deliver one finalized utterance in several pieces and
+          // independently of Emma's output. Keep one object for this spoken
+          // turn, so late pieces update the right row instead of becoming
+          // several different things the guest supposedly said.
+          curUser += evt.text || '';
+          if (curUser) {
+            if (!userLine) {
+              userLine = { who: 'you', text: curUser };
+              transcript.push(userLine);
+            } else {
+              userLine.text = curUser;
+            }
+            renderDrawer();
+          }
+          break;
+        case 'assistant_transcript':
+          curBot += evt.text || '';
+          paintReply();                      // shows only while playing
+          logLine('emma', curBot, true);
+          break;
+        case 'turn_complete':
+          // Don't clear curBot here: the model has stopped generating but its
+          // audio can still be playing for seconds, and the reply line stays
+          // up until that audio ends (see playChunk onended).
+          sentMs = 0;
+          break;
+        case 'tool_result': {
+          // Emma put something on screen. The visual displays go on the stage
+          // and the mascot corners; the text-table screens (calc / unitlist /
+          // promotions / unittypes) aren't ported yet and leave her centred.
+          var r = evt.result || {};
+          if (r.embed) showFrame(r.embed);
+          else if (r.screen === 'unit' && r.unit) showUnit(r.unit);
+          else if (r.screen === 'clear') clearStage();
+          if ('slide' in evt && evt.slide) showSlide(evt.slide);
+          break;
+        }
+        case 'idle_timeout':
+        case 'farewell':
+          endCall();
+          status('Call ended — tap the mic to start again');
+          break;
+        case 'error':
+          show('error');
+          if (evt.code === 'unauthorized') status(evt.message || 'A token is required');
+          else if (evt.code === 'superseded') status('Another tab is using Emma');
+          else status(evt.message || 'Something went wrong');
+          manualEnd = true;
+          break;
+      }
+    }
+
+    // ---- dial / hang up ----
+    function startCall() {
+      if (inCall) return;
+      if (!apiKeyOK) { show('error'); return; }
+      clearTranscript();
+      planDisplay.reset();
+      manualEnd = false; inCall = true;
+      try { ws && ws.close(); } catch (e) {}
+      releaseCallHardware();
+      sentMs = 0; playHead = 0; sources = []; playing = false;
+      muted = false; curBot = '';
+      clearStage();
+      show('loading'); status('Connecting...');
+      setMicLabel('Connecting');
+
+      var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      var urlProfile = q.get('profile'), urlLang = q.get('lang'), urlToken = q.get('token');
+      var urlVoice = q.get('voice');
+      if (urlVoice && voices.length) {
+        var m = voices.find(function (v) { return v.id.toLowerCase() === urlVoice.toLowerCase(); });
+        if (m) selectedVoice = m.id;
+      }
+      ws = new WebSocket(proto + '://' + location.host + '/ws?voice=' + encodeURIComponent(selectedVoice || '')
+        + (urlProfile ? '&profile=' + encodeURIComponent(urlProfile) : '')
+        + (urlLang ? '&lang=' + encodeURIComponent(urlLang) : '')
+        + (urlToken ? '&token=' + encodeURIComponent(urlToken) : ''));
+      ws.binaryType = 'arraybuffer';
+      var callSocket = ws;
+      ws.onmessage = function (m) { if (ws === callSocket) onMessage(m); };
+      ws.onerror = function () { if (ws !== callSocket) return; show('error'); status('Connection error'); };
+      ws.onclose = function () {
+        if (ws !== callSocket) return;
+        planDisplay.reset();
+        releaseCallHardware();
+        inCall = false;
+        clearTranscript();
+        setMicLabel('Tap to talk');
+        if (!manualEnd) { show('idle'); status('Disconnected — tap the mic to try again'); }
+        else { show('idle'); }
+      };
+    }
+
+    function endCall() {
+      manualEnd = true;
+      inCall = false;
+      clearTranscript();
+      planDisplay.reset();
+      try { ws && ws.close(); } catch (e) {}
+      releaseCallHardware();
+      show('idle');
+      restScreen();
+    }
+
+    function toggleMute() {
+      muted = !muted;
+      setMicLabel(muted ? 'Muted' : 'Listening');
+      micBtn && micBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+      if (!playing) { show('listening'); status(muted ? 'Muted' : 'Listening...'); }
+    }
+
+    var appMicLabels = {
+      'Tap to talk': 'กดเพื่อพูด',
+      'Connecting': 'กำลังเชื่อมต่อ',
+      'Listening': 'กำลังฟัง',
+      'Muted': 'ปิดไมค์',
+      'Mic unavailable': 'ไมค์ไม่พร้อม'
+    };
+    function setMicLabel(text) {
+      if (micLabel) micLabel.textContent = appShell && appMicLabels[text] ? appMicLabels[text] : text;
+    }
+
+    // ---- Message button: a plain transcript drawer (aria was "Open
+    //      transcript"). Guest speech never auto-appears on a public screen
+    //      elsewhere, but this page is the operator/laptop view, and the
+    //      drawer is opened by hand. ----
+    var drawer = null;
+    function ensureDrawer() {
+      if (drawer) return drawer;
+      var s = document.createElement('style');
+      s.textContent = '.vp-drawer{position:fixed;inset:auto 0 0 0;max-height:52vh;overflow:auto;'
+        + 'background:rgba(10,14,20,.97);border-top:1px solid rgba(255,255,255,.12);'
+        + 'padding:16px 18px 22px;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;'
+        + 'color:#e7edf3;z-index:50;box-shadow:0 -18px 40px rgba(0,0,0,.5)}'
+        + '.vp-drawer h4{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8b97a5}'
+        + '.vp-line{margin:0 0 8px;max-width:640px}'
+        + '.vp-line .w{font-size:11px;color:#8b97a5;margin-right:6px}'
+        + '.vp-line.emma .w{color:#33d17a}'
+        + '.vp-asr-note{margin:0 0 12px;max-width:640px;font-size:12px;color:#8b97a5}'
+        + '.vp-empty{color:#8b97a5}';
+      document.head.appendChild(s);
+      drawer = document.createElement('section');
+      drawer.className = 'vp-drawer';
+      drawer.hidden = true;
+      drawer.innerHTML = '<h4>บทสนทนา</h4>'
+        + '<p class="vp-asr-note">ข้อความฝั่งคุณเป็นคำถอดเสียงอัตโนมัติ อาจต่างจากสิ่งที่ Emma เข้าใจจากเสียง</p>'
+        + '<div class="vp-body"></div>';
+      document.body.appendChild(drawer);
+      return drawer;
+    }
+    function renderDrawer() {
+      if (!drawer || drawer.hidden) return;
+      var body = drawer.querySelector('.vp-body');
+      if (!transcript.length) { body.innerHTML = '<p class="vp-empty">No conversation yet.</p>'; return; }
+      body.innerHTML = transcript.map(function (l) {
+        var who = l.who === 'emma' ? 'Emma' : 'คำถอดเสียง';
+        return '<p class="vp-line ' + (l.who === 'emma' ? 'emma' : 'you') + '">'
+          + '<span class="w">' + who + '</span>' + escapeHtml(l.text) + '</p>';
+      }).join('');
+      body.scrollTop = body.scrollHeight;
+    }
+    function clearTranscript() {
+      transcript = [];
+      curBot = '';
+      curUser = '';
+      userLine = null;
+      if (drawer) {
+        var body = drawer.querySelector('.vp-body');
+        if (body) body.innerHTML = '<p class="vp-empty">No conversation yet.</p>';
+        drawer.hidden = true;
+      }
+      if (msgBtn) msgBtn.setAttribute('aria-pressed', 'false');
+    }
+    function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+    // Assistant transcript streams in pieces; replace the open Emma line
+    // rather than stacking a new bubble per fragment (index.html's rule).
+    function logLine(who, text, replaceLast) {
+      if (!text) return;
+      if (replaceLast && transcript.length && transcript[transcript.length - 1].who === who) {
+        transcript[transcript.length - 1].text = text;
+      } else {
+        transcript.push({ who: who, text: text });
+      }
+      renderDrawer();
+    }
+
+    // ---- stage: Emma's on-screen displays (cards / plans / photos / embeds).
+    //      The centre takes the content and the mascot corners
+    //      (body.emma-staging). Rendering ported from index.html's stage —
+    //      same tool_result data shapes — but no price is ever pulled onto
+    //      this public screen (owner rule: the desk says the number). ----
+    var stageEl = null, stageInner = null, stageCloseBtn = null, frameWatch = 0;
+    var planDisplay = PlanDisplayProtocol.create({
+      currentSocket: function () { return ws; },
+      renderPlan: function (plan, blobUrl) { return showPlan(plan, blobUrl); },
+      clearPlan: function (shown) {
+        if (stageInner && stageInner.contains(shown)) clearStage();
+      }
+    });
+    function ensureStage() {
+      if (stageEl) return;
+      stageEl = document.createElement('section');
+      stageEl.className = 'vp-stage';
+      stageInner = document.createElement('div');
+      stageInner.className = 'vp-stage-inner';
+      stageEl.appendChild(stageInner);
+      document.body.appendChild(stageEl);
+      stageCloseBtn = document.createElement('button');
+      stageCloseBtn.className = 'vp-stage-close';
+      stageCloseBtn.setAttribute('aria-label', 'Close');
+      stageCloseBtn.textContent = '×';
+      stageCloseBtn.onclick = clearStage;
+      document.body.appendChild(stageCloseBtn);
+    }
+    function openStage() { ensureStage(); stageInner.innerHTML = ''; document.body.classList.add('emma-staging'); }
+    function clearStage() {
+      if (frameWatch) { clearTimeout(frameWatch); frameWatch = 0; }
+      if (stageInner) stageInner.innerHTML = '';
+      document.body.classList.remove('emma-staging');
+    }
+    function elDiv(cls, text) { var d = document.createElement('div'); if (cls) d.className = cls; if (text != null) d.textContent = text; return d; }
+
+    function showFrame(url) {
+      openStage();
+      var f = document.createElement('iframe');
+      f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+      f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+      f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
+      var loaded = false;
+      f.onload = function () { loaded = true; };
+      f.src = url;
+      stageInner.appendChild(f);
+      // No event fires when a site refuses to be framed — wait for the load
+      // that should have happened and say so if it didn't (index.html rule).
+      if (frameWatch) clearTimeout(frameWatch);
+      frameWatch = setTimeout(function () {
+        if (loaded || !document.body.classList.contains('emma-staging')) return;
+        status('เว็บนี้ไม่ยอมให้แสดงในหน้านี้ · the site refused to be embedded');
+        clearStage();
+      }, 6000);
+    }
+
+    function showSlide(slide) {
+      if (!slide || !slide.url) return;
+      openStage();
+      var img = new Image();
+      var assetUrl = new URL(slide.url, location.href);
+      var tok = q.get('token');
+      // Only attach the token to this server's own slide assets, never remote.
+      if (tok && assetUrl.origin === location.origin && assetUrl.pathname.indexOf('/slides/') === 0) {
+        assetUrl.searchParams.set('token', tok);
+      }
+      img.src = assetUrl.href;
+      img.alt = slide.title_th || slide.title_en || '';
+      stageInner.appendChild(img);
+    }
+
+    function showUnit(u) {
+      openStage();
+      var card = elDiv('vp-card');
+      var top = elDiv('u-top');
+      var shot = elDiv('u-shot');
+      if (u.photo) { shot.textContent = ''; var i1 = new Image(); i1.src = u.photo; shot.appendChild(i1); }
+      else shot.textContent = 'ภาพห้อง — รอจากฝ่ายขาย';
+      var plan = elDiv('u-plan');
+      if (u.floorplan) { plan.textContent = ''; var i2 = new Image(); i2.src = u.floorplan; plan.appendChild(i2); }
+      else plan.textContent = 'แปลนรายยูนิต — รอจากฝ่ายขาย';
+      top.append(shot, plan);
+      card.appendChild(top);
+      card.appendChild(elDiv('u-room', 'ห้อง ' + (u.room || '—')));
+      var bits = [];
+      if (u.floor) bits.push('ชั้น ' + u.floor);
+      if (u.type) bits.push(u.type);
+      if (u.sqm) bits.push(u.sqm + ' ตร.ม.');
+      if (u.aspect) bits.push(u.aspect);
+      card.appendChild(elDiv('u-meta', bits.join('  ·  ')));
+      if (u.status_th) {
+        var b = elDiv('u-badge ' + (u.status || ''));
+        b.appendChild(document.createElement('i'));
+        b.appendChild(document.createTextNode(u.status_th));
+        card.appendChild(b);
+      }
+      card.appendChild(elDiv('u-price', 'ราคา — สอบถามฝ่ายขาย'));
+      if (u.source === 'live') card.appendChild(elDiv('u-who', 'ข้อมูลสดจากระบบผังขาย · อัปเดต ' + (u.updated_at || '—')));
+      stageInner.appendChild(card);
+    }
+
+    function showPlan(r, verifiedImageUrl) {
+      openStage();
+      var card = elDiv('vp-card');
+      var head = elDiv('u-head');
+      var title = document.createElement('b');
+      title.textContent = 'ผังชั้น ' + r.floor + (r.building ? ' · ตึก ' + r.building : '');
+      var c = r.counts || {};
+      var legend = document.createElement('span');
+      legend.textContent = 'ว่าง ' + (c.available || 0) + ' · จอง ' + (c.reserved || 0) + ' · ขายแล้ว ' + (c.sold || 0);
+      head.append(title, legend);
+      card.appendChild(head);
+      var wrap = elDiv('u-planwrap');
+      var img = new Image(); img.src = verifiedImageUrl; wrap.appendChild(img);
+      var NS = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 100 100');
+      svg.setAttribute('preserveAspectRatio', 'none');
+      svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+      var FILL = { sold: 'rgba(192,85,90,.72)', reserved: 'rgba(224,163,58,.72)', available: 'rgba(53,196,106,.16)' };
+      (r.units || []).forEach(function (u) {
+        var shape;
+        if (u.poly && u.poly.length >= 3) {
+          shape = document.createElementNS(NS, 'polygon');
+          shape.setAttribute('points', u.poly.map(function (p) { return p[0] + ',' + p[1]; }).join(' '));
+        } else {
+          shape = document.createElementNS(NS, 'rect');
+          shape.setAttribute('x', u.x); shape.setAttribute('y', u.y);
+          shape.setAttribute('width', u.w); shape.setAttribute('height', u.h);
+        }
+        shape.setAttribute('fill', FILL[u.status] || 'transparent');
+        shape.setAttribute('stroke', 'rgba(255,255,255,.35)');
+        shape.setAttribute('stroke-width', '.08');
+        if (u.dim) shape.setAttribute('opacity', '.18');
+        svg.appendChild(shape);
+      });
+      wrap.appendChild(svg);
+      card.appendChild(wrap);
+      card.appendChild(elDiv('u-who', 'สถานะสดจากระบบผังขาย · แดง=ขายแล้ว เหลือง=จอง โปร่ง=ว่าง'));
+      stageInner.appendChild(card);
+      return img;
+    }
+
+    function restScreen() {
+      // The at-rest screen (not connected): mascot only, no reply text — the
+      // greeting appears when Emma actually speaks it, not printed under an
+      // idle mascot. The invitation lives in the status line and the button.
+      curBot = '';
+      clearStage();
+      show('idle');
+      status('Tap the mic to talk');
+      setMicLabel('Tap to talk');
+    }
+
+    // ---- wire the controls ----
+    if (micBtn) micBtn.onclick = function () { if (!inCall) startCall(); else toggleMute(); };
+    if (endBtn) endBtn.onclick = function () { endCall(); };
+    if (msgBtn) msgBtn.onclick = function () {
+      ensureDrawer();
+      drawer.hidden = !drawer.hidden;
+      msgBtn.setAttribute('aria-pressed', drawer.hidden ? 'false' : 'true');
+      renderDrawer();
+    };
+    addEventListener('emma-native-pause', function () { if (inCall) endCall(); });
+    addEventListener('pagehide', function () { if (inCall) endCall(); });
+
+    // ---- press-and-hold the mascot to bring the hidden controls back while a
+    //      display is up (owner, 2026-09-14). A drag is not a hold: if the
+    //      pointer moves appreciably the timer is cancelled, so the free-drag
+    //      feature and the reveal don't fight. ----
+    var mascotEl = document.querySelector('.mascot-wrap');
+    var holdTimer = 0, peekTimer = 0, holdStart = null;
+    function peekControls() {
+      document.body.classList.add('controls-peek');
+      if (peekTimer) clearTimeout(peekTimer);
+      peekTimer = setTimeout(function () { document.body.classList.remove('controls-peek'); }, 4500);
+    }
+    function cancelHold() { if (holdTimer) { clearTimeout(holdTimer); holdTimer = 0; } }
+    if (mascotEl) {
+      mascotEl.addEventListener('pointerdown', function (e) {
+        holdStart = { x: e.clientX, y: e.clientY };
+        cancelHold();
+        holdTimer = setTimeout(function () {
+          holdTimer = 0;
+          if (document.body.classList.contains('emma-staging')) peekControls();
+        }, 500);
+      });
+      mascotEl.addEventListener('pointermove', function (e) {
+        if (holdStart && Math.hypot(e.clientX - holdStart.x, e.clientY - holdStart.y) > 12) cancelHold();
+      });
+      mascotEl.addEventListener('pointerup', cancelHold);
+      mascotEl.addEventListener('pointercancel', cancelHold);
+    }
+
+    if (designOnly) return;   // ?demo=1 stays a pure visual walkthrough
+
+    // ---- boot: mirror index.html's /voices + /health handshake ----
+    Emma.stopPoseDemo && Emma.stopPoseDemo();
+    restScreen();
+    Promise.all([
+      fetch('/voices').then(function (r) { return r.json(); }),
+      fetch('/health').then(function (r) { return r.json(); }),
+    ]).then(function (res) {
+      var vd = res[0], health = res[1];
+      voices = vd.voices || [];
+      var def = voices.find(function (v) { return v.id === vd.default; }) || voices[0];
+      selectedVoice = def ? def.id : null;
+      providerName = health.provider || providerName;
+      apiKeyOK = !!health.api_key_configured;
+      if (health.mic) {
+        micCallBoost = (typeof health.mic.boost_call === 'number') ? health.mic.boost_call : (health.mic.boost || 1);
+        micNS = !!health.mic.noise_suppression;
+        micCompressor = health.mic.compressor !== false;
+        micAGC = health.mic.agc !== false;
+      }
+      // Per-client mic overrides, same as index.html (the robot passes ?agc=0).
+      if (['0', '1'].indexOf(q.get('agc')) >= 0) micAGC = q.get('agc') === '1';
+      if (['0', '1'].indexOf(q.get('ns')) >= 0) micNS = q.get('ns') === '1';
+      if (!apiKeyOK) {
+        show('error');
+        status('No API key on the server — set it in .env and restart');
+      }
+    }).catch(function () {
+      status('Could not reach the server');
+    });
+  })();
+  </script>
+</body>
+</html>

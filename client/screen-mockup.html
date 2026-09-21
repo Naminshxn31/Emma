@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>แบบร่างจอหน้าอกหุ่น · Emma</title>
+<!--
+  แบบร่างจอหน้าอกหุ่น (1080×1920) — 2026-09-18
+
+  นี่คือ "แบบร่าง" ไม่ใช่หน้าใช้งาน: ไม่มี WebSocket ไม่มีไมค์ ไม่มีกล้อง
+  ไม่ต่อ /ws /voices /health และไม่แสดงคำพูดของลูกค้าเลยแม้แต่ช่องเดียว
+  มีไว้เปิดบนจอหุ่นจริงเพื่อตัดสินสามเรื่องที่ตัดสินจากหน้าจอคอมไม่ได้:
+  ขนาดตัวอักษรที่ระยะยืนจริง, สัดส่วนของ Emma เทียบเนื้อหา, และจังหวะ
+  ที่จอควรสลับจาก "Emma นำ" เป็น "เนื้อหานำ"
+
+  ขนาดจอจริง: 18.5" 16:9 ติดตั้งแนวตั้ง = กว้าง 230 มม. × สูง 409 มม.
+  1080 px วางบน 230 มม. => 4.69 px/มม. (~119 dpi) ทุกตัวเลข px ในไฟล์นี้
+  แปลงเป็นมิลลิเมตรด้วยตัวหารนี้ ดูรายละเอียดที่ปุ่ม "กฎที่ใช้ออกแบบ"
+-->
+<style>
+  :root {
+    --ink: #eef7f4;
+    --ink-2: #d7e0e6;
+    --ink-3: #b7c0cb;
+    --ink-4: #8b97a5;
+    --gold: #f0e4c8;
+    --gold-2: #f0dca0;
+    --mint: #69edba;
+    --ok: #33d17a;
+    --warn: #e0a33a;
+    --sold: #e06b6b;
+    --card: rgba(12, 16, 22, .92);
+    --line: rgba(255, 255, 255, .10);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #05080d;
+    color: var(--ink);
+    font-family: "Noto Sans Thai", "Sarabun", "Segoe UI", system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+  }
+
+  /* ---- the 1080×1920 panel, scaled to whatever screen opens it ----
+     ออกแบบที่ขนาดจริงเสมอ แล้วย่อด้วย transform ตอนแสดง — เปิดบนจอหุ่น
+     ได้ 1:1 และเปิดบนคอมได้สัดส่วนเดียวกันเป๊ะ ไม่ใช่ layout คนละชุด */
+  #viewport { position: fixed; inset: 0; display: grid; place-items: center; }
+
+  #panel {
+    width: 1080px;
+    height: 1920px;
+    position: relative;
+    overflow: hidden;
+    transform-origin: center center;
+    background:
+      radial-gradient(ellipse 95% 58% at 22% -2%, rgba(72, 111, 154, .28), transparent 62%),
+      radial-gradient(ellipse 72% 48% at 48% 70%, rgba(35, 92, 118, .13), transparent 72%),
+      linear-gradient(170deg, #07111d 0%, #050b12 56%, #03070c 100%);
+  }
+
+  #panel::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    width: 2400px; height: 2400px;
+    left: -1180px; top: -760px;
+    border: 1px solid rgba(124, 181, 230, .13);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .layer { position: absolute; inset: 0; z-index: 1; opacity: 0; transition: opacity .45s ease; pointer-events: none; }
+  .layer.on { opacity: 1; }
+
+  /* ---- shared bits ---- */
+  .pad { position: absolute; left: 72px; right: 72px; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 18px;
+    padding: 20px 40px; border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, .09);
+    background: rgba(8, 17, 28, .58);
+    color: var(--ink-2); font-size: 38px; line-height: 1;
+  }
+  .pill i { width: 20px; height: 20px; border-radius: 999px; background: var(--mint); }
+
+  .mascot { position: absolute; display: block; pointer-events: none; }
+
+  .headline { font-size: 116px; font-weight: 700; line-height: 1.08; letter-spacing: -.5px; }
+  .title { font-size: 72px; font-weight: 700; line-height: 1.15; }
+  .body { font-size: 56px; line-height: 1.38; color: var(--ink); }
+  .sub { font-size: 40px; line-height: 1.4; color: var(--ink-3); }
+  .meta { font-size: 32px; line-height: 1.35; color: var(--ink-4); }
+
+  /* ---- bottom control bar (same two buttons as the app) ---- */
+  .bar { position: absolute; left: 0; right: 0; bottom: 76px; display: flex;
+         justify-content: center; align-items: flex-end; gap: 130px; z-index: 3; }
+  .btn { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .btn .ic {
+    width: 148px; height: 148px; border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    background: rgba(255, 255, 255, .055);
+    display: grid; place-items: center;
+    box-shadow: 0 18px 38px rgba(0, 0, 0, .34);
+  }
+  .btn.mic .ic {
+    width: 196px; height: 196px; border: 0;
+    background: radial-gradient(circle at 36% 25%, #caffee 0%, #69edba 42%, #32d998 100%);
+    box-shadow: 0 22px 48px rgba(48, 218, 153, .34), 0 0 0 18px rgba(78, 231, 174, .08);
+  }
+  .btn .lb { font-size: 40px; font-weight: 600; color: var(--ink-2); }
+  .btn.mic .lb { color: #bff7df; }
+  .btn.end .lb { color: #e3a7b0; }
+  .btn svg { width: 62px; height: 62px; fill: none; stroke: #f4f8fb; stroke-width: 2.1; }
+  .btn.mic svg { width: 78px; height: 78px; stroke: #04301f; stroke-width: 2.2; }
+
+  /* ---- 1. attract ---- */
+  #attract .art { position: absolute; inset: 0; }
+  #attract .art figure { position: absolute; inset: 0; margin: 0; opacity: 0;
+    animation: cyc 21s infinite; background-size: cover; background-position: center; }
+  #attract .art figure:nth-child(2) { animation-delay: 7s; }
+  #attract .art figure:nth-child(3) { animation-delay: 14s; }
+  @keyframes cyc { 0%, 28% { opacity: .5 } 33%, 100% { opacity: 0 } }
+  #attract .scrim { position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(4, 8, 14, .55) 0%, rgba(4, 8, 14, .18) 34%,
+                rgba(3, 7, 12, .82) 72%, #03070c 100%); }
+  .ph { position: absolute; inset: 0; display: grid; place-items: center;
+        background: linear-gradient(145deg, #0b1926, #071019);
+        color: #55657a; font-size: 34px; text-align: center; padding: 40px; }
+
+  /* ---- 5. speaking + card ---- */
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 34px; padding: 44px 46px 48px;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, .55);
+  }
+  .card .top { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .card .shot, .card .plan {
+    aspect-ratio: 4 / 3; border-radius: 22px; overflow: hidden;
+    background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08);
+    display: grid; place-items: center; text-align: center; color: var(--ink-4);
+    font-size: 30px; padding: 20px;
+  }
+  .card .shot img, .card .plan img { width: 100%; height: 100%; object-fit: cover; }
+  .card .room { font-size: 62px; font-weight: 700; margin-top: 32px; }
+  .card .mt { color: var(--ink-3); font-size: 40px; margin-top: 8px; }
+  .badge { display: inline-flex; align-items: center; gap: 14px; margin-top: 26px;
+    font-size: 34px; padding: 12px 26px; border-radius: 999px; background: rgba(255, 255, 255, .06); }
+  .badge i { width: 18px; height: 18px; border-radius: 999px; background: currentColor; }
+  .badge.available { color: var(--ok); }
+  .card .price { margin-top: 30px; font-size: 42px; color: var(--gold-2); }
+  .card .who { margin-top: 22px; color: var(--ink-4); font-size: 30px; }
+
+  /* ---- 6. content full-bleed ---- */
+  #stage .frame { position: absolute; left: 0; right: 0; top: 128px; bottom: 300px;
+    display: grid; place-items: center; padding: 0 40px; }
+  #stage .frame > * { max-width: 100%; max-height: 100%; border-radius: 26px; }
+  #stage .legend { display: flex; gap: 40px; font-size: 34px; color: var(--ink-3); }
+  #stage .legend b { font-weight: 600; }
+  .dot { display: inline-block; width: 18px; height: 18px; border-radius: 999px;
+         margin-right: 12px; vertical-align: -1px; }
+
+  /* ---- mockup chrome (ไม่ใช่ส่วนหนึ่งของดีไซน์) ---- */
+  #rail { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    padding: 10px 12px; border-radius: 16px; background: rgba(6, 12, 20, .92);
+    border: 1px solid rgba(255, 255, 255, .12); z-index: 50; max-width: 96vw;
+    transition: opacity .3s ease; font-size: 14px; }
+  #rail.hide { opacity: .12; }
+  #rail button {
+    font: inherit; color: #cfdae4; background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .12); border-radius: 10px;
+    padding: 9px 13px; cursor: pointer; white-space: nowrap;
+  }
+  #rail button.on { background: #2d6c58; border-color: #49a281; color: #eafff5; }
+  #rail .sep { width: 1px; background: rgba(255, 255, 255, .14); margin: 2px 4px; }
+
+  #notes { position: fixed; inset: 0; z-index: 60; overflow: auto; display: none;
+    background: rgba(3, 7, 12, .97); padding: 44px 34px 90px; }
+  #notes.on { display: block; }
+  #notes .wrap { max-width: 860px; margin: 0 auto; font-size: 16px; line-height: 1.75; color: #d2dce5; }
+  #notes h2 { font-size: 24px; margin: 0 0 6px; color: #f0e4c8; }
+  #notes h3 { font-size: 18px; margin: 30px 0 6px; color: #9fe6c6; }
+  #notes p { margin: 0 0 12px; }
+  #notes ul { margin: 0 0 12px; padding-left: 22px; }
+  #notes li { margin-bottom: 7px; }
+  #notes code { background: rgba(255, 255, 255, .07); padding: 1px 6px; border-radius: 5px; font-size: 14px; }
+  #notes table { width: 100%; border-collapse: collapse; margin: 6px 0 14px; font-size: 15px; }
+  #notes th, #notes td { border: 1px solid rgba(255, 255, 255, .13); padding: 7px 10px; text-align: left; }
+  #notes th { background: rgba(255, 255, 255, .05); color: #cfe9dd; }
+  .draftflag { position: absolute; top: 34px; right: 72px; z-index: 4;
+    font-size: 26px; color: #8b7a52; border: 1px solid rgba(240, 228, 200, .22);
+    border-radius: 999px; padding: 9px 22px; background: rgba(30, 24, 10, .4); }
+</style>
+</head>
+<body>
+
+<div id="viewport">
+  <div id="panel">
+
+    <div class="draftflag">แบบร่าง · ข้อมูลตัวอย่าง</div>
+
+    <!-- ============ 1. ว่าง / ดึงดูด ============ -->
+    <section class="layer" id="attract">
+      <div class="art" id="attractArt"></div>
+      <div class="scrim"></div>
+      <img class="mascot" data-pose="idle" style="width: 430px; left: 50%; margin-left: -215px; top: 960px;">
+      <div class="pad" style="top: 150px;">
+        <div class="meta" style="letter-spacing: 6px; color: #7f8fa0;">EMBASSY WORLD</div>
+        <div class="headline" style="margin-top: 22px;">ยินดีต้อนรับค่ะ</div>
+      </div>
+      <div class="pad" style="top: 1420px; text-align: center;">
+        <div class="body" style="color: var(--ink-2);">เรียก <b style="color: var(--gold)">“เอ็มม่า”</b> หรือแตะปุ่มไมค์ได้เลยค่ะ</div>
+        <div class="sub" style="margin-top: 20px;">ถามเรื่องห้อง ส่วนกลาง หรือขอดูผังชั้นได้</div>
+      </div>
+      <div class="bar">
+        <div class="btn mic"><div class="ic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><div class="lb">กดเพื่อพูด</div></div>
+      </div>
+    </section>
+
+    <!-- ============ 2. เห็นคนเข้ามา — ยังไม่รู้จัก ============ -->
+    <section class="layer" id="greet">
+      <img class="mascot" data-pose="greeting-wave" style="width: 700px; left: 50%; margin-left: -350px; top: 430px;">
+      <div class="pad" style="top: 1150px; text-align: center;">
+        <div class="headline">สวัสดีค่ะ</div>
+        <div class="body" style="margin-top: 28px; color: var(--ink-2);">มีอะไรให้เอ็มม่าช่วยไหมคะ</div>
+      </div>
+      <div class="pad" style="top: 210px; text-align: center;">
+        <span class="pill"><i></i> เอ็มม่าเปิดฟังแล้ว</span>
+      </div>
+      <div class="bar">
+        <div class="btn mic"><div class="ic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><div class="lb">กดเพื่อพูด</div></div>
+        <div class="btn end"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 9a16 16 0 0 1 16 0v4l-4.5-1v-3a11 11 0 0 0-7 0v3L4 13z"/></svg></div><div class="lb">จบ</div></div>
+      </div>
+    </section>
+
+    <!-- ============ 3. จำได้ → ทักชื่อ ============ -->
+    <section class="layer" id="named">
+      <img class="mascot" data-pose="greeting-wave" style="width: 700px; left: 50%; margin-left: -350px; top: 430px;">
+      <div class="pad" style="top: 1150px; text-align: center;">
+        <div class="headline">สวัสดีค่ะ<br><span style="color: var(--gold)">คุณโชกุน</span></div>
+        <div class="body" style="margin-top: 28px; color: var(--ink-2);">ยินดีที่ได้เจอกันอีกนะคะ</div>
+      </div>
+      <div class="pad" style="top: 210px; text-align: center;">
+        <span class="pill"><i></i> เอ็มม่าเปิดฟังแล้ว</span>
+      </div>
+      <div class="bar">
+        <div class="btn mic"><div class="ic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><div class="lb">กดเพื่อพูด</div></div>
+        <div class="btn end"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 9a16 16 0 0 1 16 0v4l-4.5-1v-3a11 11 0 0 0-7 0v3L4 13z"/></svg></div><div class="lb">จบ</div></div>
+      </div>
+    </section>
+
+    <!-- ============ 4. กำลังฟัง ============ -->
+    <section class="layer" id="listening">
+      <div class="pad" style="top: 210px; text-align: center;">
+        <span class="pill"><i style="animation: none;"></i> กำลังฟัง…</span>
+      </div>
+      <img class="mascot" data-pose="listening" style="width: 640px; left: 50%; margin-left: -320px; top: 560px;">
+      <div class="pad" style="top: 1300px; text-align: center;">
+        <div class="sub">เอ็มม่ากำลังฟังอยู่ พูดได้ตามสบายค่ะ</div>
+      </div>
+      <div class="bar">
+        <div class="btn mic"><div class="ic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><div class="lb">กำลังฟัง</div></div>
+        <div class="btn end"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 9a16 16 0 0 1 16 0v4l-4.5-1v-3a11 11 0 0 0-7 0v3L4 13z"/></svg></div><div class="lb">จบ</div></div>
+      </div>
+    </section>
+
+    <!-- ============ 5. Emma พูด + การ์ดห้อง ============ -->
+    <section class="layer" id="speaking">
+      <div class="pad" style="top: 120px; display: flex; align-items: center; gap: 34px;">
+        <img class="mascot" data-pose="speaking" style="position: static; width: 220px; flex: 0 0 auto;">
+        <div>
+          <div class="meta">เอ็มม่ากำลังพูด</div>
+          <div class="title" style="margin-top: 10px;">ห้อง A-801 ค่ะ</div>
+        </div>
+      </div>
+
+      <div class="pad card" style="top: 460px;">
+        <div class="top">
+          <div class="shot" data-slide="2">ภาพห้อง — รอจากฝ่ายขาย</div>
+          <div class="plan">แปลนรายยูนิต — รอจากฝ่ายขาย</div>
+        </div>
+        <div class="room">ห้อง A-801</div>
+        <div class="mt">ชั้น 8 · ตึก A · 1 Bedroom · 33.1 ตร.ม.</div>
+        <span class="badge available"><i></i> ว่าง</span>
+        <div class="price">ราคา — สอบถามฝ่ายขาย</div>
+        <div class="who">ข้อมูลสดจากระบบผังขาย · อัปเดต 18 ก.ย. 2026 10:42</div>
+      </div>
+
+      <div class="bar">
+        <div class="btn mic"><div class="ic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><div class="lb">กดเพื่อพูด</div></div>
+        <div class="btn end"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 9a16 16 0 0 1 16 0v4l-4.5-1v-3a11 11 0 0 0-7 0v3L4 13z"/></svg></div><div class="lb">จบ</div></div>
+      </div>
+    </section>
+
+    <!-- ============ 6. เนื้อหานำ — เต็มจอ ============ -->
+    <section class="layer" id="stage">
+      <div class="pad" style="top: 40px; display: flex; align-items: center; gap: 26px;">
+        <img class="mascot" data-pose="presenting" style="position: static; width: 128px; flex: 0 0 auto;">
+        <div class="title" style="font-size: 52px;">ผังชั้น 8 · ตึก A</div>
+      </div>
+      <div class="frame"><div class="ph" style="position: relative; border-radius: 26px; width: 100%; height: 100%;">ผังชั้น — ภาพจริงต่อจากระบบผังขาย</div></div>
+      <div class="pad" style="bottom: 210px; display: flex; justify-content: center;">
+        <div class="legend">
+          <span><b style="color: var(--ok)"><span class="dot" style="background: var(--ok)"></span>ว่าง 12</b></span>
+          <span><b style="color: var(--warn)"><span class="dot" style="background: var(--warn)"></span>จอง 1</b></span>
+          <span><b style="color: var(--sold)"><span class="dot" style="background: var(--sold)"></span>ขายแล้ว 7</b></span>
+        </div>
+      </div>
+      <div class="bar" style="bottom: 60px;">
+        <div class="btn mic"><div class="ic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><div class="lb">กดเพื่อพูด</div></div>
+        <div class="btn end"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 9a16 16 0 0 1 16 0v4l-4.5-1v-3a11 11 0 0 0-7 0v3L4 13z"/></svg></div><div class="lb">จบ</div></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div id="rail">
+  <button data-go="attract">1 ว่าง</button>
+  <button data-go="greet">2 ทักคนแปลกหน้า</button>
+  <button data-go="named">3 ทักชื่อ</button>
+  <button data-go="listening">4 กำลังฟัง</button>
+  <button data-go="speaking">5 พูด + การ์ดห้อง</button>
+  <button data-go="stage">6 เนื้อหาเต็มจอ</button>
+  <div class="sep"></div>
+  <button id="playBtn">▶ เล่นต่อเนื่อง</button>
+  <button id="notesBtn">กฎที่ใช้ออกแบบ</button>
+</div>
+
+<div id="notes">
+  <div class="wrap">
+    <h2>กฎที่ใช้ออกแบบจอหน้าอกหุ่น</h2>
+    <p>ทุกข้อด้านล่างมาจากไฟล์จริงในรีโปหรือจากการคำนวณขนาดจอ ไม่ได้มาจากความชอบ
+       ถ้าข้อไหนขัดกับที่เจ้าของต้องการ ให้แก้ข้อนั้นก่อนแล้วค่อยลงโค้ด</p>
+
+    <h3>1. ขนาดตัวอักษรมาจากระยะยืน ไม่ใช่จากความสวย</h3>
+    <p>จอ 18.5" 16:9 ติดตั้งแนวตั้ง = กว้าง <b>230 มม.</b> × สูง 409 มม.
+       วาง 1080 px บน 230 มม. ได้ <b>4.69 px/มม.</b> (~119 dpi)</p>
+    <p>เกณฑ์ที่ใช้กันคือความสูงตัวอักษรพิมพ์ใหญ่ต้องไม่ต่ำกว่า <code>ระยะ ÷ 200</code>
+       จึงจะอ่านออก และ <code>÷ 150</code> จึงจะอ่านสบาย</p>
+    <table>
+      <tr><th>ระยะยืน</th><th>cap height ต่ำสุด</th><th>= font-size ประมาณ</th></tr>
+      <tr><td>1.0 ม.</td><td>5.0 มม.</td><td>34 px</td></tr>
+      <tr><td>1.5 ม.</td><td>7.5 มม.</td><td>50 px</td></tr>
+      <tr><td>2.0 ม.</td><td>10.0 มม.</td><td><b>67 px</b></td></tr>
+    </table>
+    <p><b>ข้อที่ต้องรู้:</b> หน้าแอปตอนนี้ (<code>html.app-shell .reply-text</code>) ตั้งไว้
+       <code>clamp(1rem, 2.8vw, 1.32rem)</code> ซึ่งบนจอกว้าง 1080 px คือ <b>21 px</b> —
+       ขนาดนั้นอ่านออกที่ประมาณ <b>0.6 เมตร</b> คือระยะถือมือถือ ไม่ใช่ระยะยืนคุยกับหุ่น
+       แบบร่างนี้จึงตั้งตัวพื้นที่ <b>56 px</b> คำทักที่ <b>116 px</b> และตัวเล็กสุดที่ <b>30 px</b>
+       สำหรับข้อความที่ยอมให้อ่านไม่ออกจากระยะไกล (ที่มา/เวลาอัปเดต)</p>
+
+    <h3>2. ห้ามเอาคำที่ลูกค้าพูดขึ้นจอนี้</h3>
+    <p>กฎเดิมของ <code>/display?chat=1</code> ใน CLAUDE.md ใช้กับจอนี้ทั้งข้อ — เหตุผลเดียวกันเป๊ะ:
+       ถอดเสียงผิดบ่อยพอที่จะทำให้หุ่นที่ทำงานถูกดูเหมือนพัง และ prompt สั่งให้เอ็มม่า
+       <b>ทวนเบอร์โทรกลับ</b> = เบอร์คนแปลกหน้าขึ้นจอกลางห้องขายให้คนเดินผ่านอ่าน</p>
+    <p>แบบร่างนี้จึงไม่มีช่อง transcript เลย มีแต่ตัวชี้วัด “กำลังฟัง…”
+       <b>ปุ่ม “ข้อความ” ที่มีอยู่ในแอปตอนนี้ต้องไม่ติดมาที่จอหุ่น</b>
+       (จอโน้ตบุ๊กพนักงานยังมีได้ นั่นคนละพื้นผิว)</p>
+
+    <h3>3. ชื่อคนใช้ได้แค่ประโยคทัก แล้วหายไป</h3>
+    <p>ตรงกับ <code>greeting_for</code> ในเซิร์ฟเวอร์: หลังทักแล้วโมเดลไม่มี speaker ID
+       จึงไม่รู้ว่าเสียงถัดไปเป็นใคร ปล่อยชื่อค้างบนจอทั้งสาย = จอยืนยันสิ่งที่ระบบไม่รู้
+       จอที่ 3 จึงมีชื่ออยู่จอเดียว จอที่ 4-6 ไม่มีชื่อเลย</p>
+    <p>และชื่อขึ้นได้เฉพาะเมื่อเงื่อนไขครบตามที่โค้ดมีอยู่แล้ว: ผ่านเกณฑ์ + ยืนยันหลายเฟรม +
+       margin อันดับ 1-2 + <b>หน้าเดียวในเฟรม</b> + consent ไม่ถูกเพิกถอน
+       ไม่ครบข้อไหนก็ตกไปที่จอที่ 2 ซึ่ง<b>ไม่มีวันผิด</b></p>
+
+    <h3>4. โหมดว่างต้องไม่ใช่นาฬิกาเรือนที่สอง</h3>
+    <p>บั๊กที่โปรเจกต์นี้จ่ายมาแล้วหลายรอบคือกลไกใหม่ที่มีนาฬิกาของตัวเอง
+       (Canva กับจอเว็บ, ตัวกระตุ้นทัวร์กับคิวเสียง) โหมดว่างจึงต้องเป็น
+       <b>state เดียวกับที่หน้าเว็บมีอยู่แล้ว</b> (<code>data-emma-state="idle"</code>)
+       ไม่ใช่ timer แยกที่ตัดสินเองว่าเมื่อไหร่ควรกลับไปวนภาพ
+       ไม่งั้นจะได้อาการ “หุ่นกลับไปโชว์ภาพโครงการกลางประโยคที่กำลังตอบลูกค้า”</p>
+
+    <h3>5. จอสลับเองตามสถานการณ์ ไม่ใช่มีปุ่มให้คนสลับ</h3>
+    <ul>
+      <li><b>ว่าง</b> → โหมดดึงดูด (จอ 1)</li>
+      <li><b>กล้องเห็นคน</b> → ทัก (จอ 2 หรือ 3 ตามเงื่อนไขข้อ 3)</li>
+      <li><b>คุยกันอยู่</b> → Emma นำ (จอ 4)</li>
+      <li><b>เครื่องมือคืนของที่มีภาพ</b> → Emma หดไปบน + การ์ด (จอ 5)</li>
+      <li><b>ผัง/สไลด์/เว็บ</b> → เนื้อหาเต็มจอ Emma เหลือหัวเล็ก (จอ 6)</li>
+      <li><b>ปิดของ / จบสาย</b> → กลับจอ 1</li>
+    </ul>
+    <p>จอ 5 กับ 6 ต่างกันตรง “ของชิ้นนี้ต้องมองนานแค่ไหน” การ์ดห้องอ่าน 5 วินาทีจบ
+       ผังชั้นกับสไลด์ต้องกวาดตา จึงยอมให้กิน Emma ได้</p>
+
+    <h3>6. ช่องว่างติดป้ายว่าขาดอะไร ไม่ซ่อน</h3>
+    <p>“ภาพห้อง — รอจากฝ่ายขาย” และ “ราคา — สอบถามฝ่ายขาย” อยู่ในแบบร่างโดยตั้งใจ
+       ตามกฎเดิมของการ์ดห้อง ช่องว่างที่บอกว่าต้องเติมอะไรทวงตารางยูนิตได้ดีกว่าอีเมล
+       และ <code>UNITS_SHOW_PRICE=false</code> ยังเป็นค่าเริ่มต้นตามคำสั่งเจ้าของ</p>
+
+    <h3>สิ่งที่แบบร่างนี้ยังไม่ตอบ</h3>
+    <ul>
+      <li>ภาพที่จะวนในโหมดว่าง — ตอนนี้ดึงสไลด์มาใช้ชั่วคราว ของจริงควรเป็นชุดภาพที่เลือกไว้เพื่อการนี้</li>
+      <li>เสียง/แอนิเมชันตอนเปลี่ยนจอ — ยังไม่ออกแบบ ต้องดูของจริงบนหุ่นก่อน</li>
+      <li>จอเวลาเน็ตหลุด / เซิร์ฟเวอร์ดับ — ต้องมี แต่ยังไม่ได้ร่าง</li>
+      <li>4 จอที่ยังไม่ได้พอร์ต (calc / unitlist / promotions / unittypes) — เจ้าของเลือกไม่เอารอบนี้</li>
+    </ul>
+    <p style="margin-top: 26px;"><button onclick="document.getElementById('notes').classList.remove('on')"
+       style="font: inherit; padding: 10px 18px; border-radius: 10px; border: 1px solid #3c5568;
+              background: #14202c; color: #cfe0ec; cursor: pointer;">ปิด</button></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var params = new URLSearchParams(location.search);
+  var token = params.get('token') || '';
+
+  // ---- mascot art: the same PNGs the app already serves at /assets/emma/ ----
+  // ถ้าเปิดไฟล์นี้นอกเซิร์ฟเวอร์ รูปจะโหลดไม่ขึ้น แล้วเหลือกรอบเปล่า —
+  // จงใจไม่ใส่รูปสำรอง เพราะแบบร่างที่ดูดีบนรูปที่ไม่ใช่ของจริงคือแบบร่างที่โกหก
+  Array.prototype.forEach.call(document.querySelectorAll('.mascot'), function (img) {
+    img.src = 'assets/emma/emma-' + img.getAttribute('data-pose') + '.png';
+    img.alt = '';
+    img.addEventListener('error', function () { img.style.visibility = 'hidden'; });
+  });
+
+  // ---- attract artwork: real deck images when the server can serve them ----
+  var art = document.getElementById('attractArt');
+  ['ew_004.jpg', 'ew_012.jpg', 'ew_028.jpg'].forEach(function (name) {
+    var fig = document.createElement('figure');
+    var url = '/slides/' + name + (token ? '?token=' + encodeURIComponent(token) : '');
+    var probe = new Image();
+    probe.onload = function () { fig.style.backgroundImage = 'url("' + url + '")'; };
+    probe.onerror = function () {
+      fig.innerHTML = '<div class="ph">ภาพโครงการสำหรับโหมดว่าง<br>' +
+        '(เปิดหน้านี้ผ่านเซิร์ฟเวอร์พร้อม ?token= เพื่อเห็นภาพจริง)</div>';
+      fig.style.opacity = '';
+    };
+    probe.src = url;
+    art.appendChild(fig);
+  });
+
+  // ---- one card image borrowed from the deck, same rule ----
+  var shot = document.querySelector('#speaking .shot');
+  if (shot) {
+    var surl = '/slides/ew_021.jpg' + (token ? '?token=' + encodeURIComponent(token) : '');
+    var sp = new Image();
+    sp.onload = function () { shot.textContent = ''; shot.appendChild(sp); };
+    sp.src = surl;
+  }
+
+  // ---- state machine (one clock, like the note says) ----
+  var order = ['attract', 'greet', 'named', 'listening', 'speaking', 'stage'];
+  var dwell = { attract: 7000, greet: 4000, named: 4000, listening: 4000, speaking: 7000, stage: 7000 };
+  var current = '';
+  var playing = false;
+  var timer = null;
+
+  function go(id) {
+    if (current === id) return;
+    current = id;
+    order.forEach(function (name) {
+      document.getElementById(name).classList.toggle('on', name === id);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#rail button[data-go]'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-go') === id);
+    });
+    if (playing) {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        go(order[(order.indexOf(id) + 1) % order.length]);
+      }, dwell[id] || 5000);
+    }
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#rail button[data-go]'), function (b) {
+    b.addEventListener('click', function () { stop(); go(b.getAttribute('data-go')); });
+  });
+
+  function stop() { playing = false; clearTimeout(timer); playBtn.textContent = '▶ เล่นต่อเนื่อง'; }
+  var playBtn = document.getElementById('playBtn');
+  playBtn.addEventListener('click', function () {
+    if (playing) { stop(); return; }
+    playing = true;
+    playBtn.textContent = '⏸ หยุด';
+    var next = order[(order.indexOf(current) + 1) % order.length];
+    current = '';
+    go(next);
+  });
+
+  document.getElementById('notesBtn').addEventListener('click', function () {
+    document.getElementById('notes').classList.toggle('on');
+  });
+
+  // ---- scale the 1080×1920 panel to whatever opened it ----
+  var panel = document.getElementById('panel');
+  function fit() {
+    var s = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
+    panel.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  // ---- rail fades out of the way on the robot, comes back on tap ----
+  var rail = document.getElementById('rail');
+  var fade = null;
+  function nudge() {
+    rail.classList.remove('hide');
+    clearTimeout(fade);
+    fade = setTimeout(function () { rail.classList.add('hide'); }, 6000);
+  }
+  document.addEventListener('pointerdown', nudge);
+  nudge();
+
+  go(params.get('screen') && order.indexOf(params.get('screen')) >= 0 ? params.get('screen') : 'attract');
+})();
+</script>
+</body>
+</html>

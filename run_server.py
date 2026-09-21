@@ -5,15 +5,50 @@ this project's HOST and PORT variables as bind options.  This entrypoint does.
 """
 from __future__ import annotations
 
+import os
+import logging
+import re
 import socket
 import sys
 import threading
 import time
 import webbrowser
+from pathlib import Path
+
+# Run from the repo root no matter what the launcher's working directory is.
+# Relative paths — in .env and in the code (certs/, data/wake/silero_vad.onnx,
+# data/logs, data/call_debug, …) — resolve against the process CWD. Started
+# from elsewhere, the SSL cert crashed the boot (FileNotFoundError at
+# load_cert_chain) and the Silero VAD model went "missing" and silently fell
+# back to Gemini, at which point VAD_MIN_RMS does nothing. Both were the same
+# wrong-CWD bug. Done before importing app.config so .env loads from here too.
+os.chdir(Path(__file__).resolve().parent)
 
 import uvicorn
 
 from app.config import settings
+
+
+class _TokenRedactionFilter(logging.Filter):
+    """Remove reusable query credentials from Uvicorn's WebSocket lines."""
+
+    _TOKEN = re.compile(r"([?&]token=)[^&\s\"]+")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.args:
+            record.args = tuple(
+                self._TOKEN.sub(r"\1***", value) if isinstance(value, str) else value
+                for value in record.args
+            )
+        if isinstance(record.msg, str):
+            record.msg = self._TOKEN.sub(r"\1***", record.msg)
+        return True
+
+
+def _install_token_redaction() -> None:
+    redact = _TokenRedactionFilter()
+    for name in ("uvicorn.error", "uvicorn.access"):
+        logging.getLogger(name).addFilter(redact)
 
 
 def _open_when_up(url: str, delay: float = 2.5) -> None:
@@ -56,22 +91,36 @@ def _lan_ip() -> str:
         sock.close()
 
 
+def _resolve_repo_path(p: str) -> str | None:
+    """A path from .env, resolved against this script's directory.
+
+    SSL paths in .env are written relative to the repo (``certs/lan-cert.pem``).
+    uvicorn hands a relative certfile to the OS, which looks it up under the
+    *terminal's* working directory — so starting the server from anywhere but
+    the project root failed with ``FileNotFoundError`` at ``load_cert_chain``.
+    Resolving here against ``run_server.py``'s own location makes the start
+    working-directory-independent.
+    """
+    from pathlib import Path
+
+    p = p.strip()
+    if not p:
+        return None
+    path = Path(p)
+    return str(path if path.is_absolute() else (Path(__file__).resolve().parent / path))
+
+
 if __name__ == "__main__":
-    cert = settings.ssl_certfile.strip() or None
-    key = settings.ssl_keyfile.strip() or None
+    _install_token_redaction()
+    cert = _resolve_repo_path(settings.ssl_certfile)
+    key = _resolve_repo_path(settings.ssl_keyfile)
     scheme = "https" if cert and key else "http"
     base = f"{scheme}://{_lan_ip()}:{settings.port}"
-    # The token has to be on every page URL, and forgetting it looks exactly
-    # like the server being broken: the page loads, the socket is accepted,
-    # and then nothing happens. Printing the ready-made links is cheaper than
-    # explaining that once per machine. The value is already in .env on this
-    # machine, so echoing it to this machine's own console reveals nothing.
+    # Keep the token for the local --open URL, but never print it. Console
+    # output is commonly redirected to a log and URL query strings then turn
+    # into a reusable credential sitting on disk.
     q = f"?token={settings.ws_token}" if settings.ws_token else ""
-    print(f"  talk to Emma : {base}/{q}")
-    print(f"  robot kiosk  : {base}/{q}&kiosk=1" if q
-          else f"  robot kiosk  : {base}/?kiosk=1")
-    print(f"  robot screen : {base}/display{q}&chat=1" if q
-          else f"  robot screen : {base}/display?chat=1")
+    print(f"  talk to Emma : {base}/ (token configured: {bool(settings.ws_token)})")
     if not settings.ws_token:
         print("  (WS_TOKEN is empty - anyone on this network can open a session)")
     if not (cert and key):
@@ -89,6 +138,10 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         log_level=settings.log_level.lower(),
+        # Uvicorn includes the full query string in access lines. Control and
+        # kiosk pages authenticate in that query, so request logging would
+        # persist the credential on disk/stdout.
+        access_log=False,
         ssl_certfile=cert,
         ssl_keyfile=key,
     )

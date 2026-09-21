@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embassy World — ข้อมูลทั้งหมด (ตรวจสอบ/แก้ไขได้)</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#fff; --ink:#1a2230; --muted:#5b6875; --line:#e3e8ee;
+    --ok:#0f9d58; --live:#1a73e8; --draft:#e8830c; --empty:#8a94a3;
+    --ok-bg:#e6f4ea; --live-bg:#e8f0fe; --draft-bg:#fff3e0; --empty-bg:#eef1f4;
+    --accent:#5b3fd6; --warn:#c62828; --warn-bg:#fdecea;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI","Sarabun",system-ui,-apple-system,sans-serif;
+    line-height:1.6;font-size:15px}
+  .wrap{max-width:940px;margin:0 auto;padding:24px 18px 90px}
+  header{background:linear-gradient(135deg,#1a2230,#3a2f6e);color:#fff;
+    border-radius:16px;padding:26px 28px;margin-bottom:18px}
+  header h1{margin:0 0 6px;font-size:24px}
+  header p{margin:4px 0;color:#cdd4e8;font-size:14px}
+
+  /* sticky toolbar */
+  .toolbar{position:sticky;top:0;z-index:50;display:flex;gap:9px;flex-wrap:wrap;
+    align-items:center;background:#fff;border:1px solid var(--line);
+    border-radius:12px;padding:10px 12px;margin-bottom:18px;
+    box-shadow:0 2px 12px rgba(20,30,50,.06)}
+  button{font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+    border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:8px 14px;border-radius:9px}
+  button:hover{background:#f0f2f6}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.on{background:var(--ok);color:#fff;border-color:var(--ok)}
+  #status{font-size:12.5px;color:var(--muted);margin-left:auto}
+  #status.saved{color:var(--ok)} #status.dirty{color:var(--draft)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+    border-radius:20px;font-size:12.5px;font-weight:600;white-space:nowrap}
+  .b-ok{background:var(--ok-bg);color:var(--ok)}
+  .b-live{background:var(--live-bg);color:var(--live)}
+  .b-draft{background:var(--draft-bg);color:var(--draft)}
+  .b-empty{background:var(--empty-bg);color:var(--empty)}
+
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:20px 22px;margin-bottom:16px}
+  section h2{margin:0 0 2px;font-size:19px;display:flex;align-items:center;
+    gap:10px;flex-wrap:wrap}
+  section h2 .num{color:var(--accent);font-weight:800}
+  .src{display:block;color:var(--muted);font-size:12px;margin:2px 0 12px;
+    padding:4px 9px;background:#f7f9fb;border-radius:7px;border-left:3px solid var(--accent)}
+  .src b{color:#33404f}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f7f9fb;font-weight:700;color:var(--muted);font-size:12.5px;
+    text-transform:uppercase;letter-spacing:.3px}
+  tr:last-child td{border-bottom:none}
+  .num-cell{font-variant-numeric:tabular-nums;white-space:nowrap}
+  ul{margin:8px 0;padding-left:22px} li{margin:4px 0}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;
+    border-radius:6px;margin-left:4px;vertical-align:middle;white-space:nowrap}
+  .pill-ok{background:var(--ok-bg);color:var(--ok)}
+  .pill-live{background:var(--live-bg);color:var(--live)}
+  .pill-draft{background:var(--draft-bg);color:var(--draft)}
+  .pill-empty{background:var(--empty-bg);color:var(--empty)}
+  .note{background:#f7f9fb;border-left:4px solid var(--accent);padding:10px 14px;
+    border-radius:0 8px 8px 0;margin:12px 0;font-size:13.5px;color:#33404f}
+  .warn{background:var(--warn-bg);border-left:4px solid var(--warn);padding:10px 14px;
+    border-radius:0 8px 8px 0;margin:12px 0;font-size:13.5px}
+  .warn b{color:var(--warn)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  .zone{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fbfcfd}
+  .zone h4{margin:0 0 6px;font-size:14.5px;color:var(--accent)}
+  .zone ul{margin:0;font-size:13.5px}
+  td.chk{color:var(--muted)}
+  footer{color:var(--muted);font-size:12.5px;text-align:center;margin-top:24px;
+    padding-top:16px;border-top:1px solid var(--line)}
+
+  /* editing mode */
+  #doc.editing [data-edit]{outline:1.5px dashed #c7cfdb;outline-offset:2px;
+    border-radius:4px;background:#fffef5}
+  #doc.editing [data-edit]:focus{outline:2px solid var(--accent);background:#fff}
+  [data-edit]{transition:background .15s}
+  .hint{font-size:12.5px;color:var(--muted)}
+
+  @media print{
+    body{background:#fff;font-size:12px}
+    .toolbar,.hint{display:none}
+    header{background:#2a2456!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    section{break-inside:avoid;border:1px solid #ccc}
+    .badge,.pill,.src{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #doc.editing [data-edit]{outline:none;background:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="toolbar">
+  <button id="editBtn" class="primary" onclick="toggleEdit()">✏️ เปิดโหมดแก้ไข</button>
+  <button onclick="download()">⬇️ ดาวน์โหลดไฟล์ที่แก้แล้ว</button>
+  <button onclick="window.print()">🖨️ พิมพ์ / PDF</button>
+  <button onclick="resetDoc()">↺ คืนค่าเดิม</button>
+  <span id="status" class="saved">●  พร้อมใช้งาน</span>
+</div>
+<p class="hint">กด “เปิดโหมดแก้ไข” แล้วคลิกที่ข้อความใดก็ได้เพื่อพิมพ์แก้ · ทุกการแก้ถูกเก็บอัตโนมัติในเบราว์เซอร์นี้ · ถ้าจะส่งต่อให้คนอื่น กด “ดาวน์โหลดไฟล์ที่แก้แล้ว”</p>
+
+<div id="doc">
+
+<header>
+  <h1 data-edit>Embassy World — รวบรวมข้อมูลโครงการ (ฉบับทำงาน)</h1>
+  <p data-edit>รอบนี้: รวบรวมข้อมูลจริงทั้งหมดแบบจริงจัง · จัดทำ 2026-09-16 · แก้ไข/เพิ่มได้ทุกช่อง</p>
+  <p data-edit>รวมทุกข้อมูลที่หุ่นต้อนรับ “Emma” ใช้พูดกับลูกค้า — ยังไม่ใช่ฉบับเซ็นยืนยัน</p>
+</header>
+
+<div class="legend">
+  <span class="badge b-ok">✅ จาก condo_facts (ตั้งค่าในระบบแล้ว)</span>
+  <span class="badge b-live">🟢 จาก Supabase (โครงสร้างผังขาย)</span>
+  <span class="badge b-draft">📝 จากสไลด์ — ยังเป็นร่าง</span>
+  <span class="badge b-empty">⬜ ยังไม่มีในระบบ / รอเก็บ</span>
+</div>
+
+<!-- 0 provenance -->
+<section>
+  <h2><span class="num">0.</span> ที่มาของข้อมูล (ยืนยันได้)</h2>
+  <table>
+    <tr><th>ป้าย</th><th>ดึงมาจากไฟล์/ตารางจริง</th></tr>
+    <tr><td><span class="pill pill-ok">✅ condo_facts</span></td><td><code>data/condo_facts.json</code> — เจ้าของยืนยันในระบบแล้ว</td></tr>
+    <tr><td><span class="pill pill-live">🟢 Supabase</span></td><td>ตาราง <code>units</code> + <code>unit_types</code> · query <code>projects.slug = embassy-world</code> · ดึง 2026-09-16 (1,082 ยูนิต) — ใช้เฉพาะ<b>โครงสร้าง</b> (ตึก/ชั้น/แบบห้อง/ขนาด/สถานะ) · <b>ราคาในชุดนี้เป็นตัวอย่าง ไม่ใช่ของจริง จึงตัดออก</b></td></tr>
+    <tr><td><span class="pill pill-draft">📝 สไลด์</span></td><td><code>data/slides/index.json</code> — เด็คนำเสนอ (ew-001…065, picture-*, plan-*) <b>ร่างจากภาพสไลด์ ยังไม่มีฝ่ายขายเซ็น</b></td></tr>
+    <tr><td><span class="pill pill-draft">📝 แนวคิด</span></td><td><code>data/personal-docs/embassy-world/*.md</code> (ภาพรวม, facility ตามชั้น, landscape)</td></tr>
+  </table>
+  <div class="warn"><b>ราคา:</b> ยังไม่รวมในเอกสารนี้ — ราคาใน Supabase เป็นข้อมูลตัวอย่าง (sample) และ condo_facts ก็ยังว่าง · รอข้อมูลราคาจริงจากฝ่ายขาย</div>
+  <div class="note">ทั้งเด็คระบุว่าเป็น <b>Preliminary Concept อาจเปลี่ยนแปลงได้</b> — ตัวเลขจากสไลด์ยังไม่ผูกมัด</div>
+</section>
+
+<!-- spec sheet -->
+<section>
+  <h2><span class="num">★</span> สเปคโครงการมาตรฐาน — ช่องที่ต้องมีครบ</h2>
+  <span class="src">อ้างอิงโครงสร้างเพจโครงการมาตรฐาน (เช่น Sansiri) · <b>ช่องว่าง = ยังต้องเก็บ</b> · แก้/เติมได้ทุกช่อง</span>
+  <table>
+    <tr><th style="width:34%">ช่องข้อมูล</th><th>ค่าที่เรามี</th><th style="width:16%">สถานะ</th></tr>
+    <tr><td>ชื่อโครงการ</td><td data-edit>Embassy World</td><td><span class="pill pill-ok">✅ มี</span></td></tr>
+    <tr><td>เจ้าของโครงการ</td><td data-edit>Empire Group</td><td><span class="pill pill-ok">✅ มี</span></td></tr>
+    <tr><td>ประเภทโครงการ (Low/High-rise)</td><td data-edit>คอนโด 6 อาคาร สูง 8 ชั้น (Low-rise?) — ยืนยันคำเรียก</td><td><span class="pill pill-draft">⚠️ เดาจากผัง</span></td></tr>
+    <tr><td>ที่ตั้ง (ที่อยู่เต็ม)</td><td data-edit>ริมหาดจอมเทียน ถ.จอมเทียนสาย 2 — <b>ยังไม่มีเลขที่/ตำบล/อำเภอ เต็ม</b></td><td><span class="pill pill-draft">⚠️ บางส่วน</span></td></tr>
+    <tr><td>เนื้อที่โครงการ (ไร่)</td><td data-edit></td><td><span class="pill pill-empty">⬜ ยังไม่มี</span></td></tr>
+    <tr><td>จำนวนอาคาร</td><td data-edit>A–F (6 ตึก)</td><td><span class="pill pill-live">🟢 มี (DB)</span></td></tr>
+    <tr><td>จำนวนชั้น</td><td data-edit>1–8</td><td><span class="pill pill-live">🟢 มี (DB)</span></td></tr>
+    <tr><td>จำนวนยูนิต</td><td data-edit>1,082</td><td><span class="pill pill-live">🟢 มี (DB)</span></td></tr>
+    <tr><td>แบบห้อง / ขนาด</td><td data-edit>Studio 23.6–28.9 · 1BR 32.5–34.4 · 2BR 51.2–52.2 ตร.ม.</td><td><span class="pill pill-live">🟢 มี (DB)</span></td></tr>
+    <tr><td>ราคาเริ่มต้น</td><td data-edit></td><td><span class="pill pill-empty">⬜ ยังไม่มีจริง</span></td></tr>
+    <tr><td>กรรมสิทธิ์ (Freehold / Leasehold)</td><td data-edit></td><td><span class="pill pill-empty">⬜ ยังไม่มี</span></td></tr>
+    <tr><td>ที่จอดรถ (จำนวน / อัตราส่วน %)</td><td data-edit>มีชั้นใต้ดิน + จุดชาร์จ EV — ยังไม่มีจำนวน/สัดส่วน</td><td><span class="pill pill-draft">⚠️ บางส่วน</span></td></tr>
+    <tr><td>กำหนดเสร็จ / เริ่มก่อสร้าง</td><td data-edit></td><td><span class="pill pill-empty">⬜ ยังไม่มี</span></td></tr>
+    <tr><td>ค่าส่วนกลาง (บาท/ตร.ม./เดือน)</td><td data-edit></td><td><span class="pill pill-empty">⬜ ยังไม่มี</span></td></tr>
+    <tr><td>เงินกองทุน (Sinking fund)</td><td data-edit></td><td><span class="pill pill-empty">⬜ ยังไม่มี</span></td></tr>
+    <tr><td>สิ่งอำนวยความสะดวก</td><td data-edit>ครบ 3 ระดับ (ดูข้อ 6)</td><td><span class="pill pill-draft">📝 มี (สไลด์)</span></td></tr>
+    <tr><td>ทำเล / การเดินทาง</td><td data-edit>สนามบิน 3 แห่ง · มอเตอร์เวย์ 7 · รถไฟความเร็วสูง · EEC (ดูข้อ 3)</td><td><span class="pill pill-draft">📝 มี (สไลด์)</span></td></tr>
+    <tr><td>ระยะทางถึงจุดสำคัญ (กม./นาที เป็นตัวเลข)</td><td data-edit>มีเชิงบรรยาย ยังไม่มีตัวเลข</td><td><span class="pill pill-draft">⚠️ บางส่วน</span></td></tr>
+    <tr><td>แปลนโครงการ (floor plan)</td><td data-edit>plan-01…11 (ชั้นใต้ดิน–ดาดฟ้า)</td><td><span class="pill pill-draft">📝 มี (สไลด์)</span></td></tr>
+    <tr><td>แนวคิดโครงการ</td><td data-edit>New Generation Living / One Place Many Worlds (ดูข้อ 4)</td><td><span class="pill pill-draft">📝 มี</span></td></tr>
+  </table>
+  <div class="warn"><b>ยังขาด (ควรเก็บให้ครบ):</b> เนื้อที่โครงการ · ราคาเริ่มต้นจริง · กรรมสิทธิ์ freehold/leasehold · กำหนดเสร็จ · ค่าส่วนกลาง · เงินกองทุน · จำนวนที่จอดรถ · ระยะทางเป็นตัวเลข · ที่อยู่เต็ม
+  <br><span class="hint">— หมายเหตุ: “กรรมสิทธิ์” สำคัญมากสำหรับผู้ซื้อต่างชาติในพัทยา (โควตาต่างชาติ 49% / freehold-leasehold)</span></div>
+</section>
+
+<!-- 1 -->
+<section>
+  <h2><span class="num">1.</span> ข้อมูลหลักที่ Emma ใช้ตอบ <span class="pill pill-ok">condo_facts</span></h2>
+  <span class="src">ที่มา: <b>data/condo_facts.json</b></span>
+  <table>
+    <tr><th>หัวข้อ</th><th>ค่า</th><th>สถานะ</th></tr>
+    <tr><td>ผู้พัฒนา</td><td data-edit>Empire Group (16 โครงการ, 6,000+ ยูนิต, รางวัล 2011–2025)</td><td><span class="pill pill-ok">✅</span></td></tr>
+    <tr><td>ทำเล</td><td data-edit>ริมหาดจอมเทียน ถ.จอมเทียนสาย 2 ใกล้สุขุมวิท ใกล้สนามบินดอนเมือง/สุวรรณภูมิ/อู่ตะเภา</td><td><span class="pill pill-ok">✅</span></td></tr>
+    <tr><td>จุดเด่น</td><td data-edit>ลากูน 155ม., Biogenesis, Junior World, Aqua Cinema, Thermal Galaxy, Sky Pool, Social Club, บ้านอัจฉริยะ, Embassy AI</td><td><span class="pill pill-ok">✅</span></td></tr>
+    <tr><td>แผนที่</td><td data-edit>https://maps.app.goo.gl/aqvEKh8Px1M9hZwm8</td><td><span class="pill pill-ok">✅</span></td></tr>
+    <tr><td>แบบห้อง / ขนาด</td><td data-edit>condo_facts ว่าง — โครงสร้างแบบห้อง/ขนาด ดูข้อ 5 (จาก Supabase)</td><td><span class="pill pill-empty">⬜ facts</span><span class="pill pill-live">🟢 โครงสร้าง</span></td></tr>
+    <tr><td>ราคา</td><td data-edit>ยังไม่มีข้อมูลจริง (Supabase เป็นตัวอย่าง) — รอฝ่ายขาย</td><td><span class="pill pill-empty">⬜ ว่าง</span></td></tr>
+    <tr><td>โปรโมชั่น</td><td data-edit>—</td><td><span class="pill pill-empty">⬜ ว่าง</span></td></tr>
+    <tr><td>เวลาทำการห้องขาย</td><td data-edit>—</td><td><span class="pill pill-empty">⬜ ว่าง</span></td></tr>
+  </table>
+</section>
+
+<!-- 2 -->
+<section>
+  <h2><span class="num">2.</span> ผู้พัฒนา / รางวัล / ผู้บริหาร <span class="pill pill-draft">📝 สไลด์</span></h2>
+  <span class="src">ที่มา: <b>slides</b> ew-002, ew-003, picture-02..04</span>
+  <ul>
+    <li data-edit>Empire Group — 16 โครงการสำเร็จ ส่งมอบบ้านกว่า 6,000 ยูนิต · “Building more than homes, building better tomorrows”</li>
+    <li data-edit>รางวัล — ต่อเนื่องปี 2011–2025 จาก Thailand Property Awards, Asia Pacific Property Awards, OPP Awards for Excellence (~10 รายการ)</li>
+    <li data-edit>ผู้บริหาร 4 คน — Miki Haim · Pudthachad Sucharitakul · Dor Haim · Moran Haim ❓ ตรวจชื่อ-ตำแหน่ง-สะกด</li>
+  </ul>
+</section>
+
+<!-- 3 -->
+<section>
+  <h2><span class="num">3.</span> ทำเล · การเดินทาง · EEC <span class="pill pill-draft">📝 สไลด์</span></h2>
+  <span class="src">ที่มา: <b>slides</b> ew-004, ew-005, ew-013, picture-05 (EEC), picture-22 (แผนที่)</span>
+  <ul>
+    <li data-edit>ริมหาดจอมเทียน ติดถนนจอมเทียนสาย 2 ใกล้สุขุมวิท ใกล้วัดบุญกัญจนาราม</li>
+    <li data-edit>ใกล้โครงการพี่น้อง Empire Group: Empire Tower และ Embassy Life (คนละโครงการกับ Embassy World)</li>
+    <li data-edit>เชื่อมสนามบิน ดอนเมือง / สุวรรณภูมิ / อู่ตะเภา ผ่านทางด่วน มอเตอร์เวย์ 7 และรถไฟความเร็วสูง</li>
+    <li data-edit>โซนพัทยา: เหนือ / กลาง / ใต้ / จอมเทียน</li>
+  </ul>
+  <div class="note"><b>EEC (picture-05)</b> — ข้อมูลที่ Emma พูดตอนเปิดบท มาจากสไลด์นี้ ไม่ได้แต่งเอง · ตัวเลขอยู่ใน checklist ข้อ 9</div>
+</section>
+
+<!-- 4 -->
+<section>
+  <h2><span class="num">4.</span> แนวคิดโครงการ <span class="pill pill-draft">📝 สไลด์ + เอกสาร</span></h2>
+  <span class="src">ที่มา: <b>slides</b> ew-008..015 · <b>personal-docs</b> embassy-world-overview.md</span>
+  <ul>
+    <li data-edit>New Generation Living / “Nothing Is Missing” — New Generation = วิธีใช้ชีวิต ไม่ใช่อายุ · Luxury = การมีเวลา · ขาย “ชีวิตที่ดีขึ้น” ก่อนขายเทคโนโลยี</li>
+    <li data-edit>สามองค์ประกอบชีวิตที่ดี: อากาศ · น้ำ · ธรรมชาติ</li>
+    <li data-edit>“One Place, Many Worlds” — โลกแห่งการเคลื่อนไหว / ผ่อนคลาย / ค้นพบ / อนาคต / เชื่อมต่อ / แรงบันดาลใจ · “Futuristic Living, Limitless Possibilities”</li>
+  </ul>
+</section>
+
+<!-- 5 -->
+<section>
+  <h2><span class="num">5.</span> แบบห้อง · ขนาด · สถานะ <span class="pill pill-live">🟢 Supabase (โครงสร้าง)</span></h2>
+  <span class="src">ที่มา: <b>Supabase</b> ตาราง <code>units</code> + <code>unit_types</code> · slug=embassy-world · ดึง 2026-09-16 (1,082 ยูนิต) — <b>ราคาตัดออก (เป็นตัวอย่าง)</b></span>
+  <table>
+    <tr><th>แบบห้อง</th><th>จำนวน</th><th>ว่าง</th><th>ขนาด (ตร.ม.)</th></tr>
+    <tr><td>Studio</td><td class="num-cell" data-edit>120</td><td class="num-cell" data-edit>56</td><td class="num-cell" data-edit>23.6 – 28.9</td></tr>
+    <tr><td>1 Bedroom</td><td class="num-cell" data-edit>806</td><td class="num-cell" data-edit>610</td><td class="num-cell" data-edit>32.5 – 34.4</td></tr>
+    <tr><td>2 Bedroom</td><td class="num-cell" data-edit>150</td><td class="num-cell" data-edit>74</td><td class="num-cell" data-edit>51.2 – 52.2</td></tr>
+    <tr><td>Shop</td><td class="num-cell" data-edit>6</td><td class="num-cell" data-edit>0</td><td class="num-cell" data-edit>29.1 – 76.4</td></tr>
+  </table>
+  <div class="grid2" style="margin-top:12px">
+    <div class="zone">
+      <h4>โครงสร้างอาคาร</h4>
+      <table style="margin:0">
+        <tr><td>ยูนิตรวม</td><td class="num-cell" data-edit>1,082</td></tr>
+        <tr><td>อาคาร</td><td data-edit>A–F (6 ตึก)</td></tr>
+        <tr><td>ชั้น</td><td data-edit>1–8</td></tr>
+        <tr><td>สถานะ</td><td data-edit>ว่าง 740 · ขาย 339 · จอง 3</td></tr>
+      </table>
+    </div>
+    <div class="zone">
+      <h4>ยูนิตต่อตึก</h4>
+      <table style="margin:0">
+        <tr><td>A</td><td class="num-cell" data-edit>152</td><td>B</td><td class="num-cell" data-edit>200</td></tr>
+        <tr><td>C</td><td class="num-cell" data-edit>186</td><td>D</td><td class="num-cell" data-edit>168</td></tr>
+        <tr><td>E</td><td class="num-cell" data-edit>184</td><td>F</td><td class="num-cell" data-edit>192</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:12px">
+    <div class="zone"><h4>Collection</h4>
+      <ul><li data-edit>LAGOON — 429</li><li data-edit>SIGNATURE — 373</li><li data-edit>PARKSIDE — 183</li><li data-edit>BREEZE — 87</li></ul>
+    </div>
+    <div class="zone"><h4>วิว / ทิศ / ออปชัน</h4>
+      <ul style="font-size:13px"><li data-edit>วิว: Sea, Pool, Garden, City, Park, ORT</li><li data-edit>ทิศ: CITY, POOL, PARK, ORT, EMB, URBAN, VILLAS</li><li data-edit>ออปชัน: Corner 217 · Pool Access 28</li></ul>
+    </div>
+  </div>
+  <div class="note">✅ อาคาร A–F และชั้น 1–8 ตรงกันทั้ง DB และสไลด์</div>
+</section>
+
+<!-- 6 -->
+<section>
+  <h2><span class="num">6.</span> สิ่งอำนวยความสะดวก 3 ระดับ <span class="pill pill-draft">📝 สไลด์/ผัง</span></h2>
+  <span class="src">ที่มา: <b>slides</b> picture-27..63, plan-02..11 · <b>personal-docs</b> facilities-by-floor.md</span>
+  <div class="grid2">
+    <div class="zone"><h4>ชั้นทางเข้า (Entrance)</h4>
+      <ul>
+        <li data-edit>BIOGENESIS — ฟิตเนส วิวลากูน + สแกนร่างกาย (Spinning · Pilates · Bungee Gym &amp; Yoga)</li>
+        <li data-edit>Junior World — โซนเด็กธีมอวกาศ/ใต้ทะเล</li>
+        <li data-edit>Lobby · วิวลากูน</li>
+      </ul>
+    </div>
+    <div class="zone"><h4>ชั้นใต้ดิน (Basement)</h4>
+      <ul>
+        <li data-edit>Aqua Cinema — สระในร่ม + จอหนัง</li>
+        <li data-edit>Journey to the Mars — ธีมดาวอังคาร</li>
+        <li data-edit>Thermal Galaxy (wellness): Himalayan Salt / Ice Bath / Floating Swing / Crystal Stone Sauna / Hydro Therapy Capsule</li>
+        <li data-edit>ที่จอดรถใต้ดิน + จุดชาร์จ EV</li>
+      </ul>
+    </div>
+    <div class="zone"><h4>ชั้น 3</h4>
+      <ul>
+        <li data-edit>Sky Pool — สระลอยฟ้า + จากุซซี่</li>
+        <li data-edit>Social Club — บาร์เทนเดอร์หุ่นยนต์</li>
+        <li data-edit>Co-working Lounge · Common Sphere</li>
+      </ul>
+    </div>
+    <div class="zone"><h4>Future Living</h4>
+      <ul><li data-edit>Future Home (สมาร์ตโฮม)</li><li data-edit>แอป Embassy AI</li></ul>
+    </div>
+  </div>
+  <div class="warn"><b>กฎกันสับสน:</b> Biogenesis = ฟิตเนส (ไม่ใช่ wellness) · wellness = Thermal Galaxy (ใต้ดิน) · ชั้น 3 ไม่มี gym</div>
+</section>
+
+<!-- 7 -->
+<section>
+  <h2><span class="num">7.</span> ระบบอัจฉริยะ / Future Living <span class="pill pill-draft">📝 กำลังพัฒนา</span></h2>
+  <span class="src">ที่มา: <b>slides</b> ew-059, ew-060, picture-62/63 · <b>personal-docs</b> future-climate-landscape.md</span>
+  <ul>
+    <li data-edit>Future Home: คุมผ่านมือถือ · กลอนดิจิทัล · กล้องหน้าประตู · เครื่องฟอกอากาศ · ตรวจ PM2.5/อุณหภูมิ · ฝักบัวอัจฉริยะ</li>
+    <li data-edit>Embassy AI App: คอนเซียร์จ AI 24 ชม. · จองส่วนกลาง · เรียกรถ/แม่บ้าน · แจ้งซ่อม · ข้อมูลชุมชน</li>
+    <li data-edit>Future Climate &amp; Landscape (แนวคิด developing): ภูมิทัศน์ ~10,000 ตร.ม. · Hybrid Microclimate Cooling · Intelligent Irrigation · Smart Environmental &amp; Pool Monitoring</li>
+  </ul>
+  <div class="warn"><b>ระวัง:</b> ระบบเหล่านี้ยัง “กำลังพัฒนา” — ต้องพูดเป็นแนวคิด ไม่ใช่ของเสร็จ</div>
+</section>
+
+<!-- 8 -->
+<section>
+  <h2><span class="num">8.</span> จุดขัดแย้งที่ต้องชี้ขาด</h2>
+  <div class="warn"><b>THE PARK อยู่ใน หรือ นอกโครงการ?</b><br>
+    <span data-edit>สไลด์ ew-023 = “สวนน้ำกลางโครงการ” ↔ picture-24 + เจ้าของยืนยัน (2026-07-22) = “ติดแนวรั้ว ไม่ใช่ของภายใน” — เลือกอันที่ถูก</span></div>
+  <div class="note"><b>ยังรอเก็บ (รอบนี้ยังไม่มี):</b> <span data-edit>ราคาจริงต่อแบบห้อง (Supabase ปัจจุบันเป็นตัวอย่าง) · โปรโมชั่น · เวลาทำการห้องขาย — เติมได้ที่นี่เมื่อได้ข้อมูล</span></div>
+</section>
+
+<!-- 9 -->
+<section>
+  <h2><span class="num">9.</span> Checklist ตัวเลขสำคัญ — ตรวจ/แก้</h2>
+  <span class="src">ช่อง “ค่า” และ “ผลตรวจ” แก้ได้ · พิมพ์ ✔ หรือค่าที่ถูกในช่องผลตรวจ</span>
+  <table>
+    <tr><th>ข้อมูล</th><th>ค่าที่ระบบใช้</th><th>ที่มา</th><th style="width:26%">ผลตรวจ / แก้เป็น</th></tr>
+    <tr><td>Empire Group จำนวนโครงการ</td><td data-edit>16</td><td class="chk">📝 ew-002</td><td data-edit></td></tr>
+    <tr><td>Empire Group ส่งมอบบ้าน</td><td data-edit>6,000+ ยูนิต</td><td class="chk">📝 ew-002</td><td data-edit></td></tr>
+    <tr><td>ช่วงปีรางวัล</td><td data-edit>2011–2025</td><td class="chk">📝 ew-003</td><td data-edit></td></tr>
+    <tr><td>EEC รถไฟความเร็วสูง</td><td data-edit>220 KM</td><td class="chk">📝 picture-05</td><td data-edit></td></tr>
+    <tr><td>EEC ศูนย์กลางการบิน</td><td data-edit>60M / ปี</td><td class="chk">📝 picture-05</td><td data-edit></td></tr>
+    <tr><td>EEC ท่าเรือ</td><td data-edit>18M TEU</td><td class="chk">📝 picture-05</td><td data-edit></td></tr>
+    <tr><td>ลากูน</td><td data-edit>ยาว 155 เมตร</td><td class="chk">📝 ew-024</td><td data-edit></td></tr>
+    <tr><td>Landscape</td><td data-edit>~10,000 ตร.ม.</td><td class="chk">📝 landscape.md</td><td data-edit></td></tr>
+    <tr><td>จำนวนอาคาร</td><td data-edit>A–F (6 ตึก)</td><td class="chk">🟢 DB</td><td data-edit></td></tr>
+    <tr><td>จำนวนชั้น</td><td data-edit>1–8</td><td class="chk">🟢 DB</td><td data-edit></td></tr>
+    <tr><td>จำนวนยูนิตรวม</td><td data-edit>1,082</td><td class="chk">🟢 DB</td><td data-edit></td></tr>
+    <tr><td>Studio (ขนาด)</td><td data-edit>23.6–28.9 ตร.ม.</td><td class="chk">🟢 DB</td><td data-edit></td></tr>
+    <tr><td>1 Bedroom (ขนาด)</td><td data-edit>32.5–34.4 ตร.ม.</td><td class="chk">🟢 DB</td><td data-edit></td></tr>
+    <tr><td>2 Bedroom (ขนาด)</td><td data-edit>51.2–52.2 ตร.ม.</td><td class="chk">🟢 DB</td><td data-edit></td></tr>
+  </table>
+</section>
+
+<!-- 10 -->
+<section>
+  <h2><span class="num">10.</span> แหล่งที่ <b>ไม่รวม</b> (และเหตุผล)</h2>
+  <ul>
+    <li data-edit>สไลด์ 15 หน้า type “other-project” — เป็นโครงการอื่น ตัดออกกันปน</li>
+    <li data-edit>ไฟล์เว็บ ~130 หน้า (web-*.txt) — ส่วนใหญ่เป็น Embassy Pattaya / Embassy Life คนละโครงการ (กฎ “World ≠ Life”)</li>
+  </ul>
+</section>
+
+<footer>
+  แหล่ง: condo_facts.json (✅) · slides/index.json 65 หน้า (📝) · personal-docs/embassy-world/ (📝) · Supabase inventory (🟢)<br>
+  Embassy World · Empire Group · เอกสารภายในสำหรับตรวจสอบ · 2026-09-16
+</footer>
+
+</div><!-- /#doc -->
+</div>
+
+<script>
+const KEY = "ew-doc-2026-09-16-v2";
+const doc = document.getElementById("doc");
+const ORIGINAL = doc.innerHTML;
+const statusEl = document.getElementById("status");
+const editBtn = document.getElementById("editBtn");
+let editing = false, timer = null;
+
+// restore saved edits
+try{
+  const saved = localStorage.getItem(KEY);
+  if(saved){ doc.innerHTML = saved; setStatus("saved","● เก็บการแก้ไขไว้แล้ว"); }
+}catch(e){}
+
+function setStatus(cls,txt){ statusEl.className = cls; statusEl.textContent = txt; }
+function save(){
+  try{ localStorage.setItem(KEY, doc.innerHTML); setStatus("saved","● บันทึกแล้ว"); }
+  catch(e){ setStatus("dirty","● บันทึกไม่ได้ (เบราว์เซอร์บล็อก)"); }
+}
+function toggleEdit(){
+  editing = !editing;
+  doc.classList.toggle("editing", editing);
+  doc.querySelectorAll("[data-edit]").forEach(el=>el.contentEditable = editing);
+  editBtn.textContent = editing ? "✔ กำลังแก้ไข (กดเพื่อปิด)" : "✏️ เปิดโหมดแก้ไข";
+  editBtn.classList.toggle("on", editing);
+  if(editing) setStatus("dirty","● โหมดแก้ไขเปิดอยู่");
+}
+doc.addEventListener("input", e=>{
+  if(!editing) return;
+  setStatus("dirty","● กำลังพิมพ์…");
+  clearTimeout(timer); timer = setTimeout(save, 500);
+});
+function resetDoc(){
+  if(!confirm("คืนค่าเดิมทั้งหมด? การแก้ไขที่บันทึกไว้จะหายไป")) return;
+  try{ localStorage.removeItem(KEY); }catch(e){}
+  doc.innerHTML = ORIGINAL;
+  editing = false; doc.classList.remove("editing");
+  editBtn.textContent = "✏️ เปิดโหมดแก้ไข"; editBtn.classList.remove("on");
+  setStatus("saved","● คืนค่าเดิมแล้ว");
+}
+function download(){
+  const html = "<!doctype html>\n<html lang=\"th\">\n" +
+    document.documentElement.innerHTML.replace(/ class=\"editing\"/,"") +
+    "\n</html>";
+  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "embassy-world-ตรวจสอบ-แก้แล้ว.html";
+  document.body.appendChild(a); a.click(); a.remove();
+  setStatus("saved","● ดาวน์โหลดไฟล์แล้ว");
+}
+</script>
+</body>
+</html>

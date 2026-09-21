@@ -5,7 +5,7 @@ description = "Local voice assistant and sales gallery kiosk"
 requires-python = ">=3.14,<3.15"
 dependencies = [
   "fastapi==0.141.1", "uvicorn[standard]==0.52.1", "python-dotenv==1.2.2",
-  "google-genai==2.16.0", "websockets==16.1.1", "httpx==0.28.1",
+  "google-genai==2.24.0", "websockets==16.1.1", "httpx==0.28.1",
   "pythainlp==5.3.5", "numpy==2.5.1",
 ]
 

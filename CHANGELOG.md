@@ -1,5 +1,181 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-21 — กันผลรันทดสอบเฉพาะเครื่องออกจาก Git
+
+- `.gitignore`: เพิ่ม `.pytest-*/` ให้ครอบคลุมโฟลเดอร์ `--basetemp` ที่ตั้งชื่อด้วยขีดกลาง ซึ่งเดิมไม่ตรงกับกฎ `.pytest_*/`; ละเว้น `data/showroom/` ทั้งโฟลเดอร์เพื่อไม่ส่ง CAD และแผนที่เฉพาะสถานที่ขึ้น repository สาธารณะ
+- `apps/emma-robot-android/*`, `client/assets/vendor/rive/rive.js`, `docs/emma-ai-voice-sample-dialogue.md`, `docs/robot-arm-command-map-2026-09-16.md`: ลบช่องว่างท้ายบรรทัดและบรรทัดว่างเกินท้ายไฟล์ก่อนบันทึกชุดงาน
+- เหตุผล: ป้องกันภาพ เสียง และไฟล์จำลองที่ pytest สร้างเฉพาะเครื่องปะปนใน commit/push
+- ผลตรวจจริง: `git check-ignore` ยืนยันว่าโฟลเดอร์ `.pytest-*` ถูกละเว้น, ไม่มี `.env` หรือไฟล์ทดสอบชั่วคราวอยู่ใน staged files และ `git diff --cached --check` ผ่าน
+
+## 2026-09-21 — ปรับคำถอดเสียงฝั่งผู้พูดและแก้กล่องข้อความไม่ให้สื่อว่าเป็นสิ่งที่ Emma เข้าใจโดยตรง
+
+- `app/config.py`, `app/providers/gemini.py`, `.env`, `.env.example`: เพิ่ม `TRANSCRIBE_MODE=SMART` เพื่อให้ Gemini ASR ตัดคำฟิลเลอร์/คำซ้ำ จัดรูปประโยค และรวมการแก้คำกลางประโยคก่อนแสดงผล โดยยังใช้ language hints และ custom vocabulary เดิม; รองรับ `VERBATIM` สำหรับไล่ปัญหา และ fallback เป็น `SMART` เมื่อกำหนดค่าผิด
+- `pyproject.toml`, `uv.lock`, `requirements.txt`: อัปเดต `google-genai` จาก **2.16.0** เป็น **2.24.0** เพราะรุ่นเดิมไม่มี field `AudioTranscriptionConfig.mode` ที่ใช้โหมด SMART; regenerate lock/export และ sync environment แล้ว
+- `client/voice-preview.html`: รวมชิ้น `user_transcript` ของช่วงพูดเดียวไว้ในรายการเดียว แม้ transcript ของ Emma จะมาถึงก่อน จึงไม่แตกคำพูดหนึ่งประโยคเป็นหลายแถว; เปลี่ยนป้ายเป็น “คำถอดเสียง” และแสดงคำอธิบายว่าเป็น ASR อัตโนมัติซึ่งอาจต่างจากสิ่งที่โมเดล native-audio เข้าใจจากเสียง
+- `client/index.html`, `app/session.py`: เปลี่ยนชื่อฝั่งผู้พูดจาก “คุณ · You” เป็น “คำถอดเสียงอัตโนมัติ · Auto transcript” และแก้คำอธิบายภายในให้ระบุว่าเป็น caption จาก ASR แยกต่างหาก เพื่อไม่กล่าวอ้างว่าข้อความนี้คือความเข้าใจภายในของ Emma
+- `tests/conftest.py`, `tests/test_voice.py`, `tests/test_voice_preview_page.py`: เพิ่ม regression ของ SMART/VERBATIM/fallback, การล้างสถานะ transcript ระหว่างผู้ใช้ และการรวมชิ้นข้อความไว้ในแถวเดิม
+- เหตุผล: เจ้าของพบว่าข้อความฝั่งผู้พูดในกล่องสนทนาไม่ตรงกับสิ่งที่ Emma ใช้ตอบ; Gemini Live ประมวลเสียงให้ conversational model โดยตรง ขณะที่ `input_audio_transcription` เป็นผลถอดเสียงสำหรับ caption แยกต่างหาก จึงปรับคุณภาพและการนำเสนอโดยไม่กล่าวอ้างว่าสองผลจะตรงกัน 100%
+- ผลตรวจจริง: `py_compile`, JavaScript syntax และ `git diff --check` ผ่าน; ชุด voice/Gemini/transcription ผ่าน **187 tests / 1 warning**, ชุด preview/Android app ผ่าน **29 tests / 1 warning**; ชุดทั้งหมดผ่าน **1,631 tests / 1 warning** และยังมี failure เดิม **2 tests** ใน `tests/test_plan_action_integrity.py` เพราะ `client/index.html` ไม่มี `planSha256Hex` (ไม่เกี่ยวกับการแก้คำถอดเสียง); เปิด Live session จริงกับ `gemini-3.8-live` สำเร็จ และยืนยัน config ที่ส่งเป็น `SMART`, ภาษา `th-TH/en-US/zh-CN`, custom vocabulary **62 รายการ**
+
+## 2026-09-21 — เตรียมท่าจับมือให้ทำพร้อมคำทักทายของ Emma
+
+- `app/config.py`, `.env`, `.env.example`: เพิ่ม `ROBOT_GREETING_GESTURE_ENABLED` และ `ROBOT_GREETING_ARM_GROUP`; เครื่องนี้เลือกกลุ่ม **6** ตาม `faceregroupaction=6` ของแอปผู้ขาย แต่ยังคง `ROBOT_ARM_MOTION_ENABLED=false` จึงยังไม่มีคำสั่งเคลื่อนไหวออกจากเครื่องขณะหุ่นปิด
+- `app/robot_arm.py`: เพิ่มทางเรียกท่าทักทายหนึ่งรอบผ่าน `run_group()` เดิม โดยไม่ปลด arm, ไม่เตรียมพอร์ต และไม่ข้ามสวิตช์ `ROBOT_ARM_ENABLED`, `ROBOT_ARM_GROUPS_ENABLED`, `ROBOT_ARM_MOTION_ENABLED` หรือ latch หยุด; ถ้าหุ่นปิด/พอร์ตหาย/ถูกล็อก เสียงทักทายยังทำงานต่อ
+- `app/session.py`, `app/events.py`, `app/greeter.py`: ผูกท่ากับคำทักทายเริ่มต้นและคำทักทายจากกล้องหลังส่งข้อความเข้า voice provider แล้ว พร้อมกันการเล่นซ้ำใน summoned session; reminder และ announcement อื่นไม่ขยับแขน
+- `tests/conftest.py`, `tests/test_robot_arm_page.py`, `tests/test_events.py`, `tests/test_greeter.py`: เพิ่มการตรึงค่าเพื่อห้ามชุดทดสอบแตะหุ่นจริง และ regression สำหรับกลุ่ม 6 หนึ่งรอบ, motion interlock, การแยก greeting ออกจาก announcement อื่น และเส้นทางทักทายปกติ/จากกล้อง
+- เหตุผล: เจ้าของต้องการเตรียมให้หุ่นจับมือขณะ Emma ทักทาย แม้รอบนี้หุ่นปิดอยู่; กลุ่ม 6 มีหลักฐานจากค่าผูกเหตุการณ์ของแอปผู้ขาย แต่ยังไม่ได้ยืนยันการเคลื่อนไหวกับหุ่นตัวจริง
+- ผลตรวจจริง: `py_compile` ผ่านทุกไฟล์ Python ที่แก้; ชุดแขน/events/greeter ผ่าน **109 tests / 1 warning** และชุด voice/hardening/reminder/arrival ผ่าน **225 tests / 1 warning** รวม **334 tests**; ทดลองโหลดค่าจริงจาก `.env` ได้ `greeting_enabled=True`, `group=6`, `motion_enabled=False`, ผลเรียกท่าเป็น `started=False` และ wire log ว่าง จึงยืนยันว่าไม่มีคำสั่งออกไปขณะ interlock ปิด; ไม่ได้ทดสอบฮาร์ดแวร์เพราะหุ่นปิด
+
+## 2026-09-21 — ตรวจและปรับระบบเสียงให้รองรับ Gemini 3.8 Live
+
+- `app/providers/gemini.py`: แก้ session config ให้ `gemini-3.8-live` ไม่ส่ง `thinking_config` ตามข้อกำหนดของโมเดล stable รุ่นนี้; รองรับชื่อที่มี `models/` นำหน้า และส่ง `thinking_level` เฉพาะ Gemini 3.1 กับ `gemini-3.8-live-extended-thinking` โดยปรับ `minimal` เป็น `low` สำหรับรุ่น Extended ที่ไม่รองรับค่านี้
+- `app/providers/gemini.py`: ตรวจความสามารถ affective/proactive จากโมเดลที่ session เปิดได้จริง (`self.model`) เพื่อให้ fallback ไม่ใช้ capability ของโมเดลหลักผิดตัว
+- `app/config.py`, `.env.example`: เปลี่ยนค่าเริ่มต้นจาก Gemini 2.5 preview เป็น stable `gemini-3.8-live`, ใช้เสียง `Despina`, ปิด affective dialog ที่ Gemini 3.8 ถอดออก และอธิบายขอบเขตของ proactive audio/thinking level ให้ตรง API ปัจจุบัน
+- `.env`: ปิด `CALL_DEBUG` หลังจบการจูนไมค์ เพื่อหยุดสร้างไฟล์เสียงสนทนาใหม่ใน `data/call_debug`; ไม่แก้หรือลบไฟล์บันทึกเดิมและไม่บันทึกค่าลับลง changelog
+- `app/tools/registry.py`: แก้คำอธิบาย asynchronous function calling ให้ตรงว่า Gemini 2.5 และ 3.8 รองรับ `NON_BLOCKING` ส่วน Gemini 3.1 ไม่รองรับ
+- `tests/test_voice.py`, `tests/test_gemini_live_text.py`: เพิ่ม regression ว่า Gemini 3.8 รุ่นปกติต้องไม่มี `thinking_config`, รุ่น Extended ใช้ level ที่รองรับ และเปลี่ยนชื่อรุ่น Extended ให้ตรง endpoint ปัจจุบัน
+- เหตุผล: เครื่องจริงตั้ง `gemini-3.8-live` ถูกต้องแล้ว แต่ provider ยังจัด model family แบบรวมทุก Gemini 3.x ทำให้ส่ง field ของ 3.1 ที่ 3.8 ปฏิเสธได้ ขณะที่ไฟล์ตัวอย่างยังพาผู้ติดตั้งใหม่กลับไปใช้ preview model
+- ผลตรวจจริง: เปิด Gemini Live session จริงด้วย `gemini-3.8-live`/`Despina` สำเร็จและยืนยันว่า config ไม่มี `thinking_config`; เทิร์นทดสอบภาษาไทยตอบข้อความที่กำหนดถูกต้อง เริ่มได้ audio แรกใน **824.4 ms** และได้เสียงยาว **1.42 s**; ชุด voice/provider/VAD/debug ผ่าน **189 tests / 1 warning**, ชุด profile ผ่าน **45 tests**; ชุดทั้งหมดผ่าน **1,625 tests / 1 warning** และมี failure เดิมที่ไม่เกี่ยวกับเสียง 2 ตัวใน `tests/test_plan_action_integrity.py` เพราะ `client/index.html` ไม่มีฟังก์ชัน `planSha256Hex`
+
+## 2026-09-21 — จัดสัดส่วน Emma Rive ให้ตรงกับที่ atlas ประกอบไว้
+
+- `client/rive/emma/scene.rml`: ทุก layer ใช้ scale เดียวกัน **0.68** (เดิม head .68 / body .72 / arms .60 / ring .52)
+  และวางแต่ละ node ตามพิกัดใน atlas แมปเข้า artboard ด้วยสูตรเดียว
+  (`artboard_x = 136.06 + atlas_x*0.68`, `artboard_y = 77.48 + atlas_y*0.68`, rig อยู่ที่ 360,390) —
+  ชิ้นส่วนทั้งหมดครอปจาก atlas ใบเดียวที่ประกอบตัว Emma ไว้ถูกแล้ว การ scale แยกกันจึงเป็นต้นเหตุที่สัดส่วนเพี้ยน
+- ผลของการวัด (เทียบ ratio ต่อความกว้างหัว กับที่ atlas วางไว้): แขนชิดลำตัวเกินไป **20%** และเล็กไป **12%**,
+  วงฐานเล็กไป **23%** และต่ำไป **12%**, ลำตัวห่างจากหัวเกินไป **8%**, แขนอยู่สูงไป **16%**
+- `client/rive/emma/scene.rml`: ตาเป็นข้อยกเว้นของ scale ร่วม — ชิ้นตาใน atlas แบนกว่าตาในภาพ render ที่อนุมัติ
+  จึงใช้ `scaleX="0.68"` / `scaleY="0.88"` ที่วัดจากภาพนั้น และเลื่อนตาขึ้นจากกึ่งกลางหัว **17px** ตามตำแหน่งในภาพอ้างอิง
+- `client/rive/emma/scene.rml`: ย้ายชิ้นปาก lip-sync (`Smile`, `Mouth Opening`) ไปทับช่องปากของ head artwork จริง
+  ที่วัดได้ที่ (299, 450) ใน `head.png` — เดิมวางต่ำกว่านั้น 71px
+- `client/assets/emma/emma.riv`: build ใหม่จาก scene.rml ข้างต้น
+- `tests/test_voice_preview_page.py`: เขียน regression ของท่าหน้าตรงใหม่ให้ยึด**กฎ** แทนค่าเฉพาะจุด —
+  วนตรวจว่า artwork layer ทุกใบ (หัว ลำตัว แขนซ้าย/ขวา วงฐาน) ใช้ `scaleX="0.68" scaleY="0.68"` เหมือนกันหมด
+  แล้วจึงตรวจตำแหน่ง node, ข้อยกเว้นของตา และตำแหน่งชิ้นปาก
+- เหตุผล: เจ้าของเทียบภาพ render กับ reference sheet แล้วสั่งให้แก้ให้เหมือน
+- ผลตรวจจริง: `rive . --verify` ผ่าน **0 errors / 0 warnings**, `rive inspect . --summary` รายงาน
+  **0 problems / 1 artboard / 383 objects**, build `emma.riv` สำเร็จขนาด **793,988 bytes**;
+  ชุดหน้า preview + Emma AI voice app ผ่าน **28 tests / 1 warning**;
+  เรนเดอร์ภาพนิ่ง (`rive . --screenshot --advance=1`) แล้วทำภาพเทียบแบบล็อกความกว้างหัวให้เท่ากันกับ
+  `emma-idle.png` — หัว ปาก bezel ทับกันพอดี ตาขนาด/ตำแหน่งตรงหลังปรับ scaleY
+- **จำนวนเทสต์ได้รับการตรวจสอบแล้ว**: ไฟล์ preview ลดจาก 20 เหลือ 19 อย่างตั้งใจ เพราะถอดเทสต์ Three.js/GLB 2 ตัว
+  (`test_voice_preview_packages_the_optional_threejs_glb_renderer`, `test_preview_threejs_assets_are_served`) และเพิ่ม regression ที่ยืนยันว่าเหลือ Rive เพียง renderer เดียว 1 ตัว
+  (`test_voice_preview_packages_only_the_rive_mascot_renderer`) จึงไม่มีเทสต์สูญหาย; รวมกับชุด Android app อีก 9 ตัวเป็น 28 ตัว
+- **ขอบเขตการตรวจรอบนี้**: เปิดหน้า Preview จริงที่ `?app=1&autoPose=0&state=listening` หลัง build แล้ว ตัว Rive ใหม่แสดงหัว ลำตัว แขน และวงฐานตามสัดส่วน atlas
+  โดยไม่มีชิ้นส่วนซ้อนผิดตำแหน่ง; ส่วน motion ของ greeting/happy/thinking คงไว้ปรับและตรวจในรอบ motion ตามขอบเขตที่เจ้าของกำหนด
+
+## 2026-09-21 — ถอดโหมด Emma 3D และคง Rive เพียงแบบเดียว
+
+- `client/voice-preview.html`: ลบ canvas/CSS/loader/fallback ของ Three.js และเงื่อนไข query `renderer=3d`; หน้า Preview เริ่ม Rive โดยตรงทุกครั้ง จึงเหลือ Emma ตาม artwork หน้าตรงที่เจ้าของเลือกเพียงตัวเดียว
+- ลบ `scripts/build-emma-glb.mjs`, `client/assets/emma/{emma.glb,emma-three.js,README-3D.md}` และ `client/assets/vendor/three/` เพราะไม่ได้ใช้หลังยกเลิกตัวทดลอง 3D
+- `tests/test_voice_preview_page.py`: ลบชุดตรวจ GLB/Three.js และเพิ่ม regression ยืนยันว่า Preview มีเฉพาะ Rive พร้อมตรวจว่าไฟล์และ runtime 3D ไม่กลับเข้ามาอีก
+- เหตุผล: เจ้าของให้ยกเลิกหน้าดู 3D และโหมด demo ทั้งหมด แล้วคงเฉพาะ Emma Rive ตามภาพอ้างอิง
+- ผลตรวจจริง: ชุดหน้า Preview + Emma AI voice app ผ่าน **28 tests / 1 warning**; ตรวจค้นไม่พบ reference ของ 3D ใน runtime (เหลือเฉพาะ negative regression ใน test); เปิดตรวจหน้า Preview จริงแล้วโหลด Rive โดยตรงและแสดง Emma ตามภาพอ้างอิง
+
+## 2026-09-21 — ปรับหน้าตา Emma 3D (GLB) ให้ตรงภาพต้นแบบ
+
+- `scripts/build-emma-glb.mjs`: เพิ่ม `crescentGeometry()` สร้างทรงเสี้ยวตันจาก Bezier สองเส้นที่ใช้ปลายร่วมกัน แล้ว normalize เป็นกล่อง 1x1 ให้ผู้เรียกกำหนดขนาดจริงผ่าน mesh scale; เปลี่ยนตาและปากจาก tube มาใช้ทรงนี้ เพราะ tube คงรัศมีจนสุดปลายและ path วงกลมแบบเดิมเกิดการตัดตัวเองจนเห็นเพียงขอบ ตาใหม่จึงเป็นเสี้ยวสีดำที่เรียวปลายตามภาพต้นแบบ
+- `scripts/build-emma-glb.mjs`: ถอด `LeftCheekChrome`/`RightCheekChrome`/`LeftCheekPearl`/`RightCheekPearl`/`CheekCentreChrome` ออกทั้งชุด — ทรงรีโครเมียมสองก้อนที่ใช้แทนรอยยิ้มเรนเดอร์ออกมาเป็นหนวดคลุมครึ่งล่างของหน้า; แทนด้วยปากสามชิ้น `Smile` (ริมฝีปากบนโครเมียมหนา) + `MouthRim` (ขอบล่างของช่องปาก) + `MouthOpen` (ช่องปาก ink)
+- `scripts/build-emma-glb.mjs`: เพิ่ม `HeadBezel` เป็นวงแหวนโครเมียมของตัวเอง ให้ไฮไลต์วิ่งรอบหัวครบวง (ทรงกลมซ้อนกันแบบเดิมจับแสงแค่มุมซ้ายบน) และขยาย `FacePearlDome` ให้หน้าขาวกว้างขึ้นตามภาพอ้างอิง
+- `scripts/build-emma-glb.mjs`: mouth morph เปลี่ยนตัวคูณแกน y จาก 1.85 เป็น 5.5 ย่อ mesh ตอนพักเหลือ scale y 0.06 และย้ายช่องปากออกมาหน้าผิวโดม — ปากจึงเป็นร่องบางตอนพักและเปิดชัดตอนพูด; ลดความกว้างริมฝีปาก/ขอบล่างไม่ให้กลับไปเป็นแถบคลุมครึ่งหน้า
+- `scripts/build-emma-glb.mjs`: ลำตัวมนและกว้างขึ้น, แขนย้ายออกนอกและยาวขึ้นพร้อมหมุนฝ่ามือเข้า, ไหล่เล็กลงและลดระดับลงมาใต้หัว (ครั้งแรกที่ย้ายแขนออก ลูกบอลไหล่โผล่ทะลุเปลือกหัว), วงแสงใต้ตัวกว้างกว่าตัวหุ่นเพื่อให้อ่านว่าลอย
+- `client/assets/emma/emma.glb`: build ใหม่จากสคริปต์ข้างต้น
+- `client/assets/emma/emma-three.js`, `client/voice-preview.html`: แก้ blink ไม่ให้เขียน `scale.y = 1` ทับสัดส่วนตาจาก GLB, ให้ animation clip คุม mouth morph เมื่อไม่มี PCM สดและสลับให้ระดับเสียงคุมเฉพาะ 250 ms หลัง event, ลดไฟ ambient/fill/crown เพื่อเพิ่มช่วงขาว–ดำ และเพิ่ม asset version ป้องกัน browser ใช้ GLB/JavaScript รุ่นเก่าจาก cache
+- `tests/test_voice_preview_page.py`: เพิ่ม regression สำหรับสัดส่วนตา การรักษา base eye scale, fallback ของ mouth animation และ URL version ของ 3D assets
+- เหตุผล: เจ้าของเทียบภาพ render ปัจจุบันกับ reference sheet แล้วสั่งให้แก้ให้เหมือน ตัวที่ผิดรูปหนักที่สุดคือแก้ม/ปากซึ่งกินครึ่งล่างของหน้า
+- ผลตรวจจริง: build GLB สำเร็จขนาด **1,875,592 bytes**; โหลดกลับด้วย `GLTFLoader` ได้ **41 nodes / 9 clips / 1 mouth morph target** และค่า morph ของคลิป `speaking` ที่ t=0.78 เท่ากับ **1.0**; JavaScript ผ่าน `node --check`; ชุดหน้า preview + Emma AI voice app ผ่าน **29 tests / 1 warning**; เปิดตรวจหน้าแอป 3D จริงแล้วตาไม่ถูกยืดจากระบบ blink, รูปตาเป็นเสี้ยวตันสีดำ, ปากไม่เป็นแถบคลุมหน้า และ asset รุ่นล่าสุดถูกโหลดผ่าน versioned URL
+
+## 2026-09-21 — ปรับรูปทรง Emma Rive ให้ตรงภาพต้นแบบก่อนทำโมชั่น
+
+- `client/rive/emma/scene.rml`, `client/assets/emma/emma.riv`: ปรับองค์ประกอบท่าหน้าตรงให้ใกล้ภาพต้นแบบ โดยลดขนาดแขนและย้ายจุดไหล่เข้ากับลำตัว ลดขนาดวงฐาน ซ่อนวงออร่าด้านหลัง และซ่อนชิ้นปากยิ้มที่เคยซ้อนกับกรอบแก้มโครม; ขยายตา เพิ่มความหนา เลื่อนตาลงใกล้กึ่งกลางโดม และเพิ่มระยะห่างระหว่างตาตามสัดส่วนภาพอ้างอิง; ปรับแกนกลางอกและวงฐานเป็นแสงขาวเงินแทนสีฟ้า โดยยังคง state machine และชุด motion เดิมไว้เพื่อปรับในรอบถัดไป
+- `tests/test_voice_preview_page.py`: เพิ่ม regression ตรวจสัดส่วนและตำแหน่งตา สัดส่วนแขน/วงฐาน การซ่อนปากซ้อนและออร่า และโทนแสงแกนกลาง เพื่อป้องกันหน้าตาท่าพื้นฐานย้อนกลับไปเป็นแบบก่อนหน้า
+- เหตุผล: เจ้าของเลือกใช้ Rive ต่อและขอให้จัดหน้าตา สัดส่วน และวัสดุของท่าหน้าตรงให้ตรงภาพอ้างอิงก่อนเริ่มปรับโมชั่นหรือแอนิเมชัน
+- ผลตรวจจริง: Rive CLI verify/build ผ่าน **0 errors / 0 warnings**, `rive inspect` รายงาน **0 problems / 1 artboard**, build `emma.riv` สำเร็จขนาด **793,948 bytes**; ชุดหน้า preview + Android app ผ่าน **29 tests / 1 warning**; เปิดตรวจหน้า preview จริงแล้วตาเป็นทรงโค้งหนา อยู่ใกล้กึ่งกลางโดมและเว้นระยะตามภาพอ้างอิง ไม่พบปากซ้อนหรือวงออร่า แขนต่อกับไหล่ และแสงแกนกลาง/วงฐานเป็นขาวเงิน
+
+## 2026-09-21 — เพิ่ม Emma 3D แบบ GLB/Three.js โดยเก็บ Rive เดิมไว้
+
+- `scripts/build-emma-glb.mjs`, `client/assets/emma/emma.glb`: เพิ่มโมเดล Emma 3D ที่สร้างซ้ำได้จาก geometry ของโครงการ แยก node หัว โดมหน้า แก้ม ลำตัวทรงหยดน้ำ ไหล่ แขน มือ ตา ปาก core และวงแสง ใช้วัสดุ PBR ขาวมุก/โครม พร้อม mouth morph target และ animation clips 9 ชุด: `idle`, `listening`, `speaking`, `thinking`, `wave`, `happy`, `wai`, `sad`, `error`
+- `client/assets/emma/emma-three.js`: เพิ่ม Three.js renderer, environment lighting, ACES tone mapping, responsive canvas, AnimationMixer/crossfade, pointer head tracking, blink อิสระ และการส่งระดับเสียงไปที่ mouth morph; map สถานะเสียงเดิมเข้าคลิปของ GLB โดยไม่เปลี่ยน public voice-state API
+- `client/voice-preview.html`: เพิ่ม canvas สำหรับ 3D และโหมด `?renderer=3d`; URL ปกติยังใช้ Rive เดิม ส่วนโหมด 3D จะเริ่ม Rive แบบ delayed fallback เฉพาะเมื่อ WebGL หรือ GLB โหลดไม่สำเร็จ พร้อมส่ง event ระดับปากให้ renderer ทั้งสองแบบ และแก้ข้อความ UTF-8 ที่เคยแสดงเป็น mojibake หลังแก้ไฟล์
+- `client/assets/vendor/three/`: เก็บ Three.js 0.186.0, `GLTFLoader`, `GLTFExporter`, `RoomEnvironment` และ utility ที่จำเป็นไว้ในแอป พร้อมไฟล์ license เพื่อให้เว็บและ Android WebView ใช้งานจาก origin เดียวกันโดยไม่พึ่ง CDN
+- `client/assets/emma/README-3D.md`: บันทึกคำสั่ง build, URL สำหรับทดลอง 3D, รายชื่อ clips และพฤติกรรม fallback ไป Rive
+- `tests/test_voice_preview_page.py`: เพิ่ม regression สำหรับ GLB magic/ขนาดไฟล์, Three.js runtime/loader routes, state-to-clip mapping, mouth morph bridge, delayed Rive fallback และความถูกต้องของข้อความ UTF-8
+- ผลตรวจจริง: build GLB สำเร็จขนาด **1,378,304 bytes**, โหลดกลับด้วย `GLTFLoader` ได้ **44 nodes / 9 clips / 1 mouth morph target**; JavaScript inline 3 blocks และ modules 2 ไฟล์ผ่าน `node --check`; ชุดหน้า preview + Android app ผ่าน **28 tests / 1 warning**; เปิดตรวจหน้า 3D จริงแล้ว GLB, environment lighting, ท่า greeting/idle/happy/wai/sad และการเปลี่ยนสถานะทำงาน ส่วน URL ที่ไม่มี `renderer=3d` ยังโหลด Rive เดิมได้ตามปกติ
+
+## 2026-09-21 — ปรับ Emma Rive ให้ตรงกับ artwork ที่อนุมัติ
+
+- `client/rive/emma/scene.rml`, `client/rive/emma/assets/*.png`: เปลี่ยนภาพเวกเตอร์ชั่วคราวภายใน rig เป็นชิ้นส่วนโปร่งใสจาก Emma puppet atlas ที่เจ้าของเลือก ทั้งหัว กรอบแก้ม ตา ปาก ลำตัว แขน และวงแสง โดยคง node IDs และ state machine `EmmaVoice` เดิมไว้ จึงยังใช้ motion, gaze, blink และ lip-sync ได้
+- ปรับ origin ของแขนซ้าย/ขวาให้อยู่ที่เบ้าไหล่จริง และวางชิ้นแขนเต็มชิ้นไว้ใต้หัวกับลำตัว เพื่อให้ท่าโบกมือ คิด พูด และดีใจหมุนจากข้อต่อโดยไม่ดูเป็นแขนลอย
+- `scripts/extract-emma-rive-assets.py`: เพิ่มขั้นตอนครอป layer จาก atlas และลบกลุ่มพิกเซลที่ไม่ต่อกับชิ้นหลัก ป้องกันเศษหัวไหล่หรือวงแสงจากช่องข้างเคียงติดเข้าไฟล์ Rive; ใช้เพียง Pillow และ Python standard library
+- `client/rive/emma/README.md`: บันทึกลำดับ extract artwork แล้ว verify/build `.riv` ที่ทำซ้ำได้
+- `client/assets/emma/emma.riv`: build ใหม่โดยฝัง artwork 9 layers สำหรับ runtime ของเว็บและ Android WebView
+- `tests/test_voice_preview_page.py`: เพิ่ม regression ตรวจว่า RML ฝัง artwork ครบทุก layer, ใช้จุดหมุนไหล่ที่กำหนด และ runtime `.riv` มี texture data จริง
+- ผลตรวจจริง: extraction สำเร็จครบ 9 layers; Rive CLI 1.1.0 verify/build ผ่าน **0 errors / 0 warnings** และ `rive inspect` รายงาน **0 problems / 1 artboard**; JavaScript inline ทั้ง 3 blocks ผ่าน `node --check`; ชุดหน้า preview + Android app ผ่าน **26 tests / 1 warning**; เปิดตรวจ state demo จริงแล้ว `greeting`, `idle`, `listening`, `thinking`, `speaking` และ `happy` แสดง artwork ชุดใหม่ โดยแขนติดกับเบ้าไหล่ตลอด motion และปากไม่ถูกกรอบแก้มบัง
+
+## 2026-09-21 — เปลี่ยน Emma เป็น Rive rig และเชื่อมกับ Voice App
+
+- `client/rive/emma/{scene.rml,rive.yaml,README.md,AGENTS.md,CLAUDE.md,.gitignore}`: สร้าง source ของ Emma ด้วย Rive RML เป็นเวกเตอร์แยกหัว ลำตัว ใบหน้า ไหล่ แขน มือ core และวงแสง; แขนแต่ละข้างใช้ shoulder node เป็นจุดหมุนจึงขยับติดกับลำตัว; เพิ่ม state machine `EmmaVoice` พร้อม motion `idle`, `greeting`, `listening`, `thinking`, `speaking`, `happy`, `error` และเลเยอร์คู่ขนานสำหรับ blink, lip-sync, gaze และ ambient glow
+- `client/assets/emma/emma.riv`: เพิ่ม runtime asset ที่ build จาก source ข้างต้น โดยใช้ character ของ Emma ที่ออกแบบในโครงการนี้และไม่ใช้ไฟล์หรืองาน artwork จากตัวอย่าง Contra
+- `client/assets/vendor/rive/{rive.js,rive.wasm}`: เก็บ Rive Canvas runtime 2.42.2 ไว้ในแอปเพื่อให้หน้า preview และ Android WebView โหลดได้จากเซิร์ฟเวอร์เดียวกันโดยไม่พึ่ง CDN ตอนใช้งาน
+- `client/voice-preview.html`: เพิ่ม Rive canvas เป็น renderer หลัก, โหลด artboard `Emma`/state machine `EmmaVoice`, ส่งสถานะเสียงไปที่ `mode`, PCM amplitude ไปที่ `speechLevel` และตำแหน่ง pointer ไปที่ `lookX`/`lookY`; เก็บ SVG/PNG puppet เดิมไว้เป็น fallback และซ่อนหลัง Rive โหลดสำเร็จเท่านั้น
+- `scripts/build-emma-rive.ps1`, `client/rive/emma/README.md`: เพิ่มคำสั่ง verify/build/copy ที่ทำซ้ำได้สำหรับอัปเดต `emma.riv` หลังแก้ RML
+- `tests/test_voice_preview_page.py`: เพิ่ม regression สำหรับ canvas/runtime/state-machine bridge, magic header ของ `.riv` และ routes ของ `.riv`, JavaScript runtime และ WASM
+- ผลตรวจจริง: Rive CLI 1.1.0 `--verify` ผ่าน **0 errors / 0 warnings**, `rive inspect --summary` ไม่มีปัญหาและพบ 1 artboard, 1 state machine, 6 layers, 17 animations; build `emma.riv` สำเร็จ; JavaScript ทุก inline block ผ่าน `node --check`; ชุด preview + Android app **25 ผ่าน / 2 warnings**; เปิดตรวจใน app shell จริงแล้ว Rive canvas โหลดสำเร็จ (`rive-ready`), fallback ถูกซ่อน, ท่าทักทายยกแขนพร้อมมือที่ต่อกับหัวไหล่ และ state demo เปลี่ยน motion ได้ต่อเนื่อง
+
+## 2026-09-21 — ยึดแขน Emma เข้ากับข้อต่อและปรับท่าตามแบบ
+
+- `client/voice-preview.html`: วัดตำแหน่งข้อมือจาก alpha ของ puppet atlas แล้วเลื่อนชิ้นมือ open ขึ้นและเข้าหาเบ้าไหล่ ปรับ transform origin ของแขนทั้งสองให้ตรงศูนย์ข้อต่อจริง และให้ลำตัววางทับ cuff เพื่อไม่ให้เกิดช่องว่างระหว่างแขนกับตัวระหว่างหมุน
+- แยกชนิดมือซ้าย/ขวาต่อ pose เพื่อให้ท่าทักทายและพูดใช้แขนซ้ายแบบ relaxed พร้อมแขนขวาแบบ open/wave ส่วนท่าค้นหาใช้มือขวาร่วมกับแว่นขยาย; ปรับมุมแขนใหม่ให้หมุนรอบหัวไหล่แทนการชดเชยพิกัดชิ้นภาพเดิม
+- `tests/test_voice_preview_page.py`: เพิ่ม regression สำหรับ shoulder anchors, ตำแหน่ง open-hand sprite และ independent left/right hand state
+- ผลตรวจจริง: ชุดหน้า preview + Android shell **23 ผ่าน / 1 warning**; JavaScript syntax และ `git diff --check` ผ่าน; เปิดตรวจภาพจริงใน app shell แล้ว ท่าทักทายมีแขนซ้าย relaxed/แขนขวา wave ท่าค้นหามีแขนขวารองรับแว่นขยาย และท่า frustrated ยกสองมือข้างศีรษะ โดย cuff ทั้งสองข้างต่อกับเบ้าไหล่ตลอด motion
+
+## 2026-09-21 — แก้ปาก Emma ซ้อนกับแผ่นโครเมียมของใบหน้า
+
+- `client/voice-preview.html`: แก้การประกอบใบหน้าของมาสคอตสีเงินซึ่ง head base มีแผ่นยิ้มโครเมียมอยู่แล้ว โดยไม่วาง smile sprite ซ้ำในสถานะปกติ/ดีใจ/ทักทาย; ย้ายปากเศร้าขึ้นบนพื้นที่หน้าสีขาว และเพิ่ม SVG clip path จำกัดปากสำหรับ live lip-sync ให้อยู่เฉพาะช่องกลาง ไม่ล้นหรือถูกขอบโครเมียมทับ
+- `tests/test_voice_preview_page.py`: เพิ่ม regression สำหรับ mouth slot, การปิด smile overlay และ pose ที่ใช้ปากจาก head base เพียงชั้นเดียว
+- ผลตรวจจริง: ชุดหน้า preview + Android shell **23 ผ่าน / 1 warning**; JavaScript syntax และ `git diff --check` ผ่าน; เปิดตรวจภาพจริงใน app shell แล้ว หน้าปกติใช้แผ่นยิ้มเพียงชั้นเดียว และสถานะ frustrated ที่เคยเห็นปากซ้อนแสดงตาบีบกับแผ่นโครเมียมโดยไม่มี mouth sprite ทับ
+
+## 2026-09-21 — ปรับ motion Emma ตามวิดีโออ้างอิง 6 ฉาก
+
+- `client/voice-preview.html`: วิเคราะห์วิดีโออ้างอิงทั้ง 6 ไฟล์แล้วเปลี่ยน motion จาก pose ค้างเป็น timeline แบบ anticipation → action → settle สำหรับ idle, listening, searching/thinking, speaking, greeting, happy, error, frustrated, grateful และ loading; เพิ่มแรงตามของหัว/ลำตัว จังหวะแขนสลับขณะพูด การโบกมือ กระโดดดีใจ ส่ายหัว ก้มขอบคุณ และจังหวะสแกน โดยยังใช้มาสคอตสีเงินที่เจ้าของเลือก
+- เพิ่ม motion props แบบ SVG สำหรับแว่นขยาย, สัญลักษณ์เตือน, หัวใจ และแผงสแกนให้ปรากฏเฉพาะสถานะที่เกี่ยวข้อง และปรับ state-to-pose ให้ท่าตั้งต้นต่อเนื่องกับ timeline มากขึ้น
+- `tests/test_voice_preview_page.py`: เพิ่ม regression สำหรับ state timeline, motion props และ state-to-pose mapping ชุดใหม่
+- ผลตรวจจริง: ชุดหน้า preview + Android shell **23 ผ่าน / 1 warning**; JavaScript syntax และ `git diff --check` ผ่าน; เปิดตรวจ motion จริงใน app shell สำหรับ greeting/listening, thinking พร้อมแว่นขยาย, error พร้อมสัญลักษณ์เตือน และ loading พร้อมแผงสแกนแล้ว การขยับหัว แขน ลำตัว สีหน้า props และวงแหวนแสดงครบ
+
+## 2026-09-21 — ใช้มาสคอต Emma สีเงินตามแบบที่เจ้าของเลือก
+
+- `client/voice-preview.html`: เปลี่ยนจากมาสคอตหัวแมวหน้าจอสีน้ำเงินกลับมาใช้คาแรกเตอร์ทรงกลมสีเงินจาก puppet atlas ที่เจ้าของเลือก ถอดหู หน้าจอสี และเสาอากาศออก พร้อมคืนชุดตา ปาก ลำตัว แขน และมือจาก artwork เดียวกันให้ภาพรวมสอดคล้องกัน โดยคง pose, gaze tracking, lip-sync และวงแหวนสถานะไว้
+- `tests/test_voice_preview_page.py`: ปรับ regression ให้ตรวจการใช้ puppet atlas แบบ RGBA และยืนยันว่าชิ้นส่วนของดีไซน์หัวแมว/หน้าจอเดิมไม่เหลือในหน้าเว็บ
+- ผลตรวจจริง: ชุดหน้า preview + Android shell **23 ผ่าน / 1 warning**; JavaScript syntax และ `git diff --check` ผ่าน; เปิดตรวจใน app shell แล้ว คาแรกเตอร์สีเงิน ตา ปาก แขน มือ ลำตัว และวงแหวนแสดงครบโดยไม่มีหัวแมวหรือหน้าจอสีน้ำเงิน
+
+## 2026-09-21 — ออกแบบมาสคอต Emma ใหม่โดยไม่มีหน้ากากซ้อน
+
+- `client/voice-preview.html`: ถอดหัวและ visor แบบหน้ากากที่ซ้อนบนภาพเดิมออก แล้ววาดมาสคอต SVG ใหม่ทั้งตัวให้หน้าจอสีน้ำเงินฝังอยู่ในกรอบสีขาว เพิ่มหูพร้อมไฟ, side pods, แขนทรงครีบ, สัญลักษณ์อุ้งเท้าที่ลำตัว และใบหน้าเส้นแสงแบบเรียบตามแนวทางภาพอ้างอิง โดยยังรองรับสีสถานะ, gaze tracking, pose และ lip-sync เดิม
+- `tests/test_voice_preview_page.py`: ปรับ regression hooks ให้ตรวจโครงหัว หน้าจอ และลำตัวแบบ code-native รวมถึงยืนยันว่าหน้าเว็บไม่พึ่งภาพ atlas เดิม
+- ผลตรวจจริง: ชุดหน้า preview + Android shell **23 ผ่าน / 1 warning**; JavaScript syntax และ `git diff --check` ผ่าน; เปิดตรวจภาพจริงใน app shell แล้ว หัว หน้าจอ หู แขน ลำตัว อุ้งเท้า วงแหวน และสีสถานะแสดงครบ
+
+## 2026-09-21 — เพิ่มมาสคอต Emma แบบ interactive ใน Voice App
+
+- `client/voice-preview.html`: ปรับมาสคอตเดิมเป็นงานต้นฉบับของ Emma ที่ได้แนวทางพฤติกรรมจากตัวอย่าง Rive ของ Karina โดยไม่คัดลอกไฟล์ `.riv` หรือ artwork ต้นฉบับ; เพิ่ม visor เรืองแสง, antenna, core, วงแหวนข้อมูลและสีตามสถานะ พร้อม pointer/gaze tracking และ reduced-motion fallback
+- ผูกสถานะเสียงจริงกับท่า animation: idle, listening, thinking, speaking, error, greeting, happy, frustrated, grateful และ loading ใช้ pose/สี/วงแหวนต่างกัน; lip-sync จาก PCM, การลาก/ย่อขยาย, stage corner และ voice engine เดิมยังทำงานผ่าน `EmmaVoicePreview` API เดิม
+- `tests/test_voice_preview_page.py`: เพิ่ม regression สำหรับชิ้นส่วนมาสคอต, state-to-pose mapping, gaze tracking และ animation hooks
+- ผลตรวจจริง: ชุดหน้า preview + Android shell **23 ผ่าน / 1 warning**; เปิดหน้า app-shell ผ่าน local browser และตรวจภาพจริงใน idle/listening/speaking แล้ว visor, ท่า, สีสถานะ, core และวงแหวนแสดงครบ; ยังไม่ได้สร้างไฟล์ Rive จริงหรือทดสอบบน Android hardware
+
+## 2026-09-21 — ปิดช่องข้อมูลข้ามสายและเตรียม Voice App สำหรับ release
+
+- `client/voice-preview.html`: ล้าง transcript และปิด drawer ทุกครั้งที่เริ่มสายใหม่ จบสาย หรือ socket ปิด เพื่อไม่ให้ผู้ใช้เครื่องส่วนกลางเห็นบทสนทนาของคนก่อนหน้า; เมื่อเปิดไมโครโฟนไม่ได้ให้ปิด WebSocket/provider session และคืนสถานะปุ่มไมค์สำหรับลองใหม่ทันที; `idle_timeout`/`farewell` ใช้ teardown เดียวกับการจบสาย
+- `apps/emma-ai-voice/app/{build.gradle,src/main/AndroidManifest.xml,src/main/java/com/emma/ai/voice/MainActivity.java,src/main/res/xml/network_security_config*.xml}`, `apps/emma-ai-voice/README.md`: แยกนโยบายเครือข่าย debug/release; release บังคับ HTTPS และไม่รับ `server_url`/`ws_token` จาก Intent ภายนอก ส่วน debug อนุญาต HTTP เฉพาะ loopback/Android emulator; ตรวจ origin ซ้ำหลังผู้ใช้ตอบ permission ก่อนอนุญาต audio capture และอัปเดตคู่มือ โดยไม่บันทึก token หรือ secret
+- `app/prompts.py`: ย่อกฎซ้ำใน condo system prompt และ sales host block โดยคง scope, ภาษา, tool-result, ราคา, approval และคำสั่งกันการอ้างการกระทำที่ยังไม่สำเร็จ; ความยาวโหมดเปิดเครื่องมือทั้งหมดลดจาก **6,460 เหลือ 4,375 ตัวอักษร** ต่ำกว่าเพดาน 4,700
+- `app/providers/gemini.py`, `tests/{test_voice,test_gemini_live_text,test_voice_preview_page,test_emma_ai_voice_android_app}.py`: ปรับ capability matrix ให้ Gemini 3.8 Live/Extended Thinking รองรับ non-blocking function calls ขณะที่ 3.1 ยังคง blocking; เพิ่ม regression สำหรับ Gemini 3.8 text turn, transcript isolation, mic-failure teardown, release Intent isolation และ HTTPS/cleartext build policy
+- ผลตรวจจริง: ชุด voice/app ที่แก้ **185 ผ่าน / 1 warning**, `compileall` ผ่าน, XML manifest/network config ทั้งสามไฟล์ parse ผ่าน และ `git diff --check` ผ่าน; suite เต็ม **1,616 ผ่าน / 2 ล้ม / 1 warning** โดยสอง failure อยู่ใน `tests/test_plan_action_integrity.py` เพราะ `client/index.html` งานค้างเดิมไม่มี SHA-256 plan-display fallback ไม่เกี่ยวกับไฟล์ voice/app รอบนี้; Android Gradle task ยังรันไม่ได้เพราะเครื่องไม่มี Java และไม่ได้ตั้ง `JAVA_HOME`; ยังไม่ได้ทดสอบ APK บน Emulator/อุปกรณ์จริงหรือ live provider
+
+## 2026-09-18 — M1b-SIM browser smoke evidence (ยังไม่ปิด M1b)
+
+- `docs/m1b-sim-smoke-2026-09-18.md`: บันทึก command ID, monotonic timeline และผลจริงของ browser simulator + live provider เพื่อแยกหลักฐานที่ทดสอบแล้วออกจาก Android WebView/hardware ที่ยังไม่ทดสอบ; ไม่บันทึก secret หรือข้อมูลลูกค้า
+- ผลตรวจจริง: live `show_plan` ชั้น 1 ได้ rendered ACK ก่อน `tool_result ok:true` และเสียง 97 chunks เริ่มหลังทั้งคู่; live asset 404 ได้ `ok:false` และคำตอบเริ่มด้วยการขอโทษ; browser/server protocol จำลอง 404, hash mismatch, no ACK, late ACK และสองคำสั่งซ้อนแล้วไม่ยืนยัน success ผิด command แต่คำสั่งที่สองยังได้ `display busy`
+- ข้อค้าง: Android app ใช้ `/preview?app=1` ซึ่งยังไม่รองรับ display command/ACK, เครื่องนี้ไม่พบ emulator executable/ADB device, และยังไม่มี live audio evidence ครบทุก failure case; จึงยังไม่ประกาศ M1b-SIM หรือ M1 complete. ไม่แก้ code/config/test, approval หรือ model ในรอบนี้
+
 ## 2026-09-18 — M1a verified floor-plan render acknowledgement
 
 - `app/tools/units.py`, `app/plan_display.py`, `app/tools/registry.py`: เปลี่ยน `show_plan` ให้คืนสถานะเตรียมแสดงแทนการอ้างว่าสำเร็จ; เก็บ byte ภาพที่ตรวจ SHA-256 แล้วแบบมีอายุและผูก project, ส่ง command เฉพาะ session, รอ ACK ที่ตรง command/asset/hash ก่อนคืน `ok: true` ให้ provider; timeout/ภาพผิด/จอไม่ตอบไม่มีภาพหรือ overlay ในผลล้มเหลว
@@ -48,20 +224,36 @@
 - `app/data_sources.py`, `scripts/audit_data_sources.py`, `scripts/build_external_asset_manifest.py`, `tests/test_data_source_registry.py`, `tests/test_source_availability.py`, `tests/test_slides.py`: เพิ่มโหมด `ci`/`runtime`/`full`, ตรวจ manifest เทียบ index, ปฏิเสธ path เฉพาะเครื่อง/ข้าม root, ตรวจ scope source ที่เข้าถึงลูกค้า และทดสอบว่า CI ไม่ต้องมี asset จริงแต่ runtime ต้องมีไฟล์ตรงแฮช; test byte-serving ของสไลด์ skip เฉพาะเมื่อไม่มี bundle ทั้งชุด แต่ยัง fail หากขาดบางภาพ
 - `.github/workflows/test.yml`, `README.md`, `data/README.md`, `docs/source-availability-contract.md`: เพิ่มขั้น audit CI บน checkout ใหม่ บันทึกคำสั่งเตรียมไฟล์ภายนอก/ตรวจ deployment และข้อจำกัดว่ายังไม่มี artifact store ถาวร; ยังไม่เปลี่ยน `.env` หรือกฎ approval/disclosure
 - ตรวจจริง: `audit --mode ci` ได้ **0 errors / 1 warning**, `--mode runtime` (รวม `--feature printing`) ได้ **0 errors / 1 warning**, `--mode full` ได้ **0 errors / 3 warnings เดิม**; `build_external_asset_manifest.py --check` ผ่าน; ชุด source-contract + slide skip ล่าสุดผ่าน **15/15**, ชุด loader/สไลด์/ยูนิต/เอกสารผ่าน **339/339**; ชุดรวม **1,539 ผ่าน / 5 ล้มเดิม / 1 warning** โดย failures คือ `test_retrieval_preserves_script_approval` สี่กรณีและ `test_system_instruction_stays_short` หนึ่งกรณี; ยังไม่ได้รัน suite เต็มจาก clean checkout ที่ materialize asset ภายนอก
+- ตรวจจาก clean worktree ของชุดโค้ด M0.1.1 ที่ไม่มีรูป/PDF local จริง: `--mode ci` ได้ **0 errors / 1 warning**, `--mode runtime` ได้ **1 error / 1 warning** ตามสัญญาเพราะขาดภาพสไลด์ 135 ไฟล์; focused tests ของ registry, availability, mydocs และ slides ได้ **152 ผ่าน / 2 skip / 1 warning** โดย skip เฉพาะ test ที่ต้องอ่าน byte ภาพ; ยังไม่มี artifact store ถาวรหรือการทดสอบ deployment ที่นำ bundle มาใส่
+
+## 2026-09-18 — ตั้ง ROBOT_TOKEN เพื่อเปิดทางให้แอปบนหุ่น
+
+- `.env` (ไฟล์ local ที่ Git ignore): ตั้ง `ROBOT_TOKEN` ด้วยค่าสุ่มจาก `secrets.token_urlsafe(24)` พร้อมคอมเมนต์ภาษาไทยอธิบายว่าเป็นคนละใบกับ `WS_TOKEN` เพราะ `WS_TOKEN` อยู่ใน URL ของทุกเบราว์เซอร์บน LAN; ก่อนหน้านี้ช่องนี้ว่าง ทำให้ `app/session.py:509` ปฏิเสธ `robot_ready` ทุกครั้งด้วยเหตุผล `no_server_token` = ไม่มีซ็อกเก็ตไหนได้เป็นหุ่นแม้แอปจะส่งถูกทุกอย่าง; ไม่บันทึกค่า token ลงในประวัติ
+- รีวิวสถานะแอป Android สองตัวโดยอ่านไฟล์จริง ไม่แก้โค้ด: `apps/emma-ai-voice` เปิด `/preview?app=1` ซึ่ง `client/voice-preview.html:1704` ระบุเองว่า slimmed — ไม่มี handler `{"type":"slide"}` ที่ `app/display.py:191` ส่งลงมา, ไม่มี `/ws/camera` (ทำให้ `FACE_CAMERA_SOURCE=robot` ใช้กับแอปนี้ไม่ได้) และไม่มี `/ws/wake` ต่างจาก `client/index.html?kiosk=1` ที่มีครบ; `apps/emma-robot-android` คุม Slamware REST กับแขน CH340 ในเครื่องได้แล้วแต่ไม่มี WebSocket ไปหาเซิร์ฟเวอร์เลยตาม docstring ของตัวเอง จึงยังไม่มีแอปตัวใดส่ง `robot_ready`/`robot_arrived` ได้
+- ตรวจจริง: บรรทัดตั้งค่าใน `.env` จาก 76 เป็น **77 บรรทัด** โดยเพิ่ม `ROBOT_TOKEN` รายการเดียวและคีย์เดิมครบ, คอมเมนต์ภาษาไทยอ่านกลับได้ไม่เป็น mojibake, CRLF เดิมคงอยู่ และ `git check-ignore -v .env` ยืนยันว่าไฟล์ยังไม่ถูก track · **ยังไม่ได้รีสตาร์ตเซิร์ฟเวอร์** ค่านี้จึงยังไม่มีผลกับ process ที่รันอยู่ และยังไม่ได้ทดสอบ `robot_ready` จากแอปจริงเพราะยังไม่มีแอปที่ส่งได้
 
 ## 2026-09-18 — แยกข้อมูล Embassy World ตามโครงการและบังคับขอบเขตตอนโหลด
 
-- ตรวจจาก clean worktree ของชุดโค้ด M0.1.1 ที่ไม่มีรูป/PDF local จริง: `--mode ci` ได้ **0 errors / 1 warning**, `--mode runtime` ได้ **1 error / 1 warning** ตามสัญญาเพราะขาดภาพสไลด์ 135 ไฟล์; focused tests ของ registry, availability, mydocs และ slides ได้ **152 ผ่าน / 2 skip / 1 warning** โดย skip เฉพาะ test ที่ต้องอ่าน byte ภาพ; ยังไม่มี artifact store ถาวรหรือการทดสอบ deployment ที่นำ bundle มาใส่
 - `data/projects/embassy_world/`, `data/registry/source_registry.json`, `data/review/`: ย้าย facts, vocabulary, floor-plan assets และ Canva map ไปตามหน้าที่; แยกดัชนี/ภาพสไลด์ Embassy World 135 รายการจาก `other-project` 15 รายการที่รอจำแนก; ย้ายภาพเด็คเก่า 59 ไฟล์พร้อมไฟล์สำรองและแคชไป `review/unindexed_slides/` โดยไม่ลบเนื้อหา เพิ่ม `source_id`/`project_id` ให้ JSON ที่ย้าย และเก็บคำแนะนำโครงการจาก prompt เดิมใน `presentations/sales_context.json` สถานะ `migrated_unreviewed` ไม่เปลี่ยน draft เป็น approved
 - `app/data_sources.py`, `app/config.py`, `app/prompts.py`, `app/session.py`, `app/tools/{slides,knowledge,project_knowledge,units,registry,canva_display,mydocs}.py`: ใช้ทะเบียนแก้ path ตาม source ID; server กำหนด project ID เอง ตรวจ identity/slug ของ inventory, metadata ใน facts/สไลด์/ผัง/Canva และปฏิเสธผลเครื่องมือที่มี project ID อื่น; เอกสาร mydocs ในโหมดห้องขายถูกจำกัดที่โฟลเดอร์ของโครงการแม้ `MYDOCS_INCLUDE` ว่าง ข้อมูลเฉพาะโครงการถูกย้ายออกจาก `SALES_HOST_BLOCK` โดยคงถ้อยคำที่ประกอบ prompt เดิม
 - `.env.example`, `.gitignore`, `README.md`, `data/README.md`, `docs/project-structure-and-data-sources.md`, `scripts/{migrate_project_sources,audit_data_sources,import_slides,import_canva_export,canva_pages,approve_narration,import_page_docs,build_embeddings,analyze_log,make_test_documents}.py`, `tests/`: อัปเดต path นำเข้า/เอกสาร/การทดสอบและเพิ่มเคสกันข้อมูลข้ามโครงการ; ไม่แตะ secret ใน `.env` หรือเนื้อหาข้อมูลขายที่ต้องให้เจ้าของอนุมัติ
 - ยังไม่ย้าย `data/documents/`, `data/personal-docs/`, `data/showroom/` หรือ `data/units.sample.json` ไปติดป้ายโครงการโดยไม่มีหลักฐานเจ้าของ/ประเภทเพิ่มเติม; เอกสารส่วนตัวในโหมดห้องขายถูกจำกัดด้วย path โครงการแล้ว แต่ยังต้องตรวจเนื้อหาเอกสารแต่ละฉบับในรอบอนุมัติ
 - ตรวจจริง: เทียบ JSON เดิมกับที่ย้ายโดยตัด metadata ใหม่แล้ว ได้สไลด์ครบ 150 รายการและเนื้อหาเปลี่ยน 0 รายการ; facts, vocabulary, floor-plan assets และ Canva map เนื้อหาเดิมตรงกัน; ภาพสไลด์ที่อยู่ในดัชนีครบ **135 + 15**, ภาพ/ไฟล์เก่าในพื้นที่ review **61 ไฟล์** ไม่มีรายการสูญหาย; `python scripts/audit_data_sources.py` ได้ **0 errors / 3 warnings เดิม** (ข้อมูล facts ยังไม่มีการอนุมัติ, ตารางยูนิต local ยังไม่มี, จุดนำทาง 5 จุดยังไม่ยืนยัน); `python -m compileall -q app scripts` และ `git diff --check` ผ่าน; ชุดทดสอบรวม **1,533 ผ่าน / 5 ล้ม / 1 warning** ไม่มี regression ใหม่จากการย้ายข้อมูล; failure ที่เก็บเป็น baseline คือ `tests/test_review_fixes.py::test_retrieval_preserves_script_approval[th-False]`, `[th-None]`, `[en-False]`, `[en-None]` และ `tests/test_voice.py::test_system_instruction_stays_short` (prompt 7,979 ตัวอักษร เทียบเพดาน 4,700)
 - ขอบเขต commit M0.1: ย้ายโครงสร้าง แก้ source loading/project scoping และนำข้อความโครงการออกจาก prompt เท่านั้น; **ยังไม่เปลี่ยนกฎ approval/disclosure** หรือยกระดับ draft เป็น approved; งาน path config แบบ root และ policy gate อยู่รอบถัดไป
+- ตรวจเพิ่มจาก checkout เฉพาะไฟล์ที่ stage: `tests/test_mydocs.py` ผ่าน **14/14** หลังตรึง `MYDOCS_INCLUDE` ใน fixture; audit ใน checkout ว่างรายงาน **4 errors / 4 warnings** เพราะแหล่งที่เป็นไฟล์ local/ยังไม่อยู่ใน Git (`review/unindexed_slides`, แผนที่ห้องขาย และหลักฐานหุ่น) ไม่ได้ถูกนำเข้า commit นี้; test รูปสไลด์ 2 เคสต้องใช้ JPG ที่ Git ignore อยู่เดิม จึงยังต้องจัดการ fixture/asset สำหรับ CI แยกต่างหาก ไม่อ้างว่า checkout ใหม่ผ่านทั้งชุด
+
+## 2026-09-17 — เปิด Emma ทดสอบโมเดล Live ใหม่
+
+- `.env` (ไฟล์ local ที่ Git ignore): ตั้ง `GEMINI_THINKING_LEVEL=low` สำหรับ `gemini-3.8-live-extended-thinking` เพราะค่าเริ่มต้น `minimal` ถูกโมเดลนี้ปฏิเสธและทำให้สลับไปโมเดลสำรอง; ไม่บันทึก secret ลงในประวัติ
+- ตรวจสอบจริง: รีสตาร์ตด้วย `.venv/Scripts/python.exe run_server.py --open`, `/health` ตอบ 200, WebSocket `/ws` ได้ `ready` และได้รับเสียงทักทายจากโมเดลโดยไม่พบ `MODEL FALLBACK`; ยังไม่ได้ตรวจการเรียกเครื่องมือและวงจร `interaction_status` ของ Extended Thinking แบบครบถ้วน
+
+## 2026-09-17 — แก้ภาษาไทยเพี้ยนในไฟล์ตั้งค่าส่วนตัว
+
+- `.env` (ไฟล์ local ที่ Git ignore): กู้คอมเมนต์ภาษาไทยที่ถูกแปลง encoding ผิดสองชั้น 106 บรรทัดให้เป็น UTF-8 อ่านได้ โดยไม่แก้ค่าตัวแปรหรือบันทึก secret ลงใน changelog
+- ตรวจสอบจริง: เทียบบรรทัดที่ไม่ใช่คอมเมนต์ก่อน/หลัง 81 บรรทัดตรงกันทั้งหมด; อ่านไฟล์กลับหลังเขียนสำเร็จ; คอมเมนต์ที่เข้าลักษณะ mojibake เหลือ 0 บรรทัด
 
 ## 2026-09-17 — ลดไฟล์สร้างอัตโนมัติใน Source Control
 
-- ตรวจเพิ่มจาก checkout เฉพาะไฟล์ที่ stage: `tests/test_mydocs.py` ผ่าน **14/14** หลังตรึง `MYDOCS_INCLUDE` ใน fixture; audit ใน checkout ว่างรายงาน **4 errors / 4 warnings** เพราะแหล่งที่เป็นไฟล์ local/ยังไม่อยู่ใน Git (`review/unindexed_slides`, แผนที่ห้องขาย และหลักฐานหุ่น) ไม่ได้ถูกนำเข้า commit นี้; test รูปสไลด์ 2 เคสต้องใช้ JPG ที่ Git ignore อยู่เดิม จึงยังต้องจัดการ fixture/asset สำหรับ CI แยกต่างหาก ไม่อ้างว่า checkout ใหม่ผ่านทั้งชุด
 - `.gitignore`: ไม่แสดงแคช Gradle และผล build ใต้ `apps/emma-ai-voice/` ใน Git เพราะสร้างใหม่ได้และไม่ใช่ซอร์ส; ไม่ลบไฟล์ในเครื่องหรือซ่อนซอร์สแอป
 - ตรวจสอบจริง: ก่อนแก้ `git status --porcelain=v1 -uall` แสดง 295 ไฟล์ โดย 144 ไฟล์เป็นสองโฟลเดอร์ดังกล่าว; โฟลเดอร์ `.tmp/` ราว 15,458 ไฟล์ถูก ignore อยู่แล้ว; หลังแก้ `git status` เหลือ 151 ไฟล์ และ `git check-ignore -v` ยืนยันกฎทั้งสอง โดยซอร์สแอป 16 ไฟล์ยังปรากฏตามเดิม
 
@@ -71,6 +263,72 @@
 - เก็บจุดเรียกตัวจำลองที่ค้างใน `app/config.py`, `app/prompts.py`, `app/providers/gemini.py`, `app/session.py`, `app/tools/{__init__,registry,robot,robot_link}.py`, `app/turnlog.py`, `client/index.html`, `scripts/check_robot_readiness.py`, `tests/conftest.py`; ย้ายการจัดหมวด provider error ไป `app/session.py` เพื่อไม่ต้องพึ่งโมดูล diagnostics ของตัวจำลอง
 - ปรับ `README.md`, `.gitignore`, `docs/robot-integration.md`, `docs/robot-arrival-2026-09-09.md`, `docs/ต่อกับหุ่นยนต์ Astronaut.md` และหมายเหตุใน `docs/research/emma-robot-next-steps-2026-09-08.md` ให้ลิงก์/คำแนะนำปัจจุบันไม่ชี้ไปบริการพอร์ต 8010 ที่ลบแล้ว โดยเก็บรายงานเก่าไว้เป็นประวัติ ไม่เปลี่ยนข้อมูล draft เป็น approved
 - ตรวจสอบจริง: `pytest -q --basetemp=.pytest_cleanup_20260917 -p no:cacheprovider` ได้ **1,527 ผ่าน / 5 ล้ม / 1 warning** โดยทั้ง 5 เคสล้มเรื่อง `draft_script` (4) และความยาว prompt (1) เหมือนรอบรีวิวก่อนลบตัวจำลอง; `python -m compileall -q app scripts`, `git diff --check` และ `node tests/client_metrics.cjs` ผ่าน; `node tests/client_audio_start.cjs` กับ `node tests/client_voice_lifecycle.cjs` ยังล้มเพราะ test harness เรียก `getUserMedia` ตรง แต่หน้าเว็บปัจจุบันใช้ `openPreferredMic` จากงานค้างเดิม ไม่ใช่ผลการถอดตัวจำลอง
+
+## 2026-09-16 — สคริปต์ทดลองบทสนทนา Emma AI Voice
+
+- `docs/emma-ai-voice-sample-dialogue.md`: เพิ่มบทสนทนาภาษาไทยสำหรับทดลองหน้า Emma AI Voice ตั้งแต่ทักทาย เลือกแบบห้อง เปิดแปลน ถามราคา ฟังไม่ชัด หยุดพูด และจบสาย พร้อมลำดับ smoke test 30 วินาที; ใช้เฉพาะข้อมูลที่มีหลักฐานและกำหนดให้ตอบตามผลเครื่องมือจริง ไม่แต่งราคา/สถานะการเปิดหน้าจอ
+
+## 2026-09-16 — เพิ่มเสียงตอบ Emma และแก้สถานะไมค์บนแอป
+
+- `client/voice-preview.html`: เพิ่ม output gain 1.75 เท่าเฉพาะโหมด `app=1` พร้อม DynamicsCompressor ทำหน้าที่ limiter; หน้า `/preview` ปกติยังคง unity gain และแก้ป้ายกลางจาก `กำลังเชื่อมต่อ` เป็น `กำลังฟัง` ทันทีหลังไมค์เปิดสำเร็จ
+- `apps/emma-ai-voice/MainActivity.java`, README: ผูกปุ่มเพิ่ม/ลดเสียงของ Android กับ Media stream ซึ่งเป็นช่องที่ WebView ใช้เล่นเสียง Emma พร้อมบันทึกพฤติกรรมใหม่
+- `tests/test_emma_ai_voice_android_app.py`: เพิ่ม invariant ว่า gain ใช้เฉพาะ app shell, มี limiter, ต่อ playback ผ่าน output chain และอัปเดตสถานะไมค์; ระหว่างวิเคราะห์พบ Media volume ของ Emulator อยู่ที่ **5/15** ไม่ใช่ระดับสูงสุด
+- `AndroidManifest.xml`, `client/voice-preview.html`: เพิ่ม normal permission `MODIFY_AUDIO_SETTINGS` หลัง Chromium ระบุว่าไม่มีอุปกรณ์บันทึกเพราะต้องมีทั้งสิทธิ์นี้และ `RECORD_AUDIO`; ตรวจ Android audio monitor แล้วไม่มีแอปอื่นกำลังอัดเสียง จึงแก้ข้อความ `NotReadableError` ที่เคยฟันธงว่าแอปอื่นถือไมค์ ให้บอกสองสาเหตุที่เป็นไปได้และเปลี่ยนป้ายกลางเป็น `ไมค์ไม่พร้อม`
+- ตรวจจริง: focused tests **18 ผ่าน, 1 warning เดิมจาก Starlette/httpx**; Android `assembleDebug lintDebug` สำเร็จ; ติดตั้ง APK บน Emulator และปรับ Media volume จาก 5/15 เป็น **12/15**; เปิดสายประมาณ 5 วินาทีแล้ว Android รายงาน recording session ของ `com.emma.ai.voice` เป็น `active=true`, 48 kHz, `silenced=false`; หลังทดสอบ force-stop แล้วตรวจซ้ำไม่พบ active recorder ก่อนเปิดแอปกลับมาที่หน้าพร้อมใช้งานโดยยังไม่เปิดไมค์
+
+## 2026-09-16 — แอป Android `Emma AI Voice` และหน้าเสียงเต็มจอ
+
+- `apps/emma-ai-voice/`: สร้างแอป Android แยก package `com.emma.ai.voice` สำหรับหน้าเสียง Emma บนจอกลาง/Emulator; WebView เปิดหน้า `/preview?app=1`, เก็บ server URL กับ `WS_TOKEN` ในพื้นที่ส่วนตัวของแอป, ขอเฉพาะ Internet/ไมโครโฟน, อนุญาต audio capture เฉพาะ origin ที่ตั้งไว้, ใช้ CA ของโครงการโดยไม่ข้าม SSL error, คืนไมค์เมื่อแอปพัก และซ่อนแถบนำทาง Android ระหว่างใช้งานโดยคง status bar กับปุ่มตั้งค่า
+- `client/voice-preview.html`: เพิ่มโหมด `app=1` ตามภาพต้นแบบ—พื้นหลังน้ำเงินดำเต็มจอ, Emma กลางจอ และปุ่มไทย `ข้อความ / กดเพื่อพูด / จบ`; ใช้ engine เสียงเดิมเพียงชุดเดียว (`/voices`, `/health`, `/ws`) พร้อมแปลสถานะบนหน้าแอปและจบสายเมื่อ native app พัก โดยหน้า `/preview` เดิมยังใช้รูปแบบเดิม
+- `tests/test_emma_ai_voice_android_app.py`, `apps/emma-ai-voice/README.md`: เพิ่ม invariant เรื่อง package/สิทธิ์, การไม่ฝัง API key, same-origin microphone, lifecycle, layout, WebSocket ชุดเดียว และวิธี build/เปิดบน Emulator กับหุ่น
+- ตรวจจริง: focused tests **17 ผ่าน, 1 warning เดิมจาก Starlette/httpx**; Android `clean assembleDebug lintDebug` สำเร็จ; ติดตั้งและเปิด `Emma AI Voice` บน Emulator 1080×1920 สำเร็จ พร้อมตรวจภาพเต็มจอ; WebSocket เปิด session จริงและได้ `ready` จาก **Gemini**, profile `condo`, voice `Despina`, input 16 kHz/output 24 kHz โดยไม่ส่งเสียงไมค์ในรอบตรวจ
+
+## 2026-09-16 — จัดระเบียบโครงสร้างและทะเบียนแหล่งข้อมูลกลาง
+
+- `data/source_registry.json`, `data/README.md`: แยกสถานะของข้อมูลโครงการ ยูนิตสด/ไฟล์/ตัวอย่าง สไลด์ เอกสารส่วนตัว แผนที่ห้องขาย หลักฐานหุ่น telemetry และข้อมูลส่วนตัว runtime ให้ชัด พร้อมกติกาเมื่อต้นทางขัดกัน; registry เก็บเฉพาะชื่อ environment variable ไม่เก็บค่า secret
+- `scripts/audit_data_sources.py`, `tests/test_data_source_registry.py`: เพิ่มตัวตรวจ path และ JSON ที่จำเป็น, metadata การอนุมัติ, ป้าย sample, payload ใน document catalogue และจุดนำทางที่ยังไม่ยืนยัน; คำเตือนคงมองเห็นได้โดยไม่ทำให้ข้อมูลที่ยังรอเจ้าของยืนยันกลายเป็น approved อัตโนมัติ · audit ผ่านโดยมี **0 errors / 3 warnings** ที่ตั้งใจแสดง (approval ของ project facts, ไฟล์ยูนิตจริงที่ยังไม่มี, จุดนำทาง 5 จุดที่ยังไม่ยืนยัน); ชุด data registry + knowledge + mydocs + project knowledge + units + documents ผ่าน **123 tests, 1 warning เดิมจาก Starlette/httpx**
+- `docs/project-structure-and-data-sources.md`, `README.md`: บันทึกขอบเขตของ runtime เว็บ/เสียง, งานหุ่น และแอป Android พร้อมลำดับความน่าเชื่อถือของข้อมูล; ยังไม่ย้ายหรือลบไฟล์เดิมเพราะ working tree มีงานหลายชุดและ path ถูกอ้างจาก runtime หลายจุด
+
+## 2026-09-16 — แยกแอป Android หลักของ Emma สำหรับติดตั้งบนหุ่น
+
+- `apps/emma-robot-android/`: สร้างโปรเจกต์ Android แบบ standalone ชื่อ `Emma Robot` และ package `com.emma.robot.control` แยกจากเว็บเซิร์ฟเวอร์และเครื่องมือ Xbox Direct แต่ยกเส้นทางฮาร์ดแวร์ที่พิสูจน์แล้วมาใช้ ได้แก่ Slamware ภายใน, จอย Xbox ที่ต่อกับ Android โดยตรง, บอร์ดแขน CH340, กลุ่มท่า 1–26, กลุ่มคืนท่าพัก 99 และร่างท่าแบบหลายคีย์เฟรม; แอปบังคับแนวตั้งและเริ่มโดยล็อกการเคลื่อนไหวทุกครั้ง
+- `tests/test_emma_robot_android_app.py`: เพิ่ม invariant ว่าแอปหลักมี package แยก, มี SDK ที่ต้องใช้ในตัว, ไม่ส่งท่าแขนอัตโนมัติตอนเชื่อม, หยุด/ล็อกเมื่อเสียโฟกัสหรือจอยหลุด และไม่แสดงผังช่องที่ยังไม่มีหลักฐานเป็นข้อเท็จจริง · ผ่าน **4 tests**; Android debug APK และ lint ผ่านด้วย Gradle offline หลังรันนอก sandbox เนื่องจาก Java ถูกปฏิเสธสิทธิ์อ่าน Android SDK ภายใน sandbox · ยังไม่ได้ติดตั้งบนหุ่นและไม่ได้ส่งคำสั่งเคลื่อนไหว
+
+## 2026-09-16 — รวมข้อมูล Embassy World ทั้งหมดเป็นไฟล์ HTML ตรวจสอบ
+
+- `docs/embassy-world-ข้อมูลทั้งหมด-ตรวจสอบ-2026-09-16.html` (ใหม่): รวบรวมทุกข้อมูล Embassy World ที่ Emma พูดได้ ไว้ให้ผู้รู้โครงการตรวจถูก/ผิด — HTML self-contained มี checkbox+กล่องแก้ไข (เก็บใน localStorage), ปุ่มพิมพ์/PDF, แยกสถานะ ✅ ยืนยัน (condo_facts) / 🟢 LIVE DB (Supabase) / 📝 draft (สไลด์) / ⬜ ยังว่าง
+- แหล่ง: `condo_facts.json`, เด็ค `slides/index.json` 65 หน้า (คัด 15 หน้า other-project + ~130 ไฟล์เว็บ Pattaya/Life ออก กัน World≠Life ปน), เอกสารแนวคิด `personal-docs/embassy-world/`, และ query สด Supabase inventory
+- ดึงข้อมูลจริงจาก DB (1,082 ยูนิต): ตึก A–F, ชั้น 1–8, ว่าง 740/ขาย 339/จอง 3, แบบห้อง Studio 120 (23.6–28.9 ตร.ม.) · 1BR 806 (32.5–34.4) · 2BR 150 (51.2–52.2) · Shop 6 จากตาราง `unit_types`
+- **ราคาตัดออกทั้งหมด** — เจ้าของแจ้งว่าราคาใน Supabase เป็นข้อมูลตัวอย่าง ไม่ใช่ของจริง · reframe เอกสารเป็น "ฉบับรวบรวมข้อมูลจริงจัง" (ไม่ใช่เซ็นยืนยัน condo_facts)
+- ทำทุกช่องแก้ไขได้ (contenteditable + autosave localStorage), ปุ่มดาวน์โหลดไฟล์ที่แก้แล้ว/พิมพ์/คืนค่าเดิม, ใส่ "ที่มา" ต่อทุกชุดข้อมูล (ระบุไฟล์/ตาราง/slide id)
+- เพิ่มตาราง **สเปคโครงการมาตรฐาน** (อ้างโครงสร้างเพจ Sansiri) แมป have/missing — ที่ยังขาด: เนื้อที่โครงการ, ราคาจริง, กรรมสิทธิ์ freehold/leasehold, กำหนดเสร็จ, ค่าส่วนกลาง, เงินกองทุน, จำนวนที่จอดรถ, ระยะทางเป็นตัวเลข, ที่อยู่เต็ม
+- อ่านสถานะ/รวบรวมอย่างเดียว ไม่แก้โค้ด/ไม่ commit · ไฟล์: docs/ (เอกสาร HTML 1 ไฟล์)
+
+## 2026-09-16 — วิเคราะห์คู่มือท่าและแยกเลขกลุ่มออกจากเลขช่อง
+
+- `robot-arm-command-map-2026-09-16.md`: ตรวจคู่มือ PDF สี่ไฟล์ หน้า SDK ต้นฉบับ เอกสารในชุดพัฒนา โค้ด Aobo ที่กู้ไว้ และผลทดสอบเดิม; ยืนยันว่าเลข 18/21 ในคู่มือเป็นลำดับฟีเจอร์ ไม่ใช่ action group และรวมตารางกลุ่ม 1–26/99 กับช่อง 1–20 ตามระดับหลักฐาน
+- `servo-channel-map.json`: เพิ่ม inventory เชิงกลจากคู่มือซึ่งรวมได้ 20 แกนพอดี—หัว 2, แขนบน 4, ท่อนแขน 4, นิ้ว 10—โดยไม่แต่งลำดับ channel และบันทึกความไม่สอดคล้องกับข้อความ “22 ข้อต่อส่วนบน”
+- `gesture-labels.json`: เพิ่มหลักฐานเฉพาะเครื่องสำหรับกลุ่ม 3 ที่เห็นขยับจริงและกลุ่ม 99 ที่ยืนยันเส้นทาง reset/home แยกจากชื่อกลุ่ม 5–13 ที่ยังขัดกับ `ActionConstants`; ตรวจ JSON parse ผ่าน, รันตัวถอด DEX switch ซ้ำได้ชื่อ 5–13 ตรงรายงาน และ `git diff --check` ผ่าน (มีเพียงคำเตือน LF/CRLF เดิม) · **รอบนี้ไม่ส่งคำสั่งหุ่น**
+
+## 2026-09-16 — gitignore `.tmp/` + `xbox-direct/` (VSCode ขึ้น "10000 changes")
+
+- VSCode SCM โชว์ 10k changes เพราะโฟลเดอร์ scratch **`.tmp/`** ที่ root มี ~14,900 ไฟล์ untracked (`.tmp/android-sdk` 11,462 + `gradle-xbox` 1,964 + `android-toolchain` 629 + robot SDK dumps/video frames) — ไม่อยู่ใน .gitignore · git ยุบ untracked dir เป็น 1 บรรทัด (`git status --short` เห็น 107) แต่ VSCode นับ per-file → ชน cap 10,000
+- แก้: เพิ่ม `.tmp/` + `tools/android/xbox-direct/` ใน `.gitignore` → `git status -uall` จาก 14,509 เหลือ 124 ไฟล์ (เฉพาะงานจริง) · ไม่ลบไฟล์บนดิสก์ แค่เลิก track
+- ไฟล์: .gitignore
+
+## 2026-09-16 — ปุ่มคืนท่าพักสำหรับไล่ผังช่องแขน
+
+- `ArmController.java`, `MainActivity.java`: เพิ่มปุ่ม **คืนท่าพักเดิม (กลุ่ม 99)** ตาม reset/home ในตัวอย่าง SDK ผู้ขาย ยกเลิกลำดับ local ที่กำลังเล่นก่อนเรียกกลุ่ม 99 และไม่ส่งคำสั่งใดตอนเปิดแอป
+- `MotionDraft.java`: แยกค่าตำแหน่งชั่วคราวออกจากคีย์เฟรมที่บันทึกด้วย JSON format 2 เพื่อให้คืนท่าพักแล้วล้างค่าที่ไม่ตรงกับท่าจริงได้โดยไม่ลบร่างท่าเดิม; ยังอ่าน format 1 ได้
+- `README.md`, `tests/test_xbox_direct_controller.py`: เพิ่มวิธีใช้และ invariant ว่าปุ่ม reset ต้องใช้กลุ่ม 99, ยกเลิก pose generation ก่อน และไม่ล้าง saved frames; ตรวจ 16 tests ผ่าน, Android `assembleDebug`/`lintDebug` ผ่าน, `git diff --check` ผ่าน (มีเพียงคำเตือน LF/CRLF เดิม), APK SHA-256 `568721ECB58D0B4C593766940DE3FC486BDC29B38D0D1A6BDA376E2AC91AB8DA` ติดตั้งบน `192.168.1.63:5555` สำเร็จ และ UI ยืนยันว่าปุ่มแสดงในสถานะฐานล้อยังล็อก · **ยังไม่ได้กดสั่งกลุ่ม 99 ให้หุ่นขยับจริง**
+
+## 2026-09-15 — แกะโปรโตคอลแขนและเพิ่มสตูดิโอสร้างท่าในหุ่น
+
+- วิเคราะห์ `rios_usc.exe` แบบ static ด้วย PE VA ที่ถูกต้อง: ยืนยัน `#DOWN` เริ่มดาวน์โหลดกลุ่มใหม่, ส่งคีย์เฟรมข้อความทีละบรรทัดหลัง handshake, จบด้วย `#STOP` และ `#0P500T100`, แล้วรับ `#DOWN+OK+<หมายเลข>`; `#Read` อ่านเพียงจำนวนกลุ่ม จึงยังไม่เปิดการเขียน Flash หรืออ้างว่าสำรองคีย์เฟรมเดิมได้
+- ตรวจชุดพัฒนา `开发资料2026.3.16.zip`: source ตัวอย่าง SDK 2.1.2 มีปุ่มกลุ่ม 1–16, `#STOP`, กลุ่ม 99 และ serial callback แต่ไม่มีผังชื่อข้อต่อ; AAR ตรงกับไฟล์ที่ Xbox Direct ใช้อยู่ (SHA-256 `84C3DD4DA877334A3479A0E7A8169B584BCCCE5DCDEC093678B23BB71D5C7777`) และ `ArmManager.f(String)` เปิดทางส่งคีย์เฟรมหลายช่อง
+- `MotionDraft.java`, `ArmController.java`, `MainActivity.java`: เพิ่มร่างท่า local JSON ที่จำเฉพาะช่องซึ่งผู้ใช้ส่งจริง, เพิ่มหลายคีย์เฟรม, เล่นคำสั่งหลายช่องพร้อมกัน และยกเลิก generation ก่อน `#STOP`; หน้า Xbox Direct แสดงหลักฐานรายช่อง 5/7/8 และไม่ตั้งชื่อช่องอื่นเกินผลภาพที่มี
+- `servo-channel-map.json`, `robot-arm-protocol-and-pose-studio-2026-09-15.md`, README และ tests: บันทึกผังช่อง 1–20 ตามระดับหลักฐาน ขั้นตอนสร้างท่า และข้อจำกัดว่า command target ไม่ใช่ตำแหน่งวัดกลับ
+- ตรวจ `tests/test_xbox_direct_controller.py` ผ่าน **15 tests**; Android `assembleDebug` และ `lintDebug` ผ่าน ติดตั้ง APK บน `192.168.1.63:5555` แล้ว ตรวจ UI พบสตูดิโอท่าเริ่ม 0 คีย์เฟรม ฐานล้อยังไม่เปิดควบคุม แขนยังไม่เชื่อม และ log ตอนเริ่มไม่มีคำสั่งแขนหรือคำสั่งเคลื่อนที่ · **ยังไม่ commit**
 
 ## 2026-09-15 — Conversation brevity เฉพาะ walk-in และ family/weekend clue
 
@@ -87,6 +345,34 @@
 - Gemini Live รอบยืนยันและ rerun โดยใช้ assembled prompt snapshot เดียวต่อคู่และไม่แก้ระหว่าง A/G (`gemini-3.1-flash-live-preview`, synthetic, ปิด turn log/ราคา, ไม่ประกาศ `robot`/`smarthome`): A ตอบ “ยินดีต้อนรับค่ะ ที่นี่คือ Embassy World ค่ะ” เหมือนกันทั้งสองรอบ; G ตอบ benefit เรื่องใช้เวลาพักผ่อนกับครอบครัวในวันหยุดเพียงประโยคเดียวทั้งสองรอบ (rerun เติมคำต้อนรับสั้น ๆ แต่ไม่แตกประเด็น); ทุกเคสมีเสียงตอบ, `tool_trace=[]`, ไม่มีคำถาม/ข้อเสนอท้าย — ผ่าน acceptance ด้าน brevity, intent, factual grounding, capability truth และ anti-hook
 - ตรวจ `tests/test_profiles.py` ผ่าน **45 tests**; regression `profiles + units + knowledge + mydocs + retrieval + slides + robot` ผ่าน **342 tests, 1 warning** · `SALES_HOST_BLOCK` = **3648 chars** (SHA-256 `413ccbda4c661ace9c202d98c79bc4facf3c00e3aab94f655f8f8dab81b8a6f1`) · budget test ยังคงเป็น known failure **7982 > 4700**, assembled runtime ตาม tool groups จริง **8075**; ไม่ขยับ threshold และไม่แตะ tool schema/boundary, knowledge retrieval, price policy, navigation, slide หรือ hardware integration
 
+## 2026-09-15 — คืน camera/audio/ADB อย่างปลอดภัยหลังต่อสายหุ่น
+
+- `client/robot-console.html`, `tests/test_robot_console_page.py`, `.env`: เลิกเติม token ลง `href` ของลิงก์ย่อยใน Robot Lab หลังพบว่า accessibility tree อ่านค่าลิงก์ได้แม้ address bar ถูกล้างแล้ว; เก็บ `href` เป็น path ปกติและเติม credential เฉพาะ navigation event จากนั้นหมุน token อีกครั้ง · ชุด focused รอบสุดท้ายผ่าน **134 tests, 1 warning**; JavaScript syntax และ `git diff --check` ผ่าน
+- `app/config.py`, `app/vad_gate.py`, `app/session.py`, `.env`, `.env.example`, `tests/test_vad_gate.py`, `tests/test_greeter.py`: เลือก near-field ด้วยเสียงล้วนตามข้อจำกัดกล้องบนหัวที่มองคนยืนใกล้ไม่ครบ/เบลอ; คง `VAD_MIN_RMS=0.04`, เพิ่ม `VAD_FLOOR_GRACE_S=0` ให้เกณฑ์เริ่มตั้งแต่เฟรมแรก และ `VAD_SUMMONED_BYPASS=false` ไม่ให้สายที่กล้องเรียกปิดเกณฑ์ทั้งสาย · คง AGC ฝั่ง kiosk ปิดและ compressor ปิดเพื่อรักษาความต่างความดังคนใกล้/ไกล; ไม่ใช้ LLM ตัดสินระยะหลังถอดข้อความแล้ว · ชุด focused รวม Robot Lab/VAD/greeter ผ่าน **133 tests, 1 warning**; syntax Python/JavaScript และ `git diff --check` ผ่าน
+- `app/main.py`, `client/robot-console.html`, `tests/test_robot_cockpit_feeds.py`, `tests/test_robot_console_page.py`: แสดงเกณฑ์ near-field บน Robot Lab ทั้งค่าหลัง gain ที่ VAD ใช้และค่าก่อน gain โดยประมาณเมื่อ compressor ปิด เพื่อเทียบกับมิเตอร์ดิบจากการทดสอบหุ่นได้โดยไม่สับสนสเกล · ชุด focused รวมผ่าน **134 tests, 1 warning**; syntax และ `git diff --check` ผ่าน
+- `run_server.py`, `tests/test_greeter.py`, `.env`: ปิด Uvicorn HTTP access log, เลิกพิมพ์ URL ที่มี `WS_TOKEN` และกรอง token ออกจาก Uvicorn WebSocket status log เพราะ query string ของหน้า console/camera เคยถูกเก็บลง stdout/stderr; หมุน token หลังพบและล้างเฉพาะ log/probe ที่สร้างจาก Robot Lab รอบนี้ ไม่บันทึกค่า token ลง changelog · ตรวจหลังเปิด `/ws/wake` และ `/ws/camera` จริงแล้ว log เหลือ `token=***` และไม่พบค่า token ปัจจุบันใน stdout/stderr
+- `app/robot_android.py`, `app/main.py`, `client/robot-console.html`, `tests/test_robot_android.py`, `tests/test_robot_console_page.py`: ขยาย `/console` เป็น Robot Lab หน้าเดียวสำหรับกล้องสด ระดับไมค์ สถานะ Android ความสว่าง backlight A/B ฐานล้อ และแขน; ฝั่ง Android รับเฉพาะ path ที่ตรึงในเซิร์ฟเวอร์กับค่า brightness 0/25/50/80/100% ไม่เปิด raw ADB/serial หรือ Aobo; ป้าย A/B ระบุชัดว่ายังไม่จับคู่กับหัว/หน้าอก และค่าความสว่างอ่านกลับหลังเขียน · การเปิด `/console` โดยตรงจาก loopback เติม token ผ่าน redirect เฉพาะ navigation ที่ไม่ใช่ cross-site แล้วหน้าเอา token ออกจาก address/history; เครื่องอื่นยังต้องใส่ token · ตรวจ focused/regression **133 ผ่าน, 1 warning** และตรวจ syntax Python/JavaScript ผ่าน; เปิดหน้า Robot Lab จริงแล้ว layout/ข้อความครบ · รีสตาร์ต server 8001 และ read-only `/android/state` ตอบจากหุ่นจริงว่า ADB connected, backlight A/B 204/255, CameraService 1 ตัว และพบ Bothlent ใน ALSA โดยไม่ได้ส่งคำสั่งเคลื่อนไหว
+- `app/robot_camera.py`, `app/main.py`, `client/index.html`, `client/robot-console.html`, `client/hardware.html`, `tests/test_robot_camera.py`, `tests/test_robot_cockpit_feeds.py`, `tests/test_hardware_page.py`: เพิ่มปุ่มทดสอบไมค์หุ่น 5 วินาทีจาก Robot Lab; คำขอวิ่งไป kiosk บนหุ่นและส่งกลับเฉพาะ RMS กับชื่อ track ไม่ส่งหรือเก็บ PCM/ไฟล์เสียง, ปิด track เมื่อครบเวลา และใช้สตรีม call/wake เดิมถ้ามีอยู่เพื่อไม่เปิดไมค์ซ้อน · แก้หัว `/hardware` ให้บอกตรงว่าเปิดบนเครื่องไหนก็วัดอุปกรณ์ของเครื่องนั้น หลังภาพทดสอบบนหุ่นยืนยัน `mic: speech 0.0240`, track `Default`; การจับคู่ `Default` → Bothlent อ้างจาก AudioPolicy/AudioFlinger ที่ตรวจไว้ ไม่ใช่จากชื่อใน Chrome · ทดสอบผ่าน API จริงหลัง kiosk ส่งกล้อง `1920×1080`: ได้ telemetry จาก `robot_kiosk` 23 ตัวอย่างใน 5 วินาที, peak `0.02710`, label `Default`, ไม่มีไฟล์เสียง · รวมชุด focused กับ greeter ผ่าน **133 tests, 1 warning**; ตรวจ syntax Python/JavaScript และ `git diff --check` ผ่าน
+- `app/robot_android.py`, `app/main.py`, `client/robot-console.html`, `tests/test_robot_android.py`, `tests/test_robot_console_page.py`: ถอนปุ่มและฟังก์ชันเขียน rotation หลังทดสอบจริงแล้ว Android รับค่าแต่จอกลางยังคง 0°; `/android/state` ยังอ่านค่าไว้สำหรับวินิจฉัย และ `/android/command` ปฏิเสธ action เดิมด้วย `rotation_not_effective` เพื่อไม่แสดงคำสั่งที่ดูเหมือนสำเร็จทั้งที่ภาพไม่หมุน · รวมอยู่ในผลตรวจ focused 133 tests ข้างต้น
+- `.env`: หมุน `WS_TOKEN` หลังเครื่องมือตรวจ UI แสดง target ของลิงก์ที่มี token เดิมในผลภายใน แล้วรีสตาร์ต server 8001; ไม่บันทึกค่าเดิมหรือค่าใหม่ใน changelog
+- `client/robot-console.html`, `tests/test_robot_console_page.py`: บันทึกผลที่เจ้าของมองเห็นจากการกดจริงว่า Backlight A คือจอกลางหุ่น; Backlight B อ่าน/เขียนค่าได้แต่ไม่พบสิ่งที่เปลี่ยนและยืนยันว่าไม่ใช่ไฟหัว; แยกสถานะไฟหัวเป็น “ยังไม่มีคำสั่งที่ยืนยัน” แทนการเดาผัง
+- `.env`: ปิด `ROBOT_CHASSIS_MOTION_ENABLED=false` ก่อนตรวจหรือคืน ADB tunnel ตาม safety gate; `ROBOT_ARM_MOTION_ENABLED=false` คงเดิมและห้ามเปิด Aobo/ส่งคำสั่ง serial ระหว่างตรวจ
+- `app/robot_arm.py`, `app/main.py`, `.env`, `.env.example`: เปลี่ยน arm port เป็น `auto` ซึ่งค้น `/dev/ttyUSB*` จาก VID/PID CH340 `1a86:7523` ก่อนทุก access และปฏิเสธเมื่อไม่พบหรือพบมากกว่าหนึ่งพอร์ต; ตั้ง ADB หลักเป็น USB serial ของหุ่นแทน Wi‑Fi address เก่า โดยยังไม่เขียน serial
+- `tests/test_robot_arm_page.py`: เพิ่ม regression ว่า auto-discovery เลือก CH340 ที่ `/dev/ttyUSB11` แม้เลขเปลี่ยน และ fail closed เมื่อ identity กำกวม
+- `client/index.html`, `tests/test_robot_camera.py`, `tests/test_greeter.py`: kiosk เปิด audio stream แล้วเลือก Bothlent ด้วยชื่อและ exact `deviceId` เมื่อ browser เปิดเผยชื่อ hardware; สำหรับ Android เครื่องจริงที่ Chrome แสดงเพียงชื่อ abstract `Default`/`Speakerphone` ให้คง Default ซึ่ง AudioPolicy พิสูจน์ว่า route ไป USB card 0 Bothlent; ถ้ามีชื่อ hardware จริงแต่ไม่พบ Bothlent ยังคง fail ชัด และทั้ง wake/call ใช้ selector เดียวกัน · ปรับ invariant เดิมให้ตาม helper ใหม่โดยยังล็อกลำดับ standby gate และ stream handover เหมือนเดิม
+- ตรวจ read-only ผ่าน ADB: CH340 `3-1.4` = `/dev/ttyUSB11`, CP2102 `3-1.2` = `/dev/ttyUSB10`, Bothlent card 0 = 8-channel S16_LE 16 kHz, กล้อง `10bb:2b08` อยู่ `3-1.1`; Aobo ไม่มี process ขณะตรวจ
+- ทดสอบ backlight ตามคำขอเจ้าของผ่าน ADB USB: ลด `/sys/class/backlight/backlight` และ `backlight1` จาก `204` เป็น `0` ทีละช่อง 3 วินาที แล้วคืน `204` สำเร็จทั้งคู่; ไม่ส่ง serial/คำสั่งมอเตอร์ หลังทดสอบกล้อง USB `10bb:2b08` และ `/dev/video1-2` ยังอยู่ ไม่มี USB disconnect และ CameraService ปรับจากรายการซ้ำ 2 เหลือ external camera จริง 1 ตัว ต้องใช้ผลที่เจ้าของมองเห็นเพื่อจับคู่ว่าช่องใดเป็นไฟหัว
+- ตรวจหน้า kiosk/camera sender จริง: LAN จากหุ่นเข้า `192.168.0.3:8001` ไม่ถึง จึงผูก ADB reverse `tcp:8001 -> tcp:8001` และเปิด secure origin `https://127.0.0.1:8001`; Chrome โหลด Emma สำเร็จ, `/ws/camera` connected, ได้ JPEG สด `1920×1080` ภาพตั้งตรงจาก `camdev=0`
+- ตรวจ Bothlent จริงโดยไม่บันทึกเสียง: Chrome รายงาน track เป็นชื่อ abstract `Default` ที่ 48 kHz/mono แต่ Android AudioPolicy/AudioFlinger ยืนยัน active Chrome capture ถูก patch ไป `AUDIO_DEVICE_IN_USB_DEVICE @ card=0;device=0`, hardware Bothlent 8 ช่อง 16 kHz; จึงแก้ selector ให้ตรง behavior ของ Android แทนการ reject stream ที่ route ถูกแล้ว
+- `client/index.html`, `tests/test_robot_camera.py`: แก้ comment/invariant ไม่ให้อนุมานว่า Android camera ID หลายตัวคือหลายเลนส์จริง; ใช้คำว่า logical camera entry และระบุว่าต้องจับคู่เลนส์ด้วย occlusion test
+- หมุน `WS_TOKEN` หลังภาพตรวจหน้าจอชั่วคราวเคยเห็น query string, ลบภาพนั้นทันที และเปิด kiosk ใหม่ด้วย token ใหม่; ไม่บันทึกค่า token ลง changelog/log
+- คืน chassis relay ด้วย `nc` บนหุ่นและ ADB forward `tcp:11448 -> tcp:11448` หลังปิด motion gate; read-only power endpoint ตอบจริง และ `/health` รายงาน Slamware connected/usable แต่ `motion_enabled=false` (ไม่ได้ส่งคำสั่งเคลื่อนที่)
+- ตรวจ live หลัง refresh kiosk: `openPreferredMic()` คืน track `Default` สถานะ live mono 48 kHz และ route ที่ชั้น Android เป็น Bothlent ตามข้างต้น; ปิด probe stream แล้ว ไม่บันทึกเสียง
+- ตรวจ kiosk สุดท้ายหลังตัดแถบ URL ออกจากภาพชั่วคราว: หน้า Emma แสดงแนวตั้งตรงกับจอ จึงคง `user_rotation=0`; ปิดแท็บ Emma เก่า/ซ้ำ 5 แท็บที่แย่งกล้อง แล้วเปิดแท็บ localhost ใหม่เพียงแท็บเดียว ทำให้ `/cam.jpg` กลับมาตอบ 200 ด้วยเฟรมสด
+- ตรวจ regression: `pytest -q tests/test_robot_arm_page.py tests/test_robot_camera.py tests/test_robot_chassis.py tests/test_robot_control_page.py tests/test_hardware_page.py tests/test_robot_console_page.py` ผ่าน 219 tests (มี Starlette/httpx deprecation warning เดิม 1 รายการ)
+- ตรวจซ้ำหลังแก้ comment/Android fallback ขั้นสุดท้าย: `pytest -q tests/test_robot_camera.py tests/test_robot_arm_page.py` ผ่าน 44 tests (warning เดิม 1 รายการ) และ `git diff --check` ผ่านสำหรับไฟล์ในขอบเขต
+- full suite ด้วย workspace basetemp หลัง default Windows temp ถูกปฏิเสธสิทธิ์: 1,542 ผ่าน / 7 ล้ม; 2 รายการเป็น assertion เก่าที่ยังหา `getUserMedia(` หลังย้ายไป helper แก้แล้วและ targeted ผ่าน 2 tests; อีก 5 รายการอยู่นอก scope รอบนี้—draft-script compatibility 4 และ prompt budget `7756 > 4700` 1 · ยังไม่ได้ rerun full suite หลังแก้สอง assertion
+
 ## 2026-09-15 — ผูกคำว่า “พาชม” กับ physical navigation เท่านั้น
 
 - `app/prompts.py`: นิยาม “พาชม/พาไปดู/เดินไป/นำไป/ตามฉันมา/เดี๋ยวพาไป” ว่าเป็นการเคลื่อนที่ของหุ่นไปสถานที่จริง ต้องมี `navigation` tool สำหรับปลายทางและได้ผลสำเร็จก่อนพูดว่าพาไปได้; ถ้าไม่มี tool ต้องตอบ capability ตรงๆ ว่าตอนนี้พาเดินไปไม่ได้ ห้ามหลบด้วยการตอบเพียงว่าสถานที่ “มีให้ชม” และย้ำว่าสคริปต์ sales ในเอกสารไม่ใช่หลักฐานว่าหุ่นมี capability นั้น · ลบกฎเดิมที่สั่งตอบรับว่าจะพาไปโดยไม่ดู tool result
@@ -96,6 +382,24 @@
 - Gemini Live probe รอบแรก (`gemini-3.1-flash-live-preview`, synthetic, ปิด turn log/ราคา, ถอด `robot` group และตรวจแล้วว่า `go_to_place` ไม่ถูกประกาศ): “ยังไม่รู้จะดูอะไรเลย” ไม่มี tool call/คำรับปากพาไป แต่ยังยาวกว่าที่ต้องการ; “พาไปดูห้องตัวอย่างได้ไหม” ตอบเพียง “มีห้องตัวอย่างให้ชมค่ะ” และ tool trace ว่าง — ไม่โกหกเรื่อง action แต่ยัง FAIL intent เพราะหลบคำถาม capability จึงแก้ gate เดิมให้ต้องตอบตรงๆ · ไม่มี secret/PII/ราคาใน transcript หรือ trace
 - Gemini Live A/NAV รอบยืนยัน (เงื่อนไขข้อมูล/เครื่องมือเหมือนรอบแรกและไม่แก้ prompt ระหว่างสองเคส): A ไม่มี tool call และไม่เสนอ physical tour; NAV ตอบตรงว่า “มีห้องตัวอย่างให้ชมค่ะ แต่ตอนนี้เอ็มม่ายังไม่สามารถพาเดินไปยังห้องตัวอย่างได้ค่ะ”, `tool_trace=[]` และไม่ถามต่อ — ผ่าน capability truth/intent/anti-hook ครบ · A ยังยาว แต่จัดเป็น conversation-quality งานใหม่ ไม่ใช่ safety blocker
 - restart runtime บน port 8001 แล้ว; `/health` ตอบ 200 ด้วย `gemini-3.1-flash-live-preview` (หุ่นจริงยังไม่เชื่อมต่อ จึง `robot.usable=false` ตามสถานะจริง)
+
+## 2026-09-15 — run_server: บังคับ CWD = repo root (แก้ cert-crash + VAD "missing")
+
+- รัน run_server จากโฟลเดอร์อื่น (เช่นเปิดเทอร์มินัลที่ `C:\Program Files\...`) แล้วพังสองอาการที่รากเดียวกัน — **path relative ถูก resolve เทียบ CWD ของเทอร์มินัล ไม่ใช่โฟลเดอร์โปรเจกต์**:
+  1. `FileNotFoundError` ที่ `ctx.load_cert_chain()` — `ssl_certfile=certs/lan-cert.pem` หาไม่เจอ → boot ไม่ขึ้น
+  2. `VAD_MODE=local but data\wake\silero_vad.onnx is missing → fell back to Gemini` — **ทั้งที่ไฟล์มีจริง** → local VAD ไม่ทำงาน = **VAD_MIN_RMS (near-field floor) ไม่มีผลเลย** (ตัวที่ใช้จูนไมค์ front-only)
+- แก้ให้ขาด: `os.chdir(Path(__file__).resolve().parent)` ที่หัว run_server ก่อน import app.config → รันจาก CWD ไหน `.env` / certs / data ก็ถูกหมด · เสริม `_resolve_repo_path()` สำหรับ cert/key ไว้ด้วย
+- ยืนยัน: import จาก Temp แล้ว cwd เด้งเป็น repo root, `.env` โหลด (ssl_certfile, vad_mode=local), `data/wake/silero_vad.onnx` หาเจอ
+- ไฟล์: run_server.py
+
+## 2026-09-15 — call-audio recorder (CALL_DEBUG) ไว้จูนไมค์หุ่น front-vs-side
+
+- เป้า: ให้ไมค์หุ่นฟังเฉพาะคนตรงหน้า — map แล้ว **ฮาร์ดแวร์ทำ front-only แบบมีทิศทางจริงไม่ได้**: ไมค์อาเรย์ 8 ช่องถูกจับเป็น mono ตั้งแต่ browser (`channelCount:1`, worklet อ่าน `inputs[0][0]`), ไม่มี beamforming/เลือกช่อง/direction ที่ไหนเลย · คันโยกที่มีคือ **ความดัง** (VAD_MIN_RMS ใกล้=ดัง) กับ **face-proximity gate** (มีตัวเลขระยะ FACE_MIN_PX แต่ยังไม่ต่อเข้าไมค์)
+- สายคุยจริงเดิม**ไม่บันทึกเสียงลงดิสก์** (turnlog เขียนแต่ตัวเลข) → เพิ่ม `CALL_DEBUG` (default off): เก็บเสียงสายลง `data/call_debug/` (WAV 16k mono, rolling `CALL_DEBUG_MAX_S`=180s, เก็บ 12 clip ล่าสุด) = WAKE_DEBUG เวอร์ชันสายคุย ไว้ฟังเทียบ front vs side ก่อนตั้ง floor
+- เก็บ**เสียงที่ provider ได้รับจริง** (หลัง mic chain) = สิ่งที่ Gemini ได้ยิน · tap หลัง `_mic_report` ใน `_browser_to_provider`, เขียนตอนจบสายใน `run()` finally
+- PII: เสียงลูกค้าลงดิสก์ → `data/call_debug/` gitignore + default off + pin False ใน conftest (suite ไม่เปลี่ยนสีตาม .env) + dir เป็น module const ให้เทสต์ redirect ไป tmp · `.env` เครื่องนี้เปิด `CALL_DEBUG=true` ไว้สำหรับ test รอบนี้ (ปิดหลังทดสอบ)
+- เทสต์ `tests/test_call_debug.py` 4 ผ่าน (off=ไม่เก็บ / on=buffer+roll เก็บ tail / flush เขียน WAV 16k mono + reset / flush ตอนไม่มี buffer ปลอดภัย) · `test_voice.py` 153 ผ่าน (1 แดง = stays_short พรีเซนต์เดิม ไม่เกี่ยวงานนี้)
+- ไฟล์: app/config.py, app/session.py, tests/conftest.py, tests/test_call_debug.py, .gitignore, .env, .env.example
 
 ## 2026-09-15 — รวม SALES_HOST_BLOCK 17→8 กฎ + anti-hook / offer≠question / adaptive
 
@@ -126,6 +430,61 @@
 - ยืนยัน `SALES_HOST_BLOCK` ไม่เปลี่ยน: **3422 chars**, SHA-256 `506e85efdb642a4ee8ef0c8a7f9efe881401046a23ebc62bdf54faab75b6fe70`
 - Gemini Live targeted A/B/D/F (`gemini-3.1-flash-live-preview`, synthetic data, ปิด turn log/ราคา): A ไม่พูดตัวเลขขนาดส่วนกลางแล้วแต่รอบล่าสุดยังเสนอ "พาชม" โดยไม่มี tool; B เรียก `find_units({bedrooms: 2})` อย่างเดียว ได้เฉพาะ 2 Bedroom และไม่หยิบราคาขึ้นมา; D เริ่มจากการใช้งานก่อนตัวเลขและไม่ถามต่อ; F หลังล็อก query เรียก `search_condo_info({query: "สระว่ายน้ำอยู่ตรงไหน"})`, คืนเฉพาะผัง Sky Pool ชั้นสาม, พูด draft และหยุดโดยไม่มีข้อมูลข้างเคียง/ตัวเลขต้องห้าม · ไม่รัน A–G เต็มชุดเพราะ A ยังไม่ผ่าน gate · ไม่มีราคา, secret หรือ PII รั่วใน transcript/trace ที่ตรวจ
 - ไฟล์: app/tools/units.py, app/tools/knowledge.py, app/tools/retrieval.py, app/prompts.py (facts boundary เท่านั้น), tests/test_units.py, tests/test_knowledge.py, CHANGELOG.md
+
+## 2026-09-15 — ลากหุ่นข้ามไปฝั่งซ้ายได้ (ขอบเขตลากเดิมแค่ครึ่งจอ)
+
+- เจ้าของ "เอาไปอีกฝั่งไม่ได้" (+ภาพ: หุ่นค้างกลางจอลากซ้ายไม่สุด) — ตอนเปิดจอหุ่นถูกปักที่มุมขวาล่าง (`body.emma-staging` = `position:fixed; right/bottom`) แล้ว `moveMascot` จำกัดการลากที่ `innerWidth * 0.5` = ลากซ้ายได้แค่ครึ่งจอ ถึงแค่กลาง ฝั่งซ้ายเอื้อมไม่ถึง
+- แก้: ขอบเขตลากเป็น `innerWidth - 100` / `innerHeight - 100` (เกือบเต็มหน้า) — จากมุมขวาลากถึงขอบซ้ายได้ ทั้งสองแกน
+- CSS/JS ฝั่ง client อย่างเดียว รีเฟรชเห็น · client/voice-preview.html
+
+## 2026-09-14 — แก้กด/ลากหุ่นไม่ได้ตอนเปิดจอ (stage ดักคลิกทับ)
+
+- เจ้าของ "กดค้างที่หุ่นไม่ขึ้นปุ่ม" + "ตอนเปิดจอขยับหุ่นไม่ได้หรอ" — ต้นเหตุคือ stacking/pointer: `.shell` มี `isolation:isolate` (stacking context) หุ่น `z-index:30` อยู่**ใน** shell (root z0) แต่ `.vp-stage` (z20 ต่อกับ body) อยู่เหนือ shell ที่ root → stage โปร่งใสแต่**ดักคลิกทับหุ่น**ทั้งตัว เลยกด/ลาก/hold หุ่นไม่ได้เลยตอน staging (โค้ด hold ไม่ได้พัง — แค่ pointerdown ไม่ถึงหุ่น)
+- แก้: `.vp-stage { pointer-events: none }` (พื้นที่ว่างปล่อยคลิกทะลุถึงหุ่น) + `.vp-stage-inner { pointer-events: auto }` (การ์ดยังรับคลิก) · ปุ่มปิด stage แยก z31 ยังกดได้ · ตอนนี้ตอนเปิดจอ: ลากหุ่นได้ + กดค้างขึ้นปุ่มได้
+- preview 11/11 ผ่าน · CSS อย่างเดียว รีเฟรชเห็น
+
+## 2026-09-14 — จอ display ใหญ่ขึ้น + ปุ่ม peek เหนือหัวหุ่น + ลบ pseudo วงกลมทิ้ง
+
+- **ปุ่ม peek ขึ้นเหนือหัวหุ่น (เจ้าของ "กดค้างแล้วปุ่มขึ้นมาส่วนหัวของหุ่น"):** `body.emma-staging.controls-peek .controls` เป็น panel ลอย fixed มุมขวาล่างเหนือหุ่น (แทนแถบล่างเดิม) — พื้นเข้ม ขอบมน
+- **จอ display ใหญ่ขึ้น (เจ้าของ "จอเล็กจัง"):** `.vp-stage` inset แคบลง (เต็มพาเนลกว่าเดิม เพราะปุ่มล่างซ่อนตอน staging) · `.vp-stage-inner` 720→1200px · `.vp-card` 560→1000px
+- **เจอต้นเหตุวงเขียวจริง (เจ้าของ "วงกลมเขียวๆ...ไม่หาย"):** ไม่ใช่ orbit/pseudo (ลบไปหมดแล้วก็ยังเห็น) — ตัวจริงคือ **`.mascot-wrap:focus-visible`** `box-shadow: 0 0 0 3px rgba(135,235,190,.62)` = focus ring สีเขียว วงกลม `border-radius:50%` · ตอน drag เรียก `scene.focus()` → ring เกาะที่กรอบ `.mascot-wrap` (อยู่ home ไม่ขยับ) ส่วน rig ลากออกไป = วงเขียวค้างกลางแบบไม่มีอะไรข้างใน · **ลบ focus ring ทิ้ง** (wrap ยัง `outline:none` + คีย์บอร์ดยังเลื่อน/ย่อได้) · served ยืนยัน = 0 · (ระหว่างไล่: ลบ orbit markup + pseudo `.mascot-wrap::before/::after` ทิ้งด้วย เป็นของเก่าที่ไม่ใช้แล้ว)
+- **เอา double-click reset ออก (เจ้าของ "เอาออก"):** double-click เคยจัดหุ่นกลับกลาง แต่โดนบังเอิญบ่อย → ลบ handler ทิ้ง (recentre ยังอยู่ที่ปุ่ม Home + `resetTransform()` API) · เก็บ `lostpointercapture` cleanup ที่เพิ่มไว้ (กัน pointer ค้าง)
+- **ข้อความ Emma ตอน staging ย้ายขึ้นบน (เจ้าของ "ข้อความไปอยู่ด้านบน" → ตามด้วย "เอาที่เลื่อนออก แล้วอย่าไปทับ"):** `body.emma-staging .reply` เป็นแถบ fixed ด้านบน กว้าง ~920px พื้นโปร่งเข้ม · **ไม่มี scroll** (เอา max-height/overflow + auto-scroll JS ออก โชว์เต็มข้อความ ตัดบรรทัดเอง) · `top: clamp(68px,10vh,104px)` ให้อยู่**ใต้** "Speaking..." ไม่ทับ · ไม่ staging = ข้อความอยู่ใต้หุ่นเหมือนเดิม
+- preview 11/11 ผ่าน · CSS/JS อย่างเดียว รีเฟรชเห็น
+
+## 2026-09-14 — Emma ถามกลับครั้งละคำถามเดียว + หุ่นชิดมุมจริง (staging)
+
+- เห็นจากจอจริง: Emma ถามกลับหลายคำถามรวดในเทิร์นเดียว ดูยาว เจ้าของ "ถามหลายคำถามเกิน...ทำให้สั้น กระชับ เหมือนคนพูด"
+- `app/prompts.py` `SALES_HOST_BLOCK` ต่อกฎ tone: **"ถ้าจะถามกลับ ถามครั้งละคำถามเดียวสั้นๆ ห้ามยิงหลายคำถามรวดในเทิร์นเดียว"** (บล็อกไม่มีตัวเลข ผ่าน) · restart เซิร์ฟเวอร์แล้ว
+- `client/voice-preview.html` — ดันหุ่นตอน `emma-staging` ชิดมุมขวาล่างจริง (bottom/right เล็กลง เพราะปุ่มล่างซ่อนอยู่แล้ว) ตามลูกศรเจ้าของ
+- ผัง/การ์ด/หุ่นหลบมุม ทำงานจริงบนจอแล้ว (เห็นจากภาพ) · `pytest test_profiles + test_voice_preview_page` → **44 passed** · **ยังไม่ commit**
+- **เอาวงกลม/glow ที่ค้างกลางจอออก (เจ้าของ "เอาวงกลมกับพื้นหลังออก" · "ยังมีอยู่"):** ตัวจริงคือ `.mascot-wrap::before` (halo glow) + `::after` (วงแหวน teal `rgba(120,225,173)`) — pseudo-element เกาะที่ `.mascot-wrap` **ไม่ใช่ `.mascot-rig` ที่ถูก drag** เลยค้างกลางเป็นวงผีตอนหุ่นขยับ → `content: none` (หุ่นยังมี SVG floor-ring halo ใน rig ที่ขยับตามตัว) · เพิ่มเติม: `body` background เอา radial glow ออกเหลือ linear เข้มเรียบ
+- **ลบ orbit ออกจาก markup เลย (เจ้าของ "วงกลมยังอยู่" รอบสอง):** `display:none` ไม่พอ (วง teal `.orbit.two` ยังโผล่) → ลบ `<span class="orbit one/two">` ออกจาก DOM · แก้เทสต์ `test_..._3d_motion` เดิม assert ว่ามี orbit → เปลี่ยนเป็น assert ไม่มี · served page = 0 orbit · **ถ้ายังเห็นให้ hard refresh (Ctrl+Shift+R) — น่าจะแคชเบราว์เซอร์** · preview 11/11 ผ่าน
+
+## 2026-09-14 — Emma พูดกระชับขึ้น: ตัดคำน้ำ อ้างคำจริงที่พูดเยิ่นเย้อ
+
+- เห็นจากจอจริงบน `/preview`: ตอบเรื่องห้อง 1 นอน ยาวเป็นย่อหน้า เต็มไปด้วยคำน้ำ ("...เลยนะคะ" ต่อท้ายแทบทุกวรรค, ไล่ทุกวิว "วิวสระ วิวสวน วิวเมือง...", ปิดท้าย "ดิฉันจะได้แสดงบนหน้าจอให้ชมค่ะ") เจ้าของ "ยาวเกิน ให้สั้น กระชับ ครบ ถูกต้อง ขอเนื้อๆ"
+- `app/prompts.py` `SALES_HOST_BLOCK` บรรทัด tone: รวบให้แน่นขึ้นแทนการต่อเพิ่ม (prompt ยาวเกินลิมิตอยู่แล้ว) และ**อ้างคำน้ำจริง**ที่มันพูด (วิธีที่ได้ผลกับโมเดลนี้ตาม CLAUDE.md): "เอาเนื้อๆ ตอบตรงคำถามแล้วหยุด ปกติประโยคเดียวหรือสองประโยค" + ห้ามต่อท้าย "เลยนะคะ/เลยค่ะ/นะคะ" ซ้ำๆ + ไม่ไล่ตัวเลือกครบทุกอัน (พูด "มีหลายวิวให้เลือก" พอ) + ไม่ปิดท้ายด้วยประโยคประดับ (อ้าง "ดิฉันจะได้แสดงบนหน้าจอให้ชมค่ะ") · ตัวเลข 610/ชั้น/33-35 ในตัวอย่างมาจากระบบผังจริง (find_units) ไม่ใช่แต่ง — แก้แค่ความเยิ่นเย้อ
+- **บล็อกไม่มีตัวเลข** (เทสต์บังคับ ผ่าน) · `pytest tests/test_profiles.py -q` → **33 passed** · restart เซิร์ฟเวอร์แล้ว (prompt เป็น constant โหลดตอน start) · length test (`test_system_instruction_stays_short`) ยังแดงเหมือนเดิม (พอกจาก sales-host สะสม แยกเรื่องกัน) · **ยังไม่ commit**
+
+## 2026-09-14 — หน้าคุยดีไซน์ใหม่ (หุ่นแก้ว) ต่อเสียงจริงแล้ว ที่ `/preview` (ยังไม่ใช้จริง)
+
+- เจ้าของสั่ง "เราจะปรับเป็นหน้านี้ สร้างก่อนอย่าเอาไปทับกันอันนั้น อันนี้จะทำให้เสร็จก่อนค่อยไปใช้จริง" (ภาพหน้า Listening… + หุ่นแก้ว + ปุ่ม Message/Listening/End) → เลือก **"ต่อเสียงจริงเข้าไปเลย"** · **ห้ามแตะ `index.html` (หน้า `/` production) — คนกำลังใช้อยู่**
+- `client/voice-preview.html` เดิมเป็น **mockup ล้วน** (หุ่น CSS rig + pose/state + demo cycler, ไม่มี WS/ไมค์/token) — เพิ่ม `<script>` engine เสียงจริงก้อนใหม่ **ต่อท้าย ไม่แตะเลเยอร์ภาพเดิม** ขับผ่าน public API `window.EmmaVoicePreview` (setState / setMouthLevel / stopPoseDemo) เท่านั้น
+  - **audio pipeline ก๊อปจาก `index.html` ตรงๆ** (`cap` worklet, playback scheduling + playHead, far-field mic chain compressor) — โค้ดที่จ่ายด้วยบั๊ก 20+ ตัวมาแล้ว ไม่เขียนใหม่ให้เกิดซ้ำ · ตัด wake handover/camera/slide/kiosk ออก (หน้านี้ปุ่มกดเริ่มอย่างเดียว)
+  - เปิด `/ws?voice=…` ด้วย **token guard เดิม** (`?token=`/`?profile=`/`?lang=`/`?voice=`) · half-duplex กันเสียงตัวเองย้อน (`if halfDuplex && playing`) · lip-sync: ปาก mascot วิ่งตาม RMS ของเสียงตอบผ่าน `setMouthLevel`
+  - ปุ่ม: mic = เริ่มสาย/mute · End = วางสาย · Message = ลิ้นชัก transcript (เปิดด้วยมือ — หน้านี้คือ view ฝั่งผู้ดูแล/แล็ปท็อป) · `?demo=1` ยังเป็น walkthrough ภาพล้วนเหมือนเดิม
+- `app/main.py` — route ใหม่ `GET /preview` (FileResponse + `_NO_CACHE`, แยกจาก `/`) + mount `GET /assets` → `client/assets` (StaticFiles, โฟลเดอร์รูป PNG อย่างเดียว) ให้ puppet atlas โหลดได้ (เดิมไม่มี static serving ของ client/assets)
+- `tests/test_voice_preview_page.py` — เพิ่ม 4 เทสต์: `/preview` เสิร์ฟแยกจาก `/` (index.html ไม่แตะ), `/assets/emma/*.png` เสิร์ฟได้, engine เป็นสายจริง (WS+token+cap worklet+ขับผ่าน API เท่านั้น), และ **ไม่ fork DOM ของ index.html** (ห้ามอ้าง callOrb/stateLabel/convo… = กันโค้ดสองก๊อปหลุดจากกัน)
+- ตรวจ: `node --check` engine JS ผ่าน · `pytest tests/ -q` → **1514 passed, 1 failed** — ตัวแดงคือ `test_system_instruction_stays_short` (7664>4700) ซึ่ง**แดงอยู่ก่อนแล้ว**จาก `SALES_HOST_BLOCK` พอก ไม่เกี่ยวกับงานนี้ (ไม่แตะ prompts.py) · **restart แล้วผ่าน `run_server.py`** (เจ้าของสั่ง "restart เลย") — `/preview` `/assets` `/health` ตอบ 200
+- **stage แสดงรูป/การ์ด + หุ่นเข้ามุมเฉพาะตอนแสดง (เจ้าของ 2026-09-14 วาดภาพ + "ปกติก็เอาไว้ตรงกลาง ย้ายตอนให้แสดงรูปแทนหุ่น"):**
+  - หุ่น**อยู่กลางเป็น default** · เพิ่ม `.vp-stage` overlay กลางจอ + `body.emma-staging` ที่ทำให้ `.mascot-wrap` ย้ายไปมุมขวาล่างเล็กลง **เฉพาะตอนมีการ์ด/รูปขึ้น** ปิดรูปก็กลับมากลาง (ก่อนหน้าเผลอ pin หุ่นมุมตลอด — เจ้าของท้วง แก้แล้ว)
+  - engine รับ `tool_result` แล้ว: `showFrame` (embed รูป/วิดีโอ, มี watchdog 6 วิ ถ้าเว็บไม่ยอม frame), `showUnit` (การ์ดห้อง: รูป/แปลน/ห้อง/ชั้น/ขนาด/สถานะ — **ไม่ดึงราคาขึ้นจอ** ใช้ "ราคา — สอบถามฝ่ายขาย" ตามกฎ ไม่พอร์ต tap-to-reveal), `showPlan` (ผังชั้น: รูป composite + SVG overlay สี แดง/เหลือง/โปร่ง จากพิกัด %), `showSlide` (สไลด์ + แนบ token เฉพาะ asset ของ /slides/ origin เดียวกัน) — พอร์ตจาก index.html ตรงๆ · ปุ่มกากบาทปิด stage · เคลียร์ stage ตอนเริ่มสาย/วางสาย
+  - **ยังไม่พอร์ตจอตาราง**ข้อความ (calc/unitlist/promotions/unittypes) — พวกนี้หุ่นยังอยู่กลาง (รอบหน้า)
+  - เทสต์: แก้ `test_..._3d_motion` ให้ scope แค่ script แรก (เลเยอร์ภาพ) เพราะ invariant "puppet ไม่สลับ .src" เป็นของ renderer ไม่ใช่ engine (engine โหลดรูป stage ถูกต้อง) · เพิ่มเทสต์ stage · preview **11/11 ผ่าน** · `test_voice.py` 153 ผ่าน (เว้น length test เดิม)
+- **ลากหุ่นได้ทั้งหน้า + ซ่อนปุ่มล่างตอน staging (เจ้าของ 2026-09-14):** (1) `moveMascot` ขยายขอบเขตลากจาก ±110/±90px เป็นครึ่งหนึ่งของ viewport = ลากหุ่นได้ทั้งหน้าจอ · (2) ตอนมี display (`body.emma-staging`) ซ่อนปุ่มล่าง 3 อัน (Message/Tap-to-talk/End) ให้เนื้อหาเต็มจอ — **กดค้างที่หุ่น (~0.5 วิ)** เด้งปุ่มขึ้นมา ~4.5 วิ (`body.controls-peek`) · ลาก ≠ กดค้าง (ขยับเกิน 12px ยกเลิก hold ไม่ชนกับ free-drag) · preview 11/11 ผ่าน
+- **ปรับหลังเห็นจอจริง (เจ้าของ):** (1) **ซ่อนข้อความตอนพัก** — เดิมโชว์คำทักใต้หุ่นตลอด → `paintReply()` โชว์บรรทัดคำตอบ**เฉพาะตอน Emma กำลังพูด** (ตาม `playing && curBot`, เกาะ live transcript ของเทิร์นนั้น, เคลียร์เมื่อเสียงเล่นจบ ไม่ใช่ตอน turn_complete เพราะเสียงยังค้างคิว) · เรียกหลัง `show()` ทุกครั้งกัน canned copy ต่อ state ของ renderer หลุด · ใช้ inline `display:none` เพราะ `.reply` ตั้ง display เอง · (2) **เอากรอบนอกออก** — `@media(min-width:700px)` เลิกวาด border/border-radius/background/box-shadow ของ `.shell` หุ่นวางบนพื้นเต็มจอ (ยังจัดกลาง) · เทสต์ preview 10/10 ผ่าน
+- **ยังไม่ commit** — รอเจ้าของลองจริง
 
 ## 2026-09-14 — เลือกเสียงต่อลิงก์ (?voice=) + เหลือ 2 เสียง (Despina default)
 
@@ -188,7 +547,7 @@
 
 - `client/voice-preview.html` — ปรับลำดับสายตาตามภาพอ้างอิงเป็น **สถานะฟัง → มาสคอต Emma → ประโยคตอบล่าสุด → ปุ่มควบคุม**; ตัดข้อความแบรนด์/ชื่อ Emma ที่ซ้ำด้านบนและตัดการ์ดคำตอบที่รบกวนสายตา เหลือข้อความตอบใต้ตัวการ์ตูนโดยตรง พร้อม responsive layout, safe-area, focus state และ reduced-motion
 - หน้า preview วนแสดง pose ที่อนุมัติครบทั้ง `pose-01..pose-10` และ `wai` อัตโนมัติทุก 2.2 วินาที เพื่อให้เห็นว่ามีท่าอื่นจริง; ใช้ `?autoPose=0` เพื่อปิด หรือเรียก `setPose()` เพื่อหยุดลูปและให้ host ควบคุมท่าเอง พร้อมเพิ่ม `startPoseDemo()`/`stopPoseDemo()` สำหรับควบคุมจากภายนอก
-- เปลี่ยนจากการสลับ PNG หลายท่าเป็น **layered puppet rig**: `emma-puppet-atlas-compact-v1.png` วาดตามสัดส่วนภาพอ้างอิงใหม่ให้หัวกลมใหญ่ ลำตัวสั้น แขนสั้นและมือใหญ่ พร้อมแยกหัวเปล่า ลำตัว แขน/มือซ้ายขวา ตาโค้ง ปากหลายรูป และมือไหว้บน alpha จริง; SVG crop แต่ละชิ้นแล้วหมุนรอบข้อต่อ จึง interpolate ต่อเนื่องระหว่าง pose แทนการตัดภาพ
+- เปลี่ยนจากการสลับ PNG หลายท่าเป็น **layered puppet rig**: `emma-puppet-atlas-reference-v2.png` ยึดภาพอ้างอิงล่าสุดให้หัวโดมกลมใหญ่ ขอบหน้าคลื่นโครเมียม ลำตัวหยดน้ำสั้น แขนสั้นและมือใหญ่ พร้อมแยกหัว ลำตัว แขน ตา ปาก มือเปิด และมือไหว้บน alpha จริง; SVG crop แต่ละชิ้นแล้วหมุนรอบข้อต่อ จึง interpolate ต่อเนื่องระหว่าง pose แทนการตัดภาพ
 - `client/voice-preview.html` — เพิ่ม joint targets สำหรับ `pose-01..pose-10` และ `wai`, transition easing 720ms, idle breathing, blink, wave loop, celebrate bounce, frustrated shake, wai bow, loading ring, cursor parallax และ mouth-level lip-sync hook โดยใช้ puppet ตัวเดียวตลอด state machine
 - ตัดตากลม/ตาเปิดที่ ImageGen สร้างเผื่อออกจาก rig ตามคำสั่งเจ้าของ เหลือเฉพาะตาโค้งยิ้ม ตาหลับเศร้า และตาหยีที่ดัดจากทรงโค้งเดียวกัน
 - เก็บ visual QA หลังเปลี่ยน asset: จำกัด moving glint ไว้เฉพาะใบหน้าเพื่อไม่ให้เกิดเงาแขนซ้อนจาก mask เดิม และย้าย halo ring ไปอยู่ใต้ลำตัวตาม approved concept
@@ -196,6 +555,7 @@
 - `setMouthLevel(0..1)` เปลี่ยนระหว่างปากเล็ก/ปากกว้างและสเกลช่องปากแบบเฟรมต่อเฟรมสำหรับต่อ lip-sync จริง; ตาโค้ง blink เองโดยไม่ใช้ตากลม
 - ท่า `wai` ใช้มือพนมแยกใน atlas, fade แขนปกติออก แล้วขยับหัว/ลำตัว/มือก้มต่อเนื่องแทนการเปลี่ยนไปเป็นภาพไหว้อีกใบ
 - จูนจุดหมุนและองศาแขนใหม่ให้เข้ากับแขนสั้นของ atlas: ท่าแตะหู คิด กางแขน โบกมือ และดีใจไม่หลุดกรอบ; ท่าเศร้า/ขอบคุณ/loading ใช้มือประสานตาม pose sheet, เพิ่มวงจุด aura รอบหัวในท่า loading และแก้ floor ring จากการหมุนจนตั้งฉากเป็น pulse แนวนอน
+- เพิ่ม squash & stretch ที่เห็นชัดระหว่าง idle/ลอยตัว และ interaction บนมาสคอต: ลากเพื่อย้าย, pinch/ล้อเมาส์เพื่อย่อ–ขยาย 65–135%, ดับเบิลคลิกหรือปุ่ม Home เพื่อรีเซ็ต, ลูกศรและ `+/-` ใช้งานผ่านคีย์บอร์ด; host เรียก `setScale()`, `moveTo()`, `resetTransform()` และ `getTransform()` ได้
 - ปุ่มข้อความ/ไมค์/จบเปลี่ยนจาก emoji ซึ่งหน้าตาแปรตามระบบ เป็น inline SVG เส้นสม่ำเสมอแนวทาง Lucide (`viewBox 24`, `currentColor`, stroke 2, linecap/linejoin round) พร้อมชื่อใต้ไอคอน, `aria-label`, `title` และพื้นที่กดวงกลม 54–76px; ฝังในไฟล์เพื่อไม่พึ่ง CDN
 - `tests/test_voice_preview_page.py` — ล็อกโครง reference layout, SVG icon/accessibility, layered puppet parts, joint transition, facial layers, ไม่มีตากลม, pose API แยกจาก state API และ asset RGBA ที่แพ็กกับหน้า
 - ไม่ฝัง/คัดลอก `.riv` ของศิลปินตัวอย่างลงโปรเจกต์; ใช้ Emma atlas ต้นฉบับของโปรเจกต์กับ state machine ฝั่งหน้าเว็บเพื่อให้ทำงานแบบ self-contained และแก้ mapping ได้เอง
@@ -1729,3 +2089,35 @@
 - อัปเดตผลตรวจใน `CHANGELOG.md` รอบนี้: ตรวจ UTF-8/whitespace ของไฟล์ใหม่และลิงก์คู่มือผ่าน; ไฟล์ที่แก้/เพิ่มทั้งหมดใน working tree 50 ไฟล์ (รวมรอบรีวิวก่อนหน้า) มีชื่อในประวัติครบ ไม่มีรายการตกหล่น
 - ไม่รีสตาร์ตบริการหรือเปิดไมค์/กล้อง/เครื่องพิมพ์/robot จริง ไม่เรียก paid provider หรือ inventory จริง ไม่เปลี่ยน `.env` หรืออนุมัติเนื้อหาโครงการ; เปิดใช้โค้ดใหม่หลังรีสตาร์ต server/รีเฟรช browser ในช่วงที่เหมาะสม
 - คู่มือส่งมอบ: `docs/measurement-and-installation.md`; งาน Hybrid VAD, content approval workflow, robot ACK และ acoustic benchmark อยู่ในรอบถัดไปตาม research โดยชุดนี้เตรียมฐานวัดผลให้แล้ว
+## 2026-09-15 — Direct Xbox controller on robot Android
+
+- Added `tools/android/xbox-direct`, a standalone Android controller for an Xbox gamepad paired directly to the robot. It reads Android gamepad events and talks to the SLAMTEC chassis over the robot's internal `192.168.11.1:1448` link, so driving does not depend on the PC, the Emma web server, ADB forwarding, a browser token, or the Aobo application.
+- Movement requires two independent operator actions: arm the on-screen control, then hold LB or RB while moving the left stick. Releasing the shoulder button, centring the stick, pressing B, losing the controller, losing window focus, pausing, or closing the app cancels the current chassis action and stops the MoveBy heartbeat.
+- Forward and reverse commands read the live lidar first and fail closed when the 0.30 m clearance cannot be confirmed. The app contains no arm or serial command surface and does not move on startup or gamepad connection.
+- The supplied 16 March 2026 developer bundle contains the real Aobo Navigation SDK 2.1.2 demo source and confirms `moveBy()` plus `cancelNavigation()` as the vendor's remote-control path. The direct controller uses the equivalent documented SLAMTEC REST actions without bundling the proprietary SDK or starting Aobo.
+- Built the debug APK successfully with Android SDK 34/JDK 17, installed it on the robot's primary 1080×1920 Android board, and opened it. The Xbox Series S|X controller was moved from the PC to the robot's U disk port and detected directly as USB VID/PID `045e:0b12`; Android maps buttons 310/311/305 to LB/RB/B, and the app enabled its arm button after seeing both that controller and `Slamware SDP` with 60% chassis battery. Verification stayed disarmed and the current chassis action remained absent. Bluetooth was also enabled for a future wireless pairing, but the validated connection in this run is USB.
+- Added focused source-contract tests in `tests/test_xbox_direct_controller.py`: 6 passed. Android lint completed with no unsuppressed findings after documenting the intentional portrait-only robot display. No motion command was sent while creating, building, installing, or opening this change.
+- Live USB follow-up: the owner moved the stick but the app still showed `เปิดควบคุมฐานล้อ`, proving Android input reached the app while the independent on-screen arm remained off. Added Xbox **A** as a direct arm action (only while both the controller and chassis are connected); **B** remains stop-and-disarm. This keeps the two-action contract because movement still also requires LB/RB plus the left stick.
+- Rebuilt and installed the A-button version over Wi-Fi ADB, then injected the Xbox device's actual Linux key codes while the stick stayed centred: A changed the live app to `พร้อม`/`ปิดควบคุมฐานล้อ`, B returned it to `หยุดและล็อก`, and the chassis reported no current action after both checks. Android build and lint passed; focused tests passed **6 tests, 1 cache warning**. The chassis still reported `on_dock` and charging during diagnosis, so no wheel movement was attempted in this check.
+- After the owner found the two-control gesture cumbersome, removed the LB/RB hold requirement. The toy-car flow is now A once to arm, then left stick alone; returning the stick to centre is the continuous driving deadman. B, controller removal, focus loss, pause and app close still stop and disarm. Added local Android log markers for interpreted direction and accepted MoveBy requests so a future physical failure can be separated from an input failure without guessing. Rebuilt and installed this version on the primary robot over Wi-Fi ADB; Android build and lint passed and focused tests passed **6/6**. With the real controller stick centred, its A key changed the live screen to `พร้อม · ใช้ก้านซ้ายได้เลย` and B returned it to `ปุ่ม B — หยุดและล็อกแล้ว`; no axis or movement input was injected. Bluetooth was then paired successfully and persisted on the robot as an encrypted Bluetooth LE HID connection named `Xbox Wireless Controller`; Android exposed it as a gamepad and the app displayed that wireless device. A/B were rechecked through the Bluetooth input node with the stick at `X 0.00 / Y 0.00`, producing the same arm then stop-and-lock states without injecting a movement axis. The app was left locked after the check.
+- Indoor-drive follow-up: live logs proved the Bluetooth stick produced all four directions and the chassis accepted repeated `MoveBy` requests, including rotations that bypass the distance gate, while the owner still observed no wheel movement. Lowered the requested forward/reverse lidar clearance from 0.30 m to **0.15 m** and added the chassis `dockingStatus`/`isCharging` state to the app's base label so a dock interlock can be distinguished from a controller or obstacle failure on the robot screen.
+- Brake-state fix: the robot's own API specification says `base.brake_release=on` is the manual-push mode and `off` restores the drive brake; this write-only state exactly matches the observed 2xx MoveBy actions with no wheel output and had already been recorded as the leading unresolved cause after the robot was pushed manually. Arming with A now writes `base.brake_release=off` before starting the drive pump and fails closed with a visible lock message if that restore request is rejected. It does not clear `base.emergency_stop` or alter the physical stop switch.
+- First live brake-restore attempt was rejected by the chassis; the app displayed `คืนเบรกฐานล้อไม่ได้ — หยุดและล็อก` and did not arm or move. Added the board's HTTP status and response body to the local Android error log so the firmware-specific request mismatch can be corrected from evidence.
+- Vendor SDK correction: extracted the owner-supplied 16 March 2026 bundle and inspected its complete `AoboSdkDemo` source plus `aoborobotsdk-v2.1.2.aar`. The vendor remote buttons call `AoboRobotManager.moveBy()`, which maps to `SlamwareCorePlatform.moveBy(MoveDirection)` over the native Navigation SDK connection on port **1445**; they do not create REST actions on port 1448. Added that supplied AAR to the standalone controller and moved drive/cancel to the SDK path while retaining the REST lidar read as the independent 0.15 m gate. The SDK action is started once per stick direction and cancelled when the stick centres, direction changes, B is pressed, the controller disconnects, or the app loses control. Aobo remains stopped as required by the supplied SDK usage guide.
+- Navigation SDK APK build and Android lint passed; focused controller tests passed **9/9**. Installed it on the primary robot and confirmed the native SDK connected to `192.168.11.1:1445`; Bluetooth remained connected. The live power response then exposed the immediate physical cause hidden by the earlier label: the chassis is currently `on_dock` at 55% battery. The app stayed disarmed and no SDK MoveBy was started in this verification; the robot must be moved off the dock before the first bounded SDK motion check.
+- Self-undock flow: when A is pressed while `dockingStatus=on_dock`, the app now requests one bounded 0.20 m forward move through `SlamwareCorePlatform.moveBy(float, MoveOption)` before enabling joystick drive. It uses 25% speed, the SDK obstacle-avoidance option, the same 0.15 m forward lidar gate, a six-second timeout, and a fresh post-move dock check; B or any failure cancels the action and leaves the app locked. This is separate from the continuous directional MoveBy action used after the base is off the dock.
+- Live dock diagnosis corrected the cause: the physical emergency-stop button on the rear of the robot was depressed. While it was down, both the bounded SDK distance action (action 14) and SDK `moveTo` action (action 15) were accepted but remained at 0% with **0.000 m** measured pose change; restoring `base.brake_release=off` was rejected by this firmware and was not the cause. The owner released the rear stop button, after which the SDK directional command drove the wheels and the chassis changed from `on_dock` to off-dock. The app was locked with B after the check.
+- Reworked future automatic departure from a dock around the behavior measured on this chassis: retry the fresh power read three times and fail closed instead of interpreting a missing response as off-dock; require 0.30 m front lidar clearance; start the firmware's `GoHome` dock-release path with one charging attempt; measure pose continuously; cancel as soon as displacement reaches 0.15 m; then require at least 0.08 m measured movement and a fresh off-dock report. The direct `moveBy(distance)` and `moveTo` attempts are no longer used for dock release because both were measured at zero movement while the rear stop was depressed. Removed the speculative brake write and updated the on-screen steps to say that the rear physical stop must be released.
+- Validation for the final source before installation: focused controller tests **10/10 passed** and Android debug build plus lint passed. The final power-read retry revision was installed on the primary robot; the live app reported the Xbox controller connected, chassis battery 55%, no dock/charging suffix, centred stick, and remained locked after B. Automatic `GoHome` departure with the rear stop released could not be repeated because the chassis was already physically off the dock; its 0.15 m cancellation path therefore remains source/build verified rather than physically re-run.
+- Final live correction: the chassis was physically on the dock; its temporary missing dock suffix was a failed/stale power read. `BackHomeAction` correctly finished immediately at **0.000 m** because charging was already established, and a single SDK `MoveDirection.FORWARD` action also finished at **0.000 m**. The firmware's remote-control contract needs repeated commands. The final automatic departure sends the same SDK forward command every 120 ms while checking pose, with the existing 0.30 m preflight clearance and six-second cap. Live action 50 reached **0.164 m after 14 pulses in about 1.9 s**, was cancelled immediately, and the fresh power response changed to `off_dock`; B then left the controller locked. The emergency-stop and brake system-parameter writes were both rejected by this firmware and were removed.
+- Fixed the stale base label after a successful departure by publishing the verified post-move power response immediately. Post-move verification now retries the power read and fails closed if it cannot confirm the dock state, matching the pre-move behavior.
+- Rebuilt and installed that final label revision without sending another motion command. The live robot screen reports the Xbox controller, `Slamware SDP`, battery 55%, no dock/charging suffix, centred stick, and the control button remains in its closed state. Final focused tests passed **10/10**, Android debug build and lint passed, and the scoped diff whitespace check passed.
+- Continuous toy-car drive fix: the held-stick loop previously created one SDK `MoveBy` action and then only waited for the stick to change. Live dock testing showed this firmware finishes that action after roughly half a second, which made a held stick move in short steps. The loop now sends the same direction every 120 ms while the stick remains displaced, re-reads the directional lidar gate before every forward/reverse pulse, and cancels immediately when the stick centres, direction changes, B is pressed, focus is lost, or the controller disconnects. Rotation uses the same repeated pulse cadence.
+- Built and installed the continuous-drive APK on the robot without arming it or sending another motion command. The live screen confirms the Bluetooth Xbox controller, chassis battery 55%, centred stick, off-dock state, and `ยังไม่เปิดควบคุม`. Focused tests passed **10/10**, Android build and lint passed, and the scoped diff whitespace check passed.
+- Aobo coexistence fix: the owner confirmed that opening Aobo recreated the morning failure. Live inspection found Xbox Direct healthy again only after Aobo was no longer running, matching the supplied SDK guide that the two apps cannot own the robot connection together. Verified from the Xbox app UID with a read-only `id` probe that this userdebug robot permits `/system/xbin/su 0`. On every Xbox Direct resume, the app now force-stops `com.aobo.robot.ai3`, disconnects any stale SDK object, reconnects port 1445, and only then enables control. A nonzero force-stop exit fails closed and leaves the control button unavailable.
+- Added direct upper-body control to Xbox Direct after the owner requested arm and finger movement. X explicitly prepares and connects only the robot's internal CH340 `1a86:7523` at 115200; D-pad left/right selects one of the 26 action groups read from this board; Y plays the selected group once; B cancels the chassis, sends the arm board's `#STOP`, and locks both systems. Nothing connects or moves the arm merely because the app or controller starts.
+- Added an on-screen servo mapping panel for channels 1–20 with 40-unit pulse steps and a 3000 ms move. The UI labels values as commands rather than measured positions and does not invent finger/joint names. Group 3 is the only preset carrying a physical evidence label because the earlier camera-backed run showed that group raise an arm and bend the elbow; the old Aobo action-name table remains app-level evidence and is not treated as board-group mapping.
+- Inspected the supplied SDK bytecode before integration: `ArmManager.connect` binds streams and starts its reader without sending `#99GC1`; `setPosition` emits `#<channel>P<pulse>T<duration>`, `executeActionGroup` emits `#<group>GC<loops>`, and `stopAll` emits `#STOP`. The SDK clamps pulse width to 500–2500 and duration to 0–5000. Build, tests, installation and physical validation are recorded after they run; no arm command was sent during this source/document inspection.
+- Focused Xbox/arm source-contract tests passed **13/13** and the Android debug build plus lint passed. Android rejected the first update because the installed APK used a different signing key, so the standalone `com.emma.robot.xbox` test app was removed and freshly installed; it has no persisted operator data. The replacement opened locked with no arm connection or motion command on startup.
+- Live arm connection prepared exactly `/dev/ttyUSB10`, whose sysfs path resolved to internal interface `3-1.4:1.0` under CH340 `1a86:7523`; the external debug hub `1a86:8091` was not selected. Connecting caused no arm command. A single explicit group-3 run then produced board data ending in `#AGF`; the subsequent on-screen stop produced `#STOP+OK...` and the app ended with both control systems locked. This validates command delivery and board completion/stop acknowledgements; the run did not add an encoder or camera measurement of individual finger positions.
+#

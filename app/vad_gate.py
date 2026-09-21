@@ -59,7 +59,7 @@ class VadGate:
     """
 
     def __init__(self, detector, prefix_padding_ms: int, sample_rate: int = 16000,
-                 min_rms: float = 0.0) -> None:
+                 min_rms: float = 0.0, floor_grace_s: float = 3.0) -> None:
         self._detector = detector
         self._rate = sample_rate
         #: Bytes of pre-roll to keep: ms * (2 bytes/sample) * samples/ms.
@@ -89,7 +89,7 @@ class VadGate:
         #: floor firing on the one utterance it exists to protect.
         import time
 
-        self._floor_off_until = time.monotonic() + self.FLOOR_GRACE_S
+        self._floor_off_until = time.monotonic() + max(0.0, float(floor_grace_s))
 
     #: Seconds after opening during which the floor does not apply.
     FLOOR_GRACE_S = 3.0
@@ -268,7 +268,8 @@ def for_session():
                 (" | near-field floor %.3f" % settings.vad_min_rms)
                 if settings.vad_min_rms > 0 else "")
     return VadGate(detector, prefix_padding_ms=settings.vad_prefix_padding_ms,
-                   min_rms=settings.vad_min_rms)
+                   min_rms=settings.vad_min_rms,
+                   floor_grace_s=settings.vad_floor_grace_s)
 
 
 def reset_warnings() -> None:

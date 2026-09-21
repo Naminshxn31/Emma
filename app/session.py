@@ -22,6 +22,7 @@ import asyncio
 import json
 import logging
 import time
+from pathlib import Path
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -45,6 +46,14 @@ def _provider_failure_kind(exc: Exception) -> str:
     if any(word in value for word in ("connect", "timeout", "network")):
         return "network"
     return "provider"
+
+#: Call-mic debug recorder (CALL_DEBUG). Customer audio on disk, off by
+#: default and gitignored — the WAKE_DEBUG equivalent for a live call, for
+#: tuning the near-field floor by ear. The directory is a module constant so
+#: tests redirect it to a tmp path instead of touching the repo's data/.
+CALL_DEBUG_DIR = Path(__file__).resolve().parent.parent / "data" / "call_debug"
+CALL_DEBUG_KEEP = 12
+CALL_DEBUG_RATE = 16000
 
 
 class VoiceSession:
@@ -195,7 +204,7 @@ class VoiceSession:
                 if hasattr(provider, "model"):
                     self.metrics.labels["model"] = provider.model
                 self.provider = provider
-                if self.summoned:
+                if self.summoned and settings.vad_summoned_bypass:
                     # The machine opened this session to talk to somebody
                     # at a distance; the near-field floor would filter out
                     # exactly that person's reply. See VadGate.stand_down.
@@ -223,6 +232,15 @@ class VoiceSession:
                 down = asyncio.create_task(self._provider_to_browser())
                 unanswered = asyncio.create_task(self._resume_after_silence())
                 jobs = {up, down, unanswered}
+                if not self.summoned:
+                    # The provider has already accepted its opening greeting
+                    # in __aenter__, and the audio pump is now running. The
+                    # arm request cannot delay or cancel speech, and its helper
+                    # cannot bypass any hardware interlock. Summoned sessions
+                    # take this path in events.announce instead, exactly once.
+                    from app import robot_arm
+
+                    await robot_arm.greet()
                 # Only when it is switched on. These tasks race under
                 # FIRST_COMPLETED, so a task that returns immediately ends
                 # the session immediately — with IDLE_TIMEOUT_S unset (the
@@ -258,6 +276,7 @@ class VoiceSession:
             logger.exception("voice session failed")
             await self._send_json({"type": "error", "code": "internal", "message": str(exc)})
         finally:
+            self._flush_call_debug()
             self.metrics.finish("session_closed")
             active.reset(metrics_token)
             for name in ("_nudge_task", "_respeak_task"):
@@ -358,6 +377,50 @@ class VoiceSession:
                        verdict=verdict.split(" — ")[0][:40])
         st.update(at=now, peak=0.0, sum=0.0, n=0, zero=0)
 
+    def _call_debug_feed(self, pcm16: bytes) -> None:
+        """Roll the last CALL_DEBUG_MAX_S of call-mic audio into a buffer.
+
+        Off unless CALL_DEBUG=true. The call path writes no audio otherwise
+        (turnlog is numbers only) — this is the WAKE_DEBUG equivalent for a
+        live call, so the near-field floor (VAD_MIN_RMS) can be tuned by ear
+        against front-vs-side recordings. It is customer speech on disk;
+        data/call_debug is gitignored and this stays off outside a mic-chase.
+        What is captured is exactly what the provider receives (post the
+        browser mic chain) — i.e. what Gemini actually hears.
+        """
+        if not settings.call_debug:
+            return
+        buf = getattr(self, "_call_cap", None)
+        if buf is None:
+            buf = self._call_cap = bytearray()
+        buf.extend(pcm16)
+        cap = max(1, settings.call_debug_max_s) * CALL_DEBUG_RATE * 2
+        if len(buf) > cap:
+            del buf[:len(buf) - cap]
+
+    def _flush_call_debug(self) -> None:
+        """Write the buffered call audio at session end; newest few kept."""
+        buf = getattr(self, "_call_cap", None)
+        self._call_cap = None
+        if not buf:
+            return
+        import wave
+
+        try:
+            CALL_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+            path = CALL_DEBUG_DIR / time.strftime("call-%Y%m%d-%H%M%S.wav")
+            with wave.open(str(path), "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(CALL_DEBUG_RATE)
+                w.writeframes(bytes(buf))
+            for old in sorted(CALL_DEBUG_DIR.glob("call-*.wav"))[:-CALL_DEBUG_KEEP]:
+                old.unlink(missing_ok=True)
+            logger.info("call debug: wrote %s (%.1fs of call audio)",
+                        path.name, len(buf) / 2 / CALL_DEBUG_RATE)
+        except Exception:
+            logger.exception("call debug: could not write clip")
+
     def _greeting_turn_done(self) -> None:
         """The first completed turn of a summoned session is its greeting.
 
@@ -398,6 +461,7 @@ class VoiceSession:
                         turnlog.record("ears_open",
                                        greeted=self._greeting_turn_seen)
                     self._mic_report(data)
+                    self._call_debug_feed(data)
                     await self.provider.send_audio(data)
                     continue
 
@@ -602,10 +666,11 @@ class VoiceSession:
                             self._respeak_task = asyncio.create_task(self._respeak_silent_block())
 
                 elif event.kind == "user_transcript":
-                    # What the robot *heard*, which is the field that has
-                    # explained the most confusing bugs: "ao rummy" for Thai,
-                    # "ไอ้บ้า" for "ice bath". Without it, a wrong answer is
-                    # indistinguishable from a wrong question.
+                    # A separate ASR caption of the guest audio. Gemini's
+                    # conversational model consumes the audio directly, so
+                    # this text can be wrong even when Emma understood and
+                    # answered the spoken request correctly. Keep it useful
+                    # for diagnostics without treating it as model truth.
                     turnlog.record("heard", text=event.text or "")
                     # Kept so the destructive slide tools can check whether
                     # anybody asked for what they are about to do. See

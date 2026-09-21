@@ -393,12 +393,10 @@ def as_gemini_tool():
             # Lets the conversation continue while the action runs, instead
             # of the guest standing in silence waiting for it to finish.
             #
-            # Only Gemini 2.5 honours this. On 3.x Live the field is not
-            # supported and the model blocks until the tool responds — which
-            # is invisible today, because every tool here returns in
-            # milliseconds, and becomes the worst bug in the product the day
-            # a `navigate_to` is added and a guest waits half a minute in
-            # front of a robot that has gone silent mid-sentence.
+            # Gemini 2.5 and 3.8 Live honour this; Gemini 3.1 Live blocks until
+            # the tool responds. That distinction is invisible while tools
+            # return in milliseconds and becomes obvious as soon as a slow
+            # navigation or search tool is added.
             from app.config import settings
             from app.providers.gemini import supports_non_blocking
 
@@ -410,7 +408,7 @@ def as_gemini_tool():
                     "asynchronous function calling — the model will STOP "
                     "SPEAKING until it returns. Use a gemini-2.5-* model, or "
                     "make this tool acknowledge immediately and report its "
-                    "result separately.",
+                    "result separately or use Gemini 3.8 Live.",
                     t.name, settings.gemini_model,
                 )
         declarations.append(types.FunctionDeclaration(**kwargs))

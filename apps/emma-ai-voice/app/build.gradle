@@ -1,0 +1,41 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.emma.ai.voice'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.emma.ai.voice'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '0.1.0'
+        manifestPlaceholders = [
+                usesCleartextTraffic: 'false',
+                networkSecurityConfig: '@xml/network_security_config'
+        ]
+    }
+
+    buildTypes {
+        debug {
+            manifestPlaceholders = [
+                    usesCleartextTraffic: 'true',
+                    networkSecurityConfig: '@xml/network_security_config_debug'
+            ]
+        }
+        release {
+            minifyEnabled false
+            manifestPlaceholders = [
+                    usesCleartextTraffic: 'false',
+                    networkSecurityConfig: '@xml/network_security_config'
+            ]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}

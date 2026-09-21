@@ -92,6 +92,16 @@ def open_camera(index: int | None = None, say=None):
     the answer is known.
     """
     say = logger.info if say is None else say
+    if settings.face_camera_source == "robot":
+        # Not a lens on this machine at all - see app/robot_camera.py. The
+        # handle is always "open"; a robot that is not sending yet reads
+        # as empty frames, which the greeter already treats as a camera
+        # that stopped delivering.
+        from app import robot_camera
+
+        say("camera source: the robot's kiosk page (/ws/camera) - "
+            f"{robot_camera.feed.senders} sender(s) connected")
+        return robot_camera.capture()
     if index is None:
         index = settings.face_camera
     if index is not None and index >= 0:

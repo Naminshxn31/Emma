@@ -1,0 +1,123 @@
+<Rive version="1" kind="fragment">
+    <!-- Approved Emma artwork is split into independent transparent layers.
+         The animated nodes keep their original IDs so the state machine can
+         drive the face, lip sync, gaze, body and complete shoulder chains. -->
+    <ImageAsset file="assets/head.png" name="Emma Head Artwork" id="0:1100"/>
+    <ImageAsset file="assets/body.png" name="Emma Body Artwork" id="0:1101"/>
+    <ImageAsset file="assets/arm-left.png" name="Emma Left Arm Artwork" id="0:1102"/>
+    <ImageAsset file="assets/arm-right.png" name="Emma Right Arm Artwork" id="0:1103"/>
+    <ImageAsset file="assets/eye-left.png" name="Emma Left Eye Artwork" id="0:1104"/>
+    <ImageAsset file="assets/eye-right.png" name="Emma Right Eye Artwork" id="0:1105"/>
+    <ImageAsset file="assets/mouth-smile.png" name="Emma Smile Artwork" id="0:1106"/>
+    <ImageAsset file="assets/mouth-open.png" name="Emma Open Mouth Artwork" id="0:1107"/>
+    <ImageAsset file="assets/ring.png" name="Emma Ground Ring Artwork" id="0:1108"/>
+    <!-- Every layer is cropped from one atlas that already has Emma assembled
+         correctly, so the rig keeps ONE scale (0.68) for all of them and places
+         each node at its atlas position mapped into the artboard:
+             artboard_x = 136.06 + atlas_x * 0.68
+             artboard_y = 77.48  + atlas_y * 0.68
+         Scaling the parts separately (head .68, body .72, arms .60, ring .52)
+         is what drifted the proportions away from the reference: arms 20% too
+         close to the body and 12% too small, the ring 23% too small and 12%
+         too low, the torso 8% too far below the head. Measured, not guessed -
+         crop boxes live in scripts/extract-emma-rive-assets.py. -->
+    <Artboard defaultStateMachineId="0:900" styleId="0:3" clip="true" width="720" height="860" name="Emma" id="0:2">
+        <LayoutComponentStyle name="Emma Artboard Style" id="0:3"/>
+        <Node x="360" y="390" name="Emma Rig" id="0:10">
+            <Node x="-11" y="-95" name="Head" id="0:20">
+                <Node name="Face Features" id="0:30">
+                    <Shape x="-87" y="-17" scaleY="0.02" opacity="0" name="Left Eyelid" id="0:36"><Ellipse width="102" height="76" name="Path"/><Fill name="Fill"><SolidColor colorValue="FFF8FAFD" name="Color"/></Fill></Shape>
+                    <Shape x="87" y="-17" scaleY="0.02" opacity="0" name="Right Eyelid" id="0:37"><Ellipse width="102" height="76" name="Path"/><Fill name="Fill"><SolidColor colorValue="FFF8FAFD" name="Color"/></Fill></Shape>
+                    <Node name="Mouth" id="0:40">
+                        <Image x="4" y="119" scaleX="0.68" scaleY="0.68" originX="0.5" originY="0.5" opacity="0" assetId="0:1106" name="Smile" id="0:42"/>
+                        <Image x="4" y="119" scaleX="0.68" scaleY="0.68" originX="0.5" originY="0.5" opacity="0" assetId="0:1107" name="Mouth Opening" id="0:41"/>
+                    </Node>
+                    <Image x="-87" y="-17" scaleX="0.68" scaleY="0.88" originX="0.5" originY="0.5" assetId="0:1104" name="Left Eye" id="0:34"/>
+                    <Image x="87" y="-17" scaleX="0.68" scaleY="0.88" originX="0.5" originY="0.5" assetId="0:1105" name="Right Eye" id="0:35"/>
+                </Node>
+                <Image scaleX="0.68" scaleY="0.68" originX="0.5" originY="0.5" assetId="0:1100" name="Head Artwork"/>
+            </Node>
+
+            <Node x="2" y="182" name="Torso" id="0:50">
+                <Shape y="6" opacity="0.78" name="Core Glow" id="0:54"><Ellipse width="91" height="91" name="Path"/><Fill name="Fill"><RadialGradient startX="0" startY="0" endX="46" endY="0" name="Core"><GradientStop colorValue="FFFFFFFF" position="0"/><GradientStop colorValue="CCFFFFFF" position="0.48"/><GradientStop colorValue="00FFFFFF" position="1"/></RadialGradient></Fill></Shape>
+                <Image scaleX="0.68" scaleY="0.68" originX="0.5" originY="0.5" assetId="0:1101" name="Body Artwork"/>
+            </Node>
+
+            <Node x="-115" y="109" rotation="-0.18" name="Left Arm" id="0:60">
+                <Node name="Left Hand" id="0:64"/>
+                <Image scaleX="0.68" scaleY="0.68" originX="0.78" originY="0.17" assetId="0:1102" name="Left Arm Artwork"/>
+            </Node>
+            <Node x="119" y="109" rotation="0.18" name="Right Arm" id="0:70">
+                <Node name="Right Hand" id="0:74"/>
+                <Image scaleX="0.68" scaleY="0.68" originX="0.22" originY="0.17" assetId="0:1103" name="Right Arm Artwork"/>
+            </Node>
+        </Node>
+
+        <Image x="362" y="705" scaleX="0.68" scaleY="0.68" originX="0.5" originY="0.5" assetId="0:1108" name="Ground Ring" id="0:82"/>
+        <Shape x="362" y="705" name="Ground Core" id="0:83"><Ellipse width="320" height="63" name="Path"/><Stroke thickness="10" name="Glow"><SolidColor colorValue="33FFFFFF" name="Color"/></Stroke></Shape>
+        <Shape x="360" y="274" opacity="0" name="Aura" id="0:80"><Ellipse width="470" height="470" name="Path"/><Stroke thickness="5" name="Aura Stroke"><SolidColor colorValue="775CD8FF" name="Color"/></Stroke></Shape>
+
+        <StateMachine name="EmmaVoice" id="0:900">
+            <StateMachineNumber value="0" name="mode" id="0:901"/><StateMachineNumber value="0" name="speechLevel" id="0:902"/><StateMachineNumber value="50" name="lookX" id="0:903"/><StateMachineNumber value="50" name="lookY" id="0:904"/><StateMachineTrigger name="gesture" id="0:905"/>
+            <StateMachineLayer name="Mode" id="0:910">
+                <AnyState x="0" y="-150">
+                    <StateTransition stateToId="0:912" duration="180"><TransitionNumberCondition inputId="0:901" opValue="equal" value="0"/></StateTransition>
+                    <StateTransition stateToId="0:913" duration="180"><TransitionNumberCondition inputId="0:901" opValue="equal" value="1"/></StateTransition>
+                    <StateTransition stateToId="0:914" duration="180"><TransitionNumberCondition inputId="0:901" opValue="equal" value="2"/></StateTransition>
+                    <StateTransition stateToId="0:915" duration="180"><TransitionNumberCondition inputId="0:901" opValue="equal" value="3"/></StateTransition>
+                    <StateTransition stateToId="0:916" duration="180"><TransitionNumberCondition inputId="0:901" opValue="equal" value="4"/></StateTransition>
+                    <StateTransition stateToId="0:917" duration="180"><TransitionNumberCondition inputId="0:901" opValue="equal" value="5"/></StateTransition>
+                    <StateTransition stateToId="0:918" duration="120"><TransitionNumberCondition inputId="0:901" opValue="equal" value="6"/></StateTransition>
+                    <StateTransition stateToId="0:913" duration="100"><TransitionTriggerCondition inputId="0:905"/></StateTransition>
+                </AnyState>
+                <ExitState x="240" y="-150"/><EntryState x="-180" y="0"><StateTransition stateToId="0:912"/></EntryState>
+                <AnimationState x="0" y="0" animationId="0:200" id="0:912"/><AnimationState x="180" y="0" animationId="0:210" reset="true" id="0:913"/><AnimationState x="360" y="0" animationId="0:220" reset="true" id="0:914"/><AnimationState x="540" y="0" animationId="0:230" reset="true" id="0:915"/><AnimationState x="720" y="0" animationId="0:240" reset="true" id="0:916"/><AnimationState x="900" y="0" animationId="0:250" reset="true" id="0:917"/><AnimationState x="1080" y="0" animationId="0:260" reset="true" id="0:918"/>
+            </StateMachineLayer>
+            <StateMachineLayer name="Blink" id="0:920"><AnyState x="0" y="-150"/><ExitState x="240" y="-150"/><EntryState x="-180" y="0"><StateTransition stateToId="0:921"/></EntryState><AnimationState x="0" y="0" animationId="0:270" id="0:921"/></StateMachineLayer>
+            <StateMachineLayer name="Lip Sync" id="0:930"><AnyState x="0" y="-150"/><ExitState x="240" y="-150"/><EntryState x="-180" y="0"><StateTransition stateToId="0:931"/></EntryState><BlendState1DInput x="0" y="0" inputId="0:902" id="0:931"><BlendAnimation1D animationId="0:280" value="0"/><BlendAnimation1D animationId="0:281" value="100"/></BlendState1DInput></StateMachineLayer>
+            <StateMachineLayer name="Look X" id="0:940"><AnyState x="0" y="-150"/><ExitState x="240" y="-150"/><EntryState x="-180" y="0"><StateTransition stateToId="0:941"/></EntryState><BlendState1DInput x="0" y="0" inputId="0:903" id="0:941"><BlendAnimation1D animationId="0:290" value="0"/><BlendAnimation1D animationId="0:291" value="50"/><BlendAnimation1D animationId="0:292" value="100"/></BlendState1DInput></StateMachineLayer>
+            <StateMachineLayer name="Look Y" id="0:950"><AnyState x="0" y="-150"/><ExitState x="240" y="-150"/><EntryState x="-180" y="0"><StateTransition stateToId="0:951"/></EntryState><BlendState1DInput x="0" y="0" inputId="0:904" id="0:951"><BlendAnimation1D animationId="0:293" value="0"/><BlendAnimation1D animationId="0:294" value="50"/><BlendAnimation1D animationId="0:295" value="100"/></BlendState1DInput></StateMachineLayer>
+            <StateMachineLayer name="Ambient Glow" id="0:960"><AnyState x="0" y="-150"/><ExitState x="240" y="-150"/><EntryState x="-180" y="0"><StateTransition stateToId="0:961"/></EntryState><AnimationState x="0" y="0" animationId="0:300" id="0:961"/></StateMachineLayer>
+        </StateMachine>
+
+        <LinearAnimation loopValue="loop" duration="120" name="idle" id="0:200">
+            <KeyedObject objectId="0:10"><KeyedProperty propertyKey="14"><KeyFrameDouble value="390" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble><KeyFrameDouble value="378" frame="60" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble><KeyFrameDouble value="390" frame="120"/></KeyedProperty><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.012" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble><KeyFrameDouble value="0.012" frame="60" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble><KeyFrameDouble value="-0.012" frame="120"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:20"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.014"/><KeyFrameDouble value="-0.014" frame="60"/><KeyFrameDouble value="0.014" frame="120"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:60"><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.18"/><KeyFrameDouble value="-0.13" frame="60"/><KeyFrameDouble value="-0.18" frame="120"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:70"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.18"/><KeyFrameDouble value="0.13" frame="60"/><KeyFrameDouble value="0.18" frame="120"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation loopValue="loop" duration="96" name="greeting" id="0:210">
+            <KeyedObject objectId="0:10"><KeyedProperty propertyKey="14"><KeyFrameDouble value="390" interpolationType="elastic"><ElasticInterpolator easingValue="1" amplitude="0.45" period="0.35"/></KeyFrameDouble><KeyFrameDouble value="376" frame="22"/><KeyFrameDouble value="390" frame="96"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:20"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0"/><KeyFrameDouble value="-0.055" frame="22"/><KeyFrameDouble value="0" frame="96"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:60"><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.18"/><KeyFrameDouble value="-0.18" frame="96"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:70"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.18" interpolationType="elastic"><ElasticInterpolator easingValue="1" amplitude="0.7" period="0.28"/></KeyFrameDouble><KeyFrameDouble value="-1.38" frame="18"/><KeyFrameDouble value="-1.08" frame="32"/><KeyFrameDouble value="-1.42" frame="46"/><KeyFrameDouble value="-1.08" frame="60"/><KeyFrameDouble value="0.18" frame="96"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation loopValue="loop" duration="72" name="listening" id="0:220">
+            <KeyedObject objectId="0:10"><KeyedProperty propertyKey="14"><KeyFrameDouble value="390" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble><KeyFrameDouble value="382" frame="36" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble><KeyFrameDouble value="390" frame="72"/></KeyedProperty><KeyedProperty propertyKey="16"><KeyFrameDouble value="1"/><KeyFrameDouble value="1.025" frame="36"/><KeyFrameDouble value="1" frame="72"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:60"><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.45"/><KeyFrameDouble value="-0.45" frame="72"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:70"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.45"/><KeyFrameDouble value="0.45" frame="72"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation loopValue="loop" duration="110" name="thinking" id="0:230">
+            <KeyedObject objectId="0:10"><KeyedProperty propertyKey="14"><KeyFrameDouble value="390"/><KeyFrameDouble value="384" frame="55"/><KeyFrameDouble value="390" frame="110"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:20"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0"/><KeyFrameDouble value="-0.1" frame="20"/><KeyFrameDouble value="-0.07" frame="110"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:60"><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.18"/><KeyFrameDouble value="-0.18" frame="110"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:70"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.18" interpolationType="elastic"><ElasticInterpolator easingValue="1" amplitude="0.5" period="0.35"/></KeyFrameDouble><KeyFrameDouble value="1.38" frame="24"/><KeyFrameDouble value="1.38" frame="110"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:74"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.28"/><KeyFrameDouble value="-0.35" frame="24"/><KeyFrameDouble value="-0.35" frame="110"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation loopValue="loop" duration="54" name="speaking" id="0:240">
+            <KeyedObject objectId="0:10"><KeyedProperty propertyKey="14"><KeyFrameDouble value="390"/><KeyFrameDouble value="382" frame="27"/><KeyFrameDouble value="390" frame="54"/></KeyedProperty><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.015"/><KeyFrameDouble value="0.018" frame="27"/><KeyFrameDouble value="-0.015" frame="54"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:60"><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.5"/><KeyFrameDouble value="-0.78" frame="27"/><KeyFrameDouble value="-0.5" frame="54"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:70"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.45"/><KeyFrameDouble value="0.72" frame="27"/><KeyFrameDouble value="0.45" frame="54"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation loopValue="loop" duration="70" name="happy" id="0:250">
+            <KeyedObject objectId="0:10"><KeyedProperty propertyKey="14"><KeyFrameDouble value="390" interpolationType="elastic"><ElasticInterpolator easingValue="1" amplitude="0.65" period="0.3"/></KeyFrameDouble><KeyFrameDouble value="354" frame="22"/><KeyFrameDouble value="390" frame="70"/></KeyedProperty><KeyedProperty propertyKey="17"><KeyFrameDouble value="1"/><KeyFrameDouble value="1.05" frame="22"/><KeyFrameDouble value="1" frame="70"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:60"><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.18"/><KeyFrameDouble value="1.18" frame="20"/><KeyFrameDouble value="-0.18" frame="70"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:70"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.18"/><KeyFrameDouble value="-1.18" frame="20"/><KeyFrameDouble value="0.18" frame="70"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation loopValue="loop" duration="36" name="error" id="0:260">
+            <KeyedObject objectId="0:10"><KeyedProperty propertyKey="13"><KeyFrameDouble value="360"/><KeyFrameDouble value="346" frame="6"/><KeyFrameDouble value="374" frame="12"/><KeyFrameDouble value="348" frame="18"/><KeyFrameDouble value="372" frame="24"/><KeyFrameDouble value="360" frame="36"/></KeyedProperty><KeyedProperty propertyKey="14"><KeyFrameDouble value="390"/><KeyFrameDouble value="390" frame="36"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:20"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0"/><KeyFrameDouble value="-0.07" frame="9"/><KeyFrameDouble value="0.07" frame="18"/><KeyFrameDouble value="0" frame="36"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:60"><KeyedProperty propertyKey="15"><KeyFrameDouble value="-0.18"/><KeyFrameDouble value="-1.15" frame="12"/><KeyFrameDouble value="-1.15" frame="36"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:70"><KeyedProperty propertyKey="15"><KeyFrameDouble value="0.18"/><KeyFrameDouble value="1.15" frame="12"/><KeyFrameDouble value="1.15" frame="36"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <LinearAnimation loopValue="loop" duration="190" name="blink" id="0:270">
+            <KeyedObject objectId="0:36"><KeyedProperty propertyKey="18"><KeyFrameDouble value="0"/><KeyFrameDouble value="0" frame="150"/><KeyFrameDouble value="1" frame="156"/><KeyFrameDouble value="1" frame="163"/><KeyFrameDouble value="0" frame="170"/><KeyFrameDouble value="0" frame="190"/></KeyedProperty><KeyedProperty propertyKey="17"><KeyFrameDouble value="0.02"/><KeyFrameDouble value="0.02" frame="150"/><KeyFrameDouble value="1" frame="156"/><KeyFrameDouble value="1" frame="163"/><KeyFrameDouble value="0.02" frame="170"/><KeyFrameDouble value="0.02" frame="190"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:37"><KeyedProperty propertyKey="18"><KeyFrameDouble value="0"/><KeyFrameDouble value="0" frame="150"/><KeyFrameDouble value="1" frame="156"/><KeyFrameDouble value="1" frame="163"/><KeyFrameDouble value="0" frame="170"/><KeyFrameDouble value="0" frame="190"/></KeyedProperty><KeyedProperty propertyKey="17"><KeyFrameDouble value="0.02"/><KeyFrameDouble value="0.02" frame="150"/><KeyFrameDouble value="1" frame="156"/><KeyFrameDouble value="1" frame="163"/><KeyFrameDouble value="0.02" frame="170"/><KeyFrameDouble value="0.02" frame="190"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="mouthClosed" id="0:280"><KeyedObject objectId="0:41"><KeyedProperty propertyKey="18"><KeyFrameDouble value="0"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:42"><KeyedProperty propertyKey="18"><KeyFrameDouble value="0"/></KeyedProperty></KeyedObject></LinearAnimation>
+        <LinearAnimation duration="1" name="mouthOpen" id="0:281"><KeyedObject objectId="0:41"><KeyedProperty propertyKey="18"><KeyFrameDouble value="1"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:42"><KeyedProperty propertyKey="18"><KeyFrameDouble value="0"/></KeyedProperty></KeyedObject></LinearAnimation>
+        <LinearAnimation duration="1" name="lookLeft" id="0:290"><KeyedObject objectId="0:30"><KeyedProperty propertyKey="13"><KeyFrameDouble value="-13"/></KeyedProperty></KeyedObject></LinearAnimation><LinearAnimation duration="1" name="lookCentreX" id="0:291"><KeyedObject objectId="0:30"><KeyedProperty propertyKey="13"><KeyFrameDouble value="0"/></KeyedProperty></KeyedObject></LinearAnimation><LinearAnimation duration="1" name="lookRight" id="0:292"><KeyedObject objectId="0:30"><KeyedProperty propertyKey="13"><KeyFrameDouble value="13"/></KeyedProperty></KeyedObject></LinearAnimation>
+        <LinearAnimation duration="1" name="lookUp" id="0:293"><KeyedObject objectId="0:30"><KeyedProperty propertyKey="14"><KeyFrameDouble value="-10"/></KeyedProperty></KeyedObject></LinearAnimation><LinearAnimation duration="1" name="lookCentreY" id="0:294"><KeyedObject objectId="0:30"><KeyedProperty propertyKey="14"><KeyFrameDouble value="0"/></KeyedProperty></KeyedObject></LinearAnimation><LinearAnimation duration="1" name="lookDown" id="0:295"><KeyedObject objectId="0:30"><KeyedProperty propertyKey="14"><KeyFrameDouble value="10"/></KeyedProperty></KeyedObject></LinearAnimation>
+        <LinearAnimation loopValue="loop" duration="100" name="ambientGlow" id="0:300">
+            <KeyedObject objectId="0:54"><KeyedProperty propertyKey="16"><KeyFrameDouble value="0.94"/><KeyFrameDouble value="1.12" frame="50"/><KeyFrameDouble value="0.94" frame="100"/></KeyedProperty><KeyedProperty propertyKey="17"><KeyFrameDouble value="0.94"/><KeyFrameDouble value="1.12" frame="50"/><KeyFrameDouble value="0.94" frame="100"/></KeyedProperty><KeyedProperty propertyKey="18"><KeyFrameDouble value="0.78"/><KeyFrameDouble value="0.78" frame="100"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:80"><KeyedProperty propertyKey="18"><KeyFrameDouble value="0"/><KeyFrameDouble value="0" frame="100"/></KeyedProperty><KeyedProperty propertyKey="16"><KeyFrameDouble value="0.96"/><KeyFrameDouble value="1.04" frame="50"/><KeyFrameDouble value="0.96" frame="100"/></KeyedProperty><KeyedProperty propertyKey="17"><KeyFrameDouble value="0.96"/><KeyFrameDouble value="1.04" frame="50"/><KeyFrameDouble value="0.96" frame="100"/></KeyedProperty></KeyedObject><KeyedObject objectId="0:83"><KeyedProperty propertyKey="18"><KeyFrameDouble value="0.48"/><KeyFrameDouble value="0.68" frame="50"/><KeyFrameDouble value="0.48" frame="100"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+    </Artboard>
+</Rive>

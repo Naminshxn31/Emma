@@ -1,0 +1,105 @@
+{
+  "dex_sha256": "1587455af53aa343415fe9ddbe2b24159b3130995bfc6e6ea7ae47357ed3cf00",
+  "method": "Lcom/aobo/aibot/services/IdleActionService;->getActionName(I)Ljava/lang/String;",
+  "code_item_offset": 3820232,
+  "code_item_offset_hex": "0x3a4ac8",
+  "instruction_start_hex": "0x3a4ad8",
+  "switch_instruction_hex": "2b 03 3e 00 00 00",
+  "payload_delta_code_units": 62,
+  "payload_file_offset_hex": "0x3a4b54",
+  "payload_hex": "00 01 09 00 05 00 00 00 39 00 00 00 35 00 00 00 31 00 00 00 2e 00 00 00 2a 00 00 00 27 00 00 00 23 00 00 00 1f 00 00 00 1b 00 00 00",
+  "offset_rule": "target = switch_instruction_address + signed_target_delta * 2",
+  "hardware_verified": false,
+  "targets": [
+    {
+      "key": 5,
+      "target_delta_code_units": 57,
+      "target_byte_offset_in_method": 114,
+      "target_file_offset_hex": "0x3a4b4a",
+      "payload_entry_hex": "39 00 00 00",
+      "target_instruction_and_return_hex": "1b 03 c9 d5 00 00 11 03",
+      "string_id": 54729,
+      "label": "敬礼"
+    },
+    {
+      "key": 6,
+      "target_delta_code_units": 53,
+      "target_byte_offset_in_method": 106,
+      "target_file_offset_hex": "0x3a4b42",
+      "payload_entry_hex": "35 00 00 00",
+      "target_instruction_and_return_hex": "1b 03 80 d5 00 00 11 03",
+      "string_id": 54656,
+      "label": "握手"
+    },
+    {
+      "key": 7,
+      "target_delta_code_units": 49,
+      "target_byte_offset_in_method": 98,
+      "target_file_offset_hex": "0x3a4b3a",
+      "payload_entry_hex": "31 00 00 00",
+      "target_instruction_and_return_hex": "1b 03 86 d5 00 00 11 03",
+      "string_id": 54662,
+      "label": "摆臂"
+    },
+    {
+      "key": 8,
+      "target_delta_code_units": 46,
+      "target_byte_offset_in_method": 92,
+      "target_file_offset_hex": "0x3a4b34",
+      "payload_entry_hex": "2e 00 00 00",
+      "target_instruction_and_return_hex": "1a 03 f8 cf 11 03",
+      "string_id": 53240,
+      "label": "倒水"
+    },
+    {
+      "key": 9,
+      "target_delta_code_units": 42,
+      "target_byte_offset_in_method": 84,
+      "target_file_offset_hex": "0x3a4b2c",
+      "payload_entry_hex": "2a 00 00 00",
+      "target_instruction_and_return_hex": "1b 03 88 d5 00 00 11 03",
+      "string_id": 54664,
+      "label": "撕拉"
+    },
+    {
+      "key": 10,
+      "target_delta_code_units": 39,
+      "target_byte_offset_in_method": 78,
+      "target_file_offset_hex": "0x3a4b26",
+      "payload_entry_hex": "27 00 00 00",
+      "target_instruction_and_return_hex": "1a 03 3d d0 11 03",
+      "string_id": 53309,
+      "label": "全部动作"
+    },
+    {
+      "key": 11,
+      "target_delta_code_units": 35,
+      "target_byte_offset_in_method": 70,
+      "target_file_offset_hex": "0x3a4b1e",
+      "payload_entry_hex": "23 00 00 00",
+      "target_instruction_and_return_hex": "1b 03 87 d5 00 00 11 03",
+      "string_id": 54663,
+      "label": "摆臂行走"
+    },
+    {
+      "key": 12,
+      "target_delta_code_units": 31,
+      "target_byte_offset_in_method": 62,
+      "target_file_offset_hex": "0x3a4b16",
+      "payload_entry_hex": "1f 00 00 00",
+      "target_instruction_and_return_hex": "1b 03 23 d5 00 00 11 03",
+      "string_id": 54563,
+      "label": "打招呼行走"
+    },
+    {
+      "key": 13,
+      "target_delta_code_units": 27,
+      "target_byte_offset_in_method": 54,
+      "target_file_offset_hex": "0x3a4b0e",
+      "payload_entry_hex": "1b 00 00 00",
+      "target_instruction_and_return_hex": "1b 03 ca d5 00 00 11 03",
+      "string_id": 54730,
+      "label": "敬礼行走"
+    }
+  ]
+}

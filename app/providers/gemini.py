@@ -48,15 +48,11 @@ def supports_native_audio_extras(model: str | None = None) -> bool:
 def supports_non_blocking(model: str | None = None) -> bool:
     """Can this model run a tool *while* it keeps talking?
 
-    Gemini 2.5 accepts `Behavior.NON_BLOCKING` on a function declaration and
-    carries on speaking while the tool runs. **Gemini 3.x Live does not** —
-    it waits for the tool response before it produces anything at all.
-
-    Harmless for a light switch. Not harmless for the robot: `moveToPoint`
-    takes tens of seconds, and on a 3.x model the guest stands in silence
-    for all of them, in front of a robot that has stopped responding.
+    Gemini 2.5 and 3.8 Live accept `Behavior.NON_BLOCKING`. Gemini 3.1 Live
+    predates asynchronous function calling and must wait for tool results.
     """
-    return not (model or settings.gemini_model).startswith("gemini-3")
+    name = (model or settings.gemini_model).removeprefix("models/")
+    return not name.startswith("gemini-3.1-")
 
 
 def facility_names() -> list[str]:
@@ -135,7 +131,7 @@ def language_codes() -> list[str]:
 
 
 def _transcription_config():
-    """Input transcription, tuned by TRANSCRIBE_LANGUAGES.
+    """Input transcription, tuned for readable intent-level captions.
 
     Two things to know about this config, both learned the hard way:
 
@@ -152,9 +148,9 @@ def _transcription_config():
        English recogniser and came back romanised ("ao rummy"), so the panel
        showed the guest saying words in a language they never spoke.
 
-    `language_codes` and `custom_vocabulary` are the current fields.
+    `language_codes`, `custom_vocabulary`, and `mode` are the current fields.
     `language_hints`, `language_auto` and `adaptation_phrases` all still
-    exist but are marked Deprecated in google-genai 2.16 — they're used only
+    exist but are marked Deprecated — they're used only
     as a fallback for older SDKs, and a config the server rejects would kill
     the whole session over a caption, so the last resort is no hints at all.
     """
@@ -162,18 +158,22 @@ def _transcription_config():
 
     codes = language_codes()
     phrases = adaptation_phrases()
+    mode = (settings.transcribe_mode or "SMART").strip().upper()
+    if mode not in {"SMART", "VERBATIM"}:
+        logger.warning("unknown TRANSCRIBE_MODE=%r; using SMART", mode)
+        mode = "SMART"
 
     # Current field names.
     try:
-        kwargs: dict = {}
+        kwargs: dict = {"mode": mode}
         if codes:
             kwargs["language_codes"] = codes
         if phrases:
             kwargs["custom_vocabulary"] = phrases
         cfg = types.AudioTranscriptionConfig(**kwargs)
         logger.info(
-            "input transcription: languages=%s vocabulary=%d phrase(s)",
-            ",".join(codes) if codes else "auto-detect", len(phrases),
+            "input transcription: mode=%s languages=%s vocabulary=%d phrase(s)",
+            mode, ",".join(codes) if codes else "auto-detect", len(phrases),
         )
         return cfg
     except Exception:
@@ -370,10 +370,25 @@ class GeminiProvider(VoiceProvider):
                 types.Tool(google_search=types.GoogleSearch())
             )
 
-        # Thinking costs latency before the first word is spoken, and 2.5
-        # native audio turns it on by default. Gemini 3.x uses levels
-        # instead of a token budget, so pick the field the model understands.
-        if self.model.startswith("gemini-3"):
+        # Thinking configuration differs between the Live model families.
+        # Gemini 3.8 Live performs interleaved reasoning internally and
+        # rejects *any* thinking_config in session setup. The Extended
+        # Thinking variant accepts levels (but not "minimal"), Gemini 3.1
+        # accepts levels including "minimal", and 2.5 accepts a token budget.
+        # Normalize the optional models/ prefix before choosing the shape.
+        model_name = self.model.removeprefix("models/")
+        if model_name == "gemini-3.8-live":
+            pass
+        elif model_name == "gemini-3.8-live-extended-thinking":
+            level = (settings.gemini_thinking_level or "low").strip().lower()
+            if level == "minimal":
+                logger.warning(
+                    "GEMINI_THINKING_LEVEL=minimal is not supported by %s; "
+                    "using low instead.", self.model,
+                )
+                level = "low"
+            config["thinking_config"] = types.ThinkingConfig(thinking_level=level)
+        elif model_name.startswith("gemini-3"):
             config["thinking_config"] = types.ThinkingConfig(
                 thinking_level=settings.gemini_thinking_level
             )
@@ -389,7 +404,7 @@ class GeminiProvider(VoiceProvider):
         # the system behaves differently from its own configuration and
         # nothing says so. Ask for something this model can't do and you get
         # told, at startup, once.
-        if supports_native_audio_extras():
+        if supports_native_audio_extras(self.model):
             if settings.gemini_affective_dialog:
                 config["enable_affective_dialog"] = True
             if settings.gemini_proactive_audio:
@@ -444,7 +459,7 @@ class GeminiProvider(VoiceProvider):
                 logger.error(
                     "MODEL FALLBACK: %s is unavailable (%s) — switching to %s "
                     "for this session. The robot will still work; check whether "
-                    "the preview model has been withdrawn or renamed.",
+                    "the configured model is unavailable for this key or region.",
                     self.model, exc, fallback,
                 )
                 from app import turnlog

@@ -5,11 +5,16 @@ import json
 import logging
 import secrets
 from pathlib import Path
+from urllib.parse import quote
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from collections import deque
+from datetime import datetime
+
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from app.slide_assets import SlideAssets
+from fastapi.staticfiles import StaticFiles
 
 from app import display, turnlog, voices
 from app.config import settings
@@ -31,6 +36,19 @@ app.add_middleware(
 ROOT = Path(__file__).resolve().parent.parent
 CLIENT_INDEX = ROOT / "client" / "index.html"
 DISPLAY_INDEX = ROOT / "client" / "display.html"
+HARDWARE_PAGE = ROOT / "client" / "hardware.html"
+ROBOT_CONTROL_PAGE = ROOT / "client" / "robot-control.html"
+ROBOT_ARM_PAGE = ROOT / "client" / "robot-arm.html"
+ROBOT_HUD_PAGE = ROOT / "client" / "robot-hud.html"
+ROBOT_DRIVE_PAGE = ROOT / "client" / "robot-joystick.html"
+ROBOT_MAPVIEW_PAGE = ROOT / "client" / "robot-map.html"
+ROBOT_CONSOLE_PAGE = ROOT / "client" / "robot-console.html"
+#: The next-generation call screen (the glass-mascot design). Served at its
+#: own URL, deliberately separate from `/` (index.html) so the production
+#: gallery page is untouched while this one is finished and signed off.
+PREVIEW_PAGE = ROOT / "client" / "voice-preview.html"
+CLIENT_ASSETS = ROOT / "client" / "assets"
+PLAN_DISPLAY_PROTOCOL = ROOT / "client" / "plan-display-protocol.js"
 
 # Serve the slide images. Mounted only if the folder exists so the app still
 # starts on a machine that hasn't imported a deck yet.
@@ -39,6 +57,12 @@ if not _slides_path.is_absolute():
     _slides_path = ROOT / _slides_path
 if _slides_path.is_dir():
     app.mount("/slides", SlideAssets(directory=str(_slides_path)), name="slides")
+
+# The mascot art the preview page (voice-preview.html) references. Images
+# only — a read-only folder of PNGs — so a plain static mount is safe here,
+# same as the slides mount above.
+if CLIENT_ASSETS.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(CLIENT_ASSETS)), name="assets")
 
 _MODEL_FOR = {"gemini": lambda: settings.gemini_model, "openai": lambda: settings.openai_model}
 
@@ -161,9 +185,18 @@ async def _log_effective_config() -> None:
         # gallery would find out the robot never moves when a guest asks it to.
         from app.tools import robot_link
 
-        log.info("robot: enabled — waiting for the app to send robot_ready; "
+        from app import robot_chassis
+
+        # Two different things to be waiting for, and saying the wrong one is
+        # worse than saying nothing: an operator who reads "waiting for
+        # robot_ready" on a machine driving the chassis directly would go
+        # hunting for an Android app that is never going to report in.
+        waiting = ("the chassis at %s to answer" % settings.robot_chassis_url
+                   if robot_chassis.configured()
+                   else "the app to send robot_ready")
+        log.info("robot: enabled — waiting for %s; "
                  "until then every movement runs in mock mode (%s)",
-                 robot_link.status())
+                 waiting, robot_link.status())
     if settings.canva_url and not settings.multi_session:
         # Actually open it, rather than checking that the *package* imports.
         # The old check passed while Chromium itself was missing, so the
@@ -291,6 +324,29 @@ async def _no_teardown_noise() -> None:
 
 
 @app.on_event("startup")
+async def _warm_search() -> None:
+    """Load the slide/document search model at boot, not inside a customer's
+    first question. Measured 2026-09-14: `search_condo_info` cold-starts the
+    local MiniLM encoder for ~7.5s the first time, and on a server already
+    busy with a live audio session that lands past a tool call's 15s ceiling
+    and reads as "lookup — timeout" on the page. Warming it in the background
+    moves that one-time cost to a moment nobody is waiting on."""
+    import asyncio
+
+    async def go() -> None:
+        log = logging.getLogger("condo_voice")
+        try:
+            from app.tools.knowledge import search_condo_info
+
+            await asyncio.to_thread(search_condo_info, "warm up")
+            log.info("search: embedding model warmed")
+        except Exception:
+            log.debug("search warm-up skipped", exc_info=True)
+
+    asyncio.create_task(go())
+
+
+@app.on_event("startup")
 async def _watch_the_door() -> None:
     """Open the entrance camera, if this machine has one and wants it.
 
@@ -302,6 +358,34 @@ async def _watch_the_door() -> None:
     from app import greeter
 
     greeter.start()
+
+
+@app.on_event("startup")
+async def _reach_the_chassis() -> None:
+    """Start polling the robot's navigation board, if this machine has one.
+
+    `ROBOT_CHASSIS_URL` is empty by default and every machine before
+    2026-09-10 ran that way, so this is a no-op unless somebody has pointed
+    it at a chassis. `robot_chassis.start()` checks the switch itself, the
+    same as `greeter.start()`, so nothing here has to be kept in step.
+
+    It has to be a background poller rather than something the tools call:
+    the REST API has no callback, so an arrival is only noticed by asking,
+    and nobody is asking while the model waits for a turn that never comes.
+    """
+    from app import robot_chassis
+
+    robot_chassis.start()
+
+
+@app.on_event("shutdown")
+async def _let_go_of_the_chassis() -> None:
+    """Stop polling and close the socket. Deliberately does not cancel a walk
+    in progress — the server shutting down is not a reason to move a robot,
+    and a robot that must stop has a physical button for it."""
+    from app import robot_chassis
+
+    await robot_chassis.stop()
 
 
 @app.on_event("shutdown")
@@ -340,6 +424,20 @@ _NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
 @app.get("/")
 async def serve_client() -> FileResponse:
     return FileResponse(CLIENT_INDEX, headers=_NO_CACHE)
+
+
+@app.get("/preview")
+async def serve_preview() -> FileResponse:
+    #: The glass-mascot call screen, a work in progress. Same `/ws`, `/voices`
+    #: and `/health` as `/`, so it is a real call — just wearing the new
+    #: design. Kept off `/` until the owner signs it off.
+    return FileResponse(PREVIEW_PAGE, headers=_NO_CACHE)
+
+
+@app.get("/plan-display-protocol.js")
+async def serve_plan_display_protocol() -> FileResponse:
+    # Both call pages must receive the same verifier/ACK implementation.
+    return FileResponse(PLAN_DISPLAY_PROTOCOL, media_type="text/javascript", headers=_NO_CACHE)
 
 
 async def _reject_unauthorized(websocket: WebSocket, token: str | None) -> bool:
@@ -486,6 +584,627 @@ async def serve_display() -> FileResponse:
     return FileResponse(DISPLAY_INDEX, headers=_NO_CACHE)
 
 
+@app.get("/hardware")
+async def serve_hardware() -> FileResponse:
+    """A bench for the microphone and camera of whatever device opens it.
+
+    No token: it carries no controls and reaches nothing. Every other page
+    here can drive this machine — open programs, move slides, move a robot —
+    which is what `WS_TOKEN` guards. This one only looks at the microphone
+    and camera of the browser it is running in, sends nothing anywhere, and
+    is most needed exactly when the token is the thing that is wrong.
+    """
+    return FileResponse(HARDWARE_PAGE, headers=_NO_CACHE)
+
+
+#: The last few hardware summaries any device sent in. Memory only, on
+#: purpose. The page these come from is holding a live microphone, and a file
+#: of diagnostics collected in a showroom is exactly the shape of thing that
+#: becomes a retention question nobody ever decided — the mistake `data/logs/`
+#: had to be given `TURN_LOG_KEEP_DAYS` to undo. These die with the process,
+#: which is the whole useful life of one debugging session anyway.
+_HARDWARE_REPORTS: deque[dict] = deque(maxlen=8)
+
+#: A summary is a few hundred characters of device names and levels. The cap
+#: is there so an endpoint that takes a POST without a token cannot be used
+#: to park a megabyte in this process's memory.
+_HARDWARE_REPORT_LIMIT = 4000
+
+
+@app.post("/hardware/report")
+async def take_hardware_report(request: Request) -> dict:
+    """Accept one device's own summary of its microphone and camera.
+
+    **Text only, and that is the whole design.** A browser can only measure
+    the devices of the machine it runs on, so the robot's own readings are
+    unreachable from the sales desk — which is where the person reading them
+    is standing. This carries the verdicts across: device names, levels, frame
+    rates. It never carries audio or video, and `tests/test_hardware_page.py`
+    holds the page to that.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": False, "error": "expected JSON"}
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "expected an object"}
+    report = str(body.get("report") or "")[:_HARDWARE_REPORT_LIMIT]
+    if not report.strip():
+        return {"ok": False, "error": "empty report"}
+    _HARDWARE_REPORTS.appendleft({
+        "at": datetime.now().strftime("%H:%M:%S"),
+        "label": str(body.get("label") or "")[:80],
+        "from": request.client.host if request.client else "?",
+        "report": report,
+    })
+    return {"ok": True, "kept": len(_HARDWARE_REPORTS)}
+
+
+@app.get("/hardware/reports")
+async def read_hardware_reports() -> dict:
+    """What other devices have sent, newest first."""
+    return {"reports": list(_HARDWARE_REPORTS)}
+
+
+def _authorized(token: str | None) -> bool:
+    """The same gate `_reject_unauthorized` applies to every socket.
+
+    Written out again rather than shared, because that one's job is to accept
+    a WebSocket and explain itself before closing. The comparison is the part
+    that matters and it is identical: encoded before `compare_digest`, which
+    refuses non-ASCII and would otherwise raise on a token pasted out of a
+    password manager — an exception here reads as "the gate is broken".
+    """
+    if not settings.ws_token:
+        return True
+    return token is not None and secrets.compare_digest(
+        token.encode("utf-8"), settings.ws_token.encode("utf-8"))
+
+
+#: How far one press of the manual control may move the robot. Server-side,
+#: and not negotiable by the page: a control surface that lets the client name
+#: the distance is one typo away from sending a robot across a gallery, and
+#: the client is a web page anyone on the LAN can open.
+_NUDGE_METRES = 0.3
+_NUDGE_RADIANS = 0.2618          # 15 degrees
+
+
+@app.get("/robot")
+async def serve_robot_control() -> FileResponse:
+    """Manual control, for proving the robot answers at all.
+
+    This one *does* need the token: everything on it moves a real machine.
+    """
+    return FileResponse(ROBOT_CONTROL_PAGE, headers=_NO_CACHE)
+
+
+@app.get("/robot/state")
+async def robot_state(token: str = "") -> dict:
+    """Read the chassis right now, not from the poll cache.
+
+    Somebody standing next to a moving robot with a hand on a stop button
+    needs this second's answer, not the one from up to `ROBOT_CHASSIS_POLL_S`
+    ago.
+    """
+    from app import robot_chassis
+
+    if not _authorized(token):
+        return {"ok": False, "error": "unauthorized"}
+    if not robot_chassis.configured():
+        return {"ok": False, "error": "ROBOT_CHASSIS_URL ยังไม่ได้ตั้ง"}
+    try:
+        return {"ok": True, "state": await robot_chassis.live_state()}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@app.get("/robot/map")
+async def robot_map(token: str = "") -> dict:
+    """The occupancy grid, for a page that lets somebody click where to go.
+
+    Cells go out as the board's own bytes, base64, one per cell, row-major
+    from the origin (row 0 is the *lowest* y, so a canvas has to flip).
+    world_x = origin_x + (col + 0.5) * resolution, likewise y. What a byte
+    means is not decided here — see `robot_chassis.parse_explore_map`.
+    """
+    import base64
+
+    from app import robot_chassis
+
+    if not _authorized(token):
+        return {"ok": False, "error": "unauthorized"}
+    if not robot_chassis.configured():
+        return {"ok": False, "error": "ROBOT_CHASSIS_URL ยังไม่ได้ตั้ง"}
+    try:
+        grid = await robot_chassis.explore_map()
+    except ValueError as exc:
+        return {"ok": False, "error": f"แมพอ่านไม่ออก: {exc}"}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    if grid is None:
+        return {"ok": False, "error": "หุ่นยังไม่มีแมพ"}
+    return {"ok": True, "map": {
+        "origin_x": grid["origin_x"], "origin_y": grid["origin_y"],
+        "width": grid["width"], "height": grid["height"],
+        "resolution": grid["resolution"],
+        "cells_b64": base64.b64encode(grid["cells"]).decode("ascii"),
+    }}
+
+
+#: Most lidar points a page gets per fetch unless it asks for fewer. The full
+#: frame is ~1,600 points; a radar redrawn a few times a second does not need
+#: them all, and the tunnel to the chassis is a `nc` relay on the robot.
+_LASERSCAN_MAX_POINTS = 400
+
+
+@app.get("/robot/laserscan")
+async def robot_laserscan(token: str = "", max: int = _LASERSCAN_MAX_POINTS) -> dict:
+    """The current lidar frame, for a radar view on the driving page.
+
+    `angle` is radians from the robot's front (counter-clockwise positive),
+    `distance` metres, `valid` the board's own verdict on the return. `pose`
+    is where the robot was when the frame was taken. Read-only.
+    """
+    from app import robot_chassis
+
+    if not _authorized(token):
+        return {"ok": False, "error": "unauthorized"}
+    if not robot_chassis.configured():
+        return {"ok": False, "error": "ROBOT_CHASSIS_URL ยังไม่ได้ตั้ง"}
+    limit = max if 0 < max <= _LASERSCAN_MAX_POINTS else _LASERSCAN_MAX_POINTS
+    try:
+        scan = await robot_chassis.laserscan(max_points=limit)
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": True, "points": scan["points"], "pose": scan["pose"],
+            "total": scan["total"], "valid": scan["valid"],
+            "clearance": scan["clearance"],
+            "min_clearance": settings.robot_drive_min_clearance_m}
+
+
+def _coordinate(body: dict, key: str) -> float | None:
+    """A number from the request, or None. Strings of digits count; anything
+    else is None rather than an exception, so the caller can say *which*."""
+    value = body.get(key)
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+@app.post("/robot/command")
+async def robot_command(request: Request) -> dict:
+    """One bounded step, or stop.
+
+    Stop is first in the dispatch and is the only command that runs while
+    motion is locked — a lock that also disabled the brake would be a worse
+    thing than no lock. Everything else is a fixed increment computed from
+    the pose at the moment of the press, so the failure mode of a dropped
+    connection is a robot that finishes one short step and waits.
+    """
+    from app import robot_chassis
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    if not robot_chassis.configured():
+        return {"ok": False, "error": "ROBOT_CHASSIS_URL ยังไม่ได้ตั้ง"}
+
+    if not _authorized(body.get("token") or request.query_params.get("token")):
+        return {"ok": False, "error": "unauthorized"}
+    action = str(body.get("action") or "")
+    try:
+        if action == "stop":
+            # Disarms a held joystick too; a plain cancel would leave its
+            # deadman to cancel again, which is harmless but says the wrong
+            # thing in the log.
+            await robot_chassis.drive_stop(reason="stop button")
+            return {"ok": True, "did": "stop"}
+        if action == "relocalize":
+            # Before the lock: `dock` and `static` do not move the robot,
+            # and a robot that does not know where it is needs this most
+            # while everything else is still locked. `rotate` moves, and
+            # `relocalize` itself refuses it while locked.
+            mode = str(body.get("mode") or "dock")
+            report = await robot_chassis.relocalize(mode)
+            turnlog.record("robot_manual_command", action="relocalize")
+            return {"ok": True, "did": "relocalize", **report}
+        if action == "save_poi":
+            # Also before the lock: writing a map point moves nothing. The
+            # name is data the owner typed, logged by count not content.
+            saved = await robot_chassis.save_poi(str(body.get("name") or ""))
+            turnlog.record("robot_manual_command", action="save_poi")
+            return {"ok": True, "did": "save_poi", **saved}
+        if action == "save_map":
+            report = await robot_chassis.save_map()
+            turnlog.record("robot_manual_command", action="save_map")
+            return {"ok": True, "did": "save_map", **report}
+        if action == "dock_check":
+            return {"ok": True, "did": "dock_check", **(await robot_chassis.dock_check())}
+        if action == "register_dock":
+            # Moves nothing; fixes where `home` will go. Before the lock for
+            # the same reason relocalize is.
+            report = await robot_chassis.register_dock()
+            turnlog.record("robot_manual_command", action="register_dock")
+            return {"ok": True, "did": "register_dock", **report}
+        if not settings.robot_chassis_motion_enabled:
+            return {"ok": False, "error": "motion_locked",
+                    "hint": "ตั้ง ROBOT_CHASSIS_MOTION_ENABLED=true ใน .env แล้วรีสตาร์ต"}
+        if action == "drive":
+            # Hold-to-drive: the page repeats this every ~150 ms; only the
+            # first of a burst is worth a log line.
+            started = await robot_chassis.drive(str(body.get("direction") or ""))
+            if started:
+                turnlog.record("robot_manual_command", action="drive")
+            return {"ok": True, "did": "drive"}
+        if action == "forward":
+            await robot_chassis.nudge(forward_m=_NUDGE_METRES)
+        elif action == "back":
+            await robot_chassis.nudge(forward_m=-_NUDGE_METRES)
+        elif action == "left":
+            await robot_chassis.nudge(turn_rad=_NUDGE_RADIANS)
+        elif action == "right":
+            await robot_chassis.nudge(turn_rad=-_NUDGE_RADIANS)
+        elif action == "home":
+            await robot_chassis.go_home()
+        elif action == "undock":
+            report = await robot_chassis.undock()
+            if report["sent"] != "ok":
+                return {"ok": False, "error": "ออกจากแท่นไม่ได้ — " + report["sent"]}
+            turnlog.record("robot_manual_command", action="undock")
+            return {"ok": True, "did": "undock", **report}
+        elif action == "goto":
+            place = str(body.get("place") or "")
+            x, y = _coordinate(body, "x"), _coordinate(body, "y")
+            if place:
+                # A named point from the robot's own map — the only kind the
+                # voice path can ask for, and one the client cannot invent.
+                sent = await robot_chassis.send("move_to_point", place=place)
+            elif x is not None and y is not None:
+                # A clicked coordinate. The client chose it, so the server
+                # checks it is on the map before the motors hear about it.
+                try:
+                    sent = await robot_chassis.goto_xy(x, y)
+                except ValueError as exc:
+                    return {"ok": False, "error": str(exc)}
+            else:
+                return {"ok": False, "error": "goto ต้องมี place หรือ x,y"}
+            if sent != "ok":
+                return {"ok": False, "error": "ไปจุดนี้ไม่ได้ — " + sent}
+        else:
+            return {"ok": False, "error": f"ไม่รู้จักคำสั่ง {action!r}"}
+    except PermissionError:
+        return {"ok": False, "error": "motion_locked"}
+    except robot_chassis.ObstacleError as exc:
+        # A machine-readable shape, because the page shows this one as a
+        # warning in the radar rather than as a line of text.
+        return {"ok": False, "error": "obstacle", "hint": str(exc),
+                "blocked": {"direction": exc.direction,
+                            "distance": round(exc.distance, 3),
+                            "limit": exc.limit}}
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    turnlog.record("robot_manual_command", action=action)
+    return {"ok": True, "did": action}
+
+
+@app.get("/arm")
+async def serve_arm_control() -> FileResponse:
+    """Manual control of the upper body. A desk instrument, not a feature.
+
+    Deliberately a separate page from `/robot`. The chassis answers questions
+    about itself and can be told to stop; this board does neither, and putting
+    both on one screen would put a button that cannot stop an arm next to one
+    that really does stop the wheels.
+    """
+    return FileResponse(ROBOT_ARM_PAGE, headers=_NO_CACHE)
+
+
+@app.get("/hud")
+async def serve_robot_hud() -> FileResponse:
+    """One screen showing what is known about the robot, in its own shape.
+
+    Read-only. The controls stay at `/robot` and `/arm` and this links to
+    them, because two copies of a stop button drift apart and the copy that
+    drifts is found by whoever needed it most.
+    """
+    return FileResponse(ROBOT_HUD_PAGE, headers=_NO_CACHE)
+
+
+@app.get("/drive")
+async def serve_robot_drive() -> FileResponse:
+    """Hold-to-step driving. Pages only; every step still goes through
+    `/robot/command`, so the distance stays the server's decision."""
+    return FileResponse(ROBOT_DRIVE_PAGE, headers=_NO_CACHE)
+
+
+@app.get("/mapview")
+async def serve_robot_mapview() -> FileResponse:
+    """The chassis map with click-to-go. Reads `/robot/map`, sends `goto`
+    with a coordinate, and the server decides whether that point is on the
+    map before the motors hear about it."""
+    return FileResponse(ROBOT_MAPVIEW_PAGE, headers=_NO_CACHE)
+
+
+@app.get("/cam.jpg")
+async def robot_camera_frame(token: str = "") -> Response:
+    """The robot's latest camera frame, for the cockpit's live view.
+
+    The frames come from the robot's own kiosk page (?cam=1) into
+    `robot_camera.feed` — the same feed the greeter reads. A frame older than
+    two seconds is refused with 503, never served: a stale JPEG repeated while
+    the link is down reads as a still person to anyone watching, which is the
+    exact thing the greeter's "a frozen feed is a stopped camera" rule exists
+    to prevent. The polling <img> on the page shows its placeholder on the 503.
+    """
+    import time
+
+    from app import robot_camera
+
+    if not _authorized(token):
+        return Response(status_code=401)
+    _seq, jpeg, at = robot_camera.feed.latest()
+    if not jpeg or (time.monotonic() - at) > 2.0:
+        return Response(status_code=503)
+    return Response(content=jpeg, media_type="image/jpeg",
+                    headers={"Cache-Control": "no-store"})
+
+
+@app.get("/mic/level")
+async def mic_level_endpoint(token: str = "") -> dict:
+    """The robot kiosk's most recent mic level, for the cockpit meter.
+
+    Calls, wake mode, and the bounded mic test all report only RMS telemetry.
+    Fall back to the older standby meter for clients that predate kiosk
+    telemetry.  `streaming` is false when neither path sent a recent frame.
+    """
+    if not _authorized(token):
+        return {"ok": False, "error": "unauthorized"}
+    from app import robot_camera, wake
+
+    calibration = {
+        "near_field_floor": settings.vad_min_rms if settings.vad_mode == "local" else 0.0,
+        "capture_boost": settings.call_mic_boost,
+        "raw_floor_estimate": (
+            round(settings.vad_min_rms / settings.call_mic_boost, 5)
+            if (settings.vad_mode == "local" and settings.vad_min_rms > 0
+                and settings.call_mic_boost > 0 and not settings.mic_compressor)
+            else None
+        ),
+    }
+    robot = robot_camera.feed.mic_level()
+    if robot["streaming"]:
+        return {"ok": True, **robot,
+                "speech_floor": wake.WakeStream.SPEECH,
+                "quiet_floor": wake.WakeStream.QUIET, **calibration}
+    return {"ok": True, **wake.mic_level(), "source": "standby",
+            "device_label": None, **calibration}
+
+
+@app.post("/mic/control")
+async def mic_control(request: Request) -> dict:
+    """Ask the robot kiosk for one five-second level-only microphone test."""
+    from app import robot_camera
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    if not _authorized(body.get("token") or request.query_params.get("token")):
+        return {"ok": False, "error": "unauthorized"}
+    if body.get("action") != "probe":
+        return {"ok": False, "error": "ไม่รู้จักคำสั่งไมค์"}
+    if robot_camera.feed.senders < 1:
+        return {"ok": False, "error": "หน้า Emma บนหุ่นยังไม่เชื่อมต่อ"}
+    seq = robot_camera.feed.set_control(mic_probe_s=5)
+    return {"ok": True, "did": "probe", "seconds": 5, "seq": seq}
+
+
+@app.post("/cam/control")
+async def cam_control(request: Request) -> dict:
+    """Adjust the robot camera from the cockpit (currently zoom).
+
+    The camera track lives on the robot's own page, not here, so this only
+    records the wish; `/ws/camera` relays it to the page, which applies it
+    with `applyConstraints`. Zoom is the one setting this camera actually
+    exposes (1..4x, measured) — the FOV cannot be widened past the lens.
+    """
+    from app import robot_camera
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    if not _authorized(body.get("token") or request.query_params.get("token")):
+        return {"ok": False, "error": "unauthorized"}
+    ctl: dict = {}
+    if "zoom" in body:
+        try:
+            ctl["zoom"] = max(1.0, min(8.0, float(body["zoom"])))
+        except (TypeError, ValueError):
+            pass
+    if not ctl:
+        return {"ok": False, "error": "no control"}
+    seq = robot_camera.feed.set_control(**ctl)
+    return {"ok": True, "control": ctl, "seq": seq, "senders": robot_camera.feed.senders}
+
+
+@app.get("/console")
+async def serve_robot_console(request: Request, token: str = "") -> Response:
+    """Verified robot controls and live readings on one test-session screen.
+
+    Composes the existing chassis, arm, camera and microphone endpoints with
+    a narrow Android display controller. The two stop buttons stay distinct
+    on purpose — one is a chassis cancel that has been seen to work, the
+    other writes a frame nobody has watched stop a joint — and merging them
+    would let the proven one lend its credibility to the unproven one.
+    A direct navigation from this same computer may bootstrap the token.  A
+    cross-site fetch may not: without the Sec-Fetch-Site check, any webpage
+    open on the PC could read the redirect target and steal the LAN control
+    token through the permissive CORS middleware.
+    """
+    client_host = request.client.host if request.client else ""
+    fetch_site = request.headers.get("sec-fetch-site", "")
+    local_navigation = (
+        client_host in _LOOPBACK_HOSTS
+        and fetch_site in {"", "none", "same-origin"}
+    )
+    if not token and settings.ws_token and local_navigation:
+        return RedirectResponse(
+            "/console?token=" + quote(settings.ws_token, safe=""),
+            status_code=302,
+            headers=_NO_CACHE,
+        )
+    return FileResponse(ROBOT_CONSOLE_PAGE, headers=_NO_CACHE)
+
+
+@app.get("/android/state")
+async def robot_android_state(token: str = "") -> dict:
+    """Android hardware state used by the all-controls test console."""
+    from app import robot_android
+
+    if not _authorized(token):
+        return {"ok": False, "error": "unauthorized"}
+    try:
+        return {"ok": True, "state": await robot_android.state()}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@app.post("/android/command")
+async def robot_android_command(request: Request) -> dict:
+    """Allow-listed screen controls; never accepts a shell command or path."""
+    from app import robot_android
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    if not _authorized(body.get("token") or request.query_params.get("token")):
+        return {"ok": False, "error": "unauthorized"}
+    action = str(body.get("action") or "")
+    try:
+        if action == "brightness":
+            result = await robot_android.set_brightness(
+                str(body.get("display") or ""), int(body.get("percent")))
+        elif action == "rotation":
+            return {"ok": False, "error": "rotation_not_effective",
+                    "hint": "ทดสอบกับหุ่นแล้ว Android รับค่า แต่จอจริงไม่หมุน"}
+        else:
+            return {"ok": False, "error": "ไม่รู้จักคำสั่ง Android"}
+    except (TypeError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    turnlog.record("robot_android_command", action=action)
+    return {"ok": True, "did": action, "result": result}
+
+
+@app.get("/arm/state")
+async def arm_state(token: str = "") -> dict:
+    from app import robot_arm
+
+    if not _authorized(token):
+        return {"ok": False, "error": "unauthorized"}
+    try:
+        return {"ok": True, "state": await robot_arm.state()}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@app.post("/arm/command")
+async def arm_command(request: Request) -> dict:
+    """One line on the servo board's wire, or a refusal.
+
+    `stop` and `arm` are dispatched before the configuration check for the
+    same reason stop comes first on the chassis page: the state of a switch
+    must never be the reason somebody cannot disarm a machine. They are also
+    the only two that do not touch the port at all.
+    """
+    from app import robot_arm
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    if not _authorized(body.get("token") or request.query_params.get("token")):
+        return {"ok": False, "error": "unauthorized"}
+
+    action = str(body.get("action") or "")
+    if action == "stop":
+        out = await robot_arm.stop()
+        note = ("ล็อกแล้ว และเชลล์บนหุ่นรายงานว่าเขียน #STOP สำเร็จ — "
+                if out["stop_write_ok"] else
+                "ล็อกแล้ว แต่การเขียน #STOP ล้มเหลว — ")
+        return {"ok": True, "did": "stop",
+                "stop_write_ok": out["stop_write_ok"], "error": out["error"],
+                "note": note + "ไม่ยืนยันว่าเฟรมถึงบอร์ดหรือแขนหยุด "
+                               "ตัวหยุดที่แน่นอนคือไฟเลี้ยงเซอร์โว"}
+    if action == "group" and not settings.robot_arm_groups_enabled:
+        # Ahead of the configuration and port checks so the reason reported is
+        # the one that will still be true after the port comes back.
+        return {"ok": False, "error": "groups_locked",
+                "hint": "กลุ่มท่าขยับช่องไหนไกลแค่ไหนยังไม่มีใครรู้ — "
+                        "ตั้ง ROBOT_ARM_GROUPS_ENABLED=true ใน .env แล้วรีสตาร์ต"}
+    if action == "arm":
+        robot_arm.arm()
+        return {"ok": True, "did": "arm"}
+
+    if not robot_arm.configured():
+        return {"ok": False, "error": "arm_not_configured",
+                "hint": "ตั้ง ROBOT_ARM_ENABLED=true และ ROBOT_ARM_PORT ใน .env แล้วรีสตาร์ต"}
+    if not await robot_arm.port_present():
+        return {"ok": False, "error": "port_missing",
+                "hint": f"ไม่พบ {robot_arm.port_description()} บนหุ่นตอนนี้"}
+
+    try:
+        if action == "prepare":
+            out = await robot_arm.prepare()
+            return {"ok": out == "ok", "did": "prepare", "note": out}
+        channel = int(body.get("channel") or 0)
+        if action == "centre":
+            at = await robot_arm.centre(channel)
+        elif action in ("up", "down"):
+            at = await robot_arm.step(channel, 1 if action == "up" else -1)
+        elif action == "group":
+            await robot_arm.run_group(int(body.get("group") or 0))
+            at = None
+        else:
+            return {"ok": False, "error": f"ไม่รู้จักคำสั่ง {action!r}"}
+    except PermissionError as exc:
+        if str(exc) == "motion_locked":
+            return {"ok": False, "error": "motion_locked",
+                    "hint": "ยังไม่มีวิธีหยุดแขนที่พิสูจน์แล้ว (#STOP ได้ ACK แต่ข้อต่อเคลื่อนต่อ) — "
+                            "ตั้ง ROBOT_ARM_MOTION_ENABLED=true ใน .env เมื่อมีคนตัดสินใจแล้ว"}
+        return {"ok": False, "error": "disarmed",
+                "hint": "กดปุ่มพร้อมสั่งงานก่อน"}
+    except (ValueError, LookupError) as exc:
+        return {"ok": False, "error": str(exc)}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    turnlog.record("robot_arm_command", action=action)
+    return {"ok": True, "did": action, "at": at}
+
+
 async def _hold_standby(websocket: WebSocket, wake) -> None:
     """Keep a browser reachable without listening to it.
 
@@ -581,6 +1300,71 @@ async def ws_endpoint(websocket: WebSocket, voice: str | None = None, provider: 
         return
     await handle_connection(websocket, provider=provider, voice=voice, profile=profile, lang=lang,
                             summoned=summoned == "1")
+
+
+@app.websocket("/ws/camera")
+async def ws_camera(websocket: WebSocket, token: str | None = None) -> None:
+    """The robot's camera, one JPEG per binary message (kiosk `?cam=1`).
+
+    Receives only. Frames land in `robot_camera.feed`, which the greeter
+    reads when FACE_CAMERA_SOURCE=robot - see app/robot_camera.py for why
+    the robot's own page is the sender. Token-gated like every socket: a
+    picture of the showroom door is not for "some socket on the LAN".
+    """
+    import asyncio
+    import json as _json
+
+    from app import robot_camera
+
+    if await _reject_unauthorized(websocket, token):
+        return
+    await websocket.accept()
+    robot_camera.feed.attach()
+
+    async def _recv_frames() -> None:
+        while True:
+            msg = await websocket.receive()
+            if msg.get("type") == "websocket.disconnect":
+                return
+            data = msg.get("bytes")
+            if data:
+                robot_camera.feed.push(data)
+                continue
+            text = msg.get("text")
+            if text:
+                try:
+                    event = _json.loads(text)
+                    if (event.get("type") == "mic_level"
+                            and isinstance(event.get("level"), (int, float))
+                            and not isinstance(event.get("level"), bool)):
+                        robot_camera.feed.push_mic_level(
+                            event["level"], str(event.get("label") or ""))
+                except (TypeError, ValueError, _json.JSONDecodeError):
+                    continue
+
+    async def _push_control() -> None:
+        # The one thing the server sends the robot's page: camera controls the
+        # cockpit asked for (zoom). Latest-wins, and sent on connect too so a
+        # page that reconnected picks up the current setting.
+        last = -1
+        while True:
+            seq, ctl = robot_camera.feed.control()
+            if seq != last and ctl:
+                last = seq
+                await websocket.send_text(_json.dumps({"type": "camctl", **ctl}))
+                if "mic_probe_s" in ctl:
+                    robot_camera.feed.clear_control("mic_probe_s")
+            await asyncio.sleep(0.3)
+
+    tasks = [asyncio.create_task(_recv_frames()), asyncio.create_task(_push_control())]
+    try:
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        for t in tasks:
+            t.cancel()
+        robot_camera.feed.detach()
 
 
 @app.websocket("/ws/display")
