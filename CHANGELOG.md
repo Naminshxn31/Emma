@@ -1,5 +1,13 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-22 — ปิดกล่องข้อความได้และกันเสียงคลิกไม่ให้ Emma ตอบเอง
+
+- `client/voice-preview.html`: เพิ่มปุ่ม × ใน transcript drawer, ให้ปุ่มข้อความเดิมสลับเปิด/ปิด, รองรับ `Escape` และซิงก์ `aria-expanded`, `aria-controls`, label และ focus ให้ตรงกับสถานะจริง
+- `app/config.py`, `app/vad_gate.py`, `.env.example`, `README.md`: เพิ่ม `VAD_MIN_SPEECH_MS` ค่าเริ่มต้น 250 ms สำหรับ local Silero VAD เพื่อไม่เปิด turn จากเสียงคลิก/กระแทกสั้น ๆ โดยยังใช้ prefix padding เก็บหัวคำพูดจริง
+- `tests/test_voice_preview_page.py`, `tests/test_vad_gate.py`: เพิ่ม regression สำหรับทุกทางปิด drawer และยืนยันว่า detector ใช้เกณฑ์เสียงต่อเนื่อง 250 ms
+- เหตุผล: drawer บังปุ่มข้อความด้านล่างแต่ไม่มีปุ่มปิดในตัว และเกณฑ์ `min_speech_duration` เดิม 100 ms ยอมรับ transient สั้นจนเกิดคำถอดเสียงหลอน `FB1` แล้วโมเดลตอบทั้งที่ผู้ใช้ไม่ได้พูด
+- ผลตรวจจริง: รีสตาร์ตเซิร์ฟเวอร์แล้วเปิด drawer บนหน้าพรีวิวจริง ตรวจว่าปุ่ม × และ `Escape` ปิดกล่องพร้อมคืนสถานะปุ่มเป็น collapsed ได้; local Silero โหลดด้วย `min_speech_ms=250` และการป้อน transient ดัง 100 ms ให้ผล 0 speech segments/0 wire actions; ชุดทดสอบ voice, preview, VAD, Android packaging และ JavaScript syntax ผ่าน 217 รายการ มีเพียง warning เดิมจาก Starlette/httpx และ pytest cache
+
 ## 2026-09-22 — ให้ลาก Emma ต่อได้หลังย้ายไปขอบจอ
 
 - `client/voice-preview.html`: ย้าย `translate/scale` จาก canvas/rig ภายในไปไว้ที่ `.mascot-wrap` เพื่อให้พื้นที่รับ pointer เคลื่อนตามภาพ Emma จริง, ปิด transition ระหว่างลาก และคำนวณขอบจากตำแหน่ง layout กับขนาดหลัง scale โดยเหลือพื้นที่ให้จับกลับอย่างน้อย 48–96px

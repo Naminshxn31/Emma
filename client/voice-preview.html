@@ -2368,7 +2368,10 @@
         + 'background:rgba(10,14,20,.97);border-top:1px solid rgba(255,255,255,.12);'
         + 'padding:16px 18px 22px;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;'
         + 'color:#e7edf3;z-index:50;box-shadow:0 -18px 40px rgba(0,0,0,.5)}'
-        + '.vp-drawer h4{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8b97a5}'
+        + '.vp-drawer-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 10px}'
+        + '.vp-drawer h4{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8b97a5}'
+        + '.vp-drawer-close{display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid rgba(255,255,255,.16);border-radius:50%;background:rgba(255,255,255,.06);color:#fff;font:24px/1 system-ui;cursor:pointer}'
+        + '.vp-drawer-close:hover,.vp-drawer-close:focus-visible{background:rgba(255,255,255,.14);outline:2px solid #69edba;outline-offset:2px}'
         + '.vp-line{margin:0 0 8px;max-width:640px}'
         + '.vp-line .w{font-size:11px;color:#8b97a5;margin-right:6px}'
         + '.vp-line.emma .w{color:#33d17a}'
@@ -2377,12 +2380,31 @@
       document.head.appendChild(s);
       drawer = document.createElement('section');
       drawer.className = 'vp-drawer';
+      drawer.id = 'emma-transcript-drawer';
+      drawer.setAttribute('aria-label', 'บทสนทนา');
       drawer.hidden = true;
-      drawer.innerHTML = '<h4>บทสนทนา</h4>'
+      drawer.innerHTML = '<div class="vp-drawer-head"><h4>บทสนทนา</h4>'
+        + '<button class="vp-drawer-close" type="button" aria-label="ปิดกล่องข้อความ" title="ปิด">×</button></div>'
         + '<p class="vp-asr-note">ข้อความฝั่งคุณเป็นคำถอดเสียงอัตโนมัติ อาจต่างจากสิ่งที่ Emma เข้าใจจากเสียง</p>'
         + '<div class="vp-body"></div>';
       document.body.appendChild(drawer);
+      drawer.querySelector('.vp-drawer-close').onclick = function () {
+        setTranscriptDrawerOpen(false);
+        if (msgBtn) msgBtn.focus({ preventScroll: true });
+      };
       return drawer;
+    }
+    function setTranscriptDrawerOpen(open) {
+      if (open) ensureDrawer();
+      if (drawer) drawer.hidden = !open;
+      if (msgBtn) {
+        msgBtn.setAttribute('aria-pressed', open ? 'true' : 'false');
+        msgBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        msgBtn.setAttribute('aria-controls', 'emma-transcript-drawer');
+        msgBtn.setAttribute('aria-label', open ? 'Close transcript' : 'Open transcript');
+        msgBtn.setAttribute('title', open ? 'ปิดข้อความ' : 'เปิดข้อความ');
+      }
+      if (open) renderDrawer();
     }
     function renderDrawer() {
       if (!drawer || drawer.hidden) return;
@@ -2403,9 +2425,8 @@
       if (drawer) {
         var body = drawer.querySelector('.vp-body');
         if (body) body.innerHTML = '<p class="vp-empty">No conversation yet.</p>';
-        drawer.hidden = true;
       }
-      if (msgBtn) msgBtn.setAttribute('aria-pressed', 'false');
+      setTranscriptDrawerOpen(false);
     }
     function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
     // Assistant transcript streams in pieces; replace the open Emma line
@@ -2578,11 +2599,13 @@
     if (micBtn) micBtn.onclick = function () { if (!inCall) startCall(); else toggleMute(); };
     if (endBtn) endBtn.onclick = function () { endCall(); };
     if (msgBtn) msgBtn.onclick = function () {
-      ensureDrawer();
-      drawer.hidden = !drawer.hidden;
-      msgBtn.setAttribute('aria-pressed', drawer.hidden ? 'false' : 'true');
-      renderDrawer();
+      setTranscriptDrawerOpen(!drawer || drawer.hidden);
     };
+    addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape' || !drawer || drawer.hidden) return;
+      setTranscriptDrawerOpen(false);
+      if (msgBtn) msgBtn.focus({ preventScroll: true });
+    });
     addEventListener('emma-native-pause', function () { if (inCall) endCall(); });
     addEventListener('pagehide', function () { if (inCall) endCall(); });
 

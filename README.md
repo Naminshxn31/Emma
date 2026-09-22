@@ -822,6 +822,10 @@ transcription quality; higher just feels sluggish.
 `VAD_PREFIX_PADDING_MS` (default 300) is how much audio *before* detected
 speech gets included, so the first syllable isn't clipped.
 
+With `VAD_MODE=local`, `VAD_MIN_SPEECH_MS` (default 250) requires sustained
+speech before opening a turn. It rejects short clicks and desk bumps without
+clipping word starts because the prefix buffer is sent when speech is accepted.
+
 OpenAI additionally supports `OPENAI_TURN_DETECTION=semantic_vad`, which
 decides the guest is done based on whether the sentence *sounds* complete
 rather than on silence alone. `OPENAI_VAD_EAGERNESS` trades responsiveness

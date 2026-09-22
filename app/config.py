@@ -814,6 +814,9 @@ class Settings:
     # pauses and hurts quality; longer just feels sluggish.
     vad_silence_ms: int = int(os.getenv("VAD_SILENCE_MS", "500"))
     vad_prefix_padding_ms: int = int(os.getenv("VAD_PREFIX_PADDING_MS", "300"))
+    # Local Silero only: reject clicks/bumps that resemble speech for one or
+    # two frames. Pre-roll preserves the beginning while the detector waits.
+    vad_min_speech_ms: int = int(os.getenv("VAD_MIN_SPEECH_MS", "250"))
 
     # Gemini only. Read these carefully — the names are the opposite of what
     # they sound like:

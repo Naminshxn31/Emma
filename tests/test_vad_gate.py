@@ -264,6 +264,42 @@ def test_for_session_carries_the_configured_floor(monkeypatch):
     assert gate._min_rms == pytest.approx(0.07)
 
 
+def test_local_detector_requires_sustained_speech_to_reject_clicks(monkeypatch, tmp_path):
+    """A one-frame desk tap must not become a user turn and model reply."""
+    import sys
+    from types import SimpleNamespace
+
+    from app import vad_gate
+
+    model = tmp_path / "silero.onnx"
+    model.write_bytes(b"model placeholder")
+
+    class VadModelConfig:
+        def __init__(self):
+            self.silero_vad = SimpleNamespace(
+                model="", threshold=0, min_silence_duration=0,
+                min_speech_duration=0)
+            self.sample_rate = 0
+
+    captured = {}
+
+    def detector(config, buffer_size_in_seconds):
+        captured["config"] = config
+        captured["buffer"] = buffer_size_in_seconds
+        return SimpleNamespace()
+
+    fake_sherpa = SimpleNamespace(
+        VadModelConfig=VadModelConfig,
+        VoiceActivityDetector=detector,
+    )
+    monkeypatch.setitem(sys.modules, "sherpa_onnx", fake_sherpa)
+    monkeypatch.setattr(settings, "vad_model", str(model))
+    monkeypatch.setattr(settings, "vad_min_speech_ms", 250)
+
+    assert vad_gate._make_detector() is not None
+    assert captured["config"].silero_vad.min_speech_duration == pytest.approx(0.25)
+
+
 def test_the_call_uses_its_own_mic_boost_not_standbys():
     """The two modes want opposite microphones: standby's compressor lets
     the name carry across the room, and the same compressor lifts everyone

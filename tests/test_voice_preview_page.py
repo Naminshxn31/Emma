@@ -405,6 +405,17 @@ def test_drag_moves_the_mascot_hit_area_and_keeps_a_regrabbable_edge_visible():
     assert ".mascot-wrap.is-dragging { cursor: grabbing; transition: none; }" in html
 
 
+def test_transcript_drawer_can_be_closed_with_button_toggle_or_escape():
+    html = PAGE.read_text(encoding="utf-8")
+
+    assert 'class="vp-drawer-close"' in html
+    assert 'aria-label="ปิดกล่องข้อความ"' in html
+    assert "function setTranscriptDrawerOpen(open)" in html
+    assert "setTranscriptDrawerOpen(!drawer || drawer.hidden)" in html
+    assert "event.key !== 'Escape'" in html
+    assert "msgBtn.setAttribute('aria-expanded'" in html
+
+
 def test_preview_is_served_at_its_own_url_not_over_slash(client):
     """The new design lives at /preview. `/` stays index.html untouched —
     the whole point of building it beside the production page rather than on
@@ -469,7 +480,7 @@ def test_preview_wipes_each_guests_transcript_on_every_exit_and_new_call():
     close = code[code.index("ws.onclose = function") : code.index("function endCall()")]
 
     assert "transcript = []" in clear_fn
-    assert "drawer.hidden = true" in clear_fn
+    assert "setTranscriptDrawerOpen(false)" in clear_fn
     assert "curUser = ''" in clear_fn
     assert "userLine = null" in clear_fn
     assert "clearTranscript();" in start

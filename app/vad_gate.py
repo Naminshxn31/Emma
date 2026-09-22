@@ -243,7 +243,10 @@ def _make_detector():
         # was just raised to 900 because 500 cut off Thai speakers pausing
         # mid-sentence; that decision must survive the mode switch.
         cfg.silero_vad.min_silence_duration = settings.vad_silence_ms / 1000
-        cfg.silero_vad.min_speech_duration = 0.1
+        # 100 ms admitted desk taps and browser/USB transients as one-word
+        # turns (measured as the phantom transcript "FB1"). Wait for sustained
+        # speech; prefix padding keeps the first syllable in the sent audio.
+        cfg.silero_vad.min_speech_duration = max(0, settings.vad_min_speech_ms) / 1000
         cfg.sample_rate = 16000
         return sherpa_onnx.VoiceActivityDetector(cfg, buffer_size_in_seconds=30)
     except Exception:
