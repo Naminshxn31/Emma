@@ -32,7 +32,7 @@ def test_voice_preview_keeps_the_reference_layout_and_accessible_controls():
     assert 'stroke="currentColor"' in html
     assert not any(icon in html for icon in ("💬", "🎤", "✕"))
 
-    for label in ("Open transcript", "Mute microphone", "End conversation"):
+    for label in ("Open transcript", "Start voice conversation", "End conversation"):
         assert f'aria-label="{label}"' in html
 
 
@@ -210,7 +210,7 @@ def test_voice_preview_packages_and_drives_the_rive_mascot():
         'class="mascot-rive"',
         'src="/assets/vendor/rive/rive.js"',
         "RuntimeLoader.setWasmUrl('/assets/vendor/rive/rive.wasm')",
-        "src: '/assets/emma/emma.riv?v=20260921-blink1'",
+        "src: '/assets/emma/emma.riv?v=20260922-connect1'",
         "stateMachine: 'EmmaVoice'",
         "stateMachineInputs('EmmaVoice')",
         "setRiveInput('mode'",
@@ -289,6 +289,23 @@ def test_rive_blink_compresses_the_chrome_eyes_without_white_discs():
     assert '<KeyFrameDouble value="0.08" frame="156"/>' in blink
     assert '<Shape x="-87" y="-17" scaleY="0.02" opacity="0" name="Left Eyelid"' in source
     assert '<Shape x="87" y="-17" scaleY="0.02" opacity="0" name="Right Eyelid"' in source
+
+
+def test_connecting_and_listening_keep_the_arms_in_the_approved_rest_pose():
+    html = PAGE.read_text(encoding="utf-8")
+    source = (ROOT / "client" / "rive" / "emma" / "scene.rml").read_text(encoding="utf-8")
+    listening = source.split('name="listening" id="0:220">', 1)[1].split("</LinearAnimation>", 1)[0]
+
+    assert "listening: 2, thinking: 3, loading: 0" in html
+    assert 'objectId="0:60"' in listening
+    assert 'value="-0.18" frame="72"' in listening
+    assert 'objectId="0:70"' in listening
+    assert 'value="0.18" frame="72"' in listening
+    assert 'value="-0.45"' not in listening
+    assert 'value="0.45"' not in listening
+    assert 'body[data-emma-state="idle"] .topbar { opacity: .78; }' in html
+    assert "'Tap to talk': appShell ? 'เริ่มสนทนาด้วยเสียง'" in html
+    assert html.count("micBtn.setAttribute('aria-pressed', 'false')") >= 4
 
     # The eyes are the one exception to the shared scale: the atlas eye cell is
     # flatter than the eyes in the approved render, so scaleY is measured off

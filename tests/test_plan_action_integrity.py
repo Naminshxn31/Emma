@@ -208,26 +208,31 @@ def test_voice_socket_pump_routes_ack_to_pending_action(monkeypatch):
 
 
 def test_browser_requires_hash_and_does_not_reload_plan_on_tool_result():
-    source = (Path(__file__).parents[1] / "client" / "index.html").read_text(encoding="utf-8")
-    assert "await planSha256Hex(await blob.arrayBuffer())" in source
-    assert "await decoded.decode()" in source and "await shown.decode()" in source
-    assert "case 'display_command':" in source
-    assert "case 'display_cancel':" in source and "pending.controller.abort()" in source
-    assert "if (r.screen === 'plan') showPlan(r)" not in source
+    client = Path(__file__).parents[1] / "client"
+    page_source = (client / "index.html").read_text(encoding="utf-8")
+    protocol_source = (client / "plan-display-protocol.js").read_text(encoding="utf-8")
+    assert '<script src="/plan-display-protocol.js"></script>' in page_source
+    assert "await sha256Hex(await blob.arrayBuffer())" in protocol_source
+    assert "await decoded.decode()" in protocol_source and "await shown.decode()" in protocol_source
+    assert "case 'display_command':" in page_source
+    assert "case 'display_cancel':" in page_source and "p.controller.abort()" in protocol_source
+    assert "if (r.screen === 'plan') showPlan(r)" not in page_source
 
 
 def test_lan_http_sha256_fallback_matches_known_vectors():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node unavailable; browser SHA-256 fallback not executable here")
-    source = (Path(__file__).parents[1] / "client" / "index.html").read_text(encoding="utf-8")
-    code = source.split("async function planSha256Hex(buffer) {", 1)[1].split(
-        "async function handlePlanDisplayCommand", 1)[0]
+    source = (Path(__file__).parents[1] / "client" / "plan-display-protocol.js").read_text(
+        encoding="utf-8")
+    code = source.split("async function sha256Hex(buffer) {", 1)[1].split(
+        "\n  function create(options)", 1)[0]
     vectors = ["", "abc", "x" * 65000]
     harness = ("Object.defineProperty(globalThis, 'crypto', {value: undefined});\n"
-               + "async function planSha256Hex(buffer) {" + code
+               + "const root = globalThis;\n"
+               + "async function sha256Hex(buffer) {" + code
                + "\n(async () => { for (const value of " + json.dumps(vectors)
-               + ") console.log(await planSha256Hex(new TextEncoder().encode(value).buffer)); })();")
+               + ") console.log(await sha256Hex(new TextEncoder().encode(value).buffer)); })();")
     result = subprocess.run([node, "-"], input=harness, capture_output=True, text=True,
                             timeout=10, check=True)
     assert result.stdout.splitlines() == [hashlib.sha256(v.encode()).hexdigest()

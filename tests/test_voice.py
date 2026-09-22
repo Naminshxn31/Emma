@@ -2208,6 +2208,26 @@ def test_only_guest_speech_resets_the_idle_clock(monkeypatch):
 # ============ the LAN gate ============
 
 
+def test_tokenless_websocket_is_allowed_only_from_the_same_loopback_page():
+    from types import SimpleNamespace
+
+    from app.main import _same_origin_loopback_websocket
+
+    def socket(client_host="127.0.0.1", origin="https://127.0.0.1:8001",
+               host="127.0.0.1:8001"):
+        return SimpleNamespace(
+            client=SimpleNamespace(host=client_host),
+            headers={"origin": origin, "host": host},
+        )
+
+    assert _same_origin_loopback_websocket(socket()) is True
+    assert _same_origin_loopback_websocket(
+        socket(client_host="::1", origin="https://localhost:8001", host="localhost:8001")) is True
+    assert _same_origin_loopback_websocket(socket(origin="https://example.com")) is False
+    assert _same_origin_loopback_websocket(socket(client_host="192.168.1.8")) is False
+    assert _same_origin_loopback_websocket(socket(origin="")) is False
+
+
 def test_every_socket_refuses_a_missing_or_wrong_token(monkeypatch):
     """WS_TOKEN set = every WebSocket demands it. The machines crossed the
     LAN line (HOST=0.0.0.0) carrying tools that open programs and press

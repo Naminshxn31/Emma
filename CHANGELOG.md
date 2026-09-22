@@ -1,5 +1,15 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-22 — แก้ปุ่มพูดเชื่อมต่อไม่ได้และไม่ให้แขนขยับตอนเริ่มฟัง
+
+- `client/rive/emma/scene.rml`, `client/assets/emma/emma.riv`: เปลี่ยน keyframe แขนของสถานะ `listening` จากมุมกาง `±0.45` เป็นมุมพัก `±0.18` เท่ากับ idle ให้ Emma ขยับลอย/หายใจได้โดยไม่กางแขนทันทีเมื่อกดปุ่ม
+- `client/voice-preview.html`: ให้ `loading` ใช้ท่าพักแทนท่าคิดที่ยกแขน, แสดงแถบสถานะแม้ยังไม่ได้ต่อสาย, แก้ accessibility label ของปุ่มให้ตรงกับการกระทำ เริ่มสนทนา/ปิดไมค์/เปิดไมค์ และเพิ่ม asset version เพื่อเลี่ยง cache
+- `app/main.py`: อนุญาต WebSocket ที่ไม่มี token เฉพาะเมื่อ TCP peer, `Origin` และ `Host` เป็น loopback origin เดียวกัน เพื่อให้หน้า `https://127.0.0.1:8001/preview` บนเครื่องนี้กดพูดได้โดยไม่เผย `WS_TOKEN` ใน URL; หน้าเว็บอื่น, LAN และ client ที่ไม่มี Origin ยังต้องใช้ token เหมือนเดิม
+- `tests/test_voice_preview_page.py`, `tests/test_voice.py`: เพิ่ม regression ว่า connecting/listening ใช้มุมแขนพัก, สถานะ idle ยังมองเห็นข้อความเชื่อมต่อ และข้อยกเว้น tokenless รับเฉพาะ same-origin loopback
+- `tests/test_plan_action_integrity.py`: ปรับเทสต์ความถูกต้องของ hash ให้ตรวจ implementation กลางใน `client/plan-display-protocol.js` ซึ่งหน้าเว็บใช้งานจริง แทนชื่อฟังก์ชันเก่าที่เคยฝังใน `client/index.html`
+- เหตุผล: process เซิร์ฟเวอร์เดิมยังถือ `Settings` รุ่นก่อนเพิ่ม `transcribe_mode` จึงเปิดหน้าได้แต่ `/ws` ตอบ `provider_error`; หน้า idle ซ่อนข้อความ error และการ map `loading → thinking`, `listening → ยกแขน` ทำให้ดูเหมือนปุ่มไม่เชื่อมต่อพร้อมมือขยับผิดจังหวะ
+- ผลตรวจจริง: รีสตาร์ตเซิร์ฟเวอร์ที่พอร์ต 8001 แล้ว `/health` ตอบ 200, WebSocket same-origin ที่ไม่ส่ง token ตอบ `ready` จาก `gemini-3.8-live` เสียง `Despina`, foreign origin ถูกปฏิเสธด้วย `unauthorized`; กดปุ่มบนหน้าพรีวิวจริงแล้วเชื่อมต่อและได้รับคำทักทายจาก Emma โดยแขนอยู่ท่าพัก (เบราว์เซอร์ทดสอบภายในไม่มีอุปกรณ์ไมค์ จึงไม่ได้ตรวจเสียงจากไมค์จริง); Rive verify 0 errors/0 warnings, inspect 0 problems/1 artboard และ build `emma.riv` 793,906 bytes; ชุดทดสอบเฉพาะส่วนผ่าน 35 รายการและชุดเต็มผ่าน 1,636 รายการ มีเพียง warning เดิมจาก Starlette/httpx และ pytest cache
+
 ## 2026-09-21 — แก้ blink ของ Emma ไม่ให้ตากลายเป็นวงรีขาว
 
 - `client/rive/emma/scene.rml`: เปลี่ยน blink จากการเปิดแผ่นเปลือกตาวงรีสีขาวทับหน้า เป็นการย่อ artwork ตาโครเมียมตามแกน Y ชั่วครู่ จึงอ่านเป็นตาปิดและไม่มีเฟรมที่ตาหายเป็นช่องขาว

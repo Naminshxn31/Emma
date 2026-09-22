@@ -1,11 +1,12 @@
 """FastAPI entry point: serves the voice UI and bridges it to the chosen provider."""
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import secrets
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from collections import deque
 from datetime import datetime
@@ -440,16 +441,49 @@ async def serve_plan_display_protocol() -> FileResponse:
     return FileResponse(PLAN_DISPLAY_PROTOCOL, media_type="text/javascript", headers=_NO_CACHE)
 
 
+def _same_origin_loopback_websocket(websocket: WebSocket) -> bool:
+    """Allow the local Emma page to dial without exposing WS_TOKEN in its URL.
+
+    The TCP peer, page Origin and request Host must all be the same loopback
+    origin. An internet page can ask a browser to reach localhost, but its
+    Origin will not match this WebSocket Host and is rejected. LAN clients and
+    non-browser clients still need the configured token.
+    """
+    client = websocket.client
+    if client is None:
+        return False
+    try:
+        if not ipaddress.ip_address(client.host).is_loopback:
+            return False
+    except ValueError:
+        return False
+
+    origin = websocket.headers.get("origin", "")
+    host = websocket.headers.get("host", "")
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    try:
+        origin_is_loopback = ipaddress.ip_address(parsed.hostname).is_loopback
+    except ValueError:
+        origin_is_loopback = parsed.hostname.casefold() == "localhost"
+    return origin_is_loopback and parsed.netloc.casefold() == host.casefold()
+
+
 async def _reject_unauthorized(websocket: WebSocket, token: str | None) -> bool:
     """True = this socket was rejected and closed.
 
-    Applied to every WebSocket the moment WS_TOKEN is set: the same server
-    that answers questions also opens programs and presses keys, so "some
-    socket on the LAN" must never be enough to reach it. Accept-then-close
-    because a handshake-level refusal shows browsers nothing actionable —
-    this way the page can display *why* and stand down instead of redialing.
+    Applied to every WebSocket the moment WS_TOKEN is set, except a tokenless
+    connection from the same loopback page. The same server that answers
+    questions also opens programs and presses keys, so "some socket on the
+    LAN" must never be enough to reach it. Accept-then-close because a
+    handshake-level refusal shows browsers nothing actionable — this way the
+    page can display *why* and stand down instead of redialing.
     """
-    if not settings.ws_token:
+    if not settings.ws_token or (not token and _same_origin_loopback_websocket(websocket)):
         return False
     # Encoded, not compared as str: `compare_digest` refuses non-ASCII text,
     # and a token someone pastes out of a password manager can contain

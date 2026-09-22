@@ -1174,7 +1174,7 @@
     transition: opacity .25s ease;
   }
 
-  html.app-shell body[data-emma-state="idle"] .topbar { opacity: 0; }
+  html.app-shell body[data-emma-state="idle"] .topbar { opacity: .78; }
   html.app-shell .status {
     padding: 8px 16px;
     border: 1px solid rgba(255,255,255,.07);
@@ -1422,7 +1422,7 @@
         <span class="control-label">Message</span>
       </button>
 
-      <button class="control mic" type="button" aria-label="Mute microphone" title="Mute microphone" aria-pressed="false">
+      <button class="control mic" type="button" aria-label="Start voice conversation" title="Start voice conversation" aria-pressed="false">
         <span class="control-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
         </span>
@@ -1518,7 +1518,7 @@
       };
 
       var riveModeValues = {
-        idle: 0, greeting: 1, listening: 2, thinking: 3, loading: 3,
+        idle: 0, greeting: 1, listening: 2, thinking: 3, loading: 0,
         speaking: 4, happy: 5, grateful: 5, error: 6, frustrated: 6
       };
 
@@ -1543,7 +1543,7 @@
         try {
           window.rive.RuntimeLoader.setWasmUrl('/assets/vendor/rive/rive.wasm');
           riveController = new window.rive.Rive({
-            src: '/assets/emma/emma.riv?v=20260921-blink1',
+            src: '/assets/emma/emma.riv?v=20260922-connect1',
             canvas: riveCanvas,
             artboard: 'Emma',
             stateMachine: 'EmmaVoice',
@@ -2067,6 +2067,7 @@
       ws = null;
       inCall = false;
       manualEnd = true;
+      if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
       releaseCallHardware();
       try { failedSocket && failedSocket.close(); } catch (e) {}
     }
@@ -2254,6 +2255,7 @@
       clearTranscript();
       planDisplay.reset();
       manualEnd = false; inCall = true;
+      if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
       try { ws && ws.close(); } catch (e) {}
       releaseCallHardware();
       sentMs = 0; playHead = 0; sources = []; playing = false;
@@ -2282,6 +2284,7 @@
         planDisplay.reset();
         releaseCallHardware();
         inCall = false;
+        if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
         clearTranscript();
         setMicLabel('Tap to talk');
         if (!manualEnd) { show('idle'); status('Disconnected — tap the mic to try again'); }
@@ -2292,6 +2295,7 @@
     function endCall() {
       manualEnd = true;
       inCall = false;
+      if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
       clearTranscript();
       planDisplay.reset();
       try { ws && ws.close(); } catch (e) {}
@@ -2316,6 +2320,17 @@
     };
     function setMicLabel(text) {
       if (micLabel) micLabel.textContent = appShell && appMicLabels[text] ? appMicLabels[text] : text;
+      if (micBtn) {
+        var action = ({
+          'Tap to talk': appShell ? 'เริ่มสนทนาด้วยเสียง' : 'Start voice conversation',
+          'Connecting': appShell ? 'กำลังเชื่อมต่อ Emma' : 'Connecting to Emma',
+          'Listening': appShell ? 'ปิดไมโครโฟน' : 'Mute microphone',
+          'Muted': appShell ? 'เปิดไมโครโฟน' : 'Unmute microphone',
+          'Mic unavailable': appShell ? 'ลองเปิดไมโครโฟนอีกครั้ง' : 'Retry microphone'
+        })[text] || text;
+        micBtn.setAttribute('aria-label', action);
+        micBtn.setAttribute('title', action);
+      }
     }
 
     // ---- Message button: a plain transcript drawer (aria was "Open
