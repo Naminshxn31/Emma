@@ -504,6 +504,24 @@ def test_preview_labels_asr_honestly_and_keeps_one_user_line_per_utterance():
     assert "userLine = null" in speech_branch
 
 
+def test_first_audio_chunk_keeps_the_start_of_emmas_transcript():
+    code = _engine_code()
+    binary_branch = code.split("if (msg.data instanceof ArrayBuffer) {", 1)[1].split("var evt;", 1)[0]
+    assistant_branch = code.split("case 'assistant_transcript':", 1)[1].split("break;", 1)[0]
+    complete_branch = code.split("case 'turn_complete':", 1)[1].split("break;", 1)[0]
+    clear_fn = code[code.index("function clearTranscript()") :]
+    clear_fn = clear_fn[: clear_fn.index("\n    }")]
+
+    assert "beginAssistantTurn();" in binary_branch
+    assert "curBot = ''" not in binary_branch
+    assert "appendAssistantTranscript(evt.text || '')" in assistant_branch
+    assert "assistantTurnText += text" in code
+    assert "assistantLine.text = assistantTurnText" in code
+    assert "resetAssistantTurn();" in complete_branch
+    assert "resetAssistantTurn();" in clear_fn
+    assert "who + ': </span>'" in code
+
+
 def test_preview_closes_the_provider_session_when_the_microphone_cannot_open():
     code = _engine_code()
     failure = code[code.index("function stopFailedCall()") : code.index("function armAudioUnlock")]

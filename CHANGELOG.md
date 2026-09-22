@@ -1,5 +1,12 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-22 — ให้คำทักทายในกล่องข้อความตรงกับเสียงตั้งแต่คำแรก
+
+- `client/voice-preview.html`: แยกตัวสะสม transcript ของ Emma ออกจากข้อความชั่วคราวที่ใช้ระหว่างเล่นเสียง, เริ่ม turn เพียงครั้งเดียวไม่ว่า transcript หรือ audio จะมาถึงก่อน และเพิ่ม `: ` หลังชื่อผู้พูดในกล่องข้อความ
+- `tests/test_voice_preview_page.py`: เพิ่ม regression ยืนยันว่า audio chunk แรกไม่ลบต้นประโยคของ Emma และการจบ/ล้างบทสนทนารีเซ็ตตัวสะสมครบ
+- เหตุผล: provider ส่ง `Hello, I'm ` มาก่อน audio chunk แรก แต่โค้ดเดิมล้าง `curBot` ตอนรับ audio จึงทำให้กล่องข้อความเริ่มที่ `Emma.` และป้ายชื่อชิดกับเนื้อหาเป็น `EmmaEmma.`
+- ผลตรวจจริง: ชุดทดสอบ voice, preview, Android packaging และ JavaScript syntax ผ่าน 198 รายการ; ตรวจ WebSocket ของเซิร์ฟเวอร์จริงพบ transcript 5 chunks มาก่อน audio รวมข้อความได้ครบ `Hello, I'm Emma. Welcome to Embassy World. Is this your first visit to our project?` และได้รับ audio 19 chunks โดยต้นประโยคไม่หาย
+
 ## 2026-09-22 — ปิดกล่องข้อความได้และกันเสียงคลิกไม่ให้ Emma ตอบเอง
 
 - `client/voice-preview.html`: เพิ่มปุ่ม × ใน transcript drawer, ให้ปุ่มข้อความเดิมสลับเปิด/ปิด, รองรับ `Escape` และซิงก์ `aria-expanded`, `aria-controls`, label และ focus ให้ตรงกับสถานะจริง

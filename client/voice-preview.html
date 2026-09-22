@@ -1940,7 +1940,10 @@
     var voices = [], selectedVoice = null;
     var micCallBoost = 1, micNS = false, micAGC = true, micCompressor = true;
     var inCall = false, manualEnd = false, apiKeyOK = true;
-    var curBot = '';               // assistant transcript building this turn
+    var curBot = '';               // assistant text currently shown while audio plays
+    var assistantTurnText = '';    // full assistant transcript for the current turn
+    var assistantLine = null;      // transcript row owned by the current turn
+    var assistantTurnStarted = false;
     var curUser = '';              // ASR chunks building this utterance
     var userLine = null;           // stays editable if Emma's line arrives first
     var transcript = [];           // [{who,text}] for the Message drawer
@@ -2178,7 +2181,10 @@
     // ---- server -> client (slimmed: no slides / stage / camera here) ----
     function onMessage(msg) {
       if (msg.data instanceof ArrayBuffer) {
-        if (sentMs === 0) curBot = '';
+        // Transcript and audio are independent streams. Either one may arrive
+        // first, so initialize the turn once instead of erasing transcript text
+        // when the first audio chunk follows it.
+        beginAssistantTurn();
         sentMs += (msg.data.byteLength / 2 / outputRate) * 1000;
         playChunk(msg.data);
         return;
@@ -2208,6 +2214,7 @@
             if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'played', heard_ms: heard }));
           }
           curBot = '';                       // a reply talked over is gone
+          resetAssistantTurn();
           if (inCall) { show('listening'); status('Listening...'); } else paintReply();
           break;
         case 'interrupted': {
@@ -2215,6 +2222,7 @@
           sentMs = 0;
           if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'played', heard_ms: h }));
           curBot = '';
+          resetAssistantTurn();
           if (inCall) show('listening'); else paintReply();
           break;
         }
@@ -2235,15 +2243,14 @@
           }
           break;
         case 'assistant_transcript':
-          curBot += evt.text || '';
-          paintReply();                      // shows only while playing
-          logLine('emma', curBot, true);
+          appendAssistantTranscript(evt.text || '');
           break;
         case 'turn_complete':
           // Don't clear curBot here: the model has stopped generating but its
           // audio can still be playing for seconds, and the reply line stays
           // up until that audio ends (see playChunk onended).
           sentMs = 0;
+          resetAssistantTurn();
           break;
         case 'tool_result': {
           // Emma put something on screen. The visual displays go on the stage
@@ -2413,13 +2420,14 @@
       body.innerHTML = transcript.map(function (l) {
         var who = l.who === 'emma' ? 'Emma' : 'คำถอดเสียง';
         return '<p class="vp-line ' + (l.who === 'emma' ? 'emma' : 'you') + '">'
-          + '<span class="w">' + who + '</span>' + escapeHtml(l.text) + '</p>';
+          + '<span class="w">' + who + ': </span>' + escapeHtml(l.text) + '</p>';
       }).join('');
       body.scrollTop = body.scrollHeight;
     }
     function clearTranscript() {
       transcript = [];
       curBot = '';
+      resetAssistantTurn();
       curUser = '';
       userLine = null;
       if (drawer) {
@@ -2429,16 +2437,33 @@
       setTranscriptDrawerOpen(false);
     }
     function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
-    // Assistant transcript streams in pieces; replace the open Emma line
-    // rather than stacking a new bubble per fragment (index.html's rule).
-    function logLine(who, text, replaceLast) {
+    function beginAssistantTurn() {
+      if (assistantTurnStarted) return;
+      assistantTurnStarted = true;
+      assistantTurnText = '';
+      assistantLine = null;
+      curBot = '';
+    }
+    function resetAssistantTurn() {
+      assistantTurnStarted = false;
+      assistantTurnText = '';
+      assistantLine = null;
+    }
+    // Assistant transcript streams independently from audio. Keep its own
+    // accumulator so playback bookkeeping cannot remove the first words.
+    function appendAssistantTranscript(text) {
       if (!text) return;
-      if (replaceLast && transcript.length && transcript[transcript.length - 1].who === who) {
-        transcript[transcript.length - 1].text = text;
+      beginAssistantTurn();
+      assistantTurnText += text;
+      curBot = assistantTurnText;
+      if (!assistantLine) {
+        assistantLine = { who: 'emma', text: assistantTurnText };
+        transcript.push(assistantLine);
       } else {
-        transcript.push({ who: who, text: text });
+        assistantLine.text = assistantTurnText;
       }
       renderDrawer();
+      paintReply();
     }
 
     // ---- stage: Emma's on-screen displays (cards / plans / photos / embeds).
