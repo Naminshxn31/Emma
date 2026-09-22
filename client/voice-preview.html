@@ -122,16 +122,19 @@
     cursor: grab;
     touch-action: none;
     outline: none;
+    transform: translate(var(--user-x), var(--user-y)) scale(var(--user-scale));
+    transform-origin: center;
+    transition: transform .12s ease-out;
+    will-change: transform;
   }
 
-  /* No focus ring on the mascot. It was drawn on .mascot-wrap, which stays at
-     its home position while only the inner rig is dragged — so focusing the
-     mascot (a pointer-drag calls scene.focus()) left a green circle floating
-     at centre with nothing in it (owner, 2026-09-14 "วงกลมเขียวๆ...ไม่หาย").
-     The wrap keeps outline:none; keyboard users still move/resize with the
-     arrow keys and it stays reachable via tabindex. */
+  /* No focus ring on the mascot. A pointer-drag calls scene.focus() so the
+     keyboard controls remain available, but the extra green outline is not
+     part of the approved artwork (owner, 2026-09-14 "วงกลมเขียวๆ...ไม่หาย").
+     Keyboard users can still move/resize with the arrow keys and the wrap
+     remains reachable via tabindex. */
 
-  .mascot-wrap.is-dragging { cursor: grabbing; }
+  .mascot-wrap.is-dragging { cursor: grabbing; transition: none; }
 
   /* The .mascot-wrap::before/::after halo decorations were deleted outright
      (owner, 2026-09-14 "เอาวงกลม...ออก"): they lived on the wrap, not the
@@ -169,10 +172,7 @@
     inset: 0;
     z-index: 1;
     transform-style: preserve-3d;
-    transform:
-      translate(var(--user-x), var(--user-y))
-      scale(var(--user-scale))
-      rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
     transition: transform .12s ease-out, opacity .24s ease;
     will-change: transform;
   }
@@ -184,10 +184,7 @@
     width: 100%;
     height: 100%;
     opacity: 0;
-    transform:
-      translate(var(--user-x), var(--user-y))
-      scale(var(--user-scale))
-      rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
     filter: drop-shadow(0 30px 30px rgba(0,0,0,.42));
     transition: transform .12s ease-out, opacity .24s ease;
     pointer-events: none;
@@ -1654,21 +1651,47 @@
         scene.style.setProperty('--user-scale', userTransform.scale.toFixed(3));
         scene.dispatchEvent(new CustomEvent('emma-transform-change', { detail: Object.assign({}, userTransform) }));
       }
+      function mascotLayoutCentre() {
+        // offsetLeft/offsetTop stay at the layout position even after the wrap
+        // is transformed. That gives stable drag limits while the visual and
+        // its pointer hit area move together.
+        var x = scene.offsetWidth / 2;
+        var y = scene.offsetHeight / 2;
+        var node = scene;
+        while (node) {
+          x += node.offsetLeft || 0;
+          y += node.offsetTop || 0;
+          node = node.offsetParent;
+        }
+        var fixed = getComputedStyle(scene).position === 'fixed';
+        return { x: x - (fixed ? 0 : scrollX), y: y - (fixed ? 0 : scrollY) };
+      }
+      function constrainMascotPosition(x, y) {
+        var centre = mascotLayoutCentre();
+        var width = scene.offsetWidth * userTransform.scale;
+        var height = scene.offsetHeight * userTransform.scale;
+        // Leave enough of Emma visible to grab again after releasing at an
+        // edge. The whole transformed wrap remains the hit target.
+        var grab = Math.min(96, Math.max(48, Math.min(width, height) * .2));
+        return {
+          x: Math.max(grab - centre.x - width / 2,
+            Math.min(innerWidth - grab - centre.x + width / 2, Number(x) || 0)),
+          y: Math.max(grab - centre.y - height / 2,
+            Math.min(innerHeight - grab - centre.y + height / 2, Number(y) || 0))
+        };
+      }
       function setMascotScale(value) {
         userTransform.scale = Math.max(.65, Math.min(1.35, Number(value) || 1));
+        var constrained = constrainMascotPosition(userTransform.x, userTransform.y);
+        userTransform.x = constrained.x;
+        userTransform.y = constrained.y;
         applyUserTransform();
         return userTransform.scale;
       }
       function moveMascot(x, y) {
-        // Draggable across the whole page, not just a small area around its
-        // home position (owner, 2026-09-14 "ขยับ...เป็นทั้งหน้า"). During
-        // staging the rig is pinned bottom-right, so half-width travel only
-        // reached centre — the left side was unreachable (owner, 2026-09-15
-        // "เอาไปอีกฝั่งไม่ได้"). Allow near-full-viewport travel both axes.
-        var mx = Math.max(160, innerWidth - 100);
-        var my = Math.max(160, innerHeight - 100);
-        userTransform.x = Math.max(-mx, Math.min(mx, Number(x) || 0));
-        userTransform.y = Math.max(-my, Math.min(my, Number(y) || 0));
+        var constrained = constrainMascotPosition(x, y);
+        userTransform.x = constrained.x;
+        userTransform.y = constrained.y;
         applyUserTransform();
         return { x: userTransform.x, y: userTransform.y };
       }

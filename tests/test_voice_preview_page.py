@@ -390,6 +390,21 @@ def test_voice_preview_mascot_can_be_moved_and_resized_accessibly():
         assert hook in html
 
 
+def test_drag_moves_the_mascot_hit_area_and_keeps_a_regrabbable_edge_visible():
+    html = PAGE.read_text(encoding="utf-8")
+    wrap_css = html.split(".mascot-wrap {", 1)[1].split("}", 1)[0]
+    rig_css = html.split(".mascot-rig {", 1)[1].split("}", 1)[0]
+    rive_css = html.split(".mascot-rive {", 1)[1].split("}", 1)[0]
+
+    assert "transform: translate(var(--user-x), var(--user-y)) scale(var(--user-scale))" in wrap_css
+    assert "translate(var(--user-x)" not in rig_css
+    assert "translate(var(--user-x)" not in rive_css
+    assert "function mascotLayoutCentre()" in html
+    assert "function constrainMascotPosition(x, y)" in html
+    assert "var grab = Math.min(96, Math.max(48" in html
+    assert ".mascot-wrap.is-dragging { cursor: grabbing; transition: none; }" in html
+
+
 def test_preview_is_served_at_its_own_url_not_over_slash(client):
     """The new design lives at /preview. `/` stays index.html untouched —
     the whole point of building it beside the production page rather than on
