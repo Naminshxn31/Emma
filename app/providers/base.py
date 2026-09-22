@@ -24,7 +24,9 @@ Normalized protocol (see `app/session.py` for the server side and
     server -> browser
         {"type": "ready", "input_rate": …, "output_rate": …,
          "provider": …, "voice": …, "session_limit_min": …}
-        {"type": "user_transcript",      "text": …}
+        {"type": "user_transcript",      "text": …, "utterance_id": …}
+        # utterance_id is optional; Gemini uses it to group input deltas
+        # independently of output playback and local speech-start signals.
         {"type": "assistant_transcript", "text": …}
         {"type": "interrupted"}     stop playback immediately
         {"type": "turn_complete"}

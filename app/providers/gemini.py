@@ -295,6 +295,16 @@ class GeminiProvider(VoiceProvider):
         # reconnect when *we* are the ones shutting down.
         self._resume_handle: str | None = None
         self._closing = False
+        # One event stream merges upstream audio, local speech boundaries and
+        # tool results. Tools keep their order without holding up socket reads.
+        self._event_queue = asyncio.Queue(maxsize=64)
+        self._tool_batches = asyncio.Queue(maxsize=32)
+        self._event_tasks: list[asyncio.Task] = []
+        self._input_serial = 0
+        self._input_turn_id: str | None = None
+        self._input_finished: bool | None = None
+        self._pending_tool_ids: set[str] = set()
+        self._cancelled_tool_ids: set[str] = set()
 
     def _build_config(self):
         from google.genai import types
@@ -520,6 +530,7 @@ class GeminiProvider(VoiceProvider):
 
     async def __aexit__(self, *exc) -> None:
         self._closing = True
+        await self._stop_event_tasks()
         if self._cm is not None:
             try:
                 await self._cm.__aexit__(*(exc or (None, None, None)))
@@ -542,6 +553,7 @@ class GeminiProvider(VoiceProvider):
         # `我们走吧` or metered.
         for kind, data in self._vad_gate.feed(pcm16):
             if kind == "start":
+                await self._event_queue.put(ProviderEvent(kind="speech_started"))
                 await self._session.send_realtime_input(
                     activity_start=types.ActivityStart())
             elif kind == "end":
@@ -587,11 +599,15 @@ class GeminiProvider(VoiceProvider):
 
         from app import tools
 
+        session = self._session
+
         calls = [
             (getattr(fc, "id", None), fc.name, dict(fc.args or {}))
             for fc in function_calls
         ]
         for _cid, name, args in calls:
+            if _cid in self._cancelled_tool_ids:
+                continue
             # Names of the arguments, never their values: the values are
             # phone numbers (Emma reads them back to confirm), budgets,
             # room numbers, what somebody asked her to remember. The
@@ -602,21 +618,94 @@ class GeminiProvider(VoiceProvider):
             logger.info("tool call: %s(%s)", name, ", ".join(sorted(args)))
             yield ProviderEvent(kind="tool_call", text=name)
 
-        results = (await tools.dispatch_all(calls) if self.use_tools else
-                   [(cid, name, {"ok": False, "error": "tools disabled for this session"})
-                    for cid, name, _args in calls])
+        results = []
+        for cid, name, args in calls:
+            if (self._closing or self._session is not session
+                    or cid in self._cancelled_tool_ids):
+                continue
+            # Check cancellation between actions as well as between batches.
+            # An action already executing cannot necessarily be undone.
+            results.extend(await tools.dispatch_all([(cid, name, args)]) if self.use_tools else
+                           [(cid, name, {"ok": False, "error": "tools disabled for this session"})])
+        results = [r for r in results if r[0] not in self._cancelled_tool_ids]
 
         responses = [
             types.FunctionResponse(id=cid, name=name, response=result)
             for cid, name, result in results
         ]
-        if self._session is not None and responses:
-            await self._session.send_tool_response(function_responses=responses)
+        # A result from a retired connection must not enter its replacement.
+        if self._closing or self._session is not session:
+            return
+        if session is not None and responses:
+            await session.send_tool_response(function_responses=responses)
 
         for _cid, name, result in results:
             yield ProviderEvent(kind="tool_result", text=name, data=result)
 
+    def _input_event(self, text: str) -> ProviderEvent:
+        if self._input_turn_id is None:
+            self._input_serial += 1
+            self._input_turn_id = str(self._input_serial)
+        return ProviderEvent(kind="user_transcript", text=text,
+                             data={"utterance_id": self._input_turn_id})
+
+    async def _stop_event_tasks(self) -> None:
+        tasks, self._event_tasks = self._event_tasks, []
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        while not self._tool_batches.empty():
+            self._tool_batches.get_nowait()
+        self._pending_tool_ids.clear()
+        self._cancelled_tool_ids.clear()
+
     async def events(self) -> AsyncIterator[ProviderEvent]:
+        if self._session is None:
+            return
+
+        async def receive():
+            try:
+                async for event in self._receive_events():
+                    await self._event_queue.put(event)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                await self._event_queue.put(ProviderEvent(kind="error", text=str(exc)))
+            await self._event_queue.put(None)
+
+        async def run_tools():
+            while True:
+                session, calls = await self._tool_batches.get()
+                ids = {fc.id for fc in calls if getattr(fc, "id", None)}
+                try:
+                    if self._closing or session is not self._session:
+                        continue
+                    async for event in self._run_tool_calls(calls):
+                        await self._event_queue.put(event)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    logger.exception("Gemini tool response failed")
+                    await self._event_queue.put(ProviderEvent(kind="error", text=str(exc)))
+                    await self._event_queue.put(None)
+                    return
+                finally:
+                    self._pending_tool_ids.difference_update(ids)
+                    self._cancelled_tool_ids.difference_update(ids)
+
+        self._event_tasks = [asyncio.create_task(receive()),
+                             asyncio.create_task(run_tools())]
+        try:
+            while True:
+                event = await self._event_queue.get()
+                if event is None:
+                    return
+                yield event
+        finally:
+            await self._stop_event_tasks()
+
+    async def _receive_events(self) -> AsyncIterator[ProviderEvent]:
         """Yield events for the whole conversation, not just one turn.
 
         `session.receive()` deliberately stops iterating once it sees
@@ -647,7 +736,6 @@ class GeminiProvider(VoiceProvider):
                     update = getattr(message, "session_resumption_update", None)
                     if update is not None and getattr(update, "new_handle", None):
                         self._resume_handle = update.new_handle
-                        continue
                     if getattr(message, "go_away", None) is not None:
                         # `go_away` is not a warning to note and carry on from.
                         # It is an instruction: close the socket yourself. The
@@ -699,11 +787,17 @@ class GeminiProvider(VoiceProvider):
                         yield ProviderEvent(kind="usage", data={
                             "source": "gemini_report", **counts(data, keys)})
 
+                    cancellation = getattr(message, "tool_call_cancellation", None)
+                    if cancellation is not None:
+                        self._cancelled_tool_ids.update(
+                            set(getattr(cancellation, "ids", None) or [])
+                            & self._pending_tool_ids)
                     tool_call = getattr(message, "tool_call", None)
                     if tool_call and getattr(tool_call, "function_calls", None):
-                        async for evt in self._run_tool_calls(tool_call.function_calls):
-                            yield evt
-                        continue
+                        self._pending_tool_ids.update(
+                            fc.id for fc in tool_call.function_calls if getattr(fc, "id", None))
+                        await self._tool_batches.put(
+                            (self._session, list(tool_call.function_calls)))
 
                     content = getattr(message, "server_content", None)
                     if content is None:
@@ -714,16 +808,23 @@ class GeminiProvider(VoiceProvider):
                     if getattr(content, "interrupted", False):
                         self._out_filter.reset()
                         self._out_spacing.reset()
-                        self._in_spacing.reset()
                         yield ProviderEvent(kind="interrupted")
-                        continue
 
                     if getattr(content, "input_transcription", None):
+                        finished = getattr(content.input_transcription, "finished", None)
+                        if isinstance(finished, bool):
+                            self._input_finished = finished
                         text = content.input_transcription.text
                         if text:
                             text = self._in_spacing.feed(text)
                             if text:
-                                yield ProviderEvent(kind="user_transcript", text=text)
+                                yield self._input_event(text)
+                        if finished is True:
+                            tail = self._in_spacing.flush()
+                            if tail:
+                                yield self._input_event(tail)
+                            self._input_turn_id = None
+                            self._input_finished = None
 
                     if getattr(content, "output_transcription", None):
                         text = content.output_transcription.text
@@ -746,9 +847,14 @@ class GeminiProvider(VoiceProvider):
                         tail += self._out_spacing.flush()
                         if tail:
                             yield ProviderEvent(kind="assistant_transcript", text=tail)
-                        user_tail = self._in_spacing.flush()
-                        if user_tail:
-                            yield ProviderEvent(kind="user_transcript", text=user_tail)
+                        # Output completion must not split an input transcript
+                        # explicitly marked unfinished by the provider. Older
+                        # models omit finished, so retain the turn fallback.
+                        if self._input_finished is not False:
+                            user_tail = self._in_spacing.flush()
+                            if user_tail:
+                                yield self._input_event(user_tail)
+                            self._input_turn_id = None
                         yield ProviderEvent(kind="turn_complete")
 
                 if not received_anything:

@@ -522,6 +522,18 @@ def test_first_audio_chunk_keeps_the_start_of_emmas_transcript():
     assert "who + ': </span>'" in code
 
 
+def test_preview_transcript_with_interleaved_audio_and_delayed_user_chunks():
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required to execute the preview event handler")
+    result = subprocess.run([node, "tests/client_preview_transcript.cjs"],
+                            cwd=ROOT, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_preview_closes_the_provider_session_when_the_microphone_cannot_open():
     code = _engine_code()
     failure = code[code.index("function stopFailedCall()") : code.index("function armAudioUnlock")]

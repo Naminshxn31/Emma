@@ -1946,6 +1946,7 @@
     var assistantTurnStarted = false;
     var curUser = '';              // ASR chunks building this utterance
     var userLine = null;           // stays editable if Emma's line arrives first
+    var userLinesById = Object.create(null);
     var transcript = [];           // [{who,text}] for the Message drawer
 
     // ---- mic capture worklet (verbatim from index.html) ----
@@ -2231,11 +2232,19 @@
           // independently of Emma's output. Keep one object for this spoken
           // turn, so late pieces update the right row instead of becoming
           // several different things the guest supposedly said.
+          // Stable IDs keep delayed chunks attached to their own utterance,
+          // even if a later local speech_started has already reached us.
+          var utteranceId = typeof evt.utterance_id === 'string' ? evt.utterance_id : null;
+          if (utteranceId !== null) {
+            userLine = userLinesById[utteranceId] || null;
+            curUser = userLine ? userLine.text : '';
+          }
           curUser += evt.text || '';
           if (curUser) {
             if (!userLine) {
               userLine = { who: 'you', text: curUser };
               transcript.push(userLine);
+              if (utteranceId !== null) userLinesById[utteranceId] = userLine;
             } else {
               userLine.text = curUser;
             }
@@ -2430,6 +2439,7 @@
       resetAssistantTurn();
       curUser = '';
       userLine = null;
+      userLinesById = Object.create(null);
       if (drawer) {
         var body = drawer.querySelector('.vp-body');
         if (body) body.innerHTML = '<p class="vp-empty">No conversation yet.</p>';

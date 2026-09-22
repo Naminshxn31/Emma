@@ -681,7 +681,11 @@ class VoiceSession:
                     # the timer exists to end, and it is busy throughout.
                     self._last_heard_at = time.monotonic()
                     self._respeak_fired = False
-                    await self._send_json({"type": "user_transcript", "text": event.text or ""})
+                    payload = {"type": "user_transcript", "text": event.text or ""}
+                    utterance_id = (event.data or {}).get("utterance_id")
+                    if isinstance(utterance_id, str):
+                        payload["utterance_id"] = utterance_id
+                    await self._send_json(payload)
 
                 elif event.kind == "assistant_transcript":
                     if (event.text or "").strip():

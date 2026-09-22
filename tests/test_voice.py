@@ -847,6 +847,29 @@ def test_gemini_conversation_survives_multiple_turns(client, monkeypatch):
     assert "มีอะไรให้ช่วยอีกไหมคะ" in said        # turn 3 arrived
 
 
+def test_gemini_input_utterance_ids_survive_the_websocket_relay(client, monkeypatch):
+    _fake_gemini(monkeypatch, [
+        [_Msg(_Content(input_transcription=_Text("First "))),
+         _Msg(_Content(output_transcription=_Text("Reply."))),
+         _Msg(_Content(input_transcription=_Text("question."))),
+         _Msg(_Content(turn_complete=True))],
+        [_Msg(_Content(input_transcription=_Text("Second question."))),
+         _Msg(_Content(turn_complete=True))],
+    ])
+    inputs = []
+    with client.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "ready"
+        complete = 0
+        while complete < 2:
+            event = ws.receive_json()
+            if event["type"] == "user_transcript":
+                inputs.append(event)
+            if event["type"] == "turn_complete":
+                complete += 1
+    assert inputs[0]["utterance_id"] == inputs[1]["utterance_id"]
+    assert inputs[1]["utterance_id"] != inputs[2]["utterance_id"]
+
+
 def test_gemini_stops_cleanly_when_socket_closes(client, monkeypatch):
     """The per-turn loop must not spin forever on a dead session."""
     _fake_gemini(monkeypatch, [
