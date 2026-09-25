@@ -1,5 +1,15 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-25 — reinstall แทนที่ agent เก่า (ไม่งั้นตัวเก่าถือพอร์ตไว้ ตัวใหม่ไม่ขึ้น)
+
+- ขอบเขต: `scripts/make_room_package.py` (install.cmd หยุด agent เก่าก่อนติดตั้ง), `tests/*` (+1)
+- **เจอตอนลง B ครั้งที่สาม**: ลงใหม่เพื่อเพิ่ม `screen` แต่แผงคุมขึ้น "bad token" และ health โชว์
+  13/13 (ไม่ใช่ 14) = **agent ตัวเก่ายังรันถือพอร์ต 8777 อยู่** ตัวใหม่ (มี screen + token ใหม่)
+  bind ไม่ได้เลย exit → เครื่องยังเสิร์ฟโค้ดเก่า token เก่าเงียบๆ
+- แก้: install.cmd `schtasks /end` + kill pythonw ที่รัน run_room_agent (แมตช์ด้วย command line
+  ไม่ใช่ pythonw ทุกตัว) **ก่อน**ติดตั้ง — upgrade จึงแทนที่จริง และปลดล็อกไฟล์ที่อาจถูกจับด้วย
+- เทสต์ยันว่า stop มาก่อน copy/start · packager 15 ผ่าน
+
 ## 2026-09-25 — แผงคุมบนเว็บ: เลือกห้อง เห็นจอสด กดปุ่มสั่ง
 
 - ขอบเขต: `room_console_server.py` (ใหม่), `client/room-console.html` (ใหม่),

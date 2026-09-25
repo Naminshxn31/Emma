@@ -217,3 +217,18 @@ def test_the_installer_covers_screenshots_perms_and_a_loud_pip_failure(package):
     assert "goto pip_failed" in install and ":pip_failed" in install
     assert "exit /b 0" in install
     assert install.index("exit /b 0") < install.index(":pip_failed")
+
+
+def test_reinstall_stops_the_old_agent_before_starting_the_new(package):
+    """An upgrade must replace the running agent. If it does not, the old process
+    keeps port 8777, the new agent cannot bind and exits, and the machine keeps
+    serving the OLD code and OLD token -- a new capability/token silently never
+    takes effect (seen on a real reinstall 2026-09-25). install.cmd stops the
+    task and the agent's own pythonw before installing, and does it early enough
+    to also free any locked files."""
+    install = (package / "install.cmd").read_text(encoding="ascii")
+    assert "schtasks /end" in install
+    assert "run_room_agent.py" in install and "Stop-Process" in install
+    # before the Python install / file copy, not after the new one is started
+    assert install.index("Stop-Process") < install.index("Copying files")
+    assert install.index("Stop-Process") < install.index("Start it now")

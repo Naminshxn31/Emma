@@ -100,6 +100,15 @@ set "SRC=%~dp0"
 set "DEST=C:\\ProgramData\\EmmaRoomAgent"
 echo Installing Emma Room Agent to %DEST%
 
+REM Stop any agent already running first. An upgrade must REPLACE the old one:
+REM otherwise the old process keeps port 8777, the new agent cannot bind and
+REM exits, and the machine quietly keeps serving the old code with the old token
+REM (seen on a real reinstall 2026-09-25 -- the new `screen` capability and the
+REM new token never took effect). End the task, then stop only the agent's own
+REM pythonw (matched by its command line, not every pythonw on the box).
+schtasks /end /tn "EmmaRoomAgent" >nul 2>&1
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"Name='pythonw.exe'\\" | Where-Object { $_.CommandLine -like '*run_room_agent.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
+
 REM --- Python: use the system copy if present, else install a PRIVATE one into
 REM the agent's own folder and use it by full path. A private copy means the
 REM agent never fights a system Python's version and needs nothing on PATH; any
