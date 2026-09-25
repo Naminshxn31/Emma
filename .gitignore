@@ -103,6 +103,8 @@ data/faces/
 # hostnames/IPs of approved company PCs, hand-maintained. Names infrastructure,
 # so it stays out of the repo.
 data/room-deploy.json
+# Python installer cached once on the server to bundle into room packages (25 MB).
+.tmp/python-cache/
 # The deploy audit log: which agent went to which host, when, by whom. Local
 # operational record, never a token or a password in it, but not history.
 data/room-deploy-log/

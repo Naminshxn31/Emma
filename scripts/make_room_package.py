@@ -32,6 +32,7 @@ import json
 import secrets
 import shutil
 import sys
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,6 +42,17 @@ ROOT = Path(__file__).resolve().parent.parent
 FILES = ("run_room_agent.py",)
 TREES = ("app",)
 DATA = ("data/registry/source_registry.json",)
+
+#: The Python that ships INSIDE the package, so the target PC never has to reach
+#: the internet to get it. Bundling is the point: a sales-room PC is often on a
+#: LAN with no direct route to python.org (or behind a proxy), and downloading
+#: Python *there* stalls at 0 bytes -- observed on a real target 2026-09-25.
+#: The management machine, which does have internet, fetches it once and carries
+#: it. Keep this version in step with the one install.cmd names.
+PY_VERSION = "3.12.7"
+PY_INSTALLER = f"python-{PY_VERSION}-amd64.exe"
+PY_URL = f"https://www.python.org/ftp/python/{PY_VERSION}/{PY_INSTALLER}"
+PY_CACHE = ROOT / ".tmp" / "python-cache" / PY_INSTALLER
 
 START_CMD = """@echo off
 REM Start Emma's room agent on this PC IN THE FOREGROUND. Leave this window open.
@@ -102,13 +114,19 @@ if defined PYW goto have_python
 if exist "%PRIV%\\pythonw.exe" ( set "PYW=%PRIV%\\pythonw.exe" & set "PY=%PRIV%\\python.exe" & goto have_python )
 
 set "PYVER=3.12.7"
-set "PYEXE=%TEMP%\\python-%PYVER%-amd64.exe"
-echo Python not found -- downloading Python %PYVER% (about 25 MB)...
-curl.exe -L -o "%PYEXE%" "https://www.python.org/ftp/python/%PYVER%/python-%PYVER%-amd64.exe"
+REM Prefer the Python that shipped INSIDE this package -- no internet needed on
+REM this PC. Downloading here is only the fallback, and it stalls at 0 bytes on a
+REM LAN with no route to python.org (seen on a real target), so it is bounded
+REM with timeouts and never the first choice.
+set "PYSETUP=%SRC%python-%PYVER%-amd64.exe"
+if exist "%PYSETUP%" goto run_python_setup
+echo No bundled Python -- trying to download Python %PYVER% (about 25 MB)...
+set "PYSETUP=%TEMP%\\python-%PYVER%-amd64.exe"
+curl.exe -L --fail --connect-timeout 20 --max-time 600 -o "%PYSETUP%" "https://www.python.org/ftp/python/%PYVER%/python-%PYVER%-amd64.exe"
 if errorlevel 1 goto no_python
-echo Installing Python quietly into %PRIV% ...
-"%PYEXE%" /quiet InstallAllUsers=1 PrependPath=0 Include_launcher=0 Shortcuts=0 Include_test=0 TargetDir="%PRIV%"
-del "%PYEXE%" >nul 2>&1
+:run_python_setup
+echo Installing Python %PYVER% into %PRIV% (quiet) ...
+"%PYSETUP%" /quiet InstallAllUsers=1 PrependPath=0 Include_launcher=0 Shortcuts=0 Include_test=0 TargetDir="%PRIV%"
 if not exist "%PRIV%\\pythonw.exe" goto no_python
 set "PYW=%PRIV%\\pythonw.exe"
 set "PY=%PRIV%\\python.exe"
@@ -185,6 +203,27 @@ if not defined ROOM_AGENT_SILENT pause
 """
 
 
+def ensure_bundled_python(out: Path) -> str | None:
+    """Put the Python installer into the package, fetching it once (on the
+    machine that has internet) and caching it. Returns the filename it wrote, or
+    None if it could not be obtained -- in which case the package still builds and
+    install.cmd falls back to downloading on the target, then to a manual message.
+    A failure to bundle must never fail the build."""
+    if not PY_CACHE.exists():
+        try:
+            PY_CACHE.parent.mkdir(parents=True, exist_ok=True)
+            print(f"fetching {PY_INSTALLER} once (cached at {PY_CACHE.relative_to(ROOT)}) ...")
+            tmp = PY_CACHE.with_suffix(".part")
+            urllib.request.urlretrieve(PY_URL, tmp)
+            tmp.replace(PY_CACHE)
+        except Exception as exc:                 # no internet here, or blocked
+            print(f"  could not fetch Python to bundle ({exc}); the package will "
+                  f"download it on the target instead.")
+            return None
+    shutil.copy(PY_CACHE, out / PY_INSTALLER)
+    return PY_INSTALLER
+
+
 def project_identity() -> tuple[str, str, Path]:
     registry = json.loads((ROOT / "data" / "registry" / "source_registry.json").read_text(encoding="utf-8"))
     for source in registry["sources"]:
@@ -196,7 +235,7 @@ def project_identity() -> tuple[str, str, Path]:
 
 
 def build(room: str, out: Path, host: str, port: int, allow: str,
-          programs: str, token: str | None) -> dict:
+          programs: str, token: str | None, bundle_python: bool = True) -> dict:
     if out.exists() and any(out.iterdir()):
         raise SystemExit(f"{out} is not empty — pick an empty folder or delete it first")
     out.mkdir(parents=True, exist_ok=True)
@@ -237,10 +276,12 @@ def build(room: str, out: Path, host: str, port: int, allow: str,
                        ("uninstall.cmd", UNINSTALL_CMD)):
         (out / name).write_bytes(body.replace("\n", "\r\n").encode("ascii"))
 
+    bundled = ensure_bundled_python(out) if bundle_python else None
+
     assert not (out / ".env.example").exists()
     leaked = [p for p in out.rglob("*") if p.is_file() and p.name == ".env" and p.parent != out]
     assert not leaked, leaked
-    return {"room": room, "token": token, "port": port, "out": str(out)}
+    return {"room": room, "token": token, "port": port, "out": str(out), "python": bundled}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -256,16 +297,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--programs", default="",
                         help='programs this room may open; "all" lets the Start Menu decide')
     parser.add_argument("--token", default=None, help="reuse an existing token instead of a new one")
+    parser.add_argument("--no-bundle-python", action="store_true",
+                        help="do not ship Python inside the package (smaller; the target must "
+                             "already have Python or be able to download it)")
     args = parser.parse_args(argv)
 
-    built = build(args.room, args.out, args.host, args.port, args.allow, args.programs, args.token)
+    built = build(args.room, args.out, args.host, args.port, args.allow, args.programs,
+                  args.token, bundle_python=not args.no_bundle_python)
 
     print(f"built {built['out']}")
+    if built.get("python"):
+        print(f"  Python {PY_VERSION} is bundled -- the target needs no internet for it")
+    elif not args.no_bundle_python:
+        print("  NOTE: could not bundle Python here (no internet?); the target will try to "
+              "download it, which fails on a LAN with no route to python.org")
     print("\nON THE ROOM PC")
     print("1. copy that whole folder over (USB, or drag it in through AnyDesk/RDP)")
-    print("2. run install.cmd  (one file: installs Python packages, opens the port,")
-    print("   auto-starts at every logon, and starts it now in the background)")
-    print("   -- Python must already be installed; install.cmd says so if it is not")
+    print("2. run install.cmd  (one file: installs Python if missing, the packages, opens")
+    print("   the port, auto-starts at every logon, and starts it now in the background)")
     print("3. note the LAN address it prints at the end")
     print("\nON THIS MACHINE, add the room to data/rooms.json:")
     print(json.dumps({built["room"]: {"url": f"http://<the room PC's IP>:{built['port']}",

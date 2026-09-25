@@ -31,8 +31,10 @@ _spec.loader.exec_module(mrp)
 @pytest.fixture
 def package(tmp_path):
     out = tmp_path / "room1"
+    # bundle_python=False so the suite never reaches out to python.org for 25 MB;
+    # the bundling path has its own tests that seed a fake cache.
     mrp.build("ห้องขาย 1", out, host="0.0.0.0", port=8777,
-              allow="all", programs="all", token="test-token-xyz")
+              allow="all", programs="all", token="test-token-xyz", bundle_python=False)
     return out
 
 
@@ -146,3 +148,47 @@ def test_the_installer_provisions_python_when_it_is_missing(package):
     assert '"%PY%" -m pip install' in install
     # no PATH lookup for the task any more (it is resolved once, above)
     assert "for /f \"delims=\" %%P in ('where pythonw') do set" not in install
+
+
+def test_the_installer_prefers_a_bundled_python_over_downloading(package):
+    """The target often has no route to python.org, so downloading there stalls.
+    install.cmd must run the Python that shipped in the package first, and treat
+    the download as a bounded fallback -- not the first move."""
+    install = (package / "install.cmd").read_text(encoding="ascii")
+    assert 'set "PYSETUP=%SRC%python-' in install
+    assert 'if exist "%PYSETUP%" goto run_python_setup' in install
+    assert "--connect-timeout" in install and "--max-time" in install   # bounded, cannot hang
+    assert install.index("%SRC%python-") < install.index("curl.exe")     # bundle checked first
+
+
+def test_python_is_bundled_from_cache_without_a_network_call(tmp_path, monkeypatch):
+    """The management machine fetches the installer ONCE (cached) and carries it
+    in the package, so nothing hits the network at deploy time."""
+    fake_cache = tmp_path / "cache" / mrp.PY_INSTALLER
+    fake_cache.parent.mkdir(parents=True)
+    fake_cache.write_bytes(b"MZ fake python installer")
+    monkeypatch.setattr(mrp, "PY_CACHE", fake_cache)
+    monkeypatch.setattr(mrp.urllib.request, "urlretrieve",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("hit the network")))
+
+    out = tmp_path / "pkg"
+    built = mrp.build("ห้องขาย 9", out, host="0.0.0.0", port=8777,
+                      allow="all", programs="all", token="t", bundle_python=True)
+
+    assert built["python"] == mrp.PY_INSTALLER
+    assert (out / mrp.PY_INSTALLER).read_bytes() == b"MZ fake python installer"
+
+
+def test_a_bundle_failure_never_fails_the_build(tmp_path, monkeypatch):
+    """No cache and no internet -> the package still builds and stays usable;
+    install.cmd falls back to downloading, then to a manual message."""
+    monkeypatch.setattr(mrp, "PY_CACHE", tmp_path / "cache" / mrp.PY_INSTALLER)
+    monkeypatch.setattr(mrp.urllib.request, "urlretrieve",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("no internet")))
+
+    out = tmp_path / "pkg"
+    built = mrp.build("ห้องขาย 9", out, host="0.0.0.0", port=8777,
+                      allow="all", programs="all", token="t", bundle_python=True)
+
+    assert built["python"] is None
+    assert (out / "install.cmd").is_file()      # still a working package

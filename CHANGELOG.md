@@ -1,5 +1,23 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-25 — Python มากับชุด (ไม่ต้องโหลดที่เครื่องปลายทาง)
+
+- ขอบเขต: `scripts/make_room_package.py` (bundle Python installer + install.cmd
+  ใช้ตัว bundle ก่อน), `tests/test_make_room_package.py` (12 ตัว), `docs/...`, `.gitignore`
+- **เจอของจริง**: เจ้าของรันชุดใหม่บนเครื่องปลายทาง `install.cmd` โหลด Python แล้ว**ค้างที่ 0 ไบต์** —
+  curl ต่อ python.org ไม่ได้ (คอมห้องขายอยู่ LAN ที่ไม่มีเส้นทางออกเน็ต หรือมี proxy)
+- **แก้ที่ต้นเหตุ: โหลดที่เครื่องปลายทางคือ dependency ที่ผิด** ตอนนี้เครื่องเซิร์ฟเวอร์ (มีเน็ต)
+  โหลด `python-3.12.7-amd64.exe` **ครั้งเดียว** (cache ที่ `.tmp/python-cache/`) แล้วใส่ไว้ในชุด
+  · `install.cmd` รันตัวที่ bundle มาแบบ local — **เครื่องปลายทางไม่ต้องมีเน็ตเลย**
+- ลำดับใน install.cmd: system Python → private ที่ลงไว้แล้ว → **ตัว bundle ในชุด** → โหลด (fallback,
+  มี `--connect-timeout 20 --max-time 600 --fail` ไม่ให้ค้างอีก) → ข้อความให้ลงเอง
+- **bundle ล้มไม่ทำ build ล้ม** ถ้าเซิร์ฟเวอร์ไม่มีเน็ต ชุดยังสร้างได้ (ไม่มี Python ใน bundle)
+  install.cmd ถอยไปโหลด/ข้อความเอง · `--no-bundle-python` ปิด bundle ได้ถ้าอยากได้ชุดเล็ก
+- ใช้ label/goto กัน same-block variable expansion ของ batch (curl เขียนผิดพาธถ้าใช้ `( )`)
+  · `.tmp/python-cache/` gitignore แล้ว (25MB ไม่เข้า git)
+- เทสต์: seed cache ปลอม + block `urlretrieve` ยืนยัน bundle จาก cache โดยไม่แตะเน็ต, และ bundle ล้ม
+  build ไม่ล้ม · 12 ตัวผ่าน ไม่มี syntax warning · **ไม่ได้รัน install.cmd จริงบนเครื่องนี้**
+
 ## 2026-09-25 — install.cmd ลง Python ให้เองถ้าเครื่องไม่มี
 
 - ขอบเขต: `scripts/make_room_package.py` (install.cmd auto-provision Python),
