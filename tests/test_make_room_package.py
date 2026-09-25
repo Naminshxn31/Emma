@@ -192,3 +192,28 @@ def test_a_bundle_failure_never_fails_the_build(tmp_path, monkeypatch):
 
     assert built["python"] is None
     assert (out / "install.cmd").is_file()      # still a working package
+
+
+def test_the_task_runs_as_the_interactive_user_not_the_installer(package):
+    """No task principal meant the task bound to whoever ran install.cmd -- over a
+    WinRM deploy, the IT admin, who is never logged on at the room PC, so after a
+    reboot the agent came up in a session that does not exist. A Users-group
+    principal runs it in the logged-on user's own interactive session (needed for
+    screen/keyboard capabilities). Found by the red-team 2026-09-25."""
+    install = (package / "install.cmd").read_text(encoding="ascii")
+    assert "New-ScheduledTaskPrincipal" in install
+    assert r"BUILTIN\Users" in install
+    assert "-RunLevel Limited" in install
+
+
+def test_the_installer_covers_screenshots_perms_and_a_loud_pip_failure(package):
+    """pillow for screenshots; icacls so the limited-user auto-start can write its
+    logs/shots under ProgramData; and a pip failure exits loudly (goto pip_failed)
+    before the task is registered, so a half-installed agent cannot masquerade as
+    installed. The success path must stop (exit /b 0) before the failure label."""
+    install = (package / "install.cmd").read_text(encoding="ascii")
+    assert "pillow" in install
+    assert "icacls" in install and "S-1-5-32-545" in install
+    assert "goto pip_failed" in install and ":pip_failed" in install
+    assert "exit /b 0" in install
+    assert install.index("exit /b 0") < install.index(":pip_failed")

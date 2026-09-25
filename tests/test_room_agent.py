@@ -305,3 +305,18 @@ def test_the_agent_reads_the_env_file_sitting_next_to_it():
         read = re.search(r'(?:os\.getenv|_list)\(\s*"%s"' % setting, source)
         assert read, f"nothing reads {setting} any more"
         assert load.start() < read.start(), f"{setting} is read before .env is loaded"
+
+
+def test_the_agent_logs_to_a_file_when_run_headless():
+    """Under pythonw (the background start and the scheduled task) a detached
+    process has no console -- sys.stdout/stderr are None and uvicorn's logging
+    writes there, which is why the foreground python.exe came up on a real target
+    while the background pythonw did not (2026-09-25). run_room_agent redirects to
+    a logfile when headless, BEFORE importing/starting the app, which both fixes
+    the start and leaves a trace to diagnose."""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "run_room_agent.py").read_text(encoding="utf-8")
+    assert "_redirect_output_when_headless" in src
+    assert "pythonw" in src and "agent.log" in src
+    assert src.index("_redirect_output_when_headless()") < src.index("from app.room_agent import main")

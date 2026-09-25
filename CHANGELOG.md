@@ -1,5 +1,27 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-25 — คุมเครื่อง B ผ่าน LAN ได้จริง + แก้ 5 บั๊กที่เจอตอนรันจริง/red-team
+
+- ขอบเขต: `scripts/make_room_package.py` (install.cmd: task principal, pip check, pillow, icacls),
+  `run_room_agent.py` (redirect output ตอน headless), `tests/*` (+5), `docs/...`
+- **พิสูจน์แล้วว่าใช้งานได้**: เครื่องเซิร์ฟเวอร์สั่งเครื่อง B (192.168.0.9) ผ่าน LAN — `health` +
+  `list_windows` เห็นหน้าต่างจริงบน B ครบ 27 อัน (SketchUp/VS Code/Edge/LINE) นี่คือ remote control จริง
+- **บั๊กที่ทำให้ auto-start ไม่ขึ้น (สำคัญสุด)**: ตัว foreground `python.exe` รันได้ แต่ background
+  `pythonw.exe` ไม่ขึ้น เพราะ process แบบ detached ไม่มี console → `sys.stdout/stderr` เป็น None
+  และ uvicorn เขียน log ลงตรงนั้น · แก้: `run_room_agent.py` redirect ไป `agent.log` เมื่อ headless
+  (ได้ทั้งแก้ปัญหาและได้ log ไว้ไล่ปัญหาครั้งแรก)
+- **screenshot ใช้ไม่ได้** — ขาด Pillow · เพิ่ม `pillow` ใน pip ของ install.cmd
+- **task รีบูตแล้วตาย (red-team)**: `Register-ScheduledTask` ไม่ได้ตั้ง principal → ผูกกับบัญชีที่รัน
+  installer พอ deploy ผ่าน WinRM (แอดมิน IT ที่ไม่เคย logon ที่เครื่องนั้น) รีบูตแล้ว task รันใน
+  session ที่ไม่มีอยู่ · แก้: principal เป็นกลุ่ม Users (SID) รันใน session ของคน logon จริง
+- **pip ล้มแบบเงียบ (red-team)**: ไม่เช็ค errorlevel → ถ้า pip ล้ม (offline) จะติดตั้งครึ่งๆ แต่ deploy
+  post-condition (ไฟล์+task) ผ่าน แล้ว agent crash ตอน `import fastapi` · แก้: `goto pip_failed`
+  ฟ้องชัด+ exit 1 ก่อนสร้าง task (deploy จึงจับได้)
+- **สิทธิ์เขียน log**: ProgramData ไม่ให้ user เขียน default → agent (รันเป็น user) เขียน log/shots/agent.log
+  ไม่ได้ · แก้: `icacls %DEST% /grant Users:(OI)(CI)M`
+- ยังเหลือ (ทำต่อ): bundle wheels ให้ offline จริง (ตอนนี้ pip ยังต้องต่อ pypi — B ต่อได้)
+- เทสต์: room ทั้งชุด 55 ผ่าน · **ยังไม่ได้รัน install.cmd ตัวใหม่บนเครื่องนี้** (มันตั้ง autostart+เปิดพอร์ต)
+
 ## 2026-09-25 — Python มากับชุด (ไม่ต้องโหลดที่เครื่องปลายทาง)
 
 - ขอบเขต: `scripts/make_room_package.py` (bundle Python installer + install.cmd

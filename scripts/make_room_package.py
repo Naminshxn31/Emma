@@ -152,8 +152,25 @@ copy /y "%SRC%run_room_agent.py" "%DEST%\\" >nul
 copy /y "%SRC%.env" "%DEST%\\" >nul
 copy /y "%SRC%uninstall.cmd" "%DEST%\\" >nul
 
+REM Let the logged-on (limited) user the task runs as write here -- its action
+REM log, its screenshots and agent.log all live under this folder, and
+REM ProgramData is not user-writable by default, so the headless auto-start would
+REM silently fail to log or capture without this. S-1-5-32-545 = the Users group
+REM (by SID, so it is right on a Thai-language Windows too).
+icacls "%DEST%" /grant *S-1-5-32-545:(OI)(CI)M >nul
+
 echo Installing Python packages...
-"%PY%" -m pip install --quiet --disable-pip-version-check fastapi uvicorn python-dotenv
+REM Prefer wheels that shipped in the package (offline). The interpreter being
+REM bundled but its packages not was the gap: pip would still reach pypi.org over
+REM the same missing internet, fail, and -- unchecked -- leave a half-installed
+REM agent that crashes on `import fastapi`. So: use the bundled wheelhouse if
+REM present, else pip online, and FAIL LOUDLY either way.
+if exist "%SRC%wheelhouse" (
+  "%PY%" -m pip install --quiet --disable-pip-version-check --no-index --find-links "%SRC%wheelhouse" fastapi uvicorn python-dotenv pillow
+) else (
+  "%PY%" -m pip install --quiet --disable-pip-version-check fastapi uvicorn python-dotenv pillow
+)
+if errorlevel 1 goto pip_failed
 
 REM Read the port from the .env that travelled with this package.
 set "PORT=8777"
@@ -162,9 +179,14 @@ netsh advfirewall firewall delete rule name="Emma Room Agent" >nul 2>&1
 netsh advfirewall firewall add rule name="Emma Room Agent" dir=in action=allow protocol=TCP localport=%PORT% >nul
 echo Opened inbound TCP port %PORT%.
 
-REM Auto-start at logon, no window, as the ordinary (non-admin) user. %PYW% was
-REM resolved above (system or the private copy), so no PATH lookup is needed.
-powershell -NoProfile -Command "Register-ScheduledTask -TaskName 'EmmaRoomAgent' -Force -RunLevel Limited -Action (New-ScheduledTaskAction -Execute '%PYW%' -Argument '\\"%DEST%\\run_room_agent.py\\"' -WorkingDirectory '%DEST%') -Trigger (New-ScheduledTaskTrigger -AtLogOn)" >nul
+REM Auto-start at logon, no window, as WHOEVER LOGS IN (the interactive user),
+REM not as the account that ran this installer. With no principal the task binds
+REM to the installer's identity, so over a WinRM deploy -- run as an IT admin who
+REM is never interactively logged on at the room PC -- the agent would come back
+REM after a reboot in a session that does not exist, and its screen/keyboard
+REM capabilities need the interactive session. A Users-group principal runs it in
+REM the logged-on user's own session. %PYW% was resolved above, so no PATH lookup.
+powershell -NoProfile -Command "Register-ScheduledTask -TaskName 'EmmaRoomAgent' -Force -Action (New-ScheduledTaskAction -Execute '%PYW%' -Argument '\\"%DEST%\\run_room_agent.py\\"' -WorkingDirectory '%DEST%') -Trigger (New-ScheduledTaskTrigger -AtLogOn) -Principal (New-ScheduledTaskPrincipal -GroupId 'BUILTIN\\Users' -RunLevel Limited)" >nul
 echo Registered auto-start (Task Scheduler entry: EmmaRoomAgent).
 
 REM Start it now, in the background, no window.
@@ -182,6 +204,17 @@ echo.
 REM ROOM_AGENT_SILENT is set by the remote deploy (deploy_room_agents.ps1): a
 REM `pause` under WinRM has no console to read a key and would hang the deploy.
 if not defined ROOM_AGENT_SILENT pause
+exit /b 0
+
+:pip_failed
+echo.
+echo FAILED to install the Python packages (fastapi/uvicorn/python-dotenv).
+echo The agent cannot run without them. This PC has no route to pypi.org and the
+echo package shipped no offline wheels. Rebuild the package on a machine with
+echo internet (it will bundle the wheels), or give this PC internet, then re-run.
+echo Nothing was left auto-starting.
+if not defined ROOM_AGENT_SILENT pause
+exit /b 1
 """
 
 UNINSTALL_CMD = """@echo off
