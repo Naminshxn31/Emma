@@ -133,10 +133,25 @@ if __name__ == "__main__":
         # a page open to wake *into* — the summon rings standby browsers, and
         # with none of them there the greeting is a line in the log.
         _open_when_up(f"{scheme}://localhost:{settings.port}/{q}")
+    # --reload (or DEV_RELOAD=true) restarts the app when a file changes, so a
+    # code edit shows up without killing and relaunching this script. Off by
+    # default and never for the sales room: the reloader runs a watcher process
+    # and drops every live WebSocket on each restart, which mid-conversation
+    # means the robot resets itself. It also re-runs the startup hooks, so a
+    # machine with CANVA_OPEN_AT_START would pop a browser window per save.
+    dev_reload = "--reload" in sys.argv or os.getenv("DEV_RELOAD", "").strip().lower() in {"1", "true", "yes", "on"}
+    if dev_reload:
+        print("  DEV RELOAD ON - restarts on file changes. Do not use while a guest is talking.")
     uvicorn.run(
         "app.main:app",
         host=settings.host,
         port=settings.port,
+        reload=dev_reload,
+        # Watch only what this app is: the server package and the pages it
+        # serves. Without this the reloader also watches data/ and restarts
+        # the robot every time a turn is written to data/logs.
+        reload_dirs=[str(Path(__file__).resolve().parent / "app"),
+                     str(Path(__file__).resolve().parent / "client")] if dev_reload else None,
         log_level=settings.log_level.lower(),
         # Uvicorn includes the full query string in access lines. Control and
         # kiosk pages authenticate in that query, so request logging would
