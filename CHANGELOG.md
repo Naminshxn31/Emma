@@ -1,5 +1,41 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-25 — ลง agent หลายเครื่องผ่าน LAN (WinRM) · red-team เจอ 5 บั๊กจริง แก้หมด
+
+- ขอบเขต: `scripts/deploy_room_agents.ps1` (ใหม่), `scripts/make_room_package.py`
+  (+ก๊อป uninstall.cmd, +pause กันค้างตอนรัน headless), `tests/test_deploy_room_agents.py`
+  (13 ตัว ใหม่), `tests/test_make_room_package.py` (+2), `.gitignore`,
+  `docs/ติดตั้งตัวคุมคอมในห้องขาย.md`
+- เจ้าของอนุมัติสถาปัตยกรรม deploy จากส่วนกลาง (เครื่องบริษัท ได้รับอนุญาต) พร้อมกติกา:
+  รายชื่อเครื่องชัดเจน ไม่สแกน · ไม่ self-propagation · audit · uninstall — ทำตามนั้นครบ
+- `deploy_room_agents.ps1` รันบนเครื่องกลาง ลง agent ให้ทุกเครื่องใน `data/room-deploy.json`
+  ผ่าน WinRM: build ชุดของแต่ละห้อง → push → รัน install.cmd remote → อัปเดต `rooms.json` ให้เอง
+  · `-WhatIf` ดูแผนไม่แตะเครื่องไหน · `-Uninstall` ถอน · รหัส admin ผ่าน `Get-Credential` ไม่เก็บ
+- **แทน agent.msi ด้วยชุดโฟลเดอร์ + install.cmd ที่ทดสอบแล้ว** MSI ต้องฝัง Python (หนัก) —
+  ไว้ทำตอนย้าย Intune/SCCM · WinRM ต้องเปิดที่ปลายทางก่อน (เขียนใน docs พร้อมเคส workgroup/domain)
+- **ให้ 3 agent red-team ตัวสคริปต์ (มุมความลับ / injection+WinRM / ขอบเขต) + verify แบบ adversarial**
+  (11 subagent) เจอของจริง 5 ข้อ แก้ครบ:
+  1. **ค่า token ค้างบนเครื่องกลางเมื่อ deploy ล้ม** — `$stage` (มี .env token) ลบเฉพาะตอนสำเร็จ
+     ย้ายไป `finally` แบบ guard ลบทุกทาง
+  2. **รายชื่อขาด host/room ทำทั้งงานล้ม** — `$t.host` อ่านนอก try + StrictMode = terminating
+     escape ทั้ง loop เครื่องที่เหลือถูกข้ามเงียบ ไม่มี audit · ตอนนี้ validate ทั้งรายชื่อ**ก่อน**
+     ถาม credential/แตะเครื่องไหน ผิดที่เดียวหยุดทั้งงาน
+  3. **ลบ staging ฝั่งปลายทางแบบเงียบ** — `catch {}` ว่าง ถ้าลบไม่สำเร็จ token ค้างบน endpoint
+     โดยไม่มีใครรู้ · ตอนนี้ลบผ่าน session เดิม + เตือน + audit `stage-cleanup` ถ้าล้ม
+  4. **exit code ของ install.cmd ถูกทิ้ง เขียน result='ok' เสมอ** — install ล้ม (ไม่มี Python /
+     token WinRM ไม่ได้ยกสิทธิ์ → self-elevate no-op) ก็รายงานสำเร็จ + เขียน rooms.json ชี้ไป agent
+     ที่ไม่ได้รัน · ตอนนี้**เช็ค post-condition บนเครื่องปลายทาง** (ไฟล์อยู่ + task ถูกตั้ง) ก่อนเขียน
+     rooms.json · uninstall ก็เช็ค task หายจริง · และ install.cmd/uninstall.cmd `pause` มี
+     `ROOM_AGENT_SILENT` กันค้างตอน headless (WinRM ไม่มี console กด key)
+  5. **audit log อาจติด token fragment** — ถ้า rooms.json พัง ข้อความ error ของ ConvertFrom-Json
+     อาจมีเนื้อไฟล์ (ที่มี token) แล้วถูกเขียนลง log ที่สัญญาว่า "ไม่มี token" · ตอนนี้ `Write-Audit`
+     redact รูป token ทุกค่า + ตัดยาวไม่เกิน 300 ตัว
+- ทุกข้อมี regression test · เทสต์: room ทั้งชุด 48 ผ่าน (deploy 13, package 10, agent 18, control ...)
+- **ทดสอบเท่าที่ทำได้บนเครื่องเดียว**: parse ผ่าน, `-WhatIf` โชว์แผนไม่แตะเครื่อง, รายชื่อพังหยุดก่อน
+  ติดต่อ, redaction ทำงาน · **ไม่ได้ยิง WinRM ไปเครื่องจริง** (ไม่มีเป้าหมาย/สิทธิ์ และเป็น
+  operation ที่คนต้องเป็นคนสั่งพร้อม credential) — รันจริงบนเครื่องกลางที่มีรายชื่อ + admin
+- ยังไม่ต่อกับ Emma (มีเทสต์กันทั้ง agent, caller, deploy)
+
 ## 2026-09-25 — ตัวติดตั้งไฟล์เดียวสำหรับคอมห้องขาย (รันเบื้องหลัง แต่ไม่ซ่อน)
 
 - ขอบเขต: `scripts/make_room_package.py` (+`install.cmd`, +`uninstall.cmd`),

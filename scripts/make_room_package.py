@@ -94,7 +94,7 @@ if errorlevel 1 (
   echo Python was not found on this PC. Install it, then run this file again:
   echo   https://www.python.org/downloads/   (tick "Add python.exe to PATH")
   echo.
-  pause
+  if not defined ROOM_AGENT_SILENT pause
   exit /b 1
 )
 
@@ -103,6 +103,7 @@ xcopy "%SRC%app" "%DEST%\\app" /e /i /y /q >nul
 xcopy "%SRC%data" "%DEST%\\data" /e /i /y /q >nul
 copy /y "%SRC%run_room_agent.py" "%DEST%\\" >nul
 copy /y "%SRC%.env" "%DEST%\\" >nul
+copy /y "%SRC%uninstall.cmd" "%DEST%\\" >nul
 
 echo Installing Python packages...
 python -m pip install --quiet --disable-pip-version-check fastapi uvicorn python-dotenv
@@ -131,7 +132,9 @@ echo It now starts at every logon with no window.
 echo Installed at %DEST% -- shown in Task Scheduler as EmmaRoomAgent.
 echo To stop and remove it: run uninstall.cmd
 echo.
-pause
+REM ROOM_AGENT_SILENT is set by the remote deploy (deploy_room_agents.ps1): a
+REM `pause` under WinRM has no console to read a key and would hang the deploy.
+if not defined ROOM_AGENT_SILENT pause
 """
 
 UNINSTALL_CMD = """@echo off
@@ -149,7 +152,7 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"Name='p
 netsh advfirewall firewall delete rule name="Emma Room Agent" >nul 2>&1
 echo Removed the scheduled task and the firewall rule.
 echo Files remain at %DEST% -- delete that folder to remove them completely.
-pause
+if not defined ROOM_AGENT_SILENT pause
 """
 
 

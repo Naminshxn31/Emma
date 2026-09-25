@@ -105,3 +105,24 @@ def test_the_port_the_installer_opens_matches_the_env(package):
     install = (package / "install.cmd").read_text(encoding="ascii")
     assert 'if /i "%%A"=="ROOM_AGENT_PORT" set "PORT=%%B"' in install
     assert "localport=%PORT%" in install
+
+
+def test_the_target_keeps_its_own_uninstaller(package):
+    """install.cmd copies uninstall.cmd to the install dir, so a machine can be
+    cleaned up later even after the original package folder is gone -- and so a
+    remote deploy can run it over WinRM. Without this the uninstaller only ever
+    exists in the staging copy, which the deploy script deletes."""
+    install = (package / "install.cmd").read_text(encoding="ascii")
+    assert 'copy /y "%SRC%uninstall.cmd" "%DEST%\\"' in install
+
+
+def test_the_installers_do_not_hang_when_run_headless(package):
+    """A remote WinRM deploy runs install.cmd/uninstall.cmd with no console, so
+    a bare `pause` would block the deploy forever. Every pause in these two must
+    be guarded by ROOM_AGENT_SILENT, which the deploy sets. (start-room-agent.cmd
+    is the interactive runner and may pause.)"""
+    for name in ("install.cmd", "uninstall.cmd"):
+        text = (package / name).read_text(encoding="ascii")
+        for line in text.splitlines():
+            assert line.strip() != "pause", f"{name} has an unguarded pause"
+        assert "if not defined ROOM_AGENT_SILENT pause" in text

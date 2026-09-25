@@ -99,6 +99,14 @@ data/personal-docs/
 #   python scripts/fetch_face_model.py
 data/faces/
 
+# The push-deploy target list (scripts/deploy_room_agents.ps1): internal
+# hostnames/IPs of approved company PCs, hand-maintained. Names infrastructure,
+# so it stays out of the repo.
+data/room-deploy.json
+# The deploy audit log: which agent went to which host, when, by whom. Local
+# operational record, never a token or a password in it, but not history.
+data/room-deploy-log/
+
 # Which machine is in which room, and the token for each (scripts/room_control.py).
 # One shared secret per sales-room PC. A token in the history is a token that has
 # to be changed on every machine it was ever used on.
