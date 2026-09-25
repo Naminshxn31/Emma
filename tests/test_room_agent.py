@@ -249,3 +249,28 @@ def test_the_agent_is_not_wired_into_emma_yet():
         if path.name == "room_agent.py":
             continue
         assert "room_agent" not in path.read_text(encoding="utf-8"), path
+
+
+def test_what_the_agent_writes_on_a_room_pc_never_reaches_the_repo():
+    """`screenshot` saves a full-desktop capture under data/room-agent/shots/.
+
+    That is whatever happened to be on a sales-room monitor: a customer's
+    details, an inventory sheet, somebody's mail. It is taken by a service
+    driven from ANOTHER machine, so unlike every other file in data/ there is
+    nobody standing there deciding to keep it. Found by running the agent for
+    real on 2026-09-25 -- the unit tests patch the capture away, so the path it
+    writes to had never once existed while a test was looking.
+
+    Same rule as data/logs/: local evidence, not history.
+    """
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    for written in ("data/room-agent/2026-01-01.jsonl",
+                    "data/room-agent/shots/20260101-000000.png"):
+        result = subprocess.run(["git", "check-ignore", "-q", written],
+                                cwd=root, capture_output=True, text=True, encoding="utf-8")
+        # exit 0 == ignored. Anything else and a screenshot of a sales desk is
+        # one `git add -A` away from the history.
+        assert result.returncode == 0, written

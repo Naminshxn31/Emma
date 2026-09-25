@@ -99,6 +99,14 @@ data/personal-docs/
 #   python scripts/fetch_face_model.py
 data/faces/
 
+# What the room agent writes on the machine it runs on (app/room_agent.py):
+# full-desktop screenshots and a per-day action log. The screenshots are
+# whatever was on a sales-room monitor at that moment -- a customer's details,
+# an inventory sheet, someone's mail -- and they are taken by a service driven
+# from another machine, so nobody is standing there deciding to keep them.
+# Same rule as data/logs/: it is local evidence, it is not history.
+data/room-agent/
+
 # Showroom CAD model and derived maps are site-specific local references.
 data/showroom/
 
