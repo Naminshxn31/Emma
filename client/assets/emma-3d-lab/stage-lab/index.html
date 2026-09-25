@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emma · Stage projection lab</title>
+<!--
+  The projection study, in the lab (owner, 2026-09-24: "ทำใน lab ก่อนนะ
+  อย่าเอาไปใช้จริง"). Nothing here is loaded by the app: this page and
+  ./mascot-stage.js are the whole thing, and the shipping renderer and
+  /preview are untouched.
+
+  What it is trying to be: the owner's mockup — a lit screen on the left, Emma
+  standing at the right turned toward it, twin beams leaving HER EYES and
+  opening out to fill the panel.
+
+  What is adjustable, because the point of a lab is to settle numbers before
+  they go into the product: the turn angle, the beam spread/softness/opacity,
+  the accent colour, and the two frame styles that were shortlisted.
+-->
+<script type="importmap">
+{ "imports": {
+    "three": "/assets/emma-3d-lab/vendor/build/three.module.js",
+    "three/addons/": "/assets/emma-3d-lab/vendor/examples/jsm/"
+} }
+</script>
+<style>
+  :root {
+    --accent: #5fb8ff;
+    --accent-soft: 96, 186, 255;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(120% 95% at 76% 55%, rgba(var(--accent-soft), .16), transparent 64%),
+      radial-gradient(90% 70% at 20% 20%, rgba(20,60,110,.35), transparent 70%),
+      #050a12;
+    font-family: 'Noto Sans Thai', system-ui, sans-serif;
+    color: #dbe7f3;
+    overflow: hidden;
+  }
+
+  /* ---- the screen ---- */
+  /* Sized from the owner's own drawing over the app (2026-09-24): the panel
+     takes the left three quarters and its BOTTOM EDGE sits at her eye line, so
+     the lower beam runs almost flat — that is what makes it read as a
+     projector rather than a spotlight. */
+  .screen {
+    position: fixed;
+    left: 5vw;
+    top: 17vh;
+    width: 74vw;
+    height: 55vh;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    padding: clamp(14px, 2vw, 26px);
+    z-index: 20;
+    background:
+      linear-gradient(180deg, rgba(10,28,52,.62), rgba(6,16,32,.78)),
+      radial-gradient(rgba(var(--accent-soft), .22) 1px, transparent 1px) 0 0 / 26px 26px;
+    /* The mockup's frame is a thin bright line with a second line just inside
+       it, not one thick border — that inner line is what makes it read as a
+       screen edge rather than a box outline. */
+    border: 2px solid rgba(var(--accent-soft), .95);
+    box-shadow:
+      inset 0 0 0 1px rgba(var(--accent-soft), .28),
+      inset 0 0 90px rgba(var(--accent-soft), .10),
+      0 0 18px rgba(var(--accent-soft), .55),
+      0 0 70px rgba(var(--accent-soft), .28),
+      0 26px 70px rgba(0,0,0,.55);
+  }
+  /* Corner brackets, from the mockup. Four of them, drawn by two elements. */
+  /* Longer and thinner than a moment ago: in the mockup the brackets read as
+     an overlay ON the frame, not as a heavier corner. */
+  .screen b {
+    position: absolute; width: 58px; height: 58px; pointer-events: none;
+    border: 2px solid rgba(255,255,255,.92);
+    box-shadow: 0 0 16px rgba(var(--accent-soft), .75);
+  }
+  .screen b.tl { top: -3px; left: -3px; border-right: 0; border-bottom: 0; border-radius: 16px 0 0 0; }
+  .screen b.tr { top: -3px; right: -3px; border-left: 0; border-bottom: 0; border-radius: 0 16px 0 0; }
+  .screen b.bl { bottom: -3px; left: -3px; border-right: 0; border-top: 0; border-radius: 0 0 0 16px; }
+  .screen b.br { bottom: -3px; right: -3px; border-left: 0; border-top: 0; border-radius: 0 0 16px 0; }
+
+  /* Frame style B: no hard border, a floating slab lit from its own base. */
+  body.style-b .screen {
+    border: 1px solid rgba(var(--accent-soft), .30);
+    border-bottom: 0;
+    border-radius: 18px 18px 6px 6px;
+    background:
+      linear-gradient(180deg, rgba(10,30,48,.34), rgba(8,20,34,.80)),
+      repeating-linear-gradient(0deg, rgba(var(--accent-soft), .07) 0 2px, transparent 2px 7px);
+    box-shadow: inset 0 40px 90px rgba(var(--accent-soft), .10), 0 -10px 70px rgba(var(--accent-soft), .18);
+  }
+  body.style-b .screen b { opacity: 0; }
+  body.style-b .screen::after {
+    content: ""; position: absolute; left: 6%; right: 6%; bottom: -14px; height: 22px;
+    background: radial-gradient(60% 100% at 50% 0%, rgba(var(--accent-soft), .95),
+                rgba(var(--accent-soft), .22) 55%, transparent 75%);
+    filter: blur(2px);
+  }
+
+  .demo { width: 100%; display: grid; gap: 14px; }
+  .demo h1 {
+    margin: 0; text-align: center; letter-spacing: .14em;
+    font-size: clamp(13px, 1.4vw, 18px); font-weight: 600; color: #cfe6ff;
+  }
+  .demo .plan {
+    height: min(40vh, 380px); border-radius: 10px;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 2px, transparent 2px 84px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.10) 0 2px, transparent 2px 70px),
+      linear-gradient(135deg, rgba(var(--accent-soft), .18), rgba(10,20,34,.55));
+    box-shadow: inset 0 0 40px rgba(0,0,0,.45);
+  }
+  .demo .legend { display: flex; gap: 18px; justify-content: center; font-size: 13px; color: #b8cadd; }
+  .demo .legend i { font-style: normal; }
+  .demo .legend i::before {
+    content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+    margin-right: 7px; vertical-align: -2px; background: rgba(255,255,255,.35);
+  }
+  .demo .legend .hold::before { background: #f0c46a; }
+  .demo .legend .sold::before { background: #e2685f; }
+
+  /* ---- Emma ---- */
+  /* Which side she stands on. The owner's drawings have had her on the right
+     and then on the left, so this is a switch rather than a decision. */
+  body.emma-left .screen { left: auto; right: 5vw; }
+  body.emma-left .mascot-wrap { right: auto; left: 1.5vw; }
+  .mascot-wrap {
+    position: fixed;
+    right: 1.5vw;
+    /* Her eye line (0.29 of her own box) lands just under the panel's bottom
+       edge at 72vh, which is where the drawing puts it. */
+    bottom: 4vh;
+    width: min(21vw, 230px);
+    aspect-ratio: 720 / 860;
+    display: grid;
+    place-items: center;
+    z-index: 30;
+    --user-x: 0px; --user-y: 0px; --user-scale: 1;
+    transform: translate(var(--user-x), var(--user-y)) scale(var(--user-scale));
+  }
+  .mascot-3d { width: 100%; height: 100%; display: block; }
+
+  /* ---- the light ---- */
+  /* PREVIEW of the sculpted eyes, drawn over the 3D face. The model still has
+     its arch eyes; this is how the shape and its animation get judged before
+     anyone rebuilds a GLB (owner: "ก่อนจะปั้นลองวาดแบบมาก่อน"). Same numbers
+     the sculpt would use, in model units. */
+  .eyes { position: fixed; inset: 0; z-index: 31; pointer-events: none; }
+  .eyes svg { width: 100%; height: 100%; }
+  .beam { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+  .beam svg { width: 100%; height: 100%; mix-blend-mode: screen; }
+
+  /* ---- the tuning panel: a lab is for settling numbers ---- */
+  .panel {
+    position: fixed; right: 14px; top: 14px; z-index: 60; width: 244px;
+    /* It grew past her head once the eye controls went in — a panel that
+       covers the thing it is tuning is not a panel. */
+    max-height: 62vh; overflow: auto;
+    padding: 14px 16px; border-radius: 14px;
+    background: rgba(8,14,24,.86); border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 18px 44px rgba(0,0,0,.5);
+    font-size: 12px; line-height: 1.7;
+  }
+  .panel h2 { margin: 0 0 8px; font-size: 12px; letter-spacing: .1em; color: #8fb6da; text-transform: uppercase; }
+  .panel label { display: block; margin: 8px 0 2px; color: #a9c0d6; }
+  .panel input[type=range] { width: 100%; }
+  .panel .row { display: flex; gap: 8px; align-items: center; }
+  .panel button {
+    flex: 1; padding: 7px 8px; border-radius: 9px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: #dbe7f3;
+  }
+  .panel button.on { background: rgba(var(--accent-soft), .30); border-color: rgba(var(--accent-soft), .7); }
+  .panel code { color: #9fd0ff; }
+  .hint { position: fixed; left: 16px; bottom: 12px; z-index: 60; font-size: 12px; color: #6d8298; }
+</style>
+</head>
+<body>
+
+<!-- Deliberately empty (owner, 2026-09-24: "จอที่แสดงยังไม่ต้องมีอะไร ให้เป็น
+     สี่เหลี่ยมเปล่าๆ เพราะเดี๋ยวอาจจะให้แสดงเป็นรูปภาพหรือคลิปอื่น"). The frame
+     and the light are what this lab is settling; whatever lands inside it later
+     is the app's business. -->
+<section class="screen" aria-label="จอฉาย (ว่างไว้สำหรับรูปหรือคลิป)">
+  <b class="tl"></b><b class="tr"></b><b class="bl"></b><b class="br"></b>
+</section>
+
+<div class="beam" aria-hidden="true"><svg id="beamSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div class="eyes" aria-hidden="true"><svg id="eyeSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+<div class="mascot-wrap" data-emma-state="speaking" data-emma-pose="pose-05"
+     data-emma-eyes="smile" data-emma-mouth="none" data-emma-hands="relaxed"
+     tabindex="0" role="img" aria-label="Emma">
+  <canvas class="mascot-3d" data-emma-3d></canvas>
+</div>
+
+<aside class="panel">
+  <h2>Stage lab</h2>
+  <div class="row">
+    <button id="styleA" class="on">กรอบ A</button>
+    <button id="styleB">แผ่นลอย B</button>
+  </div>
+  <label>หันเข้าหาจอ <code id="turnOut">35°</code></label>
+  <input id="turn" type="range" min="0" max="70" value="35">
+  <label>ความกว้างลำแสง <code id="spreadOut">1.00</code></label>
+  <input id="spread" type="range" min="40" max="160" value="100"><!-- 100 = exactly the panel corners, which is what the drawing shows -->
+  <label>ความเข้มแสง <code id="glowOut">0.55</code></label>
+  <input id="glow" type="range" min="0" max="100" value="55">
+  <label>ความฟุ้ง <code id="blurOut">9</code></label>
+  <input id="blur" type="range" min="0" max="26" value="9">
+  <label>สี</label>
+  <div class="row">
+    <button data-accent="#5fb8ff" class="on">ฟ้า</button>
+    <button data-accent="#f0c98a">ทอง</button>
+    <button data-accent="#7cf0c0">มิ้นต์</button>
+  </div>
+  <label><input id="eyes" type="checkbox" checked> ตาสว่าง</label>
+  <label>สีตา</label>
+  <div class="row">
+    <button data-eye="#0a6cff" class="on">น้ำเงิน</button>
+    <button data-eye="#1f8bff">ฟ้าเข้ม</button>
+    <button data-eye="#5fb8ff">ฟ้าอ่อน</button>
+  </div>
+  <label><input id="ring" type="checkbox"> ร่างตาทับ (ของเก่า เลิกใช้แล้ว — ตาจริงอยู่ในโมเดลแล้ว)</label>
+  <label><input id="anim" type="checkbox" checked> แอนิเมชัน (กะพริบ/เต้น/แสงไหล)</label>
+  <label>ความสูงตา <code id="eyeHOut">0.235</code></label>
+  <input id="eyeH" type="range" min="120" max="320" value="235">
+  <label>ความกว้างตา <code id="eyeWOut">0.105</code></label>
+  <input id="eyeW" type="range" min="60" max="260" value="105">
+  <div class="row"><button id="sideR" class="on">เธออยู่ขวา</button><button id="sideL">เธออยู่ซ้าย</button></div>
+</aside>
+<p class="hint">ลากตัว Emma เพื่อหมุนกล้อง · shift+ลาก เพื่อย้าย · ลำแสงเกาะตำแหน่งจริงของเธอทุกเฟรม</p>
+
+<script type="module" src="./mascot-stage.js?v=1"></script>
+<script>
+(function () {
+  var wrap = document.querySelector('.mascot-wrap');
+  var screenEl = document.querySelector('.screen');
+  var svg = document.getElementById('beamSvg');
+  var $ = function (id) { return document.getElementById(id); };
+
+  var eyeSvg = document.getElementById('eyeSvg');
+  var cfg = { turn: 35, spread: 1, glow: .55, blur: 9, accent: '#5fb8ff', eyes: true,
+              ring: false, anim: true, eyeColour: '#0a6cff', eyeA: .105, eyeB: .235, left: false };
+  // Her head is 0.60 of her box wide (measured off a render by counting bright
+  // pixels), and the head's own half-width is RX 1.16 model units — so this is
+  // how many pixels one model unit is worth at whatever size she is now.
+  var UNIT = function (boxW) { return 0.30 * boxW / 1.16; };
+  var t0 = performance.now();
+
+  // Her eyes as a share of her own box. Measured off a render by profiling the
+  // dark pixels inside the head: the eye band peaks at 0.29 of the wrap's
+  // height, and the two arches sit either side of centre. Fractions, not
+  // pixels, so the origin holds at any size she is dragged to.
+  var EYE_Y = 0.29, EYE_X = [0.44, 0.56];
+
+  function paint() {
+    var w = wrap.getBoundingClientRect();
+    var s = screenEl.getBoundingClientRect();
+    // When she turns toward the screen her eyes swing that way too; a share of
+    // the turn keeps the light leaving her face instead of her cheek.
+    // The renderer knows where her eyes are drawn; ask it. The old fractions
+    // were a guess about her box and drifted off her face the moment she
+    // turned (owner: "แสงที่ฉายก็ให้ตามกับตาด้วย"). Fractions stay as the
+    // fallback for the SVG puppet, which has no 3D eyes to ask about.
+    var eyes = null;
+    try { eyes = window.EmmaMascot && window.EmmaMascot.eyePoints(); } catch (e) {}
+    if (!eyes || eyes.length !== 2) {
+      var lean = (cfg.turn / 70) * 0.06 * w.width;
+      eyes = EYE_X.map(function (fx) {
+        return { x: w.left + w.width * fx - lean, y: w.top + w.height * EYE_Y };
+      });
+    }
+    // The far edge: the beam opens onto the screen's right-hand side, and the
+    // spread slider walks those two points out past the frame or in towards it.
+    var mid = (s.top + s.bottom) / 2, half = (s.height / 2) * cfg.spread;
+    // The cone's edges land on the panel corners FACING HER, not on the far
+    // edge (owner drew the two lines, 2026-09-25). With the far edge as the
+    // target the rays swept diagonally across the panel's face, which reads as
+    // light passing over it rather than filling it. Which edge that is comes
+    // from where she is standing, so it follows her when she is dragged or
+    // when the side switch is used.
+    var nearX = (eyes[0].x < (s.left + s.right) / 2) ? s.left : s.right;
+    var far = [[nearX, mid - half], [nearX, mid + half]];
+    var rgb = hexToRgb(cfg.accent);
+
+    var rays = '';
+    // The mockup's light is not one cone: it is a handful of thin rays that
+    // fan out with visible edges, over a soft wide wash. Drawn from each eye,
+    // fanned across the screen's right edge, with the outer ones dimmer.
+    var N = 5;
+    eyes.forEach(function (e) {
+      var tt = (performance.now() - t0) / 1000;
+      for (var i = 0; i < N; i++) {
+        var t = N === 1 ? .5 : i / (N - 1);
+        // A slow travelling shimmer down the fan, so the light looks alive.
+        var live = cfg.anim ? (0.75 + 0.25 * Math.sin(tt * 1.6 + i * 0.9)) : 1;
+        var y0 = mid - half + (2 * half) * t;
+        var thickness = half * (0.16 + 0.10 * Math.sin(t * Math.PI));
+        var dim = 0.35 + 0.65 * Math.sin(t * Math.PI);      // brightest in the middle
+        rays += '<polygon points="' + e.x + ',' + e.y + ' ' +
+                nearX + ',' + (y0 - thickness / 2) + ' ' +
+                nearX + ',' + (y0 + thickness / 2) + '"' +
+                ' fill="url(#fade)" opacity="' + (cfg.glow * dim * live * .55).toFixed(3) + '"/>';
+      }
+    });
+    svg.innerHTML =
+      '<defs>' +
+        '<linearGradient id="fade" x1="1" y1="0" x2="0" y2="0">' +
+          '<stop offset="0" stop-color="rgb(' + rgb + ')" stop-opacity="0"/>' +
+          '<stop offset=".5" stop-color="rgb(' + rgb + ')" stop-opacity=".45"/>' +
+          '<stop offset="1" stop-color="rgb(' + rgb + ')" stop-opacity="1"/>' +
+        '</linearGradient>' +
+        '<radialGradient id="hot">' +
+          '<stop offset="0" stop-color="#ffffff" stop-opacity=".95"/>' +
+          '<stop offset=".35" stop-color="rgb(' + rgb + ')" stop-opacity=".8"/>' +
+          '<stop offset="1" stop-color="rgb(' + rgb + ')" stop-opacity="0"/>' +
+        '</radialGradient>' +
+        '<filter id="soft"><feGaussianBlur stdDeviation="' + cfg.blur + '"/></filter>' +
+        '<filter id="hair"><feGaussianBlur stdDeviation="' + Math.max(1, cfg.blur * .18) + '"/></filter>' +
+      '</defs>' +
+      // the soft wash under everything
+      eyes.map(function (e) {
+        return '<polygon points="' + e.x + ',' + e.y + ' ' + far[0] + ' ' + far[1] + '"' +
+               ' fill="url(#fade)" opacity="' + (cfg.glow * .45).toFixed(3) + '" filter="url(#soft)"/>';
+      }).join('') +
+      '<g filter="url(#hair)">' + rays + '</g>' +
+      // and the hot spot where it leaves her, which is what sells it as light
+      eyes.map(function (e) {
+        return '<circle cx="' + e.x + '" cy="' + e.y + '" r="' + (w.width * .09).toFixed(1) + '"' +
+               ' fill="url(#hot)" opacity="' + (cfg.glow * .9).toFixed(3) + '"/>';
+      }).join('');
+    paintEyes(w, lean);
+    requestAnimationFrame(paint);
+  }
+
+  // The eyes: two vertical oval rings with a lit core, exactly the shape the
+  // sculpt would make (annulus, model units A x B). Animated so the design can
+  // be judged moving, not as a still: a slow pulse, and a blink that squashes
+  // the ring the way an eyelid would.
+  function paintEyes(w, lean) {
+    if (!cfg.ring) { eyeSvg.innerHTML = ''; return; }
+    var u = UNIT(w.width);
+    var t = (performance.now() - t0) / 1000;
+    var pulse = cfg.anim ? 0.88 + 0.12 * Math.sin(t * 1.9) : 1;
+    // A blink every ~4.5s: 140ms of the ring collapsing and coming back.
+    var phase = cfg.anim ? (t % 4.5) : 9;
+    var blink = phase < 0.14 ? Math.abs(Math.cos(phase / 0.14 * Math.PI)) : 1;
+    var rgb = hexToRgb(cfg.accent);
+    var parts = ['<defs><filter id="eglow" x="-120%" y="-120%" width="340%" height="340%">' +
+                 '<feGaussianBlur stdDeviation="' + (u * .035).toFixed(2) + '"/></filter></defs>'];
+    [-1, 1].forEach(function (side) {
+      var cx = w.left + w.width / 2 + side * 0.574 * u - lean;
+      var cy = w.top + w.height * 0.29;
+      var rx = cfg.eyeA * u, ry = cfg.eyeB * u * blink;
+      parts.push('<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '"' +
+                 ' fill="none" stroke="rgb(' + rgb + ')" stroke-width="' + (u * .05) + '"' +
+                 ' opacity="' + (0.95 * pulse) + '" filter="url(#eglow)"/>');
+      parts.push('<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + (rx * .55) + '" ry="' + (ry * .62) + '"' +
+                 ' fill="#eaf8ff" opacity="' + (0.9 * pulse) + '"/>');
+    });
+    eyeSvg.innerHTML = parts.join('');
+  }
+
+  function hexToRgb(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(',');
+  }
+
+  function applyAccent() {
+    document.documentElement.style.setProperty('--accent', cfg.accent);
+    document.documentElement.style.setProperty('--accent-soft', hexToRgb(cfg.accent));
+    try {
+      window.EmmaMascot.setAccent(cfg.accent);
+      // The eyes take their own, deeper blue: at the accent's lightness they
+      // washed out against the pearl head under the studio lights.
+      window.EmmaMascot.setEyes(cfg.eyes ? cfg.eyeColour : null);
+    } catch (e) {}
+  }
+  function applyTurn() {
+    // NEGATIVE: measured, not guessed. Rendered her at -0.62 / 0 / +0.62 and
+    // looked: the panel is on her left, and only the negative yaw puts her
+    // face toward it. The positive default turned her AWAY — which is exactly
+    // what the owner saw ("หันผิด").
+    // Sign follows the side: the screen is on her other side, and only the
+    // yaw that points her AT it is right. Measured by rendering both.
+    var dir = cfg.left ? 1 : -1;
+    try { window.EmmaMascot.faceStage(cfg.turn > 0, dir * cfg.turn * Math.PI / 180); } catch (e) {}
+  }
+
+  // The renderer finishes loading after this script runs — AND its
+  // `emma-3d-ready` event fires before `window.EmmaMascot` is assigned (the
+  // dispatch is inside the loader, the API is at the end of the module).
+  // Measured here: applying on the event alone left facing() at 0.000. So the
+  // page waits for the API itself rather than for the event, and gives up
+  // quietly if the model never arrives (the SVG fallback has no such API).
+  function whenMascot(fn) {
+    var tries = 0;
+    (function poll() {
+      if (window.EmmaMascot && window.EmmaMascot.faceStage) return fn();
+      if (++tries > 60) return;
+      setTimeout(poll, 100);
+    })();
+  }
+  wrap.addEventListener('emma-3d-ready', function () { whenMascot(function () { applyAccent(); applyTurn(); }); });
+
+  $('turn').oninput = function () {
+    cfg.turn = +this.value; $('turnOut').textContent = cfg.turn + '°'; applyTurn();
+  };
+  $('spread').oninput = function () {
+    cfg.spread = +this.value / 100; $('spreadOut').textContent = cfg.spread.toFixed(2);
+  };
+  $('glow').oninput = function () {
+    cfg.glow = +this.value / 100; $('glowOut').textContent = cfg.glow.toFixed(2);
+  };
+  $('blur').oninput = function () { cfg.blur = +this.value; $('blurOut').textContent = cfg.blur; };
+  $('eyes').onchange = function () { cfg.eyes = this.checked; applyAccent(); };
+  $('ring').onchange = function () { cfg.ring = this.checked; };
+  $('anim').onchange = function () { cfg.anim = this.checked; };
+  $('eyeH').oninput = function () { cfg.eyeB = +this.value / 1000; $('eyeHOut').textContent = cfg.eyeB.toFixed(3); };
+  $('eyeW').oninput = function () { cfg.eyeA = +this.value / 1000; $('eyeWOut').textContent = cfg.eyeA.toFixed(3); };
+  $('sideR').onclick = function () {
+    document.body.classList.remove('emma-left'); cfg.left = false;
+    this.classList.add('on'); $('sideL').classList.remove('on'); applyTurn();
+  };
+  $('sideL').onclick = function () {
+    document.body.classList.add('emma-left'); cfg.left = true;
+    this.classList.add('on'); $('sideR').classList.remove('on'); applyTurn();
+  };
+  document.querySelectorAll('[data-eye]').forEach(function (b) {
+    b.onclick = function () {
+      document.querySelectorAll('[data-eye]').forEach(function (o) { o.classList.remove('on'); });
+      b.classList.add('on');
+      cfg.eyeColour = b.dataset.eye;
+      applyAccent();
+    };
+  });
+  document.querySelectorAll('[data-accent]').forEach(function (b) {
+    b.onclick = function () {
+      document.querySelectorAll('[data-accent]').forEach(function (o) { o.classList.remove('on'); });
+      b.classList.add('on');
+      cfg.accent = b.dataset.accent;
+      applyAccent();
+    };
+  });
+  $('styleA').onclick = function () {
+    document.body.classList.remove('style-b'); this.classList.add('on'); $('styleB').classList.remove('on');
+  };
+  $('styleB').onclick = function () {
+    document.body.classList.add('style-b'); this.classList.add('on'); $('styleA').classList.remove('on');
+  };
+
+  whenMascot(function () { applyAccent(); applyTurn(); });
+  paint();
+})();
+</script>
+</body>
+</html>

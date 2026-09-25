@@ -1,0 +1,52 @@
+{
+  "armatures": 0,
+  "actions": 0,
+  "meshes": {
+    "EYE_HAPPY_L": {
+      "vertices": 620,
+      "nonmanifold_edges": 0,
+      "finite": true
+    },
+    "EYE_HAPPY_R": {
+      "vertices": 618,
+      "nonmanifold_edges": 0,
+      "finite": true
+    },
+    "FACE_CHIN_WHITE": {
+      "vertices": 3342,
+      "nonmanifold_edges": 0,
+      "finite": true
+    },
+    "FACE_LOWER_CHROME": {
+      "vertices": 5166,
+      "nonmanifold_edges": 0,
+      "finite": true
+    },
+    "HEAD_OUTER_CHROME": {
+      "vertices": 22882,
+      "nonmanifold_edges": 0,
+      "finite": true
+    },
+    "HEAD_SHELL_WHITE": {
+      "vertices": 12434,
+      "nonmanifold_edges": 0,
+      "finite": true
+    },
+    "HEAD_SHELL_WHITE_BACK": {
+      "vertices": 14708,
+      "nonmanifold_edges": 0,
+      "finite": true
+    }
+  },
+  "cameras": {
+    "CAM_COMPARE_BACK": "ORTHO",
+    "CAM_COMPARE_FRONT": "ORTHO",
+    "CAM_COMPARE_QUARTER": "ORTHO",
+    "CAM_COMPARE_SIDE": "ORTHO"
+  },
+  "packed_references": {
+    "REF_BACK": true,
+    "REF_FRONT": true,
+    "REF_QUARTER": true
+  }
+}

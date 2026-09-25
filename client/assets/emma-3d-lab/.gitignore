@@ -1,0 +1,18 @@
+# Anchored to THIS folder's own render-output dir. An unanchored "build/"
+# also matched vendor/build/, which is where three.module.js + three.core.js
+# live — the showroom machine would have pulled a page whose importmap
+# 404s on the three.js core while the loaders resolved fine (2026-09-23).
+/build/
+*.blend1
+*.blend2
+
+# The LOD comparison builds (2026-09-25). Nine near-identical GLBs, 28 MB, and
+# every one of them is `blender --background --python scripts/build-emma-3d-lab.py`
+# with two env vars away -- the recipe and the measured numbers are in README.md
+# under "จำนวน polygon". Two of them are byte-for-byte copies of files that ARE
+# tracked (emma-full.glb == ../emma.glb, emma-aim5.glb == ../emma-light-68k.glb).
+# Anchored like the /build/ rule above: these names only mean the lab's copies.
+/stage-lab/emma-full.glb
+/stage-lab/emma-aim*.glb
+/stage-lab/emma-lite*.glb
+/stage-lab/emma-safe*.glb

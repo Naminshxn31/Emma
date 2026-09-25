@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10191d">
+  <title>Emma — แกะแบบทีละชิ้น</title>
+  <link rel="stylesheet" href="./study.css">
+</head>
+<body>
+  <a class="skip-link" href="#study">ข้ามไปดูชิ้นส่วน</a>
+  <div class="shell">
+    <header class="page-header">
+      <div class="wordmark">EMMA <span>/</span> REFERENCE STUDY 01</div>
+      <a class="back-link" href="../emma-3d-lab/index.html">ตัวทดลอง 3D <span aria-hidden="true">↗</span></a>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">FORM · SURFACE · CONNECTION</p>
+          <h1 id="page-title">แกะแบบ ทีละชิ้น</h1>
+          <p id="intro-text" class="intro-copy">อ่านรูปทรงและรอยต่อจากภาพต้นแบบ ก่อนขึ้นโมเดลทีละส่วน</p>
+        </div>
+        <div class="draft-note"><span class="status-dot" aria-hidden="true"></span><div><strong>แบบศึกษา · Draft</strong><span>ยังไม่ใช่แบบที่อนุมัติ</span></div></div>
+      </section>
+
+      <section id="study" class="study" aria-label="สำรวจชิ้นส่วนจากภาพต้นแบบ">
+        <div class="part-navigation">
+          <span class="section-kicker">เลือกชิ้นส่วน</span>
+          <div id="part-tabs" class="part-tabs" role="tablist" aria-label="ชิ้นส่วน Emma"></div>
+        </div>
+
+        <div id="workspace" class="workspace" hidden>
+          <div class="drawing-column">
+            <div class="drawing-toolbar">
+              <div class="mode-control" role="group" aria-label="วิธีเทียบภาพ">
+                <button type="button" data-mode="reference" aria-pressed="false">ภาพต้นแบบ</button>
+                <button type="button" data-mode="overlay" aria-pressed="true">ซ้อนเส้น</button>
+                <button type="button" data-mode="trace" aria-pressed="false">เฉพาะเส้น</button>
+              </div>
+              <button id="reset-view" type="button" class="text-button">พอดีกรอบ <span aria-hidden="true">↗</span></button>
+            </div>
+            <div id="drawing-stage" class="drawing-stage">
+              <div class="drawing-caption"><span id="drawing-number">01</span><span id="drawing-name"></span></div>
+              <svg id="reference-drawing" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="drawing-title drawing-description">
+                <title id="drawing-title">ภาพต้นแบบและเส้นแกะแบบ</title>
+                <desc id="drawing-description">เส้นศึกษาอ้างอิงจากภาพต้นฉบับ สามารถปิดเส้นแต่ละชั้นเพื่อเทียบรูปทรงได้</desc>
+                <defs><clipPath id="part-crop"><rect id="crop-rectangle"></rect></clipPath></defs>
+                <g clip-path="url(#part-crop)">
+                  <image id="source-image" preserveAspectRatio="none"></image>
+                  <g id="path-layer"></g>
+                  <g id="landmark-layer"></g>
+                </g>
+              </svg>
+              <div class="drawing-footer"><span id="mode-label">REFERENCE + TRACE</span><span>เส้นศึกษาอ้างอิงจากภาพ</span></div>
+            </div>
+            <div class="drawing-controls">
+              <label class="range-control" for="trace-opacity"><span>ความเข้มเส้น <output id="opacity-value" for="trace-opacity">85%</output></span><input id="trace-opacity" type="range" min="10" max="100" value="85"></label>
+              <label class="range-control zoom-control" for="drawing-zoom"><span>ขยายภาพ <output id="zoom-value" for="drawing-zoom">1×</output></span><input id="drawing-zoom" type="range" min="100" max="180" value="100" step="5"></label>
+              <label class="checkbox-control"><input id="show-landmarks" type="checkbox"><span>จุดอ้างอิง</span></label>
+            </div>
+          </div>
+
+          <aside id="part-panel" class="part-panel" role="tabpanel" tabindex="0" aria-label="รายละเอียดชิ้นส่วน">
+            <div class="part-heading"><span id="part-number" class="part-number">01</span><h2 id="part-name"></h2></div>
+            <div class="annotation"><span class="note-label observed">เห็นจากภาพ</span><p id="part-observation"></p></div>
+            <div class="annotation"><span class="note-label proposed">แนวทางขึ้นชิ้นส่วน</span><p id="part-construction"></p></div>
+            <div id="uncertainty-note" class="uncertainty-note"><span class="note-label inferred">ต้องอนุมาน</span><p id="part-uncertainty"></p></div>
+            <section class="layers-section" aria-labelledby="layers-title"><h3 id="layers-title">เส้นที่ใช้เทียบ</h3><div id="layer-controls" class="layer-controls"></div></section>
+            <section id="dimensions-section" class="dimensions-section" aria-labelledby="dimensions-title"><h3 id="dimensions-title">สัดส่วนอ้างอิง</h3><dl id="dimensions"></dl></section>
+            <a id="part-download" class="part-download" href="./parts/head.svg" download>ดาวน์โหลดเส้นชิ้นนี้ <span>SVG ↓</span></a>
+          </aside>
+        </div>
+        <p id="load-status" class="load-status" role="status">กำลังเปิดภาพต้นแบบ…</p>
+      </section>
+
+      <section class="views-section" aria-labelledby="views-title">
+        <div class="section-heading"><div><p class="eyebrow">READ THE VOLUME</p><h2 id="views-title">ดูทรงจากหลายมุม</h2></div><p>ใช้ภาพแต่ละมุมช่วยตรวจความหนา<br>และตำแหน่งรอยต่อ</p></div>
+        <div id="reference-views" class="reference-views"></div>
+      </section>
+      <footer class="page-footer"><span>ภาพต้นฉบับ + เส้นศึกษาแยกชั้น <a href="./reference-map.json" download>พิกัดอ้างอิง JSON ↓</a></span><span>สัดส่วนจากภาพเป็นค่าประมาณ ไม่ใช่แบบวัดจากโมเดลจริง</span></footer>
+    </main>
+  </div>
+  <script type="module" src="./study.js"></script>
+</body>
+</html>

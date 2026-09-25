@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emma · 3D form & rig study</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,"Segoe UI",Tahoma,sans-serif;background:#081218;color:#e8eff1}
+    *{box-sizing:border-box}body{margin:0}button,a,input{font:inherit}button,a{touch-action:manipulation}
+    .app{display:grid;grid-template-columns:minmax(0,1fr) 330px;min-height:100dvh}
+    main{position:relative;min-height:760px;background:radial-gradient(ellipse at 48% 44%,#1a2c37 0,#0d1a23 45%,#081218 78%);overflow:hidden}
+    header{position:absolute;left:42px;top:33px;z-index:2;pointer-events:none}.eyebrow{font-size:11px;letter-spacing:3px;color:#8cc1c8}
+    h1{font-size:30px;font-weight:450;letter-spacing:-.8px;margin:12px 0 6px}header p{font-size:13px;color:#8a9da8;margin:0}
+    #viewport{position:absolute;inset:0;touch-action:none}canvas{display:block;width:100%;height:100%}
+    .viewbar{position:absolute;left:50%;bottom:35px;transform:translateX(-50%);display:flex;gap:4px;padding:5px;border:1px solid #263b48;border-radius:30px;background:#101e27e8;white-space:nowrap}
+    button{border:1px solid #2b414f;background:#152630;color:#c7d5dc;padding:11px 15px;border-radius:10px;cursor:pointer;transition:background .16s,border-color .16s}
+    button:hover{background:#213b47;border-color:#5f919b}button:focus-visible,a:focus-visible{outline:2px solid #9ce7d8;outline-offset:3px}
+    button[aria-pressed=true]{color:#cbfff1;background:#22433f;border-color:#528d81}.viewbar button{border:0;background:none;border-radius:22px;padding:8px 13px;font-size:12px}
+    .hint{position:absolute;left:36px;bottom:99px;color:#768d99;font-size:12px;pointer-events:none}
+    aside{background:#0e1b23;border-left:1px solid #223440;padding:36px 26px;display:flex;flex-direction:column;gap:24px}
+    .tag{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1.2px;color:#9bc5ca}.tag:before{content:"";width:6px;height:6px;background:#89d7be;border-radius:50%}
+    h2{font-size:18px;font-weight:500;margin:10px 0 7px}aside p{color:#8ca1ac;font-size:13px;line-height:1.7;margin:0}
+    .label{font-size:10px;letter-spacing:1.7px;text-transform:uppercase;color:#73919e;margin-bottom:11px}.poses{display:grid;grid-template-columns:1fr 1fr;gap:8px}.poses button{text-align:left;min-height:68px}
+    .poses small{display:block;font-size:10px;letter-spacing:1px;color:#78949f;margin-top:5px}.row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+    .toggles{display:grid;gap:14px;padding:19px 0;border-top:1px solid #233641;border-bottom:1px solid #233641}
+    input[type=checkbox]{accent-color:#8ddbc6;width:16px;height:16px}input[type=range]{accent-color:#8ddbc6;width:100%;margin:18px 0 8px}
+    .play{min-width:75px;padding:7px 10px;font-size:12px}#time{color:#7897a4;font-size:12px;font-variant-numeric:tabular-nums}
+    .meta{margin-top:auto;padding-top:16px}.downloads{display:flex;gap:14px;margin-top:15px}.downloads a{font-size:12px;color:#9accc9;text-decoration:none;border-bottom:1px solid #365a5f;padding-bottom:4px}
+    #status{font-size:12px;color:#96c8c8;line-height:1.6}.error{color:#ffc2aa!important}
+    @media(max-width:850px){.app{grid-template-columns:1fr}main{min-height:650px;height:75dvh}aside{border-left:0;border-top:1px solid #223440;padding:25px;display:grid;grid-template-columns:1fr 1fr}header{left:25px;top:23px}.meta{grid-column:1/-1}.hint{left:24px;font-size:11px}h1{font-size:25px}}
+    @media(max-width:500px){aside{display:flex}.viewbar button{padding:8px 10px}main{min-height:600px}}
+  </style>
+  <script type="importmap">{"imports":{"three":"./vendor/build/three.module.js","three/addons/":"./vendor/examples/jsm/"}}</script>
+</head>
+<body>
+<div class="app">
+  <main>
+    <header><div class="eyebrow">EMMA / FORM STUDY 04</div><h1>จากแบบ สู่รูปทรง</h1><p>หมุนดูรอบตัว · เทียบผิวและรอยต่อ · ดูรอบตัว</p></header>
+    <div id="viewport" aria-label="โมเดล Emma สามมิติ ลากเพื่อหมุนดูรอบตัว"></div>
+    <div class="hint">ลากเพื่อหมุน · เลื่อนล้อเมาส์เพื่อซูม · เลือกท่าเพื่อทดสอบ</div>
+    <nav class="viewbar" aria-label="มุมมอง">
+      <button data-view="reference">เทียบแบบ</button><button data-view="front">หน้าตรง</button><button data-view="quarter">มุมเฉียง</button><button data-view="side">ด้านข้าง</button><button data-view="back">ด้านหลัง</button>
+    </nav>
+  </main>
+  <aside>
+    <div><span class="tag">แบบทดลองแยก · DRAFT</span><h2>Emma · ศึกษารูปทรง</h2><p>ตรวจรูปร่างรอบตัว หัว ลำตัว วงฐาน และครีบแบนสองข้างตามแผ่น 3D MODELING REFERENCE (23 ก.ย. 2026)</p><div class="downloads"><a href="../emma-reference-study/index.html">เปิดแบบแยกชิ้นส่วน ↗</a></div></div>
+    <section><div class="label">ลองเปลี่ยนท่า</div><div class="poses">
+      <button data-clip="idle" aria-pressed="true">ท่าพัก<small>REST</small></button>
+      <button data-clip="look" aria-pressed="false">หันหัว<small>LOOK AROUND</small></button>
+    </div></section>
+    <section><div class="row"><span id="clipLabel">ท่าพัก</span><button id="play" class="play" aria-pressed="true">หยุด</button></div>
+      <input id="timeline" type="range" min="0" max="1" step="0.001" value="0" aria-label="ตำแหน่งเวลาแอนิเมชัน"><div class="row"><span id="time">0.00 / 0.00 s</span><label class="row">วนซ้ำ <input type="checkbox" id="loop" checked></label></div>
+    </section>
+    <div class="toggles">
+      <label class="row">แสดงโครงกระดูก<input id="skeleton" type="checkbox"></label>
+      <label class="row">แสดงเส้นตาข่าย<input id="wireframe" type="checkbox"></label>
+      <label class="row">มองตามเมาส์ในท่าพัก<input id="gaze" type="checkbox"></label>
+    </div>
+    <div class="meta"><div id="status" role="status">กำลังโหลดโมเดล…</div><p style="margin-top:12px">ยังเป็นแบบทดลอง รูปทรงและแสงสะท้อนยังต้องตรวจเทียบต้นแบบ แขนเป็นครีบแบนไม่มีข้อต่อตามสเปก</p><div class="downloads"><a href="./emma.blend" download>ไฟล์ Blender ↗</a><a href="./emma.glb" download>ไฟล์ GLB ↗</a></div></div>
+  </aside>
+</div>
+<script type="module" src="./viewer.js"></script>
+</body>
+</html>

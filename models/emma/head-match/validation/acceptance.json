@@ -1,0 +1,125 @@
+{
+  "phase": "A-D",
+  "status": "DRAFT - NOT APPROVED",
+  "geometry_approved": false,
+  "source_verified": true,
+  "comparison_method": "Manual source-pixel contours; front/back uniformly scaled by head width, quarter uniformly scaled by vertical extent to preserve foreshortening. No anisotropic scaling, pose fitting, or perspective warping.",
+  "metrics": {
+    "front": {
+      "iou": 0.9763582647820136,
+      "boundary_mean_source_px": 0.9396010637283325,
+      "boundary_p95_source_px": 2.703613042831421,
+      "boundary_max_source_px": 3.1967740058898926,
+      "render_width_height_px": [
+        612,
+        603
+      ],
+      "reference_width_height_px": [
+        616,
+        596
+      ],
+      "status": "review required",
+      "reference_uncertainty": [
+        "Silhouette trace uncertainty approximately 1-2 native pixels; chrome glare blurs some edges.",
+        "Front illustration has a slight turn: left chrome rim is wider than right, and W is shifted right.",
+        "Symmetric model construction must be compared against these RAW paths, not against an edited symmetric target."
+      ],
+      "within_trace_review_tolerance": true
+    },
+    "side": {
+      "status": "UNVERIFIED",
+      "reason": "No calibrated true-side source; the middle drawing is a three-quarter view. No side overlay fabricated."
+    },
+    "back": {
+      "iou": 0.9652211835517205,
+      "boundary_mean_source_px": 1.3266760110855103,
+      "boundary_p95_source_px": 3.0624451637268066,
+      "boundary_max_source_px": 3.5774734020233154,
+      "render_width_height_px": [
+        612,
+        603
+      ],
+      "reference_width_height_px": [
+        613,
+        613
+      ],
+      "status": "review required",
+      "reference_uncertainty": [
+        "Back head/chrome-neck join is partly ambiguous at y261-266; neck is excluded.",
+        "Back and front head H/W ratios differ in the drawing; one uniform scale per view is allowed, not independent x/y stretch."
+      ],
+      "within_trace_review_tolerance": false
+    },
+    "quarter": {
+      "iou": 0.9166673233154987,
+      "boundary_mean_source_px": 3.1390788555145264,
+      "boundary_p95_source_px": 6.858071804046631,
+      "boundary_max_source_px": 7.565764904022217,
+      "render_width_height_px": [
+        499,
+        603
+      ],
+      "reference_width_height_px": [
+        532,
+        599
+      ],
+      "status": "ILLUSTRATIVE ONLY: uncalibrated yaw and depth; NOT an acceptance result",
+      "reference_uncertainty": [
+        "This is NOT a true side view: a complete eye and substantial front panel remain visible.",
+        "Camera yaw and head depth cannot both be uniquely recovered from this drawing.",
+        "Do not call a 90-degree model projection matched or approved from this view."
+      ]
+    }
+  },
+  "front_component_metrics": {
+    "face": {
+      "iou": 0.9458935455508714,
+      "boundary_p95_source_px": 2.4243133068084717,
+      "method": "Actual isolated mesh alpha vs raw source contour; not an occlusion/intersection test."
+    },
+    "chin": {
+      "iou": 0.9134171533498253,
+      "boundary_p95_source_px": 2.204465627670288,
+      "method": "Actual isolated mesh alpha vs raw source contour; not an occlusion/intersection test."
+    },
+    "chrome_wave": {
+      "iou": 0.7542879110480246,
+      "boundary_p95_source_px": 3.8028523921966553,
+      "method": "Actual isolated mesh alpha vs raw source contour; not an occlusion/intersection test."
+    },
+    "eye_l": {
+      "iou": 0.9757002411426452,
+      "boundary_p95_source_px": 0.27587890625,
+      "method": "Actual isolated mesh alpha vs raw source contour; not an occlusion/intersection test."
+    },
+    "eye_r": {
+      "iou": 0.9787274817937908,
+      "boundary_p95_source_px": 0.27587890625,
+      "method": "Actual isolated mesh alpha vs raw source contour; not an occlusion/intersection test."
+    }
+  },
+  "armatures": 0,
+  "actions": 0,
+  "blocking_review_items": [
+    "True-side depth is unmeasured.",
+    "Owner visual approval has not been given.",
+    "Measured projected eye centers retain source asymmetry; canonical facial symmetry remains unverified.",
+    "Raw reference has slight turn/asymmetry; a symmetric orthographic model cannot reproduce every photographed pixel."
+  ],
+  "completed": [
+    "Measured source head contours",
+    "Orthographic front/side/back clay renders",
+    "Front/back 50% overlays and contour differences",
+    "Modular white panels/chrome wave/happy eyes"
+  ],
+  "deferred": [
+    "Torso",
+    "Arms and hands",
+    "Material polish",
+    "Rig",
+    "Expressions",
+    "Animation",
+    "GLB/FBX",
+    "Web UI"
+  ]
+}

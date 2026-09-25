@@ -1,0 +1,69 @@
+{
+  "phase": "A-D",
+  "status": "draft",
+  "meshes": [
+    "EYE_HAPPY_L",
+    "EYE_HAPPY_R",
+    "FACE_CHIN_WHITE",
+    "FACE_LOWER_CHROME",
+    "HEAD_OUTER_CHROME",
+    "HEAD_SHELL_WHITE",
+    "HEAD_SHELL_WHITE_BACK"
+  ],
+  "vertices": 41326,
+  "armatures": 0,
+  "actions": 0,
+  "materials": [
+    "MAT_BLACK",
+    "MAT_CHROME",
+    "MAT_EMISSION_WHITE",
+    "MAT_WHITE_GLOSS"
+  ],
+  "cameras": {
+    "front": {
+      "type": "ORTHO",
+      "scale": 1.25
+    },
+    "side": {
+      "type": "ORTHO",
+      "scale": 1.25
+    },
+    "back": {
+      "type": "ORTHO",
+      "scale": 1.25
+    },
+    "quarter": {
+      "type": "ORTHO",
+      "scale": 1.25
+    }
+  },
+  "front_bounds": [
+    -0.49806880950927734,
+    0.49806880950927734,
+    -0.49092063307762146,
+    0.49065759778022766
+  ],
+  "provisional_depth": 0.68,
+  "unapplied_modifiers": {
+    "EYE_HAPPY_L": [
+      "SOLIDIFY"
+    ],
+    "EYE_HAPPY_R": [
+      "SOLIDIFY"
+    ],
+    "FACE_CHIN_WHITE": [
+      "SOLIDIFY"
+    ],
+    "FACE_LOWER_CHROME": [
+      "SOLIDIFY"
+    ],
+    "HEAD_OUTER_CHROME": [],
+    "HEAD_SHELL_WHITE": [
+      "SOLIDIFY"
+    ],
+    "HEAD_SHELL_WHITE_BACK": [
+      "SOLIDIFY"
+    ]
+  },
+  "side_acceptance": "unverified: missing calibrated side reference"
+}

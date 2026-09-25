@@ -177,7 +177,12 @@
     will-change: transform;
   }
 
-  .mascot-rive {
+  /* The approved 3D Emma (owner sign-off 2026-09-23; the page loads the 68k
+     reduction emma-light-68k.glb, same sculpt) sits exactly where the Rive canvas sat: same box, same tilt,
+     same z-index, pointer-events off so the wrap keeps every pointer. The
+     drag transform lives on the WRAP alone — never duplicate
+     translate(var(--user-x)...) here or the artwork and its hit area drift. */
+  .mascot-3d {
     position: absolute;
     inset: 0;
     z-index: 2;
@@ -185,13 +190,17 @@
     height: 100%;
     opacity: 0;
     transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
-    filter: drop-shadow(0 30px 30px rgba(0,0,0,.42));
     transition: transform .12s ease-out, opacity .24s ease;
     pointer-events: none;
   }
 
-  .mascot-wrap.rive-ready .mascot-rive { opacity: 1; }
-  .mascot-wrap.rive-ready .mascot-rig {
+  /* emma-3d-ready is added only when BOTH the WebGL renderer and the GLB have
+     succeeded. Until then — and forever, on a machine without WebGL — the
+     inline SVG puppet underneath stays visible and fully driven by the same
+     data-emma-* attributes. That is the page's fallback, and it is why this
+     is a crossfade and not a deletion. */
+  .mascot-wrap.emma-3d-ready .mascot-3d { opacity: 1; }
+  .mascot-wrap.emma-3d-ready .mascot-rig {
     opacity: 0;
     visibility: hidden;
   }
@@ -529,19 +538,150 @@
     animation: glint 4.8s ease-in-out infinite;
   }
 
+  /* Emma's line is a speech bubble (owner, 2026-09-24, with a mockup). Only
+     the LOOK changed: paintReply() still decides when it is on screen, so it
+     still appears only while she is actually speaking and still clears the
+     moment she is talked over. A bubble that lingered after the audio would be
+     a caption for something nobody said. */
   .reply {
-    width: min(100%, 430px);
-    padding: 0 10px;
+    /* Own copy of the accent, NOT var(--state-rgb): that variable is declared on
+       .mascot-wrap and the bubble is its SIBLING, so it never inherited it and
+       every rgba() below silently computed to nothing - a bubble with no edge
+       at all. Custom properties inherit down the tree, not sideways. */
+    /* White, not the cyan accent (owner, 2026-09-24). Pure white at the cyan's
+       alphas glares, so the edge drops to .70 and the outer halo to .26: the
+       same lit-glass read, without a rim that competes with the hover ring. */
+    --bubble-rgb: 255, 255, 255;
+    position: relative;
+    width: max-content;
+    max-width: min(92vw, 430px);
+    padding: 14px 20px;
     text-align: center;
+    border-radius: 26px;
+    background: rgba(10, 22, 40, .86);
+    /* The mockup's bubble reads as lit glass, so the edge carries most of the
+       work: a bright hairline, an inner bloom and an outer halo in Emma's own
+       state colour. The first pass at .42 alpha disappeared against the page. */
+    border: 1.5px solid rgba(var(--bubble-rgb), .70);
+    box-shadow: inset 0 0 22px rgba(var(--bubble-rgb), .12),
+                0 0 0 4px rgba(var(--bubble-rgb), .05),
+                0 0 30px rgba(var(--bubble-rgb), .26),
+                0 14px 40px rgba(0, 0, 0, .5);
+    backdrop-filter: blur(7px);
+  }
+
+  /* The tail is a rotated square showing only its two outer edges, so it keeps
+     the bubble's own border and tint instead of needing a second colour. */
+  .reply::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -7px;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
+    background: inherit;
+    border-left: 1.5px solid rgba(var(--bubble-rgb), .70);
+    border-top: 1.5px solid rgba(var(--bubble-rgb), .70);
+    transform: rotate(45deg);
+    border-radius: 3px 0 0 0;
   }
 
   .reply-text {
-    min-height: 4.8em;
+    /* No min-height: the bubble is sized by what she actually said. The old
+       4.8em reserved a block of empty space, which under a bubble reads as a
+       half-empty box rather than as a steady line of text. */
     margin: 0;
-    color: #e3e5e9;
+    color: #e8edf3;
     font-size: clamp(1rem, 4.3vw, 1.14rem);
     line-height: 1.58;
     text-wrap: pretty;
+  }
+
+  /* Beside her, not under her, once there is room - the shape the owner drew.
+     A three-column grid with equal 1fr sides keeps the mascot dead centre
+     whether or not the bubble has anything in it, so she never shifts when
+     Emma starts or stops talking. Below this width the bubble goes back under
+     her, where a long Thai sentence has room to wrap. */
+  @media (min-width: 980px) {
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      column-gap: clamp(12px, 2vw, 28px);
+    }
+    .hero > .mascot-wrap { grid-column: 2; }
+    .hero > .reply {
+      grid-column: 3;
+      justify-self: start;
+      /* Beside the HEAD, not the middle of her body - that is where the owner's
+         mockup puts it and where a speech bubble belongs. Measured from the top
+         of the row rather than centred, so it holds as the mascot resizes. */
+      /* Centred in the row, then lifted to head height. A margin on a centred
+         grid item shifts it by HALF the margin, which is a stable way to say
+         "a bit above the middle" without knowing the mascot's pixel height. */
+      align-self: center;
+      margin-bottom: clamp(90px, 24vh, 280px);
+      text-align: left;
+      max-width: min(34vw, 420px);
+      padding: 18px 24px;
+    }
+    .hero > .reply .reply-text { font-size: clamp(1.02rem, 1.5vw, 1.26rem); }
+    .hero > .reply::after {
+      left: -9px;
+      top: 26px;
+      margin-left: 0;
+      transform: rotate(-45deg);
+      border-radius: 4px 0 0 0;
+    }
+  }
+
+  /* Emma can be dragged anywhere on the screen and resized, so the bubble is
+     pinned to her live box instead of to a grid cell (owner, 2026-09-24
+     "อยากให้กล่องบอลลูนมันตามหุ่น...ให้มันแสดงข้างหุ่น"). The grid version
+     stayed in column 3 while she walked to the bottom-right corner, which
+     reads as somebody else's caption floating in empty space.
+     The rules above still decide the LOOK and still lay the bubble out when
+     nothing is tracking (no JS, a card on the stage); these only take it out
+     of the flow. Specificity beats `.hero > .reply` on purpose. */
+  .reply.is-tracking,
+  .hero > .reply.is-tracking {
+    position: fixed;
+    margin: 0;
+    width: max-content;
+    z-index: 4;
+    /* Set by trackReply() from her live scale: she can be pinched to twice her
+       size, and a caption that stayed 20px tall beside a doubled Emma reads as
+       a label for something else (owner, 2026-09-24 "พอตัว emma ใหญ่
+       มันดูไม่ค่อยสมส่วน"). Never goes below 1 — small Emma was already right. */
+    --reply-scale: 1;
+    padding: calc(14px * var(--reply-scale)) calc(20px * var(--reply-scale));
+    border-radius: calc(26px * var(--reply-scale));
+  }
+  .reply.is-tracking .reply-text,
+  .hero > .reply.is-tracking .reply-text {
+    font-size: calc(clamp(1.02rem, 1.5vw, 1.26rem) * var(--reply-scale));
+  }
+  .reply.is-tracking::after,
+  .hero > .reply.is-tracking::after {
+    width: calc(18px * var(--reply-scale));
+    height: calc(18px * var(--reply-scale));
+  }
+  /* The tail points back at her from whichever side she left room on. */
+  .reply.is-tracking[data-side="right"]::after {
+    left: calc(-9px * var(--reply-scale)); right: auto;
+    top: calc(26px * var(--reply-scale)); margin-left: 0;
+    transform: rotate(-45deg); border-radius: 4px 0 0 0;
+  }
+  .reply.is-tracking[data-side="left"]::after {
+    left: auto; right: calc(-9px * var(--reply-scale));
+    top: calc(26px * var(--reply-scale)); margin-left: 0;
+    transform: rotate(135deg); border-radius: 4px 0 0 0;
+  }
+  .reply.is-tracking[data-side="below"]::after {
+    left: 50%; right: auto; top: calc(-7px * var(--reply-scale));
+    margin-left: calc(-9px * var(--reply-scale));
+    transform: rotate(45deg); border-radius: 3px 0 0 0;
   }
 
   .controls {
@@ -1051,7 +1191,18 @@
   /* While a card/plan is up, Emma's reply moves out of the centre (where it
      overlapped the card) to a caption band at the top that scrolls as it
      streams (owner, 2026-09-14 "ข้อความไปอยู่ด้านบน...ขึ้นทีละบรรทัดแล้วเลื่อน"). */
+  /* While a card is on the stage the reply is a caption band across the top
+     (owner, 2026-09-14). Undo the bubble here rather than letting a tail point
+     at a mascot that has stepped into the corner. */
+  body.emma-staging .reply::after { display: none; }
   body.emma-staging .reply {
+    background: none;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    border-radius: 0;
+    max-width: none;
+    text-align: center;
     position: fixed;
     top: clamp(68px, 10vh, 104px);   /* below the status line, never over it */
     left: 50%;
@@ -1273,8 +1424,8 @@
     </header>
 
     <section class="hero" aria-label="Emma voice assistant">
-      <div class="mascot-wrap" data-emma-state="listening" data-emma-pose="pose-01" data-emma-eyes="smile" data-emma-mouth="none" data-emma-hands="relaxed" data-emma-left-hand="relaxed" data-emma-right-hand="relaxed" tabindex="0" role="img" aria-label="Emma animated assistant. Drag to move, pinch or use mouse wheel to resize, and press Home to reset.">
-        <canvas class="mascot-rive" data-emma-rive width="720" height="860" aria-hidden="true"></canvas>
+      <div class="mascot-wrap" data-emma-state="listening" data-emma-pose="pose-01" data-emma-eyes="smile" data-emma-mouth="none" data-emma-hands="relaxed" data-emma-left-hand="relaxed" data-emma-right-hand="relaxed" tabindex="0" role="img" aria-label="Emma animated assistant. Drag to turn her, shift-drag to move, pinch or use mouse wheel to resize, and press Home to reset.">
+        <canvas class="mascot-3d" data-emma-3d width="720" height="860" aria-hidden="true"></canvas>
         <div class="mascot-rig" aria-hidden="true">
           <div class="mascot-turn">
             <div class="mascot-float">
@@ -1435,7 +1586,19 @@
     </nav>
   </main>
 
-  <script src="/assets/vendor/rive/rive.js"></script>
+  <!-- The 3D mascot is an ES module and three.js uses bare specifiers, so the
+       importmap must come before it. ABSOLUTE paths: this page is served from
+       /preview, so the lab's own "./vendor/..." would resolve against / and
+       404. three.module.js imports ./three.core.js relatively, so those two
+       files must stay together in vendor/build/. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/assets/emma-3d-lab/vendor/build/three.module.js",
+      "three/addons/": "/assets/emma-3d-lab/vendor/examples/jsm/"
+    }
+  }
+  </script>
   <script>
     // State copy and visual pose are intentionally independent. The host can
     // decide later which numbered reference pose belongs to each voice state.
@@ -1445,9 +1608,6 @@
 
       var statusNode = document.querySelector('[data-emma-status]');
       var replyNode = document.querySelector('[data-emma-reply]');
-      var riveCanvas = document.querySelector('[data-emma-rive]');
-      var riveController = null;
-      var riveInputs = Object.create(null);
       var rigPoses = {
         'pose-01': { headX: 0, headY: 0, headRotate: 0, headScale: 1, bodyX: 0, bodyY: 0, bodyRotate: 0, bodyScale: 1, armLeft: 5, armRight: -5, eyes: 'smile', mouth: 'none', hands: 'relaxed', leftHand: 'relaxed', rightHand: 'relaxed' },
         'pose-02': { headX: 8, headY: -7, headRotate: 4, headScale: 1.015, bodyX: 2, bodyY: 0, bodyRotate: 2, bodyScale: 1, armLeft: -8, armRight: 8, eyes: 'smile', mouth: 'none', hands: 'mixed', leftHand: 'open', rightHand: 'relaxed' },
@@ -1514,68 +1674,7 @@
         }
       };
 
-      var riveModeValues = {
-        idle: 0, greeting: 1, listening: 2, thinking: 3, loading: 0,
-        speaking: 4, happy: 5, grateful: 5, error: 6, frustrated: 6
-      };
-
-      function setRiveInput(name, value) {
-        var input = riveInputs[name];
-        if (!input) return false;
-        input.value = value;
-        return true;
-      }
-
-      function syncRiveState() {
-        var state = scene.dataset.emmaState || 'listening';
-        setRiveInput('mode', riveModeValues[state] == null ? 0 : riveModeValues[state]);
-        setRiveInput('speechLevel', 0);
-        setRiveInput('lookX', 50);
-        setRiveInput('lookY', 50);
-      }
-
-      function initRiveRenderer() {
-        if (riveController) return true;
-        if (!riveCanvas || !window.rive || !window.rive.Rive) return false;
-        try {
-          window.rive.RuntimeLoader.setWasmUrl('/assets/vendor/rive/rive.wasm');
-          riveController = new window.rive.Rive({
-            src: '/assets/emma/emma.riv?v=20260922-connect1',
-            canvas: riveCanvas,
-            artboard: 'Emma',
-            stateMachine: 'EmmaVoice',
-            autoplay: true,
-            layout: new window.rive.Layout({
-              fit: window.rive.Fit.Contain,
-              alignment: window.rive.Alignment.Center
-            }),
-            onLoad: function () {
-              riveController.resizeDrawingSurfaceToCanvas();
-              (riveController.stateMachineInputs('EmmaVoice') || []).forEach(function (input) {
-                riveInputs[input.name] = input;
-              });
-              syncRiveState();
-              scene.classList.add('rive-ready');
-              scene.dispatchEvent(new CustomEvent('emma-rive-ready'));
-            },
-            onLoadError: function () {
-              scene.classList.remove('rive-ready');
-            }
-          });
-          if ('ResizeObserver' in window) {
-            new ResizeObserver(function () {
-              if (riveController) riveController.resizeDrawingSurfaceToCanvas();
-            }).observe(riveCanvas);
-          }
-          return true;
-        } catch (error) {
-          scene.classList.remove('rive-ready');
-          return false;
-        }
-      }
-
       function clearMouthLevel() {
-        setRiveInput('speechLevel', 0);
         scene.dispatchEvent(new CustomEvent('emma-mouth-level', { detail: { level: 0 } }));
         scene.classList.remove('has-live-mouth');
         scene.style.removeProperty('--mouth-scale');
@@ -1636,7 +1735,6 @@
 
       function setMouthLevel(level) {
         var amount = Math.max(0, Math.min(1, Number(level) || 0));
-        setRiveInput('speechLevel', amount * 100);
         scene.dispatchEvent(new CustomEvent('emma-mouth-level', { detail: { level: amount } }));
         scene.style.setProperty('--mouth-scale', (.18 + amount * .95).toFixed(3));
         scene.dataset.emmaMouth = amount > .52 ? 'wide' : 'small';
@@ -1773,7 +1871,6 @@
         }
         scene.dataset.emmaState = name;
         document.body.dataset.emmaState = name;
-        setRiveInput('mode', riveModeValues[name] == null ? 0 : riveModeValues[name]);
         statusNode.textContent = states[name].status;
         replyNode.textContent = states[name].reply;
         scene.dispatchEvent(new CustomEvent('emma-state-change', { detail: { state: name } }));
@@ -1791,11 +1888,6 @@
         stopPoseDemo: stopPoseDemo,
         setMouthLevel: setMouthLevel,
         clearMouthLevel: clearMouthLevel,
-        triggerGesture: function () {
-          var input = riveInputs.gesture;
-          if (input && typeof input.fire === 'function') input.fire();
-          return !!input;
-        },
         setScale: setMascotScale,
         moveTo: moveMascot,
         resetTransform: resetMascotTransform,
@@ -1803,7 +1895,6 @@
       });
 
       var query = new URLSearchParams(location.search);
-      initRiveRenderer();
 
       var requestedState = query.get('state');
       if (requestedState) setState(requestedState);
@@ -1840,16 +1931,12 @@
         scene.style.setProperty('--light-x', (event.clientX / innerWidth * 100).toFixed(1) + '%');
         scene.style.setProperty('--light-y', (event.clientY / innerHeight * 100).toFixed(1) + '%');
         if (scene.dataset.emmaState === 'idle' || scene.dataset.emmaState === 'listening') {
-          setRiveInput('lookX', event.clientX / innerWidth * 100);
-          setRiveInput('lookY', event.clientY / innerHeight * 100);
           scene.style.setProperty('--gaze-x', (((event.clientX / innerWidth) - .5) * 16).toFixed(1) + 'px');
           scene.style.setProperty('--gaze-y', (((event.clientY / innerHeight) - .5) * 10).toFixed(1) + 'px');
         }
       }
       function centre() {
         targetX = 0; targetY = 0;
-        setRiveInput('lookX', 50);
-        setRiveInput('lookY', 50);
         scene.style.setProperty('--gaze-x', '0px');
         scene.style.setProperty('--gaze-y', '0px');
       }
@@ -1866,6 +1953,19 @@
       requestAnimationFrame(render);
     })();
   </script>
+  <!-- The approved 3D Emma. A module, so it is deferred and runs AFTER the
+       classic renderer block above has defined window.EmmaVoicePreview —
+       which is the order it needs: it attaches to the finished wrap and
+       observes data-emma-state rather than being called by it. If WebGL or
+       the GLB fails it throws once, logs one warning, never adds the
+       emma-3d-ready class, and the inline SVG puppet stays on screen. -->
+  <!-- ?v= is a cache buster, the same trick the Rive src used. StaticFiles
+       sends an ETag but no cache-control, so Chrome caches the module on its
+       own heuristic and a fixed URL kept serving the old renderer after the
+       file on disk had changed - the fix looked like it had not worked
+       (2026-09-24). Bump the date whenever mascot.js changes. -->
+  <script type="module" src="/assets/emma-3d-lab/mascot.js?v=20260924-orbit5"></script>
+
   <!-- ==================== real voice engine ====================
        The visual layer above stays a pure renderer, driven only through
        window.EmmaVoicePreview (setState / setMouthLevel / setPose). This
@@ -1919,16 +2019,206 @@
     function status(text) {
       if (statusNode) statusNode.textContent = appShell && appStatus[text] ? appStatus[text] : text;
     }
-    // The reply line shows ONLY while Emma is actually speaking (owner,
-    // 2026-09-14 "ค่อยโชว์ตอน emma พูด") — never the resting greeting under an
-    // idle mascot. It follows the live transcript of the turn being spoken and
-    // clears when playback ends. Called after every show() so the renderer's
-    // own canned per-state copy never leaks onto the screen. display:none via
-    // inline style, because .reply sets its own display and would beat [hidden].
+    // The reply line shows for every answer Emma gives (owner, 2026-09-24
+    // "ให้ขึ้นทุกครั้งที่ emma ตอบ") — but still never the resting greeting
+    // under an idle mascot, so the gate is `inCall`, not `playing`.
+    //
+    // It used to be `playing && curBot`, and measured on a real turn that
+    // bubble never appeared once: the transcript and the audio are separate
+    // streams, and `assistant_transcript` lands AFTER the queued audio has
+    // finished — by then `src.onended` had set playing=false, so every reply
+    // painted itself into a hidden box. Tying a caption to a playback flag it
+    // does not arrive with is a race, and the race lost every time.
+    // Called after every show() so the renderer's own canned per-state copy
+    // never leaks onto the screen. display:none via inline style, because
+    // .reply sets its own display and would beat [hidden].
     function paintReply() {
-      var visible = !!(playing && curBot);
+      var visible = !!(inCall && curBot);
       if (replyNode) replyNode.textContent = visible ? curBot : '';
       if (replySection) replySection.style.display = visible ? '' : 'none';
+      if (visible) { if (!replyRaf) replyRaf = requestAnimationFrame(trackReply); }
+      else stopReplyTracking();
+    }
+
+    // ---- the bubble follows Emma (owner, 2026-09-24) ----
+    // She is draggable and resizable, and `.mascot-wrap` carries both in one
+    // transform, so her live rect is the whole truth: read it, pin the bubble
+    // beside her head, flip sides when she runs out of room at the edge. A rAF
+    // loop rather than drag callbacks, because the drag lives in mascot.js (a
+    // separate module) and a second copy of "where is she now" is how the two
+    // drift apart. Writes only when the pin actually changes, and stops the
+    // moment the bubble is hidden, so an idle call costs nothing.
+    var replyRaf = 0, lastPin = '', lastMax = -1, lastScale = -1;
+    function clearPin() {
+      if (!replySection) return;
+      replySection.classList.remove('is-tracking');
+      replySection.removeAttribute('data-side');
+      replySection.style.left = '';
+      replySection.style.top = '';
+      replySection.style.maxWidth = '';
+      replySection.style.removeProperty('--reply-scale');
+      lastPin = ''; lastMax = -1; lastScale = -1;
+    }
+    function stopReplyTracking() {
+      if (replyRaf) { cancelAnimationFrame(replyRaf); replyRaf = 0; }
+      clearPin();
+    }
+    function trackReply() {
+      replyRaf = 0;
+      if (!replySection || replySection.style.display === 'none') { clearPin(); return; }
+      // While a card is on the stage the reply is a caption band across the
+      // top by design, and Emma has stepped into the corner. Leave it alone,
+      // but keep watching so it re-pins when the card closes.
+      var wrap = document.querySelector('.mascot-wrap');
+      if (document.body.classList.contains('emma-staging') || !wrap) {
+        clearPin();
+        replyRaf = requestAnimationFrame(trackReply);
+        return;
+      }
+      var m = wrap.getBoundingClientRect();
+      // Her BOX is not her BODY. Measured off a render (screenshot, bright
+      // pixels inside the wrap): the art fills 60% of the wrap's width, so
+      // ~20% of empty canvas sits on each side. Offsetting by that is the
+      // difference between "20px from Emma" and "20px from a transparent
+      // margin", which is the gap the owner could see (2026-09-24 "กล่องมัน
+      // ห่างไหม"). It is a share of the width, so it holds at any zoom.
+      var inset = m.width * 0.20;
+      // She scales, so the bubble scales with her — a 20px caption beside a
+      // doubled Emma reads as a label that belongs to something else. Never
+      // below 1: at her small sizes today's bubble is already right
+      // ("ถ้า emma หดประมาณนี้โอเค").
+      var s = wrap.offsetWidth ? m.width / wrap.offsetWidth : 1;
+      var rs = Math.min(1.9, Math.max(1, s));
+      if (rs !== lastScale) {
+        lastScale = rs;
+        replySection.style.setProperty('--reply-scale', rs.toFixed(3));
+      }
+      var vw = window.innerWidth, vh = window.innerHeight, gap = 18 * rs, edge = 12;
+      var roomRight = vw - (m.right - inset + gap) - edge;
+      var roomLeft = (m.left + inset) - gap - edge;
+      // Below her when neither side can hold a readable line. 260 is measured,
+      // not guessed: on the robot's own 1080-wide portrait screen the room
+      // beside her is 203px, and a Thai sentence in a 203px column is a tall
+      // thin ribbon. Under her it gets the full width instead.
+      var side = roomRight >= 260 ? 'right' : (roomLeft >= 260 ? 'left' : 'below');
+      // The line gets wider as she does, or a scaled-up bubble would just be
+      // big type in a narrow column.
+      var wide = 420 * rs;
+      var maxW = Math.round(side === 'below'
+        ? Math.min(wide, vw - edge * 2)
+        : Math.min(wide, side === 'right' ? roomRight : roomLeft));
+      replySection.classList.add('is-tracking');
+      replySection.setAttribute('data-side', side);
+      if (maxW !== lastMax) { lastMax = maxW; replySection.style.maxWidth = maxW + 'px'; }
+      var b = replySection.getBoundingClientRect();
+      var left, top;
+      if (side === 'below') {
+        left = m.left + m.width / 2 - b.width / 2;
+        // Her feet, not the bottom of the canvas: same empty-margin problem,
+        // measured the same way (the art ends at ~92% of the wrap's height).
+        top = m.top + m.height * 0.92 + gap;
+      } else {
+        left = side === 'right' ? m.right - inset + gap : m.left + inset - gap - b.width;
+        // Beside her MOUTH (owner, 2026-09-24 "เอาลงมาหน่อยให้อยู่บริเวณปาก"),
+        // which is where a speech bubble comes from. Measured off a render by
+        // profiling the dark pixels INSIDE the head outline, row by row: the
+        // eyes are the band at 0.26-0.35 of the wrap's height (peak 0.29) and
+        // the smile is the band at 0.37-0.47 (centre 0.42). Two earlier passes
+        // read this off a coarser profile and landed at 0.26 (her brow) and
+        // 0.33 (the gap between eyes and smile) - both still looked high on
+        // her face, which is exactly what the owner said twice.
+        //
+        // The TAIL is what gets anchored, not the middle of the box: the tail
+        // sits 26px down the bubble's own edge (plus half its 18px square), so
+        // centring the box instead drifts the tail upward as soon as the line
+        // wraps to two — visible at her larger sizes, where the tail pointed at
+        // her cheek. Both numbers ride the same scale as the bubble.
+        top = m.top + m.height * 0.42 - (26 + 9) * rs;
+      }
+      left = Math.max(edge, Math.min(left, vw - edge - b.width));
+      top = Math.max(edge, Math.min(top, vh - edge - b.height));
+      var pin = Math.round(left) + ',' + Math.round(top);
+      if (pin !== lastPin) {
+        lastPin = pin;
+        replySection.style.left = Math.round(left) + 'px';
+        replySection.style.top = Math.round(top) + 'px';
+      }
+      replyRaf = requestAnimationFrame(trackReply);
+    }
+
+    // ---- modes: tap her chest lamp to change persona ----
+    // Owner, 2026-09-24: "ให้เปลี่ยนโดยกดปุ่มตรงกลางและฐานด้วย แล้วเปลี่ยนสีได้ไหม
+    // แต่ถ้าจะเปลี่ยนต้องกดที่ตรงกลางเท่านั้น". The lamp on her chest and the ring
+    // she hovers over are one material in the GLB, so the colour IS the mode
+    // indicator — no chip, no menu, nothing else to keep in sync. The hit test
+    // lives in mascot.js (a raycast against the chest meshes) and reaches here
+    // as one event; a tap anywhere else on her still only turns her.
+    //
+    // Each mode is a different SYSTEM PROMPT on the server (app/prompts.py):
+    // emma is the owner's assistant, condo the gallery host, translator an
+    // interpreter with no facts and no memory. The server decides — `ready`
+    // carries the profile it actually opened, and that is what paints the
+    // colour, so a mode the machine refuses (emma on a gallery machine) shows
+    // the truth instead of the request.
+    // The owner named these and picked the colours (2026-09-24):
+    //   EmmaJoke, ฟ้าขาว — "ทำได้ทุกอย่างที่ไม่เกี่ยวกับโครงการ แล้วก็อย่าไป
+    //                      ยุ่งข้อมูลโครงการหรือเอกสาร"
+    //   Emma, ดำ        — "อันนี้จะเป็นช่วยขาย ค่อยให้ข้อมูลโครงการ" (ทอง
+    //                      ก่อน แล้วเจ้าของเปลี่ยนเป็นดำ)
+    // Interpreter keeps its own colour because it is a third thing the room
+    // already uses. The ids are the server's profile names, not labels.
+    //
+    // `aura` only exists on the black one, and its level is measured, not
+    // picked: the halo is drawn by re-rendering the lamp flat in this colour
+    // and blurring it, so the blur lands ON the lens as well as around it.
+    // Swept five levels against a render — #dbe7f3 washed the lens to grey
+    // (mean 170), #6b7b8c still lit its centre, #4a5765 keeps the lens black
+    // and glossy while the ring and the rim still carry a halo.
+    var MODES = [
+      { id: 'joke',       label: 'EmmaJoke', accent: '#cfefff' },
+      { id: 'condo',      label: 'Emma',     accent: '#000000', aura: '#4a5765' },
+      { id: 'translator', label: 'ล่าม',      accent: '#7cf0c0' }
+    ];
+    // A profile that is not one of the three (the owner's private `emma`,
+    // reachable by URL on his own machine) leaves her lamp the colour the
+    // model ships with, rather than borrowing a mode's colour and lying.
+    var NEUTRAL_ACCENT = '#fafbff';
+    var modeId = (q.get('profile') || '').toLowerCase();
+
+    function modeIndex() {
+      for (var i = 0; i < MODES.length; i++) if (MODES[i].id === modeId) return i;
+      return -1;
+    }
+    function paintMode() {
+      var i = modeIndex();
+      var mode = i < 0 ? null : MODES[i];
+      var accent = mode ? mode.accent : NEUTRAL_ACCENT;
+      // A black lamp still throws light: the aura is drawn separately, or the
+      // glow pass would have nothing to blur (owner: "สีดำไม่มีออร่าหรอ").
+      try { window.EmmaMascot && window.EmmaMascot.setAccent(accent, mode && mode.aura); } catch (e) {}
+    }
+    function cycleMode() {
+      var next = MODES[(modeIndex() + 1) % MODES.length];
+      modeId = next.id;
+      var u = new URLSearchParams(location.search);
+      u.set('profile', next.id);
+      // Interpreter mode needs a target language; the rest must not carry one.
+      if (next.id === 'translator') { if (!u.get('lang')) u.set('lang', 'en'); }
+      else u.delete('lang');
+      history.replaceState(null, '', location.pathname + '?' + u.toString());
+      q = u;                       // startCall() dials from q, not from the URL
+      paintMode();
+      status('โหมด ' + next.label);
+      // A persona is chosen when the session opens, so changing it redials.
+      // Through the close path, never over a live socket: the old socket's
+      // onclose releases the microphone unconditionally, and a call dialled
+      // before it fires would have its mic pulled out from under it.
+      if (inCall) {
+        manualEnd = true;
+        inCall = false;
+        try { ws && ws.close(); } catch (e) {}
+        setTimeout(startCall, 220);
+      }
     }
 
     // ---- engine globals (mirror index.html) ----
@@ -2059,7 +2349,10 @@
         if (!sources.length) {
           playing = false;
           try { Emma.clearMouthLevel(); } catch (e) {}
-          curBot = '';                       // reply line clears when she stops
+          // curBot survives the end of playback on purpose: her last answer
+          // stays readable until the guest speaks again (speech_started and
+          // interrupted still wipe it). Clearing here is what made the bubble
+          // unreachable for replies whose transcript arrives after the audio.
           if (inCall) show('listening'); else paintReply();
         }
       };
@@ -2200,6 +2493,9 @@
           planDisplay.cancel(evt.command_id);
           break;
         case 'ready':
+          // The server's answer, not the request: an unavailable persona comes
+          // back as the one it actually opened.
+          if (evt.profile) { modeId = String(evt.profile).toLowerCase(); paintMode(); }
           inputRate = evt.input_rate || inputRate;
           outputRate = evt.output_rate || outputRate;
           providerName = evt.provider || providerName;
@@ -2632,6 +2928,14 @@
 
     // ---- wire the controls ----
     if (micBtn) micBtn.onclick = function () { if (!inCall) startCall(); else toggleMute(); };
+    // The mascot reports the tap; the colour is painted again when the model
+    // finishes loading, because setAccent() before that has nothing to paint.
+    var mascotWrap = document.querySelector('.mascot-wrap');
+    if (mascotWrap) {
+      mascotWrap.addEventListener('emma-chest-tap', cycleMode);
+      mascotWrap.addEventListener('emma-3d-ready', paintMode);
+    }
+    paintMode();
     if (endBtn) endBtn.onclick = function () { endCall(); };
     if (msgBtn) msgBtn.onclick = function () {
       setTranscriptDrawerOpen(!drawer || drawer.hidden);

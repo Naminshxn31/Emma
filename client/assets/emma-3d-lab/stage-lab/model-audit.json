@@ -1,0 +1,11 @@
+{
+  "blender": "4.5.3 LTS",
+  "bones": 6,
+  "clips": [
+    "idle",
+    "look"
+  ],
+  "meshes": 24,
+  "vertices": 91698,
+  "hands": {}
+}

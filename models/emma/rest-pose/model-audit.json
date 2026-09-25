@@ -1,0 +1,68 @@
+{
+  "status": "draft",
+  "pose": "rest / hands hanging, fingers gently curved",
+  "digits_per_hand": 4,
+  "digit_definition": "one thumb plus three broad rounded fingers",
+  "source_blend": "client\\assets\\emma-3d-lab\\emma.blend",
+  "source_sha256": "dfec0ee6341307c75cda453d4c0caee54ec5fc3855102c3d5f9891d07dc769db",
+  "locked_core_objects": [
+    "Back / service hatch",
+    "Body / fine front rolled edge",
+    "Body / rounded chrome teardrop",
+    "Body / rounded front enamel",
+    "Body / rounded rear enamel",
+    "Chest / dark recessed lens",
+    "Chest / luminous core ring",
+    "Chest / polished bezel",
+    "Chest / silver core",
+    "Chin / fine rolled edge",
+    "Chin / full lower enamel cup",
+    "Eye / rounded crescent -1",
+    "Eye / rounded crescent 1",
+    "Face / convex pearl enamel",
+    "Face / fine rolled edge",
+    "Head / convex rear enamel",
+    "Head / full chrome shell",
+    "Head / rolled perimeter",
+    "Hover / luminous ring",
+    "Neck / lower rolled collar",
+    "Neck / recessed gimbal",
+    "Neck / upper rolled collar",
+    "Smile / broad sculpted chrome saddle"
+  ],
+  "locked_core_max_vertex_delta": 0.0,
+  "replaced_objects": [
+    "Shoulder / recessed ball L",
+    "Shoulder / body socket L",
+    "Shoulder / compact bearing L",
+    "Wrist / rounded chrome cuff L",
+    "Wrist / concealed swivel L",
+    "Wrist / glove lip L",
+    "Glove.L / continuous skinned surface",
+    "Shoulder / recessed ball R",
+    "Shoulder / body socket R",
+    "Shoulder / compact bearing R",
+    "Wrist / rounded chrome cuff R",
+    "Wrist / concealed swivel R",
+    "Wrist / glove lip R",
+    "Glove.R / continuous skinned surface"
+  ],
+  "hands": {
+    "HAND_REST_R": {
+      "vertices": 52152,
+      "connected_components": 1,
+      "nonmanifold_edges": 0,
+      "finite_coordinates": true
+    },
+    "HAND_REST_L": {
+      "vertices": 52152,
+      "connected_components": 1,
+      "nonmanifold_edges": 0,
+      "finite_coordinates": true
+    }
+  },
+  "armatures": 0,
+  "actions": 0,
+  "reference_note": "Latest user FULL CHARACTER VIEWS crop sets the pose. Existing project sheet supports inspection; neither provides calibrated side depth.",
+  "construction_assumptions": "Depth and cuff internals are provisional. Latest user close-up explicitly selects four fat glove digits including the thumb."
+}
