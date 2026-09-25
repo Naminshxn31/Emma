@@ -118,7 +118,7 @@ class VoiceSession:
         #: inside build_instructions — same safety as everywhere else.
         self.profile = (profile or settings.assistant_profile).strip().lower()
         # A public mode URL cannot unlock the machine owner's private persona.
-        if self.profile not in {"condo", "emma", "translator"}:
+        if self.profile not in {"condo", "emma", "joke", "translator"}:
             self.profile = "condo"
         if self.profile == "emma" and settings.assistant_profile != "emma":
             self.profile = "condo"
@@ -165,6 +165,16 @@ class VoiceSession:
         return self._metrics
 
     async def run(self) -> None:
+        # Tool visibility follows the persona of THIS conversation, and the set
+        # belongs HERE rather than in __init__ — measured: a ContextVar set in
+        # __init__ lands in the *caller's* context, so every test that merely
+        # built a session repainted the tool list for every test after it in the
+        # same process (90 red, all green again when run alone). Inside the
+        # coroutine the write stays in the task asyncio copies for it, which is
+        # also the context the provider and the tool calls inherit.
+        from app.tools import registry as _registry
+
+        _registry.session_profile.set(self.profile)
         await self.ws.accept()
 
         if not settings.api_key_for(self.provider_name):

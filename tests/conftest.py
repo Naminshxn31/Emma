@@ -239,6 +239,13 @@ def _fresh_async_state():
     display._reveal_task = None
     canva_display._task = None
     session_module._active = None
+    # Second line of defence for the per-connection tool gate: a leaked
+    # session_profile would hand the next test somebody else's tool list, and
+    # that failure reads as "unrelated test broke" — the shape this repo has
+    # been bitten by with module-level asyncio state.
+    from app.tools import registry as _registry
+
+    _registry.session_profile.set(None)
 
 
 @pytest.fixture(autouse=True)

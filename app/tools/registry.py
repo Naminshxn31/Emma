@@ -37,6 +37,7 @@ import asyncio
 import inspect
 import logging
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -142,17 +143,37 @@ def tool(
     return decorate
 
 
+#: The persona being served on THIS connection. Tool visibility is a property
+#: of the conversation, not of the machine: with one server answering a sales
+#: session and an EmmaJoke session at the same time, reading the machine's
+#: .env would hand both the same tools. A ContextVar is per-task, and every
+#: session runs in its own task, so each one asks and answers for itself.
+session_profile: ContextVar[str | None] = ContextVar("session_profile", default=None)
+
+#: Everything EmmaJoke must not be able to reach (owner, 2026-09-24: "อย่าไป
+#: ยุ่งข้อมูลโครงการหรือเอกสาร"). The project groups, plus the owner's private
+#: ones — a public mode on a robot in a showroom is the last place to hand out
+#: memory or control of his computer.
+_JOKE_DENIED = {"knowledge", "mydocs", "documents", "slides", "units", "calc",
+                "memory", "computer", "websearch"}
+
+
 def allowed(entry: Tool) -> bool:
     from app.config import settings
     from app.tools import _OPT_IN
 
     if not settings.tools_enabled:
         return False
+    profile = session_profile.get() or settings.assistant_profile
     # Optional personal/web/computer tools have no condo source-approval
     # contract. TOOL_GROUPS may not turn them into an alternate knowledge or
     # file/display path for a sales session.
-    if settings.assistant_profile == "condo" and entry.group in {
+    if profile == "condo" and entry.group in {
             "memory", "mydocs", "websearch", "computer"}:
+        return False
+    # EmmaJoke answers anything EXCEPT the project. Stated in its prompt and
+    # enforced here, because a prompt is a request and this is a fact.
+    if profile == "joke" and entry.group in _JOKE_DENIED:
         return False
     groups = settings.enabled_tool_groups()
     if entry.group is None:

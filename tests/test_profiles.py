@@ -588,3 +588,63 @@ def test_this_project_means_our_own_projects(monkeypatch):
     assert "ในเครือ Empire" in text
     assert "ไม่ทราบว่าเป็นโครงการอะไร" in text       # the quoted live failure
     assert "ห้ามยกโครงการนอกเครือ" in text
+
+
+def test_emmajoke_can_talk_about_anything_except_the_project():
+    """Owner, 2026-09-24: "EmmaJoke ... ทำได้ทุกอย่างที่ไม่เกี่ยวกับโครงการ
+    แล้วก็อย่าไปยุ่งข้อมูลโครงการหรือเอกสาร" (the gold Emma stays the one that
+    "ช่วยขาย ค่อยให้ข้อมูลโครงการ").
+
+    The prompt says it; the tool gate below is what makes it true.
+    """
+    text = build_instructions("Embassy World", profile="joke", robot_name="Emma")
+
+    # None of the sales material comes with it.
+    assert "SALES" not in text
+    assert "ราคาเริ่มต้น" not in text
+    assert "search_condo_info" not in text
+    assert "search_my_documents" not in text
+    assert "[เอกสาร]" not in text and "[ความจำ]" not in text
+
+    # It knows what to SAY when the question comes — a missing tool cannot
+    # answer "ห้องนี้ราคาเท่าไหร่" politely on its own.
+    assert "ไม่ได้ดูข้อมูลโครงการ" in text
+    assert "ไฟที่หน้าอก" in text            # how the guest switches to Emma
+
+    # The lessons this repo paid for in real bugs survive the profile switch.
+    assert "ห้ามเดา" in text
+    assert "ทวนยืนยัน" in text
+    assert "mock=" in text                   # read the hardware result first
+    assert "ห้ามอ่าน markdown" in text
+
+
+def test_emmajoke_cannot_reach_a_single_project_tool(monkeypatch):
+    """The wall is `registry.allowed()`, not the wording above it.
+
+    Measured with the tools loaded from this machine's own TOOL_GROUPS:
+    condo and emma see the unit/knowledge tools, EmmaJoke sees only the
+    smart-home and robot ones. Per CONNECTION, not per machine — one server
+    answers a sales session and an EmmaJoke session at the same time.
+    """
+    from app import tools as tools_module
+    from app.tools import registry
+
+    tools_module.load_tools()
+
+    def names_for(profile):
+        token = registry.session_profile.set(profile)
+        try:
+            return {t.name for t in registry.all_tools()}
+        finally:
+            registry.session_profile.reset(token)
+
+    joke = names_for("joke")
+    condo = names_for("condo")
+
+    assert joke                                   # it is not simply muted
+    for tool in ("search_condo_info", "search_my_documents", "show_unit",
+                 "find_units", "show_plan", "calc_roi", "list_promotions"):
+        assert tool not in joke, tool
+    assert "search_condo_info" in condo            # the gate is per profile
+    for tool in joke:
+        assert registry.get(tool).group in {"smarthome", "robot", "reminders"}, tool

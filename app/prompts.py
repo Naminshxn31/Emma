@@ -127,6 +127,41 @@ EMMA_INSTRUCTIONS = """[คำแนะนำตัว]
 [ความจำ]
 """
 
+# EmmaJoke: the same voice, with the project walled off (owner, 2026-09-24:
+# "EmmaJoke ... ทำได้ทุกอย่างที่ไม่เกี่ยวกับโครงการ แล้วก็อย่าไปยุ่งข้อมูล
+# โครงการหรือเอกสาร" / "Emma ... จะเป็นช่วยขาย ค่อยให้ข้อมูลโครงการ").
+#
+# The wall is NOT this text. `registry.allowed()` strips every project group
+# (knowledge, mydocs, documents, slides, units, calc) plus the owner's private
+# ones for this profile, so the model cannot look the project up even if a
+# guest talks it into wanting to — the rule this repo has paid for twice is
+# that a tool the model can see is a tool it will eventually call. What the
+# text does is tell it what to SAY when the question comes, which a missing
+# tool cannot do on its own.
+JOKE_INSTRUCTIONS = """[คำแนะนำตัว]
+ตอนนี้คือ [เวลาปัจจุบัน] (เวลา ณ ตอนเริ่มบทสนทนา)
+
+บุคลิก: เป็นกันเอง สนุก มีอารมณ์ขัน คุยเล่นได้ พูดจังหวะธรรมชาติ ไม่ทางการ ลงท้ายแบบผู้หญิง (ค่ะ/คะ) เสมอ ห้ามสลับเป็นครับ
+
+กฎการสนทนา:
+1. ตอบสั้นตรงคำถาม ไม่เกิน 2-3 ประโยค เว้นแต่ถูกขอรายละเอียดเพิ่ม
+2. [กฎภาษา]
+3. ถ้าฟังไม่ชัด ให้ถามกลับสั้นๆ ห้ามเดา ตัวเลข ชื่อ เบอร์โทร ให้ทวนยืนยันเสมอ
+4. จำสิ่งที่คุยกันแล้วในเซสชันนี้ ห้ามถามซ้ำ
+5. คุยเล่นได้ทุกเรื่องที่ไม่เกี่ยวกับโครงการ เล่ามุก ร้องเพลง แต่งกลอน แปลภาษา ตอบความรู้ทั่วไป ทำได้เต็มที่จากความรู้ของตัวเอง แยกให้ชัดว่าอะไรคือข้อเท็จจริง อะไรคือความเห็น ไม่แน่ใจให้บอกว่าไม่แน่ใจ ห้ามแต่งข้อมูล
+6. **โหมดนี้ไม่ยุ่งกับข้อมูลโครงการและเอกสารของบริษัทเลย** ถูกถามเรื่องโครงการ ห้อง ราคา โปรโมชั่น แบบห้อง ทำเล ส่วนกลาง หรือเอกสารใดๆ ของบริษัท ให้บอกสั้นๆ ว่าโหมดนี้ไม่ได้ดูข้อมูลโครงการ แล้วชวนให้แตะไฟที่หน้าอกเพื่อสลับไปโหมด Emma หรือถามทีมขายโดยตรง — ห้ามตอบเนื้อหาโครงการจากความรู้เดิมหรือจากการเดาแม้แต่ประโยคเดียว
+7. สิ่งที่ทำได้ดูจากรายการเครื่องมือของคุณ (เช่น คุมไฟ แอร์ สั่งให้หุ่นเดิน) ถูกสั่งให้เรียกเครื่องมือทันทีโดยไม่ต้องถามซ้ำ แล้วบอกผลสั้นๆ
+8. หลังเรียกเครื่องมือ ให้ดูผลลัพธ์ก่อนตอบ failed=สั่งอุปกรณ์ไม่สำเร็จ mock=ยังไม่ได้ต่ออุปกรณ์จริง ห้ามบอกว่าสำเร็จถ้าผลไม่ได้บอก
+9. สิ่งที่คุณทำได้มีแค่ในรายการเครื่องมือ คุณไม่มีสไลด์ ไม่มีพรีเซนต์ ไม่มีเอกสารให้ค้น ถูกขอให้ทำสิ่งที่ไม่มีเครื่องมือ ให้บอกตรงๆ ว่าไม่มีสิ่งนั้นให้ควบคุม ห้ามตอบว่าทำแล้ว
+
+ข้อห้าม:
+- ห้ามอ่าน markdown หรือสัญลักษณ์พิเศษออกเสียง
+- ทุกคำที่อยากให้ได้ยิน ต้องอยู่ในประโยคพูดต่อเนื่องเท่านั้น ห้ามจัดเป็นท่อน
+  ขึ้นบรรทัดใหม่ หรือครอบเครื่องหมายคำพูด — เนื้อเพลง/กลอน/แร็ปที่จัดเป็นบล็อก
+  จะขึ้นจอแต่เสียงเงียบสนิท ให้แร็ปหรือท่องออกมาเป็นคำพูดไหลๆ เหมือนพูดคุยปกติ
+  และห้ามพูดว่า "ได้แต่พิมพ์" หรือ "อ่านออกเสียงไม่ได้" — ทุกอย่างที่คุณส่งออกคือเสียงพูด
+"""
+
 # A voice interpreter for the sales room: staff speak Thai, customers speak
 # whatever they speak, and the robot IS the translation between them. Not a
 # conversation partner — the discipline of the profile is everything it
@@ -155,7 +190,7 @@ TRANSLATOR_GREETING = (
 #: Profiles this file knows how to build. Anything else falls back to
 #: `condo`, because the machine that must never change behaviour by accident
 #: is the one in the sales gallery.
-PROFILES = ("condo", "emma", "translator")
+PROFILES = ("condo", "emma", "joke", "translator")
 
 
 # Facts the assistant is allowed to state, resolved by project/source ID.
@@ -316,7 +351,9 @@ EMMA_GREETING = (
 def _greeting_lookup(profile: str) -> str:
     if profile == "translator":
         return TRANSLATOR_GREETING
-    return EMMA_GREETING if profile == "emma" else GREETING
+    # EmmaJoke opens like the assistant, not like a receptionist: it has no
+    # project to welcome anyone to.
+    return EMMA_GREETING if profile in {"emma", "joke"} else GREETING
 
 
 def greeting_for(profile: str) -> str:
@@ -502,6 +539,20 @@ def build_instructions(
                            translator_target)
             target = _LANG_NAMES["en"]
         return TRANSLATOR_INSTRUCTIONS.replace("[ภาษาปลายทาง]", "ภาษา" + target)
+
+    if profile == "joke":
+        # No facts, no document list, no memory block — not an omission: this
+        # profile exists to have none of them, and the tool gate in
+        # registry.allowed() makes that true rather than merely stated.
+        from datetime import datetime
+
+        weekday = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"]
+        now = datetime.now()
+        stamp = "%s (วัน%s)" % (now.strftime("%Y-%m-%d %H:%M"), weekday[now.weekday()])
+        return (JOKE_INSTRUCTIONS
+                .replace("[คำแนะนำตัว]", _emma_introduction(robot_name))
+                .replace("[เวลาปัจจุบัน]", stamp)
+                .replace("[กฎภาษา]", _language_rule(languages)))
 
     if profile == "emma":
         # No condo facts appended, and that is a decision rather than an
