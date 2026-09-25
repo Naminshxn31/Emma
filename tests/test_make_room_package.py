@@ -126,3 +126,23 @@ def test_the_installers_do_not_hang_when_run_headless(package):
         for line in text.splitlines():
             assert line.strip() != "pause", f"{name} has an unguarded pause"
         assert "if not defined ROOM_AGENT_SILENT pause" in text
+
+
+def test_the_installer_provisions_python_when_it_is_missing(package):
+    """Deploying to many PCs must not mean hand-installing Python on each. When
+    no Python is found, install.cmd downloads the official one and installs a
+    PRIVATE copy into the agent's folder, used by full path -- so it needs
+    nothing on PATH and never fights a system Python. The manual link stays as a
+    fallback for a machine with no internet, and the scheduled task uses the
+    resolved interpreter, not a bare PATH lookup."""
+    install = (package / "install.cmd").read_text(encoding="ascii")
+    assert "www.python.org/ftp/python/" in install          # official download
+    assert "curl.exe" in install
+    assert r"EmmaRoomAgent\python" in install               # private target dir
+    assert 'TargetDir="%PRIV%"' in install
+    assert "https://www.python.org/downloads/" in install   # manual fallback kept
+    # the task and the immediate start use the resolved interpreter
+    assert "-Execute '%PYW%'" in install
+    assert '"%PY%" -m pip install' in install
+    # no PATH lookup for the task any more (it is resolved once, above)
+    assert "for /f \"delims=\" %%P in ('where pythonw') do set" not in install

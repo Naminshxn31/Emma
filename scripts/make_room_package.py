@@ -88,15 +88,44 @@ set "SRC=%~dp0"
 set "DEST=C:\\ProgramData\\EmmaRoomAgent"
 echo Installing Emma Room Agent to %DEST%
 
-where pythonw >nul 2>&1
-if errorlevel 1 (
-  echo.
-  echo Python was not found on this PC. Install it, then run this file again:
-  echo   https://www.python.org/downloads/   (tick "Add python.exe to PATH")
-  echo.
-  if not defined ROOM_AGENT_SILENT pause
-  exit /b 1
-)
+REM --- Python: use the system copy if present, else install a PRIVATE one into
+REM the agent's own folder and use it by full path. A private copy means the
+REM agent never fights a system Python's version and needs nothing on PATH; any
+REM user can run it because it is executed by its full path. Falls back to a
+REM manual message only if the download itself is blocked.
+set "PRIV=C:\\ProgramData\\EmmaRoomAgent\\python"
+set "PYW="
+set "PY="
+for /f "delims=" %%P in ('where pythonw 2^>nul') do if not defined PYW set "PYW=%%P"
+for /f "delims=" %%P in ('where python 2^>nul')  do if not defined PY  set "PY=%%P"
+if defined PYW goto have_python
+if exist "%PRIV%\\pythonw.exe" ( set "PYW=%PRIV%\\pythonw.exe" & set "PY=%PRIV%\\python.exe" & goto have_python )
+
+set "PYVER=3.12.7"
+set "PYEXE=%TEMP%\\python-%PYVER%-amd64.exe"
+echo Python not found -- downloading Python %PYVER% (about 25 MB)...
+curl.exe -L -o "%PYEXE%" "https://www.python.org/ftp/python/%PYVER%/python-%PYVER%-amd64.exe"
+if errorlevel 1 goto no_python
+echo Installing Python quietly into %PRIV% ...
+"%PYEXE%" /quiet InstallAllUsers=1 PrependPath=0 Include_launcher=0 Shortcuts=0 Include_test=0 TargetDir="%PRIV%"
+del "%PYEXE%" >nul 2>&1
+if not exist "%PRIV%\\pythonw.exe" goto no_python
+set "PYW=%PRIV%\\pythonw.exe"
+set "PY=%PRIV%\\python.exe"
+goto have_python
+
+:no_python
+echo.
+echo Could not get Python automatically (no internet, or the download was blocked).
+echo Install it by hand, then run this file again:
+echo   https://www.python.org/downloads/   (tick "Add python.exe to PATH")
+echo.
+if not defined ROOM_AGENT_SILENT pause
+exit /b 1
+
+:have_python
+if not defined PY set "PY=%PYW:pythonw.exe=python.exe%"
+echo Using Python at %PYW%
 
 echo Copying files...
 xcopy "%SRC%app" "%DEST%\\app" /e /i /y /q >nul
@@ -106,7 +135,7 @@ copy /y "%SRC%.env" "%DEST%\\" >nul
 copy /y "%SRC%uninstall.cmd" "%DEST%\\" >nul
 
 echo Installing Python packages...
-python -m pip install --quiet --disable-pip-version-check fastapi uvicorn python-dotenv
+"%PY%" -m pip install --quiet --disable-pip-version-check fastapi uvicorn python-dotenv
 
 REM Read the port from the .env that travelled with this package.
 set "PORT=8777"
@@ -115,8 +144,8 @@ netsh advfirewall firewall delete rule name="Emma Room Agent" >nul 2>&1
 netsh advfirewall firewall add rule name="Emma Room Agent" dir=in action=allow protocol=TCP localport=%PORT% >nul
 echo Opened inbound TCP port %PORT%.
 
-REM Auto-start at logon, no window, as the ordinary (non-admin) user.
-for /f "delims=" %%P in ('where pythonw') do set "PYW=%%P"
+REM Auto-start at logon, no window, as the ordinary (non-admin) user. %PYW% was
+REM resolved above (system or the private copy), so no PATH lookup is needed.
 powershell -NoProfile -Command "Register-ScheduledTask -TaskName 'EmmaRoomAgent' -Force -RunLevel Limited -Action (New-ScheduledTaskAction -Execute '%PYW%' -Argument '\\"%DEST%\\run_room_agent.py\\"' -WorkingDirectory '%DEST%') -Trigger (New-ScheduledTaskTrigger -AtLogOn)" >nul
 echo Registered auto-start (Task Scheduler entry: EmmaRoomAgent).
 

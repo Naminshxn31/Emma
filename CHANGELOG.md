@@ -1,5 +1,23 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-25 — install.cmd ลง Python ให้เองถ้าเครื่องไม่มี
+
+- ขอบเขต: `scripts/make_room_package.py` (install.cmd auto-provision Python),
+  `tests/test_make_room_package.py` (+1 = 10), `docs/ติดตั้งตัวคุมคอมในห้องขาย.md`
+- เจ้าของเจอ "Python was not found" ตอนกด install.cmd บนเครื่องปลายทาง ถามว่าทำไมไม่ลง Python ให้เลย
+  — ถูก การลง Python เองทุกเครื่องคือ friction ของการ deploy หลายเครื่อง
+- ตอนนี้ install.cmd: มี system Python → ใช้เลย · ไม่มี → `curl.exe` โหลด python-3.12.7-amd64
+  จาก python.org แล้วลง**เงียบ**เป็น**สำเนาส่วนตัว**ที่ `C:\ProgramData\EmmaRoomAgent\python`
+  ใช้แบบระบุพาธเต็ม (`%PYW%`/`%PY%`) — ไม่ต้องแตะ PATH, ไม่ชนกับ Python ตัวอื่นบนเครื่อง,
+  user ไหนก็รันได้เพราะเรียกจากพาธเต็ม · scheduled task กับ pip ใช้ interpreter ตัวที่ resolve แล้ว
+  ไม่ใช่ `where` (เพิ่งลงเสร็จ PATH ยังไม่อัปเดตในเซสชันเดิม)
+- **ยังมี fallback** ถ้าโหลดไม่ได้ (ไม่มีเน็ต/ถูกบล็อก) บอกให้ลงเองจาก python.org แล้วรันซ้ำ
+  — และ `deploy_room_agents.ps1` post-condition check จับได้ถ้า provision ล้ม (ไฟล์ไม่ครบ) จะไม่รายงานสำเร็จ
+- ใช้ label/goto ใน batch (CRLF อยู่แล้ว รองรับ label) · ตัวสร้างเขียนพาธด้วย `\` กัน SyntaxWarning
+  ของ Python และให้ output ยังเป็น ASCII+CRLF+ไม่มี BOM เหมือนเดิม
+- **ไม่ได้รัน install.cmd จริงบนเครื่องนี้** (มันจะโหลด+ลง Python + ตั้ง autostart บนเครื่อง dev) —
+  ยืนยันด้วยเทสต์เนื้อหา 10 ตัว + ไม่มี syntax warning
+
 ## 2026-09-25 — ลง agent หลายเครื่องผ่าน LAN (WinRM) · red-team เจอ 5 บั๊กจริง แก้หมด
 
 - ขอบเขต: `scripts/deploy_room_agents.ps1` (ใหม่), `scripts/make_room_package.py`
