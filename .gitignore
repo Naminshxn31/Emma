@@ -53,6 +53,11 @@ data/projects/*/presentations/slides/*.jpg
 data/projects/*/presentations/slides/*.jpeg
 data/projects/*/presentations/slides/*.png
 data/projects/*/presentations/slides/index.json.bak
+# Backups the data console keeps beside any file it rewrites (app/data_console.py).
+# The .bak is the undo for a wrong approval; it is local evidence, not history.
+data/projects/*/facts/*.json.bak
+data/projects/*/presentations/*.json.bak
+data/projects/*/sales/*.json.bak
 data/review/other_projects/presentations/slides/*.jpg
 data/review/other_projects/presentations/slides/*.jpeg
 data/review/other_projects/presentations/slides/*.png

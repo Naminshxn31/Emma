@@ -70,6 +70,23 @@
       "approval_fields": ["approval_status", "approved_by", "approved_at", "effective_at", "disclosure_scope", "content_state"]
     },
     {
+      "id": "project_qa_script",
+      "availability": "tracked",
+      "required_for": ["review"],
+      "project_id": "embassy_world",
+      "label": "สคริปต์ Q&A ลูกค้าเดินเข้าห้องขาย",
+      "domain": "sales",
+      "kind": "json_file",
+      "location": "data/projects/embassy_world/sales/qa_script.json",
+      "required": true,
+      "tracked": true,
+      "authority": "curated",
+      "customer_facing": "conditional",
+      "uses": ["รูปแบบคำตอบที่คนตรวจแล้วสำหรับคำถามหน้าห้องขาย", "ต้นฉบับของ docs/emma-qa-walkin-script-2026-09-24.md ซึ่งถูกสร้างใหม่ทุกครั้งที่บันทึก"],
+      "not_for": ["บทที่ Emma ท่องคำต่อคำ", "ราคา", "โปรโมชั่น", "การอนุมัติเนื้อหาอัตโนมัติ", "โครงการอื่น"],
+      "approval_fields": ["approval_status", "approved_by", "approved_at", "effective_at", "disclosure_scope", "content_state"]
+    },
+    {
       "id": "project_vocabulary",
       "availability": "tracked",
       "required_for": ["runtime"],

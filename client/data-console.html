@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>โต๊ะอนุมัติข้อมูล · Emma</title>
+<!--
+  The owner's approval desk. Every rule that decides anything lives on the
+  server (app/data_console.py); this page only shows what the server says and
+  collects three things it refuses to invent: a human name, a content state
+  from the policy's own list, and an explicit confirmation.
+
+  Three things this page must never do, each paid for by a bug in this repo:
+  * never remember or pre-fill the approver's name — the field exists so that
+    a person puts their name on the data, and a remembered name is nobody's;
+  * never send a timestamp. The server dates its own signature; a page-side
+    clock would let a laptop with the wrong date approve something into the
+    future, which reads as approved on screen and stays denied at runtime;
+  * never let the approve button act on text the editor boxes no longer
+    show. Typing a promotion and pressing อนุมัติ without pressing บันทึก
+    used to approve the *old* text, wipe the box and turn the page green.
+-->
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --line:#2b3440;
+    --ink:#e8edf3; --dim:#9fb0c3; --ok:#39d98a; --no:#ff6b6b; --warn:#ffb648;
+    --accent:#6ea8fe;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Sarabun","Noto Sans Thai","Segoe UI",system-ui,sans-serif;
+    font-size:17px; line-height:1.55;
+  }
+  header{
+    padding:14px 20px; border-bottom:1px solid var(--line); background:var(--panel);
+    display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline;
+  }
+  header h1{font-size:21px; margin:0; font-weight:700}
+  header .meta{color:var(--dim); font-size:14px}
+  main{display:grid; grid-template-columns:minmax(340px,38%) 1fr; gap:0; height:calc(100% - 58px)}
+  #list,#detail{overflow:auto; padding:16px 18px 60px}
+  #list{border-right:1px solid var(--line)}
+  @media (max-width:900px){
+    main{grid-template-columns:1fr; height:auto}
+    #list{border-right:0; border-bottom:1px solid var(--line); max-height:46vh}
+  }
+  .banner{
+    margin:14px 18px; padding:14px 16px; border-radius:10px;
+    background:#3a1d1d; border:1px solid #7a3b3b; color:#ffd9d9; font-size:17px;
+  }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; margin-bottom:10px;
+  }
+  .card.clickable{cursor:pointer}
+  .card.clickable:hover{border-color:var(--accent)}
+  .card.on{border-color:var(--accent); background:var(--panel2)}
+  .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  .name{font-weight:700}
+  .id{color:var(--dim); font-size:13px; font-family:ui-monospace,Consolas,monospace}
+  .pill{
+    font-size:13px; padding:2px 9px; border-radius:999px; border:1px solid var(--line);
+    white-space:nowrap;
+  }
+  .pill.yes{background:#123524; color:var(--ok); border-color:#1d6b46}
+  .pill.no{background:#3a1d1d; color:var(--no); border-color:#7a3b3b}
+  .pill.ro{background:#232a33; color:var(--dim)}
+  .why{color:var(--dim); font-size:14.5px; margin-top:4px}
+  h2{font-size:19px; margin:18px 0 8px}
+  h3{font-size:16px; margin:16px 0 6px; color:var(--dim); font-weight:600}
+  label{display:block; font-size:14.5px; color:var(--dim); margin:10px 0 4px}
+  input[type=text],select,textarea{
+    width:100%; background:#0b0f14; color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:10px 12px; font:inherit;
+  }
+  textarea{min-height:78px; resize:vertical; line-height:1.5}
+  .fact{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; background:var(--panel)}
+  .fact .empty{color:var(--warn); font-size:13.5px}
+  button{
+    font:inherit; font-weight:600; padding:10px 18px; border-radius:8px;
+    border:1px solid var(--line); background:var(--panel2); color:var(--ink); cursor:pointer;
+  }
+  button:disabled{opacity:.42; cursor:not-allowed}
+  button.go{background:#1d6b46; border-color:#2a9160; color:#eafff3}
+  button.off{background:#5a2a2a; border-color:#8a4444; color:#ffe8e8}
+  .check{display:flex; gap:9px; align-items:flex-start; margin:12px 0; color:var(--ink); font-size:15.5px}
+  .check input{margin-top:5px; width:19px; height:19px}
+  .msg{margin-top:12px; padding:11px 13px; border-radius:8px; font-size:15.5px; white-space:pre-wrap}
+  .msg.ok{background:#123524; color:#c8ffe4; border:1px solid #1d6b46}
+  .msg.err{background:#3a1d1d; color:#ffd9d9; border:1px solid #7a3b3b}
+  /* "nothing changed" is not a failure. Painting it the colour of the
+     failures told the operator that the edit he had just made was lost. */
+  .msg.info{background:var(--panel2); color:var(--ink); border:1px solid var(--line)}
+  .dirty{
+    margin-top:10px; padding:10px 12px; border-radius:8px; background:#3a2f16;
+    border:1px solid #7a6330; color:#ffe6b8; font-size:15px;
+  }
+  .caveat{
+    margin-top:8px; padding:10px 12px; border-radius:8px; background:var(--panel2);
+    border:1px solid var(--line); font-size:15px;
+  }
+  table{width:100%; border-collapse:collapse; font-size:14.5px}
+  td,th{border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top}
+  .scroller{max-height:340px; overflow:auto; border:1px solid var(--line); border-radius:8px}
+  /* The Q&A script. Laid out the way the printed draft reads — situation,
+     what the guest says, then the two answers side by side — because the
+     person checking it has to be able to read straight down the page, not
+     hunt for one cell. Every box is the real field; there is no read-only
+     "preview" copy that could disagree with what gets saved. */
+  .qa-entry{border:1px solid var(--line); border-radius:10px; padding:12px 14px;
+    margin-bottom:14px; background:var(--panel)}
+  .qa-entry .head{display:flex; gap:8px; align-items:center; margin-bottom:6px}
+  .qa-entry .q-num{font-weight:700; color:var(--dim); min-width:2.2em}
+  .qa-entry .q-title{flex:1}
+  .qa-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:6px}
+  .qa-grid .col-now label{color:var(--warn)}
+  .qa-grid .col-after label{color:var(--ok)}
+  @media (max-width:820px){ .qa-grid{grid-template-columns:1fr} }
+  .q-note{display:grid; grid-template-columns:minmax(120px,26%) 1fr auto; gap:8px;
+    align-items:start; margin-top:8px}
+  .q-note textarea{min-height:56px}
+  .mini{font:inherit; font-size:14px; font-weight:600; padding:5px 10px}
+  .qa-tools{display:flex; gap:6px}
+  .audit{font-size:13.5px; color:var(--dim); font-family:ui-monospace,Consolas,monospace; white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>โต๊ะอนุมัติข้อมูล</h1>
+  <span class="meta" id="meta">กำลังอ่านทะเบียนแหล่งข้อมูล…</span>
+</header>
+<div id="banner" class="banner" hidden></div>
+<main>
+  <section id="list"></section>
+  <section id="detail"><p class="why">เลือกแหล่งข้อมูลทางซ้ายเพื่อดูหรือแก้ไข</p></section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+let STATE = {sources: [], states: [], current: null, detail: null, clean: null, msg: null};
+
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+async function api(path, options) {
+  // The token rides the query string on reads only — the same exposure
+  // /console and /unit_price already have. A write puts it in the body
+  // instead, because WS_TOKEN is also what unlocks /ws (which drives the
+  // robot and opens programs on this machine) and uvicorn writes every
+  // request line into its access log verbatim. A console session must not
+  // leave the machine's control token in whatever the sales-room box
+  // redirects stdout to.
+  const opts = options || {};
+  const url = opts.method
+    ? path
+    : path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN);
+  const res = await fetch(url, opts);
+  let data;
+  try { data = await res.json(); } catch (err) { data = {ok:false, error:'เซิร์ฟเวอร์ตอบกลับไม่ได้'}; }
+  if (!res.ok || data.ok === false) throw new Error(data.error || ('ผิดพลาด ' + res.status));
+  return data;
+}
+
+async function post(path, body) {
+  return api(path, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(Object.assign({token: TOKEN}, body)),
+  });
+}
+
+function verdictPill(v) {
+  return v && v.allowed
+    ? '<span class="pill yes">Emma พูดได้</span>'
+    : '<span class="pill no">ยังพูดไม่ได้</span>';
+}
+
+async function loadList() {
+  try {
+    const data = await api('/data-console/sources');
+    STATE.sources = data.sources;
+    STATE.states = data.content_states;
+    $('meta').textContent = 'โครงการ ' + data.project_id + ' · นโยบาย ' + data.policy
+      + ' · ทะเบียนปรับปรุง ' + (data.updated_on || '-') + ' · ' + data.sources.length + ' แหล่งข้อมูล';
+    $('banner').hidden = true;
+    renderList();
+  } catch (err) {
+    $('banner').hidden = false;
+    $('banner').textContent = err.message;
+    $('meta').textContent = 'เปิดหน้านี้ไม่สำเร็จ';
+  }
+}
+
+function renderList() {
+  const editable = STATE.sources.filter(s => s.editable);
+  const rest = STATE.sources.filter(s => !s.editable);
+  const card = (s) => {
+    const cls = 'card' + (s.editable ? ' clickable' : '') + (STATE.current === s.id ? ' on' : '');
+    const ro = s.editable ? '' : '<span class="pill ro">อ่านอย่างเดียว</span>';
+    const why = s.editable ? esc(s.what_th) : esc(s.readonly_th || '');
+    return '<article class="' + cls + '" data-id="' + esc(s.id) + '">'
+      + '<div class="row"><span class="name">' + esc(s.label) + '</span>'
+      + verdictPill(s.verdict) + ro + '</div>'
+      + '<div class="id">' + esc(s.id) + ' · ' + esc(s.authority || '-') + ' · '
+      + esc(s.location || 'ไม่มีไฟล์ในเครื่อง') + '</div>'
+      + '<div class="why">เหตุผลจากนโยบาย: ' + esc(s.verdict.reason_th)
+      + ' <span class="id">(' + esc(s.verdict.reason) + ')</span></div>'
+      + (why ? '<div class="why">' + why + '</div>' : '')
+      + (s.counts ? '<div class="why">' + s.counts.total + ' ภาพ</div>' : '')
+      + '</article>';
+  };
+  $('list').innerHTML =
+    '<h2>แก้ไขและอนุมัติได้</h2>' + editable.map(card).join('')
+    + '<h2>แหล่งข้อมูลอื่นในทะเบียน</h2>'
+    + '<p class="why">แหล่งเหล่านี้ไม่ได้ผ่านการอนุมัติด้วยมือ จึงไม่มีปุ่มอนุมัติ '
+    + 'แสดงไว้เพื่อให้เห็นว่านโยบายตัดสินอย่างไรกับทุกแหล่ง</p>'
+    + rest.map(card).join('');
+  $('list').querySelectorAll('.card.clickable').forEach(el => {
+    el.onclick = () => openSource(el.dataset.id);
+  });
+}
+
+// ------------------------------------------------------- unsaved editing
+//
+// The editor boxes and the approve button used to be unconnected: typing
+// into a fact and pressing อนุมัติ without pressing บันทึก approved the text
+// already in the file, wiped the box in the re-render, and showed the green
+// "Emma พูดได้" pill. The operator walked away believing he had published
+// what he had typed. Everything that can throw typing away — approving,
+// switching source, closing the tab — asks unsavedFields() first.
+
+function editorValues() {
+  const d = STATE.detail;
+  if (!d) return null;
+  if (d.editor === 'facts' && $('facts')) {
+    return Array.from($('facts').children).map(el => ({
+      label: el.querySelector('.f-label').value,
+      value: el.querySelector('.f-value').value,
+    }));
+  }
+  if (d.editor === 'rules' && $('rules')) {
+    return Array.from(document.querySelectorAll('.r-text'))
+      .map(el => ({label: el.dataset.key, value: el.value}));
+  }
+  if (d.editor === 'qa' && $('qaEntries')) return qaEditorValues();
+  return null;
+}
+
+function unsavedFields() {
+  const now = editorValues();
+  const was = STATE.clean;
+  if (!now || !was) return [];
+  const out = [];
+  if (now.length !== was.length) out.push('จำนวนหัวข้อ');
+  now.forEach((row, i) => {
+    const old = was[i];
+    if (!old || old.label !== row.label || old.value !== row.value) {
+      out.push(row.label || ('หัวข้อที่ ' + (i + 1)));
+    }
+  });
+  return out;
+}
+
+function markClean() {
+  const now = editorValues();
+  STATE.clean = now ? now.map(r => ({label: r.label, value: r.value})) : null;
+}
+
+function showDirty() {
+  const note = $('dirtyNote');
+  if (!note) return;
+  const dirty = unsavedFields();
+  note.hidden = dirty.length === 0;
+  note.textContent = dirty.length
+    ? 'ยังไม่ได้บันทึก: ' + dirty.join(', ') + ' — กด "บันทึกเนื้อหา" ก่อน อนุมัติตอนนี้จะเป็นการอนุมัติข้อความเดิมในไฟล์'
+    : '';
+}
+
+window.addEventListener('beforeunload', (e) => {
+  if (unsavedFields().length) { e.preventDefault(); e.returnValue = ''; }
+});
+
+async function openSource(id) {
+  if (STATE.current && STATE.current !== id && unsavedFields().length
+      && !confirm('มีข้อมูลที่ยังไม่บันทึกอยู่ ทิ้งการแก้ไขแล้วเปิดแหล่งอื่น?')) return;
+  if (STATE.current !== id) STATE.msg = null;
+  STATE.current = id;
+  STATE.clean = null;
+  renderList();
+  $('detail').innerHTML = '<p class="why">กำลังอ่าน…</p>';
+  try {
+    STATE.detail = await api('/data-console/source/' + encodeURIComponent(id));
+    renderDetail();
+  } catch (err) {
+    $('detail').innerHTML = '<div class="msg err">' + esc(err.message) + '</div>';
+  }
+}
+
+function approvalBlock(d) {
+  const a = d.approval;
+  const rows = [
+    ['สถานะอนุมัติ', a.approval_status],
+    ['ผู้อนุมัติ', a.approved_by],
+    ['เวลาอนุมัติ', a.approved_at],
+    ['เริ่มมีผล', a.effective_at],
+    ['ขอบเขต', a.disclosure_scope],
+    ['สถานะเนื้อหา', a.content_state],
+  ];
+  return '<h3>ข้อมูลการอนุมัติในไฟล์ตอนนี้</h3><table>'
+    + rows.map(r => '<tr><th>' + esc(r[0]) + '</th><td>'
+        + (r[1] ? esc(r[1]) : '<span class="pill no">ยังว่าง</span>')
+        + '</td></tr>').join('')
+    + '</table>';
+}
+
+function factsEditor(d) {
+  return '<h3>ข้อเท็จจริง</h3>'
+    + '<p class="why">ช่องที่ว่างคือข้อมูลที่ยังไม่มีใครยืนยัน ปล่อยว่างไว้ได้ '
+    + 'Emma จะบอกลูกค้าว่ายังไม่มีข้อมูลและให้ติดต่อฝ่ายขาย ห้ามให้ใครเดาแทน</p>'
+    + '<div id="facts">'
+    + d.facts.map((f, i) =>
+        '<div class="fact" data-i="' + i + '">'
+        + '<label>หัวข้อ</label><input type="text" class="f-label" value="' + esc(f.label) + '">'
+        + '<label>เนื้อหา' + (f.value ? '' : ' <span class="empty">— ยังว่าง</span>') + '</label>'
+        + '<textarea class="f-value">' + esc(f.value || '') + '</textarea>'
+        + '</div>').join('')
+    + '</div>'
+    + '<button id="addFact" type="button">+ เพิ่มหัวข้อ</button>';
+}
+
+function rulesEditor(d) {
+  return '<h3>กติกาการนำเสนอ</h3>'
+    + (d.review_status ? '<p class="why">review_status: ' + esc(d.review_status) + '</p>' : '')
+    + '<div id="rules">'
+    + d.rules.map(r =>
+        '<div class="fact"><label>' + esc(r.key) + '</label>'
+        + '<textarea class="r-text" data-key="' + esc(r.key) + '" style="min-height:190px">'
+        + esc(r.text) + '</textarea></div>').join('')
+    + '</div>';
+}
+
+function catalogView(d) {
+  const types = Object.entries(d.counts.types)
+    .map(([k, n]) => esc(k) + ' ' + n).join(' · ');
+  return '<h3>คลังภาพ ' + d.counts.total + ' ภาพ</h3>'
+    + '<p class="why">' + types + '</p>'
+    + '<p class="why">อนุมัติชุดนี้แปลว่า Emma ยกคำบรรยายทุกบรรทัดข้างล่างไปพูดกับลูกค้าได้ '
+    + 'เลื่อนอ่านให้ครบก่อนติ๊กยืนยัน</p>'
+    + '<div class="scroller"><table><tr><th>รหัส</th><th>ประเภท</th><th>ชื่อภาพ</th><th>คำบรรยาย</th></tr>'
+    + d.images.map(im => '<tr><td class="id">' + esc(im.id) + '</td><td>' + esc(im.type)
+        + '</td><td>' + esc(im.title_th) + '</td><td>' + esc(im.summary_th) + '</td></tr>').join('')
+    + '</table></div>';
+}
+
+// ----------------------------------------------------- the Q&A script
+//
+// The draft this came from is a document a salesperson reads top to bottom,
+// so the editor is the document with the boxes switched on rather than a
+// form with the document hidden behind it. Two rules it keeps from the rest
+// of the page: a blank answer is left blank (an answer nobody has written is
+// not the same as a helpful placeholder that a robot could end up saying),
+// and nothing here is generated — every string is what a person typed.
+
+function qaNoteRow(note) {
+  return '<div class="q-note">'
+    + '<input type="text" class="q-note-kind" placeholder="เช่น ห้ามทำ / เหตุผล" value="'
+    + esc(note.kind || '') + '">'
+    + '<textarea class="q-note-text">' + esc(note.text || '') + '</textarea>'
+    + '<button type="button" class="mini" data-act="delNote">ลบ</button></div>';
+}
+
+function qaEntryCard(entry) {
+  return '<article class="qa-entry" data-id="' + esc(entry.id || '') + '">'
+    + '<div class="head"><span class="q-num"></span>'
+    + '<input type="text" class="q-title" placeholder="สถานการณ์ เช่น &quot;ราคาเท่าไหร่&quot;" value="'
+    + esc(entry.title || '') + '">'
+    + '<span class="qa-tools">'
+    + '<button type="button" class="mini" data-act="up" title="เลื่อนขึ้น">▲</button>'
+    + '<button type="button" class="mini" data-act="down" title="เลื่อนลง">▼</button>'
+    + '<button type="button" class="mini off" data-act="delEntry">ลบข้อนี้</button>'
+    + '</span></div>'
+    + '<label>ลูกค้าพูดว่า (บรรทัดละหนึ่งแบบ)</label>'
+    + '<textarea class="q-says" style="min-height:56px">'
+    + esc((entry.guest_says || []).join('\n')) + '</textarea>'
+    + '<div class="qa-grid">'
+    + '<div class="col-now"><label>ตอนนี้ (ยังไม่อนุมัติข้อมูล)</label>'
+    + '<textarea class="q-now">' + esc(entry.answer_now || '') + '</textarea></div>'
+    + '<div class="col-after"><label>หลังอนุมัติ</label>'
+    + '<textarea class="q-after">' + esc(entry.answer_after || '') + '</textarea></div>'
+    + '</div>'
+    + '<div class="q-notes">' + (entry.notes || []).map(qaNoteRow).join('') + '</div>'
+    + '<button type="button" class="mini" data-act="addNote" style="margin-top:8px">+ เพิ่มหมายเหตุ</button>'
+    + '</article>';
+}
+
+function qaEditor(d) {
+  const doc = d.doc || {};
+  const how = doc.how_to_read || {};
+  const prose = '<p class="why">' + esc(doc.drafted_on_th || '') + ' · '
+    + esc(doc.audience_th || '') + '</p>'
+    + (doc.intro || []).map(p => '<p class="why">' + esc(p) + '</p>').join('')
+    + (how.lead ? '<p class="why">' + esc(how.lead) + '</p>' : '')
+    + '<ul class="why">' + (how.items || []).map(i => '<li>' + esc(i) + '</li>').join('') + '</ul>'
+    + (how.tail ? '<p class="why">' + esc(how.tail) + '</p>' : '')
+    + '<p class="why">บันทึกครั้งไหนก็ตาม ระบบจะเขียน <span class="id">' + esc(doc.export || '')
+    + '</span> ใหม่ทั้งไฟล์จากข้อมูลชุดนี้ ไฟล์ markdown เป็นสำเนาไว้อ่าน ไม่ใช่ต้นฉบับ '
+    + 'ส่วนคำนำและหัวข้อด้านบนนี้แก้ที่ไฟล์ JSON โดยตรง</p>';
+
+  return '<h3>' + esc(doc.rules_title || 'กฎที่คุมทุกคำตอบ') + '</h3>'
+    + prose
+    + '<div id="qaRules">'
+    + d.rules.map(text => '<div class="fact q-rule-row">'
+        + '<textarea class="q-rule">' + esc(text) + '</textarea>'
+        + '<div class="row" style="margin-top:6px"><button type="button" class="mini off" data-act="delRule">ลบกฎข้อนี้</button></div>'
+        + '</div>').join('')
+    + '</div>'
+    + '<button id="addRule" type="button" class="mini">+ เพิ่มกฎ</button>'
+    + '<h3>สถานการณ์ที่ลูกค้าถาม (' + d.entries.length + ' ข้อ)</h3>'
+    + '<p class="why">อ่านไล่ลงมาได้ทั้งหน้า ช่องซ้ายคือคำตอบที่ Emma ใช้วันนี้ ช่องขวาคือหลังอนุมัติข้อมูลแล้ว '
+    + 'ช่องที่ยังว่างคือคำตอบที่ยังไม่มีใครเขียน ปล่อยว่างไว้ได้ ระบบจะไม่เติมประโยคให้เอง</p>'
+    + '<div id="qaEntries">' + d.entries.map(qaEntryCard).join('') + '</div>'
+    + '<button id="addEntry" type="button">+ เพิ่มสถานการณ์</button>'
+    + '<h3>' + esc(doc.decisions_title || 'สิ่งที่เจ้าของต้องตัดสิน') + '</h3>'
+    + '<div id="qaDecisions">'
+    + d.decisions.map(text => '<div class="fact q-dec-row">'
+        + '<textarea class="q-dec" style="min-height:56px">' + esc(text) + '</textarea>'
+        + '<div class="row" style="margin-top:6px"><button type="button" class="mini off" data-act="delDec">ลบข้อนี้</button></div>'
+        + '</div>').join('')
+    + '</div>'
+    + '<button id="addDecision" type="button" class="mini">+ เพิ่มข้อที่ต้องตัดสิน</button>'
+    + (doc.next_steps || []).map(p => '<p class="why">' + esc(p) + '</p>').join('');
+}
+
+function qaRenumber() {
+  const cards = document.querySelectorAll('#qaEntries > .qa-entry');
+  cards.forEach((el, i) => { el.querySelector('.q-num').textContent = (i + 1) + '.'; });
+}
+
+function qaBody() {
+  const entries = Array.from(document.querySelectorAll('#qaEntries > .qa-entry')).map(el => ({
+    id: el.dataset.id || '',
+    title: el.querySelector('.q-title').value,
+    guest_says: el.querySelector('.q-says').value.split('\n')
+      .map(s => s.trim()).filter(s => s !== ''),
+    answer_now: el.querySelector('.q-now').value,
+    answer_after: el.querySelector('.q-after').value,
+    notes: Array.from(el.querySelectorAll('.q-note')).map(n => ({
+      kind: n.querySelector('.q-note-kind').value,
+      text: n.querySelector('.q-note-text').value,
+    })),
+  }));
+  return {
+    rules: Array.from(document.querySelectorAll('#qaRules .q-rule')).map(el => el.value),
+    entries: entries,
+    decisions: Array.from(document.querySelectorAll('#qaDecisions .q-dec')).map(el => el.value),
+  };
+}
+
+// The dirty check compares flat label/value rows, so the script is flattened
+// into one row per box. Reordering changes the labels, adding or removing
+// changes the length: both are caught by the same guard that already stops
+// อนุมัติ from signing text the boxes no longer show.
+function qaEditorValues() {
+  const body = qaBody();
+  const rows = body.rules.map((text, i) => ({label: 'กฎข้อ ' + (i + 1), value: text}));
+  body.entries.forEach((entry, i) => {
+    const at = 'ข้อ ' + (i + 1) + ' ';
+    rows.push({label: at + 'หัวข้อ', value: entry.title});
+    rows.push({label: at + 'ลูกค้าพูดว่า', value: entry.guest_says.join('\n')});
+    rows.push({label: at + 'คำตอบตอนนี้', value: entry.answer_now});
+    rows.push({label: at + 'คำตอบหลังอนุมัติ', value: entry.answer_after});
+    entry.notes.forEach((note, k) => {
+      rows.push({label: at + 'หมายเหตุ ' + (k + 1), value: note.kind + '\n' + note.text});
+    });
+  });
+  body.decisions.forEach((text, i) => {
+    rows.push({label: 'ข้อที่ต้องตัดสิน ' + (i + 1), value: text});
+  });
+  return rows;
+}
+
+// Delete asks first, on every delete button without exception.
+//
+// Deleting a whole situation already asked, which teaches the page that
+// delete asks — and then the three most reachable delete buttons did not:
+// one click on "ลบกฎข้อนี้", sitting directly under the box you were just
+// reading, removed a prompt rule with no confirm and no undo. The only way
+// back was to leave the source and answer a confirm that throws away every
+// other unsaved edit on the page. Naming the text being removed is the
+// point: "ลบข้อนี้?" cannot be checked against what your finger landed on.
+function confirmDelete(what, text) {
+  const line = String(text == null ? '' : text).trim().replace(/\s+/g, ' ');
+  const shown = line.slice(0, 40) + (line.length > 40 ? '…' : '');
+  return confirm(what + (shown ? ' "' + shown + '"' : '')
+    + '? จะมีผลจริงเมื่อกดบันทึก');
+}
+
+function wireQa() {
+  const entries = $('qaEntries');
+  if (!entries) return;
+  qaRenumber();
+
+  entries.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-act]');
+    if (!button) return;
+    const card = button.closest('.qa-entry');
+    const act = button.dataset.act;
+    if (act === 'delEntry') {
+      if (!confirmDelete('ลบสถานการณ์', card.querySelector('.q-title').value)) return;
+      card.remove();
+    } else if (act === 'up' && card.previousElementSibling) {
+      card.parentNode.insertBefore(card, card.previousElementSibling);
+    } else if (act === 'down' && card.nextElementSibling) {
+      card.parentNode.insertBefore(card.nextElementSibling, card);
+    } else if (act === 'delNote') {
+      const note = button.closest('.q-note');
+      if (!confirmDelete('ลบหมายเหตุนี้', note.querySelector('.q-note-text').value)) return;
+      note.remove();
+    } else if (act === 'addNote') {
+      card.querySelector('.q-notes').insertAdjacentHTML('beforeend', qaNoteRow({}));
+    } else { return; }
+    qaRenumber();
+    showDirty();
+  });
+
+  // A new situation carries no id: the server mints one, so two people
+  // adding a row cannot collide on an id the page guessed.
+  $('addEntry').onclick = () => {
+    entries.insertAdjacentHTML('beforeend', qaEntryCard({id: '', notes: []}));
+    qaRenumber();
+    showDirty();
+  };
+  $('addRule').onclick = () => {
+    $('qaRules').insertAdjacentHTML('beforeend',
+      '<div class="fact q-rule-row"><textarea class="q-rule"></textarea>'
+      + '<div class="row" style="margin-top:6px"><button type="button" class="mini off" data-act="delRule">ลบกฎข้อนี้</button></div></div>');
+    showDirty();
+  };
+  $('addDecision').onclick = () => {
+    $('qaDecisions').insertAdjacentHTML('beforeend',
+      '<div class="fact q-dec-row"><textarea class="q-dec" style="min-height:56px"></textarea>'
+      + '<div class="row" style="margin-top:6px"><button type="button" class="mini off" data-act="delDec">ลบข้อนี้</button></div></div>');
+    showDirty();
+  };
+  ['qaRules', 'qaDecisions'].forEach(id => {
+    $(id).addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-act]');
+      if (!button) return;
+      const box = button.closest('.fact');
+      const field = box.querySelector('textarea');
+      const what = button.dataset.act === 'delRule' ? 'ลบกฎข้อนี้' : 'ลบข้อนี้';
+      if (!confirmDelete(what, field ? field.value : '')) return;
+      box.remove();
+      showDirty();
+    });
+  });
+}
+
+// A box is as tall as what is written in it.
+//
+// Every answer box used to be a fixed three lines, so a long answer was cut
+// horizontally through the middle of the glyphs on the third line — which
+// reads as a broken renderer, not as "there is more text below". Measured on
+// the real script: 11 of 32 answers clipped on a 1366 laptop, 13 of 32 plus
+// 15 of 16 notes on a phone. This is the one page whose stated job is
+// "อ่านไล่ลงมาได้ทั้งหน้า" before somebody signs their name to it, and the
+// reviewer was scrolling inside a three-line box to find out what Emma may
+// say. The CSS min-heights stay as the floor; this only ever grows a box.
+function autoSize(el) {
+  if (!el || el.tagName !== 'TEXTAREA') return;
+  // 'auto' first so deleting text shrinks the box back to its floor, and
+  // (offsetHeight - clientHeight) adds the borders back: with
+  // box-sizing:border-box a plain scrollHeight leaves the last line 2px
+  // short and puts a scrollbar on a box that looks full.
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + el.offsetHeight - el.clientHeight) + 'px';
+}
+
+function autoSizeAll(root) {
+  (root || document).querySelectorAll('textarea').forEach(autoSize);
+}
+
+function renderDetail() {
+  const d = STATE.detail;
+  const allowed = d.verdict.allowed;
+  let body = '<h2>' + esc(d.label) + ' <span class="id">' + esc(d.id) + '</span></h2>'
+    + '<div class="row">' + verdictPill(d.verdict)
+    + '<span class="why">' + esc(d.verdict.reason_th) + '</span></div>'
+    + '<p class="why">ไฟล์: <span class="id">' + esc(d.location) + '</span></p>'
+    + (d.verdict.caveat_th ? '<p class="why">Emma ต้องพูดกำกับทุกครั้ง: ' + esc(d.verdict.caveat_th) + '</p>' : '')
+    + approvalBlock(d);
+
+  if (d.editor === 'facts') body += factsEditor(d);
+  else if (d.editor === 'rules') body += rulesEditor(d);
+  else if (d.editor === 'qa') body += qaEditor(d);
+  else body += catalogView(d);
+
+  const canEdit = d.editor !== 'catalog';
+  body += '<h3>บันทึกการแก้ไข / การอนุมัติ</h3>'
+    + '<label for="who">ชื่อผู้รับผิดชอบ (พิมพ์เองทุกครั้ง)</label>'
+    + '<input type="text" id="who" autocomplete="off" placeholder="เช่น ชื่อ-นามสกุล ของคนที่รับผิดชอบข้อมูลชุดนี้">';
+
+  if (canEdit) {
+    body += '<div class="dirty" id="dirtyNote" hidden></div>'
+      + '<div style="margin-top:12px"><button id="saveBtn" type="button">บันทึกเนื้อหา (ยังไม่อนุมัติ)</button></div>'
+      + '<p class="why">แก้เนื้อหาของชุดที่อนุมัติไว้แล้ว = การอนุมัติเดิมถูกถอนทันที '
+      + 'เพราะคนที่เซ็นชื่อไว้ไม่เคยเห็นข้อความใหม่ ต้องอนุมัติใหม่อีกครั้ง</p>';
+  }
+
+  // Nothing is pre-selected, on purpose. The file's own value used to be the
+  // default, so one approval as "existing" quietly became the suggestion for
+  // every approval after it — and this is the field that decides whether
+  // Emma is forced to say "เป็นแนวคิดเบื้องต้น".
+  body += '<h3>อนุมัติให้ Emma พูดกับลูกค้า</h3>'
+    + '<label for="state">สถานะเนื้อหา (เลือกใหม่ทุกครั้ง)</label><select id="state">'
+    + '<option value="">— เลือก —</option>'
+    + STATE.states.map(s => '<option value="' + esc(s.value) + '">'
+        + esc(s.value) + ' — ' + esc(s.label_th) + '</option>').join('')
+    + '</select>'
+    + '<div class="caveat" id="stateCaveat">เลือกสถานะเนื้อหา แล้วบรรทัดนี้จะบอกว่า Emma ต้องพูดกำกับว่าอะไร</div>'
+    + (d.editor === 'catalog'
+        ? '<div class="check"><input type="checkbox" id="readAll"><label for="readAll" style="margin:0;color:var(--ink)">อ่านรายการทั้ง '
+          + d.counts.total + ' ภาพข้างบนแล้ว</label></div>'
+        : '')
+    + '<div class="check"><input type="checkbox" id="confirm"><label for="confirm" style="margin:0;color:var(--ink)">'
+    + 'ยืนยันว่าข้อมูลชุดนี้ถูกต้อง และรับผิดชอบในนามที่พิมพ์ไว้ข้างบน — '
+    + esc(d.what_th) + '</label></div>'
+    + '<div class="row"><button id="approveBtn" class="go" type="button" disabled>อนุมัติ</button>'
+    + (allowed ? '<button id="revokeBtn" class="off" type="button">ถอนการอนุมัติ</button>' : '')
+    + '</div>'
+    + '<div id="msg"></div>'
+    + '<h3>ประวัติการแก้ไขและอนุมัติ</h3><div id="audit" class="audit">กำลังอ่าน…</div>';
+
+  $('detail').innerHTML = body;
+  autoSizeAll($('detail'));
+  markClean();
+  wireDetail();
+  paintMsg();
+  loadAudit();
+}
+
+function paintMsg() {
+  const box = $('msg');
+  if (!box) return;
+  if (!STATE.msg) { box.className = ''; box.textContent = ''; return; }
+  box.className = 'msg ' + STATE.msg.kind;
+  box.textContent = STATE.msg.text;
+}
+
+// A message has to outlive the re-render of the thing it is reporting on,
+// or a successful save leaves behind an empty box and the only coloured
+// feedback the operator ever sees is the red "ไม่มีอะไรเปลี่ยน" of pressing
+// save twice.
+function say(text, kind) {
+  STATE.msg = {text: text, kind: kind};
+  paintMsg();
+}
+
+function wireDetail() {
+  const d = STATE.detail;
+  wireQa();
+  const add = $('addFact');
+  if (add) add.onclick = () => {
+    const wrap = document.createElement('div');
+    wrap.className = 'fact';
+    wrap.innerHTML = '<label>หัวข้อ</label><input type="text" class="f-label">'
+      + '<label>เนื้อหา</label><textarea class="f-value"></textarea>';
+    $('facts').appendChild(wrap);
+    showDirty();
+  };
+
+  const stateCaveat = () => {
+    const box = $('stateCaveat');
+    const picked = STATE.states.find(s => s.value === $('state').value);
+    if (!picked) {
+      box.textContent = 'เลือกสถานะเนื้อหา แล้วบรรทัดนี้จะบอกว่า Emma ต้องพูดกำกับว่าอะไร';
+    } else if (picked.caveat_th) {
+      box.textContent = picked.value + ' — ' + picked.label_th
+        + '\nEmma จะถูกบังคับให้พูดกำกับทุกครั้งว่า: ' + picked.caveat_th;
+    } else {
+      box.textContent = picked.value + ' — ' + picked.label_th
+        + '\nไม่มีคำกำกับ Emma จะพูดข้อมูลชุดนี้เป็นเรื่องที่ยืนยันแล้ว เลือกข้อนี้เมื่อแน่ใจเท่านั้น';
+    }
+  };
+
+  const refresh = () => {
+    const ready = $('who').value.trim() !== '' && $('state').value !== ''
+      && $('confirm').checked && (!$('readAll') || $('readAll').checked);
+    $('approveBtn').disabled = !ready;
+    stateCaveat();
+  };
+  ['who', 'state', 'confirm', 'readAll'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('input', refresh);
+    if (el) el.addEventListener('change', refresh);
+  });
+  $('detail').addEventListener('input', (event) => {
+    autoSize(event.target);
+    showDirty();
+  });
+  refresh();
+  showDirty();
+
+  const save = $('saveBtn');
+  if (save) save.onclick = async () => {
+    const rows = editorValues() || [];
+    const body = {source_id: d.id, by: $('who').value};
+    if (d.editor === 'facts') body.facts = rows;
+    else if (d.editor === 'qa') Object.assign(body, qaBody());
+    else body.rules = rows.map(r => ({key: r.label, text: r.value}));
+    try {
+      const res = await post('/data-console/edit', body);
+      say(res.message_th + (res.changed ? ' (' + res.changed + ' รายการ)' : ''),
+          res.unchanged ? 'info' : 'ok');
+      await loadList();
+      await openSource(d.id);
+    } catch (err) { say(err.message, 'err'); }
+  };
+
+  $('approveBtn').onclick = async () => {
+    const dirty = unsavedFields();
+    if (dirty.length) {
+      say('มีข้อมูลที่ยังไม่บันทึก: ' + dirty.join(', ')
+        + '\nกด "บันทึกเนื้อหา" ก่อนอนุมัติ — ไม่อย่างนั้นสิ่งที่อนุมัติคือข้อความเดิมในไฟล์', 'err');
+      return;
+    }
+    try {
+      const res = await post('/data-console/approve', {
+        source_id: d.id,
+        by: $('who').value,
+        content_state: $('state').value,
+        confirm: true,
+      });
+      say(res.verdict.allowed
+        ? 'อนุมัติแล้ว Emma พูดข้อมูลชุดนี้กับลูกค้าได้'
+            + (res.caveat_th ? '\nและต้องพูดกำกับทุกครั้งว่า: ' + res.caveat_th : '')
+        : 'เขียนไฟล์แล้วแต่นโยบายยังไม่อนุญาต: ' + res.verdict.reason_th,
+        res.verdict.allowed ? 'ok' : 'err');
+      await loadList();
+      await openSource(d.id);
+    } catch (err) { say(err.message, 'err'); }
+  };
+
+  const revoke = $('revokeBtn');
+  if (revoke) revoke.onclick = async () => {
+    if (!confirm('ถอนการอนุมัติชุดนี้? เนื้อหาไม่ถูกลบ แต่ Emma จะกลับไปบอกว่าไม่มีข้อมูล')) return;
+    try {
+      await post('/data-console/revoke', {source_id: d.id, by: $('who').value, confirm: true});
+      say('ถอนการอนุมัติแล้ว Emma กลับไปบอกลูกค้าว่ายังไม่มีข้อมูล', 'ok');
+      await loadList();
+      await openSource(d.id);
+    } catch (err) { say(err.message, 'err'); }
+  };
+}
+
+async function loadAudit() {
+  // Filtered by the server. Asking for the last thirty lines of the whole
+  // trail and filtering them here told a twice-approved source that it had
+  // "ยังไม่มีประวัติ" as soon as thirty writes to other sources had happened
+  // since — on a page about accountability that is worse than no panel.
+  try {
+    const data = await api('/data-console/audit?limit=30&source_id='
+      + encodeURIComponent(STATE.current || ''));
+    $('audit').textContent = data.entries.length
+      ? data.entries.slice().reverse().map(e => e.at + '  ' + e.action + '  โดย ' + e.by
+          + '  (' + (e.changes || []).map(c => c.field).join(', ') + ')'
+          + (e.note ? '  ' + e.note : '')).join('\n')
+      : 'ยังไม่มีประวัติของแหล่งนี้';
+  } catch (err) {
+    $('audit').textContent = err.message;
+  }
+}
+
+loadList();
+</script>
+</body>
+</html>

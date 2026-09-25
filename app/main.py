@@ -44,6 +44,10 @@ ROBOT_HUD_PAGE = ROOT / "client" / "robot-hud.html"
 ROBOT_DRIVE_PAGE = ROOT / "client" / "robot-joystick.html"
 ROBOT_MAPVIEW_PAGE = ROOT / "client" / "robot-map.html"
 ROBOT_CONSOLE_PAGE = ROOT / "client" / "robot-console.html"
+#: The owner's approval desk (app/data_console.py). Separate page from the
+#: robot console on purpose: that one drives hardware, this one signs what
+#: Emma is allowed to say.
+DATA_CONSOLE_PAGE = ROOT / "client" / "data-console.html"
 #: The next-generation call screen (the glass-mascot design). Served at its
 #: own URL, deliberately separate from `/` (index.html) so the production
 #: gallery page is untouched while this one is finished and signed off.
@@ -1105,6 +1109,147 @@ async def serve_robot_console(request: Request, token: str = "") -> Response:
             headers=_NO_CACHE,
         )
     return FileResponse(ROBOT_CONSOLE_PAGE, headers=_NO_CACHE)
+
+
+# ---------------------------------------------------------------------------
+# The data console: read the source registry, edit the curated JSON, approve.
+#
+# Everything below delegates to `app/data_console.py`, which owns the rules
+# (deny by default, the server stamps the clock, a typed human name, one
+# audit line per write). These handlers only carry the token and turn a
+# `ConsoleError` into a status code with its Thai sentence intact — the page
+# shows the server's words rather than inventing its own, so a refusal can
+# never read as "something went wrong" when it means "type your name".
+# ---------------------------------------------------------------------------
+
+
+def _console_reply(call) -> Response:
+    from fastapi.responses import JSONResponse
+
+    from app.data_console import ConsoleError
+
+    try:
+        return JSONResponse(call())
+    except ConsoleError as exc:
+        return JSONResponse({"ok": False, "error": exc.message}, status_code=exc.status)
+
+
+async def _console_body(request: Request) -> dict:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    return body if isinstance(body, dict) else {}
+
+
+@app.get("/data-console")
+async def serve_data_console(request: Request, token: str = "") -> Response:
+    """The approval desk. Same local-navigation token bootstrap as /console:
+    a direct navigation from this machine may be handed the token, a
+    cross-site fetch may not (without the Sec-Fetch-Site check any page open
+    in the browser could read the redirect target through the permissive
+    CORS middleware and walk away with the LAN control token)."""
+    client_host = request.client.host if request.client else ""
+    fetch_site = request.headers.get("sec-fetch-site", "")
+    local_navigation = (
+        client_host in _LOOPBACK_HOSTS
+        and fetch_site in {"", "none", "same-origin"}
+    )
+    if not token and settings.ws_token and local_navigation:
+        return RedirectResponse(
+            "/data-console?token=" + quote(settings.ws_token, safe=""),
+            status_code=302,
+            headers=_NO_CACHE,
+        )
+    return FileResponse(DATA_CONSOLE_PAGE, headers=_NO_CACHE)
+
+
+@app.get("/data-console/sources")
+async def data_console_sources(token: str = "") -> Response:
+    from app import data_console
+
+    def run() -> dict:
+        data_console.require_token(token)
+        return data_console.overview(settings.project_id)
+
+    return _console_reply(run)
+
+
+@app.get("/data-console/source/{source_id}")
+async def data_console_source(source_id: str, token: str = "") -> Response:
+    from app import data_console
+
+    def run() -> dict:
+        data_console.require_token(token)
+        return data_console.detail(source_id, settings.project_id)
+
+    return _console_reply(run)
+
+
+@app.get("/data-console/audit")
+async def data_console_audit(token: str = "", limit: int = 50,
+                             source_id: str = "") -> Response:
+    """The trail, filtered on the server when a source is named: a page that
+    asks for the last N lines and filters them in the browser starts telling
+    a busy source it has no history."""
+    from app import data_console
+
+    def run() -> dict:
+        data_console.require_token(token)
+        return {"ok": True,
+                "entries": data_console.read_audit(max(1, min(500, limit)), source_id)}
+
+    return _console_reply(run)
+
+
+# The three write routes take their token from the JSON body only. A GET
+# already puts it in the query string the same way `/console` and
+# `/unit_price` do, but a write does not have to: WS_TOKEN is the same
+# credential that guards `/ws`, which drives the robot and opens programs on
+# this machine, and uvicorn's access log writes every request line verbatim.
+# "POST /data-console/approve?token=..." in whatever the sales-room box
+# redirects stdout to is the control token sitting in a log file forever.
+@app.post("/data-console/edit")
+async def data_console_edit(request: Request) -> Response:
+    from app import data_console
+
+    body = await _console_body(request)
+
+    def run() -> dict:
+        data_console.require_token(body.get("token"))
+        return data_console.edit(str(body.get("source_id") or ""),
+                                 settings.project_id, body)
+
+    return _console_reply(run)
+
+
+@app.post("/data-console/approve")
+async def data_console_approve(request: Request) -> Response:
+    from app import data_console
+
+    body = await _console_body(request)
+
+    def run() -> dict:
+        data_console.require_token(body.get("token"))
+        return data_console.approve(str(body.get("source_id") or ""),
+                                    settings.project_id, body)
+
+    return _console_reply(run)
+
+
+@app.post("/data-console/revoke")
+async def data_console_revoke(request: Request) -> Response:
+    from app import data_console
+
+    body = await _console_body(request)
+
+    def run() -> dict:
+        data_console.require_token(body.get("token"))
+        return data_console.revoke(str(body.get("source_id") or ""),
+                                   settings.project_id, body)
+
+    return _console_reply(run)
+
 
 
 @app.get("/android/state")
