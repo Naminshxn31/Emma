@@ -274,3 +274,34 @@ def test_what_the_agent_writes_on_a_room_pc_never_reaches_the_repo():
         # exit 0 == ignored. Anything else and a screenshot of a sales desk is
         # one `git add -A` away from the history.
         assert result.returncode == 0, written
+
+
+def test_the_agent_reads_the_env_file_sitting_next_to_it():
+    """Every other module here gets load_dotenv() for free by importing
+    app.config. This one does not import it -- app.tools registers Emma's tools
+    as a side effect, so the capabilities reach for it late -- which meant the
+    settings were read from an environment nothing had populated.
+
+    A room PC then started on the default port, unnamed, with no token and
+    every action refused, while its own .env said otherwise two lines away. The
+    boot banner was honest about the state and said nothing about the cause.
+    Caught by running a built room package rather than exporting the variables
+    by hand (2026-09-25).
+    """
+    from pathlib import Path
+
+    import re
+
+    source = Path(room_agent.__file__).read_text(encoding="utf-8")
+    # Both sides of this comparison have to be the CODE, never a mention of it.
+    # The first draft searched for the plain text "load_dotenv(" and matched the
+    # comment above the call explaining why it is there, which sits above
+    # everything -- so the test passed with the call moved to the bottom, which
+    # is exactly the broken version. Proven by moving it and watching it stay
+    # green. A module-level call starts its own line at column 0.
+    load = re.search(r"^load_dotenv\(", source, re.M)
+    assert load, "nothing loads this machine's .env any more"
+    for setting in ("ROOM_AGENT_TOKEN", "ROOM_AGENT_ALLOW", "ROOM_AGENT_PORT"):
+        read = re.search(r'(?:os\.getenv|_list)\(\s*"%s"' % setting, source)
+        assert read, f"nothing reads {setting} any more"
+        assert load.start() < read.start(), f"{setting} is read before .env is loaded"

@@ -99,6 +99,11 @@ data/personal-docs/
 #   python scripts/fetch_face_model.py
 data/faces/
 
+# Which machine is in which room, and the token for each (scripts/room_control.py).
+# One shared secret per sales-room PC. A token in the history is a token that has
+# to be changed on every machine it was ever used on.
+data/rooms.json
+
 # What the room agent writes on the machine it runs on (app/room_agent.py):
 # full-desktop screenshots and a per-day action log. The screenshots are
 # whatever was on a sales-room monitor at that moment -- a customer's details,

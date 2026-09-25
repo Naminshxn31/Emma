@@ -50,6 +50,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -57,15 +58,47 @@ logger = logging.getLogger("room_agent")
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Read this machine's .env BEFORE any of the settings below.
+#
+# Everywhere else in this repo the .env is read on the way through app.config,
+# and that is enough because everything else imports app.config. This module
+# deliberately does not: importing app.tools registers Emma's tools as a side
+# effect, so the capabilities reach for it late. The result was a room agent
+# that read its settings from an environment nothing had populated -- it came
+# up on the default port, unnamed, tokenless and refusing everything, while a
+# file two lines away said otherwise. The boot banner was honest about the
+# state and silent about the cause, so it read as "configured wrong" rather
+# than "the file was never opened". Caught 2026-09-25 by starting a built room
+# package instead of exporting the variables by hand.
+load_dotenv(ROOT / ".env")
+
 #: Which room this machine is. Free text, but it is what the server's routing
 #: table will match on, so it has to be the same string in both places.
 ROOM_NAME = os.getenv("ROOM_AGENT_NAME", "").strip()
 #: Shared secret, one per machine. Blank = refuse everything.
 ROOM_TOKEN = os.getenv("ROOM_AGENT_TOKEN", "").strip()
-#: Which capabilities this room turns on. Empty = none.
-ALLOW: set[str] = {a.strip().lower() for a in os.getenv("ROOM_AGENT_ALLOW", "").split(",") if a.strip()}
-#: What this room may open or close, by name, lower-case.
-PROGRAMS: set[str] = {p.strip().lower() for p in os.getenv("ROOM_AGENT_PROGRAMS", "").split(",") if p.strip()}
+
+
+def _list(var: str) -> set[str]:
+    return {x.strip().lower() for x in os.getenv(var, "").split(",") if x.strip()}
+
+
+#: Written on a list to mean "do not check this list". Owner, 2026-09-25:
+#: "ทำได้ทั้งหมดก่อน ขอแค่เข้าไปควบคุมได้ก่อน" -- so it exists, but as a word
+#: somebody typed on purpose, not as the value that arrives by forgetting.
+#: Empty is still the default and the boot banner says out loud when a list is
+#: open. It does NOT reach ROOM_AGENT_INPUT: keyboard and mouse stay their own
+#: line, because the reason that switch is separate -- one misheard word
+#: becomes keystrokes on a real machine -- is just as true in a room where
+#: everything else is allowed.
+OPEN_LIST = {"all", "*"}
+
+#: Which capabilities this room turns on. Empty = none. `all` = the catalogue.
+ALLOW: set[str] = _list("ROOM_AGENT_ALLOW")
+#: What this room may open or close, by name, lower-case. `all` hands the
+#: decision to the Start Menu, which is the wide setting the "git cmd" incident
+#: in this file's header is about.
+PROGRAMS: set[str] = _list("ROOM_AGENT_PROGRAMS")
 #: The second switch for general keyboard/mouse control.
 INPUT_ENABLED = os.getenv("ROOM_AGENT_INPUT", "").strip().lower() in {"1", "true", "yes", "on"}
 HOST = os.getenv("ROOM_AGENT_HOST", "127.0.0.1").strip() or "127.0.0.1"
@@ -265,8 +298,19 @@ def _computer(attr: str) -> Callable[..., Any]:
     """
 
     def call(**kwargs):
-        from app.tools import computer
-
+        try:
+            from app.tools import computer
+        except Exception as exc:                  # pragma: no cover - deployment shape
+            # A room PC needs app/ AND two data files: app.tools.__init__ imports
+            # app.config, which resolves paths through data/registry/source_registry.json
+            # at import time and reaches data/projects/<id>/project.json from there.
+            # Because THIS import is late, a machine missing them boots perfectly,
+            # answers /health and runs list_windows, then fails the first time
+            # somebody says "open the browser". Measured on a bare copy 2026-09-25.
+            logger.error("delegated capability %s is unavailable: %s", attr, exc)
+            return {"ok": False, "error": "this machine is not fully installed",
+                    "detail": f"{attr}: {exc}",
+                    "instruction": "เครื่องในห้องนี้ติดตั้งไม่ครบ ให้บอกตรงๆ ห้ามบอกว่าทำแล้ว"}
         return getattr(computer, attr)(**kwargs)
 
     return call
@@ -337,7 +381,7 @@ async def run_action(action: str, args: dict[str, Any]) -> dict:
         return {"ok": False, "error": "unknown action", "known": sorted(CAPABILITIES)}
     # Enabled first: a capability this room did not turn on must not even
     # reveal whether its arguments were right.
-    if name not in ALLOW:
+    if name not in ALLOW and not (ALLOW & OPEN_LIST):
         return {"ok": False, "error": "not enabled here", "enabled": sorted(ALLOW),
                 "instruction": "ห้องนี้ยังไม่ได้เปิดความสามารถนี้ ให้บอกตรงๆ ห้ามบอกว่าทำแล้ว"}
     if cap.risk == "input" and not INPUT_ENABLED:
@@ -350,7 +394,7 @@ async def run_action(action: str, args: dict[str, Any]) -> dict:
 
     if cap.program_arg:
         wanted = str(args.get(cap.program_arg, "")).strip().lower()
-        if wanted not in PROGRAMS:
+        if wanted not in PROGRAMS and not (PROGRAMS & OPEN_LIST):
             return {"ok": False, "error": "program not allowed here", "allowed": sorted(PROGRAMS),
                     "instruction": "ห้องนี้ยังไม่ได้อนุญาตโปรแกรมนี้ ให้บอกตรงๆ ห้ามบอกว่าเปิดแล้ว"}
 
@@ -375,7 +419,9 @@ def create_app() -> FastAPI:
             "ok": True,
             "room": ROOM_NAME,
             "armed": bool(ROOM_TOKEN),
-            "enabled": sorted(ALLOW & set(CAPABILITIES)),
+            "enabled": sorted(CAPABILITIES) if (ALLOW & OPEN_LIST) else sorted(ALLOW & set(CAPABILITIES)),
+            "everything_enabled": bool(ALLOW & OPEN_LIST),
+            "any_program": bool(PROGRAMS & OPEN_LIST),
             "catalogue": {n: {"risk": c.risk, "what": c.what} for n, c in sorted(CAPABILITIES.items())},
             "programs": sorted(PROGRAMS),
             "input_control": INPUT_ENABLED,
@@ -421,14 +467,30 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
     logger.info("room agent: room=%r", ROOM_NAME or "(unnamed)")
-    logger.info("room agent: enabled=%s", ",".join(sorted(ALLOW)) or "(none — every action will be refused)")
-    logger.info("room agent: programs=%s", ",".join(sorted(PROGRAMS)) or "(none)")
+    if ALLOW & OPEN_LIST:
+        logger.warning("EVERY capability in the catalogue is enabled here (%d of them).", len(CAPABILITIES))
+    else:
+        logger.info("room agent: enabled=%s", ",".join(sorted(ALLOW)) or "(none — every action will be refused)")
+    if PROGRAMS & OPEN_LIST:
+        logger.warning("ANY program the Start Menu can find may be started from the network.")
+    else:
+        logger.info("room agent: programs=%s", ",".join(sorted(PROGRAMS)) or "(none)")
     if not ROOM_TOKEN:
         logger.warning("ROOM_AGENT_TOKEN is not set — every command will be refused.")
     if INPUT_ENABLED:
         logger.warning("ROOM_AGENT_INPUT is on — this machine accepts typing and clicking from the network.")
     if HOST not in {"127.0.0.1", "localhost"}:
         logger.warning("listening on %s — keep it on the LAN and keep the token secret.", HOST)
+    # Say at BOOT whether the delegated half of the catalogue can run here, for
+    # the reason in `_computer`: those capabilities import late, so an
+    # incomplete copy starts clean and the answer arrives in front of a customer.
+    try:
+        from app.tools import computer  # noqa: F401
+    except Exception as exc:
+        logger.error("NOT fully installed: %s", exc)
+        logger.error("these will refuse until app/ and data/ are complete: %s",
+                     ", ".join(n for n, c in sorted(CAPABILITIES.items())
+                               if c.run.__qualname__.startswith("_computer")))
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")
 
 
