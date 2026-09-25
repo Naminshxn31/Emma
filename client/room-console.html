@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emma · แผงคุมห้อง</title>
+<style>
+  :root {
+    --bg: #0b0f16; --panel: #131a26; --line: #26324a; --ink: #e7eefb;
+    --dim: #8fa2c0; --accent: #4aa3ff; --ok: #43c98b; --bad: #e2685f; --warn: #f0c46a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 'Segoe UI', 'Noto Sans Thai', system-ui, sans-serif; }
+  header { display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    padding: 12px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: .01em; }
+  select, button, input { font: inherit; color: var(--ink); }
+  select, input[type=text] { background: #0c1420; border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #55606f; display: inline-block; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.off { background: var(--bad); }
+  .status { color: var(--dim); font-size: 13px; }
+  main { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 16px; padding: 16px; }
+  @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .screenwrap { position: relative; background: #05080d; border-radius: 10px; overflow: hidden;
+    min-height: 240px; display: flex; align-items: center; justify-content: center; }
+  #screen { max-width: 100%; display: block; cursor: crosshair; }
+  #screen.noclick { cursor: default; }
+  .screenmsg { color: var(--dim); padding: 40px; text-align: center; }
+  .screenbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .screenbar label { font-size: 13px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
+  button { background: #1b2536; border: 1px solid var(--line); border-radius: 9px;
+    padding: 8px 12px; cursor: pointer; transition: .12s; }
+  button:hover { border-color: var(--accent); }
+  button:active { transform: translateY(1px); }
+  button.go { background: #16324f; border-color: #2b6aa8; }
+  button.danger { border-color: #6b3630; }
+  button.danger:hover { border-color: var(--bad); }
+  .group { margin-bottom: 14px; }
+  .group h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row.stack { flex-direction: column; }
+  .input-lock { opacity: .55; }
+  .hint { font-size: 12px; color: var(--dim); margin-top: 6px; }
+  #log { height: 150px; overflow: auto; background: #0a111c; border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px; font: 12px/1.5 ui-monospace, Consolas, monospace; color: #b9c7dd; }
+  #log .ok { color: var(--ok); } #log .bad { color: var(--bad); } #log .t { color: #6c7c96; }
+  #windows { max-height: 180px; overflow: auto; font-size: 12px; color: #c5d2e6; }
+  #windows div { padding: 3px 6px; border-bottom: 1px solid #1a2333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<header>
+  <h1>แผงคุมห้อง</h1>
+  <select id="room" title="เลือกห้อง"></select>
+  <span><span class="dot" id="dot"></span> <span class="status" id="status">—</span></span>
+  <span style="flex:1"></span>
+  <span class="status" id="caps"></span>
+</header>
+
+<main>
+  <section class="card">
+    <div class="screenbar">
+      <button class="go" id="grab">ถ่ายจอ</button>
+      <label><input type="checkbox" id="live"> ดูสด</label>
+      <label>ทุก <select id="ivl"><option value="1000">1 วิ</option><option value="2000" selected>2 วิ</option><option value="4000">4 วิ</option></select></label>
+      <label><input type="checkbox" id="clickmode"> คลิกบนจอ = สั่งเมาส์</label>
+    </div>
+    <div class="screenwrap">
+      <img id="screen" alt="" hidden>
+      <div class="screenmsg" id="screenmsg">เลือกห้องแล้วกด “ถ่ายจอ” · ต้องเปิดความสามารถ <code>screen</code> ที่เครื่องนั้น</div>
+    </div>
+    <div class="hint">คลิกบนจอเพื่อสั่งเมาส์ ต้องติ๊ก “คลิกบนจอ” และเครื่องนั้นเปิด <code>ROOM_AGENT_INPUT=true</code></div>
+  </section>
+
+  <section class="card">
+    <div class="group">
+      <h3>ดู</h3>
+      <div class="row">
+        <button data-act="list_windows">รายชื่อหน้าต่าง</button>
+        <button data-act="screenshot">บันทึกภาพจอ(ที่เครื่องนั้น)</button>
+      </div>
+      <div id="windows"></div>
+    </div>
+    <div class="group">
+      <h3>จอ &amp; เครื่อง</h3>
+      <div class="row">
+        <button data-act="monitor" data-args='{"state":"off"}'>ปิดจอ</button>
+        <button data-act="monitor" data-args='{"state":"on"}'>เปิดจอ</button>
+        <button class="danger" data-act="lock_screen">ล็อกหน้าจอ</button>
+      </div>
+    </div>
+    <div class="group">
+      <h3>มีเดีย &amp; สไลด์</h3>
+      <div class="row">
+        <button data-act="media_control" data-args='{"action":"playpause"}'>เล่น/หยุด</button>
+        <button data-act="media_control" data-args='{"action":"volumedown"}'>เสียง −</button>
+        <button data-act="media_control" data-args='{"action":"volumeup"}'>เสียง +</button>
+        <button data-act="press_key" data-args='{"key":"previous_slide"}'>สไลด์ ◀</button>
+        <button data-act="press_key" data-args='{"key":"next_slide"}'>สไลด์ ▶</button>
+      </div>
+    </div>
+    <div class="group">
+      <h3>เว็บ / โปรแกรม</h3>
+      <div class="row">
+        <button id="openurl">เปิดเว็บ…</button>
+        <button id="openprog">เปิดโปรแกรม…</button>
+      </div>
+    </div>
+    <div class="group input-lock" id="inputgroup">
+      <h3>พิมพ์ (ต้องเปิด input)</h3>
+      <div class="row stack">
+        <input type="text" id="typetext" placeholder="ข้อความที่จะพิมพ์บนเครื่องนั้น">
+        <button id="typebtn">พิมพ์</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div style="padding: 0 16px 16px"><div id="log"></div></div>
+
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var roomSel = $('room'), img = $('screen'), msg = $('screenmsg');
+  var realW = 0, realH = 0, liveTimer = null, lastUrl = null;
+
+  function room() { return roomSel.value; }
+  function enc(s) { return encodeURIComponent(s); }
+
+  function log(msg, cls) {
+    var d = document.createElement('div');
+    var t = new Date().toLocaleTimeString();
+    d.innerHTML = '<span class="t">' + t + '</span> ' + (cls ? '<span class="' + cls + '">' : '') +
+      msg.replace(/</g, '&lt;') + (cls ? '</span>' : '');
+    $('log').prepend(d);
+  }
+
+  async function loadRooms() {
+    try {
+      var r = await fetch('/rooms'); var d = await r.json();
+      roomSel.innerHTML = '';
+      (d.rooms || []).forEach(function (name) {
+        var o = document.createElement('option'); o.value = name; o.textContent = name; roomSel.appendChild(o);
+      });
+      if (!d.rooms || !d.rooms.length) { log(d.error || 'ยังไม่มีห้องใน rooms.json', 'bad'); }
+      else health();
+    } catch (e) { log('โหลดรายชื่อห้องไม่ได้: ' + e, 'bad'); }
+  }
+
+  async function health() {
+    $('status').textContent = 'กำลังเช็ก…'; $('dot').className = 'dot';
+    try {
+      var r = await fetch('/health?room=' + enc(room())); var d = await r.json();
+      if (d.ok) {
+        $('dot').className = 'dot on';
+        $('status').textContent = d.room + ' · ต่อได้';
+        var en = d.enabled || [];
+        $('caps').textContent = en.length + '/' + Object.keys(d.catalogue || {}).length + ' ความสามารถ' +
+          (d.input_control ? ' · input เปิด' : ' · input ปิด');
+        $('inputgroup').classList.toggle('input-lock', !d.input_control);
+        var hasScreen = en.indexOf('screen') >= 0;
+        if (!hasScreen) msg.textContent = 'ห้องนี้ยังไม่ได้เปิดความสามารถ screen (ถ่ายจอสด)';
+      } else {
+        $('dot').className = 'dot off';
+        $('status').textContent = d.error || 'ต่อไม่ได้';
+        $('caps').textContent = '';
+      }
+    } catch (e) { $('dot').className = 'dot off'; $('status').textContent = 'ต่อไม่ได้'; }
+  }
+
+  async function grab() {
+    if (!room()) return;
+    try {
+      var r = await fetch('/screen?room=' + enc(room()) + '&t=' + Date.now());
+      if (!r.ok) {
+        var e = await r.json().catch(function () { return {}; });
+        img.hidden = true; msg.hidden = false;
+        msg.textContent = 'ดูจอไม่ได้: ' + (e.error || r.status);
+        return;
+      }
+      var size = (r.headers.get('X-Screen-Size') || '').split(',').map(Number);
+      if (size.length === 2 && size[0]) { realW = size[0]; realH = size[1]; }
+      var blob = await r.blob();
+      var url = URL.createObjectURL(blob);
+      img.src = url; img.hidden = false; msg.hidden = true;
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = url;
+    } catch (e) { log('ถ่ายจอไม่ได้: ' + e, 'bad'); }
+  }
+
+  function setLive(on) {
+    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    if (on) { grab(); liveTimer = setInterval(grab, parseInt($('ivl').value, 10)); }
+  }
+
+  async function act(action, args) {
+    if (!room()) return;
+    try {
+      var r = await fetch('/do', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ room: room(), action: action, args: args || {} }) });
+      var d = await r.json();
+      if (d.ok) {
+        log('✓ ' + action + (args ? ' ' + JSON.stringify(args) : ''), 'ok');
+        if (action === 'list_windows') showWindows(d.windows || []);
+      } else {
+        log('✗ ' + action + ' — ' + (d.error || '') + (d.instruction ? ' (' + d.instruction + ')' : ''), 'bad');
+      }
+      return d;
+    } catch (e) { log('✗ ' + action + ' — ' + e, 'bad'); }
+  }
+
+  function showWindows(list) {
+    var box = $('windows'); box.innerHTML = '';
+    list.forEach(function (w) { var d = document.createElement('div'); d.textContent = w; box.appendChild(d); });
+  }
+
+  // capability buttons
+  document.querySelectorAll('button[data-act]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var args = b.getAttribute('data-args'); act(b.getAttribute('data-act'), args ? JSON.parse(args) : {});
+    });
+  });
+  $('openurl').addEventListener('click', function () {
+    var u = prompt('เปิดเว็บอะไรบนเครื่องนั้น (http/https)'); if (u) act('open_in_browser', { url: u });
+  });
+  $('openprog').addEventListener('click', function () {
+    var p = prompt('เปิดโปรแกรมชื่ออะไร (ต้องอยู่ใน ROOM_AGENT_PROGRAMS ของห้องนั้น)'); if (p) act('open_program', { name: p });
+  });
+  $('typebtn').addEventListener('click', function () {
+    var t = $('typetext').value; if (t) act('type_text', { text: t });
+  });
+
+  // click on the live screen -> real mouse click
+  img.addEventListener('click', function (e) {
+    if (!$('clickmode').checked || !realW) return;
+    var rect = img.getBoundingClientRect();
+    var x = Math.round((e.clientX - rect.left) / rect.width * realW);
+    var y = Math.round((e.clientY - rect.top) / rect.height * realH);
+    act('mouse_click', { x: x, y: y });
+  });
+  $('clickmode').addEventListener('change', function () { img.classList.toggle('noclick', !this.checked); });
+
+  $('grab').addEventListener('click', grab);
+  $('live').addEventListener('change', function () { setLive(this.checked); });
+  $('ivl').addEventListener('change', function () { if ($('live').checked) setLive(true); });
+  roomSel.addEventListener('change', function () { setLive(false); $('live').checked = false; showWindows([]); health(); });
+
+  img.classList.add('noclick');
+  loadRooms();
+</script>
+</body>
+</html>

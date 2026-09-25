@@ -227,6 +227,38 @@ def screenshot() -> dict:
         return {"ok": False, "error": "screenshot failed"}
 
 
+def screen() -> dict:
+    """Return the current screen as a base64 JPEG, for the operator's console.
+
+    Deliberately the opposite of `screenshot`: that one saves to disk and returns
+    only a path, because a saved grab of a sales desk is a record nobody chose to
+    keep. This one SENDS the image, so a person watching the control panel can see
+    the room PC live. That is the owner looking at their own machine over the LAN,
+    and the room token is the gate. Downscaled and JPEG so it is light enough to
+    poll a few times a second; the real resolution is reported in `size`.
+    """
+    try:
+        from PIL import ImageGrab
+    except Exception:
+        return _unsupported("screen (PIL not installed)")
+    try:
+        import base64
+        import io as _io
+
+        image = ImageGrab.grab()
+        real = list(image.size)
+        max_w = 1366
+        if image.width > max_w:
+            image = image.resize((max_w, round(image.height * max_w / image.width)))
+        buf = _io.BytesIO()
+        image.convert("RGB").save(buf, format="JPEG", quality=55)
+        return {"ok": True, "jpeg_base64": base64.b64encode(buf.getvalue()).decode("ascii"),
+                "size": real}
+    except Exception:
+        logger.exception("screen grab failed")
+        return {"ok": False, "error": "screen grab failed"}
+
+
 def lock_screen() -> dict:
     if not WINDOWS:
         return _unsupported("lock_screen")
@@ -336,6 +368,7 @@ class Capability:
 CAPABILITIES: dict[str, Capability] = {
     "list_windows": Capability(list_windows, risk="read", what="รายชื่อหน้าต่างที่เปิดอยู่"),
     "screenshot": Capability(screenshot, risk="read", what="เก็บภาพหน้าจอไว้ในเครื่องนั้น"),
+    "screen": Capability(screen, risk="read", what="ภาพหน้าจอสดส่งกลับมาดูที่แผงคุม"),
     "open_program": Capability(_computer("open_program"), args=("name",), program_arg="name",
                                what="เปิดโปรแกรมในรายการของห้อง"),
     "close_program": Capability(_computer("close_program"), args=("name",), program_arg="name",

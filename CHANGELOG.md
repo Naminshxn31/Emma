@@ -1,5 +1,24 @@
 # ประวัติการเปลี่ยนแปลง
 
+## 2026-09-25 — แผงคุมบนเว็บ: เลือกห้อง เห็นจอสด กดปุ่มสั่ง
+
+- ขอบเขต: `room_console_server.py` (ใหม่), `client/room-console.html` (ใหม่),
+  `app/room_agent.py` (+capability `screen`), `tests/test_room_console.py` (7 ใหม่),
+  `tests/test_room_agent.py` (+1, แก้ catalogue), `docs/...`
+- เจ้าของ: "สร้างโปรแกรมสำหรับคุมหน่อย จะเอามาดู" — หน้าเว็บควบคุมแทนบรรทัดคำสั่ง
+- **capability `screen` ใหม่** ส่งภาพจอกลับมาเป็น base64 JPEG (ย่อ 1366px, quality 55) ให้แผงคุมดูสด
+  — **ต่างจาก `screenshot` โดยตั้งใจ**: อันนั้นเซฟลงดิสก์คืนแค่ path (ภาพโต๊ะขายมีชื่อลูกค้า ไม่ส่งออก)
+  อันนี้ส่งภาพ เพราะเจ้าของดูจอเครื่องตัวเองผ่าน LAN · risk=read เปิด/ปิดด้วย ALLOW เหมือนกัน
+- **`room_console_server.py`** FastAPI แยกต่างหาก (นอก `app/` เหมือน run_room_agent) proxy ผ่าน
+  `scripts/room_control` → ได้กติกาเดิม (รายชื่อชัดเจน, token ต่อห้อง, ไม่รู้ห้องไม่เดา) ·
+  bind 127.0.0.1 default (หน้าที่สั่งคอมได้ต้องเปิดจากเครื่องตัวเองเท่านั้น) · endpoint:
+  `/rooms` `/health` `/do` `/screen` (คืน image/jpeg ให้ `<img>` โชว์ตรงๆ)
+- **UI** เลือกห้อง, สถานะ, ดูจอสด (poll 1-4 วิ), ปุ่มความสามารถ, คลิกบนจอ→map พิกัดจริง→mouse_click,
+  พิมพ์ข้อความ · ส่วน input (พิมพ์/คลิก) จางไว้เมื่อเครื่องนั้นปิด input
+- **ทดสอบจริง**: เปิด console แล้ว proxy ไป B ได้ — `/rooms`, `/health` (ok), `/do list_windows`
+  (26 หน้าต่างจริงบน B) · `/screen` คืน 502 เพราะ B ยังเป็น agent เก่า (ต้องลงใหม่ให้มี `screen`)
+- เทสต์: room ทั้งชุด 63 ผ่าน · console แยกจาก Emma (เทสต์สแกน app/ กันไว้)
+
 ## 2026-09-25 — คุมเครื่อง B ผ่าน LAN ได้จริง + แก้ 5 บั๊กที่เจอตอนรันจริง/red-team
 
 - ขอบเขต: `scripts/make_room_package.py` (install.cmd: task principal, pip check, pillow, icacls),

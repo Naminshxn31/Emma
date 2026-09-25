@@ -222,7 +222,8 @@ def test_the_catalogue_and_its_risk_labels_stay_honest():
         assert cap.what, name
     assert {n for n, c in room_agent.CAPABILITIES.items() if c.risk == "input"} == {"type_text", "mouse_click"}
     # The read-only ones must not be able to change anything by definition.
-    assert {n for n, c in room_agent.CAPABILITIES.items() if c.risk == "read"} == {"list_windows", "screenshot"}
+    assert {n for n, c in room_agent.CAPABILITIES.items() if c.risk == "read"} == {
+        "list_windows", "screenshot", "screen"}
 
 
 def test_every_listed_action_exists_on_the_machine_side(agent):
@@ -320,3 +321,19 @@ def test_the_agent_logs_to_a_file_when_run_headless():
     assert "_redirect_output_when_headless" in src
     assert "pythonw" in src and "agent.log" in src
     assert src.index("_redirect_output_when_headless()") < src.index("from app.room_agent import main")
+
+
+def test_the_screen_capability_returns_an_image_for_the_console():
+    """`screen` is the console's live view: unlike `screenshot` (saves to disk,
+    returns a path) it returns the frame as base64 JPEG so the operator can watch
+    the room PC. Read-risk, and gated like everything else."""
+    cap = room_agent.CAPABILITIES.get("screen")
+    assert cap is not None and cap.risk == "read"
+    result = room_agent.screen()
+    # On a machine with a display + Pillow it returns an image; on a headless CI
+    # box it returns a clean "unsupported" -- never a crash, and never a path.
+    assert "saved" not in result
+    if result.get("ok"):
+        assert result["jpeg_base64"] and isinstance(result["size"], list)
+    else:
+        assert result.get("error") or result.get("detail")
