@@ -43,9 +43,112 @@ TREES = ("app",)
 DATA = ("data/registry/source_registry.json",)
 
 START_CMD = """@echo off
-REM Start Emma's room agent on this PC. Leave this window open.
+REM Start Emma's room agent on this PC IN THE FOREGROUND. Leave this window open.
+REM This is the visible way, for a first test. install.cmd is the real setup:
+REM it runs the agent in the background and brings it back at every logon.
 cd /d "%~dp0"
 python run_room_agent.py
+pause
+"""
+
+# The one-file setup. Owner asked for "a single file, everything runs in the
+# background" -- so this installs to a normal program folder, starts the agent
+# with no console window, and brings it back at every logon.
+#
+# "Background" here means "no window, runs as a service", NOT "concealed". It is
+# deliberately the OPPOSITE of hidden: a fixed, standard location
+# (C:\ProgramData\EmmaRoomAgent), a named Task Scheduler entry (EmmaRoomAgent),
+# an ordinary pythonw.exe process in Task Manager, and an uninstall.cmd beside
+# it. A service that can drive a PC has to be findable and stoppable by whoever
+# owns that PC -- that is the line between an IT agent and a backdoor, and it is
+# the same reason the token fails closed and the screenshots never leave the box.
+#
+# Console messages are ASCII on purpose: a UTF-8 BOM breaks batch, and the cmd
+# console renders Thai poorly, so an installer that talked Thai would show boxes
+# and read as broken. The chat stays Thai; this technical console does not.
+#
+# Runs as the LOGGED-IN user at limited privilege, not as admin or SYSTEM: the
+# GUI capabilities (screenshot, focus a window, media keys) only work inside the
+# interactive desktop session, which SYSTEM/session-0 does not have. The
+# installer needs admin (firewall + ProgramData + task); the agent itself does
+# not, and should not have it.
+INSTALL_CMD = """@echo off
+setlocal enableextensions
+title Emma Room Agent installer
+
+REM Needs admin: a firewall rule, C:\\ProgramData, and a scheduled task.
+net session >nul 2>&1
+if errorlevel 1 (
+  echo Approve the prompt to run this as administrator...
+  powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+  exit /b
+)
+
+set "SRC=%~dp0"
+set "DEST=C:\\ProgramData\\EmmaRoomAgent"
+echo Installing Emma Room Agent to %DEST%
+
+where pythonw >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo Python was not found on this PC. Install it, then run this file again:
+  echo   https://www.python.org/downloads/   (tick "Add python.exe to PATH")
+  echo.
+  pause
+  exit /b 1
+)
+
+echo Copying files...
+xcopy "%SRC%app" "%DEST%\\app" /e /i /y /q >nul
+xcopy "%SRC%data" "%DEST%\\data" /e /i /y /q >nul
+copy /y "%SRC%run_room_agent.py" "%DEST%\\" >nul
+copy /y "%SRC%.env" "%DEST%\\" >nul
+
+echo Installing Python packages...
+python -m pip install --quiet --disable-pip-version-check fastapi uvicorn python-dotenv
+
+REM Read the port from the .env that travelled with this package.
+set "PORT=8777"
+for /f "usebackq tokens=1,* delims==" %%A in ("%DEST%\\.env") do if /i "%%A"=="ROOM_AGENT_PORT" set "PORT=%%B"
+netsh advfirewall firewall delete rule name="Emma Room Agent" >nul 2>&1
+netsh advfirewall firewall add rule name="Emma Room Agent" dir=in action=allow protocol=TCP localport=%PORT% >nul
+echo Opened inbound TCP port %PORT%.
+
+REM Auto-start at logon, no window, as the ordinary (non-admin) user.
+for /f "delims=" %%P in ('where pythonw') do set "PYW=%%P"
+powershell -NoProfile -Command "Register-ScheduledTask -TaskName 'EmmaRoomAgent' -Force -RunLevel Limited -Action (New-ScheduledTaskAction -Execute '%PYW%' -Argument '\\"%DEST%\\run_room_agent.py\\"' -WorkingDirectory '%DEST%') -Trigger (New-ScheduledTaskTrigger -AtLogOn)" >nul
+echo Registered auto-start (Task Scheduler entry: EmmaRoomAgent).
+
+REM Start it now, in the background, no window.
+start "" /d "%DEST%" "%PYW%" run_room_agent.py
+echo Started in the background.
+
+echo.
+echo Done. This PC's address(es) on the LAN:
+powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -like '192.168.*'}).IPAddress"
+echo.
+echo It now starts at every logon with no window.
+echo Installed at %DEST% -- shown in Task Scheduler as EmmaRoomAgent.
+echo To stop and remove it: run uninstall.cmd
+echo.
+pause
+"""
+
+UNINSTALL_CMD = """@echo off
+setlocal
+net session >nul 2>&1
+if errorlevel 1 (
+  powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+  exit /b
+)
+set "DEST=C:\\ProgramData\\EmmaRoomAgent"
+echo Stopping Emma Room Agent...
+schtasks /end /tn "EmmaRoomAgent" >nul 2>&1
+schtasks /delete /f /tn "EmmaRoomAgent" >nul 2>&1
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"Name='pythonw.exe'\\" | Where-Object { $_.CommandLine -like '*run_room_agent.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
+netsh advfirewall firewall delete rule name="Emma Room Agent" >nul 2>&1
+echo Removed the scheduled task and the firewall rule.
+echo Files remain at %DEST% -- delete that folder to remove them completely.
 pause
 """
 
@@ -94,7 +197,13 @@ def build(room: str, out: Path, host: str, port: int, allow: str,
         "# Keyboard and mouse stay off unless this says true, even when ALLOW=all.\n"
         "ROOM_AGENT_INPUT=false\n",
         encoding="utf-8")
-    (out / "start-room-agent.cmd").write_text(START_CMD, encoding="utf-8")
+    # .cmd files: ASCII + CRLF, and never a BOM (batch chokes on a BOM on the
+    # first line). encode("ascii") makes a stray non-ASCII character fail here,
+    # in the build, rather than as a mojibake line on the room PC.
+    for name, body in (("start-room-agent.cmd", START_CMD),
+                       ("install.cmd", INSTALL_CMD),
+                       ("uninstall.cmd", UNINSTALL_CMD)):
+        (out / name).write_bytes(body.replace("\n", "\r\n").encode("ascii"))
 
     assert not (out / ".env.example").exists()
     leaked = [p for p in out.rglob("*") if p.is_file() and p.name == ".env" and p.parent != out]
@@ -120,16 +229,17 @@ def main(argv: list[str] | None = None) -> int:
     built = build(args.room, args.out, args.host, args.port, args.allow, args.programs, args.token)
 
     print(f"built {built['out']}")
-    print("\n1. copy that folder to the room PC")
-    print("2. on the room PC:  pip install fastapi uvicorn python-dotenv")
-    print("3. open the port once, as administrator:")
-    print(f'   netsh advfirewall firewall add rule name="Emma room agent" '
-          f'dir=in action=allow protocol=TCP localport={built["port"]}')
-    print("4. run start-room-agent.cmd and leave it open")
-    print("\n5. on THIS machine add the room to data/rooms.json:")
+    print("\nON THE ROOM PC")
+    print("1. copy that whole folder over (USB, or drag it in through AnyDesk/RDP)")
+    print("2. run install.cmd  (one file: installs Python packages, opens the port,")
+    print("   auto-starts at every logon, and starts it now in the background)")
+    print("   -- Python must already be installed; install.cmd says so if it is not")
+    print("3. note the LAN address it prints at the end")
+    print("\nON THIS MACHINE, add the room to data/rooms.json:")
     print(json.dumps({built["room"]: {"url": f"http://<the room PC's IP>:{built['port']}",
                                       "token": built["token"]}}, ensure_ascii=False, indent=1))
-    print(f'\n6. check it:  python scripts/room_control.py health "{built["room"]}"')
+    print(f'\nthen check it:  python scripts/room_control.py health "{built["room"]}"')
+    print("\nto stop and remove it on the room PC later: uninstall.cmd")
     return 0
 
 
