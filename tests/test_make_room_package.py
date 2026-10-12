@@ -58,6 +58,38 @@ def test_input_control_stays_off_even_with_everything_allowed(package):
     assert "ROOM_AGENT_INPUT=false" in env
 
 
+def test_input_control_can_be_turned_on_explicitly(tmp_path):
+    """--input is a deliberate, off-by-default escalation: with it the room PC
+    accepts keyboard and mouse from the network. It flips only that one line."""
+    out = tmp_path / "roomin"
+    mrp.build("ห้องขาย 1", out, host="0.0.0.0", port=8777, allow="all",
+              programs="all", token="t", bundle_python=False, input_enabled=True)
+    env = (out / ".env").read_text(encoding="utf-8")
+    assert "ROOM_AGENT_INPUT=true" in env
+    assert "ROOM_AGENT_INPUT=false" not in env
+
+
+def test_env_value_rejects_settings_that_would_corrupt_the_env():
+    """A newline injects a whole extra line; a '#' or a leading/trailing space
+    truncates/mis-parses the value so ROOM_AGENT_NAME no longer matches
+    rooms.json. Fail the build loudly rather than ship a mangled .env."""
+    for bad in ("ห้อง\nขาย", "trailing ", " leading", "has#hash"):
+        with pytest.raises(SystemExit):
+            mrp._env_value(bad)
+    assert mrp._env_value("ห้องขาย 1") == "ห้องขาย 1"      # a normal name is untouched
+
+
+def test_update_url_is_written_for_one_click_self_update(tmp_path):
+    """--update-url bakes the ONE fixed source the agent will self-update from,
+    so a code change never needs a full reinstall on each room PC again."""
+    out = tmp_path / "roomu"
+    mrp.build("ห้องขาย 1", out, host="0.0.0.0", port=8777, allow="all",
+              programs="all", token="t", bundle_python=False,
+              update_url="http://192.168.0.2:8799/agent-bundle")
+    env = (out / ".env").read_text(encoding="utf-8")
+    assert "ROOM_AGENT_UPDATE_URL=http://192.168.0.2:8799/agent-bundle" in env
+
+
 def test_the_cmd_files_are_plain_ascii_crlf_without_a_bom(package):
     """A UTF-8 BOM breaks batch on the first line, and a Thai console message
     renders as boxes; both read as 'the installer is broken'."""

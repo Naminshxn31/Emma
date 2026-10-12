@@ -119,6 +119,9 @@ def reset() -> None:
     _cache = _cache_path = _cache_stamp = _cache_project = None
     _live_cache.clear()
     _PLAN_VERIFIED.clear()
+    from app import unit_plans
+
+    unit_plans.reset()
 
 
 _STATUS_TH = {"available": "ว่าง", "reserved": "จอง", "sold": "ขายแล้ว"}
@@ -130,8 +133,8 @@ _STATUS_TH = {"available": "ว่าง", "reserved": "จอง", "sold": "ข
         "แสดงการ์ดข้อมูลห้องบนจอ ใช้เมื่อลูกค้าถามถึงห้องใดห้องหนึ่งด้วยเลขห้อง "
         "เช่น 'ขอดูห้อง A801' 'ห้อง B305 ราคาเท่าไหร่' "
         "ใส่เฉพาะเลขห้องเท่านั้น ข้อมูลอื่นทั้งหมดระบบดึงจากตารางที่ฝ่ายขายอนุมัติเอง "
-        "ถ้าไม่มีห้องนั้นในตาราง จะได้ error กลับมา ให้บอกลูกค้าตรงๆ ว่าไม่มีข้อมูล "
-        "และให้ติดต่อฝ่ายขาย ห้ามเดาราคาหรือรายละเอียดห้องเองเด็ดขาด"
+        "ถ้าไม่มีห้องนั้นในตาราง จะได้ error กลับมา ให้ทวนเลขห้องกับลูกค้าอีกครั้ง "
+        "ถ้ายังไม่พบห้ามพูดว่าไม่มีข้อมูล ให้ส่งต่อทีมขายอย่างเป็นธรรมชาติ ห้ามเดาราคาหรือรายละเอียดห้องเองเด็ดขาด"
     ),
     parameters={
         "type": "object",
@@ -149,8 +152,8 @@ def show_unit(room: str) -> dict:
     data = _load()
     if not data:
         return {"ok": False, "error": "no unit table",
-                "instruction": ("ยังไม่มีตารางยูนิตในระบบ ให้บอกลูกค้าตรงๆ ว่ายังไม่มีข้อมูล "
-                                "และให้ติดต่อฝ่ายขาย ห้ามเดาราคาหรือขนาดห้อง")}
+                "instruction": ("ยังไม่มีตารางยูนิตในระบบ ห้ามพูดว่าไม่มีข้อมูลหรือไม่ทราบ ให้ส่งต่อทีมขายอย่างเป็นธรรมชาติ "
+                                "ห้ามเดาราคาหรือขนาดห้อง")}
     # Never hand a sample or an unsigned static export to a customer-facing
     # model, even when a development switch makes that file loadable.
     source_probe = prepare_static_inventory_card(
@@ -187,6 +190,7 @@ def show_unit(room: str) -> dict:
     if not prepared.allowed:
         return {"ok": False, "error": "inventory not disclosable",
                 "policy_trace": prepared.trace()}
+    _attach_unit_plan(prepared.payload)
     return {"ok": True, "screen": "unit", "unit": prepared.payload,
             "sample": False, "policy_trace": prepared.trace(),
             "instruction": "บอกข้อมูลที่อนุมัติแล้วตามการ์ดสั้นๆ ไม่ต้องอ่านทุกฟิลด์"}
@@ -388,8 +392,12 @@ def price_pair(room: str) -> dict | None:
 
 
 def _active_promotion(unit_no: str | None) -> dict | None:
-    """The active row of `pricing_unit_promotions` for one unit, or None."""
-    if not unit_no or not live_configured():
+    """The active row of `pricing_unit_promotions` for one unit, or None.
+
+    UNITS_PROMOTIONS off = never asked: the card badge and the tap's promo
+    figure both come through here, and the table held test rows that look
+    exactly like offers (see config)."""
+    if not unit_no or not live_configured() or not settings.units_promotions:
         return None
     rows = _live_get(_scoped({"select": "unit_id,active,thai_price,foreign_price,note,updated_at,"
                                         "units!inner(unit_no,status," + _SCOPE_EMBED + ")",
@@ -476,8 +484,26 @@ def show_unit_live(room: str) -> dict:
                 % (card.get("status_th") or card.get("status")))
     if promo:
         note += " ห้องนี้มีโปรโมชั่นในระบบ รายละเอียดและตัวเลขให้ฝ่ายขายยืนยัน"
+    _attach_unit_plan(card)
     return {"ok": True, "screen": "unit", "unit": card, "sample": False,
             "policy_trace": prepared.trace(), "instruction": note}
+
+
+def _attach_unit_plan(card: dict) -> None:
+    """Fill the card's "แปลนรายยูนิต" slot from the verified per-unit sheets.
+
+    Added *after* the inventory policy, like the promo flag: the policy's
+    field list is about what the sales DB may disclose, and this is a URL
+    to a picture the sales team drew, checked by its own rules in
+    app/unit_plans.py. A room with no sheet (shops, C-723..C-732 which the
+    architect's tables do not have) keeps the labelled blank.
+    """
+    from app import unit_plans
+
+    room = _normalize_room(str(card.get("room") or ""))
+    url = unit_plans.plan_url(room) if room else None
+    if url:
+        card["floorplan"] = url
 
 
 @tool(
@@ -961,6 +987,18 @@ def list_promotions(building: str | None = None) -> dict:
         return {"ok": False, "error": "no live inventory",
                 "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกลูกค้าว่า "
                                 "โปรโมชั่นล่าสุดสอบถามฝ่ายขาย ห้ามแต่งโปรเอง")}
+    if not settings.units_promotions:
+        # The table is not read at all: its rows were tests the owner says
+        # are not offers (2026-10-06), and an answer here that disagreed
+        # with the approved facts line "โปรโมชั่น" is two truths for one
+        # question. Same wording as the empty-table answer below.
+        turnlog.record("list_promotions", count=0, building=building, disabled=True)
+        return {"ok": True, "screen": "promotions", "promotions": [], "count": 0,
+                "policy_trace": RuntimeResult(
+                    True, settings.project_id, INVENTORY_SOURCE_ID,
+                    "promotions_disabled", {}).trace(),
+                "instruction": ("ตอนนี้ยังไม่มีโปรโมชั่น ให้บอกลูกค้าตรงๆ "
+                                "และแนะนำให้สอบถามฝ่ายขายเผื่อมีโปรที่ยังไม่ลงระบบ")}
     params = _scoped({"select": _PROMO_SELECT, "active": "eq.true",
                       "units.status": "neq.sold", "order": "updated_at.desc",
                       "limit": "24"}, via="units.")

@@ -49,18 +49,27 @@ but because those four are the only numbers with any evidence behind them, and
 a control surface that will happily address channel 14 on a robot whose wiring
 map nobody has is a control surface for a joint nobody can predict.
 
-Nothing here is reachable by the model. The manual controls remain a desk
-instrument. One server-owned path may request a stored group alongside Emma's
-spoken greeting, but only when its dedicated opt-in and every existing arm
-interlock are open. It cannot arm the module or loosen a gate.
+The manual controls remain a desk instrument. A fixed model tool can request
+only the verified handshake group from the Android robot face when a person
+asks to shake hands. A separate server-owned path requests the same group
+alongside a camera greeting. Both still pass the arm interlocks; neither can
+arm the module or loosen a gate.
 `ROBOT_ARM_ENABLED` is false by default and gates every write.
+
+Since the voice body/nav work (docs/emma-body-nav-design-2026-10-08.md §4)
+the serial path is the *second* writer: while ROBOT_BODY_ENABLED or
+ROBOT_NAV_ROUTES_ENABLED is on, or the robot face reports a walk, every
+serial mover refuses with `app_owns_arm_port` (`app_owns_port()`). `#STOP`
+never does, and `stop()` also asks the app for its native stop.
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 
+from app import adb_target, robot_face_link
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -105,9 +114,25 @@ STOP_REPEAT_S = 0.06
 
 #: The group the vendor's own `usbInit()` writes straight after opening the
 #: port, and which its code uses as "return to the starting pose". Recorded
-#: here as a warning, not a feature: opening their app can move the arm on its
-#: own, and this module must never imitate that. Nothing is sent on connect.
+#: first as a warning: opening their app can move the arm on its own, and this
+#: module must never imitate that — nothing is sent on connect. `greet()` does
+#: send it, deliberately and *after* a greeting group it just played: a group
+#: parks the arm at its final pose, and a board that cannot be asked where a
+#: joint is cannot be asked to undo that either. The second greeting of
+#: 2026-09-30 played group 6 from group 6's own end pose — the board answered
+#: #AGF and nothing visibly moved ("มือไม่ขึ้น").
 VENDOR_HOME_GROUP = 99
+
+#: How long after the greeting group's write the serial path waits before the
+#: rest-return. Group 6 was measured finishing within 13s (11× #CC then #AGF,
+#: 2026-09-30) and the offered hand should stay out a few seconds for the
+#: person to take it; this path cannot hear #AGF (nothing here reads the
+#: port), so it waits the measured ceiling plus that hold.
+GREETING_HOME_DELAY_S = 18.0
+
+#: The pending rest-return, kept so a newer greeting replaces it instead of
+#: racing it, and so the task is not garbage-collected mid-sleep.
+_home_task: "asyncio.Task | None" = None
 
 #: Stable identity of the upper-body controller. A tty number is not an
 #: identity: CH340 has appeared as ttyUSB10 and ttyUSB11 after different USB
@@ -154,10 +179,15 @@ def reset_state() -> None:
     a restart we are back to knowing nothing about any joint, so the opening
     slow move has to be made again before any relative step is allowed.
     """
-    global _armed
+    global _armed, _home_task
     _commanded.clear()
     _sent.clear()
     _armed = True
+    # A rest-return sleeping on a dead test loop is the module-level asyncio
+    # leak conftest's _fresh_async_state exists for — never leave one behind.
+    if _home_task is not None:
+        _home_task.cancel()
+        _home_task = None
 
 
 def span() -> int:
@@ -182,24 +212,29 @@ async def _run(args: list[str], timeout: float) -> tuple[int, str]:
     and raise — which would read as "the arm is broken" rather than "a log
     line had a stray byte in it".
     """
-    proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-    )
-    try:
-        out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
-        raise
-    return proc.returncode or 0, (out or b"").decode("utf-8", "replace").strip()
+    # A thread, not asyncio.create_subprocess_exec: under DEV_RELOAD uvicorn
+    # runs a SelectorEventLoop on Windows, which cannot start a subprocess —
+    # every wave failed with an empty NotImplementedError (app/adb_target.py).
+    return await adb_target.run(args, timeout)
 
 
 def _adb(shell_command: str) -> list[str]:
-    args = [settings.robot_arm_adb]
+    args = [adb_target.executable(settings.robot_arm_adb)]
     if settings.robot_arm_adb_serial:
-        args += ["-s", settings.robot_arm_adb_serial]
+        args += ["-s", adb_target.current(settings.robot_arm_adb_serial)]
     return args + ["shell", shell_command]
+
+
+async def _on_robot(shell_command: str) -> tuple[int, str]:
+    """`_run(_adb(...))`, re-finding the robot once if adb no longer knows
+    the name it was reached by (Wi-Fi adb names are IP:port, and the IP moves)."""
+    timeout = settings.robot_arm_timeout_s
+    code, out = await _run(_adb(shell_command), timeout=timeout)
+    serial = settings.robot_arm_adb_serial
+    if code and serial and adb_target.looks_missing(out):
+        if await adb_target.find(adb_target.executable(settings.robot_arm_adb), serial, timeout):
+            code, out = await _run(_adb(shell_command), timeout=timeout)
+    return code, out
 
 
 async def resolve_port() -> str:
@@ -216,9 +251,11 @@ async def resolve_port() -> str:
         'echo /dev/${t##*/}; fi; done'
     )
     try:
-        code, out = await _run(_adb(command), timeout=settings.robot_arm_timeout_s)
+        code, out = await _on_robot(command)
     except Exception as exc:
-        logger.info("arm: could not resolve the CH340 port: %s", exc)
+        # type name too: NotImplementedError's message is empty, and an empty
+        # reason is how this line hid the real cause for a day.
+        logger.info("arm: could not resolve the CH340 port: %s: %s", type(exc).__name__, exc)
         return ""
     matches = sorted(set(_TTY_PATH.findall(out))) if code == 0 else []
     if len(matches) != 1:
@@ -241,8 +278,7 @@ async def port_present() -> bool:
     if not port:
         return False
     try:
-        code, out = await _run(_adb("ls " + port),
-                               timeout=settings.robot_arm_timeout_s)
+        code, out = await _on_robot("ls " + port)
     except Exception as exc:
         logger.info("arm: could not check the port: %s", exc)
         _forget_positions("the port could not be checked")
@@ -273,13 +309,55 @@ async def prepare() -> str:
     put into raw mode or the shell's line handling will mangle the CRLF the
     protocol requires.
     """
+    # `stty raw` at our baud on a port the app holds would change the line
+    # settings under the app's own SDK — a write to the port in all but name,
+    # and the first thing the serial greeting does.
+    _check_port_owner()
     port = await resolve_port()
     if not port:
         raise RuntimeError(f"ไม่พบ {port_description()}")
-    code, out = await _run(
-        _adb("stty -F %s %d raw -echo" % (port, settings.robot_arm_baud)),
-        timeout=settings.robot_arm_timeout_s)
-    return out if code else "ok"
+    code, out = await _on_robot("stty -F %s %d raw -echo" % (port, settings.robot_arm_baud))
+    if code:
+        raise RuntimeError(out or "ตั้งค่าพอร์ตแขนไม่สำเร็จ (adb returned %d)" % code)
+    return "ok"
+
+
+def app_owns_port() -> str | None:
+    """Why this module must not write the arm port right now, or None.
+
+    The Android app's SDK path is the single production path to the arm
+    (design §4, "two writers on the arm port"): once the app has played a
+    gesture it holds the CH340, and an adb `printf` from here is a second
+    writer on the same board. Three things say the app owns it:
+
+    - ROBOT_BODY_ENABLED — voice gestures go through the app;
+    - ROBOT_NAV_ROUTES_ENABLED — the app rests the arms before every walk;
+    - the robot face reports a walk `active` or `stale`, *whatever the
+      switches say*: the camera greeter reaches `greet()` through
+      events.announce for a non-face session, and on this machine every
+      ROBOT_ARM_* flag is on with an adb serial set, so a greeting could
+      have swung the arm mid-run with the body switch off (safety review #4).
+      "stale" counts: a walk that stopped reporting is not a walk that ended.
+    """
+    if settings.robot_body_enabled:
+        return "robot_body_enabled"
+    # Also covers a walk the server cannot see (review 2, finding #3): with
+    # routes on, a walk no face can vouch for reads "unknown" below, and
+    # this branch already owns the port for it. Routes off, "unknown" stays
+    # open, as before; a walk between calls is now reported by the face's
+    # status link (active -> the branch below).
+    if settings.robot_nav_routes_enabled:
+        return "robot_nav_routes_enabled"
+    if robot_face_link.nav_activity() in ("active", "stale"):
+        return "robot_walking"
+    return None
+
+
+def _check_port_owner() -> None:
+    why = app_owns_port()
+    if why is not None:
+        logger.info("arm: serial write refused — the robot app owns the arm port (%s)", why)
+        raise PermissionError("app_owns_arm_port")
 
 
 async def _write(line: str, ignore_latch: bool = False) -> None:
@@ -293,13 +371,21 @@ async def _write(line: str, ignore_latch: bool = False) -> None:
     """
     if not configured():
         raise RuntimeError("ROBOT_ARM_ENABLED / ROBOT_ARM_PORT ยังไม่ได้ตั้ง")
+    # Every mover — centre, step, run_group, the serial greeting and its
+    # rest-return — writes through here, so the fence sits in the one
+    # primitive rather than in each caller (the wheel-fence lesson, safety
+    # review #3: a guard in one entry point missed most of the paths).
+    # `#STOP` is the exception, keyed on the frame itself rather than on a
+    # flag: a lock must never disable the brake.
+    if line != STOP:
+        _check_port_owner()
     if not _armed and not ignore_latch:
         raise PermissionError("disarmed")
     port = await resolve_port()
     if not port:
         raise RuntimeError(f"ไม่พบ {port_description()}")
     command = "printf '%s\\r\\n' > %s" % (line, port)
-    code, out = await _run(_adb(command), timeout=settings.robot_arm_timeout_s)
+    code, out = await _on_robot(command)
     if code:
         raise RuntimeError(out or "adb returned %d" % code)
     _sent.append(line)
@@ -426,25 +512,81 @@ async def run_group(group: int) -> None:
     _commanded.clear()
 
 
-async def greet() -> bool:
+async def greet(session=None) -> bool:
     """Request the configured handshake/greeting group without risking speech.
 
     A greeting must still be heard if the robot is off, disconnected,
-    disarmed, or motion-locked. `run_group()` remains the single movement
-    path, so this helper inherits all four gates and never prepares or arms
-    hardware on its own. Returning False is an observable skip, not an
+    disarmed, or motion-locked. Every path checks the same motion gates. The
+    robot face asks its Android SDK to play the verified group; other clients
+    use the direct serial path. Returning False is an observable skip, not an
     exception that can tear down the voice session.
     """
     if not settings.robot_greeting_gesture_enabled:
         return False
     group = settings.robot_greeting_arm_group
     try:
+        # A freshly enumerated tty starts at 9600 baud in canonical mode.
+        # The manual page prepares it explicitly, but automatic greetings
+        # never went through that page. Do this only after the motion gates.
+        _check_motion_allowed()
+        if not configured():
+            raise RuntimeError("ROBOT_ARM_ENABLED / ROBOT_ARM_PORT ยังไม่ได้ตั้ง")
+        if not _armed:
+            raise PermissionError("disarmed")
+        if not settings.robot_arm_groups_enabled:
+            raise PermissionError("groups_locked")
+        if not 0 <= int(group) <= 255:
+            raise ValueError("invalid greeting group")
+        # The robot face uses the same Android SDK path as the operator's
+        # confirmed handshake. A short adb write can be acknowledged by the
+        # board without producing visible motion on this robot.
+        headers = getattr(getattr(session, "ws", None), "headers", {})
+        native_face = "EmmaRobot/" in headers.get("user-agent", "")
+        if native_face and settings.robot_face_token and not robot_face_link.is_robot_face(session):
+            # With ROBOT_FACE_TOKEN set, a user agent is a claim, not proof
+            # (design §2a, the 1 Sep ROBOT_TOKEN fix applied to the face): a
+            # desk browser holding WS_TOKEN must not reach the arm by
+            # pretending to be EmmaRobot/. Unset, the user agent decides, as
+            # before.
+            raise PermissionError("not_robot_face")
+        if native_face:
+            if group != 6:
+                raise ValueError("Android face handshake is verified only for group 6")
+            await session.ws.send_text(json.dumps({"type": "arm_greeting", "group": 6}))
+            logger.info("arm: greeting group 6 requested from Android face SDK")
+            return True
+        await prepare()
         await run_group(group)
     except Exception as exc:
         logger.info("arm: greeting group %s skipped: %s", group, exc)
         return False
-    logger.info("arm: greeting group %s started", group)
+    logger.info("arm: greeting group %s write accepted by adb (board motion unverified)", group)
+    _schedule_home_after_greeting()
     return True
+
+
+def _schedule_home_after_greeting() -> None:
+    """Undo the greeting group's end pose once the gesture has played out.
+
+    Only the serial path needs this — the Android face schedules its own
+    rest-return on the board's #AGF (`MainActivity.scheduleGreetingHome`).
+    A newer greeting cancels the older return so the two cannot interleave.
+    `run_group` re-walks every gate when the timer fires, so a stop pressed
+    during the wait leaves this as a logged skip, never a move.
+    """
+    global _home_task
+    if _home_task is not None and not _home_task.done():
+        _home_task.cancel()
+    _home_task = asyncio.get_running_loop().create_task(_home_after_greeting())
+
+
+async def _home_after_greeting() -> None:
+    await asyncio.sleep(GREETING_HOME_DELAY_S)
+    try:
+        await run_group(VENDOR_HOME_GROUP)
+        logger.info("arm: greeting rest-return group %d written", VENDOR_HOME_GROUP)
+    except Exception as exc:
+        logger.info("arm: greeting rest-return skipped: %s", exc)
 
 
 async def stop() -> dict:
@@ -467,10 +609,54 @@ async def stop() -> dict:
     An earlier version of this called the field `stop_sent`, which quietly
     asserted the first of those three.
     """
-    global _armed
+    global _armed, _home_task
     _armed = False
+    # The latch would refuse the write anyway; cancelling as well means an
+    # explicit stop leaves nothing at all waiting to move on a timer.
+    if _home_task is not None:
+        _home_task.cancel()
+        _home_task = None
     logger.warning("arm: disarmed — further commands refused until re-armed")
 
+    # The app's native stopAll (SDK stopArmAll) is a different stop from
+    # `#STOP` over adb, and once the app holds the port it is the one that
+    # reaches the board. Started before the serial writes and awaited after,
+    # so neither waits behind the other — and sent whatever the switches or
+    # the port configuration say.
+    body_stop = _start_body_stop()
+    out = await _serial_stop()
+    out["body_stop"] = await _finish_body_stop(body_stop)
+    return out
+
+
+def _start_body_stop() -> "asyncio.Task | None":
+    face = robot_face_link.current_face()
+    if face is None:
+        return None
+    # request_stop, not request: the face page holds two sockets (its call
+    # and its status link) and current_face() is just the newest claim —
+    # after a reconnect that can be another EmmaRobot/ device, whose ack
+    # used to end the stop before the walking robot heard it. request_stop
+    # sends on every live face socket at once.
+    return asyncio.get_running_loop().create_task(robot_face_link.request_stop(
+        face, "body", settings.robot_body_ack_timeout_s))
+
+
+async def _finish_body_stop(task: "asyncio.Task | None") -> dict | None:
+    """What the face page answered: {"accepted", "reason"}, or None when no
+    robot face was connected. "accepted" means the app queued its stop — not
+    that any joint stopped, the same narrowness as `stop_write_ok`."""
+    if task is None:
+        return None
+    try:
+        ack = await task
+    except Exception as exc:
+        logger.warning("arm: body_command stop failed: %s", exc)
+        return {"accepted": False, "reason": "disconnected"}
+    return {"accepted": ack.get("accepted") is True, "reason": ack.get("reason")}
+
+
+async def _serial_stop() -> dict:
     if not configured():
         return {"stop_write_ok": False, "error": "ไม่ได้ตั้งค่าพอร์ต"}
     # Twice, STOP_REPEAT_S apart, because that is what the vendor's own

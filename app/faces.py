@@ -36,9 +36,14 @@ timeout, on the one machine that has the models installed.
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 import threading
+import time
+import zipfile
 from contextlib import contextmanager
 from pathlib import Path
+from typing import IO, Callable
 
 import numpy as np
 
@@ -56,6 +61,13 @@ logger = logging.getLogger("condo_voice.faces")
 #: trained on commercially usable data, the same ArcFace family behind the
 #: same SCRFD detector — same shapes, different licence. buffalo_l stays
 #: loadable (FACE_MODEL_PACK=buffalo_l) for research comparison only.
+#:
+#: The detector is the exception, and so is active_speaker's 2d106det: the
+#: auraface pack's scrfd_10g_bnkps.onnx is byte-identical to buffalo_l's
+#: det_10g.onnx (sha256 5838f7fe…), and its 2d106det.onnx to buffalo_l's
+#: (f001b856…) — insightface model-zoo files whatever the HF repo's tag
+#: says. Using those two here: owner approved 9 Oct 2026. The recogniser
+#: (glintr100, the one that names people) is AuraFace's own.
 #:
 #: Every threshold in config.py is measured against ONE of these spaces.
 #: Changing the pack without re-running scripts/eval_faces.py is running on
@@ -285,6 +297,162 @@ def read_image(path: str | Path) -> np.ndarray | None:
     return cv2.imdecode(buf, cv2.IMREAD_COLOR)
 
 
+#: How long `write_atomically` keeps retrying a replace that Windows refused.
+#: See there; a second is far longer than any reader holds these files.
+_REPLACE_ATTEMPTS = 20
+_REPLACE_PAUSE_S = 0.05
+
+
+def write_atomically(path: str | Path, write: Callable[[IO[bytes]], object]) -> None:
+    """Write `path` so that nobody ever reads half of it.
+
+    The gallery and `people.json` are read by a running server while
+    something else rewrites them — the enrolment endpoint adds a person
+    mid-day, the rebuild runs next to a live greeter. Written in place, a
+    reader landing between truncate and the last byte gets a torn file, and
+    a crash there leaves one on disk for every later load. So the bytes go
+    to a temp file in the *same directory* (a rename across drives is a
+    copy, not a swap) and `os.replace` puts it in position in one step.
+
+    The retry is Windows, measured on this machine before it was written:
+    `os.replace` onto a file another handle has open fails with
+    PermissionError (WinError 5), because Python opens files without
+    FILE_SHARE_DELETE. The watcher reads `people.json` on every decision,
+    so an enrolment landing on that instant would fail on a race the old
+    in-place write never had. The reads take microseconds; waiting them
+    out is the fix, not a different file layout.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            write(fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+        for attempt in range(_REPLACE_ATTEMPTS):
+            try:
+                os.replace(tmp, path)
+                break
+            except PermissionError:
+                if attempt == _REPLACE_ATTEMPTS - 1:
+                    raise
+                time.sleep(_REPLACE_PAUSE_S)
+    except BaseException:
+        # A temp file left behind is harmless to readers but piles up next
+        # to the real one; nothing else would ever clean it.
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+#: How often a waiting `file_lock` tries again.
+_LOCK_POLL_S = 0.05
+
+
+class LockBusy(ValueError):
+    """`file_lock` could not get the lock in time.
+
+    A ValueError on purpose: every caller already turns ValueError into a
+    refusal somebody reads (the scan's gallery_reason, the station's
+    reason line, the rebuild's last printed line). Refusing is the point —
+    the only other thing to do after a wait runs out is write anyway, which
+    is the lost update the lock exists to stop.
+    """
+
+
+def lock_path(path: str | Path) -> Path:
+    """The lock file that guards `path`: same folder, `.lock` for the
+    suffix (`gallery.npz` -> `gallery.lock`). Not `gallery.npz.lock`: that
+    starts with the temp-file prefix `write_atomically` uses, and a lock
+    file is not a leftover."""
+    return Path(path).with_suffix(".lock")
+
+
+if os.name == "nt":
+    import errno
+    import msvcrt
+
+    def _try_lock(fd: int) -> bool:
+        # One byte at offset 0. Windows allows locking past the end of a
+        # file, so the lock file stays empty. Locks belong to the handle:
+        # a second handle in the *same* process is refused too, which is
+        # what lets a test show a rebuild and an append excluding each
+        # other without spawning anything.
+        os.lseek(fd, 0, os.SEEK_SET)
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        except OSError as exc:
+            if exc.errno in (errno.EACCES, errno.EDEADLOCK):
+                return False
+            raise
+        return True
+
+    def _unlock(fd: int) -> None:
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+else:  # pragma: no cover - the showroom machine is Windows
+    import fcntl
+
+    def _try_lock(fd: int) -> bool:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        return True
+
+    def _unlock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+@contextmanager
+def file_lock(path: str | Path, timeout: float, busy: str):
+    """Hold `lock_path(path)` exclusively — across processes, not just threads.
+
+    `gallery.npz` and `people.json` each have writers in more than one
+    process: the server (the call screen's scan) appends to the gallery and
+    records consent, `build_face_gallery.py` rewrites the gallery, the
+    enrolment station records consent and `revoke_face.py` withdraws it.
+    Each writer does
+    load -> change -> save, and a `threading.Lock` only orders the ones in
+    its own process. Measured in the 2026-09-29 review: a rebuild that
+    listed enrolled/ before a scan was saved wrote the gallery without that
+    person *after* the screen said "หุ่นจำได้แล้ว"; a revoke landing between
+    a save's load and its replace was written over, and the revoked person
+    was named again.
+
+    An OS byte-range lock rather than "create the file if absent": the OS
+    drops it when the holder dies, so a rebuild killed with Ctrl+C cannot
+    leave a lock that refuses every enrolment until somebody deletes a file
+    by hand. The lock file itself stays (deleting it on release races the
+    next opener); it is empty.
+
+    Waits up to `timeout` seconds, then raises `LockBusy(busy)`. Readers
+    never take it — the watcher reads people.json every frame, and
+    `write_atomically` already keeps a reader from seeing half a file.
+    """
+    target = lock_path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(target, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while not _try_lock(fd):
+            if time.monotonic() >= deadline:
+                raise LockBusy(busy)
+            time.sleep(_LOCK_POLL_S)
+        try:
+            yield
+        finally:
+            try:
+                _unlock(fd)
+            except OSError:
+                pass                       # closing the handle releases it anyway
+    finally:
+        os.close(fd)
+
+
 #: How much bigger the subject has to be than anyone else in the frame for
 #: the photograph to enrol them. Measured on the real photographs: the
 #: bystanders caught in the background of the studio shots come out 7x to
@@ -312,6 +480,17 @@ def embed_file(path: str | Path, det_size: int = 640) -> Face | None:
     if img is None:
         return None
     found = detect(img, det_size)
+    if not found:
+        # A camera-scan crop is cut tight around the face, and a face that
+        # fills the whole image is one SCRFD's anchors miss: a front shot
+        # (540x558) found nothing at det 640 or 320 and 0.85 once padded
+        # (2026-10-08) — every rebuild had been silently dropping it, so
+        # that person was matched on their side poses only. Black padding
+        # cannot add a second face for the subject rule below to trip on.
+        h, w = img.shape[:2]
+        padded = np.zeros((h * 2, w * 2) + img.shape[2:], dtype=img.dtype)
+        padded[h // 2:h // 2 + h, w // 2:w // 2 + w] = img
+        found = detect(padded, det_size)
     if not found:
         return None
     if len(found) > 1:
@@ -365,37 +544,65 @@ class Gallery:
         i = int(np.argmax(sims))
         return i, float(sims[i])
 
+    def appended(self, names: list[str], vecs, metas: list[dict]) -> "Gallery":
+        """A new gallery: this one plus `names`/`vecs`/`metas` at the end.
+
+        A new object rather than a mutation, because the one being extended
+        may be the gallery a live watcher is matching against right now —
+        `vecs` and `names` changing length between two reads of the same
+        frame is an index into the wrong person. The caller swaps the whole
+        thing in when it is ready.
+        """
+        names = [str(n) for n in names]
+        vecs = np.asarray(vecs, dtype=np.float32)
+        if vecs.ndim == 1:
+            vecs = vecs.reshape(1, -1)
+        metas = [dict(m) for m in metas]
+        if not (len(names) == len(vecs) == len(metas)):
+            raise ValueError(f"{len(names)} names, {len(vecs)} vectors and "
+                             f"{len(metas)} metas do not line up")
+        # Another width is another model, whatever the tag says; concatenate
+        # refuses it with a ValueError, which is the answer wanted here.
+        joined = np.concatenate([self.vecs, vecs]) if len(self.vecs) else vecs
+        return Gallery(list(self.names) + names, joined,
+                       [dict(m) for m in self.meta] + metas, self.model_tag)
+
     def save(self, path: str | Path) -> None:
         import json
 
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
         # Unicode arrays, not object arrays: an object array can only be
         # read back with allow_pickle=True, and a pickle is code — a
         # gallery file somebody edits (or swaps in) would then run inside
         # this process on the next load. Names and JSON strings fit in
         # fixed-width 'U' arrays, which numpy reads without unpickling.
-        np.savez(
-            path,
+        arrays = dict(
             names=np.array(self.names, dtype=str),
             vecs=np.asarray(self.vecs, dtype=np.float32),
             meta=np.array([json.dumps(m, ensure_ascii=False) for m in self.meta], dtype=str),
             model_tag=np.array(self.model_tag, dtype=str),
         )
+        # Through an open handle: handed a bare path, np.savez appends
+        # ".npz" to anything not already ending in it, so the temp file
+        # would be written under a name nobody then renames. Atomic because
+        # the server now adds people while the greeter reads this file.
+        write_atomically(path, lambda fh: np.savez(fh, **arrays))
 
     @classmethod
     def load(cls, path: str | Path) -> "Gallery":
         import json
 
         try:
-            data = np.load(str(path), allow_pickle=False)
-            tag = str(data["model_tag"])
-            # Read every array here: numpy raises for an object array on
-            # *access*, not on open, so a check that only reads the tag
-            # would pass the old format straight into the constructor.
-            names = [str(n) for n in data["names"]]
-            vecs = data["vecs"]
-            meta = [json.loads(m) for m in data["meta"]]
+            # `with`, so the handle is closed before this returns: an open
+            # NpzFile on Windows is what makes the next atomic save's
+            # os.replace fail (see `write_atomically`).
+            with np.load(str(path), allow_pickle=False) as data:
+                tag = str(data["model_tag"])
+                # Read every array here: numpy raises for an object array on
+                # *access*, not on open, so a check that only reads the tag
+                # would pass the old format straight into the constructor.
+                names = [str(n) for n in data["names"]]
+                vecs = data["vecs"]
+                meta = [json.loads(m) for m in data["meta"]]
         except ValueError as exc:
             # The pre-2026-09-01 format stored object arrays. Refusing is
             # the point — see `save` — and the fix is one command.
@@ -404,6 +611,28 @@ class Gallery:
                 f"{exc}. Rebuild it: build-face-gallery.cmd "
                 f"(python scripts/build_face_gallery.py)"
             ) from None
+        except (zipfile.BadZipFile, EOFError, OSError, KeyError,
+                AttributeError, TypeError) as exc:
+            # A torn file — a copy interrupted, a disk that filled, an
+            # editor that saved half. Every caller already handles
+            # ValueError as "no usable gallery"; anything else escaping
+            # here is a crash in the greeter at boot or in the enrolment
+            # endpoint mid-save. AttributeError/TypeError are a bare .npy
+            # where an .npz belongs: np.load returns an array, not a
+            # context manager.
+            raise ValueError(
+                f"gallery {path} is damaged or not a gallery "
+                f"({type(exc).__name__}: {exc}). Rebuild it: "
+                f"build-face-gallery.cmd (python scripts/build_face_gallery.py)"
+            ) from None
+        if not (len(names) == len(vecs) == len(meta)):
+            # Every lookup indexes names and meta by a row of vecs; lengths
+            # that disagree are an IndexError at the first match, or worse,
+            # the right score next to the wrong name.
+            raise ValueError(
+                f"gallery {path} is damaged: {len(names)} names, {len(vecs)} "
+                f"vectors, {len(meta)} metas. Rebuild it: build-face-gallery.cmd"
+            )
         if tag != MODEL_TAG:
             # Loud, not lenient. Vectors from another model still produce
             # cosines; they just point at the wrong people.

@@ -248,13 +248,17 @@ def test_competitor_slides_do_not_win(index):
 
 @pytest.mark.parametrize("query,title", [
     ("มีสระว่ายน้ำไหม", "pool"),
-    ("游泳池在哪里", "pool"),
-    ("где тренажерный зал", "biogenesis"),
+    # "Where is ..." is a *locate* question, and the 2026-10-06 routing
+    # (project_knowledge.json, preferred_slides.locate) answers it with the
+    # floor plan — intro-037 "3rd Floor Plan", intro-018 "Entrance Floor
+    # plan" — not the facility render. The floor is the answer to "where".
+    ("游泳池在哪里", "3rd floor"),
+    ("где тренажерный зал", "entrance floor"),
     # "basement" is what the guest says and what the alias file carries;
-    # the deck calls the same floor "Underground Floor". Assert against
-    # the slide as it is actually titled, or this passes for the wrong
-    # reason the day someone renames it.
-    ("주차장 어디예요", "underground"),
+    # the 2026-10-06 deck calls the same floor "Under Ground" (two words).
+    # Assert against the slide as it is actually titled, or this passes for
+    # the wrong reason the day someone renames it — which is what happened.
+    ("주차장 어디예요", "under ground"),
 ])
 def test_domain_vocabulary_routes_to_the_named_project_area(index, query, title):
     top = index.search(query)[0]
@@ -685,3 +689,44 @@ def test_the_suggestion_is_the_least_restrictive_pair_that_works(capsys):
     # question that scores a hair lower would be rejected.
     assert 0.50 < chosen < 0.90, \
         "picked %s — no room on either side of it" % chosen
+
+
+def test_how_far_and_how_big_are_not_price_questions():
+    """"เท่าไหร่" is how much AND how far/long/big. As a bare guard word it
+    refused measurement questions with "no pricing data" — measured live
+    2026-10-07, 15 refusals, including the beach distance (in the approved
+    facts) and the lagoon length (on an approved slide)."""
+    from app.tools.retrieval import is_commercial
+
+    for query in ("ห่างจากหาดจอมเทียนเท่าไหร่", "สระยาวเท่าไหร่", "ขนาดห้องเท่าไหร่",
+                  "ห้องกว้างเท่าไร", "ไปสนามบินใช้เวลาเท่าไหร่", "ลากูนลึกเท่าไหร่",
+                  "ฟิตเนสใหญ่เท่าไหร่", "ไกลแค่ไหน ระยะทางเท่าไหร่"):
+        assert not is_commercial(query), query
+
+
+def test_a_measure_word_does_not_unguard_the_price_of_a_unit():
+    """Review 12 Oct: matched inside tokens, the measure exemption passed
+    real price questions -- "ชั้นสูง" carries สูง, "ตารางเมตร" carries เมตร --
+    and they reached the slide search (and mydocs' marketing copy) instead of
+    the commercial answer. Per-something, a stated size, or only the words
+    that pick which unit (high floor, biggest) keep it a price question."""
+    from app.tools.retrieval import is_commercial
+
+    for query in ("ห้องวิวทะเลชั้นสูงเท่าไหร่", "ห้องขนาด 30 ตารางเมตรเท่าไหร่", "ตารางเมตรละเท่าไหร่",
+                  "ห้องใหญ่สุดเท่าไหร่", "ยูนิตใหญ่ๆ เท่าไหร่", "คอนโดชั้นสูงๆเท่าไร"):
+        assert is_commercial(query), query
+    # ...while the measurements the exemption exists for still pass
+    for query in ("ห้องขนาดเท่าไหร่", "ห้องห่างจากลิฟต์เท่าไหร่", "ตึกสูงเท่าไหร่", "ห้องน้ำกว้างเท่าไหร่"):
+        assert not is_commercial(query), query
+
+
+def test_how_much_without_a_measure_is_still_money():
+    """The exception must not open the gate: a bare "เท่าไหร่" with nothing
+    measured is a price question, and a money word catches the question even
+    when a measure word is also there."""
+    from app.tools.retrieval import is_commercial
+
+    for query in ("ห้องละเท่าไหร่", "สตูดิโอเท่าไหร่", "ค่าจองเท่าไหร่",
+                  "ห้องใหญ่ราคาเท่าไหร่", "ขนาดใหญ่สุดราคาเท่าไร",
+                  "ค่าส่วนกลางห้องขนาด 34 ตารางเมตรเท่าไหร่"):
+        assert is_commercial(query), query

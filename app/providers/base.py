@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import abc
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 
@@ -62,10 +62,21 @@ class ProviderEvent:
         # ให้แล้วค่ะ" while the room stays lit needs to see whether the
         # command actually reached the hardware.
         "tool_call", "tool_result",
+        # A tool call that was announced but will never get a result (its
+        # connection retired, or it was cancelled), and a silent reconnect
+        # with no go_away. Both exist for the turn-idle tracker
+        # (TURN_IDLE_TRACKS_TOOLS): without them an in-flight entry would
+        # outlive its call and every announcement would wait out TURN_WAIT_S.
+        # Emitted only while that switch is on.
+        "tool_dropped", "reconnected",
     ]
     audio: bytes | None = None
     text: str | None = None
     data: dict | None = None
+    #: Gemini's function-call id (or a local one) on tool_call / tool_result /
+    #: tool_dropped. Not part of equality: two events that say the same thing
+    #: to the browser are the same event, whichever call they belonged to.
+    call_id: str | None = field(default=None, compare=False)
 
 
 class VoiceProvider(abc.ABC):
@@ -118,6 +129,28 @@ class VoiceProvider(abc.ABC):
         for. Default no-op — only the local VAD gate has a floor.
         """
         return None
+
+    def watch_segments(self, hook, *, keep_audio: bool = False) -> bool:
+        """Call `hook(segment, t0, t1, pcm16) -> str | None` whenever a
+        speech segment closes, *before* the end-of-turn signal goes out; a
+        returned string is sent as a context note (`send_context_note`).
+
+        Listening focus (docs/listening-focus-2026-10-09.md). The hook runs
+        on the audio path and must only hand work off. False = this
+        provider has no local segmenter (Gemini without VAD_MODE=local,
+        OpenAI), and nothing will ever be reported.
+        """
+        return False
+
+    async def send_context_note(self, text: str) -> bool:
+        """Add `text` to the model's context WITHOUT starting a turn.
+
+        For speaker labels: the model must read it, never answer it as a
+        question and never say it aloud. False = not sent (a provider or a
+        model with no way to add context mid-conversation without a turn —
+        and a turn is exactly what a label must not be).
+        """
+        return False
 
     @abc.abstractmethod
     def events(self) -> AsyncIterator[ProviderEvent]:

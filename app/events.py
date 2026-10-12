@@ -77,6 +77,42 @@ SUMMON_WAIT_S = 12.0
 TURN_WAIT_S = 15.0
 
 
+async def _wait_for_idle(idle: asyncio.Event, source: str) -> None:
+    """Wait for the model's turn to be over, inside one TURN_WAIT_S bound.
+
+    With ANNOUNCE_SETTLE_S at its default 0 this is exactly the old code: one
+    wait if idle is clear, and nothing at all if it is set. With a settle,
+    idle must *stay* set for that long: gemini-3.8 sends `turn_complete` and
+    then its tool call, and with TURN_IDLE_TRACKS_TOOLS the call clears idle
+    again — an announcement sent in that gap is the robot talking over its
+    own tool reply. A re-clear goes back to waiting, still inside the same
+    bound, so a stream of late calls cannot hold an announcement forever.
+    """
+    from app.config import settings
+
+    settle = max(0.0, float(settings.announce_settle_s or 0.0))
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + TURN_WAIT_S
+    while True:
+        if not idle.is_set():
+            try:
+                await asyncio.wait_for(idle.wait(),
+                                       timeout=max(0.0, deadline - loop.time())
+                                       if settle else TURN_WAIT_S)
+            except asyncio.TimeoutError:
+                logger.info("previous announcement's turn never completed in %.0fs — "
+                            "sending %s anyway", TURN_WAIT_S, source)
+                return
+        if not settle:
+            return
+        left = deadline - loop.time()
+        if left <= 0:
+            return
+        await asyncio.sleep(min(settle, left))
+        if idle.is_set():
+            return
+
+
 async def announce(
     text: str,
     *,
@@ -156,12 +192,13 @@ async def announce(
         # still generating the first — a barge-in by the robot's own hand
         # (on screen 2026-09-01: the greeting cut mid-word, ถูกพูดแทรก).
         idle = getattr(session, "turn_idle", None)
-        if idle is not None and not idle.is_set():
-            try:
-                await asyncio.wait_for(idle.wait(), timeout=TURN_WAIT_S)
-            except asyncio.TimeoutError:
-                logger.info("previous announcement's turn never completed in %.0fs — "
-                            "sending %s anyway", TURN_WAIT_S, source)
+        prune = getattr(session, "prune_tools_in_flight", None)
+        if prune is not None:
+            # A tool call that never reported back must not hold idle past
+            # its ceiling just because no provider event came to prune it.
+            prune()
+        if idle is not None:
+            await _wait_for_idle(idle, source)
         waited = await display.wait_until_heard(
             max_wait=max_wait, then_pause=then_pause
         )
@@ -203,7 +240,7 @@ async def announce(
         if arm_greeting:
             from app import robot_arm
 
-            await robot_arm.greet()
+            await robot_arm.greet(session=session)
 
     logger.info("announced %s after waiting %.1fs for audio", source, waited)
     turnlog.record("announce", source=source, sent=True, waited=round(waited, 1))

@@ -200,6 +200,11 @@ def test_a_slide_change_records_the_audio_lead_at_that_instant(logging_on, monke
     from app.session import VoiceSession
     from app.tools import slides
 
+    # A slide that exists in the catalog. This said "ew-002", and the screen
+    # payload is re-authorised against the catalog before it is logged, so
+    # once the 2026-10-06 library replaced ew-* the slide resolved to None
+    # and the screen line lost its "slide" field (KeyError below).
+    slide_id = slides.load_slides()[1]["id"]
     sent = []
 
     class FakeWS:
@@ -212,7 +217,7 @@ def test_a_slide_change_records_the_audio_lead_at_that_instant(logging_on, monke
         def events(self):
             async def gen():
                 yield ProviderEvent(kind="tool_result", text="next_slide",
-                                    data={"slide": {"id": "ew-002"}})
+                                    data={"slide": {"id": slide_id}})
             return gen()
 
     sess = VoiceSession.__new__(VoiceSession)
@@ -224,7 +229,7 @@ def test_a_slide_change_records_the_audio_lead_at_that_instant(logging_on, monke
     sess._nudge_count = 0
 
     slides.reset_state()
-    slides.STATE["current"] = {"id": "ew-002", "position": 2}
+    slides.STATE["current"] = {"id": slide_id, "position": 2}
     display.set_audio_lead(6400)          # six and a bit seconds still queued
 
     asyncio.run(sess._provider_to_browser())
@@ -232,7 +237,7 @@ def test_a_slide_change_records_the_audio_lead_at_that_instant(logging_on, monke
 
     screens = [r for r in read(logging_on) if r["event"] == "screen"]
     assert screens, "a slide changed and nothing was recorded"
-    assert screens[0]["slide"] == "ew-002"
+    assert screens[0]["slide"] == slide_id
     assert screens[0]["tool"] == "next_slide"
     assert screens[0]["audio_lead_s"] >= 6.0, (
         "recorded %.1fs — the lead was read after it had drained, which makes "

@@ -129,6 +129,7 @@ def test_unexpected_status_from_backend_is_blocked(monkeypatch):
 
 def test_promotion_free_text_and_foreign_unit_do_not_reach_emma(monkeypatch):
     live(monkeypatch, [])
+    monkeypatch.setattr(settings, "units_promotions", True)
     promo = {"active": True, "note": "unapproved free-text promotion",
              "thai_price": 1, "units": ROW}
     monkeypatch.setattr(units, "_live_get", lambda params, table="units":

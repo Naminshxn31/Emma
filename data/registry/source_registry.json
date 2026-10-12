@@ -349,6 +349,23 @@
       "not_for": ["unit status", "price", "project facts"]
     },
     {
+      "id": "unit_plan_assets",
+      "availability": "generated",
+      "required_for": [],
+      "project_id": "embassy_world",
+      "materialization": "python scripts/build_unit_plans.py <Furniture PDF folder or the zip that contains it> — writes one webp per unit plus index.json pinning each file's sha256; copy the folder or rerun on another machine. Missing folder = the card keeps its labelled blank.",
+      "label": "แปลนรายยูนิตที่ครอปจากแบบเฟอร์นิเจอร์ของฝ่ายขาย",
+      "domain": "sales",
+      "kind": "directory",
+      "location": "data/projects/embassy_world/sales/unit-plans",
+      "required": false,
+      "tracked": false,
+      "authority": "derived",
+      "customer_facing": "conditional",
+      "uses": ["unit card per-unit plan image (แปลนรายยูนิต)"],
+      "not_for": ["unit status", "price", "room size claims", "furniture package claims", "rooms whose sheet title does not match the file name"]
+    },
+    {
       "id": "showroom_layout",
       "availability": "review_only",
       "required_for": [],

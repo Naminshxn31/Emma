@@ -14,16 +14,55 @@ from app.tools import project_knowledge, registry, slides, units
 
 BLOCKED = "BLOCKED_EGRESS_SENTINEL"
 
+#: The approval stamp a catalog record carries since 2026-10-06.
+_APPROVAL_KEYS = ("approval_status", "approved_by", "approved_at", "effective_at",
+                  "expires_at", "disclosure_scope", "content_state")
+
 
 def run(coro):
     return asyncio.run(coro)
+
+
+def _draft(record: dict) -> dict:
+    """A real record with its approval removed — the state these tests mean.
+
+    They built their draft as `{**load_slides()[0], "title_th": BLOCKED}`,
+    which was a draft only while the real catalogue was unapproved. The
+    sentinel that went red on 2026-10-07 was carried by `title_th` with
+    `capabilities.model_text: true`: approved copy, released by design, not
+    a leak. A gate test pins its own state; the approved-record direction
+    is checked separately below (unknown fields still never egress).
+    """
+    return {key: value for key, value in record.items() if key not in _APPROVAL_KEYS}
+
+
+def test_unknown_fields_never_egress_even_from_an_approved_record(monkeypatch):
+    """The other half of what the draft tests used to cover by accident:
+    approval releases the catalog's known copy fields, never arbitrary
+    metadata riding on the record."""
+    from app import display
+
+    approved = {**slides.load_slides()[0], "hidden": BLOCKED, "detail_th": BLOCKED}
+    assert slides._public(approved)["capabilities"]["model_text"] is True
+    monkeypatch.setattr(slides, "load_slides", lambda: [approved])
+    messages = []
+
+    class Client:
+        async def send_text(self, payload):
+            messages.append(payload)
+
+    monkeypatch.setattr(display, "_clients", {Client()})
+    run(display.broadcast({"type": "slide", "slide": {**approved,
+                          "url": "/slides/unchecked.jpg"}}))
+    assert len(messages) == 1 and BLOCKED not in messages[0]
+    assert BLOCKED not in json.dumps(slides._public(approved), ensure_ascii=False)
 
 
 def test_direct_display_adapter_sanitizes_and_rechecks_project(monkeypatch):
     from app import display
     from app.tools import canva_display
 
-    original = slides.load_slides()[0]
+    original = _draft(slides.load_slides()[0])
     draft = {**original, "title_th": BLOCKED, "summary_th": BLOCKED,
              "hidden": BLOCKED}
     monkeypatch.setattr(slides, "load_slides", lambda: [draft])
@@ -91,7 +130,7 @@ def test_delayed_reveal_rechecks_revoked_approval(monkeypatch):
 def test_direct_broadcast_cannot_bypass_display_policy(monkeypatch):
     from app import display
 
-    draft = {**slides.load_slides()[0], "title_th": BLOCKED, "hidden": BLOCKED}
+    draft = {**_draft(slides.load_slides()[0]), "title_th": BLOCKED, "hidden": BLOCKED}
     monkeypatch.setattr(slides, "load_slides", lambda: [draft])
     messages = []
 
@@ -283,7 +322,7 @@ def test_provider_serialization_and_tool_side_effects_fail_closed(
         raise RuntimeError(BLOCKED)
 
     registry._REGISTRY["broken_probe"] = registry.Tool("broken_probe", "", {}, broken)
-    draft = {**slides.load_slides()[0], "title_th": BLOCKED,
+    draft = {**_draft(slides.load_slides()[0]), "title_th": BLOCKED,
              "summary_th": BLOCKED, "hidden": BLOCKED}
     registry._REGISTRY["draft_probe"] = registry.Tool(
         "draft_probe", "", {}, lambda: {"ok": True, "slide": slides._public(draft)})

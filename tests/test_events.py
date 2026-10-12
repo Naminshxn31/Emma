@@ -179,7 +179,8 @@ def test_only_a_greeting_announcement_requests_the_arm_gesture(live, monkeypatch
 
     gestures = []
 
-    async def greet():
+    async def greet(*, session):
+        assert session is live
         gestures.append("greet")
         return True
 

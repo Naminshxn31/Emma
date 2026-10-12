@@ -11,9 +11,24 @@ from __future__ import annotations
 import asyncio
 
 import numpy as np
+import pytest
 
 from app import facewatch, greeter
 from app.config import settings
+
+
+@pytest.fixture(autouse=True)
+def _no_real_gallery_and_no_pause(monkeypatch, tmp_path):
+    """The loop now stats (and on a change, loads) the gallery file, and
+    `pause()` is module state. Neither may reach past this file: the real
+    `data/faces/` holds real people, and a pause left behind by one test
+    would silence the camera for every test after it."""
+    from app import enrollment
+
+    monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "gallery.npz"))
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    monkeypatch.setattr(greeter, "_paused_until", 0.0)
+    monkeypatch.setattr(greeter, "_holds", {})
 
 
 def _sighting(kind="known", name="ต้า", group="staff", score=0.61):
@@ -46,6 +61,31 @@ def test_a_stranger_is_greeted_without_being_told_they_are_a_stranger():
     text = greeter.greeting_for(_sighting(kind="stranger", name=None, group=""))
     assert "ห้ามบอกว่าจำไม่ได้" in text.replace(" ", "") or "จำไม่ได้" in text
     assert "ยังไม่รู้ว่าเป็นใคร" in text
+
+
+def test_the_robot_in_project_mode_opens_with_the_owners_greeting(monkeypatch):
+    """Robot log 9-10 Oct: every stranger got "สวัสดีค่ะ มีอะไรให้ช่วย..." --
+    the very line GREETING (owner, 14 Sep) replaced with an English welcome
+    and one light question about the project. On the robot in condo mode the
+    camera's stranger line now carries GREETING; the camera rules stay."""
+    from app.prompts import GREETING
+
+    stranger = _sighting(kind="stranger", name=None, group="")
+    monkeypatch.setattr(settings, "assistant_profile", "condo")
+    monkeypatch.setattr(settings, "face_camera_source", "robot")
+    text = greeter.greeting_for(stranger)
+    assert GREETING in text
+    assert "ห้ามพูดถึงกล้อง" in text and "จำไม่ได้" in text and "ยังไม่รู้ว่าเป็นใคร" in text
+    assert 'ห้ามเปิดด้วย "มีอะไรให้ช่วยไหม"' in text
+    # a known face keeps its name greeting
+    assert "ต้า" in greeter.greeting_for(_sighting()) and GREETING not in greeter.greeting_for(_sighting())
+
+    # not the robot's camera (the sales room), or not project mode: unchanged
+    for source, profile in (("local", "condo"), ("robot", "joke")):
+        monkeypatch.setattr(settings, "face_camera_source", source)
+        monkeypatch.setattr(settings, "assistant_profile", profile)
+        text = greeter.greeting_for(stranger)
+        assert GREETING not in text and "ถามว่าให้ช่วยอะไรไหม" in text
 
 
 # -- the switch -------------------------------------------------------------
@@ -191,8 +231,18 @@ def test_recognition_never_runs_on_the_event_loop(monkeypatch):
     """
     from pathlib import Path
 
+    import ast
+
     source = Path(greeter.__file__).read_text(encoding="utf-8")
-    assert "asyncio.to_thread(watcher.see" in source
+    # `_see` (watcher.see plus the crop decode) is what goes to the thread,
+    # and nothing calls watcher.see anywhere else.
+    assert "asyncio.to_thread(_see, watcher, frame" in source
+    tree = ast.parse(source)
+    callers = {fn.name for fn in ast.walk(tree)
+               if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))
+               for node in ast.walk(fn)
+               if isinstance(node, ast.Call) and ast.unparse(node.func) == "watcher.see"}
+    assert callers == {"_see"}
     assert "asyncio.to_thread(cap.read)" in source
     assert "asyncio.to_thread(camera.open_camera)" in source
 
@@ -378,6 +428,27 @@ def test_websocket_logging_redacts_a_query_token():
     assert run_server._TokenRedactionFilter().filter(record) is True
     assert "secret-value" not in record.getMessage()
     assert "token=***&x=1" in record.getMessage()
+
+
+def test_the_app_itself_redacts_so_a_reload_worker_does_too(caplog):
+    """DEV_RELOAD runs the app in a spawned worker that never saw
+    run_server.py's filter: 2026-09-29 the worker logged
+    `WebSocket /ws/camera?token=<real token> [accepted]` in the clear.
+    Importing the app must be enough to install it."""
+    import logging
+
+    import app.main  # noqa: F401  (the import is the thing under test)
+    from app.log_redaction import TokenRedactionFilter
+
+    uv = logging.getLogger("uvicorn.error")
+    assert any(isinstance(f, TokenRedactionFilter) for f in uv.filters)
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        uv.info('%s - "WebSocket %s" [accepted]', "127.0.0.1:5", "/ws/camera?token=leak-me-not")
+    assert "leak-me-not" not in caplog.text and "token=***" in caplog.text
+    # Installing twice (launcher + worker in one process) adds it once.
+    from app import log_redaction
+    log_redaction.install()
+    assert sum(isinstance(f, TokenRedactionFilter) for f in uv.filters) == 1
 
 
 # -- why nothing was heard --------------------------------------------------
@@ -680,8 +751,6 @@ def test_a_summoned_session_has_no_opening_line_of_its_own():
 
     src = inspect.getsource(session_module.VoiceSession.run)
     assert "greeting=None if self.summoned else greeting_for(self.profile)" in src
-    assert "if not self.summoned:" in src
-    assert "await robot_arm.greet()" in src
 
 
 def test_the_page_tells_the_server_when_a_dial_was_rung():
@@ -791,6 +860,28 @@ def test_the_ears_wait_for_the_greeting_to_be_heard_not_generated(monkeypatch):
         "opened while the greeting was still playing"
 
 
+def test_joke_can_barge_into_a_camera_greeting_after_browser_verification():
+    import asyncio
+    import json
+
+    from app import session as session_module
+
+    before, after = b"\x01" * 320, b"\x02" * 320
+    for profile, expected in (("joke", [after]), ("condo", [])):
+        sess = session_module.VoiceSession(None, provider_name="gemini",
+                                           profile=profile, summoned=True)
+        sess.provider = _Ears()
+        sess.ws = _MicWS([])
+        sess.ws._queue = [
+            {"bytes": before},
+            {"text": json.dumps({"type": "barge_in"})},
+            {"bytes": after},
+            {"type": "websocket.disconnect"},
+        ]
+        asyncio.run(sess._browser_to_provider())
+        assert sess.provider.heard == expected
+
+
 def test_a_summoned_session_that_never_gets_its_greeting_listens_anyway():
     """The announcement can be dropped (`still_relevant` false, the person
     walked off and back). A session that stays deaf forever is the same bug
@@ -891,6 +982,34 @@ def test_all_zero_mic_audio_is_called_digital_silence_not_quiet(monkeypatch, cap
         _pump(sess, [b"\x00" * 640, b"\x00" * 640])
     lines = [r.getMessage() for r in caplog.records if "call audio" in r.getMessage()]
     assert lines and "DIGITAL SILENCE" in lines[-1]
+    assert "DOA_ENABLED" not in lines[-1]     # DOA off: the PC's verdict, unchanged
+
+
+def test_digital_silence_names_the_array_when_the_robot_app_holds_it(monkeypatch, caplog):
+    """Robot, 2026-10-10: the app's 8-channel DOA capture opened first and the
+    WebView's call mic read exact zeros for the whole call (37 reports) — the
+    Bothlent array gives Android one capture stream. The old verdict sent the
+    reader to check-mic.cmd, which a robot does not have."""
+    import logging
+
+    from app import doa
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "doa_enabled", True)
+    monkeypatch.setattr(doa, "snapshot", lambda: {"link": {"status": {"state": "capturing"}}})
+    sess = _session_with_ears(monkeypatch, segments=0)
+    with caplog.at_level(logging.INFO, logger="condo_voice.session"):
+        _pump(sess, [b"\x00" * 640, b"\x00" * 640])
+    lines = [r.getMessage() for r in caplog.records if "call audio" in r.getMessage()]
+    assert lines and "DIGITAL SILENCE" in lines[-1] and "DOA_ENABLED=false" in lines[-1]
+
+    # the app's capture stopped: back to the microphone's own verdict
+    monkeypatch.setattr(doa, "snapshot", lambda: {"link": {"status": {"state": "stopped"}}})
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="condo_voice.session"):
+        _pump(sess, [b"\x00" * 640, b"\x00" * 640])
+    lines = [r.getMessage() for r in caplog.records if "call audio" in r.getMessage()]
+    assert lines and "check-mic.cmd" in lines[-1]
 
 
 def test_loud_audio_with_no_vad_segment_points_at_the_detector(monkeypatch, caplog):
@@ -1032,12 +1151,26 @@ def test_a_stranger_does_not_cut_into_a_live_conversation(monkeypatch):
     assert announced == []
 
 
-def test_a_known_face_still_gets_a_name_mid_conversation(monkeypatch):
-    """The other half: "หวัดดี พีท" while โชกุน is talking carries a name
-    somebody may want to hear — measured working the same morning."""
+def test_a_known_face_does_not_cut_into_a_live_conversation_either(monkeypatch):
+    """This used to assert the opposite ("a name is worth hearing
+    mid-conversation") — until 2026-09-30, when the log showed "พีท"
+    re-greeted 12s into his own conversation (11:07:15 → 11:07:27) and the
+    owner ruled: ประโยคทักทายไม่ให้พูดแทรก. A greeting belongs at the start
+    of a conversation, whoever it names."""
     from app import session as session_module
 
     monkeypatch.setattr(session_module, "_active", object())
+    announced, _ = _run_with(monkeypatch, [_sighting()])
+    assert announced == []
+
+
+def test_a_known_face_is_still_greeted_on_the_session_the_pre_ring_opened(monkeypatch):
+    """The no-interrupt rule must not eat the greeting itself: a summoned,
+    not-yet-greeted session is the line held open FOR this announcement,
+    same as the stranger case below."""
+    from app import session as session_module
+
+    monkeypatch.setattr(session_module, "_active", _Summoned())
     announced, _ = _run_with(monkeypatch, [_sighting()])
     assert [a[0] for a in announced] == ["face_known"]
 
@@ -1211,3 +1344,368 @@ def test_turn_complete_marks_the_session_idle_for_announcements():
     src = inspect.getsource(session_module.VoiceSession._provider_to_browser)
     branch = src.split('event.kind == "turn_complete"', 1)[1]
     assert "idle.set()" in branch.split('await self._send_json({"type": "turn_complete"})', 1)[0]
+
+
+# -- the gallery follows the file, without a restart ---------------------------
+
+def _save_gallery(path, names):
+    """A gallery of made-up people: random unit vectors, not anybody's face."""
+    from app import faces
+
+    rng = np.random.default_rng(len(names))
+    vecs = rng.standard_normal((len(names), 512)).astype(np.float32)
+    vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
+    faces.Gallery(list(names), vecs, [{"group": "test"} for _ in names]).save(path)
+
+
+def _follow(monkeypatch, frames, on_see):
+    """Run the loop over a real Watcher built from the gallery file in tmp.
+
+    `on_see(n, watcher)` runs inside the n-th `see()` — in its worker
+    thread, the way a scan's save lands while a frame is being judged.
+    Returns (every watcher built, the gallery each `see()` found, the
+    threads `watcher.gallery` was assigned on, the loop's own thread).
+    """
+    import threading
+
+    from app import camera, faces
+
+    built, seen, assigned = [], [], []
+
+    class _Recording(facewatch.Watcher):
+        @property
+        def gallery(self):
+            return self.__dict__.get("_gallery")
+
+        @gallery.setter
+        def gallery(self, value):
+            assigned.append(threading.get_ident())
+            self.__dict__["_gallery"] = value
+
+        def see(self, frame, now=None):
+            seen.append(self.gallery)
+            on_see(len(seen), self)
+            return super().see(frame, now)
+
+    def from_settings(cls):
+        built.append(_Recording(faces.Gallery.load(settings.face_gallery)))
+        return built[-1]
+
+    monkeypatch.setattr(facewatch.Watcher, "from_settings", classmethod(from_settings))
+    monkeypatch.setattr(faces, "locate", lambda frame: [])     # nobody in frame
+    monkeypatch.setattr(camera, "open_camera",
+                        lambda *a, **k: _Cap([np.zeros((8, 8, 3), np.uint8)] * frames))
+    monkeypatch.setattr(settings, "face_fps", 100.0)
+    monkeypatch.setattr(greeter, "MAX_EMPTY_READS", 2)
+    monkeypatch.setattr(greeter, "GALLERY_POLL_S", 0.0)          # look every frame
+    loop_thread = threading.get_ident()
+    asyncio.run(greeter.run())
+    return built, seen, assigned, loop_thread
+
+
+def test_a_scan_saved_mid_run_is_recognised_without_a_restart(monkeypatch, caplog):
+    """The person scanned expects to be known on the spot. Swapped into the
+    running watcher, not a new one: `stop()`/`start()` would forget who was
+    just greeted and greet everybody at the desk again."""
+    import logging
+
+    _save_gallery(settings.face_gallery, ["ทดสอบหนึ่ง"])
+
+    def during(n, watcher):
+        if n == 1:
+            watcher._last_greeted["name:ทดสอบหนึ่ง"] = 1.0    # just greeted
+        if n == 2:
+            _save_gallery(settings.face_gallery, ["ทดสอบหนึ่ง", "ทดสอบสอง"])
+
+    with caplog.at_level(logging.INFO, logger="condo_voice.greeter"):
+        built, seen, assigned, loop_thread = _follow(monkeypatch, 5, during)
+
+    assert [len(g) for g in seen] == [1, 1, 2, 2, 2]
+    assert len(built) == 1, "the watcher was rebuilt, and its memory with it"
+    assert built[0]._last_greeted == {"name:ทดสอบหนึ่ง": 1.0}
+    said = [r.getMessage() for r in caplog.records]
+    assert said.count("face gallery reloaded: 2 vectors") == 1
+
+
+def test_the_gallery_is_swapped_on_the_loop_never_from_the_loading_thread(monkeypatch):
+    """`see()` runs in a worker thread and reads `gallery` more than once
+    per frame (match2 for an index, then names[i]); a swap from another
+    thread can land between the two and name the wrong person."""
+    _save_gallery(settings.face_gallery, ["ทดสอบหนึ่ง"])
+
+    def during(n, watcher):
+        if n == 1:
+            _save_gallery(settings.face_gallery, ["ทดสอบหนึ่ง", "ทดสอบสอง"])
+
+    _, seen, assigned, loop_thread = _follow(monkeypatch, 3, during)
+    assert [len(g) for g in seen] == [1, 2, 2]
+    assert len(assigned) == 2                     # built, then swapped once
+    assert set(assigned) == {loop_thread}
+
+
+def test_a_broken_gallery_file_keeps_the_old_one_and_the_loop_alive(monkeypatch, caplog):
+    """The camera loop must not die over a bad file, must not drop the
+    gallery it has, and must not say so every two seconds — and a good file
+    landing afterwards is still picked up."""
+    import logging
+    from pathlib import Path
+
+    _save_gallery(settings.face_gallery, ["ทดสอบหนึ่ง"])
+
+    def during(n, watcher):
+        if n == 1:
+            Path(settings.face_gallery).write_bytes(b"not a gallery")
+        if n == 4:
+            _save_gallery(settings.face_gallery, ["ทดสอบหนึ่ง", "ทดสอบสอง"])
+
+    with caplog.at_level(logging.INFO, logger="condo_voice.greeter"):
+        _, seen, _, _ = _follow(monkeypatch, 6, during)
+
+    said = [r.getMessage() for r in caplog.records]
+    # Three polls met the broken file; one line said so.
+    assert [len(g) for g in seen] == [1, 1, 1, 1, 2, 2]
+    assert sum("did not load" in m for m in said) == 1
+    assert not any("camera greeting stopped" in m for m in said)
+
+
+def test_the_gallery_file_is_not_looked_at_more_often_than_the_poll(monkeypatch):
+    """A stat per frame is cheap, but "at most every GALLERY_POLL_S" is the
+    promise, and a loop at 100 fps is where it would be broken."""
+    import time
+
+    checks = []
+    real = greeter._gallery_signature
+
+    def counted(path):
+        checks.append(1)
+        return real(path)
+
+    monkeypatch.setattr(greeter, "_gallery_signature", counted)
+    started = time.monotonic()
+    _run_with(monkeypatch, [], frames=30)
+    elapsed = time.monotonic() - started
+
+    assert greeter.GALLERY_POLL_S == 2.0
+    # Once before the first load, then at most once per interval.
+    assert 1 <= len(checks) <= 1 + int(elapsed / greeter.GALLERY_POLL_S)
+
+
+# -- a face scan holds the door camera off -----------------------------------
+
+class _ResumingCap(_Cap):
+    """A camera whose `at`-th read is the moment the scan screen says done."""
+
+    def __init__(self, frames, at):
+        super().__init__(frames)
+        self.reads, self.at = 0, at
+
+    def read(self):
+        self.reads += 1
+        if self.reads == self.at:
+            greeter.resume()
+        return super().read()
+
+
+def _watch_paused(monkeypatch, cap):
+    import time as _t
+
+    from app import camera, events, wake
+    from app import session as session_module
+
+    rings, announced, looked = [], [], []
+
+    async def ring(reason="server"):
+        rings.append(reason)
+        return 1
+
+    async def announce(text, *, source, **kw):
+        announced.append(source)
+        return True
+
+    class _Watcher:
+        threshold, cooldown_s = 0.45, 600.0
+        # Somebody walked up a moment before the scan began: the pre-ring
+        # reads this, and it is still fresh during the pause.
+        someone_at = _t.monotonic()
+
+        def see(self, frame, now=None):
+            looked.append(1)
+            self.someone_at = _t.monotonic()
+            return _sighting() if len(looked) == 1 else None
+
+    monkeypatch.setattr(facewatch.Watcher, "from_settings",
+                        classmethod(lambda cls: _Watcher()))
+    monkeypatch.setattr(camera, "open_camera", lambda *a, **k: cap)
+    monkeypatch.setattr(wake, "summon", ring)
+    monkeypatch.setattr(events, "announce", announce)
+    monkeypatch.setattr(session_module, "_active", None)
+    monkeypatch.setattr(settings, "face_fps", 100.0)
+    monkeypatch.setattr(greeter, "MAX_EMPTY_READS", 2)
+    asyncio.run(greeter.run())
+    return looked, rings, announced
+
+
+def test_a_pause_stops_recognising_ringing_and_greeting_but_keeps_reading(monkeypatch):
+    """A scan puts a stranger at the lens on purpose, for a minute. Pre-rung
+    and greeted as a stranger mid-scan is the robot talking over the staff
+    member walking them through it."""
+    cap = _Cap([np.zeros((8, 8, 3), np.uint8)] * 4)
+    greeter.pause(60)
+
+    looked, rings, announced = _watch_paused(monkeypatch, cap)
+
+    assert looked == []
+    assert rings == [], "the pre-ring fired for the person being scanned"
+    assert announced == []
+    assert cap.frames == [], "the camera stopped being read"
+
+
+def test_resume_hands_the_camera_back_and_the_log_says_both_ends_once(monkeypatch, caplog):
+    import logging
+
+    cap = _ResumingCap([np.zeros((8, 8, 3), np.uint8)] * 6, at=3)
+    greeter.pause(60)
+
+    with caplog.at_level(logging.INFO, logger="condo_voice.greeter"):
+        looked, rings, announced = _watch_paused(monkeypatch, cap)
+
+    # Reads 1-3 fell inside the pause (the third is where it ended);
+    # 4-6 were judged again.
+    assert len(looked) == 3
+    assert announced == ["face_known"]
+    assert rings == ["face_approach"]
+    said = [r.getMessage() for r in caplog.records]
+    assert sum("camera greeting paused" in m for m in said) == 1
+    assert sum("camera greeting resumed" in m for m in said) == 1
+
+
+def test_a_pause_that_begins_during_a_frame_discards_that_frames_verdict(monkeypatch):
+    """`see()` takes 100-200ms in its thread; the scan screen can open inside
+    that window, and the verdict coming back is about the person now being
+    scanned."""
+    from app import camera, events, wake
+    from app import session as session_module
+
+    rings, announced = [], []
+
+    async def ring(reason="server"):
+        rings.append(reason)
+        return 1
+
+    async def announce(text, *, source, **kw):
+        announced.append(source)
+        return True
+
+    class _Watcher:
+        threshold, cooldown_s, someone_at = 0.45, 600.0, None
+
+        def see(self, frame, now=None):
+            import time as _t
+
+            greeter.pause(60)               # pressed while this frame was judged
+            self.someone_at = _t.monotonic()
+            return _sighting()
+
+    monkeypatch.setattr(facewatch.Watcher, "from_settings",
+                        classmethod(lambda cls: _Watcher()))
+    monkeypatch.setattr(camera, "open_camera",
+                        lambda *a, **k: _Cap([np.zeros((8, 8, 3), np.uint8)]))
+    monkeypatch.setattr(wake, "summon", ring)
+    monkeypatch.setattr(events, "announce", announce)
+    monkeypatch.setattr(session_module, "_active", None)
+    monkeypatch.setattr(settings, "face_fps", 100.0)
+    monkeypatch.setattr(greeter, "MAX_EMPTY_READS", 2)
+    asyncio.run(greeter.run())
+
+    assert rings == [] and announced == []
+
+
+def test_a_greeting_already_on_its_way_is_dropped_once_a_scan_begins(monkeypatch):
+    """The summon wait and the audio queue can hold a greeting for seconds;
+    one confirmed just before the scan screen opened must not land in it."""
+    from app import events
+
+    checks = []
+
+    async def announce(text, *, source, still_relevant=None, **kw):
+        checks.append(still_relevant())
+        greeter.pause(30)                   # the scan screen opens meanwhile
+        checks.append(still_relevant())
+        return True
+
+    monkeypatch.setattr(events, "announce", announce)
+    asyncio.run(greeter._greet(_sighting()))
+    assert checks == [True, False]
+
+
+def test_the_turn_log_carries_the_arrival_wait_only_when_it_ran(monkeypatch):
+    """FACE_TRACK_WAIT_S was set on synthetic blur; `track_s`/`held` in
+    face_seen are how it gets re-measured at the real doorway. With the
+    wait off the line stays exactly as it was."""
+    from app import events, turnlog
+
+    seen = []
+    monkeypatch.setattr(turnlog, "record", lambda ev, **f: seen.append((ev, f)))
+
+    async def announce(text, **kw):
+        return True
+
+    monkeypatch.setattr(events, "announce", announce)
+    asyncio.run(greeter._greet(_sighting()))
+    waited = _sighting(kind="stranger", name=None, score=0.21)
+    waited.track_s, waited.held = 2.4, 7
+    asyncio.run(greeter._greet(waited))
+    faces_seen = [f for ev, f in seen if ev == "face_seen"]
+    assert "track_s" not in faces_seen[0] and "held" not in faces_seen[0]
+    assert faces_seen[1]["track_s"] == 2.4 and faces_seen[1]["held"] == 7
+
+
+def test_a_pause_is_clamped_and_only_ever_extended():
+    import time
+
+    assert not greeter.paused()
+    greeter.pause(100)
+    first = greeter._paused_until
+    assert greeter.paused()
+    greeter.pause(5)                        # a shorter ask does not cut it short
+    assert greeter._paused_until == first
+    greeter.pause(float("nan"))             # json reads "NaN"; it must not end it
+    assert greeter._paused_until == first
+    greeter.pause(200)
+    assert greeter._paused_until > first
+
+    greeter.resume()
+    assert not greeter.paused()
+    greeter.pause(10_000)                   # a forgotten scan cannot deafen the day
+    assert greeter.MAX_PAUSE_S == 900.0
+    assert greeter._paused_until - time.monotonic() <= greeter.MAX_PAUSE_S
+    greeter.resume()
+    greeter.pause(-30)
+    assert not greeter.paused()
+
+
+def test_a_named_hold_is_replaced_released_and_leaves_the_others_alone():
+    """One extend-only deadline could not be given back by one holder
+    without taking everybody's: the face scan's last close zeroed it, and
+    with it the grace another scan's save had just set."""
+    greeter.hold("a", 100)
+    assert greeter.paused() and 99 < greeter.pause_left() <= 100
+    greeter.hold("a", 5)                    # replaced — shorter included
+    assert greeter.pause_left() <= 5
+
+    greeter.hold("b", 50)
+    greeter.release("a")                    # a's share only
+    assert greeter.paused() and greeter.pause_left() > 40
+    greeter.pause(10)
+    greeter.release("b")
+    assert greeter.paused()                 # the plain pause is nobody's hold
+    greeter.resume()
+    assert not greeter.paused() and greeter._holds == {}
+
+    greeter.hold("c", 10_000)               # clamped like pause()
+    assert greeter.pause_left() <= greeter.MAX_PAUSE_S
+    greeter.hold("c", float("nan"))         # nonsense releases, never "for ever"
+    assert not greeter.paused()
+    greeter.hold("c", 30)
+    greeter.hold("c", -1)
+    assert not greeter.paused()

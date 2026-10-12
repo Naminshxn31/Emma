@@ -48,13 +48,20 @@ _TOOL_MODULES = {
     "app.tools.mydocs": "mydocs",
     "app.tools.websearch": "websearch",
     "app.tools.computer": "computer",
+    # The robot's own head and arms through the face page's bridge (design
+    # §2d, docs/emma-body-nav-design-2026-10-08.md). Opt-in below: it moves
+    # the robot, so blank TOOL_GROUPS must never load it.
+    "app.tools.body": "body",
 }
 
 #: Groups that load only when *named* in the enabled set. "Everything"
 #: (TOOL_GROUPS blank on the condo profile) predates these groups, and the
 #: gallery must not sprout new tools on a git pull — a guest setting the
 #: showroom an alarm is nobody's feature. Emma names them in her default.
-_OPT_IN = {"reminders", "memory", "mydocs", "websearch", "computer"}
+_OPT_IN = {"reminders", "memory", "mydocs", "websearch", "computer",
+           # Moves the robot. Never on by omission, and never on a machine
+           # whose TOOL_GROUPS was written before it existed.
+           "body"}
 
 
 def unknown_groups(enabled: set[str] | None) -> set[str]:

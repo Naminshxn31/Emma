@@ -53,7 +53,8 @@ if (!wrap || !canvas) throw new Error('emma-3d: no mascot canvas');
 // GLB load is ever reached. Here a failure just leaves the SVG puppet up.
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas,
+                                       powerPreference: 'high-performance' });
 } catch (error) {
   console.warn('emma-3d: WebGL unavailable, keeping the SVG mascot', error);
   throw error;
@@ -184,40 +185,50 @@ const screenQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), finishFrame);
 screenQuad.frustumCulled = false; screenScene.add(screenQuad);
 let glowWidth = 1, glowHeight = 1;
 
+let glowTick = 0;
 function renderScene() {
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.setRenderTarget(hdrTarget); renderer.render(scene, camera);
-  // Keep the original meshes as depth occluders so the chest light does not
-  // shine through the back of the body.
-  const originals = [];
-  model?.traverse(o => {
-    if (o.isMesh) {
-      const luminous = m => m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0;
-      const forGlow = m => (m === glowMaterial && auraMaterial) ? auraMaterial
-        : (luminous(m) ? m : glowOccluder);
-      originals.push([o, o.material]);
-      o.material = Array.isArray(o.material) ? o.material.map(forGlow) : forGlow(o.material);
-    }
-  });
-  const floorVisible = floor.visible;
-  floor.visible = false;
-  renderer.setRenderTarget(glowTargets[0]); renderer.render(scene, camera);
-  originals.forEach(([o, material]) => { o.material = material; });
-  floor.visible = floorVisible;
-  screenQuad.material = blurGlow;
-  blurGlow.uniforms.source.value = glowTargets[0].texture;
-  blurGlow.uniforms.direction.value.set(.55 / glowWidth, 0);
-  renderer.setRenderTarget(glowTargets[1]); renderer.render(screenScene, screenCamera);
-  blurGlow.uniforms.source.value = glowTargets[1].texture;
-  blurGlow.uniforms.direction.value.set(0, .55 / glowHeight);
-  renderer.setRenderTarget(glowTargets[2]); renderer.render(screenScene, screenCamera);
-  // wide tail: blur the near halo again at 2.5x the step
-  blurGlow.uniforms.source.value = glowTargets[2].texture;
-  blurGlow.uniforms.direction.value.set(2.5 / glowWidth, 0);
-  renderer.setRenderTarget(glowTargets[3]); renderer.render(screenScene, screenCamera);
-  blurGlow.uniforms.source.value = glowTargets[3].texture;
-  blurGlow.uniforms.direction.value.set(0, 2.5 / glowHeight);
-  renderer.setRenderTarget(glowTargets[4]); renderer.render(screenScene, screenCamera);
+  // The glow chain re-renders the WHOLE rig a second time (skinning does not
+  // get cheaper because the target is small), which on the robot's tablet is
+  // the other half of every frame's cost (measured 45fps on the chest screen,
+  // owner 2026-09-30: "ตัวแอบช้าๆ ... ทำให้มันลื่นขึ้น"). The halo is blurred
+  // to mush anyway, so it is refreshed every OTHER frame and composited from
+  // the kept textures in between — the lamp follows her a frame late, behind
+  // four blur passes, where nobody can see it.
+  if ((glowTick++ & 1) === 0) {
+    // Keep the original meshes as depth occluders so the chest light does not
+    // shine through the back of the body.
+    const originals = [];
+    model?.traverse(o => {
+      if (o.isMesh) {
+        const luminous = m => m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0;
+        const forGlow = m => (m === glowMaterial && auraMaterial) ? auraMaterial
+          : (luminous(m) ? m : glowOccluder);
+        originals.push([o, o.material]);
+        o.material = Array.isArray(o.material) ? o.material.map(forGlow) : forGlow(o.material);
+      }
+    });
+    const floorVisible = floor.visible;
+    floor.visible = false;
+    renderer.setRenderTarget(glowTargets[0]); renderer.render(scene, camera);
+    originals.forEach(([o, material]) => { o.material = material; });
+    floor.visible = floorVisible;
+    screenQuad.material = blurGlow;
+    blurGlow.uniforms.source.value = glowTargets[0].texture;
+    blurGlow.uniforms.direction.value.set(.55 / glowWidth, 0);
+    renderer.setRenderTarget(glowTargets[1]); renderer.render(screenScene, screenCamera);
+    blurGlow.uniforms.source.value = glowTargets[1].texture;
+    blurGlow.uniforms.direction.value.set(0, .55 / glowHeight);
+    renderer.setRenderTarget(glowTargets[2]); renderer.render(screenScene, screenCamera);
+    // wide tail: blur the near halo again at 2.5x the step
+    blurGlow.uniforms.source.value = glowTargets[2].texture;
+    blurGlow.uniforms.direction.value.set(2.5 / glowWidth, 0);
+    renderer.setRenderTarget(glowTargets[3]); renderer.render(screenScene, screenCamera);
+    blurGlow.uniforms.source.value = glowTargets[3].texture;
+    blurGlow.uniforms.direction.value.set(0, 2.5 / glowHeight);
+    renderer.setRenderTarget(glowTargets[4]); renderer.render(screenScene, screenCamera);
+  }
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   screenQuad.material = finishFrame;
   renderer.setRenderTarget(null); renderer.render(screenScene, screenCamera);
@@ -285,7 +296,8 @@ const STATE_MOTION = {
   happy:      { clip: 'idle', bob: .046, bobRate: 1.05, sway: .026, lean: .020, turn: .07, turnRate: .55, clipYaw: 1,   armLift: .20,  shake: 0 },
   grateful:   { clip: 'idle', bob: .020, bobRate: .38, sway: .008, lean: .085,  turn: .03, turnRate: .14, clipYaw: 1,   armLift: .11,  shake: 0 },
   error:      { clip: 'idle', bob: .014, bobRate: .28, sway: .010, lean: -.075, turn: .04, turnRate: .12, clipYaw: 1,   armLift: -.05, shake: 0 },
-  frustrated: { clip: 'idle', bob: .018, bobRate: .40, sway: .014, lean: -.030, turn: 0,   turnRate: 0,   clipYaw: 1,   armLift: .04,  shake: .05 }
+  // shake 0 on purpose: no shaking of any kind for now (owner, 2026-09-29).
+  frustrated: { clip: 'idle', bob: .018, bobRate: .40, sway: .014, lean: -.030, turn: 0,   turnRate: 0,   clipYaw: 1,   armLift: .04,  shake: 0 }
 };
 const DEFAULT_MOTION = STATE_MOTION.idle;
 
@@ -307,7 +319,38 @@ const chestParts = [];
 let action = null, currentClip = '', transition = null;
 let motion = DEFAULT_MOTION, motionMix = DEFAULT_MOTION;   // motionMix eases toward motion
 let phase = 0, mouthLevel = 0, gazeX = 0, gazeY = 0, smoothX = 0, smoothY = 0;
+// One INTEGRATED phase per rate-driven sine (p += rate * dt), never
+// sin(clock * rate): the rates live in motionMix, which blendMotion eases on
+// every state change, and a rate that moves while multiplying the wall clock
+// sweeps the sine argument by (clock × Δrate×2π) — an hour into the kiosk day
+// that is a thousand radians inside one blend, i.e. the head visibly buzzing
+// for a second on EVERY button press, worse the longer the page stays open
+// (owner, 2026-09-30: "สั่นตอนกดจบ และกดเพื่อพูด หรือทำอะไรจะมีสั่นหัว").
+// Same disease the voice-rate twitch died of on 2026-09-29; the cure that
+// comment prescribed is this. `phase` stays for the constant-rate sines
+// (breathe, the shake table entry), where a product with the clock is safe.
+let bobPhase = 0, swayPhase = 0, turnPhase = 0, nodPhase = 0, flapPhase = 0;
 const boneByName = name => bones.find(b => b.name === name);
+
+// ---- attention cue (FOCUS_ATTENTION, app/focus.py attention()) ----
+// The server sends the bearing of whoever is speaking: degrees from the
+// camera axis, + = the ROBOT's left. The GLB faces +z with identity bones
+// (tests check both), so a positive turn about the Neck's Y carries the face
+// toward +x — her own left, which is the robot's left: she turns toward the
+// person. Small on purpose: the face is a decal on a sphere and slides off
+// the front past a certain yaw (YAW IS CAPPED, below). .12 rad (~7 deg) on
+// top of the idle states' .05-.10 sweep stays inside the thinking state's
+// accepted .29; the 'look'-clip states turn by themselves and get none.
+// Judge the number BY EYE on the robot, as the note below says of every yaw.
+const ATTEND_GAIN = .35;          // radians of head per radian of bearing
+const ATTEND_MAX_YAW = .12;
+function attendYaw(bearingDeg) {
+  if (bearingDeg === null || bearingDeg === undefined || bearingDeg === '') return 0;
+  const b = Number(bearingDeg);
+  if (!Number.isFinite(b)) return 0;
+  return Math.max(-ATTEND_MAX_YAW, Math.min(ATTEND_MAX_YAW, b * Math.PI / 180 * ATTEND_GAIN));
+}
+let attendTarget = 0, attendSmooth = 0;
 
 const snapshot = () => bones.map(b => ({ q: b.quaternion.clone(), p: b.position.clone(), s: b.scale.clone() }));
 const applySample = () => bones.forEach((b, i) => {
@@ -378,12 +421,26 @@ function renderStep(dt, handDt = dt) {
     const neck = boneByName('Neck');
     const head = boneByName('Head');
     const root = boneByName('Root');
-    // Speaking bobs with Emma's own voice: mouthLevel comes from the playback
-    // RMS the engine already computes, so the bob follows the syllables rather
-    // than a free-running timer.
-    const voice = mouthLevel;
+    // Voice-driven motion is OFF (owner, 2026-09-29: "ทำไมมีสั่นหยิกๆด้วย
+    // เอาออกไปก่อนยังไม่ต้องมีสั่น"). It fed the playback level into the RATE
+    // of the sines below, and every sine here is sin(phase * rate) with
+    // `phase` = seconds since the page opened. A rate that changes every frame
+    // multiplies that whole history: ten minutes in, a 0.1 change in level
+    // moves the argument by ~400 rad, so each frame lands on a random point of
+    // the wave — a twitch that grows the longer the page stays open. The sines
+    // below integrate their phases now (2026-09-30 — the STATE blend was the
+    // same disease at every button press), so voice motion can come back by
+    // feeding these rates; `mouthLevel` is still kept up to date below.
+    const voice = 0;
     const bobRate = m.bobRate + voice * 1.1;
-    const bob = Math.sin(phase * bobRate * Math.PI * 2) * (m.bob + voice * .020);
+    // Integrated phases: rate × dt this frame, so an eased rate bends the wave
+    // instead of teleporting along it (see the declaration comment).
+    bobPhase += bobRate * dt;
+    swayPhase += m.bobRate * .5 * dt;
+    turnPhase += m.turnRate * dt;
+    nodPhase += (m.bobRate + voice) * dt;
+    flapPhase += (m.bobRate + voice * .8) * dt;
+    const bob = Math.sin(bobPhase * Math.PI * 2) * (m.bob + voice * .020);
     const breathe = Math.sin(phase * .52 * Math.PI * 2) * .006;   // always on
     // += would accumulate on any frame the mixer does not rewrite this track,
     // and a bare = threw away the bone's own rest height: the GLB puts Root at
@@ -393,7 +450,7 @@ function renderStep(dt, handDt = dt) {
     // while the lab showed a clear gap (2026-09-24, owner).
     if (root) root.position.y = rootRestY + bob + breathe;
     if (body) {
-      body.rotation.z += Math.sin(phase * m.bobRate * Math.PI * 2 * .5) * m.sway;
+      body.rotation.z += Math.sin(swayPhase * Math.PI * 2) * m.sway;
       body.rotation.x += m.lean * .45;
     }
     if (neck) {
@@ -406,24 +463,36 @@ function renderStep(dt, handDt = dt) {
       // rotation.y this frame, so this multiplies the clip, once, every frame.
       neck.rotation.y *= m.clipYaw ?? 1;
       neck.rotation.x += m.lean;
-      neck.rotation.y += Math.sin(phase * m.turnRate * Math.PI * 2) * m.turn;
+      neck.rotation.y += Math.sin(turnPhase * Math.PI * 2) * m.turn;
       if (m.shake) neck.rotation.y += Math.sin(phase * 8.2 * Math.PI * 2) * m.shake;
     }
     if (head) {
-      head.rotation.x += Math.sin(phase * (m.bobRate + voice) * Math.PI * 2 + 1.1) * (m.bob * .8 + voice * .05);
+      head.rotation.x += Math.sin(nodPhase * Math.PI * 2 + 1.1) * (m.bob * .8 + voice * .05);
     }
     // Pointer gaze: the page's aim() already restricts look tracking to idle
     // and listening; it writes --gaze-x/--gaze-y and this reads the same
     // normalised target, so the two renderers agree about where she is looking.
     smoothX = THREE.MathUtils.damp(smoothX, gazeX, 5, dt);
     smoothY = THREE.MathUtils.damp(smoothY, gazeY, 5, dt);
-    if (neck) neck.rotateY(-smoothX * .45);
+    // + gazeX = the pointer on the SCREEN's right. The camera sits on +z
+    // looking at a model that faces +z (the attention block above), so the
+    // screen's right is +x — her own left — and looking at the pointer is a
+    // POSITIVE turn, the same sign the attention cue uses for a person on her
+    // left (and the SVG face's translate(+--gaze-x)). This read -smoothX
+    // until review 10 Oct: the two paths turned the same bone in opposite
+    // directions, and the pointer one was the mirrored one.
+    if (neck) neck.rotateY(smoothX * .45);
     if (head) head.rotateX(smoothY * .14);
+    // Attention: eased like the pointer gaze but slower (a head turning, not
+    // an eye darting), back to centre when the server sends null. Only on
+    // the 'idle'-clip states; the 'look' clip already sweeps the same bone.
+    attendSmooth = THREE.MathUtils.damp(attendSmooth, m.clip === 'idle' ? attendTarget : 0, 3, dt);
+    if (neck && attendSmooth) neck.rotateY(attendSmooth);
     // Arms: a lift at the shoulder, eased, so greeting/happy read as open and
     // error reads as dropped without needing bones the model does not have.
     const armL = boneByName('Arm.L');
     const armR = boneByName('Arm.R');
-    const flap = Math.sin(phase * (m.bobRate + voice * .8) * Math.PI * 2) * (m.armLift * .35);
+    const flap = Math.sin(flapPhase * Math.PI * 2) * (m.armLift * .35);
     if (armL) armL.rotation.z += m.armLift + flap;
     if (armR) armR.rotation.z -= m.armLift + flap;
   }
@@ -522,9 +591,11 @@ document.addEventListener('pointerdown', event => {
   } else if (touches.size === 1) {
     spinFrom = { x: event.clientX, y: event.clientY, theta: orbitTheta, phi: orbitPhi };
     tapFrom = chestUnder(event) ? { x: event.clientX, y: event.clientY } : null;
+    startHold(event);
   } else {
     tapFrom = null;                       // a second finger is a pinch, not a tap
   }
+  if (touches.size > 1) endHold();
   wrap.setPointerCapture(event.pointerId);
 }, true);
 document.addEventListener('pointermove', event => {
@@ -540,6 +611,7 @@ document.addEventListener('pointermove', event => {
     }
     return;
   }
+  if (hold && !hold.fired && Math.hypot(event.clientX - hold.x, event.clientY - hold.y) > HOLD_SLOP) endHold();
   if (!spinFrom) return;
   if (debugBox && Math.random() < .08) say(`  move dx=${(event.clientX - spinFrom.x).toFixed(0)} theta=${orbitTheta.toFixed(2)}`);
   // .009 -> .011 rad/px: a drag the width of the mascot itself now carries a
@@ -581,11 +653,52 @@ const chestUnder = event => {
 let tapFrom = null;
 const TAP_SLOP = 6;
 
+// ---- press and hold opens her action buttons (owner, 2026-09-29: "กดค้างที่
+// ตัวหุ่นจะมีปุ่มฟังก์ชั่นขึ้นมา") ----
+// Detected here because this module owns every one-finger gesture on her; the
+// page owns what the hold MEANS and draws everything, the same split as the
+// chest tap. Events on the wrap: 'emma-press-start' {x, y, ms} as a press
+// begins (the page fills a ring under the finger), 'emma-press-end' when it
+// turns into a drag / pinch / release first, and 'emma-long-press' {x, y} once
+// HOLD_MS passes with the finger inside HOLD_SLOP.
+//
+// When it fires, the turn is put back where the press began -- the few pixels
+// of drift inside the slop had already turned her, and a menu that opens on a
+// model that twitched reads as two gestures -- and the rest of that press
+// neither turns her nor counts as a chest tap. HOLD_SLOP is wider than
+// TAP_SLOP because a finger held still for half a second still wanders.
+const HOLD_MS = 500;
+const HOLD_SLOP = 8;
+let hold = null;
+const holdEvent = (name, detail) => wrap.dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
+function startHold(event) {
+  endHold();
+  hold = { id: event.pointerId, x: event.clientX, y: event.clientY,
+           theta: orbitTheta, phi: orbitPhi, fired: false };
+  hold.timer = setTimeout(() => {
+    if (!hold) return;
+    hold.fired = true;
+    orbitTheta = hold.theta; orbitPhi = hold.phi;
+    spinFrom = null; tapFrom = null;
+    holdEvent('emma-long-press', { x: hold.x, y: hold.y });
+  }, HOLD_MS);
+  holdEvent('emma-press-start', { x: hold.x, y: hold.y, ms: HOLD_MS });
+}
+function endHold() {
+  if (!hold) return;
+  clearTimeout(hold.timer);
+  if (!hold.fired) holdEvent('emma-press-end', {});
+  hold = null;
+}
+
 const endSpin = event => {
   const tapped = event.type === 'pointerup' && tapFrom
     && Math.abs(event.clientX - tapFrom.x) <= TAP_SLOP
     && Math.abs(event.clientY - tapFrom.y) <= TAP_SLOP;
   tapFrom = null;
+  // Only the pointer that is holding ends the hold: these listeners hear every
+  // pointer on the page, and a second finger lifting elsewhere is not a release.
+  if (hold && event.pointerId === hold.id) endHold();
   if (!touches.delete(event.pointerId) && !spinFrom) return;
   if (!touches.size) { spinFrom = null; pinchFrom = null; }
   if (wrap.hasPointerCapture?.(event.pointerId)) wrap.releasePointerCapture(event.pointerId);
@@ -607,14 +720,34 @@ wrap.addEventListener('keydown', event => {
 // what makes the default min(88vw,360px), the app-shell min(72vw,610px), the
 // <=520px min(88vw,410px), the max-height:760px min(70vw,285px) and the
 // staging min(30vw,150px) all work with no further code. ----
+//
+// The page zooms her with a CSS transform on the wrap (voice-preview.html
+// setMascotScale, --user-scale .65-1.35), and a ResizeObserver never fires for
+// a transform. So the drawing buffer stayed at its zoom-1 size and zooming in
+// only stretched that bitmap: soft at 1.35 (owner, 2026-09-29 "ซูมแล้วดู
+// เบลอๆ"). The buffer is now the LAYOUT box times the page's own scale, read
+// from the same --user-scale the transform uses, and re-sized on the event the
+// page fires for every wheel / pinch / key / Home. The capped ratio bounds the
+// fill cost if the zoom range ever grows: 2 x 1.35 = 2.7 today.
+const MAX_PIXEL_RATIO = 3;
+let bufferScale = 0;
+function userScale() {
+  return parseFloat(getComputedStyle(wrap).getPropertyValue('--user-scale')) || 1;
+}
 function resize() {
-  const { width, height } = wrap.getBoundingClientRect();
+  // offsetWidth/Height: the box before the transform. getBoundingClientRect()
+  // here used to include whatever zoom happened to be on at the last layout
+  // change, and nothing at all of a zoom applied afterwards.
+  const width = wrap.offsetWidth, height = wrap.offsetHeight;
   if (!width || !height) return;
+  const scale = userScale();
+  bufferScale = scale;
   // The staging corner is ~130-150px wide. A 0.3x glow buffer there is ~40
   // texels across and the 17-tap blur goes visibly blocky, so the pixel ratio
   // is eased down and the glow scale eased UP on small canvases.
-  const small = Math.min(width, height) < 210;
-  renderer.setPixelRatio(small ? Math.min(devicePixelRatio, 1.5) : Math.min(devicePixelRatio, 2));
+  const small = Math.min(width, height) * scale < 210;
+  const base = small ? Math.min(devicePixelRatio, 1.5) : Math.min(devicePixelRatio, 2);
+  renderer.setPixelRatio(Math.min(MAX_PIXEL_RATIO, base * scale));
   camera.aspect = width / height; camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
   const pixelRatio = renderer.getPixelRatio();
@@ -623,25 +756,44 @@ function resize() {
   glowWidth = Math.max(1, Math.round(width * pixelRatio * glowScale));
   glowHeight = Math.max(1, Math.round(height * pixelRatio * glowScale));
   glowTargets.forEach(t => t.setSize(glowWidth, glowHeight));
+  glowTick = 0;   // reallocated targets are black until the next glow pass
 }
 new ResizeObserver(resize).observe(wrap);
+// Drags fire this event too (it carries x/y as well): only a changed scale
+// re-sizes, at most once a frame, because every re-size reallocates the HDR
+// and glow targets and a pinch sends a stream of them.
+let rescalePending = false;
+wrap.addEventListener('emma-transform-change', () => {
+  if (rescalePending) return;
+  rescalePending = true;
+  requestAnimationFrame(() => {
+    rescalePending = false;
+    if (Math.abs(userScale() - bufferScale) > .005) resize();
+  });
+});
 resize();
 
 // ---- load the approved model ----
-// emma-light-68k.glb is the SAME sculpt at a coarser grid: 68,322 triangles
-// against 162,380, 2.38 MB against 5.13 MB. Same 29 nodes, 22 meshes, 6
-// materials, 2 clips, 1 skin, same names -- checked, because a reduction that
-// silently renames a node takes the chest button with it (the tap target is
-// found by the name 'Chest__...'). The shape is unchanged; a x6 amplified pixel
-// diff puts the whole difference on the chrome highlight and the silhouette
-// edge (mean 7.87/255, .tmp/stage-design-20260924/poly-compare.png).
-// emma.glb, the 162k original, is still beside it: switching back is this one
-// line -- kept switchable on purpose, the same way the old arms were.
-// Measured on an RTX 5060 at 900x1250, median frame time: 3.30 ms full vs
-// 2.60 ms light, and the glow chain costs 0.50 ms on the full model against
-// 0.10 ms on this one, because that pass submits the whole model a second time.
+// emma.glb, the 162k original the owner signed off. From 2026-09-25 to -29
+// this loaded emma-light-68k.glb (68,322 triangles, 2.38 MB), and that was
+// wrong in a way the sign-off could not see: every check of it was a FRONT
+// view (.tmp/stage-design-20260924/poly-compare.png, and a whole-frame mean of
+// ~1/255), where the head's chrome side band is seen edge-on. Turned, the band
+// edge tore into scallops (owner, 2026-09-29: "ขอบที่ดูขาดๆ ตรงรอยต่อหัว").
+// Cause, measured: the light build put "Head" in EMMA_LOD_ONLY, which cut the
+// pearl shell ('Head / pearl shell', mesh "Sphere") from 20,224 to 1,628
+// triangles; its flat facets sag up to .007 inside the curve, deeper than the
+// band edge's .004 inset (BAND_BASE .996 in emma_sculpt_body.py), so the band
+// pokes through mid-facet and sinks at every vertex. The band mesh itself is
+// fixed at 256x12 in both files. Swapping ONLY the shell between the two GLBs
+// moves the tear with it. A lighter model that keeps a fine shell (drop "Head"
+// from EMMA_LOD_ONLY, ~+18.6k triangles) is a rebuild in Blender, not built or
+// checked yet -- and any future reduction must be compared from the side and
+// from above, not just the front. Cost of going back, RTX 5060 at 900x1250,
+// median frame: 3.30 ms here vs 2.60 ms light (the robot screen is unmeasured
+// for both).
 try {
-  const gltf = await new GLTFLoader().loadAsync('/assets/emma-3d-lab/emma-light-68k.glb');
+  const gltf = await new GLTFLoader().loadAsync('/assets/emma-3d-lab/emma.glb');
   model = gltf.scene; clips = gltf.animations;
   // Per-material environment intensity, VERBATIM from viewer.js. NOTE, and do
   // not "fix" this: 'Graphite joints' and 'Soft white glove' match no material
@@ -668,6 +820,12 @@ try {
     // the GLB spelling found nothing and the button silently did not exist —
     // measured, not guessed (hasChestButton() was false with setAccent working).
     if (o.name.startsWith('Chest__')) chestParts.push(o);
+    // The hover ring under her is out (owner, 2026-09-30: "อันนี้ลบทิ้งหรือ
+    // เอาออกไปได้เลย" — the ring assembly under her feet). Hidden, not
+    // deleted from the GLB: the mesh shares 'White light' with the chest
+    // lamp, and re-exporting the model to remove one torus risks the seams
+    // all over again. The soft floor shadow stays; only the ring goes.
+    if (o.name.startsWith('Hover__')) o.visible = false;
   });
   model.traverse(o => { if (o.isBone) bones.push(o); });
   // Read the rest height BEFORE any clip or procedural motion touches it.
@@ -761,4 +919,10 @@ window.EmmaMascot = Object.freeze({
     return true;
   },
   hasChestButton: () => chestParts.length > 0,
+  // FOCUS_ATTENTION: turn toward this bearing (+ = the robot's left, degrees);
+  // null = back to centre. A target, not a pose: the render loop eases to it.
+  attend(bearingDeg) {
+    attendTarget = attendYaw(bearingDeg);
+    return true;
+  },
 });

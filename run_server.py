@@ -6,8 +6,6 @@ this project's HOST and PORT variables as bind options.  This entrypoint does.
 from __future__ import annotations
 
 import os
-import logging
-import re
 import socket
 import sys
 import threading
@@ -29,26 +27,13 @@ import uvicorn
 from app.config import settings
 
 
-class _TokenRedactionFilter(logging.Filter):
-    """Remove reusable query credentials from Uvicorn's WebSocket lines."""
-
-    _TOKEN = re.compile(r"([?&]token=)[^&\s\"]+")
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        if record.args:
-            record.args = tuple(
-                self._TOKEN.sub(r"\1***", value) if isinstance(value, str) else value
-                for value in record.args
-            )
-        if isinstance(record.msg, str):
-            record.msg = self._TOKEN.sub(r"\1***", record.msg)
-        return True
-
-
-def _install_token_redaction() -> None:
-    redact = _TokenRedactionFilter()
-    for name in ("uvicorn.error", "uvicorn.access"):
-        logging.getLogger(name).addFilter(redact)
+# The filter lives in app/log_redaction.py and app.main installs it on import,
+# so the process that actually serves requests has it — with DEV_RELOAD that is
+# a spawned worker, which a filter added only here never reached (tokens were
+# logged in the clear, 2026-09-29). Installed here too for this process's own
+# lines; the install is idempotent.
+from app.log_redaction import TokenRedactionFilter as _TokenRedactionFilter
+from app.log_redaction import install as _install_token_redaction
 
 
 def _open_when_up(url: str, delay: float = 2.5) -> None:
@@ -157,6 +142,19 @@ if __name__ == "__main__":
         # kiosk pages authenticate in that query, so request logging would
         # persist the credential on disk/stdout.
         access_log=False,
+        # proxy_headers stays uvicorn's default (trust X-Forwarded-For from
+        # 127.0.0.1) ON PURPOSE. Turning it off was tried on 2026-09-29 to
+        # stop a loopback caller rotating made-up addresses past the face
+        # scan's per-address PIN lockout, and the review of that fix found
+        # the worse trade: with it off, a reverse proxy on this machine
+        # (tailscale serve — the documented HTTPS route for MULTI_SESSION)
+        # makes every remote client arrive as 127.0.0.1, and /console,
+        # /data-console and the face scan's loopback gate treat loopback as
+        # trusted. With it on, a forged header can only make a caller look
+        # LESS trusted (a non-loopback address). The rotation it allows is
+        # bounded in face_scan instead: the wrong-PIN table holds at most
+        # MAX_FAILURE_KEYS addresses, and a new one past that is refused
+        # without its PIN being compared.
         ssl_certfile=cert,
         ssl_keyfile=key,
     )

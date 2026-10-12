@@ -1,9 +1,11 @@
 package com.emma.robot.control;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.hardware.input.InputManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,8 +16,14 @@ import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.graphics.Typeface;
+import android.text.InputType;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -52,8 +60,16 @@ import java.util.concurrent.atomic.AtomicInteger;
  * must arm this screen once with A, then move the left stick. Returning the
  * stick to centre is the driving deadman; B and every loss-of-control path
  * still stop and disarm the chassis.
+ *
+ * It is also the native end of Emma's body and navigation
+ * (docs/emma-body-nav-design-2026-10-08.md): it implements the face's
+ * {@link EmmaFace.Bridge}, owns the {@link BodyController} (one lock on the
+ * arm) and the {@link NavLauncher} (one leg of a walk through su), and the
+ * native red SafetyBar -- the only STOP on screen, so it still works when the
+ * page, the WebView or the server is dead. Every stop path stops BOTH.
  */
-public final class MainActivity extends Activity implements InputManager.InputDeviceListener {
+public final class MainActivity extends Activity
+        implements InputManager.InputDeviceListener, EmmaFace.Bridge {
     private static final String TAG = "EmmaRobotAndroid";
     private static final String BASE_URL = "http://192.168.11.1:1448";
     private static final String ACTIONS = "/api/core/motion/v1/actions";
@@ -64,7 +80,6 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     private static final String SDK_HOST = "192.168.11.1";
     private static final int SDK_PORT = 1445;
     private static final String VENDOR_PACKAGE = "com.aobo.robot.ai3";
-    private static final String SU_BINARY = "/system/xbin/su";
     private static final int ARM_GROUP_MIN = 1;
     private static final int ARM_GROUP_MAX = 26;
     private static final int SERVO_CHANNEL_MIN = 1;
@@ -91,6 +106,17 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final AtomicBoolean pumping = new AtomicBoolean(false);
     private final AtomicInteger generation = new AtomicInteger(0);
+    /** Bumped by every stopAndDisarm. An operator arm command checks
+     *  `upperBodyArmed` on the UI thread and then waits its turn on `io` --
+     *  behind a stick drive, a base-status poll (up to ~26 s) or the ~5 s arm
+     *  connect. Review 12 Oct: B pressed in that gap sent #STOP, and then the
+     *  queued group ran anyway. A command runs only if no stop came after it
+     *  was queued. (Not `generation`: a stick direction change bumps that.) */
+    private final AtomicInteger armStops = new AtomicInteger(0);
+    // The greeting's rest-return (group 99 on #AGF + hold, a fallback timer,
+    // voided by any stop or operator group) moved into BodyController, which
+    // now does the same for every arm gesture: one lock, one wave counter.
+    private static final String FACE_TOKEN = "face_token";
 
     private InputManager inputManager;
     private TextView controllerText;
@@ -116,11 +142,51 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     private volatile SlamwareCorePlatform sdkPlatform;
     private volatile IMoveAction sdkMove;
     private volatile boolean upperBodyArmed = false;
+    /** The arm board's serial link was up (onArmConnected) -- so a disconnect
+     *  is a real loss, not the SDK tidying up before its first connect. */
+    private volatile boolean armLinkUp = false;
+    private volatile boolean faceForeground = false;
     private volatile int selectedArmGroup = 3;
     private volatile int selectedServoChannel = 5;
     private volatile int selectedServoPulse = 1500;
     private MotionDraft motionDraft;
     private ArmController upperBody;
+    private EmmaFace emmaFace;
+    private BodyController body;
+    private NavLauncher nav;
+    /** The walk back to the dock after idle (owner 10 Oct, default off). */
+    private AutoReturn autoReturn;
+    /** The Emma server on the robot itself (scripts/robot_server.py): started
+     *  and watched from here, never stopped -- it serves the face. */
+    private ServerLauncher server;
+    private TextView serverText;
+    /** The mic array's direction features (docs/listening-focus-2026-10-09.md):
+     *  runs only while the face is in front and the server asks for it. */
+    private ArrayListener array;
+    private TextView arrayText;
+    private Button arrayButton;
+    private volatile boolean windowFocused = false;
+    private Button bodyEnabledButton;
+    private Button directionKnownButton;
+    private Button navEnabledButton;
+    private Button armRestButton;
+    private Button autoReturnButton;
+    private TextView autoIdleText;
+    private Button voiceChannelButton;
+    private TextView voiceChannelsText;
+    private TextView poseTargetText;
+    private TextView bodyNavText;
+    private TextView navCheckText;
+    private EditText faceTokenInput;
+    private int poseTargetIndex = 0;
+    private static final long CORNER_HOLD_MS = 3000;   // deliberate 3s hold, not a stray long-press
+    private boolean cornerHeld;
+    private final Runnable cornerRevealRun = () -> {
+        if (cornerHeld) { cornerHeld = false; toggleOperator(); }
+    };
+    private View operatorRoot;
+    private volatile boolean operatorVisible = false;
+    private boolean startHeld = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -131,11 +197,24 @@ public final class MainActivity extends Activity implements InputManager.InputDe
         motionDraft = MotionDraft.fromJson(studio.getString(STUDIO_DRAFT, ""));
         upperBody = new ArmController(this, new ArmController.Listener() {
             @Override public void onArmConnected(String port) {
-                upperBodyArmed = true;
+                // Review2 #24: no `upperBodyArmed = true` here. The SDK posts
+                // this to the main looper AFTER its connect thread set the
+                // flag ArmController.connect polls, so for a voice gesture it
+                // could land after ensureArm's reset and leave the operator's
+                // Y/servo/draft keys working without X. Arming happens only in
+                // connectUpperBody (the X press).
+                armLinkUp = true;
                 updateUpperBody("แขน: เชื่อมแล้ว " + port, 0xFF5EE6A8);
             }
             @Override public void onArmDisconnected() {
                 upperBodyArmed = false;
+                // Review #13: a frame gesture whose board dropped off never
+                // finished -- busy, the SafetyBar and every gate stuck until
+                // somebody pressed STOP (which then latched body AND nav for
+                // 60 s). halt() ends it with no latch.
+                boolean wasUp = armLinkUp;
+                armLinkUp = false;
+                if (wasUp && body != null) body.halt();
                 updateUpperBody("แขน: ยังไม่เชื่อม", 0xFFFFC857);
             }
             @Override public void onArmError(String detail) {
@@ -148,9 +227,98 @@ public final class MainActivity extends Activity implements InputManager.InputDe
             @Override public void onArmData(String data) {
                 updateArmCommand("ตอบ: " + data, 0xFF5EE6A8);
             }
+            @Override public void onArmFinished() {
+                // #AGF is the board's own "the action group finished" -- the
+                // only measured end-of-gesture signal this side has (11x #CC
+                // then #AGF inside 13s for group 6, read on 2026-09-30).
+                // ArmController frames it across serial reads (review #30):
+                // a per-chunk contains() here missed a split "#A" | "GF".
+                if (body != null) body.onArmFinished();
+            }
+            @Override public void onArmLinkLost(String why) {
+                // Review2 #10: a dead CH340 never cleared the SDK's flag, so
+                // this used to go unnoticed: gestures "done" with nothing
+                // moving, no reconnect until an app restart. Any thread.
+                upperBodyArmed = false;
+                if (body != null) body.armLost();
+                updateUpperBody("แขน: บอร์ดแขนหลุด (" + why + ") — กด X เพื่อเชื่อมใหม่", 0xFFFF5F73);
+            }
         });
-        setContentView(buildUi());
+        body = new BodyController(this, upperBody, io, new BodyController.Host() {
+            @Override public boolean foreground() { return faceForeground && windowFocused; }
+            @Override public boolean operatorVisible() { return operatorVisible; }
+            @Override public String navBlock() { return nav == null ? "nav_unknown" : nav.bodyBlock(); }
+            @Override public void ensureArm() throws Exception {
+                if (!upperBody.isConnected()) {
+                    stopConflictingVendorApp();
+                    upperBody.connect();
+                }
+                // a voice gesture unlocks none of the operator's manual controls
+                upperBodyArmed = false;
+            }
+            @Override public void changed() { bodyOrNavChanged(true); }
+        });
+        nav = new NavLauncher(this, new NavLauncher.Host() {
+            @Override public boolean foreground() { return faceForeground && windowFocused; }
+            @Override public boolean operatorVisible() { return operatorVisible; }
+            @Override public boolean bodyLatched() { return body.latched(); }
+            @Override public boolean bodyBusy() { return body.busy(); }
+            @Override public void runArmWork(Runnable work) { io.execute(work); }
+            @Override public boolean restArms(long timeoutMs) { return body.restBeforeRun(timeoutMs); }
+            @Override public void releaseBase() throws Exception {
+                stopConflictingVendorApp();
+                disconnectSdk();
+            }
+            @Override public void deleteBoardAction() {
+                try {
+                    request("DELETE", CURRENT_ACTION, null);
+                } catch (Exception ignored) {
+                    // best effort: the controller was already interrupted/killed
+                }
+            }
+            @Override public void changed() { bodyOrNavChanged(false); }
+        });
+        autoReturn = new AutoReturn(this, nav, ui, new AutoReturn.Host() {
+            @Override public boolean operatorVisible() { return operatorVisible; }
+            @Override public void changed() { bodyOrNavChanged(false); }
+        });
+        emmaFace = new EmmaFace(this, this);
+        server = new ServerLauncher(this, new ServerLauncher.Host() {
+            @Override public String serverUrl() { return emmaFace.serverUrl(); }
+            @Override public void changed() { publishServerStatus(); }
+        });
+        array = new ArrayListener(this, new ArrayListener.Host() {
+            @Override public String doaUrl() { return emmaFace.doaSocketUrl(); }
+            @Override public String faceToken() {
+                return getSharedPreferences(BodyController.PREFS, MODE_PRIVATE).getString(FACE_TOKEN, "");
+            }
+            @Override public void changed() { publishArrayStatus(); }
+        });
+        operatorRoot = buildUi();
+        FrameLayout stack = new FrameLayout(this);
+        stack.addView(emmaFace.view(), new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        stack.addView(operatorRoot, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        operatorRoot.setVisibility(View.GONE);   // customer sees Emma; the operator UI stays hidden
+        // No SafetyBar any more (owner, 10 Oct 2026: "ปุ่มแดงๆ ตรงนี้เอาออกได้ไหม"
+        // -> "เอาออกทั้งหมด", after being told the other ways to stop). A walk
+        // stops on the robot's E-stop button, gamepad B, the operator screen's
+        // STOP, a spoken stop (move_body/stop_moving), the app pausing or
+        // losing focus, and the main switch.
+        setContentView(stack);
+        // An app killed with its whole cgroup (SIGKILL, no cancel) can leave a
+        // controller or a board action behind: every start reaps an orphan of a
+        // dead app launcher (never a PC run).
+        nav.reapOnStart();
+        // Reveal the operator screen without a gamepad: a DELIBERATE 3-second hold
+        // in the top-left corner. A stock long-press fires at ~0.5s, so a customer
+        // resting a finger in the corner would open the chassis controls; the hold
+        // is tracked in dispatchTouchEvent (observes, never consumes the taps the
+        // Emma page needs) and cancelled the moment the finger moves out or lifts.
         showState("ยังไม่เปิดควบคุม", 0xFFFFC857);
+        emmaFace.start(getIntent());
+        autoReturn.start();
     }
 
     private View buildUi() {
@@ -176,6 +344,17 @@ public final class MainActivity extends Activity implements InputManager.InputDe
         stateText.setGravity(Gravity.CENTER);
         root.addView(controllerText, matchWrap(0, 10, 0, 10));
         root.addView(baseText, matchWrap(0, 10, 0, 10));
+        // one line: running / starting / not installed / failed + the last error
+        serverText = text(server == null ? "" : server.statusLine(), 17, 0xFFB8C7D9);
+        root.addView(serverText, matchWrap(0, 4, 0, 10));
+        // the 8-channel direction capture: its state, and the robot-side way
+        // out if it turns out to fight the face's own microphone
+        arrayText = text("", 15, 0xFFB8C7D9);
+        root.addView(arrayText, matchWrap(0, 2, 0, 4));
+        arrayButton = button("", 0xFF31465E);
+        arrayButton.setOnClickListener(v -> array.setEnabled(!array.enabled()));
+        root.addView(arrayButton, matchWrap(0, 2, 0, 10));
+        publishArrayStatus();
         root.addView(axesText, matchWrap(0, 10, 0, 24));
         root.addView(stateText, matchWrap(0, 18, 0, 24));
 
@@ -192,7 +371,12 @@ public final class MainActivity extends Activity implements InputManager.InputDe
 
         Button stop = button("■ หยุดและล็อกทันที (B)", 0xFFB3263E);
         stop.setTextSize(22);
-        stop.setOnClickListener(v -> stopAndDisarm("หยุดและล็อกแล้ว"));
+        stop.setOnClickListener(v -> {
+            // review #21: a live walk's DELETE comes from NavLauncher.escalate,
+            // last, after the controller is stopped -- not from here at once
+            boolean navLive = stopBodyAndNav(null, "stop_pressed", true);
+            stopAndDisarm("หยุดและล็อกแล้ว", true, !navLive);
+        });
         root.addView(stop, matchWrap(0, 18, 0, 20));
 
         TextView armTitle = text("แขนและนิ้ว", 23, Color.WHITE);
@@ -269,6 +453,8 @@ public final class MainActivity extends Activity implements InputManager.InputDe
         root.addView(studioRow, matchWrap(0, 4, 0, 8));
         publishDraftStatus();
 
+        buildBodyNavControls(root);
+
         armCommandText = text("ยังไม่ได้ส่งคำสั่งแขน", 15, 0xFFB8C7D9);
         armCommandText.setGravity(Gravity.CENTER);
         root.addView(armCommandText, matchWrap(0, 4, 0, 8));
@@ -293,6 +479,317 @@ public final class MainActivity extends Activity implements InputManager.InputDe
         root.addView(help, matchWrap(0, 16, 0, 0));
         scroll.addView(root);
         return scroll;
+    }
+
+    /** Body or nav state changed: tell the page. (This used to raise or drop
+     *  the SafetyBar too; the bar was removed on the owner's call, 10 Oct.) */
+    private void publishBodyNavStatusSoon() {
+        ui.post(this::publishBodyNavStatus);
+    }
+
+    private void bodyOrNavChanged(boolean bodyChanged) {
+        if (emmaFace != null) {
+            if (bodyChanged) emmaFace.bodyChanged();
+            else emmaFace.navChanged();
+        }
+        publishBodyNavStatusSoon();
+    }
+
+    /**
+     * Every stop path calls BOTH -- the SafetyBar, gamepad B, the operator
+     * STOP, the bridge stops, the app pausing, focus loss, opening the operator
+     * screen and the app closing. Nav first: its cancel token is what keeps a launch that
+     * is still behind the arm rest from ever reaching su; the body stop then
+     * wakes that rest wait. Both set their latch on this thread.
+     *
+     * Returns whether a walk (this app's, or a PC run the poller sees) was
+     * live when the stop was pressed: NavLauncher.escalate then owns the board
+     * DELETE, in order (review #21).
+     */
+    private boolean stopBodyAndNav(String bodyReason, String navReason, boolean explicit) {
+        boolean navWasActive = nav != null && nav.stop(navReason, explicit);
+        if (body != null) body.stop(bodyReason);
+        return navWasActive;
+    }
+
+    // ---- EmmaFace.Bridge (UI thread, cached state only) ----------------------
+
+    @Override public void armGreeting() {
+        requestArmGreeting();
+    }
+
+    @Override public String bodyList() {
+        return body.list();
+    }
+
+    @Override public String bodyStatus() {
+        return body.status();
+    }
+
+    @Override public String bodyStop() {
+        stopBodyAndNav(null, "stop_pressed", true);
+        return "{\"accepted\":true}";
+    }
+
+    @Override public String bodyGesture(String id) {
+        return body.request(id);
+    }
+
+    @Override public String navPlaces() {
+        return nav.places();
+    }
+
+    @Override public String navStatus() {
+        return nav.status();
+    }
+
+    @Override public String navGo(String placeId, String origin) {
+        // tap/voice only: "auto" is AutoReturn's, after its warning was on
+        // screen. EmmaFace's NAV_GO shape already says so; this is the
+        // second lock on the same door.
+        if (!NavRules.pageOrigin(origin)) return "{\"accepted\":false,\"reason\":\"bad_request\",\"run_id\":null}";
+        return nav.go(placeId, origin);
+    }
+
+    /** emma-nav:auto -- the auto-return state for the face's banner. */
+    @Override public String navAuto() {
+        return autoReturn.json();
+    }
+
+    /** emma-nav:auto:shown -- the warning banner is on screen now. */
+    @Override public String navAutoShown() {
+        autoReturn.shown();
+        return autoReturn.json();
+    }
+
+    /** emma-nav:auto:stay -- "อยู่ต่อ" / "รับทราบ". */
+    @Override public String navAutoStay() {
+        autoReturn.stay();
+        return autoReturn.json();
+    }
+
+    /** emma-nav:activity:* -- a call started or ended, somebody spoke in it.
+     *  Can only hold a walk back, never start one. */
+    @Override public String navActivity(String kind) {
+        autoReturn.activity(kind);
+        return autoReturn.json();
+    }
+
+    @Override public String navStop() {
+        stopBodyAndNav(null, "stop_pressed", true);
+        return "{\"accepted\":true}";
+    }
+
+    /** Review #14: the WebView renderer died and EmmaFace is rebuilding the
+     *  page. The page was the conversation that asked for whatever is moving;
+     *  nobody can answer for it now, so the walk and the arm stop -- as loss of
+     *  control, not as a STOP somebody pressed (that reason would lie in the
+     *  turn log, the way review #26 found for the other stop paths). */
+    @Override public void pageLost() {
+        stopBodyAndNav("not_foreground", "app_lost", false);
+    }
+
+    /** Typed on the operator screen; read by the trusted page once on ready
+     *  for face_hello. Never in a URL. */
+    @Override public String faceToken() {
+        try {
+            return new JSONObject().put("token",
+                    getSharedPreferences(BodyController.PREFS, MODE_PRIVATE).getString(FACE_TOKEN, ""))
+                    .toString();
+        } catch (Exception e) {
+            return "{\"token\":\"\"}";
+        }
+    }
+
+    // ---- operator screen: voice body + navigation --------------------------------
+
+    private void buildBodyNavControls(LinearLayout root) {
+        TextView title = text("ท่าทางด้วยเสียงและการนำทาง (ตั้งค่าบนหุ่น)", 20, Color.WHITE);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, matchWrap(0, 18, 0, 4));
+        TextView sides = text("ซ้าย/ขวาของท่าทาง = ของตัวหุ่นเอง: แขนซ้ายของหุ่น (ขวามือเราเมื่อยืนหน้าหุ่น)",
+                14, 0xFFFFC0A8);
+        sides.setGravity(Gravity.CENTER);
+        root.addView(sides, matchWrap(0, 2, 0, 6));
+
+        bodyEnabledButton = button("", 0xFF31465E);
+        bodyEnabledButton.setOnClickListener(v -> body.setEnabled(!body.enabled()));
+        root.addView(bodyEnabledButton, matchWrap(0, 4, 0, 4));
+        directionKnownButton = button("", 0xFF31465E);
+        directionKnownButton.setOnClickListener(v -> body.setAllowDirectionKnown(!body.allowDirectionKnown()));
+        root.addView(directionKnownButton, matchWrap(0, 4, 0, 4));
+        navEnabledButton = button("", 0xFF31465E);
+        navEnabledButton.setOnClickListener(v -> nav.setEnabled(!nav.enabled()));
+        root.addView(navEnabledButton, matchWrap(0, 4, 0, 4));
+        armRestButton = button("", 0xFF31465E);
+        armRestButton.setOnClickListener(v -> {
+            nav.setRequireArmRest(!nav.requireArmRest());
+            publishBodyNavStatus();
+        });
+        root.addView(armRestButton, matchWrap(0, 4, 0, 8));
+
+        // Owner 10 Oct: "ทำงานเสร็จก็ให้เข้าไปชาร์จที่แท่น". Off by default;
+        // the idle time steps with ◀ ▶ (no dialog: a dialog takes window
+        // focus, and focus loss is a stop path).
+        autoReturnButton = button("", 0xFF31465E);
+        autoReturnButton.setOnClickListener(v -> autoReturn.setEnabled(!autoReturn.enabled()));
+        root.addView(autoReturnButton, matchWrap(0, 4, 0, 4));
+        LinearLayout idleRow = new LinearLayout(this);
+        idleRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button idleDown = button("◀", 0xFF31465E);
+        Button idleUp = button("▶", 0xFF31465E);
+        autoIdleText = text("", 15, 0xFF80DFFF);
+        autoIdleText.setGravity(Gravity.CENTER);
+        idleDown.setOnClickListener(v -> autoReturn.stepIdle(-1));
+        idleUp.setOnClickListener(v -> autoReturn.stepIdle(1));
+        idleRow.addView(idleDown, weightedWrap());
+        idleRow.addView(autoIdleText, weightedWrap());
+        idleRow.addView(idleUp, weightedWrap());
+        root.addView(idleRow, matchWrap(0, 4, 0, 8));
+
+        // The voice channel allow-list is toggled for the channel selected
+        // above, so its camera evidence (channelEvidence) is on screen beside it.
+        voiceChannelButton = button("", 0xFF73551A);
+        voiceChannelButton.setOnClickListener(v -> {
+            int channel = selectedServoChannel;
+            body.setVoiceChannel(channel, !body.voiceChannels().contains(channel));
+            publishServoSelection();
+        });
+        root.addView(voiceChannelButton, matchWrap(0, 4, 0, 2));
+        voiceChannelsText = text("", 14, 0xFFB8C7D9);
+        voiceChannelsText.setGravity(Gravity.CENTER);
+        root.addView(voiceChannelsText, matchWrap(0, 2, 0, 8));
+
+        // No dialog for picking the id: a dialog takes window focus, and focus
+        // loss is a stop path that latches the arm and the walk.
+        LinearLayout targetRow = new LinearLayout(this);
+        targetRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button targetDown = button("◀", 0xFF31465E);
+        Button targetUp = button("▶", 0xFF31465E);
+        poseTargetText = text("", 15, 0xFF80DFFF);
+        poseTargetText.setGravity(Gravity.CENTER);
+        targetDown.setOnClickListener(v -> selectPoseTarget(-1));
+        targetUp.setOnClickListener(v -> selectPoseTarget(1));
+        targetRow.addView(targetDown, weightedWrap());
+        targetRow.addView(poseTargetText, weightedWrap());
+        targetRow.addView(targetUp, weightedWrap());
+        root.addView(targetRow, matchWrap(0, 4, 0, 4));
+        Button savePose = button("บันทึกร่างนี้เป็นท่า…", 0xFF167A58);
+        savePose.setOnClickListener(v -> saveDraftAsPose());
+        root.addView(savePose, matchWrap(0, 4, 0, 8));
+
+        LinearLayout latchRow = new LinearLayout(this);
+        latchRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button clearBodyLatch = button("ล้างการล็อกท่าทาง", 0xFF653142);
+        Button clearNavLatch = button("ล้างการล็อกการเดิน", 0xFF653142);
+        clearBodyLatch.setOnClickListener(v -> body.clearLatch());
+        clearNavLatch.setOnClickListener(v -> nav.clearLatch());
+        latchRow.addView(clearBodyLatch, weightedWrap());
+        latchRow.addView(clearNavLatch, weightedWrap());
+        root.addView(latchRow, matchWrap(0, 4, 0, 8));
+
+        Button check = button("ตรวจระบบนำทาง (ไม่ขยับ)", 0xFF16677A);
+        check.setOnClickListener(v -> {
+            navCheckText.setText("กำลังตรวจ…");
+            nav.check(() -> ui.post(() -> navCheckText.setText(nav.checkResult())));
+        });
+        root.addView(check, matchWrap(0, 4, 0, 2));
+        navCheckText = text("", 12, 0xFFB8C7D9);
+        navCheckText.setTypeface(Typeface.MONOSPACE);
+        root.addView(navCheckText, matchWrap(0, 2, 0, 8));
+
+        faceTokenInput = new EditText(this);
+        faceTokenInput.setHint("face token (ROBOT_FACE_TOKEN ของเซิร์ฟเวอร์)");
+        faceTokenInput.setTextColor(Color.WHITE);
+        faceTokenInput.setHintTextColor(0xFF728392);
+        faceTokenInput.setSingleLine(true);
+        faceTokenInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        root.addView(faceTokenInput, matchWrap(0, 4, 0, 2));
+        Button saveToken = button("บันทึก face token", 0xFF31465E);
+        saveToken.setOnClickListener(v -> {
+            String token = faceTokenInput.getText().toString().trim();
+            getSharedPreferences(BodyController.PREFS, MODE_PRIVATE).edit().putString(FACE_TOKEN, token).apply();
+            faceTokenInput.setText("");      // never shown back, like WS_TOKEN
+            updateArmCommand(token.isEmpty() ? "ล้าง face token แล้ว" : "บันทึก face token แล้ว", 0xFF5EE6A8);
+        });
+        root.addView(saveToken, matchWrap(0, 4, 0, 4));
+
+        bodyNavText = text("", 14, 0xFFB8C7D9);
+        bodyNavText.setGravity(Gravity.CENTER);
+        root.addView(bodyNavText, matchWrap(0, 4, 0, 8));
+        publishBodyNavStatus();
+    }
+
+    private void publishServerStatus() {
+        ui.post(() -> {
+            if (serverText == null || server == null) return;
+            ServerRules.State state = server.state();
+            serverText.setText(server.statusLine());
+            serverText.setTextColor(state == ServerRules.State.RUNNING ? 0xFF5EE6A8
+                    : state == ServerRules.State.OFF ? 0xFFB8C7D9
+                    : state == ServerRules.State.FAILED ? 0xFFFF5F73 : 0xFFFFC857);
+        });
+    }
+
+    private void publishArrayStatus() {
+        ui.post(() -> {
+            if (arrayText == null || array == null) return;
+            arrayText.setText(array.statusLine());
+            arrayText.setTextColor(array.statusColor());
+            arrayButton.setText("ฟังทิศเสียงด้วยไมค์ 8 ช่อง: " + onOff(array.enabled()));
+        });
+    }
+
+    private static String onOff(boolean value) {
+        return value ? "เปิด" : "ปิด";
+    }
+
+    private void publishBodyNavStatus() {
+        ui.post(() -> {
+            if (bodyEnabledButton == null || body == null || nav == null || autoReturn == null) return;
+            bodyEnabledButton.setText("สั่งท่าทางด้วยเสียง: " + onOff(body.enabled()));
+            directionKnownButton.setText("เปิดท่าที่ยังไม่ทดสอบทิศ: " + onOff(body.allowDirectionKnown()));
+            navEnabledButton.setText("ฟังก์ชันนำทาง: " + onOff(nav.enabled()));
+            // review2 #7: off = the launcher is not told the arms rest, so it
+            // refuses every leg through a door (arms_not_rest)
+            armRestButton.setText("เก็บแขนก่อนเดิน: " + onOff(nav.requireArmRest())
+                    + (nav.requireArmRest() ? "" : " · ไม่เก็บแขน: ต้องเห็นว่าแขนแนบตัวก่อนกดเดิน"));
+            autoReturnButton.setText("กลับแท่นเองเมื่อว่าง: " + onOff(autoReturn.enabled()));
+            autoIdleText.setText("ว่างนาน " + autoReturn.idleS() + " วินาที แล้วกลับแท่น (เตือนบนจอ "
+                    + NavRules.AUTO_WARN_MS / 1000 + " วิก่อนออก)");
+            String id = BodyGestures.IDS[poseTargetIndex];
+            poseTargetText.setText(id + " · " + body.effectiveStatus(id));
+            // review2 #25: su stopped answering -- the app no longer piles up
+            // stuck root children; staff are told to reboot instead
+            bodyNavText.setText("ท่าทาง: " + (body.latched() ? "ล็อกอยู่" : "ไม่ล็อก")
+                    + " · การเดิน: " + (nav.latched() ? "ล็อกอยู่" : "ไม่ล็อก")
+                    + (nav.suWedged() ? "\nsu ไม่ตอบสนอง — สถานะการเดินอ่านไม่ได้ ให้รีบูตหุ่น" : "")
+                    + "\n" + autoReturn.operatorLine());
+            voiceChannelsText.setText("ช่องที่ท่าเสียงใช้ได้: " + body.voiceChannels());
+            voiceChannelButton.setText("ช่อง " + selectedServoChannel + " ใช้กับท่าเสียง: "
+                    + (body.voiceChannels().contains(selectedServoChannel) ? "อนุญาต" : "ไม่อนุญาต"));
+        });
+    }
+
+    /** Only ids a pose may be recorded for: needs_mapping or direction_known. */
+    private void selectPoseTarget(int delta) {
+        int n = BodyGestures.IDS.length;
+        int next = poseTargetIndex;
+        for (int i = 0; i < n; i++) {
+            next = (next + delta + n) % n;
+            String status = BodyGestures.builtInStatus(BodyGestures.IDS[next]);
+            if (BodyGestures.NEEDS_MAPPING.equals(status) || BodyGestures.DIRECTION_KNOWN.equals(status)) break;
+        }
+        poseTargetIndex = next;
+        publishBodyNavStatus();
+    }
+
+    private void saveDraftAsPose() {
+        String id = BodyGestures.IDS[poseTargetIndex];
+        String refusal = body.savePose(id, motionDraft.frames(), motionDraft.playedSinceEdit());
+        if (refusal == null) updateArmCommand("บันทึกร่างเป็นท่า " + id + " แล้ว", 0xFF5EE6A8);
+        else updateArmCommand("บันทึกไม่ได้: " + refusal, 0xFFFF5F73);
+        publishBodyNavStatus();
     }
 
     private TextView text(String value, int sp, int colour) {
@@ -338,22 +835,58 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     @Override
     protected void onResume() {
         super.onResume();
+        hideSystemBars();
+        faceForeground = true;
+        if (nav != null) nav.resume();     // the poller sees a PC run while we are in front
+        // back in front: whoever brought it back is here -- the count restarts
+        if (autoReturn != null) autoReturn.activity("resume");
+        if (server != null) server.resume();   // start the on-robot server now, then watch it
         inputManager.registerInputDeviceListener(this, ui);
         scanControllers();
-        refreshBaseStatus();
+        if (operatorVisible) refreshBaseStatus();   // only the operator screen touches the chassis / Aobo
+        if (emmaFace != null) emmaFace.onActivityResume();
+        if (array != null && !operatorVisible) array.resume();
     }
 
     @Override
     protected void onPause() {
+        faceForeground = false;
+        startHeld = false;
+        stopBodyAndNav("not_foreground", "not_foreground", false);
+        if (nav != null) nav.pause();
         stopAndDisarm("แอปไม่ได้อยู่ด้านหน้า — หยุดแล้ว");
         inputManager.unregisterInputDeviceListener(this);
+        if (emmaFace != null) emmaFace.onActivityPause();
+        if (array != null) array.pause();      // never a mic behind another screen
+        // the watchdog rests; the server itself keeps serving the page
+        if (server != null) server.pause();
         super.onPause();
     }
 
     @Override
+    protected void onStop() {
+        // EmmaFace swallows the pause its own permission dialog causes (that
+        // pause used to close the face scan / end the call that asked). If the
+        // app is actually left while the dialog is up, this is where the page
+        // finally hears it.
+        if (emmaFace != null) emmaFace.onActivityStop();
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
+        if (autoReturn != null) autoReturn.stop();
+        stopBodyAndNav("not_foreground", "app_lost", false);
         stopAndDisarm("ปิดแอป — หยุดแล้ว");
-        if (upperBody != null) upperBody.disconnect();
+        if (body != null) body.shutdown();
+        if (nav != null) nav.shutdown();
+        if (server != null) server.shutdown();   // the watchdog only: the server outlives the app
+        if (array != null) array.shutdown();
+        if (emmaFace != null) emmaFace.onActivityDestroy();
+        if (upperBody != null) {
+            upperBody.disconnect();
+            upperBody.release();     // review2 #10: the USB detach receiver
+        }
         disconnectSdk();
         io.shutdownNow();
         super.onDestroy();
@@ -362,7 +895,82 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (!hasFocus) stopAndDisarm("หน้าจอเสียโฟกัส — หยุดแล้ว");
+        windowFocused = hasFocus;
+        if (hasFocus) hideSystemBars();     // a dialog or the shade brought them back
+        if (!hasFocus) {
+            startHeld = false;   // a missed START key-up must not latch the staff toggle open
+            stopBodyAndNav("not_foreground", "not_foreground", false);
+            stopAndDisarm("หน้าจอเสียโฟกัส — หยุดแล้ว");
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (emmaFace != null) emmaFace.onNewIntent(intent);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (emmaFace != null) emmaFace.onRequestPermissionsResult(requestCode, results);
+    }
+
+    /** Full screen, like every reception robot's face (owner, 10 Oct 2026:
+     *  "uxui ของแอพให้ดูดีที่สุด"): the Android status and navigation bars
+     *  took the top and bottom of the face, under the brand and the mic.
+     *  Staff still reach them -- a swipe from the edge shows them for a few
+     *  seconds (transient) -- and nothing here changes focus, so the
+     *  focus-loss stop in onWindowFocusChanged keeps its meaning. */
+    private void hideSystemBars() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController bars = getWindow().getInsetsController();
+            if (bars == null) return;
+            bars.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            bars.hide(WindowInsets.Type.systemBars());
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        }
+    }
+
+    /** Default face for customers; the operator UI stays hidden until staff reveal it. */
+    private void showEmma() {
+        operatorVisible = false;
+        stopAndDisarm("กลับหน้า Emma", true);   // explicit: a guaranteed final REST stop
+        disconnectSdk();                          // release the SDK: Emma mode is not the wheel owner
+        operatorRoot.setVisibility(View.GONE);
+        emmaFace.view().setVisibility(View.VISIBLE);
+        emmaFace.onActivityResume();              // Emma listens again
+        if (array != null) array.resume();
+    }
+
+    private void showOperator() {
+        operatorVisible = true;
+        // Review2 #24: every operator visit starts with the manual arm keys
+        // locked until X, whatever a voice gesture's connect left behind.
+        upperBodyArmed = false;
+        updateUpperBody(upperBody != null && upperBody.isConnected()
+                ? "แขน: เชื่อมอยู่ · กด X เพื่อเปิดแขน" : "แขน: ยังไม่เชื่อม", 0xFFFFC857);
+        // A walk is stopped BEFORE the operator screen connects the SDK
+        // (refreshBaseStatus waits for the stop): two drivers on the wheels.
+        stopBodyAndNav("operator_screen", "operator_screen", false);
+        emmaFace.onActivityPause();         // release the mic while staff drive -- Emma isn't listening
+        if (array != null) array.pause();   // the array too (its last state stays on this screen)
+        emmaFace.view().setVisibility(View.GONE);
+        operatorRoot.setVisibility(View.VISIBLE);
+        refreshBaseStatus();
+    }
+
+    private void toggleOperator() {
+        if (operatorVisible) showEmma();
+        else showOperator();
     }
 
     @Override
@@ -378,6 +986,7 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     @Override
     public void onInputDeviceRemoved(int deviceId) {
         scanControllers();
+        startHeld = false;   // a controller unplugged mid-hold must not latch the toggle
         stopAndDisarm("จอยหลุด — หยุดแล้ว");
     }
 
@@ -405,6 +1014,7 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     private void refreshBaseStatus() {
         io.execute(() -> {
             try {
+                if (nav != null) nav.awaitStopped(NavLauncher.STOP_DRAIN_MS);
                 showState("กำลังสลับจาก Aobo และเชื่อมฐานล้อ…", 0xFFFFC857);
                 stopConflictingVendorApp();
                 disconnectSdk();
@@ -425,20 +1035,14 @@ public final class MainActivity extends Activity implements InputManager.InputDe
         });
     }
 
+    /** Review #32: bounded. This runs on io inside a walk's launch
+     *  (releaseBase) and a gesture's ensureArm; an unbounded waitFor on a hung
+     *  su/am left an accepted walk in "preparing" for ever. A timeout throws,
+     *  which is the existing launcher_failed / arm_unavailable path. */
     private void stopConflictingVendorApp() throws Exception {
-        Process process = new ProcessBuilder(
-                SU_BINARY, "0", "sh", "-c", "am force-stop " + VENDOR_PACKAGE)
-                .redirectErrorStream(true)
-                .start();
-        try (InputStream ignored = process.getInputStream()) {
-            byte[] buffer = new byte[256];
-            while (ignored.read(buffer) != -1) {
-                // Drain the fixed system command output so waitFor cannot block.
-            }
-        }
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            throw new IllegalStateException("ปิด Aobo ไม่สำเร็จ (exit " + exitCode + ")");
+        RootShell.Result result = RootShell.run("am force-stop " + VENDOR_PACKAGE, RootShell.TIMEOUT_MS);
+        if (result.exit != 0) {
+            throw new IllegalStateException("ปิด Aobo ไม่สำเร็จ (exit " + result.exit + ")");
         }
         Log.i(TAG, "vendor app force-stopped before exclusive SDK connection");
     }
@@ -467,33 +1071,101 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     }
 
     @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        trackCornerHold(event);        // observes only, never consumes
+        // any finger on the face is somebody being served: the walk back to
+        // the dock waits (observes only, like the corner hold)
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN && autoReturn != null) autoReturn.activity("touch");
+        return super.dispatchTouchEvent(event);
+    }
+
+    /** A 3-second hold in the top-left corner reveals the operator screen. Moving
+     *  out of the corner or lifting cancels it, so only a deliberate hold counts. */
+    private void trackCornerHold(MotionEvent e) {
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                if (e.getX() < dp(90) && e.getY() < dp(90)) {
+                    cornerHeld = true;
+                    ui.postDelayed(cornerRevealRun, CORNER_HOLD_MS);
+                }
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (cornerHeld && (e.getX() > dp(120) || e.getY() > dp(120))) {
+                    cornerHeld = false;
+                    ui.removeCallbacks(cornerRevealRun);
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                cornerHeld = false;
+                ui.removeCallbacks(cornerRevealRun);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private static boolean isGamepadButton(int key) {
+        return KeyEvent.isGamepadButton(key)
+                || key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN
+                || key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT
+                || key == KeyEvent.KEYCODE_DPAD_CENTER;
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int key = event.getKeyCode();
         boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
-        if (key == KeyEvent.KEYCODE_BUTTON_A && down && event.getRepeatCount() == 0) {
-            if (!screenArmed && controllerConnected && baseConnected) armControls();
+        if (down && autoReturn != null) autoReturn.activity("key");   // somebody is at the robot
+        // Hidden staff toggle between the Emma face and the operator screen:
+        // hold START, then press SELECT. Invisible to a customer bumping the pad.
+        if (key == KeyEvent.KEYCODE_BUTTON_START) {
+            startHeld = down;
             return true;
         }
+        if (key == KeyEvent.KEYCODE_BUTTON_SELECT && down && event.getRepeatCount() == 0) {
+            if (startHeld) toggleOperator();
+            return true;
+        }
+        // B always stops and locks, in either mode -- and EXPLICITLY, so the
+        // chassis REST cancel fires even in Emma mode where the SDK was never
+        // connected here (motion started by the vendor app / RoboStudio still stops).
         if (key == KeyEvent.KEYCODE_BUTTON_B && down && event.getRepeatCount() == 0) {
-            stopAndDisarm("ปุ่ม B — หยุดและล็อกแล้ว");
+            // review #21: with a walk live, the board DELETE is NavLauncher's
+            // step 4 (after SIGINT and kill); an immediate one here raced the
+            // tether stop and drive_route renewed the deleted action
+            boolean navLive = stopBodyAndNav(null, "stop_pressed", true);
+            stopAndDisarm("ปุ่ม B — หยุดและล็อกแล้ว", true, !navLive);
             return true;
         }
-        if (key == KeyEvent.KEYCODE_BUTTON_X && down && event.getRepeatCount() == 0) {
-            connectUpperBody();
-            return true;
+        // Arm/drive keys only while the operator screen is up, so a customer's
+        // stray button press can never arm the chassis or move the arm.
+        if (operatorVisible) {
+            if (key == KeyEvent.KEYCODE_BUTTON_A && down && event.getRepeatCount() == 0) {
+                if (!screenArmed && controllerConnected && baseConnected) armControls();
+                return true;
+            }
+            if (key == KeyEvent.KEYCODE_BUTTON_X && down && event.getRepeatCount() == 0) {
+                connectUpperBody();
+                return true;
+            }
+            if (key == KeyEvent.KEYCODE_DPAD_LEFT && down && event.getRepeatCount() == 0) {
+                selectArmGroup(-1);
+                return true;
+            }
+            if (key == KeyEvent.KEYCODE_DPAD_RIGHT && down && event.getRepeatCount() == 0) {
+                selectArmGroup(1);
+                return true;
+            }
+            if (key == KeyEvent.KEYCODE_BUTTON_Y && down && event.getRepeatCount() == 0) {
+                playSelectedArmGroup();
+                return true;
+            }
         }
-        if (key == KeyEvent.KEYCODE_DPAD_LEFT && down && event.getRepeatCount() == 0) {
-            selectArmGroup(-1);
-            return true;
-        }
-        if (key == KeyEvent.KEYCODE_DPAD_RIGHT && down && event.getRepeatCount() == 0) {
-            selectArmGroup(1);
-            return true;
-        }
-        if (key == KeyEvent.KEYCODE_BUTTON_Y && down && event.getRepeatCount() == 0) {
-            playSelectedArmGroup();
-            return true;
-        }
+        // In customer mode, swallow every other gamepad button so a stray press
+        // cannot trigger a framework fallback (e.g. B->BACK) that backgrounds the
+        // kiosk or clicks a focused control on the Emma page.
+        if (!operatorVisible && isGamepadButton(key)) return true;
         return super.dispatchKeyEvent(event);
     }
 
@@ -503,10 +1175,15 @@ public final class MainActivity extends Activity implements InputManager.InputDe
             return;
         }
         updateUpperBody("แขน: กำลังเตรียม CH340…", 0xFFFFC857);
+        final int stopsAtQueue = armStops.get();
         io.execute(() -> {
             try {
                 stopConflictingVendorApp();
                 upperBody.connect();
+                if (armStops.get() != stopsAtQueue) {
+                    updateUpperBody("แขน: เชื่อมแล้ว · ล็อกอยู่ กด X เพื่อเปิด", 0xFFFFC857);
+                    return;
+                }
                 upperBodyArmed = true;
                 updateUpperBody("แขน: พร้อม · เลือกชุดท่าแล้วกด Y", 0xFF5EE6A8);
             } catch (Exception e) {
@@ -515,6 +1192,21 @@ public final class MainActivity extends Activity implements InputManager.InputDe
                 updateUpperBody("แขน: เชื่อมไม่สำเร็จ — " + e.getMessage(), 0xFFFF5F73);
             }
         });
+    }
+
+    /** Called only by the trusted face page for the verified handshake group.
+     *  The gates it always had stay here; the arm itself is BodyController's,
+     *  so the greeting shares the one lock with voice gestures and the rest
+     *  before a walk, and its rest-return is the same one they use. */
+    private void requestArmGreeting() {
+        if (!faceForeground || operatorVisible || !windowFocused) return;
+        body.greet();
+    }
+
+    /** The operator's group owns the next #AGF: a scheduled rest-return of an
+     *  earlier gesture is void (after a stop NOTHING may move on a timer). */
+    private void cancelGreetingHome() {
+        if (body != null) body.voidRestReturn();
     }
 
     private void selectArmGroup(int delta) {
@@ -532,8 +1224,11 @@ public final class MainActivity extends Activity implements InputManager.InputDe
             updateArmCommand("กด X เพื่อเปิดแขนก่อน", 0xFFFF5F73);
             return;
         }
+        cancelGreetingHome();   // the operator's group owns the next #AGF
         final int group = selectedArmGroup;
+        final int stopsAtQueue = armStops.get();
         io.execute(() -> {
+            if (!armCommandStillWanted(stopsAtQueue)) return;
             try {
                 upperBody.playGroup(group);
                 updateArmCommand("สั่งชุดท่า " + group + " หนึ่งรอบ", 0xFF80DFFF);
@@ -566,6 +1261,7 @@ public final class MainActivity extends Activity implements InputManager.InputDe
             servoText.setText(label);
             if (channelEvidenceText != null) channelEvidenceText.setText(evidence);
         });
+        publishBodyNavStatus();
     }
 
     private String channelEvidence(int channel) {
@@ -587,7 +1283,9 @@ public final class MainActivity extends Activity implements InputManager.InputDe
         }
         final int channel = selectedServoChannel;
         final int pulse = selectedServoPulse;
+        final int stopsAtQueue = armStops.get();
         io.execute(() -> {
+            if (!armCommandStillWanted(stopsAtQueue)) return;
             try {
                 upperBody.setServo(channel, pulse, 3000);
                 motionDraft.rememberTarget(channel, pulse);
@@ -606,7 +1304,9 @@ public final class MainActivity extends Activity implements InputManager.InputDe
             updateArmCommand("กด X เพื่อเปิดแขนก่อน", 0xFFFF5F73);
             return;
         }
+        final int stopsAtQueue = armStops.get();
         io.execute(() -> {
+            if (!armCommandStillWanted(stopsAtQueue)) return;
             try {
                 upperBody.resetHome();
                 motionDraft.clearCommandedTargets();
@@ -639,7 +1339,19 @@ public final class MainActivity extends Activity implements InputManager.InputDe
             return;
         }
         try {
-            upperBody.playFrames(motionDraft.frames());
+            // §2c rule 5: somebody watched it move -- review2 #22: ALL of it.
+            // Only onDone marks it played: a stop (B, the STOP bar, a newer
+            // command) ends the run without onDone, and a dead board aborts.
+            final int editsAtStart = motionDraft.startPlayback();
+            upperBody.playFrames(motionDraft.frames(), null,
+                    () -> ui.post(() -> {
+                        motionDraft.markPlayed(editsAtStart);
+                        updateArmCommand("เล่นร่างท่าจบครบทุกคีย์เฟรม — บันทึกเป็นท่าได้", 0xFF5EE6A8);
+                    }),
+                    () -> ui.post(() -> {
+                        motionDraft.playbackCut();
+                        updateArmCommand("ร่างท่าเล่นไม่จบ — บอร์ดแขนหลุด (ต้องเล่นใหม่ให้จบก่อนบันทึก)", 0xFFFF5F73);
+                    }));
             updateArmCommand("เริ่มเล่นร่างท่า " + motionDraft.frameCount() + " คีย์เฟรม", 0xFF80DFFF);
         } catch (Exception e) {
             updateArmCommand("เล่นร่างท่าไม่ได้: " + e.getMessage(), 0xFFFF5F73);
@@ -956,11 +1668,35 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     }
 
     private void stopAndDisarm(String reason) {
+        stopAndDisarm(reason, false);
+    }
+
+    private void stopAndDisarm(String reason, boolean explicit) {
+        stopAndDisarm(reason, explicit, true);
+    }
+
+    /** deleteNow=false when a live walk's stop escalation will DELETE the
+     *  board action itself, last (§4, review #21): a DELETE while drive_route
+     *  lives reads as a link drop and its VelocitySession renews the action
+     *  before the launcher's next 0.2 s tick sees the stop. The SDK move this
+     *  app may own is still cancelled at once. */
+    /** On `io`, just before an operator arm command touches the arm. */
+    private boolean armCommandStillWanted(int stopsAtQueue) {
+        if (upperBodyArmed && armStops.get() == stopsAtQueue) return true;
+        updateArmCommand("ยกเลิกคำสั่งแขนที่รออยู่ — กดหยุดไปแล้ว", 0xFFFFC857);
+        return false;
+    }
+
+    private void stopAndDisarm(String reason, boolean explicit, boolean deleteNow) {
+        armStops.incrementAndGet();
         screenArmed = false;
         upperBodyArmed = false;
         generation.incrementAndGet();
         direction = DIR_NONE;
-        if (upperBody != null) upperBody.stopAll();
+        // the arm stops and nothing scheduled may move it later; the latch is
+        // stopBodyAndNav's, on the paths that are a body stop
+        if (body != null) body.halt();
+        else if (upperBody != null) upperBody.stopAll();
         ui.post(() -> {
             if (armButton != null) {
                 armButton.setText("เปิดควบคุมฐานล้อ");
@@ -973,9 +1709,12 @@ public final class MainActivity extends Activity implements InputManager.InputDe
             }
         });
         showState(reason, 0xFFFFC857);
-        if (!io.isShutdown()) io.execute(() -> {
-            cancelCurrent();
-        });
+        if (!io.isShutdown()) {
+            io.execute(() -> {
+                if (deleteNow) cancelCurrent(explicit);
+                else cancelSdkMove();
+            });
+        }
     }
 
     private void stopFromWorker(String reason) {
@@ -990,12 +1729,23 @@ public final class MainActivity extends Activity implements InputManager.InputDe
     }
 
     private void cancelCurrent() {
+        cancelCurrent(false);
+    }
+
+    private void cancelCurrent(boolean explicit) {
         cancelSdkMove();
+        // A DELETE to the chassis's current-action endpoint stops motion started
+        // ANYWHERE -- this app's SDK path, the vendor app, or RoboStudio. On an
+        // EXPLICIT stop (the B button, the STOP button) always send it, so "B
+        // stops in every mode" holds even in Emma mode where this app never
+        // connected the SDK. On an AUTOMATIC stop (focus loss, stick centre) only
+        // send it when this app is the wheel owner (sdkPlatform set), so a routine
+        // focus change in Emma mode does not keep poking a chassis it isn't driving.
+        if (!explicit && sdkPlatform == null) return;
         try {
             request("DELETE", CURRENT_ACTION, null);
         } catch (Exception ignored) {
-            // SDK cancellation above is the primary stop path. REST cancellation
-            // remains as a second stop request for actions created elsewhere.
+            // Best-effort second stop path; the SDK cancel above is primary.
         }
     }
 

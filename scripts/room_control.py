@@ -33,8 +33,10 @@ here on purpose.
 from __future__ import annotations
 
 import json
+import socket
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -46,6 +48,47 @@ TIMEOUT = 8.0
 
 class RoomError(Exception):
     """Something the caller has to be told, not something to work around."""
+
+
+def _is_android(entry: dict) -> bool:
+    """An Android panel room is driven over adb, not the HTTP room agent. It is
+    marked either by `kind: "android"` or simply by having an `adb` address."""
+    return entry.get("kind") == "android" or bool(entry.get("adb"))
+
+
+def _input_enabled(entry: dict) -> bool:
+    """Real taps/keystrokes on an Android panel are OFF unless the room's entry
+    says exactly `"input": true` -- fail closed like the Windows agent's
+    ROOM_AGENT_INPUT (default off). A missing flag, or a non-bool such as the
+    string "false", must never hand a networked caller real input: the panel is
+    reachable from a browser (the console binds localhost, but a page in that
+    browser can still POST), so this flag is a real barrier, not a formality.
+    A malformed value is a mistake in a hand-edited file -- say so, don't guess."""
+    val = entry.get("input", False)
+    if val is True:
+        return True
+    if val is False or val is None:
+        return False
+    raise RoomError('a room\'s "input" must be true or false in rooms.json '
+                    f"(got {val!r})")
+
+
+_android = None
+
+
+def _android_mod():
+    """Load the adb backend lazily (and only when an Android room is used), so
+    room_control still imports on a machine with no adb / no Pillow."""
+    global _android
+    if _android is None:
+        import importlib.util
+
+        path = Path(__file__).resolve().parent / "android_control.py"
+        spec = importlib.util.spec_from_file_location("android_control", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _android = mod
+    return _android
 
 
 def rooms() -> dict[str, dict]:
@@ -81,7 +124,10 @@ def resolve(room: str) -> dict:
     if entry is None:
         # A near-match is still a different room. Offer the list; do not choose.
         raise RoomError(f"no room called {name!r}. known: " + ", ".join(sorted(table)))
-    if not entry.get("url"):
+    if _is_android(entry):
+        if not entry.get("adb"):
+            raise RoomError(f"room {name!r} (android) has no adb address in {TABLE}")
+    elif not entry.get("url"):
         raise RoomError(f"room {name!r} has no url in {TABLE}")
     return entry
 
@@ -110,20 +156,117 @@ def _call(url: str, token: str | None, body: dict | None = None) -> dict:
         return {"ok": False, "error": "cannot reach the room agent",
                 "detail": str(getattr(exc, "reason", exc)),
                 "instruction": "ติดต่อเครื่องในห้องนั้นไม่ได้ ให้บอกตรงๆ ห้ามบอกว่าทำแล้ว"}
+    except TimeoutError as exc:
+        # A read timeout (the agent accepted the connection but a slow/hung
+        # action never answered) is raised bare, NOT wrapped in URLError, so it
+        # would otherwise escape as a 500. It reads as "did not respond", never
+        # as the action having happened.
+        return {"ok": False, "error": "the room agent did not respond in time",
+                "detail": str(exc),
+                "instruction": "เครื่องในห้องนั้นค้างหรือช้าเกินไป ให้บอกตรงๆ ห้ามบอกว่าทำแล้ว"}
 
 
 def health(room: str) -> dict:
     entry = resolve(room)
+    if _is_android(entry):
+        return _android_mod().health(entry["adb"], name=room,
+                                     input_enabled=_input_enabled(entry))
     return _call(entry["url"].rstrip("/") + "/health", None)
 
 
 def do(room: str, action: str, args: dict[str, Any] | None = None) -> dict:
     entry = resolve(room)
+    if _is_android(entry):
+        return _android_mod().do(entry["adb"], action, args or {},
+                                 input_enabled=_input_enabled(entry))
     return _call(entry["url"].rstrip("/") + "/do", entry.get("token"),
                  {"action": action, "args": args or {}})
 
 
+def discover_android() -> list[dict]:
+    """Which Android panels adb can see right now, each with the stable serial to
+    paste into rooms.json. For first-time setup, so nobody hunts for a number."""
+    return _android_mod().discover()
+
+
+def launch_scrcpy(room: str, audio: str = "off") -> dict:
+    """Open a real-time scrcpy window for an Android room. Windows rooms have no
+    scrcpy equivalent (the room agent serves them), so this refuses them rather
+    than guessing. `audio`: "off" (video only), "playback" (video + the panel's
+    output audio), or "mic" (audio only, the room). Always live, never recorded."""
+    entry = resolve(room)
+    if not _is_android(entry):
+        raise RoomError(f"scrcpy is for Android rooms; {room!r} is a PC room")
+    return _android_mod().launch_scrcpy(entry["adb"], title=room, audio=audio)
+
+
+def _parse_mac(mac: str) -> bytes:
+    hexs = "".join(c for c in str(mac or "") if c not in ":-.").strip()
+    if len(hexs) != 12 or any(c not in "0123456789abcdefABCDEF" for c in hexs):
+        raise RoomError(f"{mac!r} is not a MAC address (expected 6 bytes like AA:BB:CC:DD:EE:FF)")
+    return bytes.fromhex(hexs)
+
+
+def _broadcast_targets(url: str) -> list[str]:
+    """Where to send the wake packet. The subnet-directed broadcast derived from
+    the PC's own IP (assume /24) is first, because it routes out the interface on
+    THAT subnet -- important on this management PC, which has two (wired
+    192.168.0.x and Wi-Fi). The limited broadcast is a fallback."""
+    targets: list[str] = []
+    try:
+        host = urllib.parse.urlparse(url).hostname or ""
+        octets = host.split(".")
+        if len(octets) == 4 and all(o.isdigit() for o in octets):
+            targets.append(".".join(octets[:3] + ["255"]))
+    except Exception:
+        pass
+    targets.append("255.255.255.255")
+    return targets
+
+
+def wake(room: str) -> dict:
+    """Wake a powered-off Windows room PC with a Wake-on-LAN magic packet.
+
+    The PC is OFF, so this cannot go through the room agent (there is nothing
+    running there) -- the management PC sends the packet itself. Android panels
+    have no WoL, so this refuses them (a smart plug is the answer there). It is
+    fire-and-forget by nature: UDP, no reply, so it reports 'signal sent', never
+    'the PC is on' -- check /health after, same honesty rule as the rest."""
+    entry = resolve(room)
+    if _is_android(entry):
+        raise RoomError(f"Wake-on-LAN is for Windows rooms; {room!r} is an Android panel "
+                        "(no WoL on Android -- use a Wi-Fi smart plug)")
+    mac = entry.get("mac", "")
+    if not mac:
+        raise RoomError(f'room {room!r} has no "mac" in {TABLE} -- add the PC\'s LAN MAC '
+                        '(its /health shows it as mac_hint while it is on) to use Wake-on-LAN')
+    packet = b"\xff" * 6 + _parse_mac(mac) * 16
+    sent: list[str] = []
+    for addr in _broadcast_targets(entry.get("url", "")):
+        for port in (9, 7):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                sock.sendto(packet, (addr, port))
+                sock.close()
+                sent.append(f"{addr}:{port}")
+            except OSError:
+                pass
+    if not sent:
+        return {"ok": False, "error": "could not send the wake packet",
+                "instruction": "ส่งสัญญาณปลุกไม่ได้ (เครือข่าย?) ให้บอกตรงๆ ห้ามบอกว่าเปิดแล้ว"}
+    return {"ok": True, "woke": mac, "sent_to": sent,
+            "instruction": "ส่งสัญญาณปลุกแล้ว — เครื่องจะเปิดเองถ้าตั้ง Wake-on-LAN ไว้ (BIOS + ไดรเวอร์แลน "
+                           "+ ปิด Fast Startup) รอสักครู่แล้วเช็ก health · ถ้าไม่ขึ้น = ยังไม่ได้ตั้ง WoL ที่เครื่องนั้น"}
+
+
 def _main(argv: list[str]) -> int:
+    # Room names are Thai; a Windows console defaults to cp1252 and would crash
+    # on printing them. Speak UTF-8 to our own stdout.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        pass
     if not argv or argv[0] in {"-h", "--help"}:
         print(__doc__)
         return 0
@@ -135,9 +278,37 @@ def _main(argv: list[str]) -> int:
                 print(f"no rooms configured — create {TABLE}")
                 return 1
             for name, entry in sorted(table.items()):
-                print(f"{name}\t{entry.get('url', '(no url)')}\t"
-                      f"token {'set' if entry.get('token') else 'MISSING'}")
+                if _is_android(entry):
+                    print(f"{name}\t{entry.get('adb', '(no adb)')}\tandroid")
+                else:
+                    print(f"{name}\t{entry.get('url', '(no url)')}\t"
+                          f"token {'set' if entry.get('token') else 'MISSING'}")
             return 0
+        if cmd == "discover":
+            try:
+                devs = discover_android()
+            except Exception as exc:                    # adb missing / server hung
+                print(f"could not list Android panels: {exc}")
+                return 1
+            if not devs:
+                print("no Android panels visible (pair one via Wireless debugging first)")
+                return 1
+            print("Android panels adb can see -- paste a line into data/rooms.json:")
+            for d in devs:
+                label = d.get("name") or d["model"]
+                # json.dumps so a panel's user-set device name cannot inject extra
+                # JSON keys into the suggested line (it is attacker-controlled: set
+                # on the panel by anyone with physical access).
+                print("  " + json.dumps({label: {"kind": "android", "adb": d["serial"]}},
+                                         ensure_ascii=False))
+            return 0
+        if cmd == "wake":
+            if not rest:
+                print("usage: wake <room>")
+                return 2
+            result = wake(rest[0])
+            print(json.dumps(result, ensure_ascii=False, indent=1))
+            return 0 if result.get("ok") else 1
         if cmd == "health":
             print(json.dumps(health(rest[0] if rest else ""), ensure_ascii=False, indent=1))
             return 0
@@ -150,7 +321,7 @@ def _main(argv: list[str]) -> int:
             result = do(room, action, args)
             print(json.dumps(result, ensure_ascii=False, indent=1))
             return 0 if result.get("ok") else 1
-        print(f"unknown command {cmd!r}. try: rooms | health | do")
+        print(f"unknown command {cmd!r}. try: rooms | discover | health | do | wake")
         return 2
     except RoomError as exc:
         print(f"error: {exc}")

@@ -138,6 +138,14 @@ def _fresh_async_state():
     # has it on in .env, and a session test that fed audio would then drop a
     # wav into the repo's data/. Off in the suite, like every pin here.
     _settings.call_debug = False
+    # LISTEN_FAR_PROFILES (the owner's machine sets joke,translator) changes
+    # the floor every session opens with and what /health tells the page.
+    # Blank = no split, the chain every older test was written against.
+    _settings.listen_far_profiles = frozenset()
+    _settings.vad_min_rms_far = 0.0
+    # Speaker focus (VAD_FOCUS_RATIO) at its code default, whatever this
+    # machine's .env says — the real-detector tests measure turn ends.
+    _settings.vad_focus_ratio = 0.30
     _settings.transcribe_mode = "SMART"
     # The live inventory link would send every unit test's show_unit call to
     # the real Supabase — network in unit tests, and results that change
@@ -145,12 +153,76 @@ def _fresh_async_state():
     _settings.inventory_url = ""
     _settings.inventory_key = ""
     _settings.units_show_price = False
+    # Promotions off by default (test rows in the sales system, 2026-10-06);
+    # tests that exercise the promotion paths turn it on themselves.
+    _settings.units_promotions = False
+    # Answer pictures without the slides group (2026-10-11) are on in the
+    # robot's env; the suite tests both settings explicitly.
+    _settings.answer_images = False
     _settings.searxng_url = ""       # เครื่องที่มี SearXNG ต้องไม่เปลี่ยนสี suite   # นโยบายราคา: default ปิด
     # MULTI_SESSION on the office test server would un-supersede every
     # takeover test and strip the tool groups the robot/slide tests need —
     # the TOOL_GROUPS trap again, one knob over. Tests that mean the shared
     # mode set it themselves.
     _settings.multi_session = False
+    # STANDING_LINE=true on the robot's machine holds a summoned session open
+    # forever, which would turn every summoned-session lifecycle test (the
+    # 30s abandon, idle timeout) green or red by .env. Tests that mean the
+    # standing line set it themselves.
+    _settings.standing_line = False
+    # HOLD_SPEECH=true on the robot changes the ready event every voice test
+    # reads. Same rule: the suite must not change colour by .env.
+    _settings.hold_speech = False
+    # Listening focus (docs/listening-focus-2026-10-09.md): the robot's .env
+    # will turn these on, and every VAD/session/prompt test would then ask a
+    # camera nobody has — denied "no camera", red on that one machine. Code
+    # defaults; focus tests set what they mean. The module's memory (faces
+    # seen, ordinals) is per process, so it is wiped like the locks above.
+    _settings.focus_enabled = False
+    _settings.focus_require_face = True
+    _settings.focus_face_min_px = 90
+    _settings.focus_yaw_max_deg = 35.0
+    _settings.focus_hold_s = 1.5
+    _settings.focus_speaker_labels = False
+    # Engagement (in-call wake word, invitation, full mode, attention cue,
+    # goodbye): the robot's env will turn these on, and every session test
+    # would then grow a watcher task or a KWS load. Code defaults here.
+    _settings.focus_wake = False
+    _settings.focus_wake_threshold = 0.10
+    _settings.focus_wake_window_s = 10.0
+    _settings.focus_invite = False
+    _settings.focus_invite_every_s = 60.0
+    _settings.focus_invite_denied_n = 0
+    _settings.focus_engage_mode = "semi"
+    _settings.focus_attention = False
+    _settings.focus_goodbye = False
+    _settings.focus_goodbye_after_s = 8.0
+    _settings.asd_enabled = False
+    _settings.voiceprint_enabled = False
+    _settings.doa_enabled = False
+    # The array as the call's ears (app/array_audio.py) and the GTCRN
+    # enhancer: the robot's .env turns these on; every session test would
+    # then route audio through a tap or a model. Code defaults here.
+    _settings.array_audio = False
+    _settings.array_audio_beam = "ds"
+    _settings.array_audio_unsteered = "mic0"
+    _settings.array_audio_gain = 1.0
+    _settings.array_audio_stale_ms = 120
+    _settings.array_audio_echo_tail_s = 0.25
+    _settings.array_capture8 = False
+    _settings.array_capture8_keep_min = 10.0
+    _settings.enhance_enabled = False
+    _array_mod = __import__("sys").modules.get("app.array_audio")
+    if _array_mod is not None:
+        _array_mod.reset_state()
+    _focus_mod = __import__("sys").modules.get("app.focus")
+    if _focus_mod is not None:
+        _focus_mod._forget_everything()
+    # The in-call ear's spotter is built for one FOCUS_WAKE_THRESHOLD; a test
+    # that changes the bar must not inherit the previous test's model.
+    _call_wake_mod = __import__("sys").modules.get("app.call_wake")
+    if _call_wake_mod is not None:
+        _call_wake_mod.reset()
     # The web stage turns `open_in_browser` and `play_youtube` into "put it
     # on the screen" instead of `os.startfile`. A test that leaves it on
     # rewires four other tests that never mentioned it — and because
@@ -159,6 +231,19 @@ def _fresh_async_state():
     # and the LAN gate, for the same reason: the suite must not change
     # colour because of a value some other test set.
     _settings.web_stage = False
+    # The IR hub, same family as robot_chassis_url below. The owner's PC has
+    # the Broadlink on its LAN, `broadlink` installed and both JSON files in
+    # data/ — so any test that reached broadlink_ir.send without the stub
+    # would have switched the real lights. And since 2026-10-09 the AC tool's
+    # declaration depends on which units have learned codes: once the Samsung
+    # codes are learned on this machine, every AC test written for one unit
+    # would turn into a "which AC?" refusal here and stay green on CI. Blank
+    # = no devices file (the original AC alone) and no codes/hub file
+    # (available() is False, send() is "mock"). Tests that mean a hub or a
+    # second unit point these at their own tmp files.
+    _settings.ir_devices_file = ""
+    _settings.ir_codes_file = ""
+    _settings.broadlink_device_file = ""
     # A machine that has been pointed at the robot's navigation board would
     # otherwise send every movement test's command down a real socket to real
     # motors, and `available()` would flip to True in tests written for a
@@ -181,6 +266,37 @@ def _fresh_async_state():
     from app import robot_arm
 
     robot_arm.reset_state()
+    # Body by voice + robot-face navigation (docs/emma-body-nav-design-
+    # 2026-10-08.md §2h): the robot machine's .env will turn these on, and a
+    # suite that changed colour with it — or sent a body_command from a unit
+    # test — is the machine-state trap again. Code defaults, every test.
+    # robot_nav_places_file is blank so no test reads the tracked floor plan
+    # by accident; tests pass their fixture explicitly.
+    _settings.robot_body_enabled = False
+    _settings.robot_nav_routes_enabled = False
+    _settings.robot_nav_panel = "off"
+    _settings.robot_nav_pin = ""
+    _settings.robot_nav_voice = "off"
+    _settings.robot_face_token = ""
+    _settings.turn_idle_tracks_tools = False
+    _settings.robot_nav_places_file = ""
+    _settings.announce_settle_s = 0.0
+    _settings.robot_heard_max_age_s = 10.0
+    _settings.robot_body_require_heard = True
+    _settings.robot_nav_require_heard = True
+    _settings.robot_nav_voice_unverified = False
+    _settings.robot_nav_status_stale_s = 20.0
+    from app import robot_face_link
+
+    robot_face_link.reset_state()
+    # The tool modules of P1/P2 register tools on import, so they are reset
+    # only if something already imported them — the calc rule.
+    import sys as _sys_modules
+
+    for _name in ("app.robot_body", "app.robot_nav"):
+        _module = _sys_modules.modules.get(_name)
+        if _module is not None and hasattr(_module, "reset_state"):
+            _module.reset_state()
     display._reveal_task = None
     canva_display._task = None
     display._audio_lead_ms = 0.0
@@ -246,6 +362,11 @@ def _fresh_async_state():
     from app.tools import registry as _registry
 
     _registry.session_profile.set(None)
+    from app import heard as _heard
+    from app import robot_face_link as _face_link
+
+    _heard.bind_session(None)
+    _face_link.reset_state()
 
 
 @pytest.fixture(autouse=True)
@@ -345,14 +466,54 @@ def _no_real_face_models(monkeypatch, request):
     monkeypatch.setattr(settings, "face_camera_source", "local")
     monkeypatch.setattr(settings, "face_threshold", 0.50)
     monkeypatch.setattr(settings, "face_confirm_frames", 3)
+    # The robot machine's .env turns the arrival wait on; the per-frame
+    # rule the rest of the suite was written against is the code default.
+    monkeypatch.setattr(settings, "face_track_wait_s", 0.0)
     monkeypatch.setattr(settings, "face_cooldown_s", 600.0)
     monkeypatch.setattr(settings, "face_greet_strangers", True)
+    # The "probably known" hold, the closer look, the turn and the
+    # named-only handshake (9 Oct): off in code, maybe on in a robot .env.
+    monkeypatch.setattr(settings, "face_probable_wait_s", 0.0)
+    monkeypatch.setattr(settings, "face_probable_min_px", 36)
+    monkeypatch.setattr(settings, "face_zoom_enabled", False)
+    monkeypatch.setattr(settings, "face_zoom_photo", False)
+    monkeypatch.setattr(settings, "face_turn_to_check", False)
+    monkeypatch.setattr(settings, "face_turn_max_deg", 30.0)
+    monkeypatch.setattr(settings, "face_handshake_named_only", False)
+
+
+@pytest.fixture(autouse=True)
+def _no_machine_unit_plans(monkeypatch):
+    """The per-unit plan crops are a generated, gitignored folder: present on
+    the machine that ran scripts/build_unit_plans.py, absent on CI. A card
+    test must not gain a `floorplan` because of which machine runs it.
+    tests/test_unit_plans.py points the folder at tmp itself."""
+    from app import unit_plans
+
+    unit_plans.reset()
+    monkeypatch.setattr(unit_plans, "_folder", lambda: None)
+    yield
+    unit_plans.reset()
+
+
+@pytest.fixture(autouse=True)
+def _no_machine_array_captures(monkeypatch, tmp_path):
+    """ARRAY_CAPTURE8 test files live in the machine's data/array_capture8/,
+    and main.py's startup hook now sweeps that folder whatever the switches
+    say — every TestClient startup would reach the real one (the robot's,
+    if the suite runs there). tmp, like the unit plans above;
+    tests/test_array_audio.py points it at its own tmp too."""
+    from app import array_audio
+
+    monkeypatch.setattr(array_audio, "_capture_dir", lambda: tmp_path / "array_capture8")
 
 
 @pytest.fixture(autouse=True)
 def _forget_what_was_heard():
     """"What the guest last said" is module state, and it now decides whether
-    a tool acts. A test that leaves "ปิดสไลด์" behind arms the next one."""
+    a tool acts. A test that leaves "ปิดสไลด์" behind arms the next one.
+    `forget()` with no argument also clears the per-session captions,
+    activity marks and spent captions of the body/nav guards."""
     from app import heard
     heard.forget()
     yield

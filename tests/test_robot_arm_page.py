@@ -410,13 +410,135 @@ def test_emmas_greeting_uses_the_vendor_handshake_group_once(shell, monkeypatch)
     monkeypatch.setattr(settings, "robot_greeting_arm_group", 6)
 
     assert asyncio.run(robot_arm.greet()) is True
-    assert shell.lines() == ["#6GC1"]
+    assert shell.lines()[0] == "#6GC1"
+    commands = [call[-1] for call in shell.calls]
+    assert commands.index("stty -F /dev/ttyUSB10 115200 raw -echo") < next(
+        index for index, command in enumerate(commands) if command.startswith("printf "))
+
+
+def test_serial_greeting_returns_the_arm_to_rest_after_the_gesture(shell, monkeypatch):
+    """A stored group parks the arm at its own end pose and nothing can read it
+    back, so a second greeting played from there has no travel left — measured
+    2026-09-30: the board answered #AGF and nobody saw the hand move. The
+    serial path therefore follows the gesture with the vendor's rest group,
+    after the measured play-out time."""
+    monkeypatch.setattr(settings, "robot_greeting_gesture_enabled", True)
+    monkeypatch.setattr(settings, "robot_greeting_arm_group", 6)
+    monkeypatch.setattr(robot_arm, "GREETING_HOME_DELAY_S", 0.0)
+
+    async def scenario():
+        assert await robot_arm.greet() is True
+        assert robot_arm._home_task is not None
+        await robot_arm._home_task
+
+    asyncio.run(scenario())
+    assert shell.lines() == ["#6GC1", "#99GC1"]
+
+
+def test_a_stop_cancels_the_pending_rest_return(shell, monkeypatch):
+    """After an explicit stop nothing may move on a timer. The disarm latch
+    would refuse the write anyway; the task itself must also be gone, so
+    nothing is left waiting for a re-arm to slip past."""
+    monkeypatch.setattr(settings, "robot_greeting_gesture_enabled", True)
+    monkeypatch.setattr(settings, "robot_greeting_arm_group", 6)
+
+    async def scenario():
+        assert await robot_arm.greet() is True
+        assert robot_arm._home_task is not None
+        out = await robot_arm.stop()
+        assert out["stop_write_ok"] is True
+        assert robot_arm._home_task is None
+
+    asyncio.run(scenario())
+    assert "#99GC1" not in shell.lines()
+
+
+def test_robot_face_greeting_uses_android_sdk_without_adb_write(shell, monkeypatch):
+    from types import SimpleNamespace
+    import json
+
+    monkeypatch.setattr(settings, "robot_greeting_gesture_enabled", True)
+    monkeypatch.setattr(settings, "robot_greeting_arm_group", 6)
+    sent = []
+
+    class FaceSocket:
+        headers = {"user-agent": "Android WebView EmmaRobot/0.1"}
+
+        async def send_text(self, payload):
+            sent.append(json.loads(payload))
+
+    face = SimpleNamespace(ws=FaceSocket())
+    assert asyncio.run(robot_arm.greet(session=face)) is True
+    assert sent == [{"type": "arm_greeting", "group": 6}]
+    assert shell.calls == []
+    # The rest-return after the gesture is the Android app's job on this path
+    # (it hears the board's #AGF; this side does not) — no serial timer here.
+    assert robot_arm._home_task is None
+
+    monkeypatch.setattr(settings, "robot_arm_motion_enabled", False)
+    assert asyncio.run(robot_arm.greet(session=face)) is False
+    assert sent == [{"type": "arm_greeting", "group": 6}]
+
+    monkeypatch.setattr(settings, "robot_arm_motion_enabled", True)
+    monkeypatch.setattr(settings, "robot_greeting_arm_group", 3)
+    assert asyncio.run(robot_arm.greet(session=face)) is False
+    assert shell.calls == []
+
+
+def test_spoken_handshake_tool_is_only_available_on_robot_face(shell, monkeypatch):
+    from types import SimpleNamespace
+    import json
+
+    from app.tools import robot as robot_tools
+    from app.tools.registry import allowed, dispatch, get, robot_face_session
+
+    monkeypatch.setattr(settings, "tools_enabled", True)
+    monkeypatch.setattr(settings, "tool_groups", "robot")
+    monkeypatch.setattr(settings, "robot_greeting_gesture_enabled", True)
+    monkeypatch.setattr(settings, "robot_greeting_arm_group", 6)
+    entry = get("request_handshake")
+    assert entry is not None
+    assert not allowed(entry)
+    sent = []
+
+    class FaceSocket:
+        headers = {"user-agent": "Android WebView EmmaRobot/0.1"}
+
+        async def send_text(self, payload):
+            sent.append(json.loads(payload))
+
+    face = SimpleNamespace(ws=FaceSocket())
+    token = robot_face_session.set(face)
+    try:
+        assert allowed(entry)
+        result = asyncio.run(dispatch("request_handshake", {}))
+        assert result["ok"] is True
+        assert result["hardware"] == "requested"
+        assert sent == [{"type": "arm_greeting", "group": 6}]
+        assert shell.calls == []
+
+        monkeypatch.setattr(settings, "robot_arm_motion_enabled", False)
+        result = asyncio.run(dispatch("request_handshake", {}))
+        assert result["ok"] is False
+        assert sent == [{"type": "arm_greeting", "group": 6}]
+    finally:
+        robot_face_session.reset(token)
+    assert not allowed(entry)
 
 
 def test_emmas_greeting_cannot_bypass_the_motion_interlock(shell, monkeypatch):
     monkeypatch.setattr(settings, "robot_greeting_gesture_enabled", True)
     monkeypatch.setattr(settings, "robot_greeting_arm_group", 6)
     monkeypatch.setattr(settings, "robot_arm_motion_enabled", False)
+
+    assert asyncio.run(robot_arm.greet()) is False
+    assert shell.lines() == []
+    assert not any("stty " in call[-1] for call in shell.calls)
+
+
+def test_greeting_skips_group_when_serial_setup_fails(shell, monkeypatch):
+    monkeypatch.setattr(settings, "robot_greeting_gesture_enabled", True)
+    shell.fail = True
 
     assert asyncio.run(robot_arm.greet()) is False
     assert shell.lines() == []

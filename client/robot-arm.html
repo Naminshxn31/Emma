@@ -191,7 +191,7 @@ let state = null;
 function paint() {
   const s = state;
   if (!s) return;
-  const blocked = busy || !s.armed || !s.configured || !s.port_present || !s.motion_enabled;
+  const blocked = busy || !s.armed || !s.configured || !s.port_present || !s.motion_enabled || !!s.app_owns_port;
   $('channels').innerHTML = s.channels.map((c) => {
     const known = s.commanded[c] != null;
     return `<div class="ch">
@@ -213,7 +213,7 @@ function paint() {
   $('runGroup').disabled = blocked || !s.groups_enabled;
   $('runGroup').textContent = s.groups_enabled
     ? 'เล่นหนึ่งรอบ' : 'ล็อกอยู่ (ROBOT_ARM_GROUPS_ENABLED)';
-  $('prepare').disabled = busy || !s.configured || !s.port_present;
+  $('prepare').disabled = busy || !s.configured || !s.port_present || !!s.app_owns_port;
   $('stop').textContent = s.armed ? 'หยุดส่งคำสั่ง' : 'กดอีกครั้งเพื่อพร้อมสั่งงาน';
 }
 
@@ -238,6 +238,15 @@ async function refresh() {
   } else if (!s.port_present) {
     msg = 'ไม่พบพอร์ต ' + s.port + ' บนหุ่นตอนนี้ — วันที่ 10 ก.ย. ตัวแปลงทั้งสองตัวหลุดหลังบูตหนึ่งนาที '
         + 'บูตใหม่แล้วเช็คภายในนาทีแรก';
+  } else if (s.app_owns_port) {
+    // The server refuses every serial button with app_owns_arm_port while
+    // this is set (design §4: one writer on the arm port). Said up front, so
+    // the buttons are not pressed only to learn it one refusal at a time.
+    msg = 'แอปบนหุ่นเป็นเจ้าของพอร์ตแขนอยู่ (' + ({
+      robot_body_enabled: 'เปิดสั่งท่าทางด้วยเสียง',
+      robot_nav_routes_enabled: 'เปิดนำทางผ่านแอป',
+      robot_walking: 'หุ่นกำลังเดิน',
+    }[s.app_owns_port] || s.app_owns_port) + ') — ปุ่มขยับในหน้านี้จะถูกปฏิเสธ ใช้หน้าหุ่นหรือปุ่มหยุด';
   } else if (!s.armed) {
     msg = 'หยุดส่งคำสั่งอยู่ — กดปุ่มแดงอีกครั้งเพื่อกลับมาพร้อมสั่งงาน';
   }

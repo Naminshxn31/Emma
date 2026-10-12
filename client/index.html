@@ -1185,7 +1185,20 @@ function showUnit(u) {
   else shot.appendChild(el('ภาพห้อง — รอจากฝ่ายขาย'));
   const plan = document.createElement('div');
   plan.className = 'uPlan';
-  if (u.floorplan) { const i = new Image(); i.src = u.floorplan; plan.appendChild(i); }
+  if (u.floorplan) {
+    // The per-unit plan (/unit-plan/<sha256>) sits behind WS_TOKEN like the
+    // card itself; only this server's own path gets the token, never a
+    // remote URL.
+    const i = new Image();
+    const planUrl = new URL(u.floorplan, location.href);
+    const planTok = new URLSearchParams(location.search).get('token');
+    if (planTok && planUrl.origin === location.origin && planUrl.pathname.startsWith('/unit-plan/')) {
+      planUrl.searchParams.set('token', planTok);
+    }
+    i.src = planUrl.href;
+    i.alt = 'แปลนห้อง ' + (u.room || '');
+    plan.appendChild(i);
+  }
   else plan.appendChild(el('แปลนรายยูนิต — รอจากฝ่ายขาย'));
   top.append(shot, plan);
   card.appendChild(top);

@@ -30,9 +30,47 @@ def slides(monkeypatch):
     sl.reload_slides()
     from tests.approval_fixture import approved_slides
 
+    # CANVA_URL is commented out in the gallery's .env today; the day it is
+    # switched back on, every tour test here would start a real Playwright
+    # driver and, with a URL naming another design, lose the measured page
+    # order the deck is built from. The suite must not change colour by .env.
+    # Tests about the Canva window set their own URL (test_canva_display).
+    monkeypatch.setattr(settings, "canva_url", "")
+    from app.tools import canva_display
+
+    monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
     monkeypatch.setattr(sl, "_slides", approved_slides(sl.load_slides()))
     sl.reset_state()
     return sl
+
+
+#: Which deck pages the `scripted` fixture gives a question. Positions, not
+#: ids, so the fixture follows whatever the measured Canva order is.
+_ASK_AT = (4, 30)
+
+
+@pytest.fixture
+def scripted(slides, monkeypatch):
+    """The real catalog plus synthetic approved scripts and two questions.
+
+    For the tests of the *script* path. The shipped deck (2026-10-06) has no
+    script_th or ask_th at all, so those tests now pin their own copy — see
+    `tests/approval_fixture.scripted_slides`. Tests about what the real deck
+    does today use `slides` and go down the summary path instead.
+    """
+    from app.tools import canva_display
+    from tests.approval_fixture import scripted_slides
+
+    order = canva_display.deck_order()
+    asks = {order[i]: "เคยมาเที่ยวพัทยาบ้างไหมคะ" for i in _ASK_AT if i < len(order)}
+    monkeypatch.setattr(slides, "_slides", scripted_slides(slides.load_slides(), asks))
+    slides.reset_state()
+    return slides
+
+
+def _real_deck(slides):
+    """The deck a tour presents today: measured Canva order, real catalog."""
+    return slides._build_deck(slides.DEFAULT_TOUR)
 
 
 @pytest.fixture
@@ -53,8 +91,22 @@ def _skip_when_bundle_not_materialized(slides):
 
 
 def test_slide_index_is_present_and_shaped(slides):
+    """Truncation is judged against the measured Canva deck, not a number.
+
+    It used to be `>= 50`, true of the 135-image library and false of the
+    48-page one that replaced it on 2026-10-06 with nothing missing. What
+    "truncated" actually means is a page of the live deck with no record
+    behind it, so that is what is checked.
+    """
+    from app.tools import canva_display
+
     library = slides.load_slides()
-    assert len(library) >= 50, "slide index missing or truncated"
+    ids = {s["id"] for s in library}
+    measured = canva_display.load_page_map(force=True)
+    assert measured, "no measured Canva page map to check the catalog against"
+    missing = sorted(set(measured) - ids)
+    assert not missing, "slide index missing or truncated: %s" % missing[:5]
+    assert len(library) >= canva_display.deck_total()
     required = {"id", "file", "type", "title_th", "title_en", "keywords_th"}
     assert required <= set(library[0])
 
@@ -93,8 +145,23 @@ def test_slide_ids_are_unique(slides):
 
 
 def test_default_catalog_contains_only_its_project(slides):
+    """Every record is this project's, and every one has a pinned asset.
+
+    The count used to be the literal 135 — a fact about one export, red the
+    day the 48-page library replaced it. The number that has to agree is the
+    asset manifest's: a record without a registered file is refused by the
+    display policy (that is how all 48 new slides were briefly blocked).
+    """
+    import json as _json
+
+    from app.data_sources import ROOT
+
     library = slides.load_slides()
-    assert len(library) == 135
+    manifest = _json.loads((ROOT / "data/registry/external_asset_manifest.json")
+                           .read_text(encoding="utf-8"))
+    pinned = {item["path"] for item in manifest["sources"]["slide_assets"]["files"]}
+    assert {s["file"] for s in library} == pinned
+    assert len(library) == len(pinned)
     assert all(s["project_id"] == settings.project_id for s in library)
     assert not any(s["type"] == "other-project" for s in library)
 
@@ -167,10 +234,13 @@ def test_generated_narration_is_not_labelled_approved(slides):
 
     Drafts must not be supplied to the model, even when the catalog itself
     has synthetic source approval in this presentation-mechanics fixture.
+
+    The draft is written here: it used to be borrowed from the real index,
+    and the 2026-10-06 library has no scripts at all (StopIteration).
     """
     from app.tools.slides import _public, load_slides
 
-    draft = next(s for s in load_slides() if s.get("script_th") or s.get("script_en"))
+    draft = {**load_slides()[0], "script_th": "บทร่างที่ยังไม่มีใครตรวจ"}
     shown = _public({**draft, "script_approved": False})
     assert not shown.get("script"), "draft narration must not be supplied to the model"
     assert shown.get("script_is_draft") is True
@@ -372,7 +442,7 @@ def test_the_scripts_themselves_do_not_trail_off_into_the_next_slide(slides):
     )
 
 
-def test_asking_for_a_slide_by_name_still_gets_the_script(slides):
+def test_asking_for_a_slide_by_name_still_gets_the_script(scripted):
     """`show_slide` handed the model the approved copy and said nothing
     about it, so "ขอดูฟิตเนส" got improvised narration while the tour got
     the real thing — the same slide, two levels of trust, decided only by
@@ -384,15 +454,32 @@ def test_asking_for_a_slide_by_name_still_gets_the_script(slides):
 
 
 def test_a_slide_with_no_script_is_not_told_to_read_one(slides):
-    """The 85 inherited slides have no narration. Telling the model to
-    follow a script that isn't there invites it to invent one."""
+    """Telling the model to follow a script that isn't there invites it to
+    invent one. The shipped deck has no scripts at all now, so this is every
+    slide: the order must be the approved-summary one, which forbids
+    guessing, and must not mention a script field to read from."""
     from app.tools.slides import load_slides
 
     bare = next(s for s in load_slides()
                 if not (s.get("script_th") or s.get("script_en")))
     out = run(registry.dispatch("show_slide", {"query": bare["title_th"]}))
-    if out.get("ok") and not out["slide"].get("script"):
-        assert "ห้ามเดา" in out["instruction"]
+    assert out.get("ok"), "an approved slide asked for by its own title"
+    assert not out["slide"].get("script")
+    assert "ห้ามเดา" in out["instruction"]
+    assert "ฟิลด์ script" not in out["instruction"]
+
+
+def test_asking_for_a_summary_slide_presents_it_without_advancing(slides):
+    """show_slide and go_to_page answer about one page. The summary order
+    they carry must be the presenting one and must never carry next_slide —
+    the advance order riding on a one-page answer is how "อธิบายหน้า 50"
+    became a presentation from page 50."""
+    shown = run(registry.dispatch("show_slide", {"query": "ฟิตเนส"}))
+    page = run(registry.dispatch("go_to_page", {"page": 5}))
+    for out in (shown, page):
+        assert out["ok"] is True and not out["slide"].get("script")
+        assert out["instruction"].startswith(slides.PRESENT_FROM_SUMMARY)
+        assert "next_slide" not in out["instruction"]
 
 
 @pytest.mark.parametrize("page,expected_position", [(1, 1), (5, 5), (24, 24)])
@@ -406,7 +493,7 @@ def test_a_page_can_be_asked_for_by_number(slides, page, expected_position):
     assert slides.STATE["index"] == page - 1, "the tour moves with it"
 
 
-def test_going_to_a_page_hands_over_that_page_s_script(slides):
+def test_going_to_a_page_hands_over_that_page_s_script(scripted):
     out = run(registry.dispatch("go_to_page", {"page": 5}))
     assert out["slide"]["script"], "page 5 has narration"
     assert "script" in out["instruction"]
@@ -587,11 +674,17 @@ def test_prompt_forbids_narrating_a_slide_that_is_not_shown():
 
 
 def test_official_deck_is_the_default_tour(slides):
-    """A sales person walks the authored deck, not an assembled selection."""
+    """A sales person walks the authored deck, not an assembled selection.
+
+    All of it: the total is the measured Canva page count (48 since
+    2026-10-06), not a literal — `>= 50` was a fact about the old export.
+    """
+    from app.tools import canva_display
+
     out = run(registry.dispatch("start_presentation", {}))
     assert out["ok"] is True
     assert out["tour"] == "deck"
-    assert out["total"] >= 50
+    assert out["total"] == canva_display.deck_total() == len(_real_deck(slides))
 
 
 def test_deck_is_presented_in_authored_order(slides):
@@ -601,13 +694,43 @@ def test_deck_is_presented_in_authored_order(slides):
     assert first < second, "deck slides must advance in page order"
 
 
-def test_falls_back_to_overview_without_an_imported_deck(slides, monkeypatch):
-    """Before anyone imports a PDF the assistant should still be able to
-    present, rather than refusing."""
-    library = [s for s in slides.load_slides() if s.get("type") != "deck"]
+def test_falls_back_to_overview_without_an_imported_deck(slides, monkeypatch, tmp_path):
+    """Before anyone imports or measures a deck the assistant should still
+    be able to present, rather than refusing.
+
+    "No deck" is now "no measured Canva page map": the deck tour is built
+    from canva_pages.json, and the old way of simulating its absence —
+    removing slides typed "deck" — removes nothing from a library that has
+    no such type, so the test was asserting a fallback that never ran.
+    """
+    import shutil
+
+    from app.tools import canva_display
+
+    shutil.copy(Path(settings.slides_dir) / "index.json", tmp_path / "index.json")
+    library = slides.load_slides()
+    monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
+    monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
+    slides.reload_slides()
+    slides.load_slides()
     monkeypatch.setattr(slides, "_slides", library)
+    assert canva_display.deck_order() == [], "the map should be gone for this test"
     out = run(registry.dispatch("start_presentation", {"tour": "deck"}))
     assert out["ok"] is True and out["tour"] == "overview"
+    assert out["total"] > 1
+
+
+def test_every_tour_offered_to_the_model_presents_its_own_subject(slides):
+    """`start_presentation`'s enum is a promise: "location" must present the
+    location pages. The 2026-10-06 library renamed the map type to
+    "location"; the tour still asked for "location-map", built nothing, and
+    start_presentation quietly fell back to the 21-slide overview — so a
+    guest asking about the location got everything else."""
+    for tour, kinds in slides.TOURS.items():
+        deck = slides._build_deck(tour)
+        assert deck, "tour %r builds nothing from the real catalog" % tour
+        if tour != "deck":
+            assert all(slides._by_id(sid).get("type") in kinds for sid in deck)
 
 
 # ==================== narration scripts ====================
@@ -821,14 +944,184 @@ def test_the_tour_does_not_preview_or_repeat_the_next_slide(slides):
 # ==================== speaking the deck's own script ====================
 
 
-def test_each_deck_slide_hands_the_model_a_script_to_speak(slides):
-    """"พูดตามลิ้ง": every deck page ships its own script, and the tour must
-    surface it so the model delivers that instead of improvising."""
+def test_each_deck_slide_hands_the_model_a_script_to_speak(scripted):
+    """"พูดตามลิ้ง": a deck page that ships its own script must have the tour
+    surface it so the model delivers that instead of improvising.
+
+    Fixture scripts (`scripted`): the 2026-10-06 deck carries none, and the
+    real-deck version of this promise is the test below."""
     out = run(registry.dispatch("start_presentation", {"tour": "deck"}))
     assert out["slide"].get("script"), "the cover should carry a script"
+    assert out["instruction"] is scripted.KEEP_GOING
 
     nxt = run(registry.dispatch("next_slide", {}))
     assert nxt["slide"].get("script"), "each advanced slide should carry its script"
+
+
+def test_the_real_deck_gives_every_page_something_approved_to_present(slides, monkeypatch):
+    """End to end on the shipped deck: start, advance through every measured
+    page in Canva order, finish — no network, no browser.
+
+    The failure this pins down: with no script anywhere, every page used to
+    come back "สไลด์นี้ไม่มีบทที่อนุมัติให้พูด ห้ามบรรยาย", so a tour would
+    walk 48 pages under orders to stay silent. Now each page carries its
+    approved summary and the order to present it and keep going, with the
+    concept state's instruction (since 2026-10-10: never say "it is a
+    concept") — and none carries a draft or an empty slot.
+    """
+    from app.tools import canva_display
+
+    # The beat between slides (0.8s) times 48 pages is longer than the
+    # suite's 20s timeout; the pacing has its own tests.
+    monkeypatch.setattr(settings, "slide_pause_s", 0.0)
+    expected = canva_display.deck_order()
+    seen = []
+    out = run(registry.dispatch("start_presentation", {}))
+    while not out.get("finished"):
+        assert out["ok"] is True
+        slide, order = out["slide"], out["instruction"]
+        seen.append(slide["id"])
+        assert slide["capabilities"] == {"display": True, "model_text": True}
+        assert slide.get("summary_th") or slide.get("summary_en")
+        assert order.startswith(slides.PRESENT_FROM_SUMMARY), slide["id"]
+        assert "next_slide" in order and "ห้ามถามว่าจะไปสไลด์ถัดไปไหม" in order
+        assert 'ห้ามพูดว่า "เป็นแนวคิดเบื้องต้น"' in order, "concept slide lost its state instruction"
+        assert "ไม่มีบทที่อนุมัติ" not in order
+        out = run(registry.dispatch("next_slide", {}))
+    assert seen == expected and out["total"] == len(expected)
+    assert slides.STATE["deck"] == [], "a finished deck must stop being a deck"
+
+
+# ============ presenting an approved summary (no script) ============
+
+
+def test_the_summary_order_forbids_reading_the_picture_out(slides):
+    """The summaries describe the picture, and reading one aloud is a guided
+    tour of the slide layout ("หน้าปกของชุดนำเสนอ พื้นหลังดำสนิท มีโลโก้...").
+    Quoted, because "don't describe the layout" is abstract and a quoted
+    phrase is something the model can match against what it is about to
+    say — the lesson KEEP_GOING's "เดี๋ยวไปดู...กันต่อนะคะ" taught. Read
+    from the real constant so a rewrite cannot drop a clause quietly."""
+    text = slides.PRESENT_FROM_SUMMARY
+    for wrong in ("'หน้านี้มี...'", "'ภาพนี้แสดง...'", "'ฝั่งซ้ายเป็น...'",
+                  "'มุมขวาบนมีผังย่อ...'", "'พื้นหลังสีดำ'"):
+        assert wrong in text, "the layout phrase %s is no longer quoted" % wrong
+    # Boundary first: a rule read last loses (KEEP_GOING's history).
+    assert text.index("ห้ามอ่าน summary ตามตัว") < 40
+    assert "ห้ามพูดถึงองค์ประกอบของภาพ" in text
+
+
+def test_the_summary_order_adds_nothing_and_stays_short(slides):
+    """The summary is the whole approved claim. Facts or figures beyond it
+    are inventions with an approver's name on the slide behind them."""
+    text = slides.PRESENT_FROM_SUMMARY
+    assert "ห้ามเพิ่มข้อเท็จจริงหรือตัวเลขที่ไม่มีในนั้น" in text
+    assert "ห้ามเดา" in text
+    assert "2-3 ประโยค" in text, "a host presents, a reader recites"
+    # Three dividers' summaries say "กำลังจะพาไปดู..." — the physical-tour
+    # wording prompt rule 6 bans without navigation.
+    assert "'พาไปดู'" in text and "'พาชม'" in text
+    # Translation is permitted, padding under its cover is not.
+    assert "ภาษานั้น" in text and "ไม่เพิ่มเนื้อหา" in text
+
+
+def test_concept_slides_carry_the_state_instruction_and_no_caveat_order(slides):
+    """Every 2026-10-06 record is content_state preliminary_concept. Its
+    instruction rides on the presenting order of every page, and since the
+    owner's 2026-10-10 ruling ("อย่าบอกว่าเป็นเพียงแนวคิดอาจจะมีการเปลี่ยนแปลง
+    ห้ามพูดแบบนี้เป็นอันขาด") that instruction bans the caveat instead of
+    ordering it. The old extra "ห้ามพูดเหมือนสร้างเสร็จหรือเปิดใช้แล้ว" is what
+    the model turned into a caveat on every slide, so it must not come back.
+    A slide with no state gets no invented instruction."""
+    from app.knowledge_policy import state_instruction
+
+    concept = {"capabilities": {"model_text": True}, "summary_th": "x",
+               "content_state_instruction": state_instruction("preliminary_concept")}
+    built = {"capabilities": {"model_text": True}, "summary_th": "x"}
+    for mode in ("tour", "single", "ask"):
+        text = slides._summary_instruction(concept, mode)
+        assert state_instruction("preliminary_concept") in text
+        assert "ห้ามพูดเหมือนสร้างเสร็จหรือเปิดใช้แล้ว" not in text
+        assert 'ห้ามพูดว่า "เป็นแนวคิดเบื้องต้น"' in text
+        assert "แนวคิดเบื้องต้น" not in slides._summary_instruction(built, mode)
+
+
+def test_a_summary_slide_with_a_question_presents_then_waits(slides, monkeypatch):
+    """A question on an unscripted page must still be a question: present,
+    ask, stop. Sent with the advancing order it would be asked on the way
+    past — the reason ASK_AND_WAIT exists."""
+    target = dict(slides._by_id(_real_deck(slides)[1]), ask_th="เคยมาพัทยาบ้างไหมคะ")
+    order = slides._narration_instruction(target)
+    assert order.startswith(slides.PRESENT_FROM_SUMMARY)
+    assert "ห้ามเรียก next_slide" in order and "รอให้ลูกค้าตอบ" in order
+    assert slides.STATE["awaiting"] == target["id"]
+
+
+def test_a_resumed_summary_slide_is_presented_not_read_as_a_script(slides):
+    """Resuming after a barge-in hard-coded KEEP_GOING — "speak only the
+    script field" — and the resumed page is exactly the one the guest needs
+    to hear properly. It goes through the same decision as every other path
+    now, minus the second asking."""
+    run(registry.dispatch("start_presentation", {"tour": "deck"}))
+    run(registry.dispatch("next_slide", {}))
+    slides.pause_for_barge_in()
+    out = run(registry.dispatch("next_slide", {}))
+    assert out["resumed"] is True
+    assert out["instruction"] is not slides.KEEP_GOING
+    assert out["instruction"].startswith(slides.PRESENT_FROM_SUMMARY)
+    assert "next_slide" in out["instruction"]
+
+
+def test_the_script_order_no_longer_licenses_narrating_from_slide_data(slides):
+    """KEEP_GOING carried "ถ้าสไลด์นี้ไม่มี script ให้บรรยายสั้นๆ ...จากข้อมูล
+    สไลด์" — on a slide whose only data describes the picture, that is the
+    layout tour PRESENT_FROM_SUMMARY forbids. Slides without a script get
+    their own order now, so the script order must not carry a second,
+    looser one."""
+    assert "ไม่มี script" not in slides.KEEP_GOING
+    assert "จากข้อมูลสไลด์" not in slides.KEEP_GOING
+
+
+def test_draft_and_silent_slides_keep_their_own_orders(slides):
+    """The summary path must not swallow the two cases that mean "say
+    nothing": text not approved, and an animation frame."""
+    real = slides._by_id(_real_deck(slides)[0])
+    unapproved = {key: value for key, value in real.items()
+                  if key not in ("approval_status", "approved_by", "approved_at",
+                                 "effective_at", "disclosure_scope", "content_state")}
+    assert "ห้ามบรรยาย" in slides._narration_instruction(unapproved)
+    assert not slides._narration_instruction(unapproved).startswith(
+        slides.PRESENT_FROM_SUMMARY)
+    assert slides._narration_instruction({**real, "silent": True}) == slides.PASS_THROUGH
+    unsummarised = {**real, "summary_th": "", "summary_en": ""}
+    assert "ไม่มีบทที่อนุมัติ" in slides._narration_instruction(unsummarised)
+
+
+def test_a_slide_whose_image_is_refused_mid_tour_is_not_a_crash(slides):
+    """`_public` answers a refused *asset* with the asset trace, which has no
+    "allowed" key. `_narration_instruction` read policy_trace["allowed"], so
+    an image dropped from the manifest mid-tour turned next_slide into a
+    KeyError instead of "don't narrate this"."""
+    real = slides._by_id(_real_deck(slides)[0])
+    order = slides._narration_instruction({**real, "file": "unregistered.jpg"})
+    assert "ห้ามบรรยาย" in order
+
+
+def test_common_area_measurements_never_ride_a_slide_payload(slides):
+    """search_condo_info strips pool/lagoon dimensions before a model sees
+    them; the slide tools did not, and an approved summary is now spoken.
+    intro-015 carries the lagoon's length in Thai and in two English forms
+    ("155m", "155-metre") — none of them may reach the tour."""
+    hits = [s for s in slides.load_slides()
+            if "155" in " ".join(str(s.get(k) or "") for k in
+                                 ("title_th", "title_en", "summary_th", "summary_en"))]
+    assert hits, "the fixture's premise: some approved copy carries the figure"
+    for slide in hits:
+        shown = slides._public(slide)
+        spoken = " ".join(str(shown.get(k) or "") for k in
+                          ("title_th", "title_en", "summary_th", "summary_en"))
+        assert "155" not in spoken, slide["id"]
+        assert "ลากูน" in spoken or "lagoon" in spoken.lower(), "the place keeps its name"
 
 
 # ==================== a barge-in pauses, never skips ====================
@@ -1033,11 +1326,13 @@ def test_a_silent_turn_is_never_nudged(slides):
 # ==================== asking the guest something ====================
 
 
-def test_a_slide_with_a_question_tells_the_model_to_wait(slides):
+def test_a_slide_with_a_question_tells_the_model_to_wait(scripted):
     """A slide carrying `ask_th` must come back with the waiting orders, not
     the advancing ones. KEEP_GOING ends "call next_slide immediately, don't
     wait for an answer" — under that instruction a question isn't a question,
-    it's something the robot says on its way past."""
+    it's something the robot says on its way past. (Fixture questions: the
+    shipped deck has none.)"""
+    slides = scripted
     run(registry.dispatch("start_presentation", {"tour": "deck"}))
     for _ in range(20):
         out = run(registry.dispatch("next_slide", {}))
@@ -1111,7 +1406,14 @@ def test_the_seeded_questions_are_open_ended_and_on_topic(slides):
     page it sits on: one that would work anywhere is one worth cutting.
     """
     asked = [s for s in slides.load_slides() if s.get("ask_th")]
-    assert asked, "no slide asks the guest anything"
+    if not asked:
+        # Read against the real index on purpose — this is about copy that
+        # customers hear, not about mechanics. The 2026-10-06 deck carries no
+        # questions, so there is nothing spoken to check; a skip says so
+        # where a pass would claim the questions were checked.
+        pytest.skip("NOT CHECKED: the shipped deck (2026-10-06) has no ask_th — "
+                    "no question is spoken to guests to vet; re-arms itself when "
+                    "the sales team adds questions")
 
     for slide in asked:
         q = slide["ask_th"]
@@ -1143,7 +1445,9 @@ def test_a_question_asked_after_the_narration_finished_does_not_replay_it(slides
     here = slides.STATE["index"]
 
     # Guest waits for the narration to end, then asks to see something.
-    slides.show_current(slides._by_id("ew-024"))
+    # A page of the real deck, far from here: the id used to be "ew-024",
+    # which no longer exists, so show_current(None) showed nothing.
+    slides.show_current(slides._by_id(_real_deck(slides)[-1]))
     assert slides.STATE["detour"] is True
 
     out = run(registry.dispatch("next_slide", {}))
@@ -1161,7 +1465,8 @@ def test_a_slide_cut_off_by_a_barge_in_is_still_resumed(slides):
     here = slides.STATE["index"]
 
     slides.pause_for_barge_in()          # talked over mid-narration
-    slides.show_current(slides._by_id("ew-024"))
+    slides.show_current(slides._by_id(_real_deck(slides)[-1]))
+    assert slides.current_slide()["id"] == _real_deck(slides)[-1], "the detour is on screen"
 
     out = run(registry.dispatch("next_slide", {}))
     assert out.get("resumed") is True, "skipped a slide nobody finished hearing"
@@ -1648,8 +1953,11 @@ def test_a_finished_deck_does_not_restart_itself_later(slides):
     assert out["finished"] is True
     assert slides.STATE["deck"] == [], "the finished deck was left loaded"
 
-    # Minutes later: the guest asks to see something.
-    slides.show_current(slides._by_id("ew-024"))
+    # Minutes later: the guest asks to see something. A real page — with the
+    # old "ew-024" this showed None, set no detour, and the assertion below
+    # passed without the relapse ever being possible.
+    slides.show_current(slides._by_id(_real_deck(slides)[23]))
+    assert slides.STATE["detour"] is True, "the guest's request is on screen"
     assert slides.should_continue_tour() is False, (
         "a finished tour came back to life and will narrate over the guest"
     )
@@ -1797,10 +2105,15 @@ def test_asking_about_one_page_does_not_start_a_presentation(slides):
     with the answer to a question about one page, it turned that answer into
     a presentation starting from page 50.
     """
-    run(registry.dispatch("start_presentation", {"tour": "deck"}))
-    out = run(registry.dispatch("go_to_page", {"page": 50}))
+    from app.tools import canva_display
 
-    assert out["slide"]["id"] == "ew-050"
+    # A late page of whatever deck is measured — page 50 of the 59-page
+    # export was the live report; the 2026-10-06 deck has 48.
+    page = canva_display.deck_total() - 2
+    run(registry.dispatch("start_presentation", {"tour": "deck"}))
+    out = run(registry.dispatch("go_to_page", {"page": page}))
+
+    assert out["slide"]["id"] == canva_display.slide_on_page(page)
     assert "next_slide" not in out["instruction"], (
         "the answer carried the tour's advance order"
     )
@@ -1814,7 +2127,8 @@ def test_an_explicit_advance_puts_the_tour_back_in_charge(slides):
     jumping around, the tour has to resume driving itself — otherwise every
     page-number question would quietly end the presentation for good."""
     run(registry.dispatch("start_presentation", {"tour": "deck"}))
-    run(registry.dispatch("go_to_page", {"page": 50}))
+    out = run(registry.dispatch("go_to_page", {"page": len(_real_deck(slides)) - 2}))
+    assert out["ok"] is True, "the page has to exist for this to test anything"
     assert slides.STATE["manual"] is True
 
     run(registry.dispatch("next_slide", {}))
@@ -1822,13 +2136,14 @@ def test_an_explicit_advance_puts_the_tour_back_in_charge(slides):
     assert slides.should_continue_tour() is True
 
 
-def test_a_page_with_a_question_still_asks_it_when_jumped_to(slides):
+def test_a_page_with_a_question_still_asks_it_when_jumped_to(scripted):
     """Dropping KEEP_GOING must not drop the question with it.
 
     Finds a page that carries a question rather than naming one. Page 55 was
     hard-coded, and re-importing the deck moved the questions to different
     page numbers — the test then failed for a reason that had nothing to do
-    with what it tests."""
+    with what it tests. (Fixture questions: the shipped deck has none.)"""
+    slides = scripted
     deck = slides._build_deck("deck")
     page = next((n for n, sid in enumerate(deck, 1)
                  if slides._by_id(sid).get("ask_th")), None)
@@ -1915,9 +2230,10 @@ def test_the_deck_is_presented_in_canva_page_order(slides, tmp_path, monkeypatch
     `data/slides/` is our own export and it disagrees with the live design —
     59 frames against a shorter deck, some of them caught mid-transition. The
     guest is looking at Canva, so Canva decides what comes after what.
+    (Real intro-NNN ids since 2026-10-06; the map is a fixture.)
     """
-    _measured(tmp_path, monkeypatch, {"ew-031": 3, "ew-001": 1, "ew-024": 2})
-    assert slides._build_deck("deck") == ["ew-001", "ew-024", "ew-031"]
+    _measured(tmp_path, monkeypatch, {"intro-031": 3, "intro-001": 1, "intro-024": 2})
+    assert slides._build_deck("deck") == ["intro-001", "intro-024", "intro-031"]
 
 
 def test_frames_with_no_canva_page_are_not_presented(slides, tmp_path, monkeypatch):
@@ -1927,45 +2243,55 @@ def test_frames_with_no_canva_page_are_not_presented(slides, tmp_path, monkeypat
     while the Canva window showed the Journey to Mars tunnel. A frame that
     isn't a page of the deck can't be a stop on a tour of the deck.
     """
-    _measured(tmp_path, monkeypatch, {"ew-001": 1, "ew-024": 2})
+    _measured(tmp_path, monkeypatch, {"intro-001": 1, "intro-024": 2})
     deck = slides._build_deck("deck")
-    assert "ew-018" not in deck and "ew-059" not in deck
-    assert deck == ["ew-001", "ew-024"]
+    assert "intro-018" not in deck and "intro-048" not in deck
+    assert deck == ["intro-001", "intro-024"]
 
 
 def test_the_deck_follows_however_many_pages_canva_has(slides, tmp_path, monkeypatch):
     """"ไม่ว่าหน้าจะมีเท่าไหร่" — the length is whatever was measured, and
-    `total` is not allowed to become a second hard-coded 59."""
+    `total` is not allowed to become a second hard-coded 59 (or 48)."""
     _measured(tmp_path, monkeypatch,
-              {"ew-%03d" % n: n for n in range(1, 13)}, total=12)
+              {"intro-%03d" % n: n for n in range(1, 13)}, total=12)
     assert len(slides._build_deck("deck")) == 12
 
 
 def test_an_unmeasured_deck_still_presents(slides, tmp_path, monkeypatch):
-    """No measurement, no regression: the export presents in its own order."""
+    """No measurement, no regression: something is still presented.
+
+    It used to count slides typed "deck" and compare — 0 == 0 on the
+    2026-10-06 library, which has no such type, so it passed while
+    presenting nothing. What an unmeasured install actually does now is fall
+    back to the assembled overview; that it starts, and with real pages, is
+    the promise.
+    """
     import shutil
     from app.tools import canva_display
 
+    library = slides.load_slides()
     src = __import__("pathlib").Path(settings.slides_dir)
     shutil.copy(src / "index.json", tmp_path / "index.json")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     monkeypatch.setattr(canva_display, "_PAGE_MAP", None)
     canva_display.load_page_map(force=True)
-    # However many frames the export happens to hold — the point is that it
-    # presents them all, not that there are 59 of them.
-    expected = sum(1 for s in slides.load_slides() if s.get("type") == "deck")
-    assert len(slides._build_deck("deck")) == expected
+    slides.reload_slides()
+    slides.load_slides()
+    monkeypatch.setattr(slides, "_slides", library)
+    out = run(registry.dispatch("start_presentation", {"tour": "deck"}))
+    assert out["ok"] is True and out["total"] > 1
+    assert out["total"] == len(slides._build_deck(out["tour"]))
 
 
 def test_a_canva_page_click_lands_on_the_slide_that_page_shows(
         slides, tmp_path, monkeypatch):
     """A salesperson clicking to page 3 must move the tour to whatever is
-    *on* page 3 — not to `ew-003`, which is the arithmetic that started all
-    of this."""
-    _measured(tmp_path, monkeypatch, {"ew-001": 1, "ew-024": 2, "ew-031": 3})
+    *on* page 3 — not to `intro-003`, which is the arithmetic that started
+    all of this."""
+    _measured(tmp_path, monkeypatch, {"intro-001": 1, "intro-024": 2, "intro-031": 3})
     slides.reload_slides()
     shown = slides.move_to_deck_page(3)
-    assert shown is not None and shown["id"] == "ew-031"
+    assert shown is not None and shown["id"] == "intro-031"
     assert shown["position"] == 3 and shown["total"] == 3
 
 

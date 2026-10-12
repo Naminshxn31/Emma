@@ -413,3 +413,27 @@ def test_arriving_mid_sentence_does_not_cut_the_sentence_off(robot):
         assert "ถึง" in robot.provider.said[0], "the arrival was lost, not delayed"
 
     asyncio.run(body())
+
+
+def test_a_handshake_request_is_never_narrated_as_motion(monkeypatch):
+    """Finding #7: the app's greet() refuses silently (stop latch, a walk,
+    the arm busy) and the arm_greeting frame has no ack. "requested" must
+    not let the model say the hand is coming after someone pressed stop."""
+    from types import SimpleNamespace
+
+    from app import robot_arm
+    from app.tools.registry import robot_face_session
+
+    async def greeted(session=None):
+        return True
+
+    monkeypatch.setattr(robot_arm, "greet", greeted)
+    token = robot_face_session.set(SimpleNamespace(ws=None))
+    try:
+        out = run(registry.dispatch("request_handshake", {}))
+    finally:
+        robot_face_session.reset(token)
+    assert out["hardware"] == "requested"
+    assert "พูดว่ากำลังยื่นมือได้" not in out["instruction"]
+    assert "ห้ามพูดว่ากำลังยื่นมือ" in out["instruction"]
+    assert "ปฏิเสธเงียบ" in out["instruction"]

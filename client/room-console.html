@@ -29,6 +29,9 @@
     min-height: 240px; display: flex; align-items: center; justify-content: center; }
   #screen { max-width: 100%; display: block; cursor: crosshair; }
   #screen.noclick { cursor: default; }
+  #cursor { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+    border: 2px solid var(--accent); border-radius: 50%; background: rgba(74,163,255,.22);
+    pointer-events: none; display: none; box-shadow: 0 0 7px rgba(74,163,255,.7); z-index: 3; }
   .screenmsg { color: var(--dim); padding: 40px; text-align: center; }
   .screenbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   .screenbar label { font-size: 13px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
@@ -56,6 +59,7 @@
 <header>
   <h1>แผงคุมห้อง</h1>
   <select id="room" title="เลือกห้อง"></select>
+  <button id="discoverBtn" title="แสดง serial ของจอ Android ที่ต่ออยู่ (สำหรับเพิ่มลง rooms.json)">หาจอ Android</button>
   <span><span class="dot" id="dot"></span> <span class="status" id="status">—</span></span>
   <span style="flex:1"></span>
   <span class="status" id="caps"></span>
@@ -66,11 +70,16 @@
     <div class="screenbar">
       <button class="go" id="grab">ถ่ายจอ</button>
       <label><input type="checkbox" id="live"> ดูสด</label>
-      <label>ทุก <select id="ivl"><option value="1000">1 วิ</option><option value="2000" selected>2 วิ</option><option value="4000">4 วิ</option></select></label>
-      <label><input type="checkbox" id="clickmode"> คลิกบนจอ = สั่งเมาส์</label>
+      <label><select id="ivl"><option value="0" selected>เร็วสุด</option><option value="500">0.5 วิ</option><option value="1000">1 วิ</option><option value="2000">2 วิ</option></select></label>
+      <label><input type="checkbox" id="clickmode"> คลิก/ลากบนจอ = สั่งเมาส์</label>
+      <button id="scrcpyBtn" class="go" style="display:none" title="เปิดหน้าต่างเรียลไทม์ลื่นๆ ของจอนี้ (ภาพอย่างเดียว)">▶ เรียลไทม์ (scrcpy)</button>
+      <button id="scrcpyAudioBtn" class="go" style="display:none" title="เรียลไทม์ + เสียงที่จอกำลังเล่น (ฟังสด ไม่บันทึก)">🔊 ฟังเสียงจอ</button>
+      <button id="scrcpyMicBtn" class="go" style="display:none" title="ฟังไมค์ในห้องของจอนี้ (ฟังสด ไม่บันทึก) — จอจะขึ้นจุดเขียวไมค์ให้คนในห้องเห็น">🎤 ฟังไมค์ห้อง</button>
+      <button id="updateBtn" style="display:none" title="ดึงโค้ดใหม่จากเครื่องคุม + รีสตาร์ต agent (ไม่ต้อง reinstall)">อัปเดต agent</button>
     </div>
     <div class="screenwrap">
       <img id="screen" alt="" hidden>
+      <div id="cursor"></div>
       <div class="screenmsg" id="screenmsg">เลือกห้องแล้วกด “ถ่ายจอ” · ต้องเปิดความสามารถ <code>screen</code> ที่เครื่องนั้น</div>
     </div>
     <div class="hint">คลิกบนจอเพื่อสั่งเมาส์ ต้องติ๊ก “คลิกบนจอ” และเครื่องนั้นเปิด <code>ROOM_AGENT_INPUT=true</code></div>
@@ -91,6 +100,9 @@
         <button data-act="monitor" data-args='{"state":"off"}'>ปิดจอ</button>
         <button data-act="monitor" data-args='{"state":"on"}'>เปิดจอ</button>
         <button class="danger" data-act="lock_screen">ล็อกหน้าจอ</button>
+        <button class="danger" data-act="reboot" data-confirm="รีสตาร์ตเครื่องในห้องนี้?">รีสตาร์ต</button>
+        <button class="danger" data-act="shutdown" data-confirm="ปิดเครื่องในห้องนี้? เปิดกลับจากที่นี่ไม่ได้">ปิดเครื่อง</button>
+        <button id="wolBtn" class="go" style="display:none" title="ส่งสัญญาณปลุก (Wake-on-LAN) เครื่อง Windows ที่ปิดอยู่ — ต้องตั้ง WoL ไว้ที่เครื่องนั้น">เปิดเครื่อง (WoL)</button>
       </div>
     </div>
     <div class="group">
@@ -131,10 +143,18 @@
   function enc(s) { return encodeURIComponent(s); }
 
   function log(msg, cls) {
+    // Built with textContent, not innerHTML: log lines carry device- and
+    // room-supplied text (window titles, device names, error detail) and must
+    // never be able to inject markup into this page.
     var d = document.createElement('div');
-    var t = new Date().toLocaleTimeString();
-    d.innerHTML = '<span class="t">' + t + '</span> ' + (cls ? '<span class="' + cls + '">' : '') +
-      msg.replace(/</g, '&lt;') + (cls ? '</span>' : '');
+    var ts = document.createElement('span');
+    ts.className = 't';
+    ts.textContent = new Date().toLocaleTimeString() + ' ';
+    d.appendChild(ts);
+    var body = document.createElement('span');
+    if (cls) body.className = cls;
+    body.textContent = msg;
+    d.appendChild(body);
     $('log').prepend(d);
   }
 
@@ -158,42 +178,79 @@
         $('dot').className = 'dot on';
         $('status').textContent = d.room + ' · ต่อได้';
         var en = d.enabled || [];
+        var isAndroid = d.kind === 'android';
         $('caps').textContent = en.length + '/' + Object.keys(d.catalogue || {}).length + ' ความสามารถ' +
-          (d.input_control ? ' · input เปิด' : ' · input ปิด');
+          (d.input_control ? ' · input เปิด' : ' · input ปิด') +
+          (!isAndroid && d.mac_hint ? ' · MAC ' + d.mac_hint + ' (ใส่ rooms.json เพื่อ WoL)' : '');
         $('inputgroup').classList.toggle('input-lock', !d.input_control);
+        var sc = isAndroid ? 'inline-block' : 'none';
+        $('scrcpyBtn').style.display = sc;
+        $('scrcpyAudioBtn').style.display = sc;    // real-time + panel audio
+        $('scrcpyMicBtn').style.display = sc;      // listen to the room (mic)
+        $('updateBtn').style.display = (!isAndroid && en.indexOf('update') >= 0) ? 'inline-block' : 'none';
+        // WoL is for Windows rooms; hide it only when we KNOW it's Android.
+        $('wolBtn').style.display = isAndroid ? 'none' : 'inline-block';
         var hasScreen = en.indexOf('screen') >= 0;
         if (!hasScreen) msg.textContent = 'ห้องนี้ยังไม่ได้เปิดความสามารถ screen (ถ่ายจอสด)';
       } else {
         $('dot').className = 'dot off';
         $('status').textContent = d.error || 'ต่อไม่ได้';
         $('caps').textContent = '';
+        $('scrcpyBtn').style.display = 'none';
+        $('scrcpyAudioBtn').style.display = 'none';
+        $('scrcpyMicBtn').style.display = 'none';
+        $('updateBtn').style.display = 'none';
+        // A PC that can't be reached is exactly when WoL is used, so keep the
+        // button available here (an Android panel that's off will just be told
+        // to use a smart plug).
+        $('wolBtn').style.display = 'inline-block';
       }
     } catch (e) { $('dot').className = 'dot off'; $('status').textContent = 'ต่อไม่ได้'; }
   }
 
   async function grab() {
-    if (!room()) return;
+    // Capture which room this grab is FOR. If the operator switches rooms while
+    // the request is in flight, a late frame (or its size) from the old room
+    // must not repaint over the new one -- clicks map to whatever is on screen,
+    // so a stale frame is a click landing on the wrong panel.
+    var forRoom = room();
+    if (!forRoom) return false;
     try {
-      var r = await fetch('/screen?room=' + enc(room()) + '&t=' + Date.now());
+      var r = await fetch('/screen?room=' + enc(forRoom) + '&t=' + Date.now());
+      if (forRoom !== room()) return false;
       if (!r.ok) {
         var e = await r.json().catch(function () { return {}; });
         img.hidden = true; msg.hidden = false;
         msg.textContent = 'ดูจอไม่ได้: ' + (e.error || r.status);
-        return;
+        return false;
       }
       var size = (r.headers.get('X-Screen-Size') || '').split(',').map(Number);
-      if (size.length === 2 && size[0]) { realW = size[0]; realH = size[1]; }
       var blob = await r.blob();
+      if (forRoom !== room()) return false;
+      if (size.length === 2 && size[0]) { realW = size[0]; realH = size[1]; }
       var url = URL.createObjectURL(blob);
       img.src = url; img.hidden = false; msg.hidden = true;
       if (lastUrl) URL.revokeObjectURL(lastUrl);
       lastUrl = url;
-    } catch (e) { log('ถ่ายจอไม่ได้: ' + e, 'bad'); }
+      return true;
+    } catch (e) { log('ถ่ายจอไม่ได้: ' + e, 'bad'); return false; }
   }
 
+  var liveOn = false;
   function setLive(on) {
+    liveOn = on;
     if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
-    if (on) { grab(); liveTimer = setInterval(grab, parseInt($('ivl').value, 10)); }
+    if (!on) return;
+    var ivl = parseInt($('ivl').value, 10);
+    if (ivl > 0) { grab(); liveTimer = setInterval(grab, ivl); }
+    else liveLoop();                       // "เร็วสุด": grab back-to-back, paced by the panel
+  }
+  async function liveLoop() {
+    if (!liveOn || parseInt($('ivl').value, 10) !== 0) return;
+    var ok = await grab();
+    // Back off after a failed grab (panel offline, e.g. right after รีสตาร์ต)
+    // instead of hammering adb back-to-back.
+    if (liveOn && parseInt($('ivl').value, 10) === 0) setTimeout(liveLoop, ok ? 0 : 2000);
   }
 
   async function act(action, args) {
@@ -206,7 +263,8 @@
         log('✓ ' + action + (args ? ' ' + JSON.stringify(args) : ''), 'ok');
         if (action === 'list_windows') showWindows(d.windows || []);
       } else {
-        log('✗ ' + action + ' — ' + (d.error || '') + (d.instruction ? ' (' + d.instruction + ')' : ''), 'bad');
+        log('✗ ' + action + ' — ' + (d.error || '') + (d.detail ? ': ' + d.detail : '') +
+            (d.instruction ? ' (' + d.instruction + ')' : ''), 'bad');
       }
       return d;
     } catch (e) { log('✗ ' + action + ' — ' + e, 'bad'); }
@@ -220,6 +278,8 @@
   // capability buttons
   document.querySelectorAll('button[data-act]').forEach(function (b) {
     b.addEventListener('click', function () {
+      var c = b.getAttribute('data-confirm');
+      if (c && !confirm(c + '\n(' + room() + ')')) return;
       var args = b.getAttribute('data-args'); act(b.getAttribute('data-act'), args ? JSON.parse(args) : {});
     });
   });
@@ -233,20 +293,101 @@
     var t = $('typetext').value; if (t) act('type_text', { text: t });
   });
 
-  // click on the live screen -> real mouse click
-  img.addEventListener('click', function (e) {
-    if (!$('clickmode').checked || !realW) return;
+  // press-drag-release on the live screen: a small move = tap, a larger move =
+  // drag/scroll. The dot follows the pointer so you can see where it will land.
+  var cursorEl = $('cursor'), dragStart = null;
+  function toReal(e) {
     var rect = img.getBoundingClientRect();
-    var x = Math.round((e.clientX - rect.left) / rect.width * realW);
-    var y = Math.round((e.clientY - rect.top) / rect.height * realH);
-    act('mouse_click', { x: x, y: y });
+    return { x: Math.round((e.clientX - rect.left) / rect.width * realW),
+             y: Math.round((e.clientY - rect.top) / rect.height * realH) };
+  }
+  function moveCursor(e) {
+    if (!$('clickmode').checked) { cursorEl.style.display = 'none'; return; }
+    var wrap = img.parentElement.getBoundingClientRect();
+    cursorEl.style.left = (e.clientX - wrap.left) + 'px';
+    cursorEl.style.top = (e.clientY - wrap.top) + 'px';
+    cursorEl.style.display = 'block';
+  }
+  img.addEventListener('mousemove', moveCursor);
+  img.addEventListener('mouseleave', function () { cursorEl.style.display = 'none'; });
+  img.addEventListener('mousedown', function (e) {
+    if (!$('clickmode').checked || !realW) return;
+    dragStart = toReal(e); e.preventDefault();
   });
-  $('clickmode').addEventListener('change', function () { img.classList.toggle('noclick', !this.checked); });
+  window.addEventListener('mouseup', function (e) {
+    if (!dragStart) return;
+    var end = toReal(e), s = dragStart; dragStart = null;
+    if (Math.abs(end.x - s.x) < 12 && Math.abs(end.y - s.y) < 12) act('mouse_click', { x: s.x, y: s.y });
+    else act('mouse_drag', { x1: s.x, y1: s.y, x2: end.x, y2: end.y, ms: 250 });
+  });
+  $('clickmode').addEventListener('change', function () {
+    img.classList.toggle('noclick', !this.checked);
+    if (!this.checked) cursorEl.style.display = 'none';
+  });
 
+  $('discoverBtn').addEventListener('click', async function () {
+    log('หาจอ Android ที่ต่ออยู่…');
+    try {
+      var r = await fetch('/discover'); var d = await r.json();
+      if (d.error) { log('หาจอไม่ได้: ' + d.error, 'bad'); return; }
+      if (!d.devices || !d.devices.length) { log('ไม่พบจอ Android (จับคู่ Wireless debugging ก่อน)', 'bad'); return; }
+      d.devices.forEach(function (x) {
+        var label = x.name || x.model;
+        // JSON.stringify so a panel's user-set device name (attacker-controllable
+        // by anyone at the panel) cannot forge extra keys in the suggested line.
+        var entry = {}; entry[label] = { kind: 'android', adb: x.serial };
+        log('พบ ' + label + ' (' + x.model + ') → ใส่ใน rooms.json:  ' + JSON.stringify(entry), 'ok');
+      });
+    } catch (e) { log('หาจอไม่ได้: ' + e, 'bad'); }
+  });
+  $('updateBtn').addEventListener('click', function () {
+    if (!room()) return;
+    if (confirm('อัปเดตโค้ด agent ของ ' + room() + ' แล้วรีสตาร์ต?\n(ดึงจากเครื่องคุม)')) act('update', {});
+  });
+  $('wolBtn').addEventListener('click', async function () {
+    if (!room()) return;
+    log('ส่งสัญญาณปลุก (WoL): ' + room() + ' …');
+    try {
+      var r = await fetch('/wake', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ room: room() }) });
+      var d = await r.json();
+      if (d.ok) log('✓ ส่งสัญญาณปลุกแล้ว (' + room() + ') — รอสักครู่แล้วกด “ถ่ายจอ”/เช็กสถานะ' +
+                    (d.instruction ? ' · ' + d.instruction : ''), 'ok');
+      else log('✗ WoL — ' + (d.error || ''), 'bad');
+    } catch (e) { log('✗ WoL — ' + e, 'bad'); }
+  });
+  async function launchScrcpy(audio, label) {
+    if (!room()) return;
+    log('เปิด ' + label + ': ' + room() + ' …');
+    try {
+      var r = await fetch('/scrcpy', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ room: room(), audio: audio }) });
+      var d = await r.json();
+      if (d.ok) log('✓ เปิด ' + label + ' แล้ว (' + room() + ')', 'ok');
+      else log('✗ ' + label + ' — ' + (d.error || ''), 'bad');
+    } catch (e) { log('✗ ' + label + ' — ' + e, 'bad'); }
+  }
+  $('scrcpyBtn').addEventListener('click', function () { launchScrcpy('off', 'เรียลไทม์'); });
+  $('scrcpyAudioBtn').addEventListener('click', function () { launchScrcpy('playback', 'เรียลไทม์+เสียงจอ'); });
+  $('scrcpyMicBtn').addEventListener('click', function () {
+    // The room's live mic. Confirm first, and the panel shows a green mic dot.
+    if (!confirm('ฟังไมค์ในห้องของ ' + room() + '?\n(จอจะขึ้นจุดเขียวไมค์ให้คนในห้องเห็น · ฟังสด ไม่บันทึก)')) return;
+    launchScrcpy('mic', 'ฟังไมค์ห้อง');
+  });
+  function clearScreen() {
+    // A room switch must not leave the previous room's frame on screen: with
+    // click mode on, a click on that stale image maps to the NEW room's panel.
+    img.hidden = true; img.removeAttribute('src'); msg.hidden = false;
+    msg.textContent = 'เลือก “ถ่ายจอ” เพื่อดูจอห้องนี้';
+    realW = 0; realH = 0; dragStart = null; cursorEl.style.display = 'none';
+    if (lastUrl) { URL.revokeObjectURL(lastUrl); lastUrl = null; }
+  }
   $('grab').addEventListener('click', grab);
   $('live').addEventListener('change', function () { setLive(this.checked); });
   $('ivl').addEventListener('change', function () { if ($('live').checked) setLive(true); });
-  roomSel.addEventListener('change', function () { setLive(false); $('live').checked = false; showWindows([]); health(); });
+  roomSel.addEventListener('change', function () {
+    setLive(false); $('live').checked = false; showWindows([]); clearScreen(); health();
+  });
 
   img.classList.add('noclick');
   loadRooms();

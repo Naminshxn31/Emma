@@ -18,8 +18,20 @@ APPROVAL = {
 BLOCKED_TEXT = "DRAFT_SENTINEL_DO_NOT_SEND"
 
 
+def _draft(record: dict) -> dict:
+    """A real catalog record with its approval stamp removed.
+
+    These tests built their "draft" by copying `load_slides()[0]` and
+    overwriting text — a draft only while the real catalogue was one. Since
+    the owner approved it (2026-10-06) the copy carried the approval with
+    it, the sentinel was released as approved copy, and the tests went red
+    with nothing wrong. A gate test pins the state it is testing.
+    """
+    return {key: value for key, value in record.items() if key not in APPROVAL}
+
+
 def test_displayable_draft_never_releases_caption_notes_or_raw_metadata():
-    slide = {**slides.load_slides()[0], "title_th": BLOCKED_TEXT,
+    slide = {**_draft(slides.load_slides()[0]), "title_th": BLOCKED_TEXT,
              "summary_th": BLOCKED_TEXT, "detail_th": BLOCKED_TEXT,
              "transcript_th": BLOCKED_TEXT, "script_th": BLOCKED_TEXT,
              "ask_th": BLOCKED_TEXT, "hidden": BLOCKED_TEXT}
@@ -65,7 +77,11 @@ def test_foreign_or_unregistered_slide_is_blocked_before_display_or_text(monkeyp
 
 
 def test_rag_filters_draft_before_index_and_reranker(monkeypatch):
-    original = slides.load_slides()[0]
+    # Without the approval stamp: the real catalogue was approved on
+    # 2026-10-06, and a "draft" built by copying an approved record is not a
+    # draft — the sentinel went straight through and the test went red.
+    original = {key: value for key, value in slides.load_slides()[0].items()
+                if key not in APPROVAL}
     approved = {**original, **APPROVAL, "id": "approved-test",
                 "title_th": "ทดสอบข้อมูล", "summary_th": "คำตอบที่อนุมัติ"}
     draft = {**original, "id": "draft-test", "title_th": BLOCKED_TEXT,
@@ -155,10 +171,10 @@ def test_canva_mapping_is_project_and_design_scoped_across_cache(monkeypatch, tm
     from pathlib import Path
 
     shutil.copy(Path(settings.slides_dir) / "index.json", tmp_path / "index.json")
-    first = slides.load_slides()[0]
-    assert first["id"].startswith("picture-")
-    # The selected ID must be a deck page, not a picture-only slide.
-    page_id = next(s["id"] for s in slides.load_slides() if s["id"].startswith("ew-"))
+    # Any catalog record: since 2026-10-06 every one is a deck page
+    # (intro-NNN), and the id spelling is no longer a gate — the scoped,
+    # measured map below is. It used to insist on an "ew-" id.
+    page_id = slides.load_slides()[0]["id"]
     path = tmp_path / "canva_pages.json"
     source = {"source_id": "canva_page_mapping", "project_id": settings.project_id,
               "deck_url": "https://canva.test/design/testdeck/view",
@@ -180,9 +196,12 @@ def test_canva_mapping_is_project_and_design_scoped_across_cache(monkeypatch, tm
 
 
 def test_manual_canva_page_click_does_not_announce_draft_copy(monkeypatch):
+    # No URL: the registered map is accepted as-is, whatever .env points at.
+    monkeypatch.setattr(settings, "canva_url", "")
     catalog = slides.load_slides()
-    target = next(s for s in catalog if s["id"] == "ew-001")
-    draft = {**target, "title_th": BLOCKED_TEXT, "summary_th": BLOCKED_TEXT,
+    canva_display.load_page_map(force=True)
+    target = next(s for s in catalog if s["id"] == canva_display.slide_on_page(1))
+    draft = {**_draft(target), "title_th": BLOCKED_TEXT, "summary_th": BLOCKED_TEXT,
              "script_th": BLOCKED_TEXT, "ask_th": BLOCKED_TEXT}
     monkeypatch.setattr(slides, "_slides", [draft] + [s for s in catalog if s is not target])
     slides.reset_state()

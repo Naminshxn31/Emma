@@ -19,14 +19,18 @@ papers over.
 from __future__ import annotations
 
 import asyncio
+import contextvars
+import itertools
 import json
 import logging
+import queue
+import threading
 import time
 from pathlib import Path
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app import display, heard, turnlog, voices
+from app import display, heard, robot_contracts, robot_face_link, turnlog, voices
 from app.config import settings
 from app.prompts import build_instructions, greeting_for
 from app.providers import ProviderError, default_voice_for, get_provider
@@ -52,6 +56,53 @@ def _provider_failure_kind(exc: Exception) -> str:
 #: tuning the near-field floor by ear. The directory is a module constant so
 #: tests redirect it to a tmp path instead of touching the repo's data/.
 CALL_DEBUG_DIR = Path(__file__).resolve().parent.parent / "data" / "call_debug"
+
+#: "Nothing sent yet" for the attention cue — distinct from None (centre).
+_UNSENT = object()
+
+
+def _array_held_by_app() -> bool:
+    """The robot app reports its native array capture as running.
+    DOA off (every PC, the default) never imports app.doa."""
+    if not settings.doa_enabled:
+        return False
+    try:
+        from app import doa
+
+        link = doa.snapshot().get("link") or {}
+        return (link.get("status") or {}).get("state") == "capturing"
+    except Exception:
+        return False
+
+
+def _invite_text(bearing: float | None, why: str) -> str:
+    """What the model is asked to say to a caller outside the lens.
+
+    An instruction, not words to read: the model picks the sentence and the
+    language, the way every announcement works (greeter.greeting_for). The
+    side is the robot's own (+ bearing = its left); named only when the array
+    was sure and the caller is clearly off to one side. Quoted wrong phrases,
+    because that is what this model obeys: narrating the machinery ("ระบบ
+    ตรวจพบเสียง") is the greeter's "ระบบจดจำใบหน้าตรวจพบ" one sense over.
+    """
+    side = ""
+    if bearing is not None and abs(bearing) >= VoiceSession.INVITE_SIDE_MIN_DEG:
+        side = " (เสียงมาทาง%sของหุ่น)" % ("ซ้าย" if bearing > 0 else "ขวา")
+    who = ("มีคนเรียกชื่อคุณอยู่นอกระยะหน้าหุ่น" if why == "name"
+           else "มีคนพูดกับหุ่นอยู่นอกระยะหน้าหุ่น")
+    return (who + side + " — เชิญเขามายืนตรงหน้าหุ่นสั้นๆ ประโยคเดียว เช่น "
+            "'เชิญมายืนตรงหน้าได้เลยค่ะ' ใช้ภาษาเดียวกับที่คุยกันอยู่ "
+            "ห้ามพูดถึงกล้องหรือไมค์ ห้ามพูดว่า 'ระบบตรวจพบเสียง' "
+            "และห้ามตอบเรื่องที่เพิ่งตอบไปแล้วซ้ำ")
+
+
+#: The goodbye (FOCUS_GOODBYE). Same shape as the invitation: an instruction,
+#: the model's own words and language, the machinery never narrated, and no
+#: question — a question to somebody walking away is a sentence to nobody.
+GOODBYE_TEXT = ("คนที่คุยอยู่เพิ่งเดินออกไปจากหน้าหุ่น — กล่าวลาสั้นๆ ประโยคเดียว "
+                "เช่น 'ขอบคุณที่แวะมานะคะ' ใช้ภาษาเดียวกับที่คุยกันอยู่ "
+                "ห้ามถามคำถาม ห้ามเล่าเรื่องที่ค้างอยู่ต่อ ห้ามพูดถึงกล้อง "
+                "และห้ามพูดว่า 'ระบบตรวจพบ'")
 CALL_DEBUG_KEEP = 12
 CALL_DEBUG_RATE = 16000
 
@@ -149,11 +200,32 @@ class VoiceSession:
         #: When a guest was last heard. Starts now rather than at zero, or a
         #: session would time out before anybody had a chance to speak.
         self._last_heard_at = time.monotonic()
+        #: Where the idle clock may start besides guest speech: the moment a
+        #: summoned line's greeting has been heard (`_greeting_turn_done`).
+        #: The idle quiet is measured from the later of the two. Set nowhere
+        #: else — the robot narrating to nobody must never reset it.
+        self._idle_from = 0.0
+        #: Whether a guest has EVER been heard on this line. `_last_heard_at`
+        #: cannot say that (it starts at "now"), and two rules need the
+        #: distinction: a virgin standing line is held open forever, and the
+        #: greeter must not deliver a greeting into a line somebody has
+        #: already started talking on (that is a conversation, ungreeted or
+        #: not — ประโยคทักทายไม่ให้พูดแทรก).
+        self._ever_heard = False
         #: A transcript chunk shaped like a formatted verse block arrived —
         #: many newlines, one atomic chunk — which is the signature of text
         #: Gemini wrote but never voiced. See `_respeak_silent_block`.
         self._silent_block_seen = False
         self._respeak_fired = False
+        #: Engagement (FOCUS_WAKE / FOCUS_INVITE / FOCUS_GOODBYE /
+        #: FOCUS_ATTENTION): all None/False unless a switch is on.
+        self._began_at = time.monotonic()
+        self._call_ears = None
+        self._ears_task: asyncio.Task | None = None
+        self._invite_task: asyncio.Task | None = None
+        self._invite_at: float | None = None
+        self._goodbye_done = False
+        self._attention_sent = _UNSENT
 
     @property
     def metrics(self):
@@ -175,6 +247,29 @@ class VoiceSession:
         from app.tools import registry as _registry
 
         _registry.session_profile.set(self.profile)
+        headers = getattr(self.ws, "headers", {})
+        robot_face = "EmmaRobot/" in headers.get("user-agent", "")
+        # The ContextVar is the user agent's *claim*, and it has to be: tool
+        # declarations are fixed when the provider connects below, before any
+        # frame from the page can arrive, so a face_hello can never widen
+        # them afterwards. With ROBOT_FACE_TOKEN set, the proof is checked
+        # where it can be — every command and every inbound body/nav frame
+        # goes through `robot_face_link.is_robot_face`, which needs the hello.
+        _registry.robot_face_session.set(self if robot_face else None)
+        if robot_face:
+            robot_face_link.claim(self)
+        # Captions and activity marks are kept per conversation (heard.py);
+        # the provider has no reference to its session, so it finds it here.
+        heard.bind_session(self)
+        query = getattr(self.ws, "query_params", {})
+        # An already-open /preview page may still run yesterday's JS after a
+        # server reload. Only a page that loaded the acoustic gate advertises
+        # this capability; otherwise the old half-duplex guard stays on.
+        # ECHO_BARGE gates the whole exception: the owner ran it for one
+        # morning (2026-09-30) and ordered it out — the duck-and-check made
+        # Emma's voice stutter, and "she finishes her sentence" won.
+        echo_barge = (settings.echo_barge and self.profile == "joke"
+                      and query.get("echo_barge") == "1")
         await self.ws.accept()
 
         if not settings.api_key_for(self.provider_name):
@@ -193,6 +288,7 @@ class VoiceSession:
             robot_name=settings.robot_name,
             profile=self.profile,
             translator_target=self.lang,
+            robot_face=robot_face,
         )
         provider = get_provider(
             self.provider_name, self.voice, instructions,
@@ -200,6 +296,9 @@ class VoiceSession:
             # Toolless by config for the translator, not by prompt: a
             # declared tool is a callable tool whatever the prompt says.
             use_tools=(self.profile != "translator"),
+            # Near or far is the mode's (LISTEN_FAR_PROFILES): the sales host
+            # hears the person in front, EmmaJoke/interpreter hear the room.
+            vad_floor=settings.call_vad_floor(self.profile),
         )
 
         from app.metrics import active
@@ -219,8 +318,13 @@ class VoiceSession:
                     # at a distance; the near-field floor would filter out
                     # exactly that person's reply. See VadGate.stand_down.
                     provider.stand_down_floor()
+                self._watch_segments(provider)
+                self._open_call_ears(provider)
                 turnlog.record("voice_ready")
-                await self._send_json({
+                hold_speech = bool(settings.hold_speech
+                                   and settings.half_duplex and not echo_barge
+                                   and not settings.listens_far(self.profile))
+                ready = {
                     "type": "ready",
                     "provider": self.provider_name,
                     # Which persona this session actually opened with — shown
@@ -235,22 +339,45 @@ class VoiceSession:
                     "auto_resumes": provider.auto_resumes,
                     # The browser knows exactly when playback is happening,
                     # so it gates the mic rather than the server guessing.
-                    "half_duplex": settings.half_duplex,
-                })
+                    "half_duplex": settings.half_duplex and not echo_barge,
+                    "barge_in": echo_barge,
+                    # Hold-speech rides ON half-duplex: she still cannot be
+                    # interrupted; the page just queues what people say over
+                    # her (above the floor) and sends it when her audio ends.
+                    #
+                    # NOT on a far-listening profile. Hold-speech tells her own
+                    # echo from a person by one rule: the echo sits UNDER
+                    # hold_floor. That holds for the near-field sales host, but
+                    # the robot's omnidirectional array on `joke` hears its own
+                    # speaker at peak 0.13–0.28 (measured 2026-10-01, well over
+                    # the 0.04 floor) — so every sentence she says is queued as
+                    # "someone talked over me" and flushed back as the next
+                    # turn. She answered herself for whole paragraphs (owner:
+                    # "emma ได้ยินเสียงตัวเองทำให้เพี้ยนพูดเองยาวๆ"). A far mic
+                    # cannot separate loud echo from a person, so hold is off
+                    # there; half-duplex still drops the mic while she speaks.
+                    "hold_speech": hold_speech,
+                    "hold_floor": settings.hold_speech_floor,
+                }
+                # Tap-to-ask topics (app/quick_asks.py), the robot face only:
+                # the sales-room desk page's `ready` stays exactly as it was.
+                self._robot_face_claim = robot_face
+                if robot_face:
+                    from app import quick_asks
+
+                    asks = quick_asks.for_page(self.profile, settings.project_name)
+                    if asks is not None:
+                        ready["quick_asks"] = asks
+                await self._send_json(ready)
+                self._open_array_and_enhancer(provider, echo_barge, hold_speech)
 
                 up = asyncio.create_task(self._browser_to_provider())
                 down = asyncio.create_task(self._provider_to_browser())
                 unanswered = asyncio.create_task(self._resume_after_silence())
                 jobs = {up, down, unanswered}
-                if not self.summoned:
-                    # The provider has already accepted its opening greeting
-                    # in __aenter__, and the audio pump is now running. The
-                    # arm request cannot delay or cancel speech, and its helper
-                    # cannot bypass any hardware interlock. Summoned sessions
-                    # take this path in events.announce instead, exactly once.
-                    from app import robot_arm
-
-                    await robot_arm.greet()
+                # A normal voice call does not imply a handshake. The camera
+                # greeting requests it in events.announce; an explicit spoken
+                # request reaches the fixed request_handshake tool instead.
                 # Only when it is switched on. These tasks race under
                 # FIRST_COMPLETED, so a task that returns immediately ends
                 # the session immediately — with IDLE_TIMEOUT_S unset (the
@@ -270,8 +397,14 @@ class VoiceSession:
                 # narrating one shared window is the two-clocks bug times N.
                 if settings.canva_url and settings.canva_poll_s > 0 and not settings.multi_session:
                     jobs.add(asyncio.create_task(self._follow_canva()))
-                if settings.idle_timeout_s or self.summoned:
+                if settings.idle_timeout_s or self.summoned or settings.focus_enabled:
                     jobs.add(asyncio.create_task(self._close_when_nobody_is_there()))
+                # Engagement (attention cue, invitation from denials, the
+                # goodbye): in the race because the goodbye ends the call,
+                # and only when one of them is on — it never returns
+                # otherwise (the FIRST_COMPLETED lesson two blocks up).
+                if self._wants_engagement_watch():
+                    jobs.add(asyncio.create_task(self._engagement_watch()))
                 _done, pending = await asyncio.wait(
                     jobs, return_when=asyncio.FIRST_COMPLETED,
                 )
@@ -286,14 +419,27 @@ class VoiceSession:
             logger.exception("voice session failed")
             await self._send_json({"type": "error", "code": "internal", "message": str(exc)})
         finally:
+            # Nothing is in flight on a closed line: a set left non-empty
+            # here would park announcements on this session's ghosts.
+            self._clear_tools_in_flight("session_end")
             self._flush_call_debug()
+            if getattr(self, "_array_tap", None) is not None:
+                self._array_tap.report()
             self.metrics.finish("session_closed")
             active.reset(metrics_token)
-            for name in ("_nudge_task", "_respeak_task"):
+            for name in ("_nudge_task", "_respeak_task", "_ears_task", "_invite_task"):
                 task = getattr(self, name, None)
                 if task is not None and not task.done():
                     task.cancel()
                     await asyncio.gather(task, return_exceptions=True)
+            ears = getattr(self, "_call_ears", None)
+            if ears is not None:
+                # What the in-call ear cost on THIS machine's event loop —
+                # the robot's own number, not the PC's (app/call_wake.py).
+                cost = ears.report()
+                logger.info("in-call wake word: %.0fs of audio, %s ms per second, %d hit(s)",
+                            cost["audio_s"], cost["ms_per_s"], cost["hits"])
+                turnlog.record("focus_wake_cpu", **cost)
             if getattr(self, "_is_robot", False):
                 # The robot's socket is gone. `app_gone` existed for this
                 # and nothing called it (found 2026-09-01): the state said
@@ -368,6 +514,16 @@ class VoiceSession:
                        "device shows NO FRAMES there too, it is the microphone "
                        "itself (mute button, replug the USB, reboot) — no page "
                        "reload or setting can help")
+            if _array_held_by_app():
+                # Measured on the robot 2026-10-10: the Bothlent array gives
+                # Android one capture stream; with the app's 8-channel DOA
+                # capture open first, the WebView's call mic read exact zeros
+                # for the whole call — and the line above sent the reader to
+                # a .cmd that does not exist on a robot.
+                verdict = ("DIGITAL SILENCE — the robot app is holding the mic "
+                           "array (DOA_ENABLED): this array gives Android one "
+                           "capture stream, so the page's mic reads zeros. Set "
+                           "DOA_ENABLED=false and restart")
         elif st["peak"] < self.MIC_SPEECH:
             verdict = ("too quiet to be speech — room noise only. Move closer, "
                        "or raise CALL_MIC_BOOST in .env")
@@ -386,6 +542,53 @@ class VoiceSession:
                        zero_frames=st["zero"], frames=st["n"], vad_segments=segs,
                        verdict=verdict.split(" — ")[0][:40])
         st.update(at=now, peak=0.0, sum=0.0, n=0, zero=0)
+
+    # ---- the robot's array as the call's ears (ARRAY_AUDIO, app/array_audio.py) ----
+
+    def _open_array_and_enhancer(self, provider, echo_barge: bool, hold_speech: bool) -> None:
+        """Both off (the default): neither attribute is set to anything but
+        None and the page's bytes go up exactly as before."""
+        from app import array_audio
+
+        self._play_until = 0.0
+        self._array_tap = array_audio.tap_for(
+            self, input_rate=getattr(provider, "input_sample_rate", 16000),
+            barge_in=echo_barge, hold_speech=hold_speech)
+        self._enhancer = None
+        if settings.enhance_enabled:
+            from app import enhance
+
+            self._enhancer = enhance.for_session(getattr(provider, "input_sample_rate", 16000))
+
+    def _note_playback(self, seconds: float) -> None:
+        """Reply audio handed to the page plays back to back from the moment
+        it arrives (the page's playHead): the server's own clock of when
+        Emma may still be audible, for the array, which has no AEC."""
+        now = time.monotonic()
+        self._play_until = max(getattr(self, "_play_until", 0.0), now) + seconds
+
+    def _array_audible_until(self, now: float) -> float:
+        """When Emma stops being audible by the server's clock: her reply
+        bytes playing back to back, or the page's reported audio lead. 0 =
+        she has not spoken on this call."""
+        lead = display.remaining_lead()
+        return max(getattr(self, "_play_until", 0.0), now + lead if lead > 0 else 0.0)
+
+    def _array_speaking(self, now: float) -> bool:
+        """Emma may be audible: her reply bytes are still playing by the
+        server's clock, or the page reports an audio lead, plus the tail."""
+        return now < self._array_audible_until(now) + settings.array_audio_echo_tail_s
+
+    def _array_frame(self, page: bytes) -> bytes:
+        """The page frame, or the array's audio in its place (never both)."""
+        if not robot_face_link.is_robot_face(self):
+            return page                 # ROBOT_FACE_TOKEN set and no hello yet
+        now = time.monotonic()
+        gate = getattr(self.provider, "_vad_gate", None)
+        in_speech = getattr(gate, "in_speech", None) if gate is not None else None
+        audible = self._array_audible_until(now)
+        return self._array_tap.frame(page, now, speaking=self._array_speaking(now),
+                                     in_speech=in_speech, audible_until=audible or None)
 
     def _call_debug_feed(self, pcm16: bytes) -> None:
         """Roll the last CALL_DEBUG_MAX_S of call-mic audio into a buffer.
@@ -431,6 +634,427 @@ class VoiceSession:
         except Exception:
             logger.exception("call debug: could not write clip")
 
+    # ---- listening focus (docs/listening-focus-2026-10-09.md) ----
+
+    def _watch_segments(self, provider) -> None:
+        """Ask the provider to report every closed speech segment, when focus
+        or voice prints want them. Both off (the default): not even asked.
+
+        Loud when it cannot: FOCUS_ENABLED with no local segmenter means
+        `may_open` is never asked — the switch is on and nothing changes,
+        the misconfiguration shape this project keeps paying for.
+        """
+        from app import focus
+
+        want_focus = focus.enabled()
+        want_voice = bool(settings.voiceprint_enabled)
+        if not (want_focus or want_voice):
+            return
+        watch = getattr(provider, "watch_segments", None)
+        ok = bool(watch(self._segment_closed, keep_audio=want_voice)) if watch else False
+        if not ok:
+            logger.warning("FOCUS_ENABLED / VOICEPRINT_ENABLED need VAD_MODE=local "
+                           "(and its model): this session has no local speech "
+                           "segments, so neither can see anything")
+            turnlog.record("focus_unavailable", why="no_local_vad")
+
+    def _segment_closed(self, gate_segment: int, t0: float, t1: float,
+                        pcm16: bytes) -> str | None:
+        """A speech segment just closed; called on the audio path by the
+        provider, before the end-of-turn signal. Returns the speaker note to
+        send ahead of it, or None.
+
+        Attribution first, the voice print second: `focus.observe_voice`
+        for this segment must arrive after `focus.segment_closed` made the
+        segment known. The print itself runs on the voice-print thread —
+        nothing here may wait on a model.
+        """
+        from app import focus
+
+        segment = next(_SEGMENT_IDS)       # unique per process, see _SEGMENT_IDS
+        note = None
+        mine = getattr(self, "_focus_epoch", None)
+        if mine is not None and mine != focus.epoch():
+            # Superseded: a newer session reset focus while this one is still
+            # unwinding. Its last segment belongs to no conversation — not the
+            # new one's attribution, not the new one's voice clusters.
+            return None
+        if focus.enabled():
+            label = focus.segment_closed(segment, t0, t1, epoch=mine)
+            if (label is not None and settings.focus_speaker_labels
+                    and getattr(self, "profile", "") != "translator"):
+                note = focus.context_note(label)
+        if settings.voiceprint_enabled and pcm16:
+            _voiceprints.submit(segment, t0, t1, pcm16)
+        return note
+
+    #: With focus on, a conversation nobody faces any more ends after this
+    #: long without a guest heard — instead of IDLE_TIMEOUT_S (120 s on the
+    #: robot) of hearing whoever walks past. Only when the camera is
+    #: delivering: a dead camera is not an empty room. Cheap to be early:
+    #: on the robot the standing line rings a fresh line at once, so the
+    #: person who comes back is heard straight away — only the previous
+    #: visitor's words leave the model's context, which is the point.
+    FOCUS_AWAY_S = 30.0
+
+    # ---- engagement: behave like an established reception robot ----
+    #
+    # Owner, 9 Oct 2026: "ลองปรับให้เหมือนหุ่นต้อนรับอื่นให้ดีที่สุด". Focus
+    # (app/focus.py) decides what is heard; this is the session's half — what
+    # the robot DOES about it: hear its name from outside the lens, invite the
+    # caller in, look at whoever speaks, and say goodbye to somebody who walked
+    # off mid-conversation. Every switch is off by default and needs
+    # FOCUS_ENABLED; off, none of these methods is reached and no task exists.
+    # Anything the robot says by itself goes through `events.announce` (waits
+    # for the ear, re-checks relevance after the wait, one at a time).
+
+    #: The invitation names a side only past this many degrees off-axis.
+    INVITE_SIDE_MIN_DEG = 15.0
+    #: An invitation whose cause is older than this by the time everything
+    #: queued before it has been heard is not said: "please step in" thirty
+    #: seconds after the call is a sentence to whoever is there now.
+    INVITE_STALE_S = 30.0
+    #: `_quiet_moment`: a guest who just finished is owed a reply for at most
+    #: this long (the model may choose silence), and the whole wait is
+    #: bounded by QUIET_WAIT_S.
+    REPLY_OWED_S = 8.0
+    QUIET_WAIT_S = 20.0
+    #: The watcher's tick — also the attention cue's top rate (4 a second).
+    ENGAGE_TICK_S = 0.25
+    #: The attention cue is resent only when the bearing moved this much:
+    #: the page smooths, so finer steps are traffic and nothing else.
+    ATTEND_STEP_DEG = 3.0
+    #: Her voice may still be in the room this long after the server's clock
+    #: says the last byte played: Android's output latency (~0.1-0.3 s, see
+    #: `_array_frame`) plus a margin, so a goodbye's last syllable is not cut.
+    AUDIBLE_TAIL_S = 0.5
+    #: A voice at the door (opened or denied, `focus.last_voice_at`) this
+    #: recent = somebody is talking now. Denied frames are asked about every
+    #: 20 ms while they are loud, so a pause longer than this is a pause.
+    VOICE_RECENT_S = 0.6
+    #: Longest the goodbye waits for itself to be heard before ending the call.
+    GOODBYE_HEARD_MAX_S = 15.0
+
+    def _she_is_audible(self, now: float) -> bool:
+        """Emma's reply may still be playing: the page's reported audio lead
+        (index.html sends one) or, where the page sends none — the robot face,
+        voice-preview.html — the server's own clock of reply bytes played back
+        to back from arrival (`_note_playback`), plus AUDIBLE_TAIL_S.
+
+        Review 10 Oct: engagement leaned on `events.announce`'s audio wait,
+        which reads `display.remaining_lead()` — always 0 on the robot face. The
+        invitation then went in while her answer to the caller was still being
+        generated (client content mid-reply interrupts it — the Live API's own
+        rule), and the goodbye's `idle_timeout` closed the page's AudioContext
+        the moment the goodbye was GENERATED: nobody ever heard it.
+        """
+        until = self._array_audible_until(now)
+        return bool(until) and now < until + self.AUDIBLE_TAIL_S
+
+    async def _until_she_is_heard(self, max_wait: float) -> None:
+        """Until her queued voice has played out (`_she_is_audible`), bounded."""
+        deadline = time.monotonic() + max(0.0, max_wait)
+        while time.monotonic() < deadline and self._she_is_audible(time.monotonic()):
+            await asyncio.sleep(0.1)
+
+    def _open_call_ears(self, provider) -> None:
+        """FOCUS_WAKE: the name inside a camera-opened call (app/call_wake.py).
+
+        Only where it can change anything: rule 2 (a face in front) binds only
+        a summoned call with FOCUS_REQUIRE_FACE, and only a local VAD gate
+        ever asks focus at all. The model loads off the event loop; until it
+        has, the call simply has no ear for the name (fail open per input).
+        """
+        from app import focus
+
+        if not (settings.focus_wake and focus.enabled() and self.summoned
+                and settings.focus_require_face):
+            return
+        if getattr(provider, "_vad_gate", None) is None:
+            return                       # _watch_segments has already said why
+        self._ears_task = asyncio.create_task(
+            self._load_call_ears(getattr(provider, "input_sample_rate", 16000)))
+
+    async def _load_call_ears(self, rate: int) -> None:
+        from app import call_wake
+
+        try:
+            spotter = await asyncio.to_thread(call_wake.load)
+        except Exception:
+            logger.exception("in-call wake word could not load")
+            return
+        if spotter is not None:
+            self._call_ears = call_wake.CallEars(spotter, rate)
+
+    def _hear_name(self, pcm16: bytes) -> None:
+        """Feed the call's ear; on the name, open focus's out-of-view window
+        and, for a caller nobody can see, ask for the invitation."""
+        try:
+            hit = self._call_ears.feed(pcm16)
+        except Exception:
+            logger.exception("in-call wake word failed — off for this call")
+            self._call_ears = None
+            return
+        if not hit:
+            return
+        from app import focus
+
+        if self._she_is_audible(time.monotonic()):
+            # Her own voice saying her own name ("เอ็มม่าค่ะ") through a mic
+            # with no echo cancelling. Half-duplex pages send nothing while
+            # she plays; a page that does must not open the room to itself.
+            # Not `display.remaining_lead()` alone: the robot face page — the
+            # only one this ear runs for — never reports a lead (review 10 Oct).
+            turnlog.record("focus_wake", ignored="own_voice")
+            return
+        info = focus.heard_name(time.monotonic())
+        if settings.focus_invite and info["camera"] and not info["in_view"]:
+            self._schedule_invite(info["bearing"], "name")
+
+    def _guest_speaking(self) -> bool:
+        """Somebody is talking right now: a segment is open, or focus was just
+        asked about a voice — allowed or DENIED. A voice focus refused never
+        opens a segment, and reading "no segment" as "silence" said the goodbye
+        over a guest asking with their face in a brochure (review 10 Oct)."""
+        gate = getattr(getattr(self, "provider", None), "_vad_gate", None)
+        if getattr(gate, "in_speech", False):
+            return True
+        from app import focus
+
+        voice = focus.last_voice_at()
+        return voice is not None and time.monotonic() - voice < self.VOICE_RECENT_S
+
+    def _reply_owed(self, now: float) -> bool:
+        """The guest finished a segment and no reply audio has come yet.
+
+        The window `events.announce` cannot see: between a guest's
+        activity_end and the first chunk of the answer (~1.2 s measured) the
+        audio queue is empty and turn_idle is set, so an announcement sent
+        then lands while the model is generating — the robot talking over
+        its own answer, the barge-in bug again."""
+        provider = getattr(self, "provider", None)
+        ended = getattr(provider, "_speech_ended_at", None)
+        if ended is None or getattr(provider, "_replied_since_end", True):
+            return False
+        return now - ended < self.REPLY_OWED_S
+
+    async def _quiet_moment(self) -> None:
+        """Until nobody is mid-sentence, no answer is owed and her own answer
+        has been heard (bounded). The last one is announce's job everywhere
+        but the robot face, whose page reports no audio lead — and an owed
+        answer that has only STARTED is still being generated there."""
+        deadline = time.monotonic() + self.QUIET_WAIT_S
+        while time.monotonic() < deadline:
+            now = time.monotonic()
+            if not (self._guest_speaking() or self._reply_owed(now)
+                    or self._she_is_audible(now)):
+                return
+            await asyncio.sleep(0.2)
+
+    def _schedule_invite(self, bearing: float | None, why: str) -> None:
+        """One invitation at a time, at most one per FOCUS_INVITE_EVERY_S —
+        per ROBOT, not per line (`focus.claim_invite`): the standing line
+        rings a fresh line seconds after the last one ends, and a per-line
+        limit restarted with every ring (review 10 Oct)."""
+        from app import focus
+
+        task = getattr(self, "_invite_task", None)
+        if task is not None and not task.done():
+            return
+        now = time.monotonic()
+        if not focus.claim_invite(now, settings.focus_invite_every_s):
+            turnlog.record("focus_invite", sent=False, why=why, reason="rate")
+            return
+        self._invite_at = now
+        self._invite_task = asyncio.create_task(self._invite(bearing, why, now))
+
+    async def _invite(self, bearing: float | None, why: str, since: float) -> None:
+        """Pepper's BasicAwareness in words: the caller is outside the zone,
+        so tell them where the zone is. Never over her own sentence or the
+        guest's (`_quiet_moment`, then announce's own waits)."""
+        from app import events, focus
+
+        await self._quiet_moment()
+
+        def still_relevant() -> bool:
+            now = time.monotonic()
+            if now - since > self.INVITE_STALE_S:
+                return False
+            away = focus.engaged_age()
+            # Camera dead: stepping in front would not make them heard.
+            # Somebody engaged now: they came in (or are being served).
+            if away is None or away < max(0.5, float(settings.focus_hold_s)):
+                return False
+            # The name was heard but nobody was, after it: a detector false
+            # fire, or a caller who said nothing more — no sentence to an
+            # empty room for it (the window it opened is all it gets).
+            if why == "name" and self._last_heard_at <= since:
+                return False
+            # Still talking (the caller, the guest), or her answer still
+            # playing on a page that reports no lead: not over either.
+            return not (self._guest_speaking() or self._she_is_audible(now))
+
+        await events.announce(_invite_text(bearing, why), source="focus_invite",
+                              still_relevant=still_relevant)
+
+    def _wants_engagement_watch(self) -> bool:
+        from app import focus
+
+        if not focus.enabled():
+            return False
+        return bool(settings.focus_attention
+                    or (settings.focus_goodbye and self.summoned)
+                    or (settings.focus_invite and settings.focus_invite_denied_n > 0
+                        and self.summoned and settings.focus_require_face))
+
+    async def _engagement_watch(self) -> None:
+        """The attention cue, the invitation from denials, the goodbye.
+
+        Races under FIRST_COMPLETED, so it returns only when the goodbye has
+        ended the call; one failing tick is logged and the next one runs.
+        """
+        from app import focus
+
+        failed_at = float("-inf")
+        while True:
+            await asyncio.sleep(self.ENGAGE_TICK_S)
+            now = time.monotonic()
+            try:
+                if settings.focus_attention:
+                    await self._send_attention(now)
+                if (settings.focus_invite and settings.focus_invite_denied_n > 0
+                        and self.summoned and settings.focus_require_face
+                        and (getattr(self, "_greeting_turn_seen", False)
+                             or getattr(self, "_ever_heard", False))):
+                    # Only once this line holds a conversation. On a virgin
+                    # standing line (all day, nobody greeted) voices denied
+                    # again and again from one side are the staff chatting
+                    # beside the robot that focus exists to ignore — and the
+                    # invitation itself un-virgins the line, which the idle
+                    # rule then ends and the standing line re-rings: an
+                    # invitation into the same chat every half minute
+                    # (review 10 Oct). A caller by NAME is not gated here.
+                    bearing = focus.calling_out_of_view(now, settings.focus_invite_denied_n)
+                    if bearing is not None:
+                        self._schedule_invite(bearing, "voice")
+                if (settings.focus_goodbye and self.summoned
+                        and not self._goodbye_done and self._left_mid_conversation(now)):
+                    self._goodbye_done = True              # once per call
+                    if await self._say_goodbye():
+                        return
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                if now - failed_at > 60.0:
+                    failed_at = now
+                    logger.exception("engagement watcher tick failed")
+
+    async def _send_attention(self, now: float) -> None:
+        """Furhat's gaze: the bearing the face should turn to, to the robot's
+        own face page only (the one with the mascot), only when it moved."""
+        if not robot_face_link.is_robot_face(self):
+            return
+        from app import focus
+
+        cue = focus.attention(now)
+        bearing = None if cue["bearing"] is None else round(float(cue["bearing"]), 1)
+        last = self._attention_sent
+        if last is not _UNSENT:
+            if bearing is None and last is None:
+                return
+            if (bearing is not None and last is not None
+                    and abs(bearing - last) < self.ATTEND_STEP_DEG):
+                return
+        self._attention_sent = bearing
+        await self._send_json({"type": "attention", "bearing": bearing,
+                               "source": cue["source"]})
+
+    def _left_mid_conversation(self, now: float) -> bool:
+        """The person this camera-opened call was with walked away from it.
+
+        All of: greeted and heard (a conversation happened); a face was
+        engaged during THIS call and none has been for FOCUS_GOODBYE_AFTER_S
+        (never under FOCUS_HOLD_S — a glance is not a leave); nobody heard
+        since they went (a caller by name out of view is still talking to
+        her); and they were heard within FOCUS_AWAY_S before going — after a
+        long silence it was not a conversation they walked out of."""
+        from app import focus
+
+        if not (getattr(self, "_greeting_turn_seen", False)
+                and getattr(self, "_ever_heard", False)):
+            return False
+        after = max(float(settings.focus_hold_s), float(settings.focus_goodbye_after_s))
+        away = focus.engaged_age(now)
+        if away is None or away < after:
+            return False                    # camera dead, or still here
+        if away >= now - getattr(self, "_began_at", now):
+            return False                    # nobody engaged during this call
+        left_at = now - away
+        heard_at = self._last_heard_at
+        if heard_at > left_at:
+            return False
+        voice = focus.last_voice_at()
+        if voice is not None and voice > left_at:
+            # A voice at the door since the face went, even one focus
+            # refused: the guest reading a brochure (face lost) asking a
+            # question, a child under the lens, the guest a step to the side.
+            # Not a walk-away to say goodbye to and hang up on (review 10 Oct).
+            return False
+        return left_at - heard_at <= self.FOCUS_AWAY_S
+
+    async def _say_goodbye(self) -> bool:
+        """Say a brief goodbye, then end the call. True = the call ended.
+
+        The reception norm (a robot does not go on answering the room after
+        its guest left): one sentence through announce, and then the line
+        closes — the standing line rings a fresh one, so the next visitor
+        meets a model with no previous visitor in its context. If they come
+        back while she says it, the conversation simply goes on.
+        """
+        from app import events, focus
+
+        heard_at = self._last_heard_at
+
+        def still_gone() -> bool:
+            away = focus.engaged_age()
+            return (away is not None and away >= max(0.5, float(settings.focus_hold_s))
+                    and self._last_heard_at == heard_at and not self._guest_speaking())
+
+        def may_say() -> bool:
+            # Not over her own answer still playing (the robot face reports
+            # no audio lead, so announce's own wait cannot see it).
+            return still_gone() and not self._she_is_audible(time.monotonic())
+
+        await self._quiet_moment()
+        if not await events.announce(GOODBYE_TEXT, source="focus_goodbye",
+                                     still_relevant=may_say):
+            return False
+        idle = getattr(self, "turn_idle", None)
+        if idle is not None:
+            try:
+                await asyncio.wait_for(idle.wait(), timeout=events.TURN_WAIT_S)
+            except asyncio.TimeoutError:
+                pass
+        # Heard, not generated: `idle_timeout` makes the page end the call and
+        # close its AudioContext, so ending at turn_complete cut the goodbye
+        # before a word of it played on the robot face (review 10 Oct).
+        await self._until_she_is_heard(self.GOODBYE_HEARD_MAX_S)
+        if not still_gone() or self._she_is_audible(time.monotonic()):
+            turnlog.record("focus_goodbye", ended=False)
+            return False
+        quiet = round(time.monotonic() - self._last_heard_at)
+        logger.info("the guest walked away mid-conversation — said goodbye, ending the call")
+        turnlog.record("focus_goodbye", ended=True)
+        turnlog.record("idle_timeout", quiet_s=quiet, why="left")
+        await self._send_json({"type": "idle_timeout", "quiet_s": quiet})
+        from app.tools import slides
+
+        try:
+            await slides.shutdown_display()
+        except Exception:
+            logger.exception("could not close the display after the goodbye")
+        return True
+
     def _greeting_turn_done(self) -> None:
         """The first completed turn of a summoned session is its greeting.
 
@@ -444,12 +1068,58 @@ class VoiceSession:
         """
         # getattr, like `_silent_block_seen` below: tests build sessions
         # with __new__ and drive this pump without __init__ ever running.
-        if (getattr(self, "_ears_closed_until", None) is None
-                or getattr(self, "_greeting_turn_seen", False)):
+        if getattr(self, "_greeting_turn_seen", False):
             return
+        closed = getattr(self, "_ears_closed_until", None)
+        if closed is None:
+            # The ears are already open. Only one case is still a greeting:
+            # a summoned line nobody has spoken on — the standing line,
+            # whose 10 s hold a mic frame ended long ago, greeted by the
+            # camera minutes or hours later. Returning here (as this did
+            # until review 10 Oct) left the greeted line "virgin": never
+            # idled, re-greetable, and once the guest spoke ended by the
+            # 30 s ABANDON rule instead of IDLE_TIMEOUT_S. A turn on a line
+            # somebody already spoke on is an answer, not a greeting.
+            if not (getattr(self, "summoned", False)
+                    and not getattr(self, "_ever_heard", False)):
+                return
         self._greeting_turn_seen = True
-        self._ears_closed_until = min(self._ears_closed_until,
-                                      time.monotonic() + display.remaining_lead())
+        now = time.monotonic()
+        # The idle clock starts when the greeting has been HEARD, not at the
+        # dial: a standing line is dialled hours before its greeting, and
+        # `_last_heard_at` (guest speech only) still held the dial time —
+        # the first idle tick after the greeting hung up on a guest who had
+        # not had a breath to answer (probe 10 Oct). Not `_last_heard_at`:
+        # that clock is guest speech and nothing else.
+        self._idle_from = max(now + display.remaining_lead(),
+                              self._array_audible_until(now))
+        if closed is not None:
+            self._ears_closed_until = min(closed, now + display.remaining_lead())
+
+    async def _nav_unlock(self, event: dict) -> None:
+        """`{type: "nav_unlock", pin}` from the robot face's นำทาง slot.
+
+        Finding #23: the unlock that lets ROBOT_NAV_VOICE=unlocked start a
+        walk by voice is bound to THIS session, not to an IP. Only the robot
+        face may send it (robot_face_link.is_robot_face — the user agent, and
+        the face token when one is set); the wrong-PIN lockout is still keyed
+        by the TCP peer, inside robot_nav.unlock.
+        """
+        from app import robot_nav
+
+        if not robot_face_link.is_robot_face(self):
+            logger.info("nav_unlock from a page that is not the robot face — ignored")
+            await self._send_json({"type": "nav_unlock_result", "ok": False,
+                                   "reason": "หน้านี้ไม่ใช่หน้าจอหุ่น"})
+            return
+        client = getattr(getattr(self.ws, "client", None), "host", None) or ""
+        try:
+            result = robot_nav.unlock(event.get("pin"), client, session=self)
+        except robot_nav.PinError as exc:
+            await self._send_json({"type": "nav_unlock_result", "ok": False,
+                                   "reason": exc.reason, "status": exc.status})
+            return
+        await self._send_json({"type": "nav_unlock_result", **result})
 
     # ---- browser -> provider ----
 
@@ -470,8 +1140,22 @@ class VoiceSession:
                                     else "never came (hold expired)")
                         turnlog.record("ears_open",
                                        greeted=self._greeting_turn_seen)
+                    if getattr(self, "_array_tap", None) is not None:
+                        data = self._array_frame(data)
+                        if not data:
+                            continue
+                    if getattr(self, "_enhancer", None) is not None:
+                        data = self._enhancer.process(data)
+                        if not data:
+                            continue
                     self._mic_report(data)
                     self._call_debug_feed(data)
+                    if getattr(self, "_call_ears", None) is not None:
+                        # Before the gate sees this frame: a hit here opens
+                        # focus's window in time for the gate's question on
+                        # this very frame, so "Emma, ..." in one breath is
+                        # heard with its pre-roll (FOCUS_WAKE).
+                        self._hear_name(data)
                     await self.provider.send_audio(data)
                     continue
 
@@ -484,6 +1168,18 @@ class VoiceSession:
                         continue
                     if event.get("type") == "stop":
                         return
+                    if event.get("type") == "barge_in":
+                        # A camera-summoned call normally holds its ears until
+                        # the greeting is heard. EmmaJoke's browser first
+                        # ducks the speaker and confirms a person is still
+                        # speaking; only then may that person interrupt the
+                        # greeting. The later mic frames must not be dropped
+                        # by the original summoned hold.
+                        if (self.summoned and self.profile == "joke"
+                                and self._ears_closed_until is not None):
+                            self._ears_closed_until = None
+                            turnlog.record("ears_open", greeted=False, why="barge_in")
+                        continue
                     if event.get("type") == "display.render_ack":
                         from app import plan_display
 
@@ -493,6 +1189,9 @@ class VoiceSession:
                         continue
                     if event.get("type") == "client_metric":
                         self.metrics.client(event)
+                        continue
+                    if event.get("type") == "quick_ask":
+                        await self._quick_ask(event)
                         continue
                     if event.get("type") == "mic_state":
                         # The browser half of the `call audio:` report:
@@ -514,6 +1213,26 @@ class VoiceSession:
                         # switching, or they show the next slide while the
                         # robot is still talking about the last one.
                         display.set_audio_lead(event.get("ms", 0))
+                        continue
+                    if event.get("type") == "nav_unlock":
+                        # The staff PIN typed on the robot face, over the
+                        # face's own socket (finding #23): the HTTP unlock
+                        # was keyed by client IP, and under adb reverse the
+                        # robot and every browser on the server PC are all
+                        # 127.0.0.1. Never logged with the PIN.
+                        await self._nav_unlock(event)
+                        continue
+                    if (event.get("type") in robot_contracts.INBOUND_TYPES
+                            or event.get("type") == "face_hello"):
+                        # The face page relaying the Android app: acks,
+                        # status, caps, and its token hello. One module owns
+                        # these frames (design §2a); it checks that this
+                        # socket is the robot face, the frame size and every
+                        # id, and drops what fails. The raw size goes along
+                        # because the limit is on what arrived, not on what
+                        # survived parsing.
+                        robot_face_link.receive(self, event,
+                                                raw_size=len(text.encode("utf-8")))
                         continue
                     if event.get("type") == "robot_ready":
                         # The Android app on the robot identifying itself, and
@@ -583,8 +1302,18 @@ class VoiceSession:
     async def _provider_to_browser(self) -> None:
         try:
             async for event in self.provider.events():
+                if settings.turn_idle_tracks_tools:
+                    self.prune_tools_in_flight()
                 if event.kind == "speech_stopped":
                     self.metrics.speech_end(event.text or "provider_vad_event")
+                    if getattr(self, "_robot_face_claim", False):
+                        # The robot face shows "thinking" the moment the guest
+                        # is heard to have finished (owner, 10 Oct: "ความเร็ว
+                        # การตอบ"): measured, ~1.1 s pass from here to her first
+                        # audio, and a face frozen in "listening" for that long
+                        # reads as not having heard. A cue, not a turn: the desk
+                        # page never gets it and its frames are unchanged.
+                        await self._send_json({"type": "heard_end"})
                     continue
                 if event.kind == "usage":
                     self.metrics.usage(event.data or {})
@@ -597,6 +1326,13 @@ class VoiceSession:
                     self._sent_audio_ms += (
                         len(event.audio) / 2 / self.provider.output_sample_rate * 1000
                     )
+                    # Every session, not only with the array tap: the robot
+                    # face page (voice-preview.html) never reports an audio
+                    # lead, so `display.remaining_lead()` is 0 there and this
+                    # is the only clock of her voice that engagement can read
+                    # (`_she_is_audible`). Arithmetic only; with no array tap
+                    # and engagement off nothing reads it.
+                    self._note_playback(len(event.audio) / 2 / self.provider.output_sample_rate)
                     await self.ws.send_bytes(event.audio)
 
                 elif event.kind == "speech_started":
@@ -620,6 +1356,9 @@ class VoiceSession:
                 elif event.kind == "interrupted":
                     self.metrics.finish("interrupted")
                     self._sent_audio_ms = 0.0
+                    # The page stops her audio on this message: so does the
+                    # array's playback clock (its tail still runs).
+                    self._play_until = min(getattr(self, "_play_until", 0.0), time.monotonic())
                     self._spoke_this_turn = False
                     # A barge-in mid-tour is a pause, not a skip: keep the deck
                     # on the current slide so the advance nudge resumes it
@@ -642,6 +1381,9 @@ class VoiceSession:
                     # normally requires the model to have spoken this turn —
                     # and across a reconnect there was no turn at all.
                     logger.info("provider resumed — checking whether a tour is owed")
+                    # A resumed model is idle with no turn to finish; calls
+                    # of the old connection will never report back.
+                    self._clear_tools_in_flight("resumed")
                     self._spoke_this_turn = True
                     await self._nudge_tour_if_stalled()
                     self._spoke_this_turn = False
@@ -662,7 +1404,16 @@ class VoiceSession:
                     self._greeting_turn_done()
                     idle = getattr(self, "turn_idle", None)
                     if idle is not None:
-                        idle.set()
+                        if settings.turn_idle_tracks_tools and getattr(
+                                self, "_tools_in_flight", None):
+                            # gemini-3.8 sends turn_complete before (13/15)
+                            # or during its tool call; the turn is not over
+                            # until the tool's own reply completes, so an
+                            # announcement here would land inside that gap.
+                            self._idle_held_by_tools = True
+                        else:
+                            idle.set()
+                            self._idle_held_by_tools = False
                     await self._send_json({"type": "turn_complete"})
                     await self._nudge_tour_if_stalled()
                     self._spoke_this_turn = False
@@ -684,12 +1435,16 @@ class VoiceSession:
                     turnlog.record("heard", text=event.text or "")
                     # Kept so the destructive slide tools can check whether
                     # anybody asked for what they are about to do. See
-                    # `app/heard.py` — this is the field that decides.
-                    heard.record(event.text or "")
+                    # `app/heard.py` — this is the field that decides. Per
+                    # session too, with its time, for the body/nav guards.
+                    _utt = (event.data or {}).get("utterance_id")
+                    heard.record(event.text or "", session=self,
+                                 utterance_id=_utt if isinstance(_utt, str) else None)
                     # Somebody is in the room. Only guest speech resets the
                     # idle clock — the robot narrating to nobody is the case
                     # the timer exists to end, and it is busy throughout.
                     self._last_heard_at = time.monotonic()
+                    self._ever_heard = True
                     self._respeak_fired = False
                     payload = {"type": "user_transcript", "text": event.text or ""}
                     utterance_id = (event.data or {}).get("utterance_id")
@@ -717,11 +1472,22 @@ class VoiceSession:
                     await display.say(event.text or "")
                     await display.set_phase("speaking")
 
+                elif event.kind == "reconnected":
+                    # The transport rotated without a go_away (gemini.py's
+                    # silent rejoin). Nothing for the browser; calls of the
+                    # old connection will never report back.
+                    self._clear_tools_in_flight("reconnect")
+
+                elif event.kind == "tool_dropped":
+                    self._tool_finished(event, dropped=True)
+
                 elif event.kind == "tool_call":
+                    self._tool_started(event)
                     turnlog.record("tool", name=event.text or "")
                     await self._send_json({"type": "tool_call", "name": event.text or ""})
 
                 elif event.kind == "tool_result":
+                    self._tool_finished(event, dropped=False)
                     # Failures get a line of their own. 2026-08-26 16:26:
                     # play_youtube failed live ("มีข้อผิดพลาดนิดหน่อยค่ะ"),
                     # the same call worked from a fresh process minutes
@@ -783,6 +1549,89 @@ class VoiceSession:
             raise
         except Exception:
             logger.exception("provider->browser pump failed")
+
+    # ---- turn_idle vs tool calls (TURN_IDLE_TRACKS_TOOLS) ----
+    #
+    # Off by default, and then none of this runs: the sales room's announce
+    # and nudge timing is exactly what it was. On, a tool call in flight keeps
+    # `turn_idle` clear, tracked BY CALL ID with its start time — never a
+    # counter. gemini.py yields no tool_result for a cancelled id or after a
+    # stale session, so a counter stuck above zero would have parked every
+    # announcement and nudge for good: CLAUDE.md's "stop nudging, nothing
+    # wakes" bug (safety review #8). Every way out is covered: the result,
+    # `tool_dropped`, `resumed`, a reconnect, the session's end, and a
+    # ceiling per entry.
+
+    def _tool_started(self, event) -> None:
+        if not settings.turn_idle_tracks_tools:
+            return
+        call_id = getattr(event, "call_id", None) or (event.data or {}).get("call_id")
+        if not isinstance(call_id, str) or not call_id:
+            # A provider without call ids (OpenAI) cannot be tracked; it
+            # keeps today's timing rather than a guess.
+            return
+        from app.tools.registry import SLOW_TOOL_TIMEOUT_S, TOOL_TIMEOUT_S, get
+
+        entry = get(event.text or "")
+        # The dispatcher's own ceiling for this tool, plus slack. A paced
+        # tool (next_slide) legitimately runs past TOOL_TIMEOUT_S, and
+        # discarding it early would let an announcement into its gap.
+        ceiling = (SLOW_TOOL_TIMEOUT_S if entry is not None and entry.paced
+                   else TOOL_TIMEOUT_S) + 2.0
+        flight = self.__dict__.setdefault("_tools_in_flight", {})
+        flight[call_id] = (time.monotonic(), ceiling)
+        idle = getattr(self, "turn_idle", None)
+        if idle is not None:
+            idle.clear()
+            self._idle_held_by_tools = True
+
+    def _tool_finished(self, event, *, dropped: bool) -> None:
+        if not settings.turn_idle_tracks_tools:
+            return
+        flight = getattr(self, "_tools_in_flight", None)
+        call_id = getattr(event, "call_id", None)
+        if call_id is None and dropped:
+            call_id = (event.data or {}).get("call_id")
+        if not flight or call_id not in flight:
+            return
+        del flight[call_id]
+        # A result is followed by the model's reply to it, whose own
+        # turn_complete sets idle. A dropped call has no reply coming, so
+        # nothing else would: release here.
+        if dropped and not flight:
+            self._release_idle()
+
+    def prune_tools_in_flight(self, now: float | None = None) -> None:
+        """Discard entries past their ceiling. Called on every provider event
+        and by `events.announce` before it waits."""
+        flight = getattr(self, "_tools_in_flight", None)
+        if not flight:
+            return
+        clock = time.monotonic() if now is None else now
+        for call_id, (started, ceiling) in list(flight.items()):
+            if clock - started > ceiling:
+                del flight[call_id]
+                logger.info("tool call %s never reported back in %.0fs — no longer "
+                            "holding turn_idle for it", call_id, ceiling)
+        if not flight:
+            self._release_idle()
+
+    def _clear_tools_in_flight(self, why: str) -> None:
+        flight = getattr(self, "_tools_in_flight", None)
+        if flight:
+            logger.info("forgetting %d tool call(s) in flight (%s)", len(flight), why)
+            flight.clear()
+        self._release_idle()
+
+    def _release_idle(self) -> None:
+        """Set turn_idle again, but only if the tool tracking is what cleared
+        it — an announcement's own pending turn is not ours to end."""
+        if not getattr(self, "_idle_held_by_tools", False):
+            return
+        self._idle_held_by_tools = False
+        idle = getattr(self, "turn_idle", None)
+        if idle is not None:
+            idle.set()
 
     async def _follow_canva(self) -> None:
         """Narrate whatever page a person puts on the Canva window.
@@ -909,19 +1758,54 @@ class VoiceSession:
                 await asyncio.sleep(5.0)
                 limit = settings.idle_timeout_s
                 if self.summoned and not getattr(self, "_greeting_turn_seen", False):
+                    if settings.standing_line and not self._ever_heard:
+                        # The standing line (owner 2026-09-30): a virgin
+                        # summoned session IS the held-open line the next
+                        # face greeting lands on in under a second, and it
+                        # costs ~nothing while idle — local VAD never
+                        # streams silence. It stops being virgin the moment
+                        # it is greeted or hears anybody, and then every
+                        # ordinary rule below ends it: one visitor's words
+                        # must not still be in the model's context when the
+                        # next visitor walks up. app/standing.py rings a
+                        # fresh line after that.
+                        continue
                     # Rung by the camera and never greeted: the face that
                     # rang did not confirm (a colleague in cooldown whose
                     # score dipped for two frames). Nothing to say and
                     # nobody talking is not a conversation worth two
                     # minutes of an open Gemini line.
                     limit = min(limit, self.SUMMONED_ABANDON_S) if limit else self.SUMMONED_ABANDON_S
+                why = None
+                from app import focus as _focus
+
+                if _focus.enabled() and self.summoned:
+                    # Listening focus: nobody has faced the robot for a
+                    # while and nobody has been heard either — the visitor
+                    # left. Placed after the standing-line hold above, so a
+                    # virgin held-open line is never ended by it.
+                    #
+                    # Camera-opened calls only, the same line as focus rule
+                    # 2 (begin_session): a call somebody started with the
+                    # button is heard from outside the lens (owner, 9 Oct),
+                    # and ending it 30 s after their last words — which is
+                    # mid-answer when Emma's reply runs longer — is ignoring
+                    # them the other way. Their call keeps IDLE_TIMEOUT_S.
+                    from app import focus
+
+                    away = focus.engaged_age()
+                    if away is not None and away >= self.FOCUS_AWAY_S:
+                        limit = min(limit, self.FOCUS_AWAY_S) if limit else self.FOCUS_AWAY_S
+                        why = "no_face"
                 if not limit:
                     continue
-                quiet = time.monotonic() - self._last_heard_at
+                quiet = time.monotonic() - max(self._last_heard_at,
+                                               getattr(self, "_idle_from", 0.0))
                 if quiet < limit:
                     continue
-                logger.info("no guest speech for %.0fs — ending the session", quiet)
-                turnlog.record("idle_timeout", quiet_s=round(quiet))
+                logger.info("no guest speech for %.0fs%s — ending the session", quiet,
+                            " and nobody in front of the camera" if why else "")
+                turnlog.record("idle_timeout", quiet_s=round(quiet), why=why)
                 await self._send_json({"type": "idle_timeout",
                                        "quiet_s": round(quiet)})
                 from app.tools import slides
@@ -1082,6 +1966,42 @@ class VoiceSession:
             still_relevant=still_worth_nudging,
         )
 
+    #: Two taps closer than this are one finger, not two questions.
+    QUICK_ASK_MIN_GAP_S = 1.2
+
+    async def _quick_ask(self, event: dict) -> None:
+        """A topic tapped on the robot face (app/quick_asks.py): an id and a
+        language code in, the server's own words out as a user turn. An id
+        this profile does not have, a page that is not the robot face, or a
+        second tap within QUICK_ASK_MIN_GAP_S goes nowhere."""
+        if not getattr(self, "_robot_face_claim", False) or getattr(self, "provider", None) is None:
+            return
+        from app import quick_asks
+
+        ask_id = event.get("id")
+        text = quick_asks.text_for(self.profile, ask_id, event.get("lang"))
+        if text is None:
+            return
+        now = time.monotonic()
+        if now - getattr(self, "_quick_ask_at", -1e9) < self.QUICK_ASK_MIN_GAP_S:
+            return
+        self._quick_ask_at = now
+        # Somebody touched the screen: the person the summoned call was
+        # holding its ears for is here (the same opening barge_in makes),
+        # and the idle clock counts a tap as being served.
+        self._last_heard_at = now
+        # ...and a tap is a guest in conversation, as speech is (review 12 Oct):
+        # without this the camera greeter's `_in_conversation` still read the
+        # summoned line as an ungreeted wait and announced "สวัสดีค่ะ" over the
+        # answer to the topic the guest had just tapped.
+        self._ever_heard = True
+        if getattr(self, "_ears_closed_until", None) is not None:
+            self._ears_closed_until = None
+            turnlog.record("ears_open", greeted=False, why="quick_ask")
+        lang = event.get("lang")
+        turnlog.record("quick_ask", id=ask_id, lang=lang if lang in quick_asks.LANGS else None)
+        await self.provider.send_text(text)
+
     async def _send_json(self, payload: dict) -> None:
         try:
             await self.ws.send_text(json.dumps(payload, ensure_ascii=False))
@@ -1104,6 +2024,104 @@ class VoiceSession:
 _active: VoiceSession | None = None
 
 
+#: Segment ids handed to focus and the voice prints. Per process, not per
+#: gate: a voice print still being computed when its session ends would
+#: otherwise report "segment 3" into the next session, whose own segment 3
+#: is somebody else — focus drops ids it never saw closed.
+_SEGMENT_IDS = itertools.count(1)
+
+
+class _VoiceprintWorker:
+    """The one thread voice prints run on (VOICEPRINT_ENABLED).
+
+    Off the audio path by construction: `submit` is a non-blocking put into
+    a small bounded queue, and a full queue drops the segment (with a log
+    row) rather than wait — a late voice print is worth less than a guest's
+    audio arriving on time. Started on first use, so a machine with the
+    switch off never has the thread at all.
+
+    The session boundary goes through the same queue (`forget`): pending
+    prints of the old session are discarded, and `voiceprint.reset()` runs
+    on this thread, after any print already in flight — never beside it.
+    Voice prints are never kept past the session (spec).
+    """
+
+    MAX_PENDING = 4
+
+    def __init__(self) -> None:
+        self._q: queue.Queue = queue.Queue(maxsize=self.MAX_PENDING)
+        self._thread: threading.Thread | None = None
+        self._gen = 0
+        self._missing = False
+        self._failed_at = 0.0
+
+    def submit(self, segment: int, t0: float, t1: float, pcm16: bytes) -> None:
+        if self._missing:
+            return
+        self._start()
+        try:
+            self._q.put_nowait(("segment", self._gen, contextvars.copy_context(),
+                                (segment, t0, t1, pcm16)))
+        except queue.Full:
+            turnlog.record("voiceprint_dropped", segment=segment)
+
+    def forget(self) -> None:
+        """Session boundary. A no-op until the thread exists."""
+        if self._thread is None:
+            return
+        self._gen += 1
+        while True:
+            try:
+                self._q.get_nowait()
+            except queue.Empty:
+                break
+        try:
+            self._q.put_nowait(("reset", self._gen, None, None))
+        except queue.Full:            # pragma: no cover - drained just above
+            pass
+
+    def _start(self) -> None:
+        if self._thread is None:
+            self._thread = threading.Thread(target=self._run, name="voiceprint",
+                                            daemon=True)
+            self._thread.start()
+
+    def _run(self) -> None:
+        import importlib
+        import sys
+
+        while True:
+            kind, gen, ctx, args = self._q.get()
+            if kind == "reset":
+                module = sys.modules.get("app.voiceprint")
+                reset = getattr(module, "reset", None) if module is not None else None
+                if reset is not None:
+                    try:
+                        reset()
+                    except Exception:
+                        logger.exception("voiceprint.reset failed")
+                continue
+            if gen != self._gen:
+                continue                  # the session it belonged to has ended
+            try:
+                module = importlib.import_module("app.voiceprint")
+            except ImportError:
+                logger.warning("VOICEPRINT_ENABLED but app/voiceprint.py is not "
+                               "importable — voice prints off until restart")
+                self._missing = True
+                continue
+            try:
+                ctx.run(module.segment, *args)
+            except Exception:
+                now = time.monotonic()
+                if now - self._failed_at > 60.0:
+                    self._failed_at = now
+                    logger.exception("voiceprint.segment failed")
+
+
+_voiceprints = _VoiceprintWorker()
+
+
 def _reset_conversation_state() -> None:
     import sys
 
@@ -1114,6 +2132,12 @@ def _reset_conversation_state() -> None:
     heard.forget()
     display.set_audio_lead(0)
     display.cancel_pending_reveal()
+    # Listening focus: who spoke, the voice clusters and the main speaker
+    # belong to one conversation (the room — faces in view — stays).
+    from app import focus
+
+    focus.reset()
+    _voiceprints.forget()
 
 
 async def handle_connection(ws: WebSocket, provider: str | None = None, voice: str | None = None,
@@ -1176,6 +2200,14 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
                            summoned=summoned)
     if single_session:
         _active = session
+        # Listening focus: only a camera-opened (summoned) call needs a face
+        # in front; a call a person started is heard from outside the lens.
+        from app import focus
+
+        focus.begin_session(summoned)
+        # The conversation this session's segments belong to — taken after
+        # `_reset_conversation_state` above bumped it (see `_segment_closed`).
+        session._focus_epoch = focus.epoch()
     import uuid
 
     log_token = turnlog.session_id.set(uuid.uuid4().hex)
@@ -1187,6 +2219,10 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
     try:
         await session.run()
     finally:
+        # Acks this session was waiting for resolve `disconnected` now, not
+        # at their timeout; its caps, nav state and issued run ids go with it.
+        robot_face_link.session_closed(session)
+        heard.forget(session)
         try:
             if _active is session:
                 _reset_conversation_state()

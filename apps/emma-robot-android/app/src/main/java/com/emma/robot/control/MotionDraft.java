@@ -15,6 +15,19 @@ final class MotionDraft {
     static final int DEFAULT_FRAME_MS = 3000;
     private final LinkedHashMap<Integer, Integer> commandedTargets = new LinkedHashMap<>();
     private final ArrayList<ArmController.PoseFrame> frames = new ArrayList<>();
+    /** §2c rule 5: a draft may be saved as a voice pose only if it was played
+     *  ("เล่นร่างท่า") since it was last edited -- somebody watched it move.
+     *  Kept in memory only: after an app restart it has to be watched again.
+     *
+     *  Review2 #22: "played" means the playback RAN TO THE END. It used to be
+     *  set the moment playback was queued, so pressing B after the first
+     *  keyframe because it looked wrong (or a dead arm board) still unlocked
+     *  the save, with played_ok:true -- which makes the id voice-playable.
+     *  Set only on the UI thread (the playback's callbacks are posted there). */
+    private volatile boolean playedSinceEdit = false;
+    /** Bumped by every edit: a playback that finishes after the draft
+     *  changed under it watched the OLD frames, not these. */
+    private volatile int edits = 0;
 
     void rememberTarget(int channel, int pulse) {
         validateTarget(channel, pulse);
@@ -33,6 +46,8 @@ final class MotionDraft {
         ArmController.PoseFrame frame = new ArmController.PoseFrame(
                 commandedTargets, DEFAULT_FRAME_MS);
         frames.add(frame);
+        playedSinceEdit = false;
+        edits++;
         return frame;
     }
 
@@ -55,6 +70,30 @@ final class MotionDraft {
     void clear() {
         frames.clear();
         commandedTargets.clear();
+        playedSinceEdit = false;
+        edits++;
+    }
+
+    /** Review2 #22: a new playback starts. Until it finishes, the draft
+     *  counts as not watched -- only the latest playback, complete, counts. */
+    int startPlayback() {
+        playedSinceEdit = false;
+        return edits;
+    }
+
+    /** From the playback's onDone only (every frame sent and timed out): the
+     *  draft counts as watched if it was not edited since startPlayback. */
+    void markPlayed(int editsAtStart) {
+        playedSinceEdit = editsAtStart == edits && !frames.isEmpty();
+    }
+
+    /** A playback that was stopped or aborted: not watched. */
+    void playbackCut() {
+        playedSinceEdit = false;
+    }
+
+    boolean playedSinceEdit() {
+        return playedSinceEdit;
     }
 
     String toJson() {

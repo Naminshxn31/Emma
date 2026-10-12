@@ -1,0 +1,69 @@
+# Every wheel the robot's server runtime unpacks, pinned (resolved 2026-10-09 for
+# manylinux aarch64 / CPython 3.14 with this PC's versions as constraints).
+# robot_server.py lock downloads exactly these (--no-deps) and records url+sha256
+# in wheels.lock.json. opencv-python-headless stands in for insightface's
+# opencv-python (same cv2, no libGL).
+# tokenizers: the ONNX embedding engine's tokenizer (app/embed_onnx.py) -- semantic
+# slide search without torch. abi3 wheel; it never imports huggingface_hub.
+# sentencepiece: encodes WAKE_SPELLINGS / WAKE_WORD for the KWS model (app/wake.py).
+# Without it only the precomputed EMMA/IMMA/A MA encodings exist (review 10 Oct).
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+broadlink==0.19.0
+certifi==2026.7.22
+cffi==2.1.1
+charset-normalizer==3.5.1
+click==8.5.0
+colorama==0.4.6
+cryptography==50.0.1
+distro==1.9.0
+fastapi==0.141.1
+flatbuffers==25.12.19
+google-auth==2.57.1
+google-genai==2.24.0
+h11==0.16.0
+httpcore==1.0.9
+httptools==0.8.0
+httpx==0.28.1
+idna==3.19
+imageio==2.37.4
+insightface==1.0.1
+lazy-loader==0.5
+ml-dtypes==0.6.0
+networkx==3.6.1
+numpy==2.5.1
+onnx==1.22.0
+onnxruntime==1.29.0
+opencv-python-headless==5.0.0.93
+packaging==26.3
+pillow==12.3.0
+protobuf==7.36.1
+pyasn1-modules==0.4.2
+pyasn1==0.6.4
+pycparser==3.0
+pydantic-core==2.46.5
+pydantic==2.13.5
+pymupdf==1.28.0
+pythainlp==5.3.5
+python-dotenv==1.2.2
+pyyaml==6.0.3
+requests==2.34.2
+scikit-image==0.26.0
+scipy==1.18.1
+sentencepiece==0.2.2
+sherpa-onnx-core==1.13.6
+sherpa-onnx==1.13.6
+sniffio==1.3.1
+starlette==1.6.0
+tenacity==9.1.4
+tifffile==2026.8.23
+tokenizers==0.23.2
+tqdm==4.70.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+tzdata==2026.3
+urllib3==2.7.0
+uvicorn==0.52.1
+watchfiles==1.2.0
+websockets==16.1.1

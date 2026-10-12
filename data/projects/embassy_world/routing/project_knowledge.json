@@ -17,14 +17,14 @@
       "search_hint": "SKY POOL สระว่ายน้ำ",
       "preferred_slides": {
         "locate": [
-          "ew-054"
+          "intro-037"
         ],
         "show": [
-          "ew-055"
+          "intro-041"
         ],
         "explain": [
-          "ew-054",
-          "ew-055"
+          "intro-041",
+          "intro-037"
         ]
       }
     },
@@ -45,14 +45,14 @@
       "search_hint": "BIOGENESIS FITNESS ฟิตเนส",
       "preferred_slides": {
         "locate": [
-          "ew-029"
+          "intro-018"
         ],
         "show": [
-          "ew-030"
+          "intro-019"
         ],
         "explain": [
-          "ew-030",
-          "ew-032"
+          "intro-019",
+          "intro-020"
         ]
       }
     },
@@ -69,16 +69,16 @@
       ],
       "search_hint": "HIMALAYAN SALT SAUNA ซาวน่า",
       "preferred_slides": {
-        "show": [
-          "ew-047"
-        ],
         "locate": [
-          "ew-045"
+          "intro-027"
+        ],
+        "show": [
+          "intro-031"
         ],
         "explain": [
-          "ew-047",
-          "ew-049",
-          "ew-050"
+          "intro-031",
+          "intro-032",
+          "intro-033"
         ]
       }
     },
@@ -94,19 +94,16 @@
         "주차장",
         "парковка"
       ],
-      "search_hint": "BASEMENT ชั้นใต้ดิน ที่จอดรถ",
+      "search_hint": "UNDER GROUND BASEMENT ชั้นใต้ดิน ที่จอดรถ",
       "preferred_slides": {
         "locate": [
-          "ew-040",
-          "ew-039"
+          "intro-026"
         ],
         "show": [
-          "ew-040",
-          "ew-039"
+          "intro-026"
         ],
         "explain": [
-          "ew-039",
-          "ew-040"
+          "intro-026"
         ]
       }
     },
@@ -124,7 +121,7 @@
       "search_hint": "EMPIRE GROUP ผู้พัฒนาโครงการ",
       "preferred_slides": {
         "explain": [
-          "ew-002"
+          "intro-002"
         ]
       }
     },
@@ -142,13 +139,10 @@
       "search_hint": "LOBBY ล็อบบี้",
       "preferred_slides": {
         "locate": [
-          "ew-028"
-        ],
-        "show": [
-          "ew-028"
+          "intro-018"
         ],
         "explain": [
-          "ew-028"
+          "intro-018"
         ]
       }
     },

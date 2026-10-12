@@ -17,12 +17,16 @@ from fastapi.responses import FileResponse, RedirectResponse
 from app.slide_assets import SlideAssets
 from fastapi.staticfiles import StaticFiles
 
-from app import display, turnlog, voices
+from app import display, log_redaction, turnlog, voices
 from app.config import settings
 from app.providers import default_voice_for
 from app.session import handle_connection
 
 logging.basicConfig(level=settings.log_level)
+# Here, not only in run_server.py: under DEV_RELOAD the app runs in a spawned
+# worker that never saw the launcher's filter, and tokens went to the log in
+# the clear (2026-09-29). See app/log_redaction.py.
+log_redaction.install()
 
 app = FastAPI(title="Condo Voice Assistant", version="2.0.0")
 
@@ -109,6 +113,31 @@ def warn_if_open_to_the_network(log: logging.Logger) -> str:
     return "open"
 
 
+def log_body_nav_boot(log: logging.Logger) -> list[str]:
+    """Say the body/nav boot decisions where somebody reads them.
+
+    `config.py` keeps its warnings (an unknown ROBOT_NAV_PANEL/VOICE read as
+    off; the panel FORCED off while routes are off) in `nav_boot_warnings`,
+    because at import time they go to a stderr nobody watches. And when body
+    or routes are on, one line says how the robot face is identified (design
+    §2a: "the boot log says so") — silence there reads as "token checked".
+    Quiet when everything is off, so the sales room's banner is unchanged.
+    Returned so a test can read the decision instead of the log handler.
+    """
+    lines = list(getattr(settings, "nav_boot_warnings", []) or [])
+    for line in lines:
+        log.warning("%s", line)
+    if settings.robot_body_enabled or settings.robot_nav_routes_enabled:
+        face = ("robot face needs face_hello with ROBOT_FACE_TOKEN"
+                if settings.robot_face_token else
+                "robot face identified by user agent only (ROBOT_FACE_TOKEN not set)")
+        log.info("body=%s nav_routes=%s nav_voice=%s nav_panel=%s — %s",
+                 settings.robot_body_enabled, settings.robot_nav_routes_enabled,
+                 settings.nav_voice_mode(), settings.nav_panel_mode(), face)
+        lines.append(face)
+    return lines
+
+
 @app.on_event("startup")
 async def _log_effective_config() -> None:
     """Print the settings that actually decide whether this thing works.
@@ -121,6 +150,7 @@ async def _log_effective_config() -> None:
     # First line of the banner on purpose: everything below is about whether
     # the assistant works, and this one is about who gets to use it.
     warn_if_open_to_the_network(log)
+    log_body_nav_boot(log)
     provider = settings.provider
     log.info("provider=%s model=%s voice=%s key=%s",
              provider, _MODEL_FOR.get(provider, lambda: "?")(),
@@ -184,6 +214,18 @@ async def _log_effective_config() -> None:
         )
     ir = broadlink_ir.status()
     log.info("infrared: %s", ir)
+    if "set_air_conditioner" in names:
+        # A listed unit whose codes are not on this machine is invisible to
+        # the model by design (app/tools/smarthome.py active_units) — said
+        # here, so "Emma doesn't know the Samsung" has an answer at boot.
+        from app.tools import smarthome as _smarthome
+
+        _active = {u.id for u in _smarthome.active_units()}
+        log.info("air conditioners: %s", ", ".join(
+            u.id if u.id in _active
+            else "%s (listed, codes not learned: python scripts/learn_ir.py --unit %s)"
+            % (u.id, u.id)
+            for u in _smarthome.configured_units()))
     if settings.robot_enabled:
         # Said at boot because the movement tools fail *quietly* by design —
         # they succeed and report `hardware: "mock"`. Without this line, a
@@ -343,6 +385,10 @@ async def _warm_search() -> None:
         try:
             from app.tools.knowledge import search_condo_info
 
+            # This is the machine asking, not a guest: the lookup row it
+            # writes is marked so analyze_log keeps it out of the customer
+            # statistics. This task's own context (and the thread's copy).
+            turnlog.origin.set("startup_warm_up")
             await asyncio.to_thread(search_condo_info, "warm up")
             log.info("search: embedding model warmed")
         except Exception:
@@ -363,6 +409,41 @@ async def _watch_the_door() -> None:
     from app import greeter
 
     greeter.start()
+
+
+@app.on_event("startup")
+async def _forget_array_captures() -> None:
+    """Delete expired ARRAY_CAPTURE8 test files, whatever the switches say.
+
+    They are raw 8-channel room audio. The test's last step turns the switch
+    off and restarts, and after that nothing in app/array_audio.py ever ran
+    here again — the "deleted after ARRAY_CAPTURE8_KEEP_MIN" promise rested
+    on a link or a call that the switches-off server never makes. No folder
+    (every machine that never ran the test): one directory check, nothing
+    runs.
+    """
+    from app import array_audio
+
+    if not array_audio._capture_dir().is_dir():
+        return
+    try:
+        if array_audio.maintain():
+            array_audio.ensure_sweeper()
+    except Exception:
+        logging.getLogger("condo_voice.array_audio").warning(
+            "ARRAY_CAPTURE8: the startup sweep failed", exc_info=True)
+
+
+@app.on_event("startup")
+async def _hold_the_line() -> None:
+    """Keep a summoned session standing by, if this machine asked to.
+
+    `STANDING_LINE` is off by default and `standing.start()` checks the
+    switch itself, the same shape as `greeter.start()`.
+    """
+    from app import standing
+
+    standing.start()
 
 
 @app.on_event("startup")
@@ -558,6 +639,35 @@ async def verified_plan(sha256: str, token: str | None = None):
                     headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
+@app.get("/unit-plan/{sha256}")
+async def unit_plan(sha256: str, token: str | None = None):
+    """A per-unit plan crop for the unit card, by the hash its index pins.
+
+    Same gate as /verified-plan: the card is behind WS_TOKEN, so the
+    pictures it points at are too. The bytes are re-hashed on every read
+    (app/unit_plans.py), so a file changed after the build is a 404, not
+    the wrong room's plan.
+    """
+    import asyncio
+    import hmac
+    import re
+    from fastapi import Response
+
+    if settings.ws_token and not hmac.compare_digest(
+            (token or "").encode(), settings.ws_token.encode()):
+        return Response(status_code=403)
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+        return Response(status_code=404)
+    from app import unit_plans
+
+    body = await asyncio.to_thread(unit_plans.plan_body, sha256)
+    if body is None:
+        return Response(status_code=404)
+    return Response(content=body, media_type="image/webp",
+                    headers={"Cache-Control": "private, max-age=3600",
+                             "X-Content-Type-Options": "nosniff"})
+
+
 @app.get("/health")
 async def health() -> dict:
     from app.tools import robot_link
@@ -597,7 +707,14 @@ async def health() -> dict:
                 # The two noise amplifiers, separately switchable — see
                 # config.py for the measured reason each earned a switch.
                 "compressor": settings.mic_compressor,
-                "agc": settings.mic_agc},
+                "agc": settings.mic_agc,
+                # Near or far per mode (LISTEN_FAR_PROFILES). The server
+                # sets the floor; the page owns the one knob the server
+                # cannot reach, the browser's AGC. `split` false = one chain
+                # for every mode, exactly as before the setting existed.
+                "listen": {"split": bool(settings.listen_far_profiles),
+                           "far_profiles": sorted(settings.listen_far_profiles),
+                           "default_far": settings.listens_far(None)}},
         "robot": robot_link.status(),
         "providers_configured": {
             "gemini": bool(settings.gemini_api_key),
@@ -769,20 +886,236 @@ async def robot_map(token: str = "") -> dict:
     }}
 
 
+# ---------------------------------------------------------------------------
+# The owner's own showroom plan over the SLAM grid (owner 2026-09-30:
+# "อัพผังให้ง่ายกว่าใหม่" — the raw occupancy grid reads as an inkblot to
+# anybody who did not build it). The image and its two-point calibration are
+# stored HERE, not in the browser, so every device on the LAN sees the same
+# plan the moment one person sets it up. The calibration maps plan pixels to
+# the chassis' world metres; the page composes the rest. Both are owner
+# content, gitignored like personal-docs.
+# ---------------------------------------------------------------------------
+
+ROBOT_PLAN_DIR = ROOT / "data" / "robot"
+#: One plan, whatever the format: uploading a PNG removes an older JPEG.
+_ROBOT_PLAN_TYPES = {"image/png": ".png", "image/jpeg": ".jpg"}
+_ROBOT_PLAN_MAX_BYTES = 8 * 1024 * 1024
+
+
+def _robot_plan_file() -> Path | None:
+    for ext in (".png", ".jpg"):
+        path = ROBOT_PLAN_DIR / f"showroom-plan{ext}"
+        if path.is_file():
+            return path
+    return None
+
+
+@app.get("/robot/plan")
+async def robot_plan(token: str = "") -> Response:
+    from fastapi.responses import JSONResponse
+
+    if not _authorized(token):
+        return JSONResponse({"ok": False, "error": "unauthorized"}, status_code=403)
+    path = _robot_plan_file()
+    if path is None:
+        return JSONResponse({"ok": False, "error": "ยังไม่มีผัง"}, status_code=404)
+    return FileResponse(path, headers=_NO_CACHE)
+
+
+@app.post("/robot/plan")
+async def robot_plan_upload(request: Request, token: str = "") -> dict:
+    if not _authorized(token or request.query_params.get("token")):
+        return {"ok": False, "error": "unauthorized"}
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    ext = _ROBOT_PLAN_TYPES.get(content_type)
+    if ext is None:
+        return {"ok": False, "error": "รับเฉพาะไฟล์ภาพ PNG หรือ JPEG"}
+    body = await request.body()
+    if not body:
+        return {"ok": False, "error": "ไฟล์ว่าง"}
+    if len(body) > _ROBOT_PLAN_MAX_BYTES:
+        return {"ok": False, "error": "ไฟล์ใหญ่เกิน 8 MB — ย่อรูปก่อน"}
+    ROBOT_PLAN_DIR.mkdir(parents=True, exist_ok=True)
+    for old in (".png", ".jpg"):
+        if old != ext:
+            (ROBOT_PLAN_DIR / f"showroom-plan{old}").unlink(missing_ok=True)
+    (ROBOT_PLAN_DIR / f"showroom-plan{ext}").write_bytes(body)
+    # A new drawing means the old pixel calibration points at the wrong
+    # pixels; stale-but-plausible is worse than absent.
+    (ROBOT_PLAN_DIR / "plan-calibration.json").unlink(missing_ok=True)
+    turnlog.record("robot_manual_command", action="plan_upload")
+    return {"ok": True, "bytes": len(body)}
+
+
+def _plan_calibration_errors(pairs: object) -> str | None:
+    """Two pairs of {px, py, wx, wy}, finite, and usefully far apart."""
+    import math as _math
+
+    if not isinstance(pairs, list) or len(pairs) != 2:
+        return "ต้องจับคู่ 2 จุดพอดี"
+    for pair in pairs:
+        if not isinstance(pair, dict):
+            return "รูปแบบจุดไม่ถูกต้อง"
+        for key in ("px", "py", "wx", "wy"):
+            value = pair.get(key)
+            if not isinstance(value, (int, float)) or not _math.isfinite(value):
+                return f"ค่า {key} ไม่ใช่ตัวเลข"
+    a, b = pairs
+    if abs(a["px"] - b["px"]) + abs(a["py"] - b["py"]) < 5:
+        return "จุดบนผังสองจุดใกล้กันเกินไป — เลือกจุดที่ห่างกัน"
+    if abs(a["wx"] - b["wx"]) + abs(a["wy"] - b["wy"]) < 0.2:
+        return "จุดบนแผนที่สองจุดใกล้กันเกินไป — เลือกจุดที่ห่างกัน"
+    return None
+
+
+@app.get("/robot/plan/calibration")
+async def robot_plan_calibration(token: str = "") -> dict:
+    if not _authorized(token):
+        return {"ok": False, "error": "unauthorized"}
+    path = ROBOT_PLAN_DIR / "plan-calibration.json"
+    if not path.is_file():
+        return {"ok": True, "calibration": None}
+    try:
+        import json as _json
+
+        return {"ok": True, "calibration": _json.loads(path.read_text(encoding="utf-8"))}
+    except Exception:
+        return {"ok": True, "calibration": None}
+
+
+@app.post("/robot/plan/calibration")
+async def robot_plan_calibrate(request: Request) -> dict:
+    import json as _json
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    if not _authorized(body.get("token") or request.query_params.get("token")):
+        return {"ok": False, "error": "unauthorized"}
+    if _robot_plan_file() is None:
+        return {"ok": False, "error": "ยังไม่ได้อัพโหลดผัง"}
+    pairs = body.get("pairs")
+    problem = _plan_calibration_errors(pairs)
+    if problem:
+        return {"ok": False, "error": problem}
+    ROBOT_PLAN_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {"pairs": [{k: float(p[k]) for k in ("px", "py", "wx", "wy")}
+                         for p in pairs]}
+    (ROBOT_PLAN_DIR / "plan-calibration.json").write_text(
+        _json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    turnlog.record("robot_manual_command", action="plan_calibrate")
+    return {"ok": True, **payload}
+
+
 #: Most lidar points a page gets per fetch unless it asks for fewer. The full
 #: frame is ~1,600 points; a radar redrawn a few times a second does not need
 #: them all, and the tunnel to the chassis is a `nc` relay on the robot.
 _LASERSCAN_MAX_POINTS = 400
 
+#: The walkable fan on the radar -- the owner, 9 ต.ค.: "ดูผลจากเรดาห์หรือ
+#: เลเซอร์กับทำให้รู้ไหมว่ามุมไหนเดินได้หรือไม่ได้". Every `_WALK_STEP_DEG`
+#: round the robot: how far its own rectangle goes straight that way
+#: (`robot_lanes.free_space`, the axis the lanes' front stop reads) and whether
+#: it has room to turn to face it (`robot_lanes.turn_sweep_gap` at least
+#: `_WALK_TURN_GAP_M`, drive_route's TURN_MARGIN_M). Base 0.70 m; 0.78 m with
+#: the arms out on `?arms=1`.
+_WALK_STEP_DEG = 5.0
+_WALK_MAX_M = 3.0
+_WALK_TURN_GAP_M = 0.04
+_WALK_WIDTH_BASE = 0.70
+_WALK_WIDTH_ARMS = 0.78
+#: drive_route's turn check will not judge a frame with fewer valid returns
+#: than this (`turn_space_clear`: `len(pts) >= 200`). Under it there is no fan:
+#: free_space reads an empty frame as "3 m free every way" only because
+#: nothing was seen, and green there would be a lie.
+_WALK_MIN_RETURNS = 200
+
+
+def _thin_scan(points: list, limit: int) -> list:
+    """Every n-th point, exactly as `robot_chassis.laserscan(max_points=limit)`
+    thins (a test pins the two equal): the endpoint now reads the whole frame
+    for the walkable fan, and the radar's points must stay what they were."""
+    import math as _math
+
+    if limit and len(points) > limit:
+        return points[::_math.ceil(len(points) / limit)]
+    return points
+
+
+def _walk_turn_gaps(pts, angles: list[float], width: float) -> dict[float, float]:
+    """`robot_lanes.turn_sweep_gap(pts, radians(a), width=width)` for every
+    heading `a` (degrees) -- built outward one step at a time. Sweeping 0..a is
+    sweeping 0..a-5 and then a-5..a, so each heading adds only its own 5°: one
+    call on the points as seen after the turn so far, the minimum carried on.
+    Asking each heading from 0 again (what the plain call does) measured
+    26-33 ms a frame per width on the recorded frames in tests/data/robot/,
+    2.5 times a second per open page; this measured 5-6 ms. The two agree to
+    0.6 mm on those frames, and a test holds them together."""
+    import math as _math
+
+    import numpy as np
+
+    from app import robot_lanes as rl
+
+    gaps = {0.0: rl.turn_sweep_gap(pts, 0.0, width=width)}
+    for sign in (1.0, -1.0):
+        so_far, done = gaps[0.0], 0.0
+        for a in sorted((x for x in angles if x * sign > 0), key=abs):
+            phi = _math.radians(done)
+            c, s = _math.cos(phi), _math.sin(phi)
+            turned = np.c_[pts[:, 0] * c + pts[:, 1] * s, -pts[:, 0] * s + pts[:, 1] * c]
+            so_far = min(so_far, rl.turn_sweep_gap(turned, _math.radians(a - done), width=width))
+            gaps[a], done = so_far, a
+    return gaps
+
+
+def _walkable(points: list, arms: bool) -> dict | None:
+    """The fan for one frame (robot_chassis.laserscan's points, the whole
+    frame), or None when the frame has too few returns to say anything.
+    `free` m the front face can go once facing `a` (None: outside the lidar's
+    arc -- behind the robot nothing is seen, which is not free), `turn` whether
+    turning to face it has room (straight ahead needs no turn)."""
+    from app import robot_lanes as rl
+
+    pts = rl.scan_points({"laser_points": points})
+    if len(pts) < _WALK_MIN_RETURNS:
+        return None
+
+    def fan(width: float) -> list[dict]:
+        free = rl.free_space(pts, width, step_deg=_WALK_STEP_DEG, max_m=_WALK_MAX_M)
+        gaps = _walk_turn_gaps(pts, [a for a, f in free if f is not None and a != 0], width)
+        return [{"a": int(round(a)),
+                 "free": None if f is None else round(f, 2),
+                 "turn": None if f is None else (a == 0 or gaps[a] >= _WALK_TURN_GAP_M)}
+                for a, f in free]
+
+    out = {"step": _WALK_STEP_DEG, "max": _WALK_MAX_M, "length": rl.ROBOT_BASE_LENGTH,
+           "width": _WALK_WIDTH_BASE, "dirs": fan(_WALK_WIDTH_BASE)}
+    if arms:
+        out["arms"] = {"width": _WALK_WIDTH_ARMS, "dirs": fan(_WALK_WIDTH_ARMS)}
+    return out
+
 
 @app.get("/robot/laserscan")
-async def robot_laserscan(token: str = "", max: int = _LASERSCAN_MAX_POINTS) -> dict:
+async def robot_laserscan(token: str = "", max: int = _LASERSCAN_MAX_POINTS,
+                          arms: bool = False) -> dict:
     """The current lidar frame, for a radar view on the driving page.
 
     `angle` is radians from the robot's front (counter-clockwise positive),
     `distance` metres, `valid` the board's own verdict on the return. `pose`
     is where the robot was when the frame was taken. Read-only.
+
+    `walkable` (see `_walkable`) is worked out from the WHOLE frame, not the
+    `max` points the page draws: thinning to 400 of ~1,600 leaves a chair leg
+    2 m away one return where the fan needs three. Left out when the frame
+    cannot carry it or the sum fails -- the rest of the answer never depends
+    on it.
     """
+    import asyncio
+
     from app import robot_chassis
 
     if not _authorized(token):
@@ -791,13 +1124,24 @@ async def robot_laserscan(token: str = "", max: int = _LASERSCAN_MAX_POINTS) -> 
         return {"ok": False, "error": "ROBOT_CHASSIS_URL ยังไม่ได้ตั้ง"}
     limit = max if 0 < max <= _LASERSCAN_MAX_POINTS else _LASERSCAN_MAX_POINTS
     try:
-        scan = await robot_chassis.laserscan(max_points=limit)
+        scan = await robot_chassis.laserscan()
     except Exception as exc:
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
-    return {"ok": True, "points": scan["points"], "pose": scan["pose"],
-            "total": scan["total"], "valid": scan["valid"],
-            "clearance": scan["clearance"],
-            "min_clearance": settings.robot_drive_min_clearance_m}
+    points = _thin_scan(scan["points"], limit)
+    out = {"ok": True, "points": points, "pose": scan["pose"],
+           "total": scan["total"], "valid": scan["valid"],
+           "clearance": robot_chassis.clearance(points),
+           "min_clearance": settings.robot_drive_min_clearance_m}
+    try:
+        # numpy in a worker: the event loop is also carrying a voice call
+        walk = await asyncio.to_thread(_walkable, scan["points"], arms)
+    except Exception as exc:
+        logging.getLogger("condo_voice").warning(
+            "laserscan: walkable left out -- %s: %s", type(exc).__name__, exc)
+        walk = None
+    if walk is not None:
+        out["walkable"] = walk
+    return out
 
 
 def _coordinate(body: dict, key: str) -> float | None:
@@ -842,6 +1186,66 @@ async def robot_command(request: Request) -> dict:
     action = str(body.get("action") or "")
     try:
         if action == "stop":
+            # Finding #0: while the robot face reports a leg run, the brake
+            # is the run's own stop — a nav stop + body stop through the face
+            # (`robot_nav.stop`, the same pair as voice's stop_moving). The
+            # board DELETE this button used to send reads to drive_route as a
+            # deleted action: VelocitySession renews and the lane goes on, so
+            # STOP paused the robot for about a second (§4 "STOP itself
+            # causing a retry"; CHANGELOG "STOP ห้าม DELETE action ก่อน
+            # SIGINT"). No DELETE first: drive_route's SIGINT handler sends
+            # its own zero/cancel. The page is told "requested", not
+            # "stopped" — the ack means the app queued it.
+            from app import robot_nav
+
+            plan, face = robot_nav.stop_plan()
+            if plan == "face":
+                nav = await robot_nav.stop(face)
+                turnlog.record("robot_manual_command", action="stop", via="nav")
+                out = {"ok": nav["nav_stop"]["accepted"], "did": "stop_requested",
+                       "nav_stop": nav["nav_stop"], "body_stop": nav["body_stop"],
+                       "note": "ส่งคำสั่งหยุดผ่านหน้าหุ่นแล้ว — ยังไม่ยืนยันว่าหุ่นหยุด ดูที่ตัวหุ่น"}
+                if not out["ok"]:
+                    out.update(error="stop_not_acked",
+                               hint="หน้าหุ่นไม่ตอบรับคำสั่งหยุด — กดปุ่มหยุดฉุกเฉิน (E-stop) บนตัวหุ่น")
+                return out
+            if plan == "face_gone":
+                # No face to reach the launcher: the server cannot stop a
+                # route run. Say so first; the board cancel is all that is
+                # left, and it is a pause, not a stop.
+                await robot_chassis.drive_stop(reason="stop button, no robot face")
+                turnlog.record("robot_manual_command", action="stop", via="board_only")
+                return {"ok": False, "did": "stop_unconfirmed", "error": "no_robot_face",
+                        "hint": robot_nav.STOP_HINT_NO_FACE}
+            if plan == "unknown":
+                # Review 2, findings #0-#2: a walk no face reported (before
+                # the status link: any walk between calls; now: no face page
+                # connected, its link silent, or the app's poll stale) left
+                # nav_activity "unknown" and this button answered
+                # {"ok": true, "did": "stop"} — /mapview said 'สั่งหยุดแล้ว'
+                # over a robot drive_route kept driving. On a machine that
+                # can run legs, unknown is "cannot see": the DELETE still
+                # goes (the right brake if nothing is walking) and the page
+                # is told it is not confirmed.
+                if face is None:
+                    await robot_chassis.drive_stop(reason="stop button, walk unknown")
+                    turnlog.record("robot_manual_command", action="stop", via="board_unknown")
+                    return {"ok": False, "did": "stop_unconfirmed", "error": "run_unknown",
+                            "hint": robot_nav.STOP_HINT_UNKNOWN}
+                # A face is connected but cannot vouch for idle (link silent,
+                # poll stale): the run's own stop goes through it too, beside
+                # the DELETE, both at once (review 10 Oct — this used to send
+                # the board's pause alone). Still not a confirmed stop.
+                import asyncio
+
+                _drive, nav = await asyncio.gather(
+                    robot_chassis.drive_stop(reason="stop button, walk unknown"),
+                    robot_nav.stop(face))
+                turnlog.record("robot_manual_command", action="stop", via="board_unknown+face")
+                return {"ok": False, "did": "stop_unconfirmed", "error": "run_unknown",
+                        "nav_stop": nav["nav_stop"], "body_stop": nav["body_stop"],
+                        "hint": (robot_nav.STOP_HINT_UNKNOWN_FACE if nav["nav_stop"]["accepted"]
+                                 else robot_nav.STOP_HINT_UNKNOWN)}
             # Disarms a held joystick too; a plain cancel would leave its
             # deadman to cancel again, which is harmless but says the wrong
             # thing in the log.
@@ -920,6 +1324,11 @@ async def robot_command(request: Request) -> dict:
                 return {"ok": False, "error": "ไปจุดนี้ไม่ได้ — " + sent}
         else:
             return {"ok": False, "error": f"ไม่รู้จักคำสั่ง {action!r}"}
+    except robot_chassis.Fenced as exc:
+        # Before PermissionError (its base): "motion_locked" would tell the
+        # operator to edit .env when the truth is "a route run owns the
+        # wheels" or "relocalize first" (design §4).
+        return {"ok": False, "error": exc.code, "hint": exc.thai}
     except PermissionError:
         return {"ok": False, "error": "motion_locked"}
     except robot_chassis.ObstacleError as exc:
@@ -1251,6 +1660,244 @@ async def data_console_revoke(request: Request) -> Response:
     return _console_reply(run)
 
 
+# ---------------------------------------------------------------------------
+# The face scan on the call screen (hold menu slot 1 on /preview). Every
+# rule is in `app/face_scan.py` (PIN, consent, sessions, the pause) and
+# `app/enrollment.py` (the faces); these handlers carry the gate and turn a
+# `ScanError` into its status with the Thai sentence intact.
+#
+# Token from the JSON body only, for the reason written above
+# /data-console/edit: uvicorn logs every request line, and a token in the
+# query string is WS_TOKEN in a log file forever.
+# ---------------------------------------------------------------------------
+
+#: The largest body a face-scan request may send: one full camera frame as a
+#: data URL (face_scan.MAX_IMAGE_BYTES) plus room for the JSON around it.
+#: Read in chunks and abandoned past this, because the gate is *inside* the
+#: body — without a ceiling, any client on the LAN could make the server
+#: buffer a gigabyte before anything had checked who was asking.
+_FACE_SCAN_BODY_SLACK = 64 * 1024
+
+
+def _same_origin_loopback_request(request: Request) -> bool:
+    """The PC's own /preview, posting to its own server.
+
+    That page is opened without ?token — its socket dials /ws through
+    `_same_origin_loopback_websocket` — and plain HTTP has no loopback
+    exemption, so once WS_TOKEN is set every face-scan POST from the one
+    screen that holds no token would be refused. The same three facts make
+    it safe here: the TCP peer is this machine, the page's Origin is a
+    loopback origin, and it is *this* server's origin (Origin == Host). A
+    site open in the same browser can make it post to localhost, but its
+    Origin is its own; a DNS-rebound name matches Host but is not loopback.
+
+    Not a second copy of the check: Starlette's Request and WebSocket are
+    both HTTPConnection, with the same `client` and `headers`, so the socket
+    function reads a request unchanged — and a copy is the one that drifts.
+    """
+    return _same_origin_loopback_websocket(request)  # type: ignore[arg-type]
+
+
+async def _face_scan_reply(request: Request, call) -> Response:
+    """Read the body (bounded), apply the gate, run `call(body, client)`.
+
+    A request that fails the gate is answered 403 here, before `call` —
+    so it can neither touch a scan nor spend (or reset) a PIN try. A body
+    that is not JSON is answered 400 before the gate.
+    """
+    from fastapi.responses import JSONResponse
+
+    from app import face_scan
+
+    limit = face_scan.MAX_IMAGE_BYTES + _FACE_SCAN_BODY_SLACK
+    too_big = JSONResponse({"ok": False, "reason": "ข้อมูลที่ส่งมาใหญ่เกินไป"},
+                           status_code=413)
+    try:
+        declared = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        declared = 0
+    if declared > limit:
+        return too_big
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            return too_big
+        chunks.append(chunk)
+    try:
+        body = json.loads(b"".join(chunks) or b"{}")
+    except (ValueError, RecursionError):
+        # 400 here, before the gate: a body that is not JSON says nothing
+        # about who is asking, and nothing past this line gets to run on
+        # it. RecursionError by name because it is not a ValueError: 200,000
+        # '[' — 200 KB, well under the ceiling — makes `json` give up with
+        # it, and it escaped as a bare 500 with a traceback in the log, on
+        # demand, from any client on the LAN with no token and no PIN.
+        return JSONResponse({"ok": False, "reason": "อ่านข้อมูลที่ส่งมาไม่ได้"},
+                            status_code=400)
+    if not isinstance(body, dict):
+        body = {}
+
+    token = body.get("token")
+    # A non-string token (a number, a list) is no token: `_authorized`
+    # encodes it, and an AttributeError there is a 500 that reads as
+    # "the gate is broken".
+    if not isinstance(token, str):
+        token = None
+    if not (_authorized(token) or _same_origin_loopback_request(request)):
+        return JSONResponse({"ok": False, "reason": "ต้องใส่ token — เปิดหน้าด้วย "
+                             "?token=... ให้ตรงกับ WS_TOKEN ใน .env"}, status_code=403)
+
+    # The PIN lockout and the scan's owner are keyed on this, so it must be
+    # the TCP peer and nothing a caller writes: run_server.py starts uvicorn
+    # with proxy_headers=False for that reason (its default rewrote this
+    # from X-Forwarded-For for any peer on 127.0.0.1 — a fresh five PIN
+    # tries per made-up header).
+    client = request.client.host if request.client else ""
+    try:
+        return JSONResponse(await call(body, client))
+    except face_scan.ScanError as exc:
+        return JSONResponse({"ok": False, "reason": exc.reason}, status_code=exc.status)
+    except Exception:
+        logging.getLogger("condo_voice.face_scan").exception("face scan request failed")
+        return JSONResponse({"ok": False, "reason": "เกิดข้อผิดพลาดที่เซิร์ฟเวอร์ — ลองใหม่"},
+                            status_code=500)
+
+
+@app.post("/face-scan/start")
+async def face_scan_start(request: Request) -> Response:
+    from app import face_scan
+
+    return await _face_scan_reply(
+        request, lambda body, client: face_scan.start(body.get("pin"), client))
+
+
+@app.post("/face-scan/consent")
+async def face_scan_consent(request: Request) -> Response:
+    from app import face_scan
+
+    return await _face_scan_reply(
+        request, lambda body, client: face_scan.answer_consent(
+            body.get("session"), body.get("agree"), client))
+
+
+@app.post("/face-scan/look")
+async def face_scan_look(request: Request) -> Response:
+    from app import face_scan
+
+    return await _face_scan_reply(
+        request, lambda body, client: face_scan.look(
+            body.get("session"), body.get("image"), body.get("fullWidth"), client))
+
+
+@app.post("/face-scan/capture")
+async def face_scan_capture(request: Request) -> Response:
+    from app import face_scan
+
+    return await _face_scan_reply(
+        request, lambda body, client: face_scan.capture(
+            body.get("session"), body.get("image"), body.get("fullWidth"), client))
+
+
+@app.post("/face-scan/save")
+async def face_scan_save(request: Request) -> Response:
+    from app import face_scan
+
+    return await _face_scan_reply(
+        request, lambda body, client: face_scan.save(
+            body.get("session"), body.get("name"), client))
+
+
+@app.post("/face-scan/cancel")
+async def face_scan_cancel(request: Request) -> Response:
+    from app import face_scan
+
+    return await _face_scan_reply(
+        request, lambda body, client: face_scan.cancel(body.get("session"), client))
+
+
+# ---------------------------------------------------------------------------
+# The face page's นำทาง slot (hold menu slot 2, docs/emma-body-nav-design-
+# 2026-10-08.md §3). The face-scan rules, for the face-scan reasons: the
+# token rides in the JSON body (a query-string token is WS_TOKEN in uvicorn's
+# log forever), the body is bounded before anything parses it, and the PIN
+# lockout is keyed on the TCP peer, never on a header a caller writes.
+# ---------------------------------------------------------------------------
+
+#: A token and a PIN, as JSON. Anything bigger is not this page talking.
+_ROBOT_NAV_BODY_MAX = 4096
+
+
+async def _robot_nav_body(request: Request) -> dict | Response:
+    from fastapi.responses import JSONResponse
+
+    too_big = JSONResponse({"ok": False, "reason": "ข้อมูลที่ส่งมาใหญ่เกินไป"},
+                           status_code=413)
+    try:
+        declared = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        declared = 0
+    if declared > _ROBOT_NAV_BODY_MAX:
+        return too_big
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > _ROBOT_NAV_BODY_MAX:
+            return too_big
+        chunks.append(chunk)
+    try:
+        body = json.loads(b"".join(chunks) or b"{}")
+    except (ValueError, RecursionError):
+        return JSONResponse({"ok": False, "reason": "อ่านข้อมูลที่ส่งมาไม่ได้"},
+                            status_code=400)
+    if not isinstance(body, dict):
+        body = {}
+    token = body.get("token")
+    if not isinstance(token, str):
+        token = None
+    if not (_authorized(token) or _same_origin_loopback_request(request)):
+        return JSONResponse({"ok": False, "reason": "ต้องใส่ token — เปิดหน้าด้วย "
+                             "?token=... ให้ตรงกับ WS_TOKEN ใน .env"}, status_code=403)
+    return body
+
+
+@app.post("/robot-nav/config")
+async def robot_nav_config(request: Request) -> Response:
+    """What the นำทาง slot is: `off` | `pin` | `open` (settings.nav_panel_mode,
+    which is `off` whenever routes are off — the boot rule, re-applied).
+
+    Never the PIN itself, only whether one is set: `pin` mode with no PIN
+    makes the slot say it is not set up instead of asking for a code that
+    cannot be right."""
+    from fastapi.responses import JSONResponse
+
+    body = await _robot_nav_body(request)
+    if isinstance(body, Response):
+        return body
+    mode = settings.nav_panel_mode()
+    return JSONResponse({"ok": True, "mode": mode,
+                         "pin_set": bool((settings.robot_nav_pin or "").strip())})
+
+
+@app.post("/robot-nav/unlock")
+async def robot_nav_unlock(request: Request) -> Response:
+    """Staff PIN for the นำทาง slot -> `{ok, ttl_s}`. The same unlock opens
+    voice starts on this face while ROBOT_NAV_VOICE=unlocked."""
+    from fastapi.responses import JSONResponse
+
+    from app import robot_nav
+
+    body = await _robot_nav_body(request)
+    if isinstance(body, Response):
+        return body
+    # The TCP peer, for the reason written in _face_scan_reply.
+    client = request.client.host if request.client else ""
+    try:
+        return JSONResponse(robot_nav.unlock(body.get("pin"), client))
+    except robot_nav.PinError as exc:
+        return JSONResponse({"ok": False, "reason": exc.reason}, status_code=exc.status)
+
+
 
 @app.get("/android/state")
 async def robot_android_state(token: str = "") -> dict:
@@ -1303,9 +1950,14 @@ async def arm_state(token: str = "") -> dict:
     if not _authorized(token):
         return {"ok": False, "error": "unauthorized"}
     try:
-        return {"ok": True, "state": await robot_arm.state()}
+        out = await robot_arm.state()
     except Exception as exc:
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    # Why every serial button below is about to be refused (design §4, "two
+    # writers on the arm port"), said before anyone presses one — not after
+    # the third press comes back with a code.
+    out["app_owns_port"] = robot_arm.app_owns_port()
+    return {"ok": True, "state": out}
 
 
 @app.post("/arm/command")
@@ -1334,8 +1986,17 @@ async def arm_command(request: Request) -> dict:
         note = ("ล็อกแล้ว และเชลล์บนหุ่นรายงานว่าเขียน #STOP สำเร็จ — "
                 if out["stop_write_ok"] else
                 "ล็อกแล้ว แต่การเขียน #STOP ล้มเหลว — ")
+        # robot_arm.stop() also asks the robot face for the app's own stopAll
+        # (the stop that reaches the board once the app holds the port).
+        # Reported with the same narrowness as stop_write_ok: "accepted"
+        # means the app queued it, not that a joint stopped.
+        body_stop = out.get("body_stop")
+        if body_stop is not None:
+            note += ("หน้าหุ่นรับคำสั่งหยุดของแอปแล้ว — " if body_stop.get("accepted")
+                     else f"หน้าหุ่นไม่รับคำสั่งหยุดของแอป ({body_stop.get('reason')}) — ")
         return {"ok": True, "did": "stop",
                 "stop_write_ok": out["stop_write_ok"], "error": out["error"],
+                "body_stop": body_stop,
                 "note": note + "ไม่ยืนยันว่าเฟรมถึงบอร์ดหรือแขนหยุด "
                                "ตัวหยุดที่แน่นอนคือไฟเลี้ยงเซอร์โว"}
     if action == "group" and not settings.robot_arm_groups_enabled:
@@ -1374,6 +2035,13 @@ async def arm_command(request: Request) -> dict:
             return {"ok": False, "error": "motion_locked",
                     "hint": "ยังไม่มีวิธีหยุดแขนที่พิสูจน์แล้ว (#STOP ได้ ACK แต่ข้อต่อเคลื่อนต่อ) — "
                             "ตั้ง ROBOT_ARM_MOTION_ENABLED=true ใน .env เมื่อมีคนตัดสินใจแล้ว"}
+        if str(exc) == "app_owns_arm_port":
+            # Before the catch-all: "กดปุ่มพร้อมสั่งงานก่อน" would send someone
+            # to re-arm a page that is armed, while the real reason is that a
+            # second writer on the app's port is refused (robot_arm.app_owns_port).
+            return {"ok": False, "error": "app_owns_arm_port",
+                    "hint": "แอปบนหุ่นเป็นเจ้าของพอร์ตแขนอยู่ (เปิดสั่งท่าทาง/นำทาง "
+                            "หรือหุ่นกำลังเดิน) — ใช้หน้าหุ่นหรือปุ่มหยุด"}
         return {"ok": False, "error": "disarmed",
                 "hint": "กดปุ่มพร้อมสั่งงานก่อน"}
     except (ValueError, LookupError) as exc:
@@ -1481,6 +2149,35 @@ async def ws_endpoint(websocket: WebSocket, voice: str | None = None, provider: 
                             summoned=summoned == "1")
 
 
+@app.websocket("/ws/robot-face")
+async def ws_robot_face(websocket: WebSocket, token: str | None = None) -> None:
+    """The robot face page's status link, open from page load whether or not
+    a call is (review 2 finding #0's real fix). It reports nav/body status
+    and carries only stops back — `robot_face_link.serve_status_link` owns
+    the rules. Token-gated like every socket: what it reports holds the
+    wheel fence open or shut, and a stop sent on it reaches the app."""
+    if await _reject_unauthorized(websocket, token):
+        return
+    from app import robot_face_link
+
+    await robot_face_link.serve_status_link(websocket)
+
+
+@app.websocket("/ws/robot-doa")
+async def ws_robot_doa(websocket: WebSocket, token: str | None = None) -> None:
+    """Direction of arrival from the robot app's native 8-channel capture
+    (docs/listening-focus-2026-10-09.md): GCC-PHAT lags in, `doa_ready` /
+    beats out -- `app.doa.serve_link` owns the rules (EmmaRobot/ only,
+    DOA_ENABLED, one array at a time, size and rate limits). Token-gated
+    like every socket: what arrives here can make the robot stop listening
+    to a direction."""
+    if await _reject_unauthorized(websocket, token):
+        return
+    from app import doa
+
+    await doa.serve_link(websocket)
+
+
 @app.websocket("/ws/camera")
 async def ws_camera(websocket: WebSocket, token: str | None = None) -> None:
     """The robot's camera, one JPEG per binary message (kiosk `?cam=1`).
@@ -1522,10 +2219,13 @@ async def ws_camera(websocket: WebSocket, token: str | None = None) -> None:
                     continue
 
     async def _push_control() -> None:
-        # The one thing the server sends the robot's page: camera controls the
-        # cockpit asked for (zoom). Latest-wins, and sent on connect too so a
-        # page that reconnected picks up the current setting.
+        # What the server sends the robot's page: camera controls the cockpit
+        # asked for (zoom), and the greeter's per-frame verdict for the
+        # temporary debug panel (owner 2026-09-30: "อยากรู้ว่ามันจับคนได้ไหม").
+        # Latest-wins both, and sent on connect too so a page that reconnected
+        # picks up the current setting.
         last = -1
+        last_face = -1
         while True:
             seq, ctl = robot_camera.feed.control()
             if seq != last and ctl:
@@ -1533,6 +2233,11 @@ async def ws_camera(websocket: WebSocket, token: str | None = None) -> None:
                 await websocket.send_text(_json.dumps({"type": "camctl", **ctl}))
                 if "mic_probe_s" in ctl:
                     robot_camera.feed.clear_control("mic_probe_s")
+            fseq, fstat = robot_camera.feed.face_status()
+            if fseq != last_face and fstat:
+                last_face = fseq
+                await websocket.send_text(_json.dumps(
+                    {"type": "face_status", **fstat}, ensure_ascii=False))
             await asyncio.sleep(0.3)
 
     tasks = [asyncio.create_task(_recv_frames()), asyncio.create_task(_push_control())]

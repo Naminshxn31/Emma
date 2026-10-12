@@ -163,3 +163,17 @@ def test_robot_mic_probe_reports_levels_only_and_stops_after_five_seconds():
     assert "Math.min(5" in probe
     assert "getTracks().forEach((t) => t.stop())" in probe
     assert "MediaRecorder" not in probe and "ArrayBuffer" not in probe
+
+
+def test_the_face_status_backchannel_is_latest_wins():
+    """The greeter's per-frame verdict for the chest screen's temporary
+    debug panel (owner 2026-09-30: "อยากรู้ว่ามันจับคนได้ไหม") — same
+    latest-wins shape as the camera controls, words only."""
+    feed = robot_camera.RobotCameraFeed()
+    seq0, status = feed.face_status()
+    assert status == {}
+    feed.set_face_status({"verdict": "ไม่เห็นหน้า"})
+    feed.set_face_status({"verdict": "ทัก ต้า (0.64)", "name": "ต้า"})
+    seq, status = feed.face_status()
+    assert seq == seq0 + 2
+    assert status["verdict"] == "ทัก ต้า (0.64)"

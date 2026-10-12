@@ -32,8 +32,10 @@ Three rules it is built around, each paid for by a bug in this repo:
   old text.
 
 Approval is authorization, never construction progress: `content_state`
-stays whatever the owner picks, and `state_instruction()` keeps forcing the
-"แนวคิดเบื้องต้น" caveat into Emma's mouth after approval exactly as before.
+stays whatever the owner picks, and `state_instruction()` decides what Emma
+does with it after approval exactly as before. (Since 2026-10-10 that is the
+opposite of a caveat for preliminary_concept: the owner banned "เป็นแนวคิด
+เบื้องต้น อาจเปลี่ยนแปลงได้" from her mouth — see `state_instruction`.)
 """
 from __future__ import annotations
 
@@ -43,7 +45,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
-from app.knowledge_policy import CONTENT_STATES, POLICY_VERSION, evaluate_claim, state_instruction
+from app.knowledge_policy import (CONTENT_STATES, POLICY_VERSION, carries_claim,
+                                  evaluate_claim, state_instruction)
 
 
 #: Repository root. A module-level name (not a constant baked into every
@@ -132,7 +135,7 @@ STATE_SNAPSHOT = "content_state_before_approval"
 
 #: Thai for each policy content state, kept beside the policy list rather
 #: than in the page: the operator is picking the one field that decides
-#: whether Emma must say "นี่เป็นแนวคิดเบื้องต้น", and raw English enum
+#: what Emma is told about a claim (`caveat_th`), and raw English enum
 #: values on a Thai screen are a coin flip. A state the policy gains and this
 #: map has not is shown as its raw value rather than silently hidden.
 CONTENT_STATE_TH = {
@@ -145,9 +148,9 @@ CONTENT_STATE_TH = {
 
 
 def content_state_options() -> list[dict]:
-    """Each policy state with its Thai gloss and the exact sentence Emma will
-    be forced to say if it is chosen — so the choice is made with the
-    consequence visible, not two screens away in `state_instruction`."""
+    """Each policy state with its Thai gloss and the exact instruction Emma
+    gets if it is chosen — so the choice is made with the consequence
+    visible, not two screens away in `state_instruction`."""
     return [{"value": state,
              "label_th": CONTENT_STATE_TH.get(state, state),
              "caveat_th": state_instruction(state)}
@@ -662,8 +665,18 @@ def detail(source_id: str, project_id: str) -> dict:
     }
     if editor == "facts":
         facts = payload.get("facts") if isinstance(payload.get("facts"), list) else []
+        # content_state per line: "" means "the file's state, picked at
+        # approval". The renderer already honoured a per-line state; the
+        # console just never showed or kept one, so a file could only say
+        # "all concept" or "all finished" (2026-09-29: the developer and the
+        # address are real today, the 23 facility names are not).
         result["facts"] = [
-            {"label": str(item.get("label") or ""), "value": item.get("value")}
+            {"label": str(item.get("label") or ""), "value": item.get("value"),
+             "content_state": str(item.get("content_state") or ""),
+             # One definition of blank for the badge and the prompt: the page
+             # used JS truthiness, so a hand-edited "-" looked filled while
+             # Emma was told there is no data.
+             "blank": not carries_claim(item.get("value"))}
             for item in facts if isinstance(item, dict)
         ]
         result["disclaimer"] = payload.get("disclaimer")
@@ -830,6 +843,9 @@ def edit(source_id: str, project_id: str, body: Mapping) -> dict:
             raise ConsoleError("ไม่มีรายการข้อเท็จจริงที่ส่งมา")
         facts: list[dict] = []
         seen: set[str] = set()
+        stored_state = {str(item.get("label")): item.get("content_state")
+                        for item in payload.get("facts", [])
+                        if isinstance(item, dict) and item.get("content_state")}
         for row in rows:
             if not isinstance(row, dict):
                 raise ConsoleError("รูปแบบข้อเท็จจริงไม่ถูกต้อง")
@@ -843,8 +859,31 @@ def edit(source_id: str, project_id: str, body: Mapping) -> dict:
             value = raw.strip() if isinstance(raw, str) else raw
             # Blank means "ยังไม่มีข้อมูล", and it must keep meaning that:
             # an empty string would read as an approved answer of nothing.
-            facts.append({"label": label, "value": value if value else None})
-        before = {str(item.get("label")): item.get("value")
+            # So does "-": the owner typed it into three boxes meaning
+            # "empty" (2026-09-29), and it rendered as a speakable value.
+            fact = {"label": label,
+                    "value": value if carries_claim(value) else None}
+            # A row that does not send the key keeps what the file has: a page
+            # opened before this box existed must not be able to strip the
+            # "แนวคิดเบื้องต้น" caveat off a line by pressing save. Sent empty
+            # means "follow the file's state"; anything else must be a state
+            # the policy knows.
+            if "content_state" in row:
+                state = str(row.get("content_state") or "").strip()
+                if state and state not in CONTENT_STATES:
+                    raise ConsoleError(
+                        f"สถานะของ '{label}' ไม่อยู่ในรายการของนโยบาย: "
+                        + ", ".join(sorted(CONTENT_STATES)))
+            else:
+                state = stored_state.get(label) or ""
+            if state:
+                fact["content_state"] = state
+            facts.append(fact)
+        # Normalised like the new rows: a "-" already in the file already
+        # renders as blank, so saving the page untouched must not count it as
+        # an edit — that would withdraw an approval nobody changed.
+        before = {str(item.get("label")): (item.get("value")
+                                           if carries_claim(item.get("value")) else None)
                   for item in payload.get("facts", []) if isinstance(item, dict)}
         after = {item["label"]: item["value"] for item in facts}
         for label in list(before) + [key for key in after if key not in before]:
@@ -852,6 +891,15 @@ def edit(source_id: str, project_id: str, body: Mapping) -> dict:
                 changes.append({"field": f"facts/{label}",
                                 "from": _short(before.get(label)),
                                 "to": _short(after.get(label))})
+        # A line's state is content, not paperwork: dropping its caveat is a
+        # stronger claim than the one that was signed, so it is a change like
+        # any other and withdraws an existing approval below.
+        after_state = {item["label"]: item.get("content_state") for item in facts}
+        for label in after_state:
+            if label in before and stored_state.get(label) != after_state[label]:
+                changes.append({"field": f"facts/{label}/content_state",
+                                "from": stored_state.get(label),
+                                "to": after_state[label]})
         updated["facts"] = facts
     elif editor == "rules":
         rows = body.get("rules")

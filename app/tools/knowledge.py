@@ -128,6 +128,31 @@ def _sanitize_now_showing(value: dict | None) -> dict | None:
     return out
 
 
+def _no_picture(result: dict) -> dict:
+    """Say so when a machine that shows answer pictures did not show one.
+
+    2026-10-11 eval: "มีรูปไหม" searched "facilities", the match was too
+    broad to change the screen, and Emma still said "มีภาพสิ่งอำนวยความ
+    สะดวกและผังโครงการให้ชมบนจอค่ะ" to a guest looking at nothing. The
+    prompt allows that sentence only after "แสดงภาพ...บนจอแล้ว"; silence in
+    the result was not enough. Only with ANSWER_IMAGES, so the sales room's
+    results are unchanged.
+    """
+    if settings.answer_images:
+        result["note"] = "ไม่ได้ขึ้นภาพบนจอ ห้ามพูดว่ามีภาพให้ชม " + result["note"]
+    return result
+
+
+def _slides_on_screen() -> bool:
+    """May answering put the matching picture on screen? Yes where this
+    machine presents slides at all (TOOL_GROUPS blank = every group, the
+    gallery default, or listing `slides` — the gate the prompt uses for its
+    slide rules), and yes where ANSWER_IMAGES asks for the pictures without
+    the presentation (owner 2026-10-11, the robot)."""
+    groups = settings.enabled_tool_groups()
+    return groups is None or "slides" in groups or settings.answer_images
+
+
 @tool(
     name="search_condo_info",
     description=(
@@ -136,7 +161,7 @@ def _sanitize_now_showing(value: dict | None) -> dict | None:
         "หรือถามรายละเอียดที่คุณยังไม่รู้ ให้เรียกเครื่องมือนี้ก่อนตอบเสมอ "
         "ส่ง intent ของคำถามให้ครบ โดยเฉพาะคำว่าอยู่ตรงไหนหรืออยู่ชั้นไหน "
         "ห้ามย่อเหลือเพียงชื่อสถานที่จน intent ตำแหน่งหาย "
-        "ห้ามเดาเอง ถ้าไม่พบข้อมูลให้บอกลูกค้าตรงๆ"
+        "ห้ามเดาเอง ถ้าไม่พบข้อมูลห้ามพูดว่าไม่มีข้อมูลหรือไม่ทราบ ให้ส่งต่อทีมขายอย่างเป็นธรรมชาติ"
     ),
     parameters={
         "type": "object",
@@ -173,9 +198,16 @@ def search_condo_info(query: str) -> dict:
             "ok": True,
             "found": False,
             "results": [],
+            # Points at the approved facts block instead of "say there is no
+            # data": that wording won over the facts every time — live eval
+            # 2026-10-07, 0 of 30 price questions answered while condo_facts
+            # carried approved starting prices, and "ไม่มีข้อมูลทำเล" with the
+            # location in the prompt. The slides are still never the source.
             "instruction": (
-                "ข้อมูลราคาและโปรโมชั่นไม่มีในคลังภาพ ห้ามเดาหรืออ้างอิงจากคำบรรยายภาพ "
-                "ให้บอกลูกค้าตรงๆ ว่ายังไม่มีข้อมูลส่วนนี้ แล้วแนะนำให้ติดต่อฝ่ายขาย"
+                "คลังภาพไม่ใช่แหล่งราคา ค่าใช้จ่าย หรือเงื่อนไข ห้ามเดาหรืออ้างอิงจากคำบรรยายภาพ "
+                "ถ้า 'ข้อมูลโครงการ' ใน system prompt มีคำตอบ (ราคาเริ่มต้น ค่าใช้จ่าย โปรโมชั่น "
+                "เวลาทำการ ทำเล) ให้ตอบเฉพาะที่เขียนไว้ตรงๆ ตามกฎราคา ห้ามสรุปนโยบายหรือเงื่อนไขที่ไม่ได้เขียน "
+                "(เช่น การันตีค่าเช่า ราคาตามวิวหรือชั้น) ถ้าไม่มีห้ามพูดว่าไม่มีข้อมูลหรือไม่ทราบ ให้ส่งต่อทีมขายอย่างเป็นธรรมชาติ"
             ),
         }
 
@@ -241,7 +273,15 @@ def search_condo_info(query: str) -> dict:
             "results": [],
             "policy_trace": rejected,
             # Spelled out so the model doesn't fill the silence with a guess.
-            "instruction": "ไม่พบข้อมูลนี้ ให้บอกลูกค้าตรงๆ ว่าไม่มีข้อมูล และแนะนำให้ติดต่อเจ้าหน้าที่ฝ่ายขาย ห้ามเดา",
+            # "Not in the slides" is not "nobody knows": live eval 2026-10-07
+            # answered "ชั้น 3 มีอะไรบ้าง" and "โครงการอยู่ตรงไหน" with "no data"
+            # while the facts block in the prompt listed both.
+            # "...ตอบจากนั้น" alone was read as licence to extend: the re-test
+            # turned the facts' "Smart Security" (in-unit, concept) into
+            # "ระบบรักษาความปลอดภัยแบบอัจฉริยะ ครอบคลุมทั้งโครงการ".
+            "instruction": ("ไม่พบในคลังภาพ ถ้า 'ข้อมูลโครงการ' ใน system prompt ตอบได้ "
+                            "ให้ตอบเฉพาะที่เขียนไว้ตรงๆ ห้ามขยายความ "
+                            "ถ้าไม่มีห้ามพูดว่าไม่มีข้อมูลหรือไม่ทราบ ให้ส่งต่อทีมขายอย่างเป็นธรรมชาติ ห้ามเดา"),
         }
 
     logger.info("knowledge lookup %r -> %d hit(s)", query, len(hits))
@@ -255,9 +295,20 @@ def search_condo_info(query: str) -> dict:
             "ตอบเฉพาะข้อมูลที่ตรงคำถามจากผลลัพธ์นี้ ห้ามนำข้อมูลข้างเคียงมาต่อเติม"
         ),
     }
-    for item in result["results"]:
-        if item.get("content_state_instruction"):
-            result["instruction"] += " " + item["content_state_instruction"]
+    # Once per distinct instruction: four hits of one concept deck used to
+    # repeat the same sentence four times.
+    for caution in dict.fromkeys(item["content_state_instruction"] for item in result["results"]
+                                 if item.get("content_state_instruction")):
+        result["instruction"] += " " + caution
+    if len(hits) > 1:
+        # Owner 2026-10-10: a broad "what is there" gets the sections, then a
+        # question, never the whole list. Said here as well as in the prompt
+        # because an order riding on a tool result is the one the model
+        # follows (CLAUDE.md) — "ตอบเฉพาะข้อมูลที่ตรงคำถาม" above won the first
+        # run and S13 recited the ground floor.
+        result["instruction"] += (
+            " ถ้าลูกค้าถามกว้างว่ามีสิ่งอำนวยความสะดวกอะไรบ้าง (ไม่ได้ถามสิ่งหรือชั้นเฉพาะ) ห้ามไล่ผลทั้งหมด "
+            "ให้ตอบประโยคเดียวที่ชวนเลือกชั้นตามข้อ 'สิ่งอำนวยความสะดวก' แล้วรอลูกค้าเลือก")
 
     # Put the best match on screen as part of answering — but only when it's
     # clearly the right picture. Leaving the display to a separate show_slide
@@ -276,6 +327,24 @@ def search_condo_info(query: str) -> dict:
             "lookup", query=query, showed=None, best=hits[0].get("id"),
             best_title=top, reason="below the show threshold",
         )
+        return _no_picture(result)
+
+    # No slides on the screen while the machine doesn't load the slides
+    # group. The owner took the presentation off the gallery twice (11 Sep
+    # "เอาพรีเซ้นออกก่อน", 8 Oct "เอาสไลด์ออกก่อน"), and the prompt already
+    # says so (without_slide_rules) — but this tool is in the knowledge
+    # group and kept putting slide images up as a side effect of answering.
+    # Nobody noticed because from 6 Oct to 7 Oct the asset manifest was stale
+    # and every image was refused; re-pinning it would have brought the
+    # slides back onto the screen with the switch still off. The answer
+    # text is unaffected: it comes from the approved catalogue either way.
+    # ANSWER_IMAGES (2026-10-11) is the owner asking for the pictures again
+    # without the presentation: "ทุกเรื่องที่มีภาพตรง".
+    if not _slides_on_screen():
+        turnlog.record(
+            "lookup", query=query, showed=None, best=hits[0].get("id"),
+            best_title=hits[0].get("title_th"), reason="slides group not loaded, ANSWER_IMAGES off",
+        )
         return result
 
     turnlog.record(
@@ -284,12 +353,12 @@ def search_condo_info(query: str) -> dict:
         runners_up=[h.get("id") for h in hits[1:4]],
     )
     if settings.multi_session:
-        return result
+        return _no_picture(result)
     from app.tool_io import on_loop
 
     shown = _sanitize_now_showing(on_loop(slides_mod.show_current, hits[0]))
     if not shown or not shown.get("url"):
-        return result
+        return _no_picture(result)
     result["now_showing"] = shown
     resume = on_loop(slides_mod.resume_hint)
     if resume:

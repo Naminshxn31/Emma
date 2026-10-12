@@ -1,0 +1,26 @@
+{
+  "_readme": [
+    "แอร์ในห้องนี้ (เจ้าของ 9 ต.ค. 2026: เพิ่มแอร์ Samsung เป็นตัวที่สอง)",
+    "แก้ name_th / name_en ได้ตรงนี้เลย ไม่ต้องแก้โค้ด - Emma ใช้ชื่อพวกนี้ถามว่า 'แอร์ตัวไหนคะ'",
+    "ตัวแรก (prefix ac_) คือแอร์ตัวเดิม: เปลี่ยนชื่อได้ ห้ามเปลี่ยน prefix",
+    "ตัวที่เพิ่มจะโผล่ให้ Emma เห็นก็ต่อเมื่อเครื่องนี้มีรหัสเปิด+ปิดของมันใน ir_codes.json แล้ว",
+    "สอนรหัส: python scripts/learn_ir.py --unit samsung",
+    "whole_state = รีโมตส่งสถานะทั้งชุดทุกครั้งที่กด, learned_with = สถานะรีโมตที่ใช้ตอนสอน"
+  ],
+  "air_conditioners": [
+    {
+      "id": "main",
+      "name_th": "แอร์ตัวเดิม",
+      "name_en": "the original air conditioner",
+      "prefix": "ac_"
+    },
+    {
+      "id": "samsung",
+      "name_th": "แอร์ Samsung ห้องนี้",
+      "name_en": "the Samsung air conditioner",
+      "prefix": "samsung_ac_",
+      "whole_state": true,
+      "learned_with": {"mode": "cool", "fan": "auto", "temp": 25}
+    }
+  ]
+}

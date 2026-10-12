@@ -76,7 +76,8 @@ def test_with_no_table_at_all_it_says_so(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "units_file", str(tmp_path / "nope.json"))
     out = units.show_unit("A801")
     assert out["ok"] is False and out["error"] == "no unit table"
-    assert "ติดต่อฝ่ายขาย" in out["instruction"]
+    assert "ส่งต่อทีมขาย" in out["instruction"]  # owner 12 Oct: natural handoff
+    assert "ห้ามพูดว่าไม่มีข้อมูล" in out["instruction"]
 
 
 def test_sample_data_is_blocked_before_reaching_emma(monkeypatch):
@@ -727,6 +728,8 @@ def test_every_live_read_is_scoped_to_our_project(monkeypatch):
     monkeypatch.setattr(settings, "inventory_url", "https://x.supabase.co")
     monkeypatch.setattr(settings, "inventory_key", "k")
     monkeypatch.setattr(settings, "inventory_project", "embassy-world")
+    # On, so the promotion reads below happen and get their scope checked.
+    monkeypatch.setattr(settings, "units_promotions", True)
     monkeypatch.setattr(units, "_live_get", fake_get)
     _verified_plan(monkeypatch)
     units._live_cache.clear()

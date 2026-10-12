@@ -34,6 +34,20 @@ def _locates(monkeypatch, *faces_):
     monkeypatch.setattr(faces, "locate", lambda img, det_size=640: list(faces_))
 
 
+def _station_with(monkeypatch, pending: list[dict]) -> enrollment.Session:
+    """Seed the station's batch.
+
+    The batch used to be a module list in the station; it is an
+    `enrollment.Session` now (the call screen needed the same capture), so
+    a fresh session per test replaces patching the list.
+    """
+    from scripts import enroll_app
+
+    session = enrollment.Session(pending=pending)
+    monkeypatch.setattr(enroll_app, "SESSION", session)
+    return session
+
+
 # -- one copy of the rules -------------------------------------------------
 
 def test_both_front_ends_share_the_same_rules():
@@ -119,6 +133,72 @@ def test_a_batch_with_two_people_in_it_is_refused():
     assert refusal is not None and "same person" in refusal
 
 
+def _mix(*parts) -> np.ndarray:
+    """Unit vector from (weight, axis) pairs over orthogonal axes."""
+    v = np.zeros(512, np.float32)
+    for weight, axis in parts:
+        v[axis] += weight
+    return v / np.linalg.norm(v)
+
+
+def test_five_poses_of_one_person_are_one_person_even_when_the_sides_differ(monkeypatch, tmp_path):
+    """Owner, 2026-09-29, on the robot: one person, five poses, refused as
+    "not the same person". The poses are MEANT to differ: turned left against
+    turned right is the least alike pair of a good batch. Each turned shot
+    only has to look like its neighbour pose (the front), not like the
+    opposite side."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "none.npz"))
+    front = _mix((1, 0))
+    batch = [front, _mix((1, 0), (.15, 1)),              # front2
+             _mix((1, 0), (.25, 2)),                     # far
+             _mix((.6, 0), (.8, 3)),                     # turned one way  (.6 to front)
+             _mix((.6, 0), (-.8, 3))]                    # turned the other (.6 to front)
+    assert enrollment.shots_agree(batch) < enrollment.AGREEMENT_FLOOR     # the old test refused this
+    assert enrollment.batch_link(batch) >= enrollment.LINK_FLOOR
+    assert enrollment.review(batch, "ต้า") is None
+
+
+def test_two_shots_of_someone_else_are_refused_even_though_they_match_each_other():
+    """The case a nearest-neighbour check alone would miss: the stranger's two
+    shots vouch for each other, but nothing links them to the rest."""
+    a, stranger = _mix((1, 0)), _mix((.3, 0), (.95, 5))
+    batch = [a, _mix((1, 0), (.1, 1)), _mix((1, 0), (.2, 2)), stranger, _mix((.3, 0), (.95, 5), (.1, 6))]
+    assert enrollment.batch_link(batch) < enrollment.LINK_FLOOR
+    refusal = enrollment.review(batch, "ต้า")
+    assert refusal is not None and refusal.startswith("the shots do not all look like the same person")
+
+
+def test_the_link_floor_sits_in_the_measured_gap():
+    # 2026-09-29: batches with 1-2 shots of somebody else at most .438; the
+    # station's genuine batches .558-.690 — and the robot's camera, poorer,
+    # refused one genuine batch at .489 while the floor was .50.
+    assert .438 < enrollment.LINK_FLOOR <= .489
+    assert enrollment.batch_link([_mix((1, 0))]) == 1.0
+
+
+def test_every_save_logs_its_pair_table_by_pose_and_never_the_name(caplog):
+    """The floor is tuned from these lines; the robot's first refusal could
+    only say 'link .489' because nothing more was written."""
+    import logging
+
+    batch = [_mix((1, 0)), _mix((1, 0), (.2, 1)), _mix((.6, 0), (.8, 3))]
+    with caplog.at_level(logging.INFO, logger="condo_voice.enrollment"):
+        enrollment._log_batch(["front", "front2", "side_a"], batch)
+    line = [r.getMessage() for r in caplog.records if "enrolment batch" in r.getMessage()]
+    assert line and "front/front2=" in line[0] and "front/side_a=0.60" in line[0]
+    assert "link " in line[0] and "floor 0.45" in line[0]
+    # Session.save writes it for every batch, before the review can refuse,
+    # and the helper is never handed the name.
+    from pathlib import Path
+
+    src = Path(enrollment.__file__).read_text(encoding="utf-8")
+    after = src.split("            _log_batch(keys, vecs)\n", 1)
+    assert len(after) == 2 and "refusal = review(vecs, name)" in after[1][:400]
+    assert "def _log_batch(keys: list[str], vecs: list[np.ndarray]) -> None:" in src
+
+
 def test_a_clean_batch_of_a_new_person_is_allowed(monkeypatch, tmp_path):
     from app.config import settings
 
@@ -137,6 +217,31 @@ def test_a_batch_that_is_already_in_the_gallery_under_another_name_is_refused(
 
     refusal = enrollment.review([ALICE_AGAIN], "มิกซ์")
     assert refusal is not None and "ต้า" in refusal
+
+
+def test_one_front_shot_under_another_name_is_enough_to_refuse(monkeypatch, tmp_path):
+    """2026-10-08: a robot scan matched a studio portrait of the same person,
+    filed under the Thai spelling of her name, at 0.507/0.546 front-on; the
+    side poses pulled the batch *mean* to 0.45 and it passed. From then on
+    every frame of her had a runner-up of another name within the margin,
+    so she was never named. Recognition judges single frames — so must this."""
+    from app.config import settings
+
+    def unit(*xs):
+        v = np.zeros(512, np.float32)
+        v[:len(xs)] = xs
+        return v / np.linalg.norm(v)
+
+    path = tmp_path / "gallery.npz"
+    faces.Gallery(["แก้ว"], np.stack([unit(1)]), [{"group": "staff"}]).save(path)
+    monkeypatch.setattr(settings, "face_gallery", str(path))
+    front = unit(0.55, 0.835)                       # 0.55 against the portrait
+    left, right = unit(0.38, 0.5, 0.778), unit(0.38, 0.5, -0.778)
+    batch = [front, left, right]
+    assert enrollment.batch_link(batch) >= enrollment.LINK_FLOOR       # one person
+    assert float(np.mean(batch, axis=0) @ unit(1)) < settings.face_threshold
+    refusal = enrollment.review(batch, "kaew")
+    assert refusal is not None and "แก้ว" in refusal
 
 
 # -- writing to disk, which happens last and only once -----------------------
@@ -192,7 +297,7 @@ def test_the_station_refuses_to_save_without_a_name_or_without_shots(
         monkeypatch, name, pending, expect):
     from scripts import enroll_app
 
-    monkeypatch.setattr(enroll_app, "_pending",
+    _station_with(monkeypatch,
                         [{"vec": v, "crop": np.zeros((4, 4, 3), np.uint8)}
                          for v in pending])
     result = enroll_app._save(name, replace=False)
@@ -211,13 +316,13 @@ def test_the_station_clears_the_pending_shots_after_saving(monkeypatch, tmp_path
 
     monkeypatch.setattr(enrollment, "ENROLLED", tmp_path)
     monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "none.npz"))
-    monkeypatch.setattr(enroll_app, "_pending",
+    _station_with(monkeypatch,
                         [{"vec": ALICE, "crop": np.full((40, 40, 3), 90, np.uint8)}])
 
     result = enroll_app._save("ต้า", replace=False)
 
     assert result["ok"] is True and result["total"] == 1
-    assert enroll_app._pending == []
+    assert enroll_app.SESSION.pending_count == 0
 
 
 def test_a_refused_batch_stays_pending(monkeypatch, tmp_path):
@@ -234,13 +339,13 @@ def test_a_refused_batch_stays_pending(monkeypatch, tmp_path):
     monkeypatch.setattr(enrollment, "ENROLLED", tmp_path)
     monkeypatch.setattr(settings, "face_gallery", str(path))
     monkeypatch.setattr(settings, "face_threshold", 0.45)
-    monkeypatch.setattr(enroll_app, "_pending",
+    _station_with(monkeypatch,
                         [{"vec": ALICE_AGAIN, "crop": np.zeros((4, 4, 3), np.uint8)}])
 
     result = enroll_app._save("มิกซ์", replace=False)
 
     assert result["ok"] is False
-    assert len(enroll_app._pending) == 1
+    assert enroll_app.SESSION.pending_count == 1
 
 
 # -- the guided capture ----------------------------------------------------
@@ -342,7 +447,7 @@ def test_the_station_refuses_a_shot_that_adds_nothing(monkeypatch):
 
     monkeypatch.setattr(faces, "locate", lambda img, det_size=640: [_face(0.0)])
     monkeypatch.setattr(faces, "describe", lambda img, f, det_size=640: f)
-    monkeypatch.setattr(enroll_app, "_pending", [
+    _station_with(monkeypatch, [
         {"vec": ALICE, "crop": np.zeros((4, 4, 3), np.uint8),
          "step": "front", "width": 200, "side": 0}])
 
@@ -488,7 +593,7 @@ def test_the_station_drops_an_impossible_step_from_the_list(monkeypatch):
     """And marks it skipped rather than leaving it looking unfinished."""
     from scripts import enroll_app
 
-    monkeypatch.setattr(enroll_app, "_pending", [
+    _station_with(monkeypatch, [
         {"vec": ALICE, "crop": np.zeros((4, 4, 3), np.uint8),
          "step": "front", "width": 119, "side": 0}])
 
@@ -503,7 +608,7 @@ def test_the_station_drops_an_impossible_step_from_the_list(monkeypatch):
 def test_a_wide_enough_first_shot_keeps_the_step(monkeypatch):
     from scripts import enroll_app
 
-    monkeypatch.setattr(enroll_app, "_pending", [
+    _station_with(monkeypatch, [
         {"vec": ALICE, "crop": np.zeros((4, 4, 3), np.uint8),
          "step": "front", "width": 260, "side": 0}])
 
@@ -567,10 +672,10 @@ def test_the_station_tells_the_page_how_long_to_hold(monkeypatch):
     """The page cannot know which step is the unverifiable one."""
     from scripts import enroll_app
 
-    monkeypatch.setattr(enroll_app, "_pending", [])
+    _station_with(monkeypatch, [])
     assert enroll_app._state()["hold_ms"] == enrollment.hold_ms(enrollment.STEPS[0])
 
-    monkeypatch.setattr(enroll_app, "_pending", [
+    _station_with(monkeypatch, [
         {"vec": ALICE, "crop": np.zeros((4, 4, 3), np.uint8),
          "step": s["key"], "width": 400, "side": 0}
         for s in enrollment.STEPS if s["key"] != "front2"])
@@ -1162,7 +1267,7 @@ def test_the_first_shot_leaves_room_for_the_step_back():
 def test_the_station_asks_for_that_room_before_the_first_shot(monkeypatch):
     from scripts import enroll_app
 
-    monkeypatch.setattr(enroll_app, "_pending", [])
+    _station_with(monkeypatch, [])
     monkeypatch.setattr(faces, "locate",
                         lambda img, det_size=640: [_face(0.0, width=140)])
 
@@ -1179,7 +1284,7 @@ def test_later_shots_only_need_the_portrait_bar(monkeypatch):
     """The room is needed once; a 140px face on step three is fine."""
     from scripts import enroll_app
 
-    monkeypatch.setattr(enroll_app, "_pending", [
+    _station_with(monkeypatch, [
         {"vec": ALICE, "crop": np.zeros((4, 4, 3), np.uint8),
          "step": "front", "width": 200, "side": 0}])
     monkeypatch.setattr(faces, "locate",
@@ -1187,3 +1292,727 @@ def test_later_shots_only_need_the_portrait_bar(monkeypatch):
 
     look = enroll_app._judge(FRAME, full_width=1280)
     assert "163px" not in look["reason"]
+
+
+# -- a name is a folder, and the folder can be deleted -----------------------
+#
+# The names below are made up. data/faces/ holds real people; nothing here
+# reads or writes it (ENROLLED and the gallery are moved to tmp_path).
+
+@pytest.mark.parametrize("raw,expect", [
+    ("ทดสอบ", "ทดสอบ"),
+    ("คุณทดสอบ ใจดี", "คุณทดสอบ ใจดี"),
+    ("  ทดสอบ  ", "ทดสอบ"),
+    ("ทด   สอบ", "ทด สอบ"),
+    ("ทด\u00a0สอบ", "ทด สอบ"),              # a pasted no-break space is still a space
+    ("O'Neil", "O'Neil"),
+    ("Jean-Luc", "Jean-Luc"),
+    ("J. Doe", "J. Doe"),
+    ("tester2", "tester2"),
+    ("ก" * 40, "ก" * 40),
+])
+def test_a_real_name_is_accepted_and_tidied(raw, expect):
+    assert enrollment.safe_person_name(raw) == expect
+
+
+@pytest.mark.parametrize("raw", [
+    "", "   ",
+    "..", "../x", "..\\..\\app", "a..b",
+    "a/b", "a\\b", "C:x", "C:\\x",
+    ".hidden", "ทดสอบ.",
+    "CON", "con", "con.txt", "Con .txt", "NUL", "aux.json", "COM1", "lpt9.x", "COM¹",
+    "ก" * 41,
+    "a\x00b", "a\tb", "a\nb", "ทดสอบ\u200b",     # control / invisible
+    "<b>", "a*b", "a?b", 'a"b', "a|b",
+])
+def test_anything_that_is_not_just_a_name_is_refused(raw):
+    """The station was 127.0.0.1 only; the call screen puts this save behind
+    a LAN endpoint, where `..\\..\\app` with replace=True is an rmtree on the
+    application. The refusal is a sentence for the operator, in Thai."""
+    with pytest.raises(ValueError) as exc:
+        enrollment.safe_person_name(raw)
+    assert re.search(r"[\u0e00-\u0e7f]", str(exc.value)), "the reason is shown on screen"
+
+
+def _outside(tmp_path):
+    """An enrolment store at tmp/data/faces/enrolled with a victim beside it."""
+    root = tmp_path / "data" / "faces" / "enrolled"
+    root.mkdir(parents=True)
+    victim = tmp_path / "data" / "app"
+    victim.mkdir(parents=True)
+    (victim / "keep.txt").write_text("still here", encoding="utf-8")
+    return root, victim
+
+
+@pytest.mark.parametrize("name", ["..\\..\\app", "../../app", "..", "C:\\"])
+def test_save_shots_never_deletes_outside_the_enrolment_folder(monkeypatch, tmp_path, name):
+    root, victim = _outside(tmp_path)
+    monkeypatch.setattr(enrollment, "ENROLLED", root)
+
+    with pytest.raises(ValueError):
+        enrollment.save_shots(name, [np.full((40, 40, 3), 90, np.uint8)], replace=True)
+
+    assert (victim / "keep.txt").read_text(encoding="utf-8") == "still here"
+    assert not (tmp_path / "data" / "faces" / "people.json").exists(), \
+        "a refused name must not get a consent record either"
+
+
+def test_the_folder_check_holds_even_if_the_name_rule_let_something_through(
+        monkeypatch, tmp_path):
+    """Two locks on one door. With the name rule switched off, where the
+    path *resolves* is still checked before anything is created or deleted."""
+    root, victim = _outside(tmp_path)
+    monkeypatch.setattr(enrollment, "ENROLLED", root)
+    monkeypatch.setattr(enrollment, "safe_person_name", lambda raw: raw)
+
+    with pytest.raises(ValueError):
+        enrollment.save_shots("../../app", [np.full((40, 40, 3), 90, np.uint8)],
+                              replace=True)
+
+    assert (victim / "keep.txt").exists()
+
+
+def test_save_shots_saves_under_the_tidied_name_and_reports_what_it_wrote(
+        monkeypatch, tmp_path):
+    """One person, one folder, one consent record — however the name was typed."""
+    from app import consent
+
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    written: list = []
+
+    total = enrollment.save_shots("  ทด   สอบ ", [np.full((40, 40, 3), 90, np.uint8)] * 2,
+                                  written=written)
+
+    assert total == 2
+    assert [p.parent.name for p in written] == ["ทด สอบ", "ทด สอบ"]
+    assert all(p.is_file() for p in written)
+    assert list(consent.load()) == ["ทด สอบ"]
+
+
+# -- one guided capture, used by the station and the call screen -------------
+
+class _FakeFace:
+    """What `faces.locate` hands back, and nothing more: bbox, kps, vec, area."""
+
+    def __init__(self, yaw: float, width: int, vec):
+        self.bbox = (0, 0, width, width)
+        self.kps = _kps(yaw)
+        self.vec = vec
+        self.det_score = 0.9
+
+    @property
+    def area(self) -> int:
+        return self.bbox[2] * self.bbox[3]
+
+
+def _view(i: int) -> np.ndarray:
+    """Distinct views of one person: every pair 0.86 alike — novel (< 0.97)
+    and in agreement (> 0.45)."""
+    v = np.zeros(512, np.float32)
+    v[0], v[i] = 1.0, 0.4
+    return v / np.linalg.norm(v)
+
+
+#: One pass through the five steps, with the refusals in between that the
+#: station meets in real life: too small, too small for the step-back, a
+#: crowd, the same shot twice, the same side twice, not stepped back far
+#: enough, and nobody there.
+WALK = [
+    [_FakeFace(0.0, 60, _view(1))],
+    [_FakeFace(0.0, 140, _view(1))],
+    [_FakeFace(0.0, 200, _view(1)), _FakeFace(0.0, 190, _view(2))],
+    [_FakeFace(0.0, 200, _view(1))],                   # front
+    [_FakeFace(-0.3, 200, _view(1))],                  # turned, but the same vector
+    [_FakeFace(-0.3, 200, _view(2))],                  # side_a
+    [_FakeFace(-0.3, 200, _view(3))],                  # that side again
+    [_FakeFace(0.3, 200, _view(3))],                   # side_b
+    [_FakeFace(0.0, 190, _view(4))],                   # not far enough back
+    [_FakeFace(0.0, 140, _view(4))],                   # far
+    [_FakeFace(0.0, 200, _view(5))],                   # front2
+    [],
+]
+#: The vectors the batch ends up holding, in shot order.
+WALK_KEPT = [1, 2, 3, 4, 5]
+
+
+def _walk(monkeypatch, judge, capture) -> list[dict]:
+    monkeypatch.setattr(faces, "describe", lambda img, f, det_size=640: f)
+    out = []
+    for found in WALK:
+        monkeypatch.setattr(faces, "locate", lambda img, det_size=640, found=found: list(found))
+        out.append(judge(FRAME, 1280))
+        out.append(judge(np.zeros((360, 640, 3), np.uint8), 1280))
+        out.append(capture(FRAME, 1280))
+    return out
+
+
+def test_the_station_is_a_session_and_nothing_else():
+    """Not "they agree" — the station holds no rule of its own to drift."""
+    from pathlib import Path
+
+    from scripts import enroll_app
+
+    assert isinstance(enroll_app.SESSION, enrollment.Session)
+    assert enroll_app._decode is enrollment.decode_data_url
+    assert enroll_app._thumb is enrollment.thumbnail
+    assert enroll_app._scale_to_camera is enrollment.scale_to_camera
+    code = Path(enroll_app.__file__).read_text(encoding="utf-8")
+    for rule in ("faces.locate", "step_ready", "is_novel", "usable_face", "STEPS"):
+        assert rule not in code, f"{rule} is back in the station"
+
+
+def test_the_station_and_a_session_answer_every_frame_the_same(monkeypatch, tmp_path):
+    from app.config import settings
+    from scripts import enroll_app
+
+    monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "none.npz"))
+    station = _station_with(monkeypatch, [])
+    session = enrollment.Session()
+
+    via_station = _walk(monkeypatch, enroll_app._judge, enroll_app._capture)
+    direct = _walk(monkeypatch, session.judge, session.capture)
+
+    assert via_station == direct
+    assert station.pending_count == session.pending_count == 5
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "a" / "enrolled")
+    saved_by_station = enroll_app._save("ทดสอบ", replace=False)
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "b" / "enrolled")
+    assert saved_by_station == session.save("ทดสอบ")
+
+
+def test_a_session_walks_the_five_steps_and_refuses_on_the_way(monkeypatch):
+    session = enrollment.Session()
+    results = _walk(monkeypatch, session.judge, session.capture)
+    captures = results[2::3]
+
+    assert [c["ok"] for c in captures] == [
+        False, False, False, True, False, True, False, True, False, True, True, False]
+    assert captures[4]["reason"] == "ภาพนี้เหมือนใบเดิม ลองขยับอีกนิด"
+    assert captures[6]["reason"] == "หันไปอีกด้านหนึ่ง"
+    assert results[3]["reason"].startswith("เข้ามาใกล้อีกนิด (140px ขอ 163px")
+    assert results[6]["say"] == enrollment.SPOKEN["crowd"]
+    assert results[-3]["say"] == enrollment.SPOKEN["no_face"]
+    last = captures[-2]
+    assert [s["step"] for s in last["shots"]] == [s["key"] for s in enrollment.STEPS]
+    assert all(s["thumb"].startswith("data:image/jpeg;base64,") for s in last["shots"])
+    assert last["step"] is None and last["prompt"] == "ครบแล้ว — กดบันทึกได้"
+
+
+def test_saving_into_the_live_gallery_needs_no_rebuild(monkeypatch, tmp_path):
+    """The call screen: the person enrolled is standing there waiting to be
+    known. The gallery gets the rows a rebuild would write for them — the
+    captured vectors, in shot order, each pointing at its own photo."""
+    from app import consent
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "gallery.npz"))
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    session = enrollment.Session()
+    _walk(monkeypatch, session.judge, session.capture)
+
+    result = session.save("ทดสอบ", add_to_gallery=True)
+
+    assert result["ok"] is True and result["total"] == 5
+    assert result["gallery_total"] == 5 and session.pending_count == 0
+    g = faces.Gallery.load(tmp_path / "gallery.npz")
+    assert g.names == ["ทดสอบ"] * 5
+    assert np.allclose(g.vecs, np.stack([_view(i) for i in WALK_KEPT]))
+    for meta in g.meta:
+        assert meta["group"] == "enrolled" and meta["source"] == "camera"
+        assert meta["consent"] == consent.OK
+        assert (tmp_path / meta["photo"]).is_file()
+    shots = sorted(p.name for p in (tmp_path / "enrolled" / "ทดสอบ").glob("*.jpg"))
+    assert [m["photo"] for m in g.meta] == [f"enrolled/ทดสอบ/{s}" for s in shots]
+
+
+def test_the_station_save_still_leaves_the_gallery_alone(monkeypatch, tmp_path):
+    """Its documented second step is the rebuild; nothing changed there."""
+    from app.config import settings
+    from scripts import enroll_app
+
+    monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "gallery.npz"))
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    _station_with(monkeypatch, [])
+    _walk(monkeypatch, enroll_app._judge, enroll_app._capture)
+
+    result = enroll_app._save("ทดสอบ", replace=False)
+
+    assert result["ok"] is True and "gallery_total" not in result
+    assert not (tmp_path / "gallery.npz").exists()
+
+
+def test_a_gallery_that_refuses_the_append_does_not_unsave_the_person(monkeypatch, tmp_path):
+    """The shots are on disk and consent recorded; "not saved" would invite
+    a second save of the same person. The refusal rides beside the success."""
+    from app.config import settings
+
+    stale = tmp_path / "gallery.npz"
+    faces.Gallery(["อื่น"], np.stack([_view(9)]), [{}], model_tag="other/model").save(stale)
+    before = stale.read_bytes()
+    monkeypatch.setattr(settings, "face_gallery", str(stale))
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    session = enrollment.Session()
+    _walk(monkeypatch, session.judge, session.capture)
+
+    result = session.save("ทดสอบ", add_to_gallery=True)
+
+    assert result["ok"] is True and result["total"] == 5
+    assert result["gallery_total"] is None and "ไม่เขียนทับ" in result["gallery_reason"]
+    assert stale.read_bytes() == before
+
+
+def test_a_double_tap_saves_the_batch_once(monkeypatch, tmp_path):
+    """Two saves of one batch were ten files and every vector twice."""
+    import threading
+    import time
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "gallery.npz"))
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    session = enrollment.Session()
+    _walk(monkeypatch, session.judge, session.capture)
+
+    first_in = threading.Event()
+    release = threading.Event()
+    real_review = enrollment.review
+
+    def slow_review(vecs, name):
+        if not first_in.is_set():
+            first_in.set()
+            release.wait(5)
+        return real_review(vecs, name)
+
+    monkeypatch.setattr(enrollment, "review", slow_review)
+    results = []
+
+    def tap():
+        results.append(session.save("ทดสอบ", add_to_gallery=True))
+
+    one, two = threading.Thread(target=tap), threading.Thread(target=tap)
+    one.start()
+    first_in.wait(5)
+    two.start()
+    time.sleep(0.2)
+    release.set()
+    one.join(5)
+    two.join(5)
+
+    assert sorted(r["ok"] for r in results) == [False, True]
+    assert len(list((tmp_path / "enrolled" / "ทดสอบ").glob("*.jpg"))) == 5
+    assert len(faces.Gallery.load(tmp_path / "gallery.npz")) == 5
+
+
+def test_a_bad_name_leaves_the_batch_waiting(monkeypatch, tmp_path):
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    session = enrollment.Session(pending=[{"vec": ALICE, "crop": np.zeros((4, 4, 3), np.uint8)}])
+
+    result = session.save("../ทดสอบ")
+
+    assert result["ok"] is False and "ชื่อ" in result["reason"]
+    assert session.pending_count == 1
+    assert not (tmp_path / "enrolled").exists()
+
+
+@pytest.mark.parametrize("body", ["", "data:image/jpeg;base64,", "not a url", 123, None,
+                                  "data:image/jpeg;base64,bm90IGFuIGltYWdl"])
+def test_a_garbage_frame_is_none_not_an_exception(body):
+    """First thing a LAN endpoint's body reaches."""
+    assert enrollment.decode_data_url(body) is None
+
+
+def test_a_real_frame_round_trips_through_a_data_url():
+    import base64
+
+    import cv2
+
+    ok, buf = cv2.imencode(".png", np.full((12, 16, 3), 77, np.uint8))
+    frame = enrollment.decode_data_url(
+        "data:image/png;base64," + base64.b64encode(buf.tobytes()).decode())
+    assert frame is not None and frame.shape == (12, 16, 3)
+
+
+@pytest.mark.parametrize("full_width", [None, 0, -5, "abc", float("nan"), float("inf")])
+def test_a_camera_width_that_is_not_a_width_is_not_a_scale(full_width):
+    assert enrollment.scale_to_camera(np.zeros((360, 640, 3), np.uint8), full_width) == 1.0
+
+
+# -- add_to_gallery ------------------------------------------------------------
+
+def _gallery_here(monkeypatch, tmp_path):
+    from app.config import settings
+
+    path = tmp_path / "gallery.npz"
+    monkeypatch.setattr(settings, "face_gallery", str(path))
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    return path
+
+
+def test_add_to_gallery_creates_the_gallery_when_there_is_none(monkeypatch, tmp_path):
+    path = _gallery_here(monkeypatch, tmp_path)
+
+    assert enrollment.add_to_gallery("ทดสอบ", [_view(1), _view(2)],
+                                     ["enrolled/ทดสอบ/a.jpg", "enrolled/ทดสอบ/b.jpg"]) == 2
+
+    g = faces.Gallery.load(path)
+    assert g.names == ["ทดสอบ", "ทดสอบ"] and g.model_tag == faces.MODEL_TAG
+    assert g.meta[1] == {"group": "enrolled", "photo": "enrolled/ทดสอบ/b.jpg",
+                         "source": "camera", "consent": "missing"}
+
+
+def test_add_to_gallery_appends_and_keeps_everybody_else(monkeypatch, tmp_path):
+    path = _gallery_here(monkeypatch, tmp_path)
+    faces.Gallery(["อื่น", "ทดสอบ"], np.stack([_view(7), _view(8)]),
+                  [{"group": "broker"}, {"group": "enrolled", "source": "camera"}]).save(path)
+
+    assert enrollment.add_to_gallery("ทดสอบ", [_view(1)], ["enrolled/ทดสอบ/c.jpg"]) == 2
+
+    g = faces.Gallery.load(path)
+    assert g.names == ["อื่น", "ทดสอบ", "ทดสอบ"]
+    assert g.meta[0] == {"group": "broker"}
+    assert np.allclose(g.vecs[:2], np.stack([_view(7), _view(8)]))
+
+
+def test_a_colleague_added_from_the_camera_stays_a_colleague(monkeypatch, tmp_path):
+    """Same rule as the rebuild: otherwise the greeting depends on which
+    vector happened to be nearest."""
+    path = _gallery_here(monkeypatch, tmp_path)
+    faces.Gallery(["ทดสอบ"], np.stack([_view(7)]), [{"group": "staff"}]).save(path)
+
+    enrollment.add_to_gallery("ทดสอบ", [_view(1)], ["enrolled/ทดสอบ/c.jpg"])
+
+    assert faces.Gallery.load(path).meta[-1]["group"] == "staff"
+
+
+@pytest.mark.parametrize("content", ["other-model", "garbage", "truncated"])
+def test_add_to_gallery_never_overwrites_a_gallery_it_cannot_read(monkeypatch, tmp_path, content):
+    """Overwriting would silently delete everybody else in it."""
+    path = _gallery_here(monkeypatch, tmp_path)
+    if content == "other-model":
+        faces.Gallery(["อื่น"], np.stack([_view(7)]), [{}], model_tag="other/model").save(path)
+    elif content == "garbage":
+        path.write_bytes(b"this is not a zip file at all")
+    else:
+        faces.Gallery(["อื่น"], np.stack([_view(7)]), [{}]).save(path)
+        path.write_bytes(path.read_bytes()[:200])
+    before = path.read_bytes()
+
+    with pytest.raises(ValueError) as exc:
+        enrollment.add_to_gallery("ทดสอบ", [_view(1)], ["enrolled/ทดสอบ/c.jpg"])
+
+    assert "ไม่เขียนทับ" in str(exc.value)
+    assert path.read_bytes() == before
+
+
+def test_add_to_gallery_leaves_no_temp_file_behind(monkeypatch, tmp_path):
+    """The gallery, and its (empty, permanent) cross-process lock file —
+    deleting that on release would race the next opener. Nothing else."""
+    path = _gallery_here(monkeypatch, tmp_path)
+    enrollment.add_to_gallery("ทดสอบ", [_view(1)], ["x"])
+    enrollment.add_to_gallery("ทดสอบ", [_view(2)], ["y"])
+    assert sorted(p.name for p in tmp_path.iterdir() if p.is_file()) == sorted(
+        [path.name, faces.lock_path(path).name])
+    assert faces.lock_path(path).stat().st_size == 0
+
+
+def test_add_to_gallery_does_not_put_back_somebody_who_withdrew(monkeypatch, tmp_path):
+    """The rebuild keeps revoked people out; this must not be the one path
+    that appends them again."""
+    from app import consent
+
+    path = _gallery_here(monkeypatch, tmp_path)
+    consent.revoke("ทดสอบ")
+
+    with pytest.raises(ValueError):
+        enrollment.add_to_gallery("ทดสอบ", [_view(1)], ["x"])
+    assert not path.exists()
+
+
+def test_add_to_gallery_refuses_a_bad_name_and_mismatched_lists(monkeypatch, tmp_path):
+    path = _gallery_here(monkeypatch, tmp_path)
+    with pytest.raises(ValueError):
+        enrollment.add_to_gallery("../x", [_view(1)], ["x"])
+    with pytest.raises(ValueError):
+        enrollment.add_to_gallery("ทดสอบ", [_view(1), _view(2)], ["x"])
+    assert not path.exists()
+
+
+def test_two_appends_at_once_lose_nobody(monkeypatch, tmp_path):
+    """Two kiosks, one process, one second: load-append-save twice over
+    must not end with one person's rows missing."""
+    import threading
+    import time
+
+    path = _gallery_here(monkeypatch, tmp_path)
+    real_load = faces.Gallery.load
+
+    def slow_load(p):
+        g = real_load(p)
+        time.sleep(0.05)
+        return g
+
+    faces.Gallery(["อื่น"], np.stack([_view(7)]), [{}]).save(path)
+    monkeypatch.setattr(faces.Gallery, "load", staticmethod(slow_load))
+    names = [f"ทดสอบ{i}" for i in range(6)]
+    threads = [threading.Thread(target=enrollment.add_to_gallery, args=(n, [_view(1)], ["x"]))
+               for n in names]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+
+    assert sorted(real_load(path).names) == sorted(["อื่น"] + names)
+
+
+def test_an_append_while_the_gallery_is_locked_refuses_and_writes_nothing(monkeypatch, tmp_path):
+    """The other holder is a rebuild, which replaces the whole file from a
+    listing it took earlier. An append into the file it is about to replace
+    was on the screen as "known" and gone when the rebuild finished; now it
+    waits a moment and refuses in Thai."""
+    path = _gallery_here(monkeypatch, tmp_path)
+    faces.Gallery(["อื่น"], np.stack([_view(7)]), [{}]).save(path)
+    before = path.read_bytes()
+    monkeypatch.setattr(enrollment, "GALLERY_LOCK_WAIT_S", 0.2)
+
+    with faces.file_lock(path, 1.0, "unused"):
+        with pytest.raises(faces.LockBusy) as exc:
+            enrollment.add_to_gallery("ทดสอบ", [_view(1)], ["x"])
+
+    assert re.search(r"[฀-๿]", str(exc.value))
+    assert "build-face-gallery" in str(exc.value)
+    assert path.read_bytes() == before
+
+
+def test_add_to_gallery_refuses_while_the_consent_file_cannot_be_read(monkeypatch, tmp_path):
+    """It might be exactly where this person's revocation is."""
+    from app import consent
+
+    path = _gallery_here(monkeypatch, tmp_path)
+    consent.people_path().parent.mkdir(parents=True, exist_ok=True)
+    consent.people_path().write_bytes(b"{ not json")
+
+    with pytest.raises(ValueError) as exc:
+        enrollment.add_to_gallery("ทดสอบ", [_view(1)], ["x"])
+
+    assert "people.json" in str(exc.value)
+    assert not path.exists()
+
+
+# -- a save that fails part-way leaves nothing half-filed --------------------------
+#
+# save_shots writes the shots first and the consent record last. An OSError
+# in between (a full disk, a people.json another program holds past the
+# retries) used to leave shots with no record and a folder, answer 500
+# "ลองใหม่", and then refuse the retry as "ชื่อนี้มีอยู่แล้ว" — so the
+# operator typed a second name and one face was filed twice (review,
+# 2026-09-29). Everything below is in tmp_path.
+
+def _walked_session(monkeypatch, tmp_path) -> enrollment.Session:
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "gallery.npz"))
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    session = enrollment.Session()
+    _walk(monkeypatch, session.judge, session.capture)
+    assert session.pending_count == 5
+    return session
+
+
+def _consent_write_fails(monkeypatch, times: int = 1) -> list:
+    """The record's write dies the way Windows kills it when another program
+    holds people.json past `write_atomically`'s retries."""
+    from app import consent
+
+    real = consent.save
+    failed: list = []
+
+    def dies(people):
+        if len(failed) < times:
+            failed.append(1)
+            raise PermissionError(13, "held by another program")
+        return real(people)
+
+    monkeypatch.setattr(consent, "save", dies)
+    return failed
+
+
+def test_a_consent_write_that_fails_takes_the_shots_back(monkeypatch, tmp_path):
+    from app import consent
+
+    session = _walked_session(monkeypatch, tmp_path)
+    _consent_write_fails(monkeypatch)
+
+    result = session.save("ทดสอบ", add_to_gallery=True)
+
+    assert result["ok"] is False
+    assert re.search(r"[฀-๿]", result["reason"]), "a sentence for the screen"
+    assert not (tmp_path / "enrolled" / "ทดสอบ").exists(), "shots with no record were left"
+    assert consent.load() == {}
+    assert not (tmp_path / "gallery.npz").exists()
+    assert session.pending_count == 5, "the batch is kept for the retry"
+
+    again = session.save("ทดสอบ", add_to_gallery=True)                 # the disk is back
+
+    assert again["ok"] is True and again["total"] == 5 and again["gallery_total"] == 5
+    assert consent.status("ทดสอบ") == consent.OK
+
+
+def test_a_shot_that_fails_to_write_takes_back_the_ones_before_it(monkeypatch, tmp_path):
+    import cv2
+
+    from app import consent
+
+    session = _walked_session(monkeypatch, tmp_path)
+    real = cv2.imencode
+    calls = []
+
+    class _Buffer:
+        def __init__(self, buf):
+            self.buf = buf
+
+        def tofile(self, path):
+            calls.append(path)
+            if len(calls) == 3:
+                with open(path, "wb") as fh:                   # half a JPEG, then the disk fills
+                    fh.write(bytes(self.buf)[:10])
+                raise OSError(28, "No space left on device")
+            self.buf.tofile(path)
+
+    def encode(ext, img, params=None):
+        ok, buf = real(ext, img, params or [])
+        return ok, _Buffer(buf)
+
+    monkeypatch.setattr(cv2, "imencode", encode)
+
+    result = session.save("ทดสอบ")
+
+    assert result["ok"] is False and re.search(r"[฀-๿]", result["reason"])
+    assert len(calls) == 3
+    assert not (tmp_path / "enrolled" / "ทดสอบ").exists()
+    assert consent.load() == {}
+    assert session.pending_count == 5
+
+
+def test_a_failed_top_up_keeps_the_shots_already_there(monkeypatch, tmp_path):
+    """Only this call's files are taken back: a station top-up that fails
+    must not cost the person the shots they had."""
+    session = _walked_session(monkeypatch, tmp_path)
+    folder = tmp_path / "enrolled" / "ทดสอบ"
+    folder.mkdir(parents=True)
+    (folder / "20260901-100000_1.jpg").write_bytes(b"old")
+    (folder / "20260901-100000_2.jpg").write_bytes(b"old")
+    _consent_write_fails(monkeypatch)
+
+    result = session.save("ทดสอบ", existing_ok=True)
+
+    assert result["ok"] is False
+    assert sorted(p.name for p in folder.iterdir()) == [
+        "20260901-100000_1.jpg", "20260901-100000_2.jpg"]
+
+
+def test_a_failed_replace_has_not_thrown_the_old_shots_away(monkeypatch, tmp_path):
+    """`replace` used to delete the folder first; a record that then failed
+    left the person with nothing. The old shots go only once the record is
+    written."""
+    folder = tmp_path / "enrolled" / "ทดสอบ"
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    crop = [np.full((90, 90, 3), 120, np.uint8)]
+    enrollment.save_shots("ทดสอบ", crop + crop)
+    old = sorted(p.name for p in folder.iterdir())
+    _consent_write_fails(monkeypatch)
+
+    with pytest.raises(OSError):
+        enrollment.save_shots("ทดสอบ", crop, replace=True)
+    assert sorted(p.name for p in folder.iterdir()) == old
+
+    assert enrollment.save_shots("ทดสอบ", crop, replace=True) == 1   # and replace still replaces
+
+
+def test_an_unreadable_consent_file_refuses_the_save_and_keeps_nothing(monkeypatch, tmp_path):
+    """consent.record refuses to write over a file it cannot read; the shots
+    this save wrote go with it, and the file is left exactly as it was."""
+    from app import consent
+
+    session = _walked_session(monkeypatch, tmp_path)
+    consent.people_path().parent.mkdir(parents=True, exist_ok=True)
+    consent.people_path().write_bytes(b'{"x": {"revoked_at": "2026-09-01"}, }')
+    before = consent.people_path().read_bytes()
+
+    result = session.save("ทดสอบ", add_to_gallery=True)
+
+    assert result["ok"] is False and "people.json" in result["reason"]
+    assert consent.people_path().read_bytes() == before
+    assert not (tmp_path / "enrolled" / "ทดสอบ").exists()
+    assert session.pending_count == 5
+
+
+def test_a_gallery_write_the_disk_refuses_is_reported_beside_the_save(monkeypatch, tmp_path):
+    """Shots and consent are on disk; an OSError from the gallery write
+    used to be a 500 "ลองใหม่" for a person who was in fact saved."""
+    from app import consent
+
+    session = _walked_session(monkeypatch, tmp_path)
+
+    def held(self, path):
+        raise PermissionError(5, "Access is denied")
+
+    monkeypatch.setattr(faces.Gallery, "save", held)
+
+    result = session.save("ทดสอบ", add_to_gallery=True)
+
+    assert result["ok"] is True and result["total"] == 5
+    assert result["gallery_total"] is None
+    assert re.search(r"[฀-๿]", result["gallery_reason"])
+    assert "build-face-gallery" in result["gallery_reason"]
+    assert consent.status("ทดสอบ") == consent.OK
+    assert session.pending_count == 0
+
+
+# -- the station can still top up the people it filed before the name rule ------
+
+def test_the_station_tops_up_a_folder_named_before_the_name_rule(monkeypatch, tmp_path):
+    """`Tom_2` was a fine station name until safe_person_name. The exact
+    name then failed the rule, and "Tom 2" was refused as a second name for
+    the same face — the station could no longer add a shot to its own
+    person."""
+    from app import consent
+    from scripts import enroll_app
+
+    root = tmp_path / "enrolled"
+    for legacy in ("Tom_2", "ทด  สอบ"):
+        (root / legacy).mkdir(parents=True)
+        (root / legacy / "20260901-100000_1.jpg").write_bytes(b"old")
+    monkeypatch.setattr(enrollment, "ENROLLED", root)
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "face_gallery", str(tmp_path / "gallery.npz"))
+
+    for legacy in ("Tom_2", "ทด  สอบ"):
+        _station_with(monkeypatch, [{"vec": ALICE, "crop": np.full((40, 40, 3), 90, np.uint8)}])
+        result = enroll_app._save(legacy, replace=False)
+        assert result["ok"] is True and result["name"] == legacy and result["total"] == 2
+        assert consent.status(legacy) == consent.OK
+    assert sorted(p.name for p in root.iterdir()) == sorted(["Tom_2", "ทด  สอบ"])
+
+
+@pytest.mark.parametrize("raw", ["tom_2", "Tom_3", "..", "Tom_2/..", "..\\enrolled\\Tom_2"])
+def test_the_station_exception_is_only_an_exact_existing_folder(monkeypatch, tmp_path, raw):
+    root = tmp_path / "enrolled"
+    (root / "Tom_2").mkdir(parents=True)
+    monkeypatch.setattr(enrollment, "ENROLLED", root)
+
+    with pytest.raises(ValueError):
+        enrollment.checked_name(raw, existing_ok=True)
+
+
+def test_the_call_screen_never_gets_the_station_exception(monkeypatch, tmp_path):
+    """A LAN screen must not add shots to anybody who already exists."""
+    root = tmp_path / "enrolled"
+    (root / "Tom_2").mkdir(parents=True)
+    monkeypatch.setattr(enrollment, "ENROLLED", root)
+    session = enrollment.Session(pending=[{"vec": ALICE, "crop": np.zeros((4, 4, 3), np.uint8)}])
+
+    result = session.save("Tom_2", add_to_gallery=True)
+
+    assert result["ok"] is False
+    assert list((root / "Tom_2").iterdir()) == []

@@ -29,7 +29,10 @@ def test_voice_preview_keeps_the_reference_layout_and_accessible_controls():
     assert html.index('class="mascot-art"') < html.index('class="reply"')
 
     # One coherent icon family: inline stroke SVGs, not platform-dependent emoji.
-    assert html.count('viewBox="0 0 24 24"') == 3
+    # Counted in the controls bar: the hold buttons' placeholder plus is the
+    # same family, drawn from script.
+    controls = html.split('<nav class="controls"', 1)[1].split("</nav>", 1)[0]
+    assert controls.count('viewBox="0 0 24 24"') == 3
     assert 'stroke="currentColor"' in html
     assert not any(icon in html for icon in ("💬", "🎤", "✕"))
 
@@ -93,11 +96,11 @@ def test_voice_preview_keeps_continuous_3d_motion_around_the_layered_puppet():
         "addEventListener('pointermove', aim",
         "requestAnimationFrame(render)",
         'href="assets/emma/emma-puppet-atlas-reference-v2.png"',
-        'class="emma-data-orbit"',
         'class="face-display"',
         "--state-accent",
         "--gaze-x",
-        "@keyframes emma-data-spin",
+        # 'class="emma-data-orbit"' and "@keyframes emma-data-spin" left this
+        # list with the floor ring (owner, 2026-09-30 "อันนี้ลบทิ้ง...ได้เลย").
         'class="emma-motion-prop prop-search"',
         'class="emma-motion-prop prop-alert"',
         'class="emma-motion-prop prop-heart"',
@@ -220,12 +223,13 @@ def test_voice_preview_packages_and_drives_the_approved_3d_mascot():
     that does not exist on a fresh clone."""
     html = PAGE.read_text(encoding="utf-8")
     lab = ROOT / "client" / "assets" / "emma-3d-lab"
-    # The file the page LOADS, which since 2026-09-25 is the 68k reduction,
-    # not the 162k emma.glb it was sculpted from. Anchoring this on the
-    # loaded name is the point: emma.glb still sits beside it as the
-    # fallback, so a check against that one stays green on a page whose
-    # model 404s.
-    glb = lab / "emma-light-68k.glb"
+    # The file the page LOADS. Anchoring this on the loaded name is the point:
+    # another GLB sits beside it, so a check against that one stays green on a
+    # page whose model 404s. 2026-09-25 to -29 it was the 68k reduction, whose
+    # coarse head shell tore the chrome band's edges when she is turned; the
+    # page is back on the 162k original (see mascot.js "load the approved
+    # model" for the measured cause).
+    glb = lab / "emma.glb"
     three = lab / "vendor" / "build" / "three.module.js"
     three_core = lab / "vendor" / "build" / "three.core.js"
     loader = lab / "vendor" / "examples" / "jsm" / "loaders" / "GLTFLoader.js"
@@ -256,7 +260,10 @@ def test_voice_preview_packages_and_drives_the_approved_3d_mascot():
     # the call site and disabling the startup loop each left this file at
     # 27 passed before the anchors went in.
     code = renderer.read_text(encoding="utf-8")
-    assert "new GLTFLoader().loadAsync('/assets/emma-3d-lab/emma-light-68k.glb')" in code
+    assert "new GLTFLoader().loadAsync('/assets/emma-3d-lab/emma.glb')" in code
+    # The reduction that tore the seams must not come back by a quiet edit:
+    # a lighter model needs a fine head shell and a check from the side.
+    assert "emma-light-68k.glb')" not in code
     startup = code.split("const clock = new THREE.Clock();", 1)[1]
     startup = startup.split("addEventListener('pagehide'", 1)[0]
     assert "renderer.setAnimationLoop(" in startup
@@ -518,7 +525,7 @@ def test_connecting_and_listening_keep_the_page_chrome_in_its_approved_state():
     html = PAGE.read_text(encoding="utf-8")
 
     assert 'body[data-emma-state="idle"] .topbar { opacity: .78; }' in html
-    assert "'Tap to talk': appShell ? 'เริ่มสนทนาด้วยเสียง'" in html
+    assert "'Tap to talk': thaiUi() ? 'เริ่มสนทนาด้วยเสียง'" in html
     assert html.count("micBtn.setAttribute('aria-pressed', 'false')") >= 4
 
 
@@ -526,7 +533,7 @@ def test_preview_3d_mascot_assets_are_served(client):
     """The page fetches these three by absolute URL. The content type matters
     as much as the bytes: a module served as text/plain is refused by the
     browser outright, and the mascot would simply never arrive."""
-    glb = client.get("/assets/emma-3d-lab/emma-light-68k.glb")
+    glb = client.get("/assets/emma-3d-lab/emma.glb")
     three = client.get("/assets/emma-3d-lab/vendor/build/three.module.js")
     core = client.get("/assets/emma-3d-lab/vendor/build/three.core.js")
     loader = client.get("/assets/emma-3d-lab/vendor/examples/jsm/loaders/GLTFLoader.js")
@@ -608,6 +615,96 @@ def test_voice_preview_mascot_can_be_moved_and_resized_accessibly():
         assert hook in html
 
 
+def test_zooming_re_renders_the_3d_mascot_instead_of_stretching_it():
+    """The zoom is a CSS transform on the wrap, and a ResizeObserver never
+    fires for a transform: the WebGL buffer stayed at its zoom-1 size and a
+    1.35x zoom stretched that bitmap (owner, 2026-09-29 "ซูมแล้วดูเบลอๆ").
+    Measured in Chrome after the fix: at dpr 1 the buffer goes 360x430 ->
+    486x580 at 1.35x (on screen 486x581), at dpr 2 720x860 -> 972x1161.
+
+    Source-level on purpose, with the reason for each anchor: the buffer must
+    follow the page's own --user-scale, be re-sized on the event the page fires
+    for every zoom, and be sized from the untransformed layout box (a
+    transformed rect double-counts the zoom at the next layout change)."""
+    code = (ROOT / "client" / "assets" / "emma-3d-lab" / "mascot.js").read_text(encoding="utf-8")
+    sizing = code.split("function resize() {", 1)[1].split("new ResizeObserver(resize)", 1)[0]
+    assert "wrap.offsetWidth" in sizing and "wrap.getBoundingClientRect()" not in sizing
+    assert "base * scale" in sizing, "the pixel ratio no longer follows the zoom"
+    assert "getPropertyValue('--user-scale')" in code
+    listener = code.split("wrap.addEventListener('emma-transform-change'", 1)[1][:400]
+    assert "resize()" in listener and "requestAnimationFrame" in listener
+    # A changed file under an unchanged ?v= is served from cache to the robot.
+    html = PAGE.read_text(encoding="utf-8")
+    assert "mascot.js?v=20260924-orbit5" not in html
+
+
+def test_press_and_hold_opens_six_action_slots_around_her():
+    """Owner, 2026-09-29, with a sketch of three circles on each side of her:
+    "ออกแบบให้กดค้างที่ตัวหุ่นจะมีปุ่มฟังก์ชั่นขึ้นมา ... ส่วนพวกฟังก์ชั่นต่างๆ
+    ค่อยเพิ่มเข้าไป". Checked end to end in Chrome (25/25): a tap and a drag
+    open nothing and the drag still turns her; a 500ms hold fills a ring and
+    opens six empty slots, left and right of her art and on screen at 1400x1250
+    and 540x960; a press on her closes them without turning her (0.00/255); a
+    hold on the chest opens the menu instead of changing mode; a quick chest
+    tap still changes it; the menu key, arrows and Escape work.
+
+    Source-level anchors for what those runs depend on."""
+    code = (ROOT / "client" / "assets" / "emma-3d-lab" / "mascot.js").read_text(encoding="utf-8")
+    html = PAGE.read_text(encoding="utf-8")
+
+    # mascot.js detects, the page decides -- the chest-tap split.
+    for event in ("'emma-press-start'", "'emma-press-end'", "'emma-long-press'"):
+        assert event in code
+    assert "const HOLD_MS = 500;" in code and "const HOLD_SLOP = 8;" in code
+    fire = code.split("hold.fired = true;", 1)[1][:200]
+    # When the hold fires: the turn goes back to where the press began, and the
+    # rest of the press neither turns her nor counts as a chest tap.
+    assert "orbitTheta = hold.theta" in fire
+    assert "spinFrom = null" in fire and "tapFrom = null" in fire
+    assert "if (touches.size > 1) endHold();" in code          # a pinch is not a hold
+    assert "> HOLD_SLOP) endHold();" in code                   # a drag is not a hold
+
+    # The layer sits outside <main>: .shell isolates and the wrap is transformed.
+    assert html.index('id="emmaActions"') > html.index("</main>")
+    assert 'id="emmaHoldRing"' in html
+    block = html.split("var ACTIONS = [", 1)[1].split("</script>", 1)[0]
+    before = html.split("var ACTIONS = [", 1)[0]
+    # A CLASSIC script, so its capture listener is registered before the
+    # module's and can swallow the press that closes the menu.
+    assert before.rsplit("<script", 1)[1].startswith(">")
+    # Six slots, declared once. Slot 1 has since been filled (the face scan,
+    # test_hold_menu_slot_one_opens_the_face_scan); the other five stay empty.
+    assert html.count("var ACTIONS = [") == 1
+    slots = block.split("];", 1)[0]
+    assert slots.count("run: ") + slots.count("{}") == 6
+    assert "stopImmediatePropagation" in block
+    # An empty slot says so; it never looks like a function that ran.
+    assert "ยังไม่มีฟังก์ชัน" in block and "is-empty" in block
+    assert "emma-staging" in block                              # not in the corner
+    assert "window.EmmaActions = Object.freeze(" in block
+
+    # From the adversarial review (CDP touch, 2026-09-29), each reproduced
+    # and then re-run green against the fix:
+    # - the finger that opened the menu released onto a slot that appeared
+    #   under it and pressed it: buttons ignore the pointer until that release
+    css = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    assert ".emma-actions.is-arming .emma-action { pointer-events: none; }" in css
+    assert "layer.classList.add('is-arming');" in block
+    # - a pinch begun on her while the menu was open turned her
+    assert "swallowed.add(e.pointerId);" in block and "if (e.isPrimary) swallowed.clear();" in block
+    # - the transcript drawer (z 50, later in the DOM) covered the bottom row
+    layer_css = css.split(".emma-actions {", 1)[1].split("}", 1)[0]
+    assert "z-index: 52;" in layer_css
+    # - buttons clamped one by one stacked on short screens and at the edges
+    assert "function pitchFor(size)" in block and "Math.max(pitch, room / 2)" in block
+    # - Escape closed the drawer too; only the top layer closes now
+    assert "e.stopImmediatePropagation();\n      closeActions(" in block
+    # - any other pointer's release cancelled a hold in progress
+    assert "if (hold && event.pointerId === hold.id) endHold();" in code
+    # - the staging "hold to peek" had been dead since the 3D mascot landed
+    assert "mascotEl.addEventListener('emma-long-press'" in html
+
+
 def test_drag_moves_the_mascot_hit_area_and_keeps_a_regrabbable_edge_visible():
     html = PAGE.read_text(encoding="utf-8")
     wrap_css = html.split(".mascot-wrap {", 1)[1].split("}", 1)[0]
@@ -631,7 +728,7 @@ def test_transcript_drawer_can_be_closed_with_button_toggle_or_escape():
     html = PAGE.read_text(encoding="utf-8")
 
     assert 'class="vp-drawer-close"' in html
-    assert 'aria-label="ปิดกล่องข้อความ"' in html
+    assert "aria-label=\"' + uiText('Close transcript', 'ปิดกล่องข้อความ')" in html
     assert "function setTranscriptDrawerOpen(open)" in html
     assert "setTranscriptDrawerOpen(!drawer || drawer.hidden)" in html
     assert "event.key !== 'Escape'" in html
@@ -684,13 +781,31 @@ def test_preview_runs_a_real_speech_to_speech_call_through_the_renderer():
     assert "new WebSocket(" in code
     assert "/ws?voice=" in code
     assert "q.get('token')" in code            # the LAN guard still applies
+    assert "(bargeGate ? '&echo_barge=1' : '')" in code
     assert "getUserMedia" in code
     assert "registerProcessor('cap', Cap)" in code   # the debugged pipeline, copied
     # The renderer stays a renderer: the engine only ever calls the public API.
     assert "Emma.setState" in code
     assert "Emma.setMouthLevel" in code
-    # Half-duplex gating survives the port — Emma must not hear herself.
-    assert "if (halfDuplex && playing) return;" in code
+    # Ordinary modes gate playback plus the acoustic tail. Joke verifies a
+    # voice during playback before sending it upstream.
+    assert "if ((halfDuplex || bargeIn) && now < echoGuardUntil) return;" in code
+    assert "var decision = bargeGate.sample(frameRms(frame), now);" in code
+    assert "personAudio.forEach(function (audio) { ws.send(audio); });" in code
+
+
+def test_preview_echo_guard_and_joke_barge_in_execute_in_javascript():
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for the browser audio gate")
+    result = subprocess.run(
+        [node, str(ROOT / "tests" / "client_echo_barge.cjs")],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_preview_wipes_each_guests_transcript_on_every_exit_and_new_call():
@@ -766,6 +881,12 @@ def test_preview_closes_the_provider_session_when_the_microphone_cannot_open():
     assert "releaseCallHardware();" in failure
     assert "failedSocket.close()" in failure
     assert "if (!micStream)" in mic and "stopFailedCall();" in mic
+    # ws = null makes the socket's onclose return early; its cleanup lives
+    # here too (review 12 Oct), the same lines endCall runs.
+    for line in ("quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();", "clearTranscript();",
+                 "planDisplay.reset();", "attendFromServer(null);",
+                 "if (window.EmmaRobotBridge) window.EmmaRobotBridge.detach();"):
+        assert line in failure, line
 
 
 def test_preview_does_not_fork_the_production_pages_dom():
@@ -1088,3 +1209,1303 @@ def test_the_stage_projection_study_stays_in_the_lab():
         path = ROOT / "client" / page
         if path.is_file():
             assert "stage-lab" not in path.read_text(encoding="utf-8"), page
+
+
+# ==================== face scan: "สแกนใบหน้า ให้หุ่นจำ" ====================
+# Owner, 2026-09-29: slot 1 of the hold menu scans a face so the robot knows
+# the person -- staff PIN, the scanned person's own consent, the enrolment
+# station's five poses, a name. Checked end to end in headless Chromium against
+# a stub server with a fake camera (1391x1250, 1080x1920 ?cam=1, 390x844, and a
+# desk window): opened through a real long-press and slot 1, 117/117 checks.
+# These are the source-level anchors for what those runs depend on.
+
+def _without_comments(code: str) -> str:
+    code = re.sub(r"<!--.*?-->", "", code, flags=re.S)
+    return "\n".join(line for line in code.splitlines()
+                     if not line.lstrip().startswith(("//", "*", "/*")))
+
+
+def _face_scan_code() -> str:
+    html = PAGE.read_text(encoding="utf-8")
+    block = html.split("// ---- face scan: ", 1)[1].split("</script>", 1)[0]
+    return _without_comments(block)
+
+
+def _camera_sender_code() -> str:
+    html = PAGE.read_text(encoding="utf-8")
+    block = html.split("// ---- the robot's own camera, sent to the server (`?cam=1`) ----", 1)[1]
+    return block.split("</script>", 1)[0]
+
+
+def _css_block(css: str, selector: str) -> str:
+    return css.split(selector + " {", 1)[1].split("}", 1)[0]
+
+
+def test_hold_menu_slot_one_opens_the_face_scan():
+    html = PAGE.read_text(encoding="utf-8")
+    menu = html.split("var ACTIONS = [", 1)[1].split("</script>", 1)[0]
+    slots = menu.split("];", 1)[0]
+    first, rest = slots.split("},", 1)
+    assert "label: 'สแกนใบหน้า'" in first and "run: openFaceScan" in first
+    assert "icon: SCAN_ICON" in first
+    # Slot 2 is navigation since 2026-10-09 (design 2026-10-08 §3, P5; its own
+    # anchors are in tests/test_face_body_nav_page.py); the other four stay empty.
+    second, others = rest.split("},", 1)
+    assert "label: 'นำทาง'" in second and "run: openNav" in second and "when: navOffered" in second
+    assert others.split() == ["{},", "{},", "{},", "{}"]
+    # Wired to the overlay's own API, and null (an honest empty slot) if the
+    # overlay script is missing -- never a button that silently does nothing.
+    assert "var openFaceScan = window.EmmaFaceScan ? window.EmmaFaceScan.open : null;" in html
+    # ...which only works if the overlay script ran first.
+    assert html.index("window.EmmaFaceScan = Object.freeze(") < html.index("var ACTIONS = [")
+    # Same icon family as the call controls: an inline stroke SVG.
+    icon = html.split("var SCAN_ICON = ", 1)[1].split(";\n", 1)[0]
+    assert 'viewBox="0 0 24 24"' in icon and 'stroke="currentColor"' in icon
+
+
+def test_face_scan_stops_the_live_emma_call_before_showing_its_own_voice(tmp_path):
+    run = _page_run(tmp_path, "scan_stops_call")
+    assert run == {"calls": [{"beforeOpen": True, "hidden": True}],
+                   "open": True, "step": "pin"}
+
+    code = _engine_code()
+    end = code.split("function endCall() {", 1)[1].split("function toggleMute()", 1)[0]
+    assert end.index("ws = null;") < end.index("closingSocket.close()")
+    assert "releaseCallHardware();" in end
+    assert "stopForFaceScan: function () { if (inCall || ws) endCall(); }" in code
+    start = code.split("function startCall() {", 1)[1].split("function endCall()", 1)[0]
+    assert "window.EmmaFaceScan.isOpen()" in start
+
+
+def test_face_scan_posts_every_step_with_the_token_in_the_body_never_the_url():
+    """WS_TOKEN also guards /ws, which drives the robot, and uvicorn's access
+    log writes each request line verbatim -- the /data-console rule."""
+    code = _face_scan_code()
+    html = PAGE.read_text(encoding="utf-8")
+    for route in ("start", "consent", "look", "capture", "save", "cancel"):
+        assert f"post('{route}'" in code, route
+    post = code.split("function post(path, data, keepalive) {", 1)[1].split("\n    }\n", 1)[0]
+    assert "if (token) body.token = token;" in post
+    assert "fetch('/face-scan/' + path, {" in post
+    assert "method: 'POST'" in post and "body: JSON.stringify(body)" in post
+    # One way to reach the server, and no token anywhere near a URL.
+    assert code.count("fetch(") == 1
+    assert "?token=" not in code
+    assert not re.search(r"/face-scan/[^'\"]*\?", html)
+    # The PIN goes in the body too, and does not stay in the page.
+    assert "post('start', { pin: pin })" in code
+    assert "pinInput.value = '';" in code
+
+
+def test_face_scan_shows_the_owners_consent_text_as_text_and_the_person_answers():
+    code = _face_scan_code()
+    html = PAGE.read_text(encoding="utf-8")
+    css = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    # Text, never markup: the server's words cannot become elements here.
+    assert "consentText.textContent = r.consent_text;" in code
+    assert "innerHTML" not in code
+    # His line breaks survive, and a long text scrolls instead of pushing the
+    # two buttons off a short screen.
+    consent_css = _css_block(css, ".emma-scan-consent")
+    assert "white-space: pre-wrap;" in consent_css and "overflow-y: auto;" in consent_css
+    assert "ขอความยินยอมเก็บข้อมูลใบหน้า" in html
+    assert ">ยินยอม</button>" in html and ">ไม่ยินยอม</button>" in html
+    # The person being scanned presses it, and staff are told so.
+    assert "ผู้ที่จะถูกสแกนต้องอ่านและกดปุ่มด้วยตัวเอง" in html
+    # "ยินยอม" is never offered over an empty box.
+    assert "!r.consent_text.trim()" in code
+    # The answer goes to the server as an answer: agree true, or agree false.
+    assert "post('consent', { session: session, agree: true })" in code
+    assert "post('consent', { session: sid, agree: false }, true)" in code
+
+
+def test_face_scan_skips_the_consent_screen_only_on_the_servers_own_true():
+    """Owner, 2026-09-29: staff only, no consent text -- the PIN holder asks
+    the person first. The server decides (it opens the scan consented); the
+    page follows only a JSON true, checked BEFORE the empty-text refusal, and
+    otherwise still refuses to offer "ยินยอม" over an empty box."""
+    code = _face_scan_code()
+    html = PAGE.read_text(encoding="utf-8")
+    start = code.split("post('start', { pin: pin }).then(function (r) {", 1)[1]
+    skip = start.index("if (r.consented === true) {")
+    assert skip < start.index("!r.consent_text.trim()")
+    branch = start[skip:].split("\n        }\n", 1)[0]
+    assert "startCapture();" in branch and "return;" in branch
+    assert "show('consent')" not in branch
+    # The PIN step tells staff their part of it.
+    assert "ถามคนที่จะถูกสแกนก่อน แล้วใส่รหัส PIN เพื่อเริ่ม" in html
+
+
+def test_face_scan_says_recognised_only_when_the_gallery_took_the_face():
+    """Saved is not recognised: with gallery_total null the shots are on disk
+    but the live gallery refused them."""
+    code = _face_scan_code()
+    assert code.count("'เรียบร้อย — หุ่นจำ '") == 1
+    done = code.split("doneLine.textContent = r.gallery_total", 1)[1]
+    done = "r.gallery_total" + done.split(";\n", 1)[0]
+    assert done.startswith("r.gallery_total == null")
+    assert "r.gallery_reason ||" in done
+    assert done.index("r.gallery_reason") < done.index("'เรียบร้อย — หุ่นจำ '")
+
+
+def test_face_scan_says_every_step_out_loud_in_english():
+    """Owner, 2026-09-29: "ตอนแสกนให้พูดบอกด้วยคนจะได้รู้ แล้วขอภาษาอังกฤษ".
+    One pre-rendered clip per enrollment step plus the page's own moments;
+    each step is said once when it becomes the step, not on every look."""
+    from app import enrollment
+
+    voice_dir = ROOT / "client" / "assets" / "face-scan" / "voice"
+    for key in [s["key"] for s in enrollment.STEPS] + ["noface", "done", "saved"]:
+        clip = voice_dir / f"{key}.wav"
+        assert clip.is_file() and clip.read_bytes()[:4] == b"RIFF", key
+    code = _face_scan_code()
+    assert "var VOICE_DIR = '/assets/face-scan/voice/';" in code
+    # The step is announced once the camera is up, and again only when it changes.
+    announce = code.split("function announceStep() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "stepKey === spokenStep" in announce and "!camStream" in announce
+    assert "attach(cam);\n        announceStep();" in code
+    assert "if (Object.prototype.hasOwnProperty.call(st, 'step')) stepKey = st.step || '';" in code
+    # No face for a while: told where to stand, a bounded number of times.
+    assert "noteFace(Array.isArray(r.box) && r.box.length >= 4);" in code
+    assert "noFaceSaid >= NOFACE_MAX" in code
+    # The last pose, and "I'll remember you" only when the gallery took the face.
+    to_name = code.split("function toName() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "speak('done');" in to_name
+    assert "if (r.gallery_total != null) speak('saved');" in code
+    # Every way out that is not the finished card stops the voice.
+    assert "hush();" in code.split("function fail(text) {", 1)[1].split("\n    }\n", 1)[0]
+    close = code.split("function closeScan() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "if (current !== 'done') hush();" in close
+
+
+def test_face_scan_round_two_review_fixes_hold():
+    """The verifier of the first round of scan fixes found three places a
+    revert stayed green, and two defects the fixes themselves introduced."""
+    code = _face_scan_code()
+    # fail() makes every in-flight reply stale, as closeScan does: a camera
+    # request answering after the scan failed must not light the lens.
+    fail = code.split("function fail(text) {", 1)[1].split("\n    }\n", 1)[0]
+    assert fail.lstrip().startswith("gen += 1;")
+    # A close during a save waits for the reply -- but not forever.
+    wait = code.split("function closeAfterSave() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "}, CLOSE_WAIT_MS);" in wait
+    assert "if (mine === gen && open && closeWanted && current === 'name')" in wait
+    assert "var CLOSE_WAIT_MS = 20000;" in code
+    # The idle deadline is wound again by every accepted shot, not only once.
+    shoot = code.split("function shoot(mine) {", 1)[1].split("\n    }\n", 1)[0]
+    ok_path = shoot.split("if (!r.ok) {", 1)[1]
+    assert "armIdle();" in ok_path
+    # A good answer clears the failure count, so failures between good looks
+    # never add up to the three-in-a-row that ends a scan.
+    tick = code.split("function tick() {", 1)[1].split("\n    }\n", 1)[0]
+    assert tick.count("failures = 0;") == 1 and "failures = 0;" in shoot
+    # A hidden desk tab ends the scan only on the camera step, never in the app.
+    assert ("if (open && document.hidden && !IN_APP && current === 'capture') closeScan();"
+            in code)
+
+
+def test_the_robot_page_answers_the_cameras_bell_through_the_one_engine():
+    """Owner, 2026-09-29: "ตอนนี้พอเจอหน้าคนจะทักเลยไหม" — it did not. The
+    greeter recognised a face and logged "no standby browser rang ... no live
+    session — dropping", because /preview never opened /ws/wake."""
+    html = PAGE.read_text(encoding="utf-8")
+    bell = html.split("// ---- the camera's bell (`?cam=1`)", 1)[1].split("</script>", 1)[0]
+    # Only the page whose camera saw the person answers.
+    assert "if (q.get('cam') !== '1') return;" in bell
+    assert "'/ws/wake'" in bell
+    # It dials through the engine's own door, not a second engine...
+    assert "window.EmmaCall.answerSummons();" in bell
+    assert "new WebSocket(" in bell and bell.count("new WebSocket(") == 1
+    engine = html.split("// ---- the robot's own camera, sent to the server (`?cam=1`) ----", 1)[0]
+    assert engine.count("new WebSocket(") == 1
+    # ...which flags the dial `summoned=1` once, so the server skips its own
+    # opening line and the camera's greeting is the first thing said.
+    assert "+ (summonedDial ? '&summoned=1' : ''));\n      summonedDial = false;" in engine
+    door = engine.split("window.EmmaCall = Object.freeze({", 1)[1].split("});", 1)[0]
+    assert "if (inCall || !apiKeyOK || (window.EmmaFaceScan && window.EmmaFaceScan.isOpen())) return false;" in door
+    assert "startCall();" in door
+    # Never over a live call, a face scan, or an app in the background.
+    ring = bell.split("function ring(evt) {", 1)[1].split("\n    }\n", 1)[0]
+    for guard in ("document.hidden", "EmmaFaceScan.isOpen()", "EmmaCall.busy()"):
+        assert guard in ring, guard
+    # Backoff resets on the server's own first message, never on onopen (the
+    # server accepts-then-closes a bad token); a refusal stops it for good.
+    assert ".onopen" not in bell
+    assert "evt.type === 'standby_only' || evt.type === 'wake_listening'" in bell
+    assert "evt.code === 'unauthorized'" in bell and "stopped = true;" in bell
+
+
+def test_emma_does_not_shake_or_vibrate():
+    """Owner, 2026-09-29: "ทำไมมีสั่นหยิกๆด้วย เอาออกไปก่อนยังไม่ต้องมีสั่น".
+    The twitch was the playback level fed into the RATE of sin(phase * rate)
+    with phase = seconds since load: a changing rate multiplies the whole
+    history, so each frame jumped to a random point of the wave.
+
+    Round two, 2026-09-30 ("สั่นตอนกดจบ และกดเพื่อพูด หรือทำอะไรจะมีสั่นหัว"):
+    the same disease through the STATE blend — blendMotion eases bobRate/
+    turnRate on every button press, and an eased rate on the wall clock sweeps
+    the sine argument by (clock × Δrate×2π), a second of visible head buzz per
+    press that grows the longer the kiosk page stays open. Every rate-driven
+    sine must integrate its own phase (p += rate * dt); only constant-rate
+    sines may multiply the clock."""
+    mascot = (ROOT / "client" / "assets" / "emma-3d-lab" / "mascot.js").read_text(encoding="utf-8")
+    assert "const voice = 0;" in mascot
+    assert "const voice = mouthLevel;" not in mascot
+    shakes = re.findall(r"shake:\s*([\d.]+)\s*}", mascot)
+    assert shakes and all(float(v) == 0 for v in shakes), shakes
+    # No motion-table rate may multiply the running clock, anywhere.
+    assert not re.findall(r"Math\.sin\(phase[^)]*(?:m\.|bobRate|turnRate)", mascot)
+    for integrated in ("bobPhase += bobRate * dt;",
+                       "turnPhase += m.turnRate * dt;",
+                       "swayPhase += m.bobRate * .5 * dt;"):
+        assert integrated in mascot, integrated
+    html = PAGE.read_text(encoding="utf-8")
+    assert "navigator.vibrate" not in html
+    # A new cache key, so the robot's WebView does not keep the shaking copy
+    # (20260930-clean); bumped again 10 Oct for the attention cue.
+    assert "/assets/emma-3d-lab/mascot.js?v=20261010-attend" in html
+
+
+def test_face_scan_cancels_the_session_and_releases_the_camera_on_every_way_out():
+    code = _face_scan_code()
+    close = code.split("function closeScan() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "if (session) { sendCancel(session); session = null; }" in close
+    assert "releaseCamera();" in close and "stopLoop();" in close
+    assert "isolate(false);" in close
+    assert "wrap.focus({ preventScroll: true });" in close        # focus back on her
+    # Fire-and-forget, and keepalive so it still leaves on pagehide.
+    assert "post('cancel', { session: sid }, true)" in code
+    assert "keepalive: !!keepalive" in code
+    # Every close button, Escape, the page going away, the app backgrounded.
+    assert "b.addEventListener('click', closeScan);" in code
+    escape = code.split("document.addEventListener('keydown', function (e) {", 1)[1].split("}, true);", 1)[0]
+    assert "e.stopImmediatePropagation();\n        closeScan();" in escape
+    assert "addEventListener('pagehide', function () { if (open) closeScan(); });" in code
+    # The app's pause still closes it -- unless this scan's own camera
+    # request is out, when the pause is Android's permission dialog (below).
+    pause = code.split("addEventListener('emma-native-pause', function () {", 1)[1].split("});", 1)[0]
+    assert "if (asking && asking === gen) { pausedWhileAsking = true; return; }" in pause
+    assert pause.rstrip().endswith("closeScan();")
+    # A saved scan is not cancelled afterwards; an early end is.
+    save = code.split("nameForm.addEventListener('submit'", 1)[1]
+    assert save.index("session = null;") < save.index("show('done');")
+    fail = code.split("function fail(text) {", 1)[1].split("\n    }\n", 1)[0]
+    assert "sendCancel(session)" in fail and "releaseCamera();" in fail
+
+
+def test_face_scan_looks_through_the_robots_stream_and_stops_only_its_own():
+    code = _face_scan_code()
+    html = PAGE.read_text(encoding="utf-8")
+    css = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    camera = code.split("function openCamera(mine) {", 1)[1].split("\n    }\n", 1)[0]
+    # The robot's shared stream first: one lens, one getUserMedia.
+    assert camera.index("window.__emmaCamStream") < camera.index("getUserMedia(")
+    assert "if (liveVideo(shared)) return Promise.resolve({ stream: shared, owned: false });" in camera
+    assert "{ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }" in camera
+    assert "}, 8000);" in camera                                 # the robot's hung request
+    release = code.split("function releaseCamera() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "if (camStream && camOwned) stopTracks(camStream);" in release
+    # Off the moment the last pose is in.
+    to_name = code.split("function toName() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "releaseCamera();" in to_name
+    # The station's loop: a small copy to look, the whole frame to keep, one
+    # request at a time, the hold time from the step, widths in camera pixels.
+    assert "Math.min(1, 640 / vw)" in code and "full ? 0.92 : 0.7" in code
+    assert "post('look', { session: session, image: grab(false), fullWidth: video.videoWidth })" in code
+    assert "post('capture', { session: session, image: grab(true), fullWidth: video.videoWidth })" in code
+    assert "if (inFlight ||" in code and "Number(st.hold_ms)" in code
+    # Mirrored for display only, box and video together.
+    assert "transform: scaleX(-1);" in _css_block(css, ".emma-scan-stage video, .emma-scan-stage canvas")
+
+
+def test_robot_camera_sender_is_ported_and_runs_only_with_cam_1():
+    """A desk browser must never start uploading its webcam because a flag was
+    left on. Measured in Chromium: with ?cam=1 frames reach /ws/camera?token=
+    at camfps and the scan reuses the stream (getUserMedia 1 -> 1); without it
+    no socket and no camera; `unauthorized` withdraws the stream, stops its
+    tracks, and never redials."""
+    raw = _camera_sender_code()
+    code = _without_comments(raw)
+    assert "if (q.get('cam') !== '1') return;" in code
+    guard = code.index("if (q.get('cam') !== '1') return;")
+    assert guard < code.index("getUserMedia(") and guard < code.index("new WebSocket(")
+    assert "q.get('kiosk')" not in code          # this page has no kiosk skin; cam=1 alone
+    assert "window.__emmaCamStream = stream;" in code
+    assert "if (window.__emmaCamStream === stream) window.__emmaCamStream = null;" in code
+    # index.html's behaviour, kept.
+    assert "'/ws/camera'" in code and "'?token=' + encodeURIComponent(token)" in code
+    # Default 6 fps since 2026-09-30 (the confirm streak counts frames, so the
+    # frame rate is half of how fast a passer-by can be greeted); cap stays 10.
+    assert "Math.min(10, Math.max(1, Number(q.get('camfps')) || 6))" in code
+    assert "Math.max(0, Number(q.get('camdev')) || 0)" in code
+    assert "cams[CAM_DEV] || cams[0]" in code
+    assert "}, 8000);" in code and "if (tries >= 6) { down = true; return; }" in code
+    assert "setTimeout(start, 10000);" in code
+    assert "setTimeout(start, 1500);" in code and "addEventListener('load', later);" in code
+    assert "s.bufferedAmount > 400000" in code and "Date.now() - lastVTat > 3000" in code
+    assert "evt.type === 'camctl'" in code and "adv.zoom" in code
+    # Unauthorized is final -- and the lens goes off with it.
+    unauthorized = code.split("evt.code === 'unauthorized') {", 1)[1].split("}", 1)[0]
+    assert "down = true;" in unauthorized and "teardown();" in unauthorized
+    # Video only: no second capture of the mic the call already holds.
+    assert "audio: false" in code
+    assert "mic_probe" not in code and "runRobotMicProbe" not in code
+    # The measured robot quirks keep their explanations.
+    assert raw.count("Measured on the robot 2026-09-11") + raw.count("measured on the robot 2026-09-11") == 2
+    assert 'Android reported its entries as "facing back"' in raw
+
+
+def test_face_scan_overlay_sits_above_every_layer_and_holds_the_page_still():
+    html = PAGE.read_text(encoding="utf-8")
+    css = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    code = _face_scan_code()
+    z = lambda block: int(re.search(r"z-index:\s*(\d+)", block).group(1))
+    scan = _css_block(css, ".emma-scan")
+    below = max(z(_css_block(css, ".emma-actions")), z(_css_block(css, ".emma-hold-ring")),
+                int(re.search(r"\.vp-drawer\{[^}]*z-index:(\d+)", html).group(1)))
+    assert z(scan) > below and below == 52
+    assert "position: fixed;" in scan and "inset: 0;" in scan
+    # Outside <main> (transformed/isolated ancestors), and a real modal.
+    assert html.index('id="emmaScan"') > html.index("</main>")
+    assert 'role="dialog" aria-modal="true"' in html
+    # A step sets display:grid, which beats the UA [hidden]: without these two
+    # rules every step would show at once.
+    assert ".emma-scan[hidden] { display: none; }" in css
+    assert ".emma-scan-step[hidden] { display: none; }" in css
+    # Opening it closes the hold menu and makes the rest of the page inert.
+    open_fn = code.split("function openScan() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "window.EmmaActions.close()" in open_fn and "isolate(true);" in open_fn
+    assert "el.inert = true;" in code
+    # The inputs the brief specifies.
+    assert '<input id="emmaScanPin" type="password" inputmode="numeric" autocomplete="off"' in html
+    assert '<input id="emmaScanName" type="text" maxlength="40"' in html
+    assert ">ชื่อที่หุ่นจะเรียก</span>" in html
+
+
+# ==================== face scan: what the review found (2026-09-29) ====================
+# The source anchors above say the code is there; these RUN it. The page's own
+# face-scan script and ?cam=1 camera sender, cut out of voice-preview.html
+# verbatim, are executed in node against a fake DOM, a fake /face-scan server
+# and a virtual clock -- so "two minutes with nobody at the lens" is two
+# minutes of the page's own timers, not a grep for a constant. Each scenario
+# below was run against the page before these fixes and came out the other
+# way (the bug) -- that is what each assertion is here to keep.
+
+_SCAN_HARNESS = r"""'use strict';
+// Runs the page's REAL face-scan script (or its ?cam=1 camera sender),
+// extracted verbatim, against a fake DOM, a fake /face-scan server and a
+// virtual clock. usage: node harness.cjs <voice-preview.html> <scenario>
+// Prints one JSON object: what the page did.
+const fs = require('fs');
+const vm = require('vm');
+const [, , PAGE, SCENARIO] = process.argv;
+const html = fs.readFileSync(PAGE, 'utf8');
+function block(marker) {
+  const at = html.indexOf(marker);
+  if (at < 0) throw new Error('marker not found: ' + marker);
+  return html.slice(at, html.indexOf('</script>', at));
+}
+
+// ---- virtual clock ----
+let now = 1000000, nextId = 1;
+const timers = new Map();
+const clock = {
+  setTimeout(fn, ms, ...a) {
+    const id = nextId++;
+    timers.set(id, { at: now + Math.max(0, Number(ms) || 0), fn, a, every: 0 });
+    return id;
+  },
+  setInterval(fn, ms, ...a) {
+    const id = nextId++;
+    const every = Math.max(1, Number(ms) || 0);
+    timers.set(id, { at: now + every, fn, a, every });
+    return id;
+  },
+  clearTimeout(id) { timers.delete(id); },
+  clearInterval(id) { timers.delete(id); },
+};
+async function flush() { for (let i = 0; i < 40; i++) await new Promise(r => setImmediate(r)); }
+async function advance(ms) {
+  const end = now + ms;
+  await flush();
+  for (;;) {
+    let bestId = 0, best = null;
+    for (const [id, t] of timers) {
+      if (t.at <= end && (!best || t.at < best.at || (t.at === best.at && id < bestId))) { best = t; bestId = id; }
+    }
+    if (!best) break;
+    now = best.at;
+    if (best.every) best.at += best.every; else timers.delete(bestId);
+    best.fn(...best.a);
+    await flush();
+  }
+  now = end;
+  await flush();
+}
+
+// ---- a DOM just big enough ----
+function makeEl(tag, props) {
+  const handlers = {};
+  const el = {
+    tagName: String(tag || 'div').toUpperCase(), hidden: false, value: '', disabled: false,
+    inert: false, scrollTop: 0, attrs: {}, children: [], width: 300, height: 150, _text: '',
+    style: { setProperty() {} },
+    classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); },
+      toggle(c, on) { if (on === undefined ? !this.set.has(c) : on) this.set.add(c); else this.set.delete(c); } },
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+    addEventListener(t, fn) { (handlers[t] = handlers[t] || []).push(fn); },
+    removeEventListener(t, fn) { handlers[t] = (handlers[t] || []).filter(f => f !== fn); },
+    fire(t, e) {
+      (handlers[t] || []).slice().forEach(fn => fn(e || { preventDefault() {}, stopImmediatePropagation() {} }));
+    },
+    focus() { doc.activeElement = el; },
+    appendChild(c) { this.children.push(c); return c; },
+    remove() { this.removed = true; },
+    contains(x) { return x === el; },
+    getClientRects() { return [1]; },
+    getContext() { return { drawImage() {}, clearRect() {}, strokeRect() {} }; },
+    toDataURL() { return 'data:image/jpeg;base64,AAAA'; },
+    toBlob(cb) { cb({ size: 10 }); },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+  };
+  Object.defineProperty(el, 'textContent', {
+    get() { return this._text; },
+    set(v) { this._text = String(v); if (this.onText) this.onText(this._text); },
+    configurable: true,
+  });
+  return Object.defineProperties(el, Object.getOwnPropertyDescriptors(props || {}));
+}
+
+function makeStream(label) {
+  const track = { readyState: 'live', label, stop() { this.readyState = 'ended'; } };
+  return { label, track, stalled: false, stalledAt: 0,
+    getVideoTracks: () => [track], getTracks: () => [track] };
+}
+
+const STEP_NAMES = ['pin', 'consent', 'capture', 'name', 'done', 'fail'];
+const steps = {};
+const xButton = makeEl('button');
+const closeButtons = [xButton];
+for (const n of STEP_NAMES) {
+  const sub = { close: makeEl('button'), error: makeEl('p'), agree: makeEl('button'),
+    decline: makeEl('button'), submit: makeEl('button') };
+  closeButtons.push(sub.close);
+  const busy = n === 'consent' ? [sub.agree, sub.decline] : [sub.submit];
+  const map = { '[data-scan-close]': sub.close, '[data-scan-error]': sub.error,
+    '[data-scan-agree]': sub.agree, '[data-scan-decline]': sub.decline };
+  steps[n] = makeEl('form', {
+    sub,
+    querySelector(sel) { return map[sel] || null; },
+    querySelectorAll(sel) { return sel === '[data-scan-busy]' ? busy : []; },
+  });
+  steps[n].attrs['data-scan-step'] = n;
+}
+const root = makeEl('div', {
+  querySelectorAll(sel) {
+    if (sel === '[data-scan-step]') return STEP_NAMES.map(n => steps[n]);
+    if (sel === '[data-scan-close]') return closeButtons;
+    return [];
+  },
+  querySelector(sel) { const m = /data-scan-step="(\w+)"/.exec(sel); return m ? steps[m[1]] : null; },
+});
+root.hidden = true;
+const scanVideo = makeEl('video', {
+  srcObject: null, readyState: 4,
+  get videoWidth() { return this.srcObject ? 1280 : 0; },
+  get videoHeight() { return this.srcObject ? 720 : 0; },
+  play() { return Promise.resolve(); },
+  pause() {},
+});
+const ids = { emmaScan: root, emmaScanVideo: scanVideo };
+const byId = id => (ids[id] = ids[id] || makeEl(id === 'emmaScanPin' || id === 'emmaScanName' ? 'input' : 'div'));
+
+// The camera sender's own <video>: currentTime runs with the clock unless
+// the stream is stalled (what its freeze guard watches for).
+function makeSenderVideo() {
+  return makeEl('video', {
+    srcObject: null, muted: false, playsInline: false,
+    get videoWidth() { return this.srcObject && this.srcObject.track.readyState === 'live' ? 1920 : 0; },
+    get videoHeight() { return this.videoWidth ? 1080 : 0; },
+    get currentTime() {
+      const s = this.srcObject;
+      if (!s) return 0;
+      return s.stalled ? s.stalledAt : now / 1000;
+    },
+    play() { return Promise.resolve(); },
+  });
+}
+
+const docHandlers = {};
+const doc = {
+  hidden: false, readyState: 'complete', activeElement: null,
+  getElementById: byId,
+  createElement(t) { return t === 'video' ? makeSenderVideo() : makeEl(t); },
+  body: { children: [], classList: { add() {}, remove() {} }, appendChild(c) { this.children.push(c); return c; } },
+  querySelector() { return null; },
+  addEventListener(t, fn) { (docHandlers[t] = docHandlers[t] || []).push(fn); },
+  removeEventListener(t, fn) { docHandlers[t] = (docHandlers[t] || []).filter(f => f !== fn); },
+  dispatch(t, e) { (docHandlers[t] || []).slice().forEach(fn => fn(e || {})); },
+};
+function setHidden(yes) { doc.hidden = yes; doc.dispatch('visibilitychange'); }
+
+// ---- the fake /face-scan server ----
+const KEYS = ['front', 'left', 'right', 'far', 'front2'];
+const server = { done: 0, log: [], hooks: {} };
+function state() {
+  const cur = server.done < KEYS.length ? KEYS[server.done] : null;
+  return { steps: KEYS.map((k, i) => ({ key: k, done: i < server.done, skipped: false, prompt: 'ท่า ' + k })),
+    step: cur, hold_ms: 1, prompt: cur ? 'ท่า ' + cur : 'ครบแล้ว' };
+}
+function response(status, body) {
+  return { ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) };
+}
+function defaultRoute(path, body) {
+  if (path === 'start') return [200, { ok: true, session: 'S1', consented: true, consent_text: null,
+    consent_version: 'staff-attested', ...state() }];
+  if (path === 'look') return [200, { ok: true, reason: '', box: [1, 2, 3, 4], frame: [640, 360], ...state() }];
+  if (path === 'capture') {
+    server.done = Math.min(KEYS.length, server.done + 1);
+    return [200, { ok: true, shots: [], ...state() }];
+  }
+  if (path === 'save') return [200, { ok: true, name: body.name, total: 5, gallery_total: 5 }];
+  if (path === 'cancel') return [200, { ok: true, closed: true }];
+  if (path === 'consent') return [200, { ok: true, ...state() }];
+  return [404, { ok: false, reason: 'ไม่พบ' }];
+}
+function deferred() {
+  const d = {};
+  d.promise = new Promise((res, rej) => {
+    d.reply = (status, body) => res(response(status, body));
+    d.drop = () => rej(new TypeError('Failed to fetch'));
+  });
+  return d;
+}
+function fetchFake(url, opts) {
+  const path = String(url).replace('/face-scan/', '');
+  const body = JSON.parse(opts.body);
+  server.log.push({ t: now, path, session: body.session || null });
+  const hook = server.hooks[path];
+  const out = hook ? hook(body) : undefined;
+  if (out === undefined) { const [s, b] = defaultRoute(path, body); return Promise.resolve(response(s, b)); }
+  if (out === 'network') return Promise.reject(new TypeError('Failed to fetch'));
+  if (out && out.promise) return out.promise;
+  return Promise.resolve(response(out[0], out[1]));
+}
+const paths = () => server.log.map(r => r.path);
+const count = p => server.log.filter(r => r.path === p).length;
+
+// ---- camera ----
+const gum = { calls: 0, times: [], plan: [], pending: null, streams: [] };
+function getUserMedia() {
+  gum.calls += 1;
+  gum.times.push(now);
+  const next = gum.plan.length ? gum.plan.shift() : 'ok';
+  if (next === 'defer') {
+    return new Promise((res, rej) => {
+      gum.pending = {
+        grant() { const s = makeStream('own' + gum.calls); gum.streams.push(s); res(s); },
+        deny() { const e = new Error('Permission denied'); e.name = 'NotAllowedError'; rej(e); },
+      };
+    });
+  }
+  if (next === 'fail') {
+    const e = new Error('Could not start video source');
+    e.name = 'NotReadableError';
+    return Promise.reject(e);
+  }
+  const s = makeStream('own' + gum.calls);
+  gum.streams.push(s);
+  return Promise.resolve(s);
+}
+
+// ---- sockets (the sender) ----
+const sockets = [];
+class FakeWS {
+  constructor(url) {
+    this.url = url; this.readyState = 0; this.bufferedAmount = 0; this.sent = 0;
+    sockets.push(this);
+    clock.setTimeout(() => { if (this.readyState === 0) { this.readyState = 1; if (this.onopen) this.onopen(); } }, 5);
+  }
+  send() { this.sent += 1; }
+  close() {
+    if (this.readyState === 3) return;
+    this.readyState = 3;
+    clock.setTimeout(() => { if (this.onclose) this.onclose(); }, 0);
+  }
+}
+FakeWS.OPEN = 1;
+
+const audio = [];
+class FakeAudio {
+  constructor(src) { this.src = src; audio.push(src); }
+  play() { return Promise.resolve(); }
+  pause() {}
+}
+
+const winHandlers = {};
+function sandboxFor(search) {
+  const sb = {
+    document: doc, fetch: fetchFake, URLSearchParams, Audio: FakeAudio, WebSocket: FakeWS,
+    setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
+    setInterval: clock.setInterval, clearInterval: clock.clearInterval,
+    Date: { now: () => now },
+    console: { log() {}, warn() {}, error() {} },
+    location: { search, protocol: 'https:', host: 'robot.test' },
+    navigator: { mediaDevices: { getUserMedia,
+      enumerateDevices: () => Promise.resolve([{ kind: 'videoinput', deviceId: 'cam0' }]) } },
+    addEventListener(t, fn) { (winHandlers[t] = winHandlers[t] || []).push(fn); },
+    removeEventListener(t, fn) { winHandlers[t] = (winHandlers[t] || []).filter(f => f !== fn); },
+  };
+  sb.window = sb;
+  return sb;
+}
+function winDispatch(t) { (winHandlers[t] || []).slice().forEach(fn => fn({ type: t })); }
+
+let sb, scan;
+function loadScan(search) {
+  sb = sandboxFor(search || '');
+  vm.createContext(sb);
+  vm.runInContext(block('// ---- face scan: '), sb);
+  scan = sb.EmmaFaceScan;
+}
+function loadSender(search) {
+  sb = sandboxFor(search);
+  vm.createContext(sb);
+  vm.runInContext(block("// ---- the robot's own camera, sent to the server (`?cam=1`) ----"), sb);
+}
+
+const promptLine = () => byId('emmaScanPrompt');
+function snapshot(extra) {
+  return Object.assign({
+    open: scan.isOpen(), step: scan.step(), paths: paths(),
+    prompt: promptLine().textContent, sub: byId('emmaScanSub').textContent,
+    done: byId('emmaScanDone').textContent, fail: byId('emmaScanFail').textContent,
+    nameError: steps.name.sub.error.textContent, gumCalls: gum.calls,
+  }, extra || {});
+}
+
+async function openToCapture(search) {
+  loadScan(search);
+  scan.open();
+  byId('emmaScanPin').value = '1234';
+  steps.pin.fire('submit', { preventDefault() {} });
+  await advance(50);
+}
+async function toNameStep(search) {
+  await openToCapture(search);
+  await advance(6000);
+  if (scan.step() !== 'name') throw new Error('did not reach the name step: ' + scan.step());
+}
+function submitName(name) {
+  byId('emmaScanName').value = name;
+  steps.name.fire('submit', { preventDefault() {} });
+}
+function closeBy(how) {
+  const ev = { key: 'Escape', preventDefault() {}, stopImmediatePropagation() {} };
+  if (how === 'x') xButton.fire('click');
+  else if (how === 'cancel') steps.name.sub.close.fire('click');
+  else if (how === 'escape') (docHandlers.keydown || []).forEach(fn => fn(ev));
+  else if (how === 'pagehide') winDispatch('pagehide');
+  else if (how === 'pause') winDispatch('emma-native-pause');
+  else throw new Error(how);
+}
+
+const scenarios = {
+  // ---- findings 0/18 + contract 1: a close while the save is out ----
+  async save_close() {
+    const [how, saveEnd, cancelEnd] = (process.argv[4] || 'x:ok:closed').split(':');
+    await toNameStep();
+    const save = deferred();
+    server.hooks.save = () => save;
+    const cancel = deferred();
+    server.hooks.cancel = () => cancel;
+    submitName('Dave');
+    await advance(10);
+    closeBy(how);
+    await advance(10);
+    const during = { open: scan.isOpen(), step: scan.step(), cancelSent: count('cancel'),
+      nameError: steps.name.sub.error.textContent };
+    if (saveEnd === 'ok') save.reply(200, { ok: true, name: 'Dave', total: 5, gallery_total: 5 });
+    else if (saveEnd === 'lost') save.drop();
+    else if (saveEnd === '500') save.reply(500, { ok: false, reason: 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์ — ลองใหม่' });
+    else if (saveEnd === 'refused') save.reply(409, { ok: false, reason: 'ชื่อนี้มีอยู่แล้ว' });
+    else if (saveEnd === 'gone') save.reply(404, { ok: false, reason: 'ไม่พบการสแกนนี้ หรือหมดเวลาแล้ว — เริ่มใหม่' });
+    await advance(10);
+    const afterSave = { open: scan.isOpen(), step: scan.step() };
+    if (cancelEnd === 'saved') cancel.reply(200, { ok: true, closed: true, saved: 'Dave' });
+    else if (cancelEnd === 'closed') cancel.reply(200, { ok: true, closed: true });
+    else if (cancelEnd === 'lost') cancel.drop();
+    await advance(10);
+    return snapshot({ during, afterSave, saidSaved: audio.filter(a => a.endsWith('/saved.wav')).length });
+  },
+  // ---- contract 2: the scan ran out before the name was saved ----
+  async save_gone() {
+    await toNameStep();
+    server.hooks.save = () => [404, { ok: false, reason: 'ไม่พบการสแกนนี้ หรือหมดเวลาแล้ว — เริ่มใหม่' }];
+    submitName('Dave');
+    await advance(50);
+    return snapshot();
+  },
+  // ---- the app paused mid-capture (no camera request out): still closes ----
+  async pause_capture() {
+    await openToCapture('?app=1');
+    await advance(300);
+    winDispatch('emma-native-pause');
+    await advance(50);
+    return snapshot({ track: gum.streams.map(s => s.track.readyState) });
+  },
+  // ---- contract 3: a save before every pose is in ----
+  async incomplete() {
+    await toNameStep();
+    server.done = 4;
+    server.hooks.save = () => [409, { ok: false, reason: 'ยังเก็บภาพไม่ครบทุกท่า — ทำให้ครบก่อนบันทึก' }];
+    submitName('Dave');
+    await advance(1000);
+    const back = snapshot({ looks: count('look') });
+    await advance(4000);
+    return snapshot({ back, captures: count('capture') });
+  },
+  // ---- finding 2: nobody finishes the capture step ----
+  async idle() {
+    await openToCapture();
+    server.hooks.look = () => [200, { ok: false, reason: 'ยังไม่เห็นหน้า', box: null, frame: [640, 360], ...state() }];
+    await advance(118000);
+    const at118 = snapshot({ looks: count('look') });
+    await advance(4000);
+    const at122 = snapshot();
+    const looksAfter = count('look');
+    await advance(10000);
+    return { at118, at122, looksLater: count('look') - looksAfter };
+  },
+  // ---- finding 2: the tab hidden mid-capture ----
+  async hidden() {
+    const search = process.argv[4] || '';
+    await openToCapture(search);
+    await advance(300);
+    setHidden(true);
+    await advance(50);
+    return snapshot({ track: gum.streams.map(s => s.track.readyState) });
+  },
+  // ---- finding 17: a capture refusal stays readable ----
+  async refusal() {
+    await openToCapture();
+    const reason = 'ภาพนี้เหมือนใบเดิม ลองขยับอีกนิด';
+    const seen = [];
+    promptLine().onText = v => seen.push([now, v]);
+    server.hooks.capture = () => [200, { ok: false, reason, shots: [], ...state() }];
+    await advance(4000);
+    const first = seen.find(s => s[1] === reason);
+    if (!first) return { error: 'refusal never shown', seen };
+    const next = seen.find(s => s[0] > first[0] && s[1] !== reason);
+    const captures = server.log.filter(r => r.path === 'capture').map(r => r.t - first[0]);
+    return { onScreenMs: next ? next[0] - first[0] : null, capturesAfterMs: captures };
+  },
+  // ---- finding 34: transient failures ----
+  async transient() {
+    const mode = process.argv[4] || 'network';      // network | 500 | 404
+    const times = Number(process.argv[5] || 1);
+    await openToCapture();
+    let left = times;
+    server.hooks.look = () => {
+      if (server.done !== 2 || left <= 0) return undefined;
+      left -= 1;
+      if (mode === 'network') return 'network';
+      if (mode === '500') return [500, { ok: false, reason: 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์ — ลองใหม่' }];
+      return [404, { ok: false, reason: 'ไม่พบการสแกนนี้ หรือหมดเวลาแล้ว — เริ่มใหม่' }];
+    };
+    await advance(20000);
+    return snapshot({ poses: server.done, looksFailed: times - left });
+  },
+  // ---- finding 20: every step starts at the top ----
+  async scroll() {
+    loadScan('');
+    scan.open();
+    root.scrollTop = 130;              // the person scrolled down to a button
+    byId('emmaScanPin').value = '1234';
+    steps.pin.fire('submit', { preventDefault() {} });
+    await advance(50);
+    return snapshot({ scrollTop: root.scrollTop });
+  },
+  // ---- contract 4: no English reaches the card ----
+  async english() {
+    await openToCapture();
+    server.hooks.look = () => [200, { ok: false, reason: 'no face found (need 1, got 0)', box: null,
+      frame: [640, 360], ...state() }];
+    await advance(1000);
+    const look = promptLine().textContent;
+    delete server.hooks.look;
+    server.hooks.capture = () => [200, { ok: false, reason: 'face too small: 40 px < 80 px', shots: [], ...state() }];
+    await advance(700);
+    const capture = promptLine().textContent;
+    delete server.hooks.capture;
+    server.hooks.look = () => [409, { ok: false, reason: 'this face is already in the gallery as Bob Smith' }];
+    await advance(1000);
+    return snapshot({ look, capture });
+  },
+  // ---- finding 22: on the robot, wait for the shared stream ----
+  async shared() {
+    const appears = Number(process.argv[4]);        // ms after the scan starts; NaN = never
+    loadScan('?app=1&cam=1');
+    sb.__emmaCamStream = null;
+    const shared = makeStream('shared');
+    if (!Number.isNaN(appears)) clock.setTimeout(() => { sb.__emmaCamStream = shared; }, appears + 50);
+    scan.open();
+    byId('emmaScanPin').value = '1234';
+    steps.pin.fire('submit', { preventDefault() {} });
+    await advance(2500);
+    const at2500 = { gumCalls: gum.calls, usingShared: scanVideo.srcObject === shared, looks: count('look') };
+    await advance(1500);
+    return snapshot({ at2500, usingShared: scanVideo.srcObject === shared, looks: count('look') });
+  },
+  // ---- finding 22: the app paused while the scan's own camera request is out ----
+  async asking() {
+    const back = process.argv[4] || 'back';          // back | away | slow
+    loadScan('?app=1');
+    gum.plan = ['defer'];
+    scan.open();
+    byId('emmaScanPin').value = '1234';
+    steps.pin.fire('submit', { preventDefault() {} });
+    await advance(100);
+    winDispatch('emma-native-pause');              // Android's permission dialog
+    doc.hidden = true;
+    doc.dispatch('visibilitychange');
+    await advance(back === 'slow' ? 20000 : 2000);  // a person reading the dialog
+    if (back !== 'away') setHidden(false);
+    await advance(50);
+    gum.pending.grant();
+    await advance(2000);
+    return snapshot({ track: gum.streams.map(s => s.track.readyState), looks: count('look') });
+  },
+
+  // ---- the ?cam=1 sender ----
+  // finding 19: isolated failures over a day must not switch the camera off
+  async sender_tries() {
+    const episodes = Number(process.argv[4] || 7);
+    loadSender('?cam=1&token=t');
+    await advance(3000);
+    const log = [];
+    for (let i = 1; i <= episodes; i++) {
+      const live = sb.__emmaCamStream;
+      if (!live) { log.push('episode ' + i + ': not live'); break; }
+      gum.plan = ['fail'];                       // the first reopen after the stall fails
+      live.stalled = true;
+      live.stalledAt = now / 1000;
+      await advance(16000);
+      log.push(!!(sb.__emmaCamStream && sb.__emmaCamStream !== live));
+    }
+    const s = sb.__emmaCamStream;
+    return { live: !!(s && s.track.readyState === 'live'), log, gumCalls: gum.calls };
+  },
+  // finding 25: the operator screen / background stops the lens
+  async sender_pause() {
+    loadSender('?cam=1&token=t&app=1');
+    await advance(3000);
+    const before = sb.__emmaCamStream;
+    const sentBefore = sockets.reduce((n, s) => n + s.sent, 0);
+    winDispatch('emma-native-pause');
+    doc.hidden = true;
+    doc.dispatch('visibilitychange');
+    const sentAtPause = sockets.reduce((n, s) => n + s.sent, 0);
+    await advance(20000);
+    const paused = {
+      track: before.track.readyState, published: !!sb.__emmaCamStream,
+      socketsOpen: sockets.filter(s => s.readyState !== 3).length,
+      framesAfter: sockets.reduce((n, s) => n + s.sent, 0) - sentAtPause, gumCalls: gum.calls,
+    };
+    setHidden(false);
+    await advance(3000);
+    const s = sb.__emmaCamStream;
+    return { sentBefore, paused,
+      resumed: { live: !!(s && s !== before && s.track.readyState === 'live'), gumCalls: gum.calls,
+        socketsOpen: sockets.filter(x => x.readyState === 1).length,
+        frames: sockets.filter(x => x.readyState === 1).reduce((n, x) => n + x.sent, 0) } };
+  },
+  // a request that lands while the app is paused is stopped, not run
+  async sender_pause_pending() {
+    gum.plan = ['defer'];
+    loadSender('?cam=1&token=t&app=1');
+    await advance(2000);                              // start() at 1.5s: request out
+    winDispatch('emma-native-pause');
+    doc.hidden = true;
+    doc.dispatch('visibilitychange');
+    gum.pending.grant();                              // lands while she is away
+    await advance(5000);
+    const landed = gum.streams[0];
+    const paused = { track: landed.track.readyState, published: !!sb.__emmaCamStream, sockets: sockets.length };
+    setHidden(false);
+    await advance(3000);
+    const s = sb.__emmaCamStream;
+    return { paused, resumed: { live: !!(s && s !== landed && s.track.readyState === 'live'), gumCalls: gum.calls } };
+  },
+  // the resume must not re-ask Android the moment a refused dialog closes
+  async sender_denied() {
+    const order = process.argv[4] || 'deny-first';   // deny-first | resume-first
+    gum.plan = ['defer'];
+    loadSender('?cam=1&token=t&app=1');
+    await advance(2000);                              // start() at 1.5s: request out
+    winDispatch('emma-native-pause');                 // the dialog
+    doc.hidden = true;
+    doc.dispatch('visibilitychange');
+    await advance(1000);
+    gum.plan = ['defer'];
+    if (order === 'deny-first') { gum.pending.deny(); await advance(10); setHidden(false); }
+    else { setHidden(false); await advance(10); gum.pending.deny(); }
+    await advance(3000);
+    const soon = gum.calls;
+    await advance(9000);
+    return { callsSoonAfter: soon, callsAfterBackoff: gum.calls, times: gum.times.map(t => t - 1000000) };
+  },
+  async scan_stops_call() {
+    loadScan('?app=1&cam=1');
+    const calls = [];
+    sb.EmmaCall = { stopForFaceScan() { calls.push({ beforeOpen: !scan.isOpen(), hidden: root.hidden }); } };
+    scan.open();
+    return { calls, open: scan.isOpen(), step: scan.step() };
+  },
+};
+
+(async () => {
+  const fn = scenarios[SCENARIO];
+  if (!fn) throw new Error('no scenario ' + SCENARIO);
+  const out = await fn();
+  process.stdout.write(JSON.stringify(out) + '\n');
+  process.exit(0);
+})().catch(e => { process.stderr.write(String(e && e.stack || e) + '\n'); process.exit(2); });
+"""
+
+
+def _page_run(tmp_path, scenario, *args):
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required to run the page's scan/camera scripts: the save/close race, "
+                    "the idle deadline, the retries and the camera pause are NOT being checked on "
+                    "this machine -- only test_face_scan_hardening_keeps_its_source_anchors is")
+    harness = tmp_path / "scan_harness.cjs"
+    harness.write_text(_SCAN_HARNESS, encoding="utf-8")
+    # encoding, not text=True: the page's Thai comes back through stdout, and
+    # Windows' default codepage (cp874) cannot decode node's UTF-8.
+    result = subprocess.run([node, str(harness), str(PAGE), scenario, *args],
+                            capture_output=True, encoding="utf-8", timeout=60)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_closing_during_a_save_waits_for_it_and_says_what_happened(tmp_path):
+    """Findings 0/18: X, ยกเลิก, Escape, pagehide and the app's pause all used to
+    close the card while the save was out and throw its reply away -- the
+    person was filed (shots, consent record, gallery rows) and staff saw a
+    plain cancel. Now the cancel goes at once (the server holds it until the
+    save is done) and the card stays until a reply says what happened."""
+    for how in ("x", "cancel", "escape", "pagehide", "pause"):
+        run = _page_run(tmp_path, "save_close", f"{how}:ok:closed")
+        assert run["during"]["open"] and run["during"]["step"] == "name", how
+        assert run["during"]["cancelSent"] == 1, how
+        assert run["during"]["nameError"] == "กำลังบันทึกอยู่ — รอผลก่อนปิด…", how
+        assert run["step"] == "done" and run["done"] == "เรียบร้อย — หุ่นจำ Dave แล้ว", how
+    # The save's reply lost: the cancel's answer decides.
+    run = _page_run(tmp_path, "save_close", "escape:lost:saved")
+    assert run["step"] == "done" and run["done"] == "ยกเลิกไม่ทัน — บันทึก Dave ไปแล้ว"
+    assert run["saidSaved"] == 0          # "I'll remember you" only with the gallery's word
+    # A 5xx is not the server's "no" either: it may have fallen over part-way.
+    run = _page_run(tmp_path, "save_close", "x:500:saved")
+    assert run["step"] == "done" and run["done"] == "ยกเลิกไม่ทัน — บันทึก Dave ไปแล้ว"
+    run = _page_run(tmp_path, "save_close", "pause:lost:closed")
+    assert not run["open"]
+    run = _page_run(tmp_path, "save_close", "cancel:lost:lost")
+    assert run["step"] == "fail" and run["fail"].startswith("ไม่ทราบว่าบันทึกสำเร็จหรือไม่")
+    # The server refused the save: nothing was filed, and the close stands.
+    for end in ("refused", "gone"):
+        run = _page_run(tmp_path, "save_close", f"x:{end}:closed")
+        assert run["during"]["open"] and not run["afterSave"]["open"] and not run["open"], end
+        assert run["paths"].count("cancel") == 1, end
+
+
+def test_a_save_refused_as_incomplete_goes_back_for_the_missing_poses(tmp_path):
+    """Contract: the server answers 409 "ยังเก็บภาพไม่ครบทุกท่า — ..." and keeps
+    the scan. A retry of the name form can only be refused again."""
+    run = _page_run(tmp_path, "incomplete")
+    back = run["back"]
+    assert back["step"] == "capture" and back["looks"] > 0
+    assert back["prompt"] == "ยังเก็บภาพไม่ครบทุกท่า — ทำให้ครบก่อนบันทึก"   # still up after 1s
+    assert back["paths"].count("cancel") == 0
+    assert run["step"] == "name" and run["captures"] == 6            # the missing pose, then the form
+
+
+def test_a_scan_that_ran_out_before_the_save_says_so_instead_of_offering_a_retry(tmp_path):
+    run = _page_run(tmp_path, "save_gone")
+    assert run["step"] == "fail" and run["fail"] == "ไม่พบการสแกนนี้ หรือหมดเวลาแล้ว — เริ่มใหม่"
+
+
+def test_an_abandoned_capture_step_ends_itself(tmp_path):
+    """Finding 2: nothing ended a capture step nobody finished -- ~5 looks a
+    second with the lens open, and every look kept the door greeting paused."""
+    run = _page_run(tmp_path, "idle")
+    assert run["at118"]["step"] == "capture" and run["at118"]["paths"].count("cancel") == 0
+    assert run["at122"]["step"] == "fail"
+    assert run["at122"]["fail"] == "หมดเวลา — ไม่ได้ภาพใหม่ใน 2 นาที ปิดแล้วเริ่มสแกนใหม่"
+    assert run["at122"]["paths"].count("cancel") == 1
+    assert run["looksLater"] == 0
+
+
+def test_a_hidden_desk_tab_closes_the_scan_but_the_app_waits_for_its_own_pause(tmp_path):
+    run = _page_run(tmp_path, "hidden")
+    assert not run["open"] and run["paths"][-1] == "cancel" and run["track"] == ["ended"]
+    # In the app the permission dialog hides the page too; 'emma-native-pause'
+    # is the app's word that it is really leaving.
+    run = _page_run(tmp_path, "hidden", "?app=1")
+    assert run["open"] and run["step"] == "capture" and run["track"] == ["live"]
+    run = _page_run(tmp_path, "pause_capture")
+    assert not run["open"] and run["paths"][-1] == "cancel" and run["track"] == ["ended"]
+
+
+def test_a_capture_refusal_stays_on_screen_and_the_hold_starts_again(tmp_path):
+    """Finding 17: the refusal was overwritten by the next look ~200ms later and
+    the full-resolution capture fired again every ~400ms."""
+    run = _page_run(tmp_path, "refusal")
+    assert run["onScreenMs"] >= 1500
+    assert all(b - a >= 1500 for a, b in zip(run["capturesAfterMs"], run["capturesAfterMs"][1:]))
+
+
+def test_one_dropped_look_does_not_throw_the_poses_away(tmp_path):
+    """Finding 34: one failed request ended the scan and cancelled the batch."""
+    for mode, times in (("network", "1"), ("500", "2")):
+        run = _page_run(tmp_path, "transient", mode, times)
+        assert run["step"] == "name" and run["poses"] == 5, (mode, times)
+        assert "cancel" not in run["paths"], (mode, times)
+    run = _page_run(tmp_path, "transient", "network", "3")
+    assert run["step"] == "fail" and run["looksFailed"] == 3 and run["paths"][-1] == "cancel"
+    assert run["fail"] == "ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจการเชื่อมต่อแล้วลองใหม่"
+    # A 404 is the server's answer (the scan ran out), not a blip.
+    run = _page_run(tmp_path, "transient", "404", "1")
+    assert run["step"] == "fail" and run["looksFailed"] == 1
+    assert run["fail"] == "ไม่พบการสแกนนี้ หรือหมดเวลาแล้ว — เริ่มใหม่"
+
+
+def test_every_scan_step_starts_at_the_top(tmp_path):
+    """Finding 20: a sideways phone scrolled to ยินยอม opened the camera step
+    with the preview's top and the X above the screen."""
+    assert _page_run(tmp_path, "scroll")["scrollTop"] == 0
+
+
+def test_no_english_reason_reaches_the_scan_card(tmp_path):
+    """Contract: the server says every look/capture refusal in Thai; the page
+    keeps its own sentence for anything that is not (a library's English, the
+    gallery's "already in the gallery as <somebody else>")."""
+    run = _page_run(tmp_path, "english")
+    assert run["look"] == "ท่า front"
+    assert run["capture"] == "เก็บภาพไม่สำเร็จ ลองอีกครั้ง"
+    assert run["step"] == "fail" and "Bob" not in run["fail"] and "gallery" not in run["fail"]
+
+
+def test_on_the_robot_the_scan_waits_for_the_shared_stream(tmp_path):
+    """Finding 22: a second getUserMedia for the lens the sender holds -- and
+    in the app, Android's permission dialog."""
+    run = _page_run(tmp_path, "shared", "1000")
+    assert run["at2500"]["gumCalls"] == 0 and run["at2500"]["usingShared"]
+    assert run["gumCalls"] == 0
+    run = _page_run(tmp_path, "shared", "NaN")          # never comes: its own camera after 3s
+    assert run["at2500"]["gumCalls"] == 0 and run["gumCalls"] == 1 and run["looks"] > 0
+
+
+def test_the_permission_dialog_does_not_close_the_scan_that_asked(tmp_path):
+    """Finding 22: requestPermissions pauses the Activity, and the pause closed
+    the scan -- staff tapped Allow over a card that was already gone."""
+    for back in ("back", "slow"):                       # slow: 20s reading the dialog
+        run = _page_run(tmp_path, "asking", back)
+        assert run["open"] and run["looks"] > 0 and "cancel" not in run["paths"], back
+    run = _page_run(tmp_path, "asking", "away")         # the app really left
+    assert not run["open"] and run["track"] == ["ended"] and run["paths"][-1] == "cancel"
+
+
+def test_robot_camera_gives_up_only_on_failures_in_a_row(tmp_path):
+    """Finding 19: six separate stalls over a day, each with one failed reopen,
+    switched the robot's camera off until a reload."""
+    run = _page_run(tmp_path, "sender_tries", "7")
+    assert run["live"] and run["log"] == [True] * 7
+
+
+def test_robot_camera_stops_while_the_app_is_paused_and_comes_back(tmp_path):
+    """Finding 25: the operator screen sends 'emma-native-pause'; the lens kept
+    uploading to the greeter behind it."""
+    run = _page_run(tmp_path, "sender_pause")
+    assert run["sentBefore"] > 0
+    assert run["paused"] == {"track": "ended", "published": False, "socketsOpen": 0,
+                             "framesAfter": 0, "gumCalls": 1}
+    assert run["resumed"]["live"] and run["resumed"]["socketsOpen"] == 1 and run["resumed"]["frames"] > 0
+
+
+def test_robot_camera_request_that_lands_while_paused_is_stopped(tmp_path):
+    """A request still out when the app pauses (Android's permission dialog
+    is exactly that) must not start the lens behind the operator screen."""
+    run = _page_run(tmp_path, "sender_pause_pending")
+    assert run["paused"] == {"track": "ended", "published": False, "sockets": 0}
+    assert run["resumed"] == {"live": True, "gumCalls": 2}
+
+
+def test_robot_camera_resume_does_not_re_ask_a_refused_camera_at_once(tmp_path):
+    """The permission dialog is a pause too: a resume that started the camera
+    straight away would raise the dialog again the moment it closed."""
+    for order in ("deny-first", "resume-first"):
+        run = _page_run(tmp_path, "sender_denied", order)
+        assert run["callsSoonAfter"] == 1 and run["callsAfterBackoff"] == 2, (order, run)
+
+
+def test_face_scan_hardening_keeps_its_source_anchors():
+    """The same guards, read from the source, for a machine without node."""
+    code = _face_scan_code()
+    sender = _without_comments(_camera_sender_code())
+    close = code.split("function closeScan() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "if (saving) { closeAfterSave(); return; }" in close
+    assert close.index("if (saving) { closeAfterSave(); return; }") < close.index("gen += 1;")
+    assert "saving = true;" in code
+    assert "if (!transient(err)) { saveRefused(err.reason, err.status); return; }" in code
+    assert "typeof said.saved === 'string' && said.saved" in code
+    assert "var CAPTURE_IDLE_MS = 120000;" in code and "fail(IDLE_TEXT);" in code
+    assert "armIdle();" in code.split("function startCapture() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "if (open && document.hidden && !IN_APP && current === 'capture') closeScan();" in code
+    assert "if (Date.now() < noticeUntil) { holdingSince = 0; setHold(0); return; }" in code
+    assert "notice(thaiOr(r.reason, 'เก็บภาพไม่สำเร็จ ลองอีกครั้ง'), NOTICE_MS);" in code
+    assert "if (transient(err) && ++failures < MAX_FAILURES) {" in code
+    assert "return status === 0 || status >= 500;" in code
+    assert "root.scrollTop = 0;" in code.split("function show(name) {", 1)[1].split("\n    }\n", 1)[0]
+    assert "setPrompt(thaiOr(r.reason, stepPrompt(st)), false);" in code
+    assert "reason.indexOf(INCOMPLETE) === 0" in code and "var INCOMPLETE = 'ยังเก็บภาพไม่ครบทุกท่า';" in code
+    assert "(CAM_SHARED ? sharedSoon(mine) : Promise.resolve(null))" in code
+    assert "if (asking === mine && (nativeDialog || (pausedWhileAsking && document.hidden))) {" in code
+    run = sender.split("function run(stream, mine) {", 1)[1]
+    assert run.lstrip().startswith("tries = 0;")
+    assert "if (down || paused || halt || asking || sock) return;" in sender
+    assert "if (mine !== gen || paused) { stopTracks(stream); return; }" in sender
+    pause = sender.split("addEventListener('emma-native-pause', function () {", 1)[1].split("});", 1)[0]
+    assert "paused = true;" in pause and "if (halt) halt();" in pause
+    assert "document.addEventListener('visibilitychange', resume);" in sender
+    assert "if (!retryTimer) start();" in sender
+
+
+def test_the_temporary_camera_debug_panel_is_robot_only_and_speaks_server_words():
+    """Owner 2026-09-30: "อยากให้เพิ่มกล้อง... อยากรู้ว่ามันจับคนได้ไหม
+    เอามาไว้ชั่วคราว". The panel lives INSIDE the ?cam=1 sender block, so a
+    desk browser never builds it; ?camdebug=0 hides it without a new APK; its
+    one line of text is the server's own verdict (evt.verdict) and never
+    anything a customer said (the kiosk-chip rule); and it looks through the
+    greeter's own lens instead of opening a second getUserMedia."""
+    html = PAGE.read_text(encoding="utf-8")
+    gate = html.index("if (q.get('cam') !== '1') return;")
+    panel = html.index("id = 'camDebug'")
+    assert gate < panel
+    assert "q.get('camdebug') !== '0'" in html
+    handler = html.index("evt.type === 'face_status'")
+    assert gate < handler
+    branch = html[handler:handler + 500]
+    assert "evt.verdict" in branch
+    for forbidden in ("curUser", "heard", "transcript"):
+        assert forbidden not in branch, forbidden
+    assert "dbgVideo.srcObject = stream;" in html
+
+
+def test_the_floor_ring_is_gone_everywhere():
+    """Owner, 2026-09-30 (screenshot of the ring assembly under her feet):
+    "อันนี้ลบทิ้งหรือเอาออกไปได้เลย". Both renderings go together — the SVG
+    fallback's ring/dashed halo/spinning orbit, and the 3D GLB's hover ring —
+    or a machine without WebGL shows the ring the 3D build deleted."""
+    html = PAGE.read_text(encoding="utf-8")
+    for gone in ("puppet-floor-ring puppet-part", 'class="emma-data-orbit"',
+                 "@keyframes puppet-ring-pulse", "@keyframes puppet-ring-loading",
+                 "@keyframes emma-data-spin"):
+        assert gone not in html, gone
+    mascot = (ROOT / "client" / "assets" / "emma-3d-lab" / "mascot.js").read_text(encoding="utf-8")
+    assert "if (o.name.startsWith('Hover__')) o.visible = false;" in mascot
+    # And the half-rate glow that came with the same request ("ตัวแอบช้าๆ ...
+    # ให้มันลื่นขึ้น"): the second full-rig render runs every other frame.
+    assert "if ((glowTick++ & 1) === 0) {" in mascot
+    assert "glowTick = 0;   // reallocated targets are black until the next glow pass" in mascot
+
+
+def test_hold_speech_queues_over_her_voice_and_flushes_only_when_she_finishes():
+    """Owner 2026-09-30: with barge-in rejected and half-duplex dropping
+    everything said over her, hold-speech is the third road — queue what
+    clears the floor while she speaks, send it the moment her audio ends.
+    The contracts that must not rot: it rides on the server flag AND
+    half-duplex AND no barge-in; frames flow into the queue only from the
+    old drop branch; the flush happens at the NATURAL end of playback and
+    nowhere else — an interruption or teardown throws the queue away (held
+    speech from a cancelled moment is nobody's next turn); the queue is
+    bounded and floor-gated with a pre-roll so first syllables survive."""
+    html = PAGE.read_text(encoding="utf-8")
+    assert "holdSpeech = !!evt.hold_speech && halfDuplex && !bargeIn;" in html
+    drop = html.index("if (!halfDuplex) { ws.send(frame); return; }")
+    assert "if (holdSpeech) holdFrame(frame, now);" in html[drop:drop + 200]
+    # flush only at the natural end of playback (src.onended, queue empty)
+    ended = html.index("if (!sources.length) {")
+    assert "flushHeldSpeech();" in html[ended:ended + 700]
+    assert html.count("flushHeldSpeech();") == 1
+    stop = html.index("function stopPlayback()")
+    assert "dropHeldSpeech();" in html[stop:stop + 900]
+    release = html.index("function releaseCallHardware()")
+    assert "dropHeldSpeech();" in html[release:release + 700]
+    # floor + hangover + pre-roll + bound
+    assert "frameRms(frame) >= holdFloor" in html
+    assert "holdVoicedUntil = now + HOLD_HANG_MS" in html
+    assert "if (holdPre.length > HOLD_PRE_FRAMES) holdPre.shift();" in html
+    assert "while (holdBytes > holdMaxBytes && holdQueue.length) {" in html
+    # a muted or closed socket never receives a flush
+    assert "if (!ws || ws.readyState !== WebSocket.OPEN || muted) return;" in html
+
+
+def test_a_soft_cue_marks_her_turn_ending_and_never_an_interruption():
+    """Owner 2026-09-30: "ให้มีเสียงบอกไหมว่าพูดได้" — a quiet two-note cue
+    when her reply finishes playing, i.e. the moment the line is the guest's.
+    It must follow real speech ending only: not stopPlayback (interruptions,
+    teardowns) and nothing on the standing line's idle cycling, or the robot
+    dings at an empty room every two minutes. ?cue=0 switches it off."""
+    html = PAGE.read_text(encoding="utf-8")
+    assert "function playListenCue()" in html
+    assert "get('cue') === '0'" in html
+    ended = html.index("if (!sources.length) {")
+    assert "if (inCall) playListenCue();" in html[ended:ended + 900]
+    stop = html.index("function stopPlayback()")
+    stop_body = html[stop:html.index("function releaseCallHardware()")]
+    assert "playListenCue" not in stop_body
+    assert html.count("playListenCue();") == 1
+
+
+def test_the_mode_lamp_colours_are_the_owners_latest_pick():
+    """Owner 2026-10-01: "เปลี่ยนสี สีขาวเป็น emma สำหรับโครงการ สีดำเป็น
+    emmajoke" — the third repaint (Emma ทอง → ดำ → ขาว, EmmaJoke ฟ้าขาว → ดำ).
+    The colours are the owner's decision, not a style choice, so the test pins
+    them; and the aura belongs to whichever lamp is BLACK (a black lens has
+    nothing for the glow pass to blur), so it must sit on joke now."""
+    html = PAGE.read_text(encoding="utf-8")
+    modes = html[html.index("var MODES = ["):]
+    modes = modes[:modes.index("];")]
+    joke = next(l for l in modes.splitlines() if "'joke'" in l)
+    condo = next(l for l in modes.splitlines() if "'condo'" in l)
+    assert "#000000" in joke and "aura" in joke
+    assert "#ffffff" in condo and "aura" not in condo
+
+
+def test_the_robot_face_speaks_english_on_screen():
+    """Owner 12 Oct on the robot: "แก้เป็นภาษาอังกฤษ ทั้งหมด". One value
+    decides the face's own words; setUiLang cannot move off it (a Thai guest
+    used to turn the pill Thai), and every reset goes back to it, not to Thai.
+    Emma's replies are not this: she still answers in the guest's language."""
+    html = PAGE.read_text(encoding="utf-8")
+    assert "var FIXED_UI_LANG = 'en';" in html
+    assert "var uiLang = FIXED_UI_LANG || 'th';" in html
+    assert "uiLang = 'th'" not in html                      # no second declaration that resets it
+    fn = html[html.index("function setUiLang(code) {"):]
+    assert fn.split("\n")[1].strip() == "if (FIXED_UI_LANG) code = FIXED_UI_LANG;"
+    assert "setUiLang('th')" not in html
+    # the buttons start from the table, not from hard-coded Thai
+    assert "messageLabel.textContent = (CHROME[uiLang] || CHROME.th).message;" in html
+    # the cards and the drawer go through uiText; the desktop /preview keeps Thai
+    assert "function uiText(en, th) { return appShell && uiLang !== 'th' ? en : th; }" in html
+    for en in ("'Price — please ask our sales team'", "'Room photo — coming from our sales team'",
+               "uiText('Conversation', 'บทสนทนา')", "UNIT_STATUS_EN[u.status]"):
+        assert en in html, en

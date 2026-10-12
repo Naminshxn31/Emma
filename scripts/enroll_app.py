@@ -30,6 +30,11 @@ and is shared with the command line. Two front ends, one set of refusals.
 Forking them would be the four-exits bug again: each copy correct on the day
 it was written and quietly different a month later.
 
+The guided capture went the same way when the robot's call screen needed
+it: the steps, the judging and the save are `enrollment.Session`, and this
+file holds one (`SESSION`) and serves HTTP. The `_judge`/`_capture`/`_save`
+names below are one-line forwards, kept so nothing that called them breaks.
+
 Bound to 127.0.0.1, always
 --------------------------
 This thing looks at faces and files them under names. It is not on the
@@ -41,7 +46,6 @@ showroom server is byte-identical to what a `git pull` gives anybody else.
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import sys
 import threading
@@ -71,214 +75,43 @@ PAGE = (ROOT / "scripts" / "enroll_app.html")
 #: refuses to run against a server that does not match.
 PROTOCOL = 8
 
-#: Shots captured but not yet saved. One station, one operator, one person in
-#: front of the lens — a dict keyed by anything would be pretending
-#: otherwise. Cleared on save and on discard.
-_pending: list[dict] = []
-_lock = threading.Lock()
+#: The person in front of the lens, and the shots taken of them so far. One
+#: station, one operator, one person — so one `Session`, and every rule it
+#: applies lives in `app/enrollment.py` beside the server endpoint's.
+SESSION = enrollment.Session()
 
-
-def _decode(data_url: str) -> np.ndarray | None:
-    import cv2
-
-    _, _, payload = data_url.partition(",")
-    try:
-        raw = base64.b64decode(payload)
-    except Exception:
-        return None
-    return cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
-
-
-def _thumb(crop: np.ndarray, size: int = 160) -> str:
-    import cv2
-
-    h, w = crop.shape[:2]
-    scale = size / max(h, w, 1)
-    small = cv2.resize(crop, (max(1, int(w * scale)), max(1, int(h * scale))))
-    ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 80])
-    return "data:image/jpeg;base64," + base64.b64encode(buf).decode() if ok else ""
-
-
-def _reference_width() -> int:
-    """The face width from the first shot. 0 before there is one."""
-    return _pending[0]["width"] if _pending else 0
-
-
-def _remaining() -> list[dict]:
-    """Steps not taken yet, minus the ones this camera cannot offer.
-
-    A step nobody can satisfy is not a step. The distance shot needs room to
-    step back into, and on a desk camera there is none: the sitter's face was
-    119px, the step wanted 89px, and `FACE_MIN_PX` refuses anything under
-    110px. Somebody stood there trying to obey an instruction that had no
-    answer, which is worse than not asking.
-    """
-    done = {p.get("step") for p in _pending}
-    reference = _reference_width()
-    return [s for s in enrollment.STEPS
-            if s["key"] not in done
-            and (not reference or enrollment.step_applies(s, reference))]
+# The same function objects, not copies: a copy here is the drift the
+# module docstring is about.
+_decode = enrollment.decode_data_url
+_thumb = enrollment.thumbnail
+_scale_to_camera = enrollment.scale_to_camera
 
 
 def _state() -> dict:
-    """Which step the station is on, and what has been taken so far."""
-    done = {p.get("step") for p in _pending}
-    reference = _reference_width()
-    steps = []
-    for step in enrollment.STEPS:
-        skipped = bool(reference) and not enrollment.step_applies(step, reference)
-        steps.append({
-            "key": step["key"], "done": step["key"] in done, "skipped": skipped,
-            "prompt": step["prompt"] + (" — ข้าม (กล้องใกล้เกินไป)" if skipped else ""),
-        })
-    todo = _remaining()
-    # The hold time belongs to the step, not to the page: the step that asks
-    # for a smile is the one nothing here can check, and the page has no way
-    # to know which one that is.
-    return {"steps": steps, "step": todo[0]["key"] if todo else None,
-            "hold_ms": enrollment.hold_ms(todo[0]) if todo else enrollment.HOLD_MS,
-            "prompt": todo[0]["prompt"] if todo else "ครบแล้ว — กดบันทึกได้"}
-
-
-def _current_step() -> dict | None:
-    todo = _remaining()
-    return todo[0] if todo else None
-
-
-def _scale_to_camera(frame: np.ndarray, full_width: int | None) -> float:
-    """How many camera pixels one analysed pixel is worth.
-
-    The preview loop sends a 640-wide copy because a box is all it needs;
-    a capture sends the whole frame. Measuring face width on each of those
-    and comparing the two numbers to the same thresholds was wrong twice
-    over: `FACE_MIN_PX` silently doubled during the preview, so people had
-    to sit far closer than the runtime will ever require, and the distance
-    step compared a 640-scale width against a reference stored at full
-    scale — the screen said 155px while the instruction said 307px, about
-    the same face in the same second.
-
-    So every width this module reasons about is in camera pixels.
-    """
-    if not full_width or frame.shape[1] <= 0:
-        return 1.0
-    return float(full_width) / float(frame.shape[1])
+    return SESSION.state()
 
 
 def _judge(frame: np.ndarray, full_width: int | None = None) -> dict:
-    """Everything the preview needs, decided here rather than in the page.
-
-    The browser owns the camera and the drawing; it does not own any rule
-    about whether a shot counts. Keeping the judgement on this side is what
-    lets the command line and the station stay one implementation.
-    """
-    found = faces.locate(frame)
-    scale = _scale_to_camera(frame, full_width)
-    base = {"box": None, "width": 0, "yaw": 0.0,
-            "frame": [int(frame.shape[1]), int(frame.shape[0])]}
-    if not found:
-        return {**base, "ok": False, "reason": "ยังไม่เห็นหน้า",
-                "say": enrollment.SPOKEN["no_face"], **_state()}
-
-    face = found[0]
-    width = int(round((face.bbox[2] - face.bbox[0]) * scale))
-    base.update(box=list(face.bbox), width=width)
-
-    if len(found) > 1:
-        runner_up = found[1].area
-        if runner_up > 0 and face.area < faces.DOMINANT_RATIO * runner_up:
-            return {**base, "ok": False,
-                    "reason": f"มี {len(found)} หน้าในภาพ — ทีละคน",
-                    "say": enrollment.SPOKEN["crowd"], **_state()}
-    if width < enrollment.portrait_min_px():
-        return {**base, "ok": False,
-                "reason": f"เข้ามาใกล้อีกนิด ({width}px ขอ {enrollment.portrait_min_px()}px)",
-                "say": enrollment.SPOKEN["closer"], **_state()}
-    if not _pending and width < enrollment.first_shot_min_px():
-        # The first shot sets the scale every later step is measured
-        # against, so it is the one place to insist on room: a first
-        # portrait this small has no step-back, and the station used to
-        # find that out only after promising five steps and delivering
-        # four. One more step toward the lens now is the whole fix.
-        return {**base, "ok": False,
-                "reason": f"เข้ามาใกล้อีกนิด ({width}px ขอ "
-                          f"{enrollment.first_shot_min_px()}px เผื่อท่าถอยหลัง)",
-                "say": enrollment.SPOKEN["closer"], **_state()}
-    if face.kps is None:
-        return {**base, "ok": False, "reason": "อ่านใบหน้าไม่ได้",
-                "say": enrollment.SPOKEN["unreadable"], **_state()}
-
-    yaw, _pitch = enrollment.head_pose(face)
-    base["yaw"] = round(yaw, 3)
-
-    step = _current_step()
-    if step is None:
-        return {**base, "ok": False, "reason": "ครบแล้ว — กดบันทึกได้",
-                "say": enrollment.SPOKEN["done"], **_state()}
-
-    with _lock:
-        sides = {p["side"] for p in _pending if p["side"]}
-        reference = _reference_width() or width
-    ready, why = enrollment.step_ready(step, yaw, width, reference, sides)
-    # What to say is the instruction itself, never the version of it carrying
-    # pixel counts: those are for whoever is running the station.
-    return {**base, "ok": ready, "reason": "" if ready else why,
-            "say": "" if ready else step["prompt"], **_state()}
+    return SESSION.judge(frame, full_width)
 
 
 def _capture(frame: np.ndarray, full_width: int | None = None) -> dict:
-    scale = _scale_to_camera(frame, full_width)
-    need = (enrollment.first_shot_min_px() if not _pending
-            else enrollment.portrait_min_px())
-    face, why = enrollment.usable_face(frame, min_px=need / scale)
-    if face is None:
-        return {"ok": False, "reason": why, **_state()}
-    yaw, _ = enrollment.head_pose(face)
-    width = int(round((face.bbox[2] - face.bbox[0]) * scale))
-
-    with _lock:
-        step = _current_step()
-        if step is None:
-            return {"ok": False, "reason": "ครบแล้ว — กดบันทึกได้", **_state()}
-        sides = {p["side"] for p in _pending if p["side"]}
-        reference = _reference_width() or width
-        ready, why = enrollment.step_ready(step, yaw, width, reference, sides)
-        if not ready:
-            return {"ok": False, "reason": why, **_state()}
-        # A shot that the batch already has teaches the gallery nothing, and
-        # five of those are one photograph counted five times. Held to the
-        # same standard whether the operator pressed the button or the hold
-        # timer fired.
-        if not enrollment.is_novel(face.vec, [p["vec"] for p in _pending]):
-            return {"ok": False, "reason": "ภาพนี้เหมือนใบเดิม ลองขยับอีกนิด",
-                    **_state()}
-        _pending.append({"vec": face.vec, "crop": enrollment.crop_face(frame, face),
-                         "step": step["key"], "width": width,
-                         "side": 0 if step["side"] == 0 else (-1 if yaw < 0 else 1)})
-        shots = [{"thumb": _thumb(p["crop"]), "step": p["step"]} for p in _pending]
-        spread = enrollment.shots_agree([p["vec"] for p in _pending])
-    return {"ok": True, "shots": shots, "spread": round(spread, 3), **_state()}
+    return SESSION.capture(frame, full_width)
 
 
 def _save(name: str, replace: bool) -> dict:
-    name = (name or "").strip()
-    if not name:
-        return {"ok": False, "reason": "ยังไม่ได้ใส่ชื่อ"}
-    with _lock:
-        if not _pending:
-            return {"ok": False, "reason": "ยังไม่ได้เก็บภาพ"}
-        vecs = [p["vec"] for p in _pending]
-        crops = [p["crop"] for p in _pending]
-
-    refusal = enrollment.review(vecs, name)
-    if refusal:
-        return {"ok": False, "reason": refusal}
-
-    total = enrollment.save_shots(name, crops, replace=replace)
-    with _lock:
-        _pending.clear()
-    return {"ok": True, "name": name, "total": total,
-            "spread": round(enrollment.shots_agree(vecs), 3),
-            "enrolled": enrollment.enrolled(), **_state()}
+    # Without add_to_gallery: the station's documented second step is the
+    # rebuild (build-face-gallery.cmd, printed at startup), which re-embeds
+    # every folder anyway. The live append exists for the call screen,
+    # where the person enrolled is standing there waiting to be known.
+    #
+    # existing_ok: this station filed names before the name rule existed
+    # (`Tom_2`, a long Thai name with a title), and the rule then refused
+    # to let it top those people up — the exact name failed the rule and
+    # the tidied one was refused as a second name for the same face. An
+    # exact, existing folder inside enrolled/ is accepted here; the call
+    # screen never passes this.
+    return SESSION.save(name, replace=replace, existing_ok=True)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -336,9 +169,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/save":
             self._send(_save(body.get("name", ""), bool(body.get("replace"))))
         elif self.path == "/discard":
-            with _lock:
-                _pending.clear()
-            self._send({"ok": True, **_state()})
+            self._send(SESSION.discard())
         else:
             self.send_error(404)
 

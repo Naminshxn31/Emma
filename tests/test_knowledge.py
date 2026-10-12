@@ -95,7 +95,9 @@ def test_commercial_questions_are_refused_outright(loaded, question):
     out = run(registry.dispatch("search_condo_info", {"query": question}))
     assert out["found"] is False, f"{question} must not be answered from slides"
     assert out["results"] == []
-    assert "ฝ่ายขาย" in out["instruction"]
+    # Owner 12 Oct: hand off to the sales team naturally, never "ไม่มีข้อมูล".
+    assert "ส่งต่อทีมขาย" in out["instruction"]
+    assert "ห้ามพูดว่าไม่มีข้อมูล" in out["instruction"]
 
 
 def test_a_commercial_question_never_changes_the_screen(loaded):
@@ -134,25 +136,41 @@ def test_nonsense_finds_nothing(loaded):
 # ---- the imported page documents ----
 
 
-def test_page_documents_reached_the_index(loaded):
-    """70 project-scoped slides carry per-page documents. The Canva
-    deck's 59 pages do not — those still need narration from the sales
-    team, which no generated description can substitute for."""
-    slides = loaded.load_slides()
-    with_detail = [s for s in slides if s.get("detail_th")]
-    assert len(with_detail) == 70
-    assert not any(s["id"].startswith("ew-") for s in with_detail)
+def test_page_documents_reached_the_index(loaded, monkeypatch):
+    """A per-page document (detail_*) is searchable and comes back as its own
+    field.
+
+    This counted the 70 old slides that carried one. The 2026-10-06 library
+    carries none — its approved text is title and summary — so the count
+    went to 0 with nothing broken. The mechanism is what has to keep
+    working for the next import that brings documents, so it is pinned with
+    a record that has a word nothing else in the deck contains.
+    """
+    library = loaded.load_slides()
+    target = dict(library[3], detail_en="The lounge has zebrawood panelling.")
+    monkeypatch.setattr(loaded, "_slides", [target] + [s for s in library
+                                                       if s["id"] != target["id"]])
+    out = run(registry.dispatch("search_condo_info", {"query": "zebrawood"}))
+    assert out["found"] is True, "a word only the page document holds was not indexed"
+    assert "zebrawood" in out["results"][0].get("description", "")
 
 
 def test_the_two_kinds_of_text_stay_separate(loaded):
     """One is the developer's own words off the slide; the other a model's
     description of a picture. Merging them lets a generated sentence be
-    quoted with the authority of the deck."""
-    out = run(registry.dispatch("search_condo_info", {"query": "ขอดูเบสเมนต์"}))
-    top = out["results"][0]
-    assert "slide_text" in top or "description" in top
-    if "slide_text" in top and "description" in top:
-        assert top["slide_text"] != top["description"]
+    quoted with the authority of the deck.
+
+    Pinned on a record carrying both — the shipped deck carries neither, so
+    the search that used to find one ("ขอดูเบสเมนต์") had nothing to check.
+    """
+    from app.tools.knowledge import _entry
+
+    record = dict(loaded.load_slides()[0], transcript_th="ข้อความบนสไลด์",
+                  detail_th="คำบรรยายภาพที่โมเดลเขียน")
+    top = _entry(record)
+    assert top["slide_text"] == "ข้อความบนสไลด์"
+    assert top["description"] == "คำบรรยายภาพที่โมเดลเขียน"
+    assert top["slide_text"] != top["description"]
 
 
 def test_facility_details_are_findable(loaded):
@@ -169,6 +187,37 @@ def test_returns_several_results_to_choose_from(loaded):
     assert 1 <= len(out["results"]) <= 4
 
 
+def test_a_broad_question_gets_the_sections_order_once(loaded):
+    """Owner 2026-10-10: a broad "what is there" gets the sections and a
+    question, not the list. The order rides on the result, because the
+    result's own "ตอบเฉพาะข้อมูลที่ตรงคำถาม" beat the prompt rule in the first
+    run; a specific question does not get it. Each state instruction is said
+    once, not once per hit."""
+    out = run(registry.dispatch("search_condo_info", {"query": "สิ่งอำนวยความสะดวก"}))
+    assert len(out["results"]) > 1
+    assert out["instruction"].count("ประโยคเดียวที่ชวนเลือกชั้น") == 1
+    for item in out["results"]:
+        caution = item.get("content_state_instruction")
+        if caution:
+            assert out["instruction"].count(caution) == 1
+    one = run(registry.dispatch("search_condo_info", {"query": "สระว่ายน้ำอยู่ตรงไหน"}))
+    assert "ประโยคเดียวที่ชวนเลือกชั้น" not in one["instruction"]
+
+
+@pytest.mark.parametrize("question", ["Embassy World คืออะไร", "ที่จอดรถ EV charger อยู่ไหน", "ผังชั้นใต้ดิน"])
+def test_the_decks_own_concept_caveat_never_reaches_the_model(loaded, question):
+    """The cover and the basement plan print "ระบุว่าเป็นแนวคิดเบื้องต้น
+    เพื่อการนำเสนอเท่านั้น และอาจเปลี่ยนแปลงได้..." in their approved summaries;
+    the owner banned that sentence on 2026-10-10, so search hands the
+    summary back without it."""
+    from app.tools.retrieval import CONCEPT_CAVEAT
+
+    out = run(registry.dispatch("search_condo_info", {"query": question}))
+    for item in out.get("results", []):
+        for key in ("title", "detail", "slide_text", "description", "approved_script"):
+            assert not CONCEPT_CAVEAT.search(str(item.get(key) or "")), (question, key, item.get(key))
+
+
 def test_a_specific_pool_location_returns_only_the_best_chunk(loaded):
     out = run(registry.dispatch(
         "search_condo_info", {"query": "สระว่ายน้ำอยู่ตรงไหน"}
@@ -176,7 +225,11 @@ def test_a_specific_pool_location_returns_only_the_best_chunk(loaded):
 
     assert out["found"] is True
     assert len(out["results"]) == 1
-    assert out["results"][0]["title"] == "ชั้น 3 — ผัง Sky Pool"
+    # The floor the pool is on, not a literal title: "ชั้น 3 — ผัง Sky Pool"
+    # was the old deck's; the 2026-10-06 one calls the same plan "ผังชั้น 3
+    # โซนส่วนกลาง". What matters is that the location answer is the floor-3
+    # plan and nothing about the other pools rides along.
+    assert "ชั้น 3" in out["results"][0]["title"]
     spoken_surface = str(out["results"])
     assert "Aqua Cinema" not in spoken_surface
     assert "ลากูน" not in spoken_surface
@@ -195,13 +248,33 @@ def test_unapproved_marketing_copy_keeps_status_but_not_the_copy(loaded):
     assert "บทที่ยังไม่อนุมัติ" not in str(top)
 
 
-def test_common_area_dimensions_never_reach_customer_facing_knowledge(loaded):
+def test_common_area_dimensions_never_reach_customer_facing_knowledge(loaded, tmp_path):
+    import json
+
     from app.prompts import load_facts
     from app.tools.knowledge import _entry
 
-    facts = load_facts()
-    assert "ลากูน" not in facts and "155" not in facts
-    assert "16 โครงการ" not in facts, "unapproved figures must not reach the model"
+    # The facts half runs on a file the test writes. It used to read the live
+    # file and assert "16 โครงการ" was absent: true while that file was
+    # draft, red the day the owner approved it (2026-09-28) with nothing
+    # wrong. Signed: the lagoon keeps its name and loses its size. Draft:
+    # none of it arrives.
+    signed = {"source_id": "project_facts", "project_id": "embassy_world",
+              "approval_status": "approved", "approved_by": "test_reviewer",
+              "approved_at": "2026-01-01T00:00:00+07:00",
+              "effective_at": "2026-01-01T00:00:00+07:00",
+              "disclosure_scope": "customer", "content_state": "existing",
+              "facts": [{"label": "จุดเด่น", "value": "ลากูน 155ม., Water Lagoon 155 เมตร"},
+                        {"label": "ผู้พัฒนา", "value": "บริษัททดสอบ 16 โครงการ"}]}
+    path = tmp_path / "facts.json"
+    path.write_text(json.dumps(signed, ensure_ascii=False), encoding="utf-8")
+    facts = load_facts(str(path))
+    assert "ลากูน" in facts and "155" not in facts
+    path.write_text(json.dumps({**signed, "approval_status": "draft"}, ensure_ascii=False),
+                    encoding="utf-8")
+    facts = load_facts(str(path))
+    assert "ลากูน" not in facts and "16 โครงการ" not in facts, \
+        "unapproved figures must not reach the model"
 
     entry = _entry({
         "source_id": "slide_catalog",
@@ -274,6 +347,66 @@ def test_answering_a_question_also_updates_the_screen(loaded):
     assert out["now_showing"], "lookup should report what it put on screen"
     assert after != before, "screen still showing the previous topic"
     assert after == out["now_showing"]["id"]
+
+
+def test_a_gallery_without_the_slides_group_answers_but_never_shows_a_slide(
+        loaded, monkeypatch):
+    """Owner, 8 Oct 2026: "เอาสไลด์ออกก่อน". The gallery's TOOL_GROUPS has no
+    `slides`, yet this knowledge-group tool put slide images up as a side
+    effect of answering — hidden only while the asset manifest was stale.
+    The answer must survive; the screen must not move."""
+    from app.config import settings
+    from app.tools import slides as sl
+
+    run(registry.dispatch("show_slide", {"query": "social club"}))
+    before = sl.current_slide()["id"]
+    monkeypatch.setattr(settings, "tool_groups",
+                        "knowledge,smarthome,mydocs,units,calc,robot")
+
+    out = run(registry.dispatch("search_condo_info", {"query": "มีซาวน่าไหม"}))
+
+    assert out["found"] is True and out["results"], "the answer itself must survive"
+    assert "now_showing" not in out
+    assert sl.current_slide()["id"] == before
+
+
+def test_answer_images_show_the_picture_without_the_slides_group(loaded, monkeypatch):
+    """Owner, 2026-10-11: "ให้บริการ / ให้ชม อาจจะเป็นรูปภาพให้เขาดู" ->
+    "ทุกเรื่องที่มีภาพตรง". ANSWER_IMAGES brings the matching picture back on
+    a machine whose TOOL_GROUPS has no `slides` (the robot) — the picture,
+    not the presentation: no slide tool becomes visible to the model."""
+    from app.config import settings
+    from app.tools import registry as reg
+
+    monkeypatch.setattr(settings, "tool_groups", "knowledge,mydocs,units,calc,robot")
+    monkeypatch.setattr(settings, "answer_images", True)
+
+    out = run(registry.dispatch("search_condo_info", {"query": "มีซาวน่าไหม"}))
+
+    assert out["found"] is True
+    assert out["now_showing"] and out["now_showing"].get("url")
+    assert out["note"].startswith("แสดงภาพที่ตรงกับคำตอบบนจอแล้ว")
+    visible = {t.name for t in reg.all_tools() if reg.allowed(t)}
+    assert not visible & {"show_slide", "next_slide", "start_presentation"}
+
+
+def test_answer_images_say_so_when_no_picture_went_up(loaded, monkeypatch):
+    """2026-10-11: "มีรูปไหม" searched "facilities", the match was too broad
+    to change the screen, and Emma said "มีภาพ...ให้ชมบนจอค่ะ" anyway. With
+    ANSWER_IMAGES the result now says no picture went up; without it the
+    sales room's result is unchanged."""
+    from app.config import settings
+    from app.tools import knowledge
+
+    monkeypatch.setattr(settings, "tool_groups", "knowledge,mydocs,units,calc,robot")
+    monkeypatch.setattr(knowledge, "confident_enough_to_show", lambda *a, **k: False)
+    monkeypatch.setattr(settings, "answer_images", True)
+    out = run(registry.dispatch("search_condo_info", {"query": "มีซาวน่าไหม"}))
+    assert "now_showing" not in out
+    assert out["note"].startswith("ไม่ได้ขึ้นภาพบนจอ ห้ามพูดว่ามีภาพให้ชม")
+    monkeypatch.setattr(settings, "answer_images", False)
+    out = run(registry.dispatch("search_condo_info", {"query": "มีซาวน่าไหม"}))
+    assert "ไม่ได้ขึ้นภาพบนจอ" not in out["note"]
 
 
 def test_a_lookup_that_finds_nothing_leaves_the_screen_alone(loaded):
@@ -475,3 +608,37 @@ def test_the_price_questions_still_get_caught_after_that_change():
                   "how much is a unit", "价格是多少", "いくらですか",
                   "얼마예요", "цена квартиры"):
         assert _is_commercial(query), query
+
+
+def test_a_refused_money_question_points_back_at_the_approved_facts(loaded):
+    """The slides are never a price source, but the approved facts block is.
+    The old instruction ("บอกลูกค้าตรงๆ ว่ายังไม่มีข้อมูลส่วนนี้") rode on the
+    tool result and beat the facts every time: live eval 2026-10-07 measured
+    0 of 30 price questions answered while condo_facts carried approved
+    starting prices. It must still forbid the captions and name sales."""
+    out = run(registry.dispatch("search_condo_info", {"query": "ราคาเริ่มต้นเท่าไหร่"}))
+    assert out["found"] is False and out["results"] == []
+    assert "ข้อมูลโครงการ' ใน system prompt" in out["instruction"]
+    assert "ห้ามเดาหรืออ้างอิงจากคำบรรยายภาพ" in out["instruction"]
+    assert "ส่งต่อทีมขาย" in out["instruction"]
+
+
+def test_nothing_in_the_slides_is_not_nothing_known(loaded):
+    """"ชั้น 3 มีอะไรบ้าง" and "โครงการอยู่ตรงไหน" were answered "no data"
+    in the live eval while the facts block listed both."""
+    out = run(registry.dispatch("search_condo_info", {"query": "zzzz ไม่มีอยู่จริง qqqq"}))
+    assert out["found"] is False
+    assert "ข้อมูลโครงการ' ใน system prompt" in out["instruction"]
+    assert "ห้ามเดา" in out["instruction"]
+
+
+def test_answering_from_the_facts_never_licenses_extending_them(loaded):
+    """Pointing the model at the facts block made it answer more — and, in
+    the 2026-10-08 re-test, extend: "Smart Security" (in-unit, concept)
+    became "ครอบคลุมทั้งโครงการ", the ban on guaranteeing returns became
+    "ไม่มีนโยบายการันตีค่าเช่า". Both instructions now say: only what is
+    written, no derived policy or condition."""
+    money = run(registry.dispatch("search_condo_info", {"query": "มีการันตีค่าเช่าไหม"}))
+    assert "ห้ามสรุปนโยบายหรือเงื่อนไขที่ไม่ได้เขียน" in money["instruction"]
+    nothing = run(registry.dispatch("search_condo_info", {"query": "zzzz ไม่มีอยู่จริง qqqq"}))
+    assert "ให้ตอบเฉพาะที่เขียนไว้ตรงๆ ห้ามขยายความ" in nothing["instruction"]

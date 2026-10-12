@@ -82,6 +82,11 @@ MULTI_SESSION_SAFE = frozenset({"units", "knowledge", "mydocs", "websearch"})
 #: a test asserts the two lists cannot drift apart.
 MULTI_SESSION_DEFAULT = frozenset({"units", "knowledge"})
 
+#: ROBOT_NAV_PANEL and ROBOT_NAV_VOICE values (design §2h). The first is the
+#: default and the fallback for anything else.
+NAV_PANEL_MODES = ("off", "pin", "open")
+NAV_VOICE_MODES = ("off", "unlocked", "on")
+
 
 @dataclass
 class Settings:
@@ -91,6 +96,13 @@ class Settings:
     # hats — forking was rejected on purpose, because twenty-plus fixed bugs
     # (Thai tokenisation, audio lead, mishearings) would need fixing twice.
     assistant_profile: str = os.getenv("ASSISTANT_PROFILE", "condo").strip().lower()
+    #: The condo prompt's layout (10 Oct 2026 experiment, owner: "เอามาปรับใช้
+    #: วัดค่าทดสอบ ว่ามันดีขึ้นไหม"). v1 = the gallery's prompt, byte for byte;
+    #: v2 = the same tuned sentences regrouped the way Gemini 3 / Realtime
+    #: prompting guides recommend (core rules first, labelled sections, data
+    #: in a tagged block last) -- see prompts.build_condo_v2. Measured with
+    #: scripts/eval_live_qa.py before it may become the default.
+    prompt_layout: str = os.getenv("PROMPT_LAYOUT", "v1").strip().lower()
 
     # Open the voice session the moment the page loads, no button and no
     # wake word first. The owner asked for this twice, knowing the trade:
@@ -201,6 +213,15 @@ class Settings:
     def call_mic_boost(self) -> float:
         return float(self.call_mic_boost_raw) if self.call_mic_boost_raw else self.mic_boost
 
+    def listens_far(self, profile: str | None) -> bool:
+        """Whether a call on this profile listens far (LISTEN_FAR_PROFILES).
+        A blank profile is the machine's default one, as the session reads it."""
+        return (profile or self.assistant_profile).strip().lower() in self.listen_far_profiles
+
+    def call_vad_floor(self, profile: str | None) -> float:
+        """The near-field floor a call on this profile opens with."""
+        return self.vad_min_rms_far if self.listens_far(profile) else self.vad_min_rms
+
     # --- Recognising faces at the door ---
     # Off by default, and for the usual reason: the showroom machine pulls
     # this repo and its behaviour must not change. A camera that starts
@@ -239,6 +260,17 @@ class Settings:
     # frame is a bad witness — blur, a turning head, someone crossing
     # behind. Same reasoning as the VAD's `min_silence_duration`.
     face_confirm_frames: int = int(os.getenv("FACE_CONFIRM_FRAMES", "3"))
+    #: For this many seconds after a face arrives, a frame that cannot
+    #: tell a colleague from a stranger — blurred, turned sideways, or
+    #: scoring in the band just under the naming bar — is not counted as
+    #: evidence of a stranger; the arrival gets that long to show a clear
+    #: frame first. Past it every frame counts as before, so a stranger is
+    #: greeted at most this much later. Measured 2026-10-08: blur that
+    #: drops a sharp-frame score of 0.73 to 0.46 reads as "a stranger" in
+    #: two frames, and the logs show colleagues greeted anonymously and
+    #: then recognised 20-90 s later. 0 = off (the old per-frame rule) —
+    #: the code default, so a machine that pulls this keeps its behaviour.
+    face_track_wait_s: float = float(os.getenv("FACE_TRACK_WAIT_S", "0"))
     #: How far the best match must lead the best match *of a different
     #: person* before the robot says a name. Two colleagues who resemble
     #: each other score close together, and "close second" is exactly the
@@ -324,6 +356,64 @@ class Settings:
     #: it). 0 = give up, the pre-2026-09-01 behaviour: greeting off until
     #: the server restarts, with nothing on the machine saying so.
     face_camera_retry_s: float = float(os.getenv("FACE_CAMERA_RETRY_S", "10"))
+    #: The face scan on the call screen (`/preview` hold menu, slot 1;
+    #: app/face_scan.py): staff PIN, the scanned person's own "ยินยอม", the
+    #: station's five poses, a name, straight into the live gallery. Off by
+    #: default for the reason every switch in this file is: the showroom
+    #: pulls this repo, and a pull must not give it a LAN endpoint that files
+    #: faces under typed names.
+    face_scan_enabled: bool = _get_bool("FACE_SCAN_ENABLED", False)
+    #: The staff PIN that opens a scan. Empty = the scan refuses to start
+    #: even when switched on: WS_TOKEN is blank on a localhost machine, and
+    #: then this PIN is the only thing between a passer-by and the gallery.
+    face_scan_pin: str = os.getenv("FACE_SCAN_PIN", "").strip()
+    #: A scan's whole lifetime from start — a hard deadline no step moves —
+    #: after which it is dropped, crops and all, on the clock with no request
+    #: needed; also how long the door camera's greeting stays off for it.
+    #: Capped at greeter.MAX_PAUSE_S (900). It used to be an idle timeout
+    #: each step refreshed, and a preview left open refreshed it forever
+    #: (review, 2026-09-29): the greeter stayed deaf for the rest of the day.
+    face_scan_session_s: float = float(os.getenv("FACE_SCAN_SESSION_S", "600"))
+    #: "Probably somebody we know" (owner 9 Oct 2026: far away, the robot
+    #: may recognise a face but not be sure). When the nearest face's best
+    #: match is a consented, enrolled person in the band under the naming
+    #: bar (facewatch.PROBABLE_LOW..FACE_THRESHOLD) — or far, blurred,
+    #: turned, or a close second — frames that would count toward "a
+    #: stranger" are held for up to this many seconds while the person
+    #: comes closer; the name is still said only on the usual rules. Past
+    #: it, or once they walk away, a stranger is greeted without a name as
+    #: before. 0 = off: the code default, so a pull changes nothing.
+    face_probable_wait_s: float = float(os.getenv("FACE_PROBABLE_WAIT_S", "0"))
+    #: The smallest face (px) the hold describes. Far faces below
+    #: FACE_MIN_PX are otherwise never described; with the hold on they are,
+    #: only to keep a probable arrival alive (they never greet). Measured
+    #: on the synthetic 1024x768 frames (scripts/eval_face_distance.py):
+    #: 33 of 35 faces at 30 px are not even detected, 2 of 35 at 40 px.
+    face_probable_min_px: int = int(os.getenv("FACE_PROBABLE_MIN_PX", "36"))
+    #: A closer look: ask the robot's face page for a q95 crop of the
+    #: tracked face at the camera's native resolution (camctl `crop`, the
+    #: answer rides /ws/camera as a tagged binary). Measured on synthetic
+    #: frames: a 40 px colleague's p10 score 0.459 -> 0.552 against the
+    #: q70 frame. Only with FACE_CAMERA_SOURCE=robot; off = nothing asked.
+    face_zoom_enabled: bool = _get_bool("FACE_ZOOM_ENABLED", False)
+    #: Let the page answer from `ImageCapture.takePhoto()` (only without a
+    #: flash, only when its photo is bigger than the video) instead of the
+    #: video frame. Unmeasured on the robot: turn on after its log line
+    #: "robot camera caps" shows a photo bigger than the video.
+    face_zoom_photo: bool = _get_bool("FACE_ZOOM_PHOTO", False)
+    #: The owner's "ขยับเพื่อเช็ค": turn the base in place toward a probable
+    #: far face (never toward it in a straight line). Refused on the dock,
+    #: while any walk runs or cannot be ruled out, with chassis motion off,
+    #: without lidar room, and while a conversation is live. Uses
+    #: robot_chassis.nudge (its own fences apply on top).
+    face_turn_to_check: bool = _get_bool("FACE_TURN_TO_CHECK", False)
+    #: Largest turn, degrees; never more than 30 whatever this says.
+    face_turn_max_deg: float = float(os.getenv("FACE_TURN_MAX_DEG", "30"))
+    #: The greeting gesture (group 6 = the verified handshake) only for a
+    #: named greeting with one face in frame — never a stranger, never two
+    #: people. Off = the gesture rides every camera greeting as before
+    #: (still behind ROBOT_GREETING_GESTURE_ENABLED and every arm gate).
+    face_handshake_named_only: bool = _get_bool("FACE_HANDSHAKE_NAMED_ONLY", False)
 
     # --- Wake word ("Emma") ---
     # Off by default: the gallery robot is started by staff each morning and
@@ -397,6 +487,12 @@ class Settings:
     broadlink_device_file: str = os.getenv(
         "BROADLINK_DEVICE_FILE", "data/broadlink_device.json"
     )
+    #: Names of the air conditioners in the room (owner, 2026-10-09: "เพิ่ม
+    #: แอร์ ... samsung", "เพิ่มเป็นตัวที่สอง"). Lists the extra units and the
+    #: code prefix each was learned under in IR_CODES_FILE. A unit takes part
+    #: only once its power codes are learned on THIS machine, so listing it
+    #: changes nothing until then; blank = the original AC only.
+    ir_devices_file: str = os.getenv("IR_DEVICES_FILE", "data/ir_devices.json")
 
     # Slide deck shown on the robot's screen. `index.json` alongside the
     # images maps each file to titles/summaries/keywords in both languages.
@@ -459,6 +555,17 @@ class Settings:
     #: but the number itself never leaves: it is stripped from the tool
     #: result, so neither the card nor Emma ever has it to show or say.
     units_show_price: bool = _get_bool("UNITS_SHOW_PRICE", False)
+    #: Whether Emma reads `pricing_unit_promotions` at all (list_promotions,
+    #: the card's promo badge, the tap-to-reveal promo figure).
+    #:
+    #: Off by default because the table cannot tell a test row from a real
+    #: offer: on 2026-10-06 it held 20 active "NET PRICE: 2,990,000 THB"
+    #: rows that the owner says are tests — "ของจริงไม่มี" — while the
+    #: approved facts say there is no promotion. With this on, Emma would
+    #: answer the same question two ways depending on which source she
+    #: picked, and the screen would list nineteen offers that do not exist.
+    #: Turn it on only once the rows in the sales system are real.
+    units_promotions: bool = _get_bool("UNITS_PROMOTIONS", False)
     #: Where the floor-plan images live. The sales app serves them as public
     #: static files on its Vercel deployment; floor->path comes from
     #: project sales/floor-plan-assets.json (copied from condo-inventory — recopy when
@@ -503,11 +610,14 @@ class Settings:
     # of (alongside) the exported images. Canva's view links refuse to be
     # embedded in an iframe (X-Frame-Options), so this isn't an embed — it's
     # a real, separate Chromium window driven by Playwright, the same way a
-    # person would click through it. Only slides from the deck that was
-    # exported to build this URL can be synced (id `ew-042` -> that deck's
-    # page 42); anything else on screen just doesn't move this window.
-    # Leave CANVA_URL blank to skip all of this — nothing below runs.
+    # person would click through it. Only slides in the measured page map
+    # (presentations/slides/canva_pages.json, whose deck_url must name the
+    # same design as this URL) can be synced; anything else on screen just
+    # doesn't move this window. Leave CANVA_URL blank to skip all of this.
     canva_url: str = os.getenv("CANVA_URL", "")
+    # Names the ids a new Canva import gets (scripts/import_canva_export.py).
+    # No longer a sync gate: the 2026-10-06 library is intro-NNN and the
+    # measured map, not the id spelling, says which page shows which slide.
     canva_deck_prefix: str = os.getenv("CANVA_DECK_PREFIX", "ew")
     # Headless has no window to put on a screen — false is what you want for
     # an actual gallery display; true is only useful for a smoke test.
@@ -591,6 +701,15 @@ class Settings:
     # narration has finished playing. A presenter pauses before moving on;
     # zero makes the deck feel like it is being flipped through.
     slide_pause_s: float = float(os.getenv("SLIDE_PAUSE_S", "0.8"))
+    #: Show the one approved picture that matches an answer (search_condo_info)
+    #: on a machine that does NOT load the `slides` group — the picture, not
+    #: the presentation. The owner took the deck off twice (11 Sep, 8 Oct) and
+    #: on 2026-10-11 asked for pictures back: "ให้บริการ / ให้ชม อาจจะเป็น
+    #: รูปภาพให้เขาดู ไม่ได้หมายถึงพาไปดู" -> "ทุกเรื่องที่มีภาพตรง". Off by
+    #: default so a pull leaves the sales room's screen exactly as it was;
+    #: the robot turns it on in data/robot-server/robot.env, and
+    #: scripts/robot_server.py then ships the 48 manifest-pinned pictures.
+    answer_images: bool = _get_bool("ANSWER_IMAGES", False)
     #: How long a slide's question waits for an answer before the tour moves
     #: on by itself. Long enough that a guest who is thinking isn't cut off,
     #: short enough that a room full of people who won't talk to a robot
@@ -753,6 +872,66 @@ class Settings:
     robot_arm_adb_serial: str = os.getenv("ROBOT_ARM_ADB_SERIAL", "")
     robot_arm_timeout_s: float = float(os.getenv("ROBOT_ARM_TIMEOUT_S", "8.0"))
 
+    # --- Body by voice + navigation from the robot face ---
+    # docs/emma-body-nav-design-2026-10-08.md §2h. Every one of these is off
+    # (or inert) by default and the robot has its own key on top, because the
+    # sales room pulls this repo and must not change on a pull. None of it has
+    # run on the robot yet.
+    #
+    #: Server key for `move_body`. The `body` group must also be named in
+    #: TOOL_GROUPS (it is opt-in), the robot must have `body_enabled`, and the
+    #: ROBOT_ARM_* interlock above still applies — this adds a key, it never
+    #: replaces one.
+    robot_body_enabled: bool = _get_bool("ROBOT_BODY_ENABLED", False)
+    robot_body_ack_timeout_s: float = float(os.getenv("ROBOT_BODY_ACK_TIMEOUT_S", "2.5"))
+    #: The heard-word guard (the `heard.py` precedent: "bit like" closed the
+    #: deck). A body tool call asks instead of moving unless a fresh caption
+    #: of this session holds the action's verb.
+    robot_body_require_heard: bool = _get_bool("ROBOT_BODY_REQUIRE_HEARD", True)
+    #: Voice nav on the robot face goes to the on-robot launcher, and the
+    #: chassis planner refuses moves — one navigation system at a time.
+    robot_nav_routes_enabled: bool = _get_bool("ROBOT_NAV_ROUTES_ENABLED", False)
+    robot_nav_ack_timeout_s: float = float(os.getenv("ROBOT_NAV_ACK_TIMEOUT_S", "3.0"))
+    robot_nav_places_file: str = os.getenv("ROBOT_NAV_PLACES_FILE", "data/robot-places/floor2.json")
+    #: Server-side pre-check only (review 2, finding #16): the app and the
+    #: launcher refuse a voice go on an unverified leg whatever this says,
+    #: so on a real robot true only moves `leg_unverified` from the server
+    #: to the robot. Kept for scripts/eval_live_qa.py's scripted robot.
+    robot_nav_voice_unverified: bool = _get_bool("ROBOT_NAV_VOICE_UNVERIFIED", False)
+    robot_nav_require_heard: bool = _get_bool("ROBOT_NAV_REQUIRE_HEARD", True)
+    #: off | unlocked | on. The robot face talks to the public and "ไป" is in
+    #: almost every sentence, so a verified leg plus a heard word was not
+    #: enough to let a passer-by send the robot down the corridor (safety
+    #: review #6). Anything unrecognised reads as `off`.
+    robot_nav_voice: str = os.getenv("ROBOT_NAV_VOICE", "off").strip().lower()
+    #: Oldest caption the body/nav heard guard accepts, in seconds.
+    robot_heard_max_age_s: float = float(os.getenv("ROBOT_HEARD_MAX_AGE_S", "10"))
+    #: off | pin | open — the face page's นำทาง slot. Forced to `off` at boot
+    #: while routes are off (see `__post_init__`); read it through
+    #: `nav_panel_mode()`, which re-applies that rule at runtime.
+    robot_nav_panel: str = os.getenv("ROBOT_NAV_PANEL", "off").strip().lower()
+    #: What .env asked for before the boot rule, so the warning can be
+    #: repeated by whoever logs the boot (the import-time line may go to a
+    #: stderr nobody reads).
+    nav_boot_warnings: list[str] = field(default_factory=list, init=False, repr=False)
+    robot_nav_pin: str = os.getenv("ROBOT_NAV_PIN", "").strip()
+    #: Silence during a voice run before one announcement; also the "stale"
+    #: bound of `robot_face_link.nav_activity()`.
+    robot_nav_status_stale_s: float = float(os.getenv("ROBOT_NAV_STATUS_STALE_S", "20"))
+    #: When set, the face session counts as the robot face only after a
+    #: matching `face_hello`. Empty = the user agent decides, as before. The
+    #: ROBOT_TOKEN/robot_ready fix of 1 Sep, applied to the face.
+    robot_face_token: str = _get_token("ROBOT_FACE_TOKEN")
+    #: `turn_complete` sets `turn_idle` only when no tool call is in flight
+    #: (gemini-3.8 sends turn_complete before its tool call in 13/15 turns,
+    #: docs/emma-live-qa-eval-2026-10-08.md). Off: the sales room's announce
+    #: and nudge timing must not change on a pull.
+    turn_idle_tracks_tools: bool = _get_bool("TURN_IDLE_TRACKS_TOOLS", False)
+    #: Wait after `turn_idle` before an announcement. 0 = no sleep and no
+    #: extra check. Revision 1 of the design had 0.8, which would have
+    #: changed condo timing; P6 measures the gap, the owner sets it.
+    announce_settle_s: float = float(os.getenv("ANNOUNCE_SETTLE_S", "0.0"))
+
     # --- Server ---
     host: str = os.getenv("HOST", "0.0.0.0")
     port: int = int(os.getenv("PORT", "8000"))
@@ -817,6 +996,15 @@ class Settings:
     # Local Silero only: reject clicks/bumps that resemble speech for one or
     # two frames. Pre-roll preserves the beginning while the detector waits.
     vad_min_speech_ms: int = int(os.getenv("VAD_MIN_SPEECH_MS", "250"))
+    # Local Silero only: "speaker focus" for the END of a turn. Once a
+    # segment is open, audio quieter than this fraction of the speaker's own
+    # recent level counts as silence for the end-of-turn clock (it is still
+    # forwarded). Measured 2026-10-08: background talk 14 dB under the
+    # speaker kept the turn open until the room went quiet (8 s+ in the
+    # test mix; up to the 60 s valve in a busy gallery); 0.30 ends it ~1.5 s
+    # after the speaker stops, and split none of 51 real call segments
+    # (0.35 split one: the same speaker, 4 dB softer). 0 = off (old chain).
+    vad_focus_ratio: float = float(os.getenv("VAD_FOCUS_RATIO", "0.30"))
 
     # Gemini only. Read these carefully — the names are the opposite of what
     # they sound like:
@@ -829,11 +1017,49 @@ class Settings:
     vad_end_sensitivity: str = os.getenv("VAD_END_SENSITIVITY", "HIGH")      # HIGH | LOW
 
     # Half-duplex: stop sending microphone audio while the assistant is
-    # speaking. Kills barge-in, but it's the reliable cure when speaker
+    # speaking. Kills barge-in in ordinary modes; the EmmaJoke preview *can*
+    # use an acoustic duck-and-check gate to admit a person who talks over
+    # her — see ECHO_BARGE below. This is the reliable cure when speaker
     # output feeds back into the mic (laptop speakers, no headphones, no
     # hardware echo cancellation). Prefer headphones or a robot with
     # hardware AEC and leave this off.
     half_duplex: bool = _get_bool("HALF_DUPLEX", False)
+
+    # The EmmaJoke barge-in exception (a page that loaded the acoustic gate
+    # may interrupt her mid-sentence). Off by default since 2026-09-30 —
+    # the owner tried it for a morning and ordered it out ("เอาพูดแทรกออก"):
+    # the duck-and-check made her voice stutter, and being uninterruptible
+    # was the lesser evil. The gate code stays; flip this to try it again.
+    # Only ever applies to profile=joke + a page advertising echo_barge=1,
+    # so the sales-room default is unchanged either way.
+    echo_barge: bool = _get_bool("ECHO_BARGE", False)
+
+    # The standing line (owner, 2026-09-30 "ทำเลย" on: ต่อสาย Gemini ค้างไว้
+    # เวลาทักจะได้ไว). app/standing.py rings the standby browser whenever no
+    # session is live, and session.py holds that summoned line open while it
+    # is still virgin (ungreeted, nobody heard) instead of abandoning it at
+    # 30s — so a face greeting costs a turn, not a 2-3s dial. A line that
+    # HAS been used still dies by the ordinary idle rules: one visitor's
+    # words must not sit in the model's context when the next one walks up,
+    # and the loop then rings a fresh line. Costs ~nothing while idle only
+    # because local VAD never streams silence; do not enable with
+    # VAD_MODE=gemini. Off by default — the sales machine keeps wake/button.
+    standing_line: bool = _get_bool("STANDING_LINE", False)
+
+    # Hold-speech (owner, 2026-09-30 "ทำเลย"): the third road between
+    # barge-in (any noise cuts her sentence — rejected the same morning) and
+    # plain half-duplex (words spoken while she talks are DROPPED, and
+    # people talk over her constantly). With this on, a half-duplex page
+    # keeps capturing during her speech, queues what clears the floor below,
+    # and sends it the moment her audio finishes — she always finishes her
+    # sentence, and the person never has to repeat theirs. The floor is what
+    # makes it safe on the robot WITHOUT the duck-and-check that stuttered:
+    # her own speaker echo measured ~0.025 peak in the robot's mic
+    # (2026-09-14) while real speech lands 0.06+, so 0.04 passes the person
+    # and starves the echo. Only meaningful with HALF_DUPLEX on and barge-in
+    # off; old pages ignore the flag and keep dropping (safe).
+    hold_speech: bool = _get_bool("HOLD_SPEECH", False)
+    hold_speech_floor: float = float(os.getenv("HOLD_SPEECH_FLOOR", "0.04"))
 
     # Who decides when speech starts and ends.
     #   gemini (default) — Google's server-side detection; the mic streams
@@ -859,6 +1085,160 @@ class Settings:
     #: Tune from the "vad floor: ... rms=X" log lines, not from theory —
     #: the first guess here was wrong by 3x for exactly this reason.
     vad_min_rms: float = float(os.getenv("VAD_MIN_RMS", "0"))
+    #: Which assistant profiles listen FAR instead of near (owner, 2026-09-29:
+    #: "แต่ละโหมดฟังเสียงต่างกัน บางโหมดจะต้องฟังเสียงคนด้านหน้า บางโหมด
+    #: สามารถฟังได้ไกล" — EmmaJoke and the interpreter far, the sales host near).
+    #: Blank = no split: every profile keeps exactly today's chain (MIC_AGC,
+    #: VAD_MIN_RMS), so a machine that never asked is unchanged. Set = the
+    #: split is real on BOTH ends: a far profile gets browser AGC on and the
+    #: VAD_MIN_RMS_FAR floor; every other profile gets AGC OFF and the
+    #: VAD_MIN_RMS floor. AGC off is not a side effect — AGC is what let a
+    #: near-field call hear the whole room (the robot, 7/15 turns from
+    #: somebody else), so a "near" mode that kept it would not be near.
+    listen_far_profiles: frozenset = frozenset(
+        p.strip().lower() for p in os.getenv("LISTEN_FAR_PROFILES", "").split(",") if p.strip())
+    #: The loudness floor for a far-listening call. 0 = none: Silero alone
+    #: decides what is speech, and SILENCE_RMS still stands underneath.
+    vad_min_rms_far: float = float(os.getenv("VAD_MIN_RMS_FAR", "0"))
+
+    # ---- listening focus: talk to the person in front of the camera ----
+    # Owner, 9 Oct 2026: the robot answered people chatting nearby ("เป็นเสียง
+    # คนคุยกันปกติ") and asked to talk only with whom it sees, separate
+    # voices, and know who is speaking. app/focus.py arbitrates; spec in
+    # docs/listening-focus-2026-10-09.md. Every switch is OFF by default:
+    # the sales room (no robot camera) must behave byte-identically.
+    #: Master switch. Off = none of the focus inputs change what is heard.
+    focus_enabled: bool = _get_bool("FOCUS_ENABLED", False)
+    #: A speech segment may open only while a face is "engaged": seen within
+    #: FOCUS_HOLD_S, at least FOCUS_FACE_MIN_PX wide (a distance proxy), and
+    #: turned toward the robot within FOCUS_YAW_MAX_DEG.
+    focus_require_face: bool = _get_bool("FOCUS_REQUIRE_FACE", True)
+    focus_face_min_px: int = int(os.getenv("FOCUS_FACE_MIN_PX", "90"))
+    focus_yaw_max_deg: float = float(os.getenv("FOCUS_YAW_MAX_DEG", "35"))
+    focus_hold_s: float = float(os.getenv("FOCUS_HOLD_S", "1.5"))
+    #: Tell the model who is speaking each turn ("ผู้พูด: คนที่ 1 / คุณ…").
+    focus_speaker_labels: bool = _get_bool("FOCUS_SPEAKER_LABELS", False)
+    # ---- engagement: behave like an established reception robot ----
+    # Owner, 9 Oct 2026: "ลองปรับให้เหมือนหุ่นต้อนรับอื่นให้ดีที่สุด" (Google
+    # Look and Talk, Pepper's engagement modes, Furhat's attention). Every
+    # switch is OFF by default and every one needs FOCUS_ENABLED: off, the
+    # call path is the focus path above, byte for byte. Spec section
+    # "Engagement" in docs/listening-focus-2026-10-09.md.
+    #: Look and Talk's "out of the zone, say the name": the wake-word
+    #: detector (app/wake.py's model and spellings, its OWN bar below) runs on
+    #: the audio of a camera-opened call. Hearing "Emma" opens a window in
+    #: which focus rule 2 (a face in front) is waived; rules 3-5 still judge
+    #: every face in view. app/call_wake.py has the CPU measurement.
+    focus_wake: bool = _get_bool("FOCUS_WAKE", False)
+    #: The in-call bar, scaled per spelling exactly like WAKE_THRESHOLD.
+    #: Measured 9 Oct on 677 s of real call audio (data/call_debug): 0.10,
+    #: 0.12 and 0.15 fire 4 times, 0.20 three -- a stricter bar barely buys
+    #: anything there -- while 0.15 already halves the owner's real name
+    #: clips caught (4 -> 2 of 60) and 0.25 loses the Thai female fixture.
+    focus_wake_threshold: float = float(os.getenv("FOCUS_WAKE_THRESHOLD", "0.10"))
+    #: How long after the name an out-of-view voice is heard.
+    focus_wake_window_s: float = float(os.getenv("FOCUS_WAKE_WINDOW_S", "10"))
+    #: Pepper's BasicAwareness (turn toward a voice), in words: an out-of-view
+    #: caller is invited to step in front, once, through events.announce.
+    focus_invite: bool = _get_bool("FOCUS_INVITE", False)
+    #: At most one invitation per this many seconds per call.
+    focus_invite_every_s: float = float(os.getenv("FOCUS_INVITE_EVERY_S", "60"))
+    #: Also invite when this many "no face in front" denials in 20 s came
+    #: from ONE direction (the array's DOA) -- somebody clearly talking to the
+    #: robot from outside the lens without the name. 0 = off: without a
+    #: bearing it cannot tell calling from chatting, and with one it still
+    #: invites two people chatting side by side. Measure before turning on.
+    focus_invite_denied_n: int = int(os.getenv("FOCUS_INVITE_DENIED_N", "0"))
+    #: Pepper's engagement modes. semi = today (anybody engaged in front can
+    #: speak; rule 5 lets a second customer join). full = once a main person
+    #: is established (the session's main speaker, focus._main_person) every
+    #: other face or voice is ignored until that person leaves (none of their
+    #: face tracks engaged for FOCUS_HOLD_S), then anyone may engage.
+    focus_engage_mode: str = os.getenv("FOCUS_ENGAGE_MODE", "semi").strip().lower()
+    #: Furhat's attention cue: the robot face's mascot turns its head toward
+    #: whoever is speaking (focus.attention), over the call's own socket.
+    focus_attention: bool = _get_bool("FOCUS_ATTENTION", False)
+    #: A brief goodbye when the person a camera-opened conversation was with
+    #: walks away mid-conversation, then the call ends (the standing line
+    #: rings a fresh one). Off: a person reading a brochure loses their face
+    #: for seconds too -- tune FOCUS_GOODBYE_AFTER_S from `focus_gap` rows
+    #: (written whenever focus is on) before turning it on.
+    focus_goodbye: bool = _get_bool("FOCUS_GOODBYE", False)
+    focus_goodbye_after_s: float = float(os.getenv("FOCUS_GOODBYE_AFTER_S", "8"))
+    #: Active speaker: mouth movement of each face, from facial landmarks on
+    #: face crops at ASD_FPS (the robot camera page sends faster while on).
+    asd_enabled: bool = _get_bool("ASD_ENABLED", False)
+    asd_fps: float = float(os.getenv("ASD_FPS", "15"))
+    #: Voice prints per speech segment (sherpa-onnx speaker embedding),
+    #: clustered per session only -- never stored across sessions.
+    voiceprint_enabled: bool = _get_bool("VOICEPRINT_ENABLED", False)
+    voiceprint_model: str = os.getenv("VOICEPRINT_MODEL", "")
+    #: Direction of arrival from the robot's mic array (the face app reads
+    #: the 8-channel Bothlent array natively and reports TDOA features).
+    doa_enabled: bool = _get_bool("DOA_ENABLED", False)
+    # ---- the array as the conversation's ears (app/array_audio.py) ----
+    # Owner, 9 Oct 2026: "คุยได้แบบไม่ติดขัดแม้จะมีคนเยอะ". Every switch below
+    # is OFF by default and needs DOA_ENABLED (the link it rides on, and the
+    # calibration it steers with): the sales room has no array and must stay
+    # byte-identical, doa_ready included.
+    #: The robot app beamforms channels 0-3 toward the focus target (the
+    #: engaged face that last spoke, else the nearest engaged face) and sends
+    #: the mono 16 kHz result up /ws/robot-doa; the robot face's session uses
+    #: it instead of the page's mic while it is live, and falls back to the
+    #: page the moment it is not (app/array_audio.py). The array has no AEC:
+    #: nothing it hears is forwarded while Emma's audio may be playing.
+    array_audio: bool = _get_bool("ARRAY_AUDIO", False)
+    #: ds = delay-and-sum: cannot hurt the target, but buys little on a ~6 cm
+    #: array (synthetic rooms: +0.1..+0.4 dB SIR, +1.0..+1.4 dB SNR).
+    #: mvdr = noise covariance learned on hops the target is not talking in:
+    #: +5.7..+9.0 dB SIR on a 4-mic circle, +1.2..+1.8 on a line -- and on a
+    #: line steered 8-15 degrees wrong the target loses 1-2.6 dB. The real
+    #: geometry is unknown: A/B on the robot (app/array_audio.py has steps).
+    array_audio_beam: str = os.getenv("ARRAY_AUDIO_BEAM", "ds").strip().lower()
+    #: What the array sends with no target (no calibration yet, nobody in
+    #: front): mic0 (one raw microphone) or average (the plain mean of four).
+    #: mic0 by default: four UNALIGNED mics averaged comb-filter the voice --
+    #: log-spectral distance 12-19 dB on the synthetic circle vs 0.2 steered.
+    array_audio_unsteered: str = os.getenv("ARRAY_AUDIO_UNSTEERED", "mic0").strip().lower()
+    #: Gain on the array stream before it reaches the VAD (its level is not
+    #: the page's: no browser chain). Tune from `array_report` rows
+    #: (page_rms vs array_rms of the same moments), never from theory.
+    array_audio_gain: float = float(os.getenv("ARRAY_AUDIO_GAIN", "1.0"))
+    #: Array audio older than this (no chunk arrived) = the stream is not
+    #: live: the next page frame goes up instead. 120, not the first 60
+    #: (review 10 Oct): "older" is measured when the event loop gets to the
+    #: page frame, so ANY loop stall longer than this reads as a dead array
+    #: -- the page frames and beam chunks queued during the stall are
+    #: processed in socket order, and the page frame first sees a beam clock
+    #: that stopped when the loop did. 60 ms is under four 16 ms hops and
+    #: well under asyncio's own 100 ms "slow callback" bar; on the robot the
+    #: server shares an RK3588 with face, ASD and DOA threads under one GIL.
+    #: A false fallback is not lost audio (the page frame goes up at once)
+    #: but it splices microphones mid-utterance, holds the page mic until the
+    #: next boundary, and puts `fallback` in array_report -- the very count
+    #: the robot A/B reads as "the array is flaky". 120 = PAGE_GAP_S, the
+    #: tap's bar for "the PAGE stream stopped" on the same loop; the price is
+    #: a real death's hole of up to ~140 ms instead of ~80. Not measured on
+    #: the robot yet: tune from array_report `max_gap_ms` (the longest chunk
+    #: gap the server saw since the last row), never from theory.
+    array_audio_stale_ms: int = int(os.getenv("ARRAY_AUDIO_STALE_MS", "120"))
+    #: After Emma's audio (the server's own playback clock), the array stays
+    #: closed this long. Shorter than the page's own 350 ms echo guard on
+    #: purpose: the page reopening is then the moment the array comes back.
+    array_audio_echo_tail_s: float = float(os.getenv("ARRAY_AUDIO_ECHO_TAIL_S", "0.25"))
+    #: Debug only (channels 4-7 question): with this on, an adb broadcast on
+    #: the robot uploads N seconds of the RAW 8-channel capture to
+    #: data/array_capture8/ARRAY8-TEST-*.s16le, deleted ARRAY_CAPTURE8_KEEP_MIN
+    #: minutes after it was made. Room audio on disk: on only for the test.
+    array_capture8: bool = _get_bool("ARRAY_CAPTURE8", False)
+    array_capture8_keep_min: float = float(os.getenv("ARRAY_CAPTURE8_KEEP_MIN", "10"))
+    #: Light speech enhancement (sherpa-onnx GTCRN, 16 kHz, streaming) on the
+    #: call stream before the VAD. Off: measured (scripts/eval_enhance.py) it
+    #: rescues Silero in fan/HVAC-type noise but not against other people's
+    #: speech -- the robot's problem -- and made babble+noise at 0 dB worse
+    #: (app/enhance.py has the numbers). Never together with the page's NS.
+    enhance_enabled: bool = _get_bool("ENHANCE_ENABLED", False)
+    enhance_model: str = os.getenv("ENHANCE_MODEL", "data/enhance/gtcrn_simple.onnx")
     #: Near-field floor exceptions. Grace preserves a wake word tail while a
     #: session opens; summoned bypass lets a camera-opened conversation hear
     #: a reply from the doorway. A robot intended to hear only nearby people
@@ -952,6 +1332,10 @@ class Settings:
     search_reranker_candidates: int = int(os.getenv("SEARCH_RERANKER_CANDIDATES", "8"))
 
     def __post_init__(self) -> None:
+        # Before the condo-only checks below, which return early for every
+        # other profile — the robot face runs `joke`, and the boot rule must
+        # hold there most of all.
+        self._apply_body_nav_boot_rules()
         if self.assistant_profile != "condo":
             return
         identity = project_identity(self.project_id)
@@ -959,6 +1343,61 @@ class Settings:
             raise ValueError("PROJECT_NAME does not match PROJECT_ID")
         if self.inventory_project != identity["inventory_slug"]:
             raise ValueError("INVENTORY_PROJECT does not match PROJECT_ID")
+
+    def _apply_body_nav_boot_rules(self) -> None:
+        """Normalise the two mode switches and force the nav panel off
+        while routes are off, loudly.
+
+        The panel with the old chassis planner still live is two navigation
+        systems on one set of wheels (design §2h, safety review #3). A
+        warning and a forced `off`, not a refusal to boot: the
+        `warn_if_open_to_the_network` precedent — a showroom that will not
+        start twenty minutes before opening is worse than one that starts
+        loudly with the risky part switched off. A typo reads as `off`, the
+        same rule as an unknown profile reading as condo.
+        """
+        import logging
+
+        log = logging.getLogger("condo_voice.config")
+        notes: list[str] = []
+        voice = (self.robot_nav_voice or "").strip().lower()
+        if voice not in NAV_VOICE_MODES:
+            notes.append("ROBOT_NAV_VOICE=%r is not off/unlocked/on — using off" % voice)
+            voice = "off"
+        self.robot_nav_voice = voice
+        panel = (self.robot_nav_panel or "").strip().lower()
+        if panel not in NAV_PANEL_MODES:
+            notes.append("ROBOT_NAV_PANEL=%r is not off/pin/open — using off" % panel)
+            panel = "off"
+        if panel != "off" and not self.robot_nav_routes_enabled:
+            notes.append(
+                "SAFETY: ROBOT_NAV_PANEL=%s FORCED OFF because "
+                "ROBOT_NAV_ROUTES_ENABLED=false — taps through the panel while "
+                "the chassis planner still takes moves would be two navigation "
+                "systems on one set of wheels. Turn routes on to use the panel."
+                % panel)
+            panel = "off"
+        self.robot_nav_panel = panel
+        self.nav_boot_warnings = notes
+        for line in notes:
+            log.warning(line)
+
+    def nav_panel_mode(self) -> str:
+        """The นำทาง slot's mode as it may be used *now*.
+
+        The boot rule above runs once, on .env values; a value set later (a
+        test, a console) would skip it. Every reader goes through here, so
+        "panel on while routes off" cannot happen at runtime either.
+        """
+        panel = (self.robot_nav_panel or "").strip().lower()
+        if panel not in NAV_PANEL_MODES or not self.robot_nav_routes_enabled:
+            return "off"
+        return panel
+
+    def nav_voice_mode(self) -> str:
+        """`ROBOT_NAV_VOICE` as it may be used now; anything else is `off`."""
+        voice = (self.robot_nav_voice or "").strip().lower()
+        return voice if voice in NAV_VOICE_MODES else "off"
 
     def api_key_for(self, provider: str | None = None) -> str | None:
         return self.gemini_api_key if (provider or self.provider) == "gemini" else self.openai_api_key

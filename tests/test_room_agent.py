@@ -7,6 +7,8 @@ behind it — a gate that is only tested through its own helper is a gate the
 next caller can walk around.
 """
 
+import dataclasses
+import inspect
 import json
 
 import pytest
@@ -54,8 +56,13 @@ def test_health_says_which_room_and_whether_it_is_armed(agent):
     assert body["ok"] is True
     assert body["room"] == "ห้องทดสอบ"
     assert body["armed"] is True
-    # The action list IS the contract. A server reading this knows exactly what
-    # this machine will do, without a version number to compare.
+    # The action list IS the compatibility contract: a server reading this knows
+    # exactly what this machine will do. code_version is a separate thing -- just
+    # enough for the console to see a self-update took (it changes with the code).
+    assert isinstance(body["code_version"], str) and body["code_version"]
+    # a MAC hint (or blank) so the console can fill rooms.json for Wake-on-LAN
+    m = body["mac_hint"]
+    assert m == "" or (len(m) == 17 and m.count(":") == 5)
     assert body["programs"] == ["notepad"]
     # The catalogue is published in full, the enabled list is what is live.
     assert set(body["catalogue"]) == set(room_agent.CAPABILITIES)
@@ -226,6 +233,127 @@ def test_the_catalogue_and_its_risk_labels_stay_honest():
         "list_windows", "screenshot", "screen"}
 
 
+def test_reboot_and_shutdown_are_act_and_honest():
+    """Power actions are `act` (not input), Windows-guarded, and must not run in
+    a test -- so this only inspects them, never calls them. shutdown must be
+    honest that the PC cannot be powered back on from here."""
+    for name in ("reboot", "shutdown"):
+        cap = room_agent.CAPABILITIES.get(name)
+        assert cap is not None and cap.risk == "act", name
+    src_r = inspect.getsource(room_agent.reboot)
+    src_s = inspect.getsource(room_agent.shutdown)
+    assert '"/r"' in src_r and "_unsupported" in src_r     # restart; no-op off Windows
+    assert '"/s"' in src_s and "_unsupported" in src_s     # shutdown
+    assert "Wake-on-LAN" in src_s                          # says it cannot power back on from here
+
+
+def _agent_bundle(extra=None):
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("run_room_agent.py", "run = 1\n")
+        zf.writestr("app/room_agent.py", "agent = 2\n")
+        zf.writestr("app/tools/computer.py", "tools = 3\n")
+        for name, body in (extra or {}).items():
+            zf.writestr(name, body)
+    return buf.getvalue()
+
+
+def test_apply_update_bundle_writes_code_and_rejects_junk(tmp_path):
+    """The self-update writes only the agent code, from a validated bundle, into
+    a staging-then-swap. Pure file work -- no network, no restart -- so it is
+    unit-tested here rather than by running the real `update`."""
+    target = tmp_path / "install"
+    assert room_agent._apply_update_bundle(_agent_bundle(), target)["ok"] is True
+    assert (target / "run_room_agent.py").read_text() == "run = 1\n"
+    assert (target / "app" / "room_agent.py").read_text() == "agent = 2\n"
+    assert room_agent._apply_update_bundle(b"not a zip", target)["ok"] is False
+    # a zip that is not an agent is refused
+    import io
+    import zipfile
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as zf:
+        zf.writestr("random.txt", "hi")
+    assert room_agent._apply_update_bundle(b.getvalue(), target)["ok"] is False
+    # a path that escapes the tree is refused
+    r = room_agent._apply_update_bundle(_agent_bundle({"../evil.py": "boom"}), target)
+    assert r["ok"] is False and "unsafe" in r["error"]
+    # a drive-letter / colon path is refused too (C:evil, C:/…)
+    r = room_agent._apply_update_bundle(_agent_bundle({"C:evil.py": "boom"}), target)
+    assert r["ok"] is False and "unsafe" in r["error"]
+
+
+def _bundle_with(app_body: str) -> bytes:
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("run_room_agent.py", "run = 1\n")
+        zf.writestr("app/room_agent.py", app_body)
+    return buf.getvalue()
+
+
+def test_apply_update_refuses_code_that_does_not_import_and_touches_nothing(tmp_path):
+    """The gate that makes self-update safe: a bundle whose agent will not even
+    import must be rejected BEFORE it replaces the live code, not discovered
+    after the swap when the agent is down and nobody is at the machine."""
+    target = tmp_path / "install"
+    (target / "app").mkdir(parents=True)
+    (target / "app" / "room_agent.py").write_text("old = 1\n")
+    r = room_agent._apply_update_bundle(_bundle_with("def broken(:\n"), target)
+    assert r["ok"] is False and "does not run" in r["error"]
+    assert (target / "app" / "room_agent.py").read_text() == "old = 1\n"     # untouched
+    assert not (target / "app.prev").exists()
+
+
+def test_apply_update_keeps_the_old_code_in_app_prev_for_rollback(tmp_path):
+    """A good update swaps atomically and leaves the previous code in app.prev,
+    which is what the supervisor restores if the new code fails to boot."""
+    target = tmp_path / "install"
+    (target / "app").mkdir(parents=True)
+    (target / "app" / "room_agent.py").write_text("old = 1\n")
+    (target / "run_room_agent.py").write_text("oldrun = 1\n")
+    assert room_agent._apply_update_bundle(_agent_bundle(), target)["ok"] is True
+    assert (target / "app" / "room_agent.py").read_text() == "agent = 2\n"        # new is live
+    assert (target / "app.prev" / "room_agent.py").read_text() == "old = 1\n"     # old is kept
+
+
+def test_update_refuses_a_bundle_whose_hash_does_not_match(monkeypatch):
+    """The console attaches the sha256 it built locally; a rogue LAN host serving
+    different bytes over plain HTTP fails the check and nothing is applied."""
+    import urllib.request
+
+    monkeypatch.setenv("ROOM_AGENT_UPDATE_URL", "http://x/agent-bundle")
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self, n=-1): return b"pretend-bundle-bytes"
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Resp())
+
+    def _must_not_apply(*a, **k):
+        raise AssertionError("a hash mismatch must be refused before applying")
+    monkeypatch.setattr(room_agent, "_apply_update_bundle", _must_not_apply)
+
+    r = room_agent.update(sha256="deadbeefdeadbeef")    # not the hash of those bytes
+    assert r["ok"] is False and "integrity" in r["error"]
+
+
+def test_update_refuses_without_a_configured_source(monkeypatch):
+    """No ROOM_AGENT_UPDATE_URL -> it does nothing (no network, no restart), so
+    this is safe to call. The source is fixed in .env, never in the request."""
+    monkeypatch.delenv("ROOM_AGENT_UPDATE_URL", raising=False)
+    r = room_agent.update()
+    assert r["ok"] is False and "no update source" in r["error"]
+
+
+def test_update_is_a_listed_act_capability():
+    cap = room_agent.CAPABILITIES.get("update")
+    assert cap is not None and cap.risk == "act"
+
+
 def test_every_listed_action_exists_on_the_machine_side(agent):
     """The map and the functions cannot drift apart.
 
@@ -308,19 +436,75 @@ def test_the_agent_reads_the_env_file_sitting_next_to_it():
         assert load.start() < read.start(), f"{setting} is read before .env is loaded"
 
 
-def test_the_agent_logs_to_a_file_when_run_headless():
-    """Under pythonw (the background start and the scheduled task) a detached
-    process has no console -- sys.stdout/stderr are None and uvicorn's logging
-    writes there, which is why the foreground python.exe came up on a real target
-    while the background pythonw did not (2026-09-25). run_room_agent redirects to
-    a logfile when headless, BEFORE importing/starting the app, which both fixes
-    the start and leaves a trace to diagnose."""
+def _load_supervisor():
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "run_room_agent.py"
+    spec = importlib.util.spec_from_file_location("run_room_agent_under_test", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_the_supervisor_runs_the_agent_as_a_child_and_logs_headless():
+    """run_room_agent is a supervisor: it runs the agent as a CHILD process so a
+    self-update can restart it (and roll a bad one back) without anyone at the
+    room PC. Under pythonw a detached process has no console, so it still points
+    a logfile at the child (the 2026-09-25 headless-start fix)."""
     from pathlib import Path
 
     src = (Path(__file__).resolve().parent.parent / "run_room_agent.py").read_text(encoding="utf-8")
-    assert "_redirect_output_when_headless" in src
+    assert "_log_stream" in src                        # headless logging kept
     assert "pythonw" in src and "agent.log" in src
-    assert src.index("_redirect_output_when_headless()") < src.index("from app.room_agent import main")
+    assert "app.room_agent" in src and "Popen" in src  # the agent runs as a child
+    assert "UPDATE_EXIT_CODE" in src and "app.prev" in src   # restart + rollback
+
+
+def test_the_supervisor_relaunches_on_update_and_rolls_back_a_bad_one(monkeypatch):
+    """The loop that makes self-update safe: exit 97 relaunches into new code; a
+    crash right after an update restores app.prev instead of leaving the agent
+    down. Driven with a fake child runner so nothing actually starts."""
+    sup = _load_supervisor()
+    monkeypatch.setattr(sup, "_log_stream", lambda: None)
+    monkeypatch.setattr(sup.time, "sleep", lambda s: None)
+    rolled = []
+    monkeypatch.setattr(sup, "_roll_back", lambda say: rolled.append(True) or False)
+
+    seq = [sup.UPDATE_EXIT_CODE, 1]                    # update asked; new code crashes fast
+    calls = []
+
+    class _Stop(Exception):
+        pass
+
+    def fake_run(stream):
+        if not seq:
+            raise _Stop
+        code = seq.pop(0)
+        calls.append(code)
+        return code
+
+    with pytest.raises(_Stop):
+        sup.main(run_agent=fake_run)
+    assert calls == [sup.UPDATE_EXIT_CODE, 1]          # it DID relaunch after the update
+    assert rolled == [True]                            # and rolled back the crash
+
+
+def test_the_supervisor_can_actually_restore_app_prev(tmp_path, monkeypatch):
+    """_roll_back swaps app.prev back into app (keeping the broken code as
+    app.bad), on real directories."""
+    sup = _load_supervisor()
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "room_agent.py").write_text("broken = 1\n")
+    (tmp_path / "app.prev").mkdir()
+    (tmp_path / "app.prev" / "room_agent.py").write_text("good = 1\n")
+    monkeypatch.setattr(sup, "ROOT", tmp_path)
+    monkeypatch.setattr(sup, "_APP", tmp_path / "app")
+    monkeypatch.setattr(sup, "_PREV", tmp_path / "app.prev")
+    assert sup._roll_back(lambda m: None) is True
+    assert (tmp_path / "app" / "room_agent.py").read_text() == "good = 1\n"
+    assert (tmp_path / "app.bad" / "room_agent.py").read_text() == "broken = 1\n"
+    assert not (tmp_path / "app.prev").exists()
 
 
 def test_the_screen_capability_returns_an_image_for_the_console():
@@ -337,3 +521,40 @@ def test_the_screen_capability_returns_an_image_for_the_console():
         assert result["jpeg_base64"] and isinstance(result["size"], list)
     else:
         assert result.get("error") or result.get("detail")
+
+
+def test_a_crashing_capability_comes_back_as_json_not_a_500(agent, monkeypatch):
+    """A capability that raises must return a JSON error the console (and Emma
+    later) can read, never a bare 500. Found 2026-09-25: `monitor` blocked/failed
+    and the console got plain 'Internal Server Error' it could not JSON-parse."""
+    def boom(**kwargs):
+        raise RuntimeError("kaboom")
+    original = room_agent.CAPABILITIES["list_windows"]
+    monkeypatch.setitem(room_agent.CAPABILITIES, "list_windows",
+                        dataclasses.replace(original, run=boom))
+    r = agent.post("/do", json={"action": "list_windows"}, headers={"x-room-token": "test-token"})
+    assert r.status_code == 200                       # JSON, not a 500
+    body = r.json()
+    assert body["ok"] is False
+    assert "action failed" in body["error"]
+    assert "RuntimeError" in body.get("detail", "")   # labelled, not the whole body
+
+
+def test_monitor_is_time_boxed_so_a_hung_window_cannot_freeze_the_agent():
+    """`monitor` broadcasts to every top-level window; a plain SendMessageW is
+    synchronous and one hung window froze the whole agent (2026-09-25). It must
+    use the time-boxed, abort-if-hung call instead."""
+    src = inspect.getsource(room_agent.monitor)
+    assert "SendMessageTimeoutW" in src
+    assert "SMTO_ABORTIFHUNG" in src
+    assert "SendMessageW(" not in src                 # the unbounded blocking broadcast is gone
+    # The prototype is spelled out so the out-buffer is pointer-sized and the "on"
+    # value (-1) sign-extends on Win64 -- not marshalled as a 32-bit int.
+    assert "argtypes" in src and "c_ssize_t" in src
+
+
+def test_capabilities_run_off_the_event_loop():
+    """A blocking ctypes call must not freeze the agent for every other request,
+    so the capability runs in a worker thread."""
+    src = inspect.getsource(room_agent.run_action)
+    assert "asyncio.to_thread" in src

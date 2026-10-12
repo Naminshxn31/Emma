@@ -289,12 +289,24 @@ def test_the_wait_budget_covers_a_typical_slide_in_the_real_deck():
         (Path(live.slides_dir).expanduser() / "index.json").read_text(encoding="utf-8")
     )
     images = raw["images"] if isinstance(raw, dict) else raw
+    # Every scripted slide, not only those typed "deck": the 2026-10-06
+    # library (intro-NNN) has no such type, and the measured Canva map now
+    # decides which records are deck pages.
     spoken = sorted(
         len(s.get("script_th") or "") / 6.0
         for s in images
-        if s.get("type") == "deck" and s.get("script_th")
+        if s.get("script_th")
     )
-    assert spoken, "the deck has no scripts — nothing to pace against"
+    if not spoken:
+        # Deliberately against the real deck — that is the point of this
+        # test — and the real deck has no scripts since 2026-10-06. Pages are
+        # presented from their approved summary in 2-3 sentences instead
+        # (slides.PRESENT_FROM_SUMMARY), whose length the model chooses and
+        # no file on disk measures. Skipped rather than passed, so the
+        # summary line does not claim the budget was checked.
+        pytest.skip("NOT CHECKED: the shipped deck has no script_th to pace "
+                    "SLIDE_TOOL_BUDGET_S against; summary pages are 2-3 "
+                    "sentences by instruction. Re-arms when scripts return.")
 
     median = spoken[len(spoken) // 2]
     budget = Settings().slide_tool_budget_s
@@ -680,3 +692,45 @@ def test_a_successful_send_still_admits_it_cannot_see_the_room(smarthome):
     out = run(set_lights(True))
     assert out.get("instruction") != IR_ONE_WAY_NOTE, \
         "mock is not ok — nothing was sent at all"
+
+
+def test_mock_result_tells_the_model_not_to_announce_it(smarthome):
+    """Live eval 2026-10-07: three mock results, three announcements —
+    "ได้ค่ะ ปิดไฟให้แล้วนะคะ", "ปรับอุณหภูมิแอร์...ให้เรียบร้อยแล้วค่ะ",
+    "I've adjusted the air conditioning". failed and ok each carried an
+    instruction on the result; mock carried none, so it fell back to rule 8
+    at the end of the prompt, which the model skips. The robot tools quote
+    their forbidden sentence on mock and were never misreported."""
+    from app.tools.smarthome import IR_MOCK_NOTE
+
+    smarthome.send.result = "mock"
+    for name, args in (("set_lights", {"on": False}),
+                       ("set_air_conditioner", {"temp": 23}),
+                       ("set_air_conditioner", {"on": True})):
+        out = run(registry.dispatch(name, args))
+        assert out["hardware"] == "mock", name
+        assert out.get("instruction") == IR_MOCK_NOTE, name
+    assert "ปิดไฟให้แล้ว" in IR_MOCK_NOTE and "I've adjusted the air conditioning" in IR_MOCK_NOTE
+
+
+def test_ac_power_is_sent_even_when_our_state_already_agrees(smarthome):
+    """The boot default is AC "on". "เปิดแอร์" on a fresh server used to send
+    nothing (state already on) and report ok — Emma: "I've turned on the air
+    conditioner for you." STATE is what we last sent, not the room."""
+    smarthome.state["ac"]["on"] = True
+    smarthome.sent.clear()
+    out = run(registry.dispatch("set_air_conditioner", {"on": True}))
+    assert ("ac_on", 1) in smarthome.sent, "the power code must go out every time"
+    assert out["hardware"] == "ok"
+
+
+def test_nothing_sent_is_never_reported_as_ok(smarthome):
+    """Temperature alone while the AC is off sends no code at all. The old
+    `_worst([])` turned that empty list into "ok"."""
+    smarthome.state["ac"]["on"] = False
+    smarthome.sent.clear()
+    out = run(registry.dispatch("set_air_conditioner", {"temp": 22}))
+    assert smarthome.sent == []
+    assert out["ok"] is False and out["hardware"] != "ok"
+    assert "ห้ามบอกว่าปรับแล้ว" in out["instruction"]
+    assert out["ac"]["temp"] == 22  # still remembered for the next power-on

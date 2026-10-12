@@ -1,0 +1,18 @@
+{"format": 1,
+ "route": "data/robot/routes/floor2_bigroom_roundtrip.json",
+ "route_sha256": "738a8a3408fd53e5513d5873550cf2d7bee57a3a2bf872c88f42364847c5cf94",
+ "places": [
+   {"id": "dock", "name_th": "แท่นชาร์จ", "name_en": "charging dock",
+    "aliases_th": ["ที่ชาร์จ", "แท่น", "จุดจอด"], "aliases_en": ["dock", "charger", "base"], "kind": "dock"},
+   {"id": "big_room", "name_th": "ห้องประชุมใหญ่", "name_en": "big meeting room",
+    "aliases_th": [], "aliases_en": [], "kind": "room",
+    "arrive_tolerance_m": 0.25, "arrive_tolerance_deg": 15}
+ ],
+ "legs": [
+   {"from": "dock", "to": "big_room", "from_step": 1, "to_step": 10, "min_battery": 30,
+    "verified": false, "est_s": null,
+    "doors": ["D8", "D11"], "note": "steps 1-10 of the round trip, ending at checkpoint 'inside the big room'"},
+   {"from": "big_room", "to": "dock", "from_step": 10, "to_step": 20, "min_battery": 10,
+    "verified": false, "est_s": null,
+    "doors": ["D11", "D8"], "note": "steps 10-20: re-measures 'inside the big room', then D11 out ... own back-in dock"}
+ ]}

@@ -649,6 +649,143 @@ def test_a_blank_box_never_becomes_an_approved_answer_of_nothing(sandbox, client
     assert after["หัวข้อใหม่"] == "เนื้อหาที่คนกรอกเอง"
 
 
+def test_a_dash_is_a_blank_box_not_an_answer(sandbox, client):
+    """2026-09-29: the owner blanked price, room types and promotions by
+    typing "-" and approved; the prompt then carried "ราคาเริ่มต้น: -" as a
+    speakable fact. A box with no letter or digit in any script stores
+    `null`, while a real value that merely contains punctuation survives."""
+    before = _load(sandbox, FACTS)
+    labels = [item["label"] for item in before["facts"]]
+
+    client.post("/data-console/edit", json={
+        "token": TOKEN, "source_id": "project_facts", "by": "คุณทดสอบ ผู้รับผิดชอบ",
+        "facts": [{"label": labels[0], "value": "-"},
+                  {"label": labels[1], "value": " — "},
+                  {"label": labels[2], "value": "..."},
+                  {"label": "หัวข้อใหม่", "value": "- เปิด 10 โมง"}],
+    })
+
+    after = {item["label"]: item["value"] for item in _load(sandbox, FACTS)["facts"]}
+    assert after[labels[0]] is None and after[labels[1]] is None and after[labels[2]] is None
+    assert after["หัวข้อใหม่"] == "- เปิด 10 โมง"
+
+
+#: Two lines of the suite's own, so nothing below depends on which facts the
+#: owner's file holds, or in what order, on the day it runs.
+REAL, CONCEPT = "ทดสอบของจริง", "ทดสอบแนวคิด"
+
+
+def _state_body(concept_state=None, value="ยังเป็นแนวคิด") -> dict:
+    """The page's body. `concept_state=None` = a page with no state box."""
+    rows = [{"label": REAL, "value": "มีอยู่จริงวันนี้"},
+            {"label": CONCEPT, "value": value}]
+    if concept_state is not None:
+        rows[0]["content_state"] = ""
+        rows[1]["content_state"] = concept_state
+    return {"token": TOKEN, "source_id": "project_facts", "by": "คุณทดสอบ ผู้รับผิดชอบ",
+            "facts": rows}
+
+
+def _stored(sandbox: Path) -> dict:
+    return {item["label"]: item for item in _load(sandbox, FACTS)["facts"]}
+
+
+def test_a_line_can_carry_its_own_content_state_into_the_prompt(sandbox, client):
+    """One file holds what is real today (the developer, the address) beside
+    what is still a concept (the facility list). A file-wide state could only
+    say "all concept" or "all finished" (2026-09-29)."""
+    from app.prompts import load_facts
+
+    client.post("/data-console/edit", json=_state_body("preliminary_concept"))
+    shown = client.get("/data-console/source/project_facts", params={"token": TOKEN}).json()
+    assert {row["label"]: row["content_state"] for row in shown["facts"]} == {
+        REAL: "", CONCEPT: "preliminary_concept"}
+
+    _approve(client, "project_facts", content_state="existing")
+    rendered = load_facts(str(sandbox / FACTS)).splitlines()
+    caveat = "แนวคิดเบื้องต้น"
+    assert caveat in next(line for line in rendered if line.startswith(f"- {CONCEPT}:"))
+    assert caveat not in next(line for line in rendered if line.startswith(f"- {REAL}:"))
+
+
+def test_a_page_without_the_state_box_cannot_strip_a_line_caveat(sandbox, client):
+    """The owner's open tab predates the box. A row that does not send the key
+    keeps the file's state; reading it as "none" would let save quietly drop
+    "แนวคิดเบื้องต้น" from a line nobody touched."""
+    client.post("/data-console/edit", json=_state_body("preliminary_concept"))
+
+    client.post("/data-console/edit", json=_state_body(None, value="แก้จากหน้าเก่า"))
+
+    assert _stored(sandbox)[CONCEPT]["value"] == "แก้จากหน้าเก่า"
+    assert _stored(sandbox)[CONCEPT]["content_state"] == "preliminary_concept"
+
+
+def test_a_line_state_outside_the_policy_list_is_refused(sandbox, client):
+    client.post("/data-console/edit", json=_state_body("preliminary_concept"))
+    before = (sandbox / FACTS).read_bytes()
+    response = client.post("/data-console/edit", json=_state_body("finished"))
+    assert response.status_code == 400
+    assert (sandbox / FACTS).read_bytes() == before
+
+
+def test_changing_only_a_line_state_withdraws_the_approval(sandbox, client):
+    """Dropping a line's caveat is a stronger claim than the one that was
+    signed, so it is an edit like any other: the approval goes, and the audit
+    line names the state that moved."""
+    client.post("/data-console/edit", json=_state_body("preliminary_concept"))
+    _approve(client, "project_facts", content_state="existing")
+    assert _verdict(sandbox, FACTS) is True
+
+    response = client.post("/data-console/edit", json=_state_body(""))
+
+    assert response.json()["demoted"] is True
+    assert _verdict(sandbox, FACTS) is False
+    assert "content_state" not in _stored(sandbox)[CONCEPT]
+    fields = {change["field"] for change in _audit_lines(sandbox)[-1]["changes"]}
+    assert f"facts/{CONCEPT}/content_state" in fields
+
+
+def test_saving_a_file_that_already_holds_a_dash_is_not_an_edit(sandbox, client):
+    """A "-" already in an approved file renders as blank. Opening the page and
+    pressing save untouched must not count "-" -> null as a change: that
+    would withdraw an approval nobody changed, in that person's name."""
+    data = _load(sandbox, FACTS)
+    data["facts"] = [{"label": REAL, "value": "มีอยู่จริงวันนี้"},
+                     {"label": "ราคาเริ่มต้น", "value": "-"}]
+    (sandbox / FACTS).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    _approve(client, "project_facts", content_state="existing")
+    shown = client.get("/data-console/source/project_facts", params={"token": TOKEN}).json()
+    assert {row["label"]: row["blank"] for row in shown["facts"]} == {
+        REAL: False, "ราคาเริ่มต้น": True}, "the page's ยังว่าง badge and the prompt disagree"
+
+    response = client.post("/data-console/edit", json={
+        "token": TOKEN, "source_id": "project_facts", "by": "คุณทดสอบ ผู้รับผิดชอบ",
+        "facts": [{"label": row["label"], "value": row["value"] or ""}
+                  for row in shown["facts"]]})
+
+    assert response.json().get("unchanged") is True
+    assert _verdict(sandbox, FACTS) is True
+
+
+def test_the_page_sends_and_watches_each_line_state():
+    """A box the save does not send is a box that silently does nothing, and
+    one the unsaved-check ignores lets approve sign the file's old state."""
+    page = (REPO / "client" / "data-console.html").read_text(encoding="utf-8")
+    values = page.split("function editorValues")[1].split("function unsavedFields")[0]
+    assert "f-state" in values and "content_state" in values
+    unsaved = page.split("function unsavedFields")[1].split("function markClean")[0]
+    assert "content_state" in unsaved
+    clean = page.split("function markClean")[1].split("function showDirty")[0]
+    assert "content_state" in clean
+    # No box -> no key, so the server keeps the line's state; "" would clear it.
+    assert "if (state) row.content_state" in values
+    # The page is served fresh from disk while the API is whatever the server
+    # loaded at start (2026-09-29: new page, 24-Sep server). Boxes appear
+    # only when the API really sends per-line states.
+    editor = page.split("function factsEditor")[1].split("function rulesEditor")[0]
+    assert "'content_state' in f" in editor and "STATE.perLine ?" in editor
+
+
 def test_editing_rules_rewrites_only_the_rule_it_was_given(sandbox, client):
     before = _load(sandbox, RULES)
 

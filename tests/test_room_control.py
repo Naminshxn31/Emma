@@ -36,6 +36,144 @@ def table(tmp_path, monkeypatch):
     return write
 
 
+def test_an_android_room_is_driven_over_adb_not_http(table, monkeypatch):
+    """A room marked kind:android (or just carrying an adb address) routes to the
+    adb backend, and must never touch the HTTP path -- a stray urlopen would mean
+    the panel was being addressed like a Windows agent."""
+    table({"จอ A": {"kind": "android", "adb": "10.0.0.5:5555", "input": True}})
+    seen = {}
+
+    class FakeAdb:
+        def health(self, addr, *, name="", input_enabled=True):
+            seen["health"] = (addr, name, input_enabled)
+            return {"ok": True, "kind": "android"}
+
+        def do(self, addr, action, args=None, *, input_enabled=True):
+            seen["do"] = (addr, action, args, input_enabled)
+            return {"ok": True}
+
+    monkeypatch.setattr(room_control, "_android_mod", lambda: FakeAdb())
+    monkeypatch.setattr(room_control.urllib.request, "urlopen",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("android room hit HTTP")))
+
+    assert room_control.health("จอ A")["kind"] == "android"
+    assert seen["health"] == ("10.0.0.5:5555", "จอ A", True)
+    room_control.do("จอ A", "screen", {"x": 1})
+    assert seen["do"] == ("10.0.0.5:5555", "screen", {"x": 1}, True)
+
+
+def test_android_input_is_off_unless_the_room_says_exactly_true(table, monkeypatch):
+    """Fail closed like ROOM_AGENT_INPUT: input is real taps/keystrokes and the
+    panel is reachable from a browser, so a missing or malformed flag must NOT
+    hand it out. Only a JSON `true` enables it; `false`/absent disable it; a
+    non-bool is a mistake in a hand-edited file and is refused, not guessed."""
+    seen = {}
+
+    class FakeAdb:
+        def health(self, addr, *, name="", input_enabled=True):
+            seen["ie"] = input_enabled
+            return {"ok": True}
+
+        def do(self, addr, action, args=None, *, input_enabled=True):
+            return {"ok": True}
+
+    monkeypatch.setattr(room_control, "_android_mod", lambda: FakeAdb())
+
+    table({"จอ A": {"kind": "android", "adb": "10.0.0.5:5555", "input": False}})
+    room_control.health("จอ A")
+    assert seen["ie"] is False
+
+    table({"จอ A": {"kind": "android", "adb": "10.0.0.5:5555"}})       # omitted
+    room_control.health("จอ A")
+    assert seen["ie"] is False                                        # fail closed
+
+    table({"จอ A": {"kind": "android", "adb": "10.0.0.5:5555", "input": True}})
+    room_control.health("จอ A")
+    assert seen["ie"] is True
+
+    # a non-bool ("true" as a string, 1, ...) is a config mistake, not "on"
+    table({"จอ A": {"kind": "android", "adb": "10.0.0.5:5555", "input": "true"}})
+    with pytest.raises(room_control.RoomError):
+        room_control.health("จอ A")
+
+
+def test_discover_android_routes_to_the_backend(monkeypatch):
+    class FakeAdb:
+        def discover(self):
+            return [{"serial": "S", "model": "M6APro"}]
+    monkeypatch.setattr(room_control, "_android_mod", lambda: FakeAdb())
+    assert room_control.discover_android()[0]["serial"] == "S"
+
+
+def test_launch_scrcpy_is_android_only(table, monkeypatch):
+    table({"จอ A": {"kind": "android", "adb": "10.0.0.5:5555"},
+           "pc": {"url": "http://x:8777", "token": "t"}})
+    seen = {}
+
+    class FakeAdb:
+        def launch_scrcpy(self, addr, *, title="", audio="off"):
+            seen["a"] = (addr, title, audio)
+            return {"ok": True}
+
+    monkeypatch.setattr(room_control, "_android_mod", lambda: FakeAdb())
+    assert room_control.launch_scrcpy("จอ A")["ok"] is True
+    assert seen["a"] == ("10.0.0.5:5555", "จอ A", "off")
+    room_control.launch_scrcpy("จอ A", audio="mic")               # the room's live mic
+    assert seen["a"] == ("10.0.0.5:5555", "จอ A", "mic")
+    with pytest.raises(room_control.RoomError):        # a PC room has no scrcpy
+        room_control.launch_scrcpy("pc")
+
+
+def test_wake_sends_a_magic_packet_to_a_windows_rooms_mac(table, monkeypatch):
+    """A powered-off PC can't be reached through its agent (nothing is running),
+    so the management PC sends a Wake-on-LAN magic packet itself: 6x0xFF then the
+    MAC repeated 16 times, broadcast on the WoL ports. It targets the /24
+    subnet-directed broadcast of the PC's own IP so it leaves the right interface
+    on this dual-homed management PC."""
+    table({"ห้องขาย 1": {"url": "http://192.168.0.9:8777", "token": "t",
+                          "mac": "AA:BB:CC:DD:EE:FF"}})
+    sent = []
+
+    class FakeSock:
+        def setsockopt(self, *a): pass
+        def sendto(self, data, addr): sent.append((data, addr))
+        def close(self): pass
+
+    monkeypatch.setattr(room_control.socket, "socket", lambda *a, **k: FakeSock())
+    r = room_control.wake("ห้องขาย 1")
+    assert r["ok"] is True
+    data, _ = sent[0]
+    assert data[:6] == b"\xff" * 6
+    assert data[6:12] == bytes.fromhex("AABBCCDDEEFF")
+    assert len(data) == 6 + 6 * 16
+    assert ("192.168.0.255", 9) in {a for _, a in sent}     # subnet-directed, WoL port
+    assert "เปิดแล้ว" not in r.get("instruction", "")        # honest: signal sent, not "PC is on"
+
+
+def test_wake_refuses_an_android_room_no_wol_there(table):
+    table({"จอ A": {"kind": "android", "adb": "10.0.0.5:5555"}})
+    with pytest.raises(room_control.RoomError):
+        room_control.wake("จอ A")
+
+
+def test_wake_needs_a_mac_and_rejects_a_bad_one(table):
+    table({"ห้องขาย 1": {"url": "http://192.168.0.9:8777", "token": "t"}})
+    with pytest.raises(room_control.RoomError):                # no mac configured
+        room_control.wake("ห้องขาย 1")
+    table({"ห้องขาย 1": {"url": "http://192.168.0.9:8777", "token": "t", "mac": "not-a-mac"}})
+    with pytest.raises(room_control.RoomError):                # malformed mac
+        room_control.wake("ห้องขาย 1")
+
+
+def test_resolve_accepts_an_android_room_without_a_url(table):
+    table({"จอ A": {"kind": "android", "adb": "10.0.0.5:5555"}})
+    assert room_control.resolve("จอ A")["adb"] == "10.0.0.5:5555"
+    # a Windows room still must carry a url
+    table({"pc": {"token": "t"}})
+    with pytest.raises(room_control.RoomError):
+        room_control.resolve("pc")
+
+
 def test_one_room_in_the_table_is_still_not_an_answer(table):
     """The single-room case is the one that tempts a fallback, and it is the
     one where the fallback is most convincing: it is right every day until a
@@ -85,6 +223,23 @@ def test_a_room_that_cannot_be_reached_is_never_reported_as_done(table, monkeypa
 
     assert result["ok"] is False
     assert "reach" in result["error"]
+    assert "ห้ามบอกว่าทำแล้ว" in result["instruction"]
+
+
+def test_a_hung_action_reads_as_no_response_not_as_a_crash(table, monkeypatch):
+    """A read timeout (the agent accepted the connection but a slow/hung action
+    never answered -- `monitor`'s window broadcast did exactly this on
+    2026-09-25) is raised bare as TimeoutError, NOT wrapped in URLError, so it
+    would otherwise escape as a 500. It must read as 'did not respond', never as
+    the action having happened."""
+    table({"ห้องขาย 1": {"url": "http://10.0.0.1:8777", "token": "t"}})
+    monkeypatch.setattr(room_control.urllib.request, "urlopen",
+                        lambda *a, **k: (_ for _ in ()).throw(TimeoutError("timed out")))
+
+    result = room_control.do("ห้องขาย 1", "monitor", {"state": "off"})
+
+    assert result["ok"] is False
+    assert "did not respond" in result["error"]
     assert "ห้ามบอกว่าทำแล้ว" in result["instruction"]
 
 
@@ -151,7 +306,9 @@ def test_the_caller_is_not_wired_into_emma_either():
     out of that check would leave the door it is about wide open.
     """
     for path in sorted((ROOT / "app").rglob("*.py")):
-        assert "room_control" not in path.read_text(encoding="utf-8"), path
+        text = path.read_text(encoding="utf-8")
+        assert "room_control" not in text, path
+        assert "android_control" not in text, path   # the adb backend is caller-side too
 
 
 def test_a_table_saved_by_notepad_still_loads(tmp_path, monkeypatch):

@@ -47,6 +47,67 @@ def _held_suffix_len(buf: str) -> int:
     return 0
 
 
+class TranscriptBudget:
+    """Never let the output transcript run far ahead of the output audio.
+
+    The output transcript is the server's transcription of what the model
+    SAYS, so it cannot honestly be much longer than the audio behind it.
+    2026-10-11 (FAQ eval, gemini-3.8-live): one turn's transcript carried
+    2,241 characters of the model's own planning ("1. **Analyze User
+    Request**: The user is asking about ... Let's call `search_condo_info`")
+    over 7.5 s of audio — 300 characters a second where speech is 12-15.
+    On the robot that text is the speech bubble a guest reads. One in 2,143
+    eval turns, none in 8,172 logged gallery replies: rare, and exactly the
+    kind of thing nobody would notice until a customer photographed it.
+
+    The allowance is generous (40 characters per second of audio, plus 120
+    for the opening words that can land before their audio does), so real
+    speech in any language never meets it; what it cuts is text with no
+    audio behind it. Per turn: reset on turn_complete and on an interrupt.
+    """
+
+    CHARS_PER_SECOND = 40
+    SLACK_CHARS = 120
+    #: A transcription of speech has no markdown; the leaked planning did
+    #: ("1.  **Analyze User Request**", "`search_condo_info`"). The ratio alone
+    #: still let ~400 of its characters through, so text carrying these marks
+    #: ends the turn's transcript — from that delta on, nothing more is shown
+    #: until the next turn.
+    #: NOT a paragraph break, though the leak had those too (review 12 Oct): a
+    #: verse the model formats as lines arrives as one atomic "\n\n..." chunk
+    #: with no audio, and that chunk is the ONLY signal session.py has to ask
+    #: for it out loud (`_respeak_silent_block`). Tainting on "\n\n" silenced
+    #: the respeak too — the guest got nothing at all. The rate cap still
+    #: bounds such a block.
+    _NOT_SPEECH = ("**", "`")
+
+    def __init__(self, bytes_per_second: int) -> None:
+        self._bps = bytes_per_second
+        self.reset()
+
+    def reset(self) -> None:
+        self._audio_bytes = 0
+        self._chars = 0
+        self._tainted = False
+        self.dropped = 0
+
+    def add_audio(self, nbytes: int) -> None:
+        self._audio_bytes += nbytes
+
+    def allow(self, text: str) -> str:
+        """The part of `text` that may be shown; the rest is counted as dropped."""
+        if self._tainted or any(mark in text for mark in self._NOT_SPEECH):
+            self._tainted = True
+            self.dropped += len(text)
+            return ""
+        budget = self.SLACK_CHARS + self.CHARS_PER_SECOND * self._audio_bytes / self._bps
+        room = max(0, int(budget) - self._chars)
+        kept = text[:room]
+        self._chars += len(kept)
+        self.dropped += len(text) - len(kept)
+        return kept
+
+
 class TranscriptFilter:
     """Streaming filter: feed deltas in, get display-safe text out."""
 

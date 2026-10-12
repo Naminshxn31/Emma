@@ -445,6 +445,235 @@ def test_the_page_cannot_ask_for_more_lidar_than_the_cap(board, client):
     assert len(fewer["points"]) <= 50
 
 
+# ==================== the walkable fan (9 ต.ค.) ====================
+# Owner: "ดูผลจากเรดาห์หรือเลเซอร์กับทำให้รู้ไหมว่ามุมไหนเดินได้หรือไม่ได้".
+# The endpoint adds `walkable` and changes nothing else it answered before.
+
+
+def _raw_frame(distance_at, n=1586):
+    """A board frame: `n` returns evenly over the lidar's ±103°, `distance_at(a)`
+    metres at angle a (radians, + = left), None = no echo (valid False)."""
+    import math
+
+    pts = []
+    for i in range(n):
+        a = math.radians(-103.0 + 206.0 * i / (n - 1))
+        d = distance_at(a)
+        pts.append({"angle": a, "distance": 0.0 if d is None else d, "valid": d is not None})
+    return {"pose": {"x": 0.0, "y": 0.0, "yaw": 0.0}, "laser_points": pts}
+
+
+def _box_room(right):
+    """Walls 4 m ahead/behind/left and `right` m to the robot's right, parallel."""
+    import math
+
+    def distance_at(a):
+        c, s = math.cos(a), math.sin(a)
+        hits = [4.0 / c if c > 1e-9 else None, -4.0 / c if c < -1e-9 else None,
+                4.0 / s if s > 1e-9 else None, -right / s if s < -1e-9 else None]
+        d = min(h for h in hits if h is not None)
+        return d if d < 12.0 else None
+    return distance_at
+
+
+@pytest.fixture
+def frame(board, monkeypatch):
+    """Serve `frame.doc` as the lidar frame; everything else is the FakeBoard's."""
+    holder = type("Frame", (), {"doc": None})()
+    real = board.request
+
+    async def request(method, path, payload=None):
+        if path == robot_chassis.LASERSCAN:
+            board.calls.append((method, path, payload))
+            return holder.doc
+        return await real(method, path, payload)
+
+    monkeypatch.setattr(robot_chassis, "request", request)
+    return holder
+
+
+def _dirs(out, key=None):
+    walk = out["walkable"] if key is None else out["walkable"][key]
+    return {d["a"]: d for d in walk["dirs"]}
+
+
+def test_the_radar_carries_the_walkable_fan_from_free_space(frame, client):
+    import math
+
+    from app import robot_lanes as rl
+
+    frame.doc = _raw_frame(_box_room(right=0.60))
+    out = client.get("/robot/laserscan", params={"token": TOKEN}).json()
+    walk = out["walkable"]
+    assert (walk["width"], walk["length"], walk["step"], walk["max"]) == (0.70, 0.60, 5.0, 3.0)
+    dirs = _dirs(out)
+    assert sorted(dirs) == list(range(-180, 180, 5)), "the whole circle every 5°"
+    # the figure is robot_lanes.free_space's own, on the WHOLE frame, rounded to cm
+    pts = rl.scan_points(frame.doc)
+    want = dict(rl.free_space(pts, 0.70))
+    for a, d in dirs.items():
+        assert d["free"] == (None if want[float(a)] is None else round(want[float(a)], 2)), a
+    # the room as a person sees it: clear ahead, a wall 0.60 m to the right,
+    # nothing known behind (outside ±103° is not free, it is unseen)
+    assert dirs[0] == {"a": 0, "free": 3.0, "turn": True}
+    assert dirs[-90]["free"] == pytest.approx(0.30, abs=0.01) and dirs[-90]["free"] < 0.4
+    assert dirs[90]["free"] == 3.0 and dirs[90]["turn"] is True
+    for a in (180, -180, 105, -105, 135, -150):
+        if a in dirs:
+            assert dirs[a] == {"a": a, "free": None, "turn": None}
+    # turn room is turn_sweep_gap >= 0.04 for the base, heading by heading
+    for a, d in dirs.items():
+        if d["free"] is not None and a != 0:
+            assert d["turn"] == (rl.turn_sweep_gap(pts, math.radians(a), width=0.70) >= 0.04), a
+
+
+def test_a_clear_way_the_robot_cannot_turn_to_is_not_walkable(frame, client):
+    """A wall 0.45 m to the right: every corner of a 0.70 x 0.60 base swings to
+    0.46 m on a turn, so past ~10° either way there is no room to turn -- even
+    toward the open left. `turn` says so; straight ahead needs no turn."""
+    import math
+
+    from app import robot_lanes as rl
+
+    frame.doc = _raw_frame(_box_room(right=0.45))
+    out = client.get("/robot/laserscan", params={"token": TOKEN}).json()
+    dirs = _dirs(out)
+    assert dirs[0]["turn"] is True and dirs[0]["free"] == 3.0
+    assert dirs[5]["turn"] is True and dirs[-5]["turn"] is True
+    assert dirs[90]["free"] == 3.0 and dirs[90]["turn"] is False
+    assert dirs[45]["turn"] is False and dirs[-45]["turn"] is False
+    pts = rl.scan_points(frame.doc)
+    for a, d in dirs.items():
+        if d["free"] is not None and a != 0:
+            assert d["turn"] == (rl.turn_sweep_gap(pts, math.radians(a), width=0.70) >= 0.04), a
+
+
+def test_alongside_a_wall_straight_ahead_is_still_walkable(frame, client):
+    """0.38 m from a wall on the right the base's side is 3 cm from it: any turn
+    at all is refused (drive_route would refuse it too), but going straight on
+    needs no turn and the strip ahead is clear."""
+    frame.doc = _raw_frame(_box_room(right=0.38))
+    dirs = _dirs(client.get("/robot/laserscan", params={"token": TOKEN}).json())
+    assert dirs[0] == {"a": 0, "free": 3.0, "turn": True}
+    assert all(d["turn"] is False for a, d in dirs.items() if d["free"] is not None and a != 0)
+
+
+def test_with_the_arms_the_fan_is_for_0_78_and_never_freer(frame, client):
+    frame.doc = _raw_frame(_box_room(right=0.60))
+    base = client.get("/robot/laserscan", params={"token": TOKEN}).json()
+    assert "arms" not in base["walkable"], "0.78 only when asked: the page polls 2.5 times a second"
+    out = client.get("/robot/laserscan", params={"token": TOKEN, "arms": 1}).json()
+    assert out["walkable"]["width"] == 0.70 and out["walkable"]["arms"]["width"] == 0.78
+    wide, narrow = _dirs(out, "arms"), _dirs(out)
+    assert sorted(wide) == sorted(narrow)
+    for a in narrow:
+        if narrow[a]["free"] is None:
+            assert wide[a]["free"] is None
+        else:
+            assert wide[a]["free"] <= narrow[a]["free"], a
+            assert not (wide[a]["turn"] and not narrow[a]["turn"]), a
+
+
+def test_the_fan_is_only_added_the_rest_is_what_it_was(frame, board, client):
+    """Byte for byte what `laserscan(max_points=limit)` gave the endpoint before:
+    the endpoint now reads the whole frame (for the fan) and thins it itself.
+    One return 0.35 m ahead sits between the thinned points, so a clearance
+    worked out on the whole frame would show here (0.35, not 1.0)."""
+    import asyncio
+
+    frame.doc = _raw_frame(lambda a: 1.0)
+    frame.doc["laser_points"][801]["distance"] = 0.35
+    assert asyncio.run(robot_chassis.laserscan())["clearance"]["front"] == 0.35
+    outs = {}
+    for limit in (400, 50, 1):
+        out = outs[limit] = client.get("/robot/laserscan", params={"token": TOKEN, "max": limit}).json()
+        old = asyncio.run(robot_chassis.laserscan(max_points=limit))
+        assert set(out) == {"ok", "points", "pose", "total", "valid", "clearance",
+                            "min_clearance", "walkable"}
+        for key in ("points", "pose", "total", "valid", "clearance"):
+            assert out[key] == old[key], (limit, key)
+        assert out["min_clearance"] == settings.robot_drive_min_clearance_m
+    assert outs[400]["clearance"]["front"] == 1.0
+    calls = [c for c in board.calls if c[1] == robot_chassis.LASERSCAN]
+    assert len(calls) == 7, "one frame per request -- the fan does not fetch a second one"
+
+
+def test_the_fan_needs_the_token_too(frame, client):
+    frame.doc = _raw_frame(_box_room(right=0.60))
+    assert client.get("/robot/laserscan", params={"arms": 1}).json() == {"ok": False, "error": "unauthorized"}
+
+
+@pytest.mark.parametrize("doc", [
+    None,                                                     # no answer
+    {"laser_points": "garbage"},                              # not a list
+    {"laser_points": [{"angle": "x", "distance": None}, 7]},  # nothing drawable
+    "STCM",                                                   # not even a dict
+])
+def test_a_bad_frame_is_a_radar_without_a_fan(frame, client, doc):
+    frame.doc = doc
+    out = client.get("/robot/laserscan", params={"token": TOKEN, "arms": 1}).json()
+    assert out["ok"] is True and out["points"] == []
+    assert "walkable" not in out
+
+
+def test_a_frame_too_thin_to_judge_has_no_fan(frame, client):
+    """Under 200 valid returns (drive_route's own floor for a turn check)
+    free_space would read the blanks as "3 m free every way"."""
+    frame.doc = _raw_frame(lambda a: 1.0 if abs(a) < 0.12 else None)
+    out = client.get("/robot/laserscan", params={"token": TOKEN}).json()
+    assert 0 < out["valid"] < 200
+    assert out["ok"] is True and "walkable" not in out
+    frame.doc = _raw_frame(lambda a: 1.0)
+    assert "walkable" in client.get("/robot/laserscan", params={"token": TOKEN}).json()
+
+
+def test_a_failing_sum_leaves_the_fan_out_and_the_radar_up(frame, client, monkeypatch):
+    from app import robot_lanes as rl
+
+    def boom(*a, **k):
+        raise ValueError("bad frame")
+
+    frame.doc = _raw_frame(_box_room(right=0.60))
+    monkeypatch.setattr(rl, "free_space", boom)
+    out = client.get("/robot/laserscan", params={"token": TOKEN}).json()
+    assert out["ok"] is True and "walkable" not in out
+    assert out["total"] == 1586 and len(out["points"]) <= 400 and out["clearance"]["front"] is not None
+
+
+def test_the_quick_turn_sweep_is_the_plain_one_on_recorded_frames():
+    """`_walk_turn_gaps` builds 0..a outward in 5° steps instead of asking
+    `turn_sweep_gap` from 0 for every heading (5x less work on the server's
+    loop). It must be the same figure: checked on the frames the lanes were
+    tuned on, both widths."""
+    import json
+    import math
+
+    import numpy as np
+
+    from app import robot_lanes as rl
+    from app.main import _walk_turn_gaps
+
+    data = Path(__file__).resolve().parent / "data" / "robot"
+    frames = 0
+    for path in sorted(data.glob("scan_*.json")):
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(doc.get("points"), list):            # robot-frame x, y
+            pts = np.asarray(doc["points"], dtype=float).reshape(-1, 2)
+        elif isinstance(doc.get("angle"), list):           # the board's angle/distance
+            pts = rl.scan_points({"laser_points": [
+                {"angle": a, "distance": d, "valid": True} for a, d in zip(doc["angle"], doc["distance"])]})
+        else:
+            continue
+        angles = [a for a, f in rl.free_space(pts, 0.70) if f is not None and a != 0]
+        for width in (0.70, 0.78):
+            quick = _walk_turn_gaps(pts, angles, width)
+            for a in angles:
+                assert quick[a] == pytest.approx(rl.turn_sweep_gap(pts, math.radians(a), width=width),
+                                                 abs=0.002), (path.name, width, a)
+        frames += 1
+    assert frames >= 3, "the recorded frames moved: this check is not checking anything"
+
+
 # ==================== what the page itself promises ====================
 
 

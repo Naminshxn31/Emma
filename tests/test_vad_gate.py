@@ -94,7 +94,7 @@ def test_the_session_config_and_the_gate_agree(monkeypatch):
     from app.providers.gemini import GeminiProvider
 
     monkeypatch.setattr(vad_gate, "for_session",
-                        lambda: VadGate(ScriptedDetector([]), prefix_padding_ms=0))
+                        lambda **_: VadGate(ScriptedDetector([]), prefix_padding_ms=0))
     with_gate = GeminiProvider("Kore", "x")._build_config()
     aad = with_gate["realtime_input_config"].automatic_activity_detection
     assert aad.disabled is True
@@ -106,7 +106,7 @@ def test_the_session_config_and_the_gate_agree(monkeypatch):
                   "prefix_padding_ms", "silence_duration_ms"):
         assert getattr(aad, stray, None) is None, stray
 
-    monkeypatch.setattr(vad_gate, "for_session", lambda: None)
+    monkeypatch.setattr(vad_gate, "for_session", lambda **_: None)
     without = GeminiProvider("Kore", "x")._build_config()
     assert without["realtime_input_config"].automatic_activity_detection.disabled is False
 
@@ -121,7 +121,7 @@ def test_send_audio_translates_gate_actions_into_activity_signals(monkeypatch):
 
     monkeypatch.setattr(
         vad_gate, "for_session",
-        lambda: VadGate(ScriptedDetector([False, True, True, False]),
+        lambda **_: VadGate(ScriptedDetector([False, True, True, False]),
                         prefix_padding_ms=300))
     provider = GeminiProvider("Kore", "x")
 
@@ -349,6 +349,127 @@ def test_the_real_detector_hears_the_committed_speech():
     assert kinds.count("start") >= 1 and kinds[0] != "end"
 
 
+class RecordingDetector(ScriptedDetector):
+    """Like sherpa-onnx: every closed segment is queued until popped."""
+
+    def __init__(self, answers):
+        super().__init__(answers)
+        self.queue = []
+        self._was = False
+
+    def is_speech_detected(self):
+        now = super().is_speech_detected()
+        if self._was and not now:
+            self.queue.append("segment audio")
+        self._was = now
+        return now
+
+    def empty(self):
+        return not self.queue
+
+    def pop(self):
+        self.queue.pop(0)
+
+
+def test_finished_segments_are_not_kept_in_memory():
+    """sherpa-onnx queues every finished segment *with its samples* for a
+    caller to pop(); the gate never popped. Measured with the real model:
+    five utterances left 11.2 s of a guest's voice in the session's memory,
+    64 KB per second of speech, for the life of the session."""
+    detector = RecordingDetector([True, True, False, False] * 5)
+    gate = VadGate(detector, prefix_padding_ms=100)
+    for _ in range(20):
+        gate.feed(LOUD_CHUNK)
+    assert gate.segments == 5
+    assert detector.queue == [], "closed segments must be dropped, not hoarded"
+
+
+def test_the_detector_gets_no_hidden_turn_length(monkeypatch, tmp_path):
+    """sherpa-onnx closes a segment at max_speech_duration — 20 s by
+    default, a clock nobody in this project set — and the gate turns that
+    into activity_end mid-sentence. The setting must be explicit and long,
+    with a buffer that can hold it (or the library grows it mid-speech and
+    prints "Overflow!")."""
+    import sys
+    from types import SimpleNamespace
+
+    from app import vad_gate
+
+    model = tmp_path / "silero.onnx"
+    model.write_bytes(b"model placeholder")
+
+    class VadModelConfig:
+        def __init__(self):
+            self.silero_vad = SimpleNamespace(model="", threshold=0,
+                                              min_silence_duration=0,
+                                              min_speech_duration=0,
+                                              max_speech_duration=20.0)
+            self.sample_rate = 0
+
+    captured = {}
+
+    def detector(config, buffer_size_in_seconds):
+        captured.update(config=config, buffer=buffer_size_in_seconds)
+        return SimpleNamespace()
+
+    monkeypatch.setitem(sys.modules, "sherpa_onnx", SimpleNamespace(
+        VadModelConfig=VadModelConfig, VoiceActivityDetector=detector))
+    monkeypatch.setattr(settings, "vad_model", str(model))
+    assert vad_gate._make_detector() is not None
+    longest = captured["config"].silero_vad.max_speech_duration
+    assert longest >= 60, longest
+    assert captured["buffer"] >= longest
+
+
+def _real_detector_or_skip(monkeypatch, what):
+    model = Path(settings.vad_model)
+    if not model.is_file():
+        pytest.skip("no silero_vad.onnx — %s is UNTESTED here; fetch with "
+                    "scripts/fetch_vad_model.py" % what)
+    from app import vad_gate
+
+    # Pinned: the real gate takes these from .env, and the suite must not
+    # change colour with the machine's knobs.
+    monkeypatch.setattr(settings, "vad_silence_ms", 900)
+    monkeypatch.setattr(settings, "vad_min_speech_ms", 250)
+    detector = vad_gate._make_detector()
+    assert detector is not None
+    return detector
+
+
+def _committed_speech(repeats):
+    """The committed TTS wavs, trimmed and joined with 300 ms pauses —
+    shorter than any hangover, so to a listener it is one long turn."""
+    import wave
+
+    import numpy as np
+
+    parts = []
+    for _ in range(repeats):
+        for name in ("emma_sentence.wav", "other.wav", "emma_thai_f.wav", "emma_thai_m.wav"):
+            with wave.open(str(Path(__file__).parent / "data" / "wake" / name)) as w:
+                x = np.frombuffer(w.readframes(w.getnframes()), "<i2")
+            loud = np.where(np.abs(x.astype("float32")) / 32768 > 0.02)[0]
+            parts += [x[loud[0]:loud[-1]], np.zeros(4800, dtype="<i2")]
+    parts.append(np.zeros(32000, dtype="<i2"))      # 2 s: room for the hangover
+    return np.concatenate(parts).tobytes()
+
+
+def test_the_real_detector_lets_a_long_turn_finish(monkeypatch):
+    """~28 s of continuous speech is one turn: one start, one end, and the
+    end only after the speech stops. Under the library default the real
+    model ended it at 20.8 s and reopened 0.5 s later."""
+    detector = _real_detector_or_skip(monkeypatch, "the 20-second forced split")
+    gate = VadGate(detector, prefix_padding_ms=300, floor_grace_s=0)
+    stream = _committed_speech(repeats=4)
+    kinds = []
+    for i in range(0, len(stream), 640):
+        kinds += [k for k, _ in gate.feed(stream[i:i + 640]) if k != "audio"]
+    assert len(stream) / 32000 > 25
+    assert kinds == ["start", "end"], kinds
+    assert detector.empty(), "the finished segment's audio is still held"
+
+
 def test_the_gate_counts_the_segments_it_opened():
     """Read by the call's microphone report: "speech level reached but
     Silero opened no segment" is a different repair from "no audio"."""
@@ -376,3 +497,129 @@ def test_a_muted_microphone_never_opens_a_segment_even_with_the_floor_down():
     assert gate.segments == 0
     # ...and it is a floor, not a wall: real quiet speech still opens.
     assert gate.feed(QUIET_CHUNK)[0][0] == "start"
+
+
+# --- Speaker focus (VAD_FOCUS_RATIO) -------------------------------------
+#
+# Owner, 2026-10-08: "โฟกัสเสียงคนนั้นที่กำลังพูดอยู่ พอพูดจบก็ตอบเลย".
+# Silero answers "is anybody speaking", so a guest's turn ended only when
+# the whole room went quiet. Focus feeds the detector silence for frames
+# far under the person who opened the segment; the forwarded audio is
+# untouched and the detector's own hangover stays the only clock.
+
+
+class LevelDetector(ScriptedDetector):
+    """Scripted answers, and the loudest sample of every frame it was fed."""
+
+    def accept_waveform(self, samples):
+        import numpy as np
+
+        self.fed.append(float(np.abs(samples).max()))
+
+
+BACKGROUND_CHUNK = (int(0.01 * 32767)).to_bytes(2, "little", signed=True) * 160  # -20 dB
+
+
+def _focus_run(ratio):
+    detector = LevelDetector([True] * 60)
+    gate = VadGate(detector, prefix_padding_ms=100, focus_ratio=ratio)
+    forwarded = []
+    for chunk in [LOUD_CHUNK] * 10 + [BACKGROUND_CHUNK] * 50:
+        forwarded += [pcm for kind, pcm in gate.feed(chunk) if kind == "audio"]
+    return detector.fed, forwarded
+
+
+def test_focus_feeds_the_detector_silence_for_frames_far_under_the_speaker():
+    fed, _ = _focus_run(0.30)
+    assert all(level > 0.09 for level in fed[:10]), fed[:10]
+    # The 0.1 s smoothing (a syllable — consonant gaps are not "quiet") takes
+    # ~0.28 s (these chunks are 10 ms) to fall under 0.30 x the speaker;
+    # from then on the detector hears silence.
+    assert fed[-20:] == [0.0] * 20, fed[10:]
+
+
+def test_focus_never_changes_what_is_forwarded_upstream():
+    """Nothing is chopped: Gemini still hears every frame of the segment."""
+    _, forwarded = _focus_run(0.30)
+    assert forwarded[-50:] == [BACKGROUND_CHUNK] * 50
+
+
+def test_focus_off_is_the_old_chain_exactly():
+    fed, _ = _focus_run(0.0)
+    assert all(level > 0.009 for level in fed[10:]), fed[10:]
+
+
+def test_focus_does_not_decide_whether_a_segment_opens():
+    """Quiet speech that opens a segment is the opener's own level — the
+    near-field floor (VAD_MIN_RMS) is the only opening gate."""
+    detector = LevelDetector([True] * 5)
+    gate = VadGate(detector, prefix_padding_ms=100, focus_ratio=0.30)
+    assert gate.feed(BACKGROUND_CHUNK)[0][0] == "start"
+    for _ in range(4):
+        gate.feed(BACKGROUND_CHUNK)
+    assert all(level > 0.009 for level in detector.fed), detector.fed
+
+
+def _speech_over_background(background_gain):
+    """The committed TTS turn (~7 s), with other people talking
+    `background_gain` under it from before it starts until 6 s after it
+    ends, then 2 s of quiet. Returns (pcm16 bytes, seconds the guest stops)."""
+    import numpy as np
+
+    guest = np.frombuffer(_committed_speech(repeats=1), "<i2")[:-32000].astype("float32")
+    lead, tail, quiet = 16000, 6 * 16000, 2 * 16000
+    talk = guest[::-1]                       # different words, same voice range
+    total = lead + len(guest) + tail
+    background = np.tile(talk, total // len(talk) + 1)[:total] * background_gain
+    mix = background.copy()
+    mix[lead:lead + len(guest)] += guest
+    mix = np.concatenate([mix, np.zeros(quiet, dtype="float32")])
+    return (np.clip(mix, -32768, 32767).astype("<i2").tobytes(),
+            (lead + len(guest)) / 16000)
+
+
+def _turn_ends(gate, stream):
+    ends, t = [], 0.0
+    for i in range(0, len(stream), 640):
+        for kind, _ in gate.feed(stream[i:i + 640]):
+            if kind == "end":
+                ends.append(t)
+        t += 0.02
+    return ends
+
+
+def test_the_real_detector_ends_the_turn_when_the_speaker_stops_not_the_room(monkeypatch):
+    """Measured 2026-10-08 on this mix: without focus the turn ended only
+    when the background did (+7.1 s at -16 and -20 dB, +4.0 s even at
+    -26 dB); with 0.30 it ended +0.7 s after the speaker. At -14 dB 0.30
+    no longer separates them (0.40 would, but split a real call) — the
+    knob's limit, stated rather than hidden."""
+    stream, guest_end = _speech_over_background(0.15)
+    focused = _turn_ends(VadGate(_real_detector_or_skip(monkeypatch, "speaker focus"),
+                                 prefix_padding_ms=300, floor_grace_s=0,
+                                 focus_ratio=0.30), stream)
+    unfocused = _turn_ends(VadGate(_real_detector_or_skip(monkeypatch, "speaker focus"),
+                                   prefix_padding_ms=300, floor_grace_s=0,
+                                   focus_ratio=0.0), stream)
+    assert focused and guest_end < focused[0] < guest_end + 2.5, (guest_end, focused)
+    assert unfocused and unfocused[0] > guest_end + 5, (guest_end, unfocused)
+
+
+def test_focus_does_not_split_a_long_clean_turn(monkeypatch):
+    """The 28 s turn above, with focus on: still one start, one end."""
+    detector = _real_detector_or_skip(monkeypatch, "speaker focus on a long turn")
+    gate = VadGate(detector, prefix_padding_ms=300, floor_grace_s=0, focus_ratio=0.30)
+    stream = _committed_speech(repeats=4)
+    kinds = []
+    for i in range(0, len(stream), 640):
+        kinds += [k for k, _ in gate.feed(stream[i:i + 640]) if k != "audio"]
+    assert kinds == ["start", "end"], kinds
+
+
+def test_for_session_carries_the_focus_ratio(monkeypatch):
+    from app import vad_gate
+
+    monkeypatch.setattr(settings, "vad_mode", "local")
+    monkeypatch.setattr(settings, "vad_focus_ratio", 0.25)
+    monkeypatch.setattr(vad_gate, "_make_detector", lambda: ScriptedDetector([]))
+    assert vad_gate.for_session()._focus_ratio == 0.25

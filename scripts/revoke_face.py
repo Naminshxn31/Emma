@@ -34,7 +34,11 @@ def main(argv=None) -> int:
     from app import consent, enrollment
 
     if args.list or not args.name:
-        people = consent.load()
+        try:
+            people = consent.load()
+        except consent.Unreadable as exc:
+            print(f"people.json: {exc}")
+            return 1
         names = sorted({n for n, _ in enrollment.enrolled()} | set(people))
         if not names:
             print("nobody enrolled from the camera, no consent records")
@@ -47,7 +51,15 @@ def main(argv=None) -> int:
               "FACE_REQUIRE_CONSENT=true) · revoked/expired = never named")
         return 0
 
-    had = consent.revoke(args.name)
+    try:
+        had = consent.revoke(args.name)
+    except ValueError as exc:
+        # consent.Unreadable / faces.LockBusy: both carry a Thai reason and
+        # both mean NOTHING was written. Said as a line, not a traceback —
+        # the person running this wants to know whether the revocation
+        # stands, and here it does not yet.
+        print(f"NOT revoked: {exc}")
+        return 1
     print(f"revoked: {args.name}" + ("" if had else " (no consent record existed — recorded the revocation anyway)"))
     if args.delete_shots:
         folder = enrollment.ENROLLED / args.name

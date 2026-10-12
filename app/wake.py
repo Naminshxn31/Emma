@@ -103,6 +103,10 @@ _KNOWN_ENCODINGS = {
     "A MA": "▁A ▁MA",
 }
 
+#: Spelling lists already reported as dropped (no sentencepiece): the
+#: encoder runs for the standby chain, the shadow and the in-call ear.
+_DROP_WARNED: set[tuple[str, ...]] = set()
+
 _spotter = None
 _load_failed = False
 
@@ -153,7 +157,8 @@ def _override_thresholds() -> dict[str, float]:
     return out
 
 
-def _encode_keyword(word: str, threshold: float | None = None) -> str | None:
+def _encode_keyword(word: str, threshold: float | None = None,
+                    base: float | None = None) -> str | None:
     """The KWS model wants BPE pieces, not letters. One line per spelling
     variant, every variant reporting the same @LABEL.
 
@@ -162,7 +167,11 @@ def _encode_keyword(word: str, threshold: float | None = None) -> str | None:
     sherpa-onnx keywords-file format. `@LABEL` is what get_result returns.
 
     `threshold` overrides the configured one — the shadow detector listens
-    for the same spellings at a floor value.
+    for the same spellings at a floor value. `base` replaces WAKE_THRESHOLD
+    as the number the per-spelling scale multiplies — the in-call ear
+    (app/call_wake.py, FOCUS_WAKE_THRESHOLD) keeps the asymmetry measured
+    for the beam and gets its own knob; WAKE_SPELLINGS' absolute `NAME:0.05`
+    bars are the standby chain's and do not apply to it.
     """
     word = word.strip().lower()
     spellings = _spellings_for(word)
@@ -177,10 +186,24 @@ def _encode_keyword(word: str, threshold: float | None = None) -> str | None:
         for spelling in spellings:
             pairs.append((spelling, " ".join(sp.encode(spelling, out_type=str))))
     except Exception:
+        dropped = []
         for spelling in spellings:
             pieces = _KNOWN_ENCODINGS.get(spelling)
             if pieces is not None:
                 pairs.append((spelling, pieces))
+            else:
+                dropped.append(spelling)
+        if pairs and dropped and tuple(dropped) not in _DROP_WARNED:
+            # Said, once per list: the robot runtime shipped without
+            # sentencepiece until 10 Oct and every WAKE_SPELLINGS entry
+            # beyond the three precomputed ones simply was not listened for
+            # — a tuning round on the robot measured spellings that did not
+            # exist, with nothing in the log to say so.
+            _DROP_WARNED.add(tuple(dropped))
+            logger.warning(
+                "sentencepiece is not available — wake spelling(s) %s are NOT "
+                "listened for (only %s have precomputed encodings)",
+                dropped, sorted(_KNOWN_ENCODINGS))
         if not pairs:
             logger.warning(
                 "cannot encode wake word %r: sentencepiece is not available "
@@ -198,6 +221,8 @@ def _encode_keyword(word: str, threshold: float | None = None) -> str | None:
         # WAKE_THRESHOLD scaled by the built-in per-spelling factor.
         if threshold is not None:
             return threshold
+        if base is not None:
+            return base * _SPELLING_SCALE.get(spelling, 1.0)
         if spelling in overrides:
             return overrides[spelling]
         return settings.wake_threshold * _SPELLING_SCALE.get(spelling, 1.0)
@@ -274,7 +299,7 @@ def _get_spotter():
     return _spotter
 
 
-def _make_spotter(keyword_line: str, filename: str):
+def _make_spotter(keyword_line: str, filename: str, **options):
     import sherpa_onnx
 
     d = _model_dir()
@@ -287,6 +312,7 @@ def _make_spotter(keyword_line: str, filename: str):
         joiner=str(d / "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx"),
         keywords_file=str(keywords_path),
         num_trailing_blanks=1,
+        **options,
     )
 
 

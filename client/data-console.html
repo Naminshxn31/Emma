@@ -234,18 +234,25 @@ function renderList() {
 function editorValues() {
   const d = STATE.detail;
   if (!d) return null;
-  if (d.editor === 'facts' && $('facts')) {
-    return Array.from($('facts').children).map(el => ({
-      label: el.querySelector('.f-label').value,
-      value: el.querySelector('.f-value').value,
-    }));
-  }
+  if (d.editor === 'facts' && $('facts')) return factRows();
   if (d.editor === 'rules' && $('rules')) {
     return Array.from(document.querySelectorAll('.r-text'))
       .map(el => ({label: el.dataset.key, value: el.value}));
   }
   if (d.editor === 'qa' && $('qaEntries')) return qaEditorValues();
   return null;
+}
+
+function factRows() {
+  return Array.from($('facts').children).map(el => {
+    const row = {label: el.querySelector('.f-label').value,
+                 value: el.querySelector('.f-value').value};
+    // No box, no key: the server then keeps the line's state. Sending ""
+    // would mean "follow the file" and clear a state nobody saw.
+    const state = el.querySelector('.f-state');
+    if (state) row.content_state = state.value;
+    return row;
+  });
 }
 
 function unsavedFields() {
@@ -256,7 +263,8 @@ function unsavedFields() {
   if (now.length !== was.length) out.push('จำนวนหัวข้อ');
   now.forEach((row, i) => {
     const old = was[i];
-    if (!old || old.label !== row.label || old.value !== row.value) {
+    if (!old || old.label !== row.label || old.value !== row.value
+        || (old.content_state || '') !== (row.content_state || '')) {
       out.push(row.label || ('หัวข้อที่ ' + (i + 1)));
     }
   });
@@ -265,7 +273,8 @@ function unsavedFields() {
 
 function markClean() {
   const now = editorValues();
-  STATE.clean = now ? now.map(r => ({label: r.label, value: r.value})) : null;
+  STATE.clean = now ? now.map(r => ({label: r.label, value: r.value,
+                                     content_state: r.content_state || ''})) : null;
 }
 
 function showDirty() {
@@ -315,16 +324,55 @@ function approvalBlock(d) {
     + '</table>';
 }
 
+// Each line can carry its own content state, because one file holds things
+// that are real today (the developer, the address) beside things that are
+// still a concept (the facility list). "" = follow the state picked at
+// approval. The caveat the line will force is shown under the box, for the
+// same reason the approval dropdown shows it: the consequence, not an enum.
+function factStateSelect(picked) {
+  return '<label>สถานะของบรรทัดนี้</label><select class="f-state">'
+    + '<option value="">ตามทั้งไฟล์ (สถานะที่เลือกตอนกดอนุมัติ)</option>'
+    + STATE.states.map(s => '<option value="' + esc(s.value) + '"'
+        + (s.value === picked ? ' selected' : '') + '>'
+        + esc(s.value) + ' — ' + esc(s.label_th) + '</option>').join('')
+    + '</select><div class="why f-caveat"></div>';
+}
+
+function paintFactCaveat(row) {
+  const select = row.querySelector('.f-state');
+  const box = row.querySelector('.f-caveat');
+  if (!select || !box) return;
+  const picked = STATE.states.find(s => s.value === select.value);
+  box.textContent = !picked
+    ? 'ใช้สถานะของทั้งไฟล์'
+    : picked.caveat_th
+      ? 'Emma ต้องพูดกำกับบรรทัดนี้ว่า: ' + picked.caveat_th
+      : 'ไม่มีคำกำกับ Emma พูดบรรทัดนี้เป็นเรื่องที่ยืนยันแล้ว';
+}
+
 function factsEditor(d) {
+  // The page is read from disk on every request, the API is whatever code
+  // the server loaded at start. A server from before per-line states sends
+  // no content_state (2026-09-29: new page, 24-Sep server) — its boxes would
+  // show "ตามทั้งไฟล์" over a line the file marks as concept, and its save
+  // drops the key. No box beats a box that lies.
+  STATE.perLine = d.facts.every(f => 'content_state' in f);
   return '<h3>ข้อเท็จจริง</h3>'
-    + '<p class="why">ช่องที่ว่างคือข้อมูลที่ยังไม่มีใครยืนยัน ปล่อยว่างไว้ได้ '
-    + 'Emma จะบอกลูกค้าว่ายังไม่มีข้อมูลและให้ติดต่อฝ่ายขาย ห้ามให้ใครเดาแทน</p>'
+    + (STATE.perLine ? '' : '<div class="msg err">เซิร์ฟเวอร์ยังรันโค้ดเวอร์ชันก่อนมีสถานะรายบรรทัด '
+        + 'หน้านี้จึงแสดงสถานะรายบรรทัดไม่ได้ และ<b>กดบันทึกตอนนี้จะลบสถานะรายบรรทัดที่ตั้งไว้ในไฟล์</b> '
+        + '— กดอนุมัติอย่างเดียวได้ตามปกติ หรือรีสตาร์ต run_server.py ก่อน</div>')
+    + '<p class="why">ช่องที่ว่างคือข้อมูลที่ไม่อยู่ในชุดนี้ ปล่อยว่างไว้ได้ '
+    + 'ถ้ามีระบบที่ตอบได้ (เช่นแบบห้อง/ห้องว่าง/โปรฯ จากผังขาย) Emma จะค้นจากระบบเอง '
+    + 'ถ้าไม่มี Emma จะบอกลูกค้าว่ายังไม่มีข้อมูลและให้ติดต่อฝ่ายขาย ห้ามให้ใครเดาแทน<br>'
+    + '<b>ทุกตัวอักษรในช่องถูกพูดเป็นคำตอบ</b> — อย่าพิมพ์โน้ต เช่น "ดูจาก DB" หรือ "ไม่ต้อง" ให้ปล่อยว่างแทน</p>'
     + '<div id="facts">'
     + d.facts.map((f, i) =>
         '<div class="fact" data-i="' + i + '">'
         + '<label>หัวข้อ</label><input type="text" class="f-label" value="' + esc(f.label) + '">'
-        + '<label>เนื้อหา' + (f.value ? '' : ' <span class="empty">— ยังว่าง</span>') + '</label>'
+        + '<label>เนื้อหา' + ((f.blank !== undefined ? f.blank : !f.value)
+            ? ' <span class="empty">— ยังว่าง</span>' : '') + '</label>'
         + '<textarea class="f-value">' + esc(f.value || '') + '</textarea>'
+        + (STATE.perLine ? factStateSelect(f.content_state || '') : '')
         + '</div>').join('')
     + '</div>'
     + '<button id="addFact" type="button">+ เพิ่มหัวข้อ</button>';
@@ -614,6 +662,10 @@ function renderDetail() {
   // every approval after it — and this is the field that decides whether
   // Emma is forced to say "เป็นแนวคิดเบื้องต้น".
   body += '<h3>อนุมัติให้ Emma พูดกับลูกค้า</h3>'
+    + (d.editor === 'facts'
+        ? '<p class="why">สถานะที่เลือกตรงนี้ใช้กับทุกบรรทัดที่ตั้งเป็น "ตามทั้งไฟล์" '
+          + 'บรรทัดที่ตั้งสถานะเองไว้ข้างบนใช้ของตัวเอง</p>'
+        : '')
     + '<label for="state">สถานะเนื้อหา (เลือกใหม่ทุกครั้ง)</label><select id="state">'
     + '<option value="">— เลือก —</option>'
     + STATE.states.map(s => '<option value="' + esc(s.value) + '">'
@@ -666,10 +718,23 @@ function wireDetail() {
     const wrap = document.createElement('div');
     wrap.className = 'fact';
     wrap.innerHTML = '<label>หัวข้อ</label><input type="text" class="f-label">'
-      + '<label>เนื้อหา</label><textarea class="f-value"></textarea>';
+      + '<label>เนื้อหา</label><textarea class="f-value"></textarea>'
+      + (STATE.perLine ? factStateSelect('') : '');
     $('facts').appendChild(wrap);
+    paintFactCaveat(wrap);
     showDirty();
   };
+  const factList = $('facts');
+  if (factList) {
+    Array.from(factList.children).forEach(paintFactCaveat);
+    factList.addEventListener('change', (event) => {
+      const row = event.target.closest('.fact');
+      if (row && event.target.classList.contains('f-state')) {
+        paintFactCaveat(row);
+        showDirty();
+      }
+    });
+  }
 
   const stateCaveat = () => {
     const box = $('stateCaveat');

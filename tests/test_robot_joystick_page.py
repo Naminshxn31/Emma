@@ -128,6 +128,116 @@ def test_the_map_click_goes_by_coordinate_not_place(html):
     assert "v===0" in norm and "v<=127" in norm
 
 
+def _node() -> str:
+    import shutil
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node not available — robot-joystick.html's JavaScript is UNPARSED and the walkable "
+                    "fan's colours / left-right mapping are NOT being checked on this machine")
+    return node
+
+
+def _run_js(code: str) -> str:
+    import subprocess
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as handle:
+        handle.write(code)
+        path = handle.name
+    try:
+        # encoding, not text=True: Thai comes back on stdout and cp874 cannot decode it
+        done = subprocess.run([_node(), path], capture_output=True, encoding="utf-8", timeout=30)
+    finally:
+        Path(path).unlink(missing_ok=True)
+    assert done.returncode == 0, done.stderr
+    return done.stdout
+
+
+def _walk_region(html: str) -> str:
+    # from the line after the opening marker (its own line is a comment)
+    return html.split("// <walkable>", 1)[1].split("\n", 1)[1].split("// </walkable>", 1)[0]
+
+
+def test_every_plain_script_block_parses(html):
+    import re
+    import subprocess
+    import tempfile
+
+    blocks = re.findall(r"<script>(.*?)</script>", html, re.S)
+    assert blocks
+    for i, block in enumerate(blocks):
+        with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as handle:
+            handle.write(block)
+            path = handle.name
+        try:
+            done = subprocess.run([_node(), "--check", path], capture_output=True,
+                                  encoding="utf-8", timeout=30)
+        finally:
+            Path(path).unlink(missing_ok=True)
+        assert done.returncode == 0, f"robot-joystick.html script #{i}:\n{done.stderr}"
+
+
+# ---- the walkable fan (owner 9 ต.ค.: "มุมไหนเดินได้หรือไม่ได้") ----
+
+def test_the_fan_reads_only_the_servers_walkable_field(html):
+    """One place decides what is in the way (app/main.py _walkable, the lanes'
+    own free_space). The overlay draws that field; it never works the answer out
+    again from the points, which would let the screen and the robot disagree."""
+    import re
+
+    code = re.sub(r"//[^\n]*", "", _walk_region(html))
+    assert "scan.walkable" in code
+    for other in (".points", ".distance", ".clearance", ".angle", "laserscan", "fetch("):
+        assert other not in code, other
+    # drawn under the stop ring and the points, from the same mapping as the points
+    radar = html.split("function drawRadar(", 1)[1].split("async function pollRadar", 1)[0]
+    assert radar.index("drawWalk(") < radar.index("min_clearance") < radar.index("p.valid) continue")
+    assert "radarXY(cx, cy, scale, p.angle, p.distance)" in radar
+
+
+def test_the_fan_colours_and_the_left_is_drawn_on_the_left(html):
+    import json
+
+    out = json.loads(_run_js(_walk_region(html) + r"""
+const set = { step: 5, max: 3, length: 0.6, width: 0.7,
+              dirs: [{ a: 0, free: 3.0, turn: true }, { a: 90, free: 0.62, turn: true }],
+              arms: { width: 0.78, dirs: [{ a: 0, free: 0.62, turn: true }] } };
+const left = radarXY(100, 100, 10, Math.PI / 2, 1), ahead = radarXY(100, 100, 10, 0, 1);
+console.log(JSON.stringify({
+  cls: [[null, null], [1.0, true], [0.99, true], [0.4, true], [0.39, true], [3.0, false], [2.0, null]]
+        .map((x) => walkClass(x[0], x[1])),
+  left, ahead,
+  base: walkSet({ walkable: set }, false).width, arms: walkSet({ walkable: set }, true).width,
+  none: [walkSet({}, false), walkSet(null, true), walkSet({ walkable: { dirs: 'x' } }, false)],
+  noArms: walkSet({ walkable: { step: 5, max: 3, length: 0.6, width: 0.7, dirs: [] } }, true).width,
+  textBase: walkAheadText(walkSet({ walkable: set }, false)),
+  textArms: walkAheadText(walkSet({ walkable: set }, true)),
+  textNone: walkAheadText(null),
+}));
+"""))
+    assert out["cls"] == ["unk", "ok", "tight", "tight", "stop", "stop", "ok"]
+    # + angle is the robot's LEFT (board convention); forward is up on the plot
+    assert out["left"][0] < 100 and abs(out["left"][1] - 100) < 1e-9
+    assert out["ahead"][1] < 100 and abs(out["ahead"][0] - 100) < 1e-9
+    assert (out["base"], out["arms"], out["noArms"]) == (0.7, 0.78, 0.7)
+    assert out["none"] == [None, None, None]
+    assert out["textBase"] == "ตรงหน้า: เดินได้ เกิน 3 ม. (ตัวกว้าง 0.70 ม.)"
+    assert out["textArms"] == "ตรงหน้า: แคบ 0.62 ม. (ตัวกว้าง 0.78 ม.)"
+    assert out["textNone"] == "มุมเดินได้: เฟรมนี้ไม่มีข้อมูล"
+
+
+def test_the_fan_has_a_thai_legend_and_asks_for_the_arms_only_when_ticked(html):
+    for label in ("เดินได้", "แคบ", "ติด", "มองไม่เห็น"):
+        assert f"</span>{label}</span>" in html, label
+    assert 'id="walknote"' in html and 'id="walkarms"' in html
+    poll = html.split("async function pollRadar", 1)[1].split("// ---------- map", 1)[0]
+    assert "(arms ? (q ? '&' : '?') + 'arms=1' : '')" in poll
+    # a lost frame clears the fan: a green left over from the last good frame
+    # is a picture of a room that may have changed
+    assert "drawRadar({ points: [] }, null);" in poll
+
+
 def test_the_pollers_pause_when_the_tab_is_hidden(html):
     # Every poller checks document.hidden so a backgrounded tab stops taxing
     # the nc tunnel (the chassis owner's rate note).

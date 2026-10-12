@@ -198,9 +198,14 @@ REM the logged-on user's own session. %PYW% was resolved above, so no PATH looku
 powershell -NoProfile -Command "Register-ScheduledTask -TaskName 'EmmaRoomAgent' -Force -Action (New-ScheduledTaskAction -Execute '%PYW%' -Argument '\\"%DEST%\\run_room_agent.py\\"' -WorkingDirectory '%DEST%') -Trigger (New-ScheduledTaskTrigger -AtLogOn) -Principal (New-ScheduledTaskPrincipal -GroupId 'BUILTIN\\Users' -RunLevel Limited)" >nul
 echo Registered auto-start (Task Scheduler entry: EmmaRoomAgent).
 
-REM Start it now, in the background, no window.
-start "" /d "%DEST%" "%PYW%" run_room_agent.py
-echo Started in the background.
+REM Start it now via the TASK, not a bare `start`. Two reasons: it then runs
+REM under the same Limited Users principal it will use after every reboot (a bare
+REM `start` would run it with the installer's elevated token until the next
+REM logon), and there is exactly ONE way the agent is ever launched -- so a
+REM self-update, which restarts the agent, can never race a second copy for the
+REM port. If /run is refused for any reason the AtLogOn trigger still starts it.
+schtasks /run /tn "EmmaRoomAgent" >nul
+echo Started in the background (via the scheduled task).
 
 echo.
 echo Done. This PC's address(es) on the LAN:
@@ -276,8 +281,28 @@ def project_identity() -> tuple[str, str, Path]:
     raise SystemExit("no project_identity in the source registry")
 
 
+def _env_value(raw: str) -> str:
+    """Validate a value going into the room PC's .env (unquoted KEY=value format).
+
+    A newline would inject a whole extra line into the file; a control character,
+    a leading/trailing space, or a '#' would be truncated or mis-parsed by
+    python-dotenv (so ROOM_AGENT_NAME would then NOT match rooms.json, and the
+    command would land nowhere). These values come from the operator building the
+    package, so a bad one is a mistake worth failing the build for -- loudly,
+    here -- rather than silently shipping a corrupt .env to a room PC."""
+    s = str(raw or "")
+    if any(ord(c) < 32 for c in s):
+        raise SystemExit("a room setting has a newline/control character -- "
+                         "refusing to write a corrupt .env")
+    if s != s.strip() or "#" in s:
+        raise SystemExit("a room setting has a leading/trailing space or '#' "
+                         f"({s!r}) -- rename it so the .env is not mangled")
+    return s
+
+
 def build(room: str, out: Path, host: str, port: int, allow: str,
-          programs: str, token: str | None, bundle_python: bool = True) -> dict:
+          programs: str, token: str | None, bundle_python: bool = True,
+          input_enabled: bool = False, update_url: str = "") -> dict:
     if out.exists() and any(out.iterdir()):
         raise SystemExit(f"{out} is not empty — pick an empty folder or delete it first")
     out.mkdir(parents=True, exist_ok=True)
@@ -297,18 +322,21 @@ def build(room: str, out: Path, host: str, port: int, allow: str,
     shutil.copy(identity_path, out / rel_identity)
 
     token = token or secrets.token_urlsafe(24)
+    q = _env_value
     (out / ".env").write_text(
         "# This machine's room agent. No API key belongs in this file.\n"
-        f"PROJECT_ID={project_id}\n"
-        f"PROJECT_NAME={display_name}\n"
-        f"ROOM_AGENT_NAME={room}\n"
-        f"ROOM_AGENT_TOKEN={token}\n"
-        f"ROOM_AGENT_HOST={host}\n"
+        f"PROJECT_ID={q(project_id)}\n"
+        f"PROJECT_NAME={q(display_name)}\n"
+        f"ROOM_AGENT_NAME={q(room)}\n"
+        f"ROOM_AGENT_TOKEN={q(token)}\n"
+        f"ROOM_AGENT_HOST={q(host)}\n"
         f"ROOM_AGENT_PORT={port}\n"
-        f"ROOM_AGENT_ALLOW={allow}\n"
-        f"ROOM_AGENT_PROGRAMS={programs}\n"
+        f"ROOM_AGENT_ALLOW={q(allow)}\n"
+        f"ROOM_AGENT_PROGRAMS={q(programs)}\n"
         "# Keyboard and mouse stay off unless this says true, even when ALLOW=all.\n"
-        "ROOM_AGENT_INPUT=false\n",
+        f"ROOM_AGENT_INPUT={'true' if input_enabled else 'false'}\n"
+        "# One-click self-update pulls agent code from THIS fixed url only (management PC).\n"
+        f"ROOM_AGENT_UPDATE_URL={q(update_url)}\n",
         encoding="utf-8")
     # .cmd files: ASCII + CRLF, and never a BOM (batch chokes on a BOM on the
     # first line). encode("ascii") makes a stray non-ASCII character fail here,
@@ -327,6 +355,13 @@ def build(room: str, out: Path, host: str, port: int, allow: str,
 
 
 def main(argv: list[str] | None = None) -> int:
+    # The summary prints a Thai room name; a Windows console defaults to cp1252
+    # and would crash on it AFTER the package is already written, which reads as
+    # a build failure when it is not. Speak UTF-8 to our own stdout.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        pass
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("room", help='the room name, exactly as the server will say it')
@@ -339,13 +374,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--programs", default="",
                         help='programs this room may open; "all" lets the Start Menu decide')
     parser.add_argument("--token", default=None, help="reuse an existing token instead of a new one")
+    parser.add_argument("--input", action="store_true",
+                        help="allow keyboard and mouse control from the network "
+                             "(off by default; this machine will accept typing and clicking)")
+    parser.add_argument("--update-url", default="",
+                        help="URL of the agent update server on the management PC "
+                             "(e.g. http://192.168.0.2:8799/agent-bundle) for one-click self-update")
     parser.add_argument("--no-bundle-python", action="store_true",
                         help="do not ship Python inside the package (smaller; the target must "
                              "already have Python or be able to download it)")
     args = parser.parse_args(argv)
 
     built = build(args.room, args.out, args.host, args.port, args.allow, args.programs,
-                  args.token, bundle_python=not args.no_bundle_python)
+                  args.token, bundle_python=not args.no_bundle_python, input_enabled=args.input,
+                  update_url=args.update_url)
 
     print(f"built {built['out']}")
     if built.get("python"):

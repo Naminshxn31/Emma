@@ -62,6 +62,10 @@
     vertical-align:-1px; }
   .lg.free { background:#e6ebf0; } .lg.wall { background:#c73838; }
   .lg.unk { background:#23282f; border:1px solid var(--line); } .lg.bot { background:#33d17a; }
+  /* the walkable fan under the radar's points (WALK_FILL, opaque here) */
+  .lg.wok { background:#3aaa5a; } .lg.wtight { background:#e0a82e; }
+  .lg.wstop { background:#d6404e; } .lg.wunk { background:#5a636e; }
+  .maplegend label { display:inline-flex; align-items:center; gap:4px; cursor:pointer; }
   .meter { height:14px; background:#05070a; border-radius:8px; overflow:hidden;
     border:1px solid var(--line); }
   .meter > div { height:100%; width:0; background:var(--go2); transition:width .12s; }
@@ -181,6 +185,14 @@
     <div class="card">
       <h2>เรดาร์ (Lidar)</h2>
       <div class="canvwrap"><canvas id="radar" width="320" height="320"></canvas></div>
+      <div class="small maplegend">
+        <span title="ไปได้ตั้งแต่ 1 ม. และมีที่หันไปทางนั้น"><span class="lg wok"></span>เดินได้</span>
+        <span title="ไปได้ 0.4–1 ม."><span class="lg wtight"></span>แคบ</span>
+        <span title="ไม่ถึง 0.4 ม. หรือหันไปทางนั้นไม่ได้"><span class="lg wstop"></span>ติด</span>
+        <span title="นอกมุม lidar (±103°) — ไม่เห็นไม่ได้แปลว่าว่าง"><span class="lg wunk"></span>มองไม่เห็น</span>
+        <label><input type="checkbox" id="walkarms">นับแขน (0.78 ม.)</label>
+      </div>
+      <div class="small" id="walknote">มุมเดินได้: รอเฟรม lidar</div>
       <div class="small" id="radarnote">รอสัญญาณ lidar จากฐาน</div>
     </div>
 
@@ -292,7 +304,16 @@ async function pump() {
 async function stopNow(why) {
   const was = driving; driving = null;
   releaseKnob();
-  try { await commandBody({ action: 'stop' }); } catch (e) {}
+  // Finding #0 (integrator): during a route run the server sends this stop
+  // through the robot face and answers did:'stop_requested' (queued, not
+  // confirmed), or ok:false with a Thai hint when the face is gone. The page
+  // used to drop the reply and say "หยุด" either way -- the one answer that
+  // told staff to press the robot's own button was never shown.
+  let r = null;
+  try { r = await commandBody({ action: 'stop' }); }
+  catch (e) { driveMsg('ส่งคำสั่งหยุดไม่ได้ — กดหยุดบนตัวหุ่น', true); return; }
+  if (r && r.ok === false) { driveMsg(r.hint || ('หยุดไม่สำเร็จ: ' + (r.error || 'ไม่ทราบสาเหตุ')), true); return; }
+  if (r && r.did === 'stop_requested') { driveMsg('ส่งคำสั่งหยุดแล้ว — ยังไม่ยืนยันว่าหุ่นหยุด ดูที่ตัวหุ่น'); return; }
   if (was || why) driveMsg(why || 'หยุด');
 }
 
@@ -444,14 +465,69 @@ async function pollMic() {
 }
 
 // ---------- radar (lidar) ----------
+// <walkable> -- the walkable fan, drawn from the server's `walkable` field
+// only (app/main.py _walkable: robot_lanes.free_space + turn_sweep_gap on the
+// whole lidar frame). Nothing here works it out again from the points: one
+// place decides what is in the way, so this screen and the lanes the robot
+// drives cannot come to disagree. Tests run this region in node.
+// Angles: 0 = the robot's front, + = LEFT (counter-clockwise, the board's own
+// convention -- robot_chassis.clearance calls + "left", robot_lanes takes
+// y = d·sin a as left). Forward is up on the plot, so + is drawn LEFT of the
+// centre. Until 9 ต.ค. the points were drawn at cx + d·sin a: mirrored, a
+// chair on the robot's left showed on the right.
+const WALK_OK_M = 1.0, WALK_TIGHT_M = 0.4;
+const WALK_FILL = { ok: 'rgba(58,170,90,.30)', tight: 'rgba(224,168,46,.36)',
+                    stop: 'rgba(214,64,78,.42)', unk: 'rgba(110,120,132,.16)' };
+const WALK_TH = { ok: 'เดินได้', tight: 'แคบ', stop: 'ติด', unk: 'มองไม่เห็น' };
+function radarXY(cx, cy, scale, angle, d) {
+  return [cx - d * scale * Math.sin(angle), cy - d * scale * Math.cos(angle)];
+}
+// free: how far (m) the front face goes once facing that way (null = outside
+// the lidar's arc: not seen, which is not free); turn: room to turn to face it.
+function walkClass(free, turn) {
+  if (free == null) return 'unk';
+  if (turn === false || free < WALK_TIGHT_M) return 'stop';
+  return free >= WALK_OK_M ? 'ok' : 'tight';
+}
+function walkSet(scan, arms) {
+  const w = scan && scan.walkable;
+  if (!w || !Array.isArray(w.dirs)) return null;
+  const a = arms && w.arms && Array.isArray(w.arms.dirs) ? w.arms : null;
+  return { step: w.step, max: w.max, length: w.length,
+           width: a ? a.width : w.width, dirs: a ? a.dirs : w.dirs };
+}
+function walkAheadText(set) {
+  const d = set && set.dirs.find((x) => x.a === 0);
+  if (!d || d.free == null) return 'มุมเดินได้: เฟรมนี้ไม่มีข้อมูล';
+  const far = d.free >= set.max ? 'เกิน ' + set.max + ' ม.' : d.free.toFixed(2) + ' ม.';
+  return 'ตรงหน้า: ' + WALK_TH[walkClass(d.free, d.turn)] + ' ' + far +
+         ' (ตัวกว้าง ' + set.width.toFixed(2) + ' ม.)';
+}
+function drawWalk(g, cx, cy, scale, set) {
+  if (!set) return;
+  const half = (set.step || 5) * Math.PI / 360;   // half a step, radians
+  const face = (set.length || 0) / 2;             // `free` is from the front face
+  for (const d of set.dirs) {
+    const a = d.a * Math.PI / 180, r = face + (d.free == null ? set.max : d.free);
+    g.fillStyle = WALK_FILL[walkClass(d.free, d.turn)];
+    g.beginPath(); g.moveTo(cx, cy);
+    for (const t of [a - half, a, a + half]) { const p = radarXY(cx, cy, scale, t, r); g.lineTo(p[0], p[1]); }
+    g.closePath(); g.fill();
+  }
+  // the body the fan was measured for: length front-back, width across
+  g.strokeStyle = '#8fd6a4'; g.lineWidth = 1;
+  g.strokeRect(cx - set.width / 2 * scale, cy - face * scale, set.width * scale, 2 * face * scale);
+}
+// </walkable>
+
 let radarWarn = null;   // {direction, distance, at} — a just-refused drive
-function drawRadar(scan) {
+function drawRadar(scan, walk) {
   const points = scan.points || [];
   const c = $('radar'), g = c.getContext('2d');
   const w = c.width, h = c.height, cx = w / 2, cy = h / 2;
   g.clearRect(0, 0, w, h);
-  // range rings every metre out to the furthest point (min 3 m).
-  let maxd = 3;
+  // range rings every metre out to the furthest point (min 3 m, or the fan's reach).
+  let maxd = walk ? Math.max(3, walk.length / 2 + walk.max) : 3;
   for (const p of points) if (p.valid && p.distance > maxd) maxd = p.distance;
   maxd = Math.ceil(maxd);
   const scale = (Math.min(w, h) / 2 - 8) / maxd;
@@ -460,6 +536,7 @@ function drawRadar(scan) {
     g.beginPath(); g.arc(cx, cy, r * scale, 0, 7); g.stroke();
     g.fillText(r + 'ม.', cx + 2, cy - r * scale + 11);
   }
+  drawWalk(g, cx, cy, scale, walk);   // under the stop ring and the points
   // The stop line: driving toward something inside this ring is refused by
   // the server (ROBOT_DRIVE_MIN_CLEARANCE_M). Flares red on a just-blocked jog.
   const warm = radarWarn && Date.now() - radarWarn.at < 2500;
@@ -472,27 +549,33 @@ function drawRadar(scan) {
   // robot at centre, heading up (+x forward → up on the plot).
   g.fillStyle = '#3a844a';
   g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill();
-  // points: angle 0 = forward (+x). Plot forward = up: px = cx + d*sin(a),
-  // py = cy - d*cos(a).
+  // points: angle 0 = forward, + = left (radarXY above).
   g.fillStyle = '#cfe9d4';
   for (const p of points) {
     if (!p.valid) continue;
-    const px = cx + p.distance * scale * Math.sin(p.angle);
-    const py = cy - p.distance * scale * Math.cos(p.angle);
-    g.fillRect(px - 1, py - 1, 2, 2);
+    const xy = radarXY(cx, cy, scale, p.angle, p.distance);
+    g.fillRect(xy[0] - 1, xy[1] - 1, 2, 2);
   }
 }
 async function pollRadar() {
   if (document.hidden) return;
+  const arms = $('walkarms').checked;
   let out = null;
-  try { out = await (await fetch('/robot/laserscan' + q)).json(); } catch (e) {}
+  try { out = await (await fetch('/robot/laserscan' + q + (arms ? (q ? '&' : '?') + 'arms=1' : ''))).json(); } catch (e) {}
   if (!out || !out.ok || !Array.isArray(out.points)) {
     $('radarnote').textContent = out && out.error
       ? 'lidar: ' + out.error : 'ยังไม่มีสัญญาณ lidar (ฐานออฟไลน์หรือยังไม่รองรับ)';
+    // no frame = no fan: a green "walkable" left over from the last good frame
+    // would be a picture of a room that may have changed (the camera panel
+    // drops a stale image the same way).
+    drawRadar({ points: [] }, null);
+    $('walknote').textContent = 'มุมเดินได้: ไม่มีสัญญาณ lidar';
     return;
   }
   const pts = out.points.filter((p) => p.valid);
-  drawRadar(out);
+  const walk = walkSet(out, arms);
+  drawRadar(out, walk);
+  $('walknote').textContent = walkAheadText(walk);
   let note = pts.length + ' จุด · ใกล้สุด ' +
     (pts.length ? Math.min.apply(null, pts.map((p) => p.distance)).toFixed(2) + ' ม.' : '—');
   if (out.clearance) {

@@ -49,6 +49,7 @@ import logging
 import os
 import math
 import re
+import threading
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -67,15 +68,67 @@ _COMMON_AREA = re.compile(
 )
 _DIMENSION = re.compile(
     r"(?:(?:ความยาว|ยาว|ขนาด|พื้นที่)\s*)?"
-    r"\d[\d,]*(?:\.\d+)?\s*"
-    r"(?:ตาราง\s*เมตร|ตร\.?\s*ม\.?|เมตร|ม\.|sqm|sq\.?\s*m\.?|m(?:etre|eter)s?)",
+    # `-?` and the bare `m\b`: the English copy of the 2026-10-06 deck writes
+    # the lagoon as "155m Water Lagoon" (intro-015 title_en) and "a 155-metre
+    # water lagoon" (its summary_en). Both walked past this pattern while the
+    # Thai "ลากูน 155 เมตร" beside them was stripped, so an English-speaking
+    # guest would have heard the one number a Thai guest never does. `m\b`
+    # needs the word to end there: "5 min" and "2 million" are not metres.
+    r"\d[\d,]*(?:\.\d+)?\s*-?\s*"
+    r"(?:ตาราง\s*เมตร|ตร\.?\s*ม\.?|เมตร|ม\.|sqm|sq\.?\s*m\.?|m(?:etre|eter)s?|m\b)",
     re.IGNORECASE,
 )
 
 
-def sanitize_common_area_dimensions(text: str | None) -> str:
-    """Hide prohibited common-area measurements while preserving locations."""
+#: The caveat the owner banned on 2026-10-10: "อย่าบอกว่าเป็นเพียงแนวคิดอาจจะ
+#: มีการเปลี่ยนแปลง ห้ามพูดแบบนี้เป็นอันขาด". The prompt and `state_instruction`
+#: ban saying it, but the approved deck itself prints it (cover, theme page,
+#: basement plan: "มุมขวาล่างระบุว่าเป็นแนวคิดเบื้องต้น เพื่อการนำเสนอเท่านั้น และ
+#: อาจเปลี่ยนแปลงได้โดยไม่ต้องแจ้งล่วงหน้า") and search hands those summaries back
+#: as `detail` — a ban in one place and the sentence as data in another is
+#: two orders for one turn. So it is cut from project text before any model
+#: reads it, the same door the dimensions go through. The approved files are
+#: not edited; that is the owner's console. Price wording is left alone:
+#: "ราคาเปลี่ยนตามห้องที่เหลือ" is a fact a buyer needs, not the banned caveat.
+CONCEPT_CAVEAT = re.compile(
+    r"แนวคิดเบื้องต้น|เป็นเพียงแนวคิด|ยังเป็นแนวคิด|เพื่อการนำเสนอเท่านั้น|อาจ(?:จะ)?มีการเปลี่ยนแปลง"
+    r"|อาจ(?:จะ)?เปลี่ยนแปลง|preliminary\s+concept|for\s+illustrative\s+purposes|subject\s+to\s+change"
+    r"|may\s+change",
+    re.IGNORECASE,
+)
+_PRICE_WORD = re.compile(r"ราคา|price|฿|baht", re.IGNORECASE)
+
+
+def strip_concept_caveat(text: str | None) -> str:
+    """Drop the clauses that carry the banned concept caveat.
+
+    Thai separates clauses with spaces and English separates sentences
+    with full stops, so an English sentence that carries it goes whole and
+    a Thai text loses only the space-delimited pieces that do. A piece about
+    price stays (see CONCEPT_CAVEAT)."""
     value = str(text or "")
+    if not value or not CONCEPT_CAVEAT.search(value):
+        return value
+    kept = []
+    for sentence in re.split(r"(?<=[.!?])\s+", value):
+        if not CONCEPT_CAVEAT.search(sentence) or _PRICE_WORD.search(sentence):
+            kept.append(sentence)
+            continue
+        if not _THAI.search(sentence):
+            continue
+        pieces = [p for p in sentence.split() if not CONCEPT_CAVEAT.search(p) or _PRICE_WORD.search(p)]
+        if pieces:
+            kept.append(" ".join(pieces))
+    return " ".join(kept).strip()
+
+
+def sanitize_common_area_dimensions(text: str | None) -> str:
+    """Hide prohibited common-area measurements while preserving locations.
+
+    Also the one door every piece of project text goes through on its way to
+    a model (facts, search results, slides), so the banned concept caveat is
+    cut here too (`strip_concept_caveat`)."""
+    value = strip_concept_caveat(text)
     if not value or not _COMMON_AREA.search(value):
         return value
     value = _DIMENSION.sub("", value)
@@ -403,7 +456,27 @@ def _l2_normalise(vectors):
 LOCAL_MODEL = os.getenv(
     "EMBED_LOCAL_MODEL",
     "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+#: Which engine runs LOCAL_MODEL: `auto` (sentence-transformers where it is
+#: installed -- the PC -- else the ONNX export, app/embed_onnx.py -- the
+#: robot), `sentence-transformers`, or `onnx`. Not a different space: the two
+#: are measured equal (CLAUDE.md), which is why the signature does not name the
+#: engine. `onnx` on the PC is how that measurement is re-run
+#: (`EMBED_LOCAL_BACKEND=onnx python scripts/eval_search.py`). A misspelling
+#: is `auto`, never an error.
+LOCAL_BACKEND = os.getenv("EMBED_LOCAL_BACKEND", "auto")
 _local = None
+#: Latched once no engine could load, so the reason is logged once and every
+#: later query fails fast to lexical -- what slide_search's own latch expects.
+_local_unavailable = False
+_local_lock = threading.Lock()
+
+
+def _onnx_serves_local_model() -> bool:
+    """The ONNX files ARE one model. Serving them for another EMBED_LOCAL_MODEL
+    would put MiniLM vectors under that model's signature."""
+    from app import embed_onnx
+
+    return LOCAL_MODEL == embed_onnx.MODEL
 
 
 def local_embeddings_installed() -> bool:
@@ -423,32 +496,95 @@ def local_embeddings_installed() -> bool:
 
     Actually loading the model stays in `_local_encoder`, where it is paid by
     whoever genuinely embeds something.
+
+    The ONNX engine (the robot's) counts when its packages and files are
+    there -- still `find_spec` and `is_file`, nothing opened or hashed.
     """
     import importlib.util
 
-    return importlib.util.find_spec("sentence_transformers") is not None
+    if importlib.util.find_spec("sentence_transformers") is not None:
+        return True
+    from app import embed_onnx
+
+    return (_onnx_serves_local_model() and embed_onnx.files_present()
+            and importlib.util.find_spec("onnxruntime") is not None
+            and importlib.util.find_spec("tokenizers") is not None)
 
 
-def _local_encoder():
-    """Load the offline model once, or None if it isn't installed."""
-    global _local
-    if _local is not None:
-        return _local
+def _st_encoder():
+    """sentence-transformers (torch), or None if it is not installed."""
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError:
-        logger.info(
-            "local embeddings unavailable — `pip install sentence-transformers` "
-            "to run search without the API"
-        )
         return None
     try:
         logger.info("loading local embedding model %s (first run downloads it)", LOCAL_MODEL)
-        _local = SentenceTransformer(LOCAL_MODEL)
-        return _local
+        return SentenceTransformer(LOCAL_MODEL)
     except Exception:
         logger.warning("could not load the local embedding model", exc_info=True)
         return None
+
+
+def _onnx_encoder():
+    """The ONNX export of LOCAL_MODEL (app/embed_onnx.py), or None."""
+    from app import embed_onnx
+
+    if not _onnx_serves_local_model():
+        logger.info("the ONNX embedding files are %s, not EMBED_LOCAL_MODEL=%s -- not used",
+                    embed_onnx.MODEL, LOCAL_MODEL)
+        return None
+    return embed_onnx.load()
+
+
+def _local_encoder():
+    """Load the offline model once, or None if no engine can.
+
+    Once, under a lock: the boot warm-up (main._warm_search) and a guest's
+    first question both arrive here in worker threads, and two concurrent
+    loads of a 470 MB model is twice the memory and twice the wait for
+    nothing. Never on the event loop -- every caller is a blocking tool or
+    the warm-up's `to_thread`.
+
+    `auto` tries sentence-transformers first: where it is installed it is
+    what built the index, and the PC's behaviour must not change with this.
+    Where it is not (the robot), the ONNX export of the same model -- the
+    same vectors, measured (app/embed_onnx.py). Neither = None, logged once;
+    `_embed_local` raises and search carries on lexical, exactly as before
+    the ONNX path existed.
+    """
+    global _local, _local_unavailable
+    if _local is not None or _local_unavailable:
+        return _local
+    with _local_lock:
+        if _local is not None or _local_unavailable:
+            return _local
+        backend = (LOCAL_BACKEND or "auto").strip().lower()
+        if backend in {"st", "sentence-transformers", "sentence_transformers", "torch"}:
+            engines = (_st_encoder,)
+        elif backend == "onnx":
+            engines = (_onnx_encoder,)
+        else:
+            if backend != "auto":
+                logger.warning("EMBED_LOCAL_BACKEND=%r is not auto/onnx/sentence-transformers "
+                               "-- using auto", LOCAL_BACKEND)
+            engines = (_st_encoder, _onnx_encoder)
+        for engine in engines:
+            model = engine()
+            if model is not None:
+                _local = model
+                return model
+        _local_unavailable = True
+        logger.info(
+            "local embeddings unavailable — no sentence-transformers and no ONNX "
+            "model (python scripts/fetch_embed_model.py); search stays lexical"
+        )
+        return None
+
+
+#: tests/conftest.py replaces `_local_encoder` for every test (the back door
+#: in CLAUDE.md) and never puts it back; tests of the loader itself call it
+#: through this name.
+_local_encoder_impl = _local_encoder
 
 
 def embedding_signature(provider: str) -> str:
@@ -466,6 +602,17 @@ def embedding_signature(provider: str) -> str:
 
     So the provider is part of the identity of the cache. Change it and the
     index is stale by definition.
+
+    The local ENGINE is deliberately not in it: sentence-transformers (PC)
+    and the ONNX export (robot, app/embed_onnx.py) were measured on 180
+    texts -- the 48 indexed slides, the 126 eval questions, Thai/English/
+    Chinese probes -- at min cosine 0.9999998 (2026-10-09); the ONNX slide
+    vectors against the PC-built embeddings.npz the same, and eval_search
+    gave identical outcomes on all 126 questions. That is one space, so an
+    index either machine builds is valid on both. The int8 export measured
+    min 0.971 and is NOT used; an export that ever is needs its own space --
+    and note that embeddings.npz records only the provider ("local"), not
+    this string, so a new signature alone would not make an old index stale.
     """
     if provider == "local":
         return "local:%s" % LOCAL_MODEL
@@ -545,6 +692,20 @@ def save_query_cache() -> None:
         logger.warning("could not save the query cache", exc_info=True)
 
 
+def _cache_space(provider: str) -> str:
+    """The query-cache key prefix. "local" stays what sentence-transformers
+    wrote (106 eval questions cached since August); the ONNX engine gets its
+    own, or `EMBED_LOCAL_BACKEND=onnx eval_search.py` would read the PC
+    engine's cached vectors for 106 of 126 questions and report that it had
+    measured ONNX. Equal spaces do not make a measurement of one engine a
+    measurement of the other."""
+    if provider != "local":
+        return provider
+    from app import embed_onnx
+
+    return "local+onnx" if isinstance(_local_encoder(), embed_onnx.OnnxEncoder) else "local"
+
+
 def embed(texts: list[str], task_type: str, provider: str, *, attempts: int = 1):
     """Embed with a named provider. Never mixes — see `embedding_signature`."""
     # One query, cache on: answer from disk if this exact question has been
@@ -553,7 +714,7 @@ def embed(texts: list[str], task_type: str, provider: str, *, attempts: int = 1)
     if _query_cache_path is not None and len(texts) == 1:
         import numpy as np
 
-        key = "%s\x00%s\x00%s" % (provider, task_type, texts[0])
+        key = "%s\x00%s\x00%s" % (_cache_space(provider), task_type, texts[0])
         hit = _QUERY_CACHE.get(key)
         if hit is not None:
             return np.asarray([hit])
@@ -571,7 +732,7 @@ def embed(texts: list[str], task_type: str, provider: str, *, attempts: int = 1)
                          attempts=max(attempts, 5 if _query_cache_path else 1))
 
     if _query_cache_path is not None and len(texts) == 1:
-        key = "%s\x00%s\x00%s" % (provider, task_type, texts[0])
+        key = "%s\x00%s\x00%s" % (_cache_space(provider), task_type, texts[0])
         _QUERY_CACHE[key] = vectors[0]
     return vectors
 
@@ -844,6 +1005,53 @@ def _term_is_thai(term: str) -> bool:
 _THAI_TERMS = tuple(t for t in COMMERCIAL_TERMS if _term_is_thai(t))
 _NON_THAI_TERMS = tuple(t for t in COMMERCIAL_TERMS if not _term_is_thai(t))
 
+#: "เท่าไหร่" is Thai for "how much" — and for how far, how long, how big.
+#: As a bare guard word it refused every measurement question as a price
+#: question: measured live 2026-10-07 (scripts/eval_live_qa.py), the guard
+#: fired 15 times, including "ห่างจากหาดจอมเทียนเท่าไหร่" (answered
+#: "ข้อมูลราคาและโปรโมชั่นไม่มีในคลังภาพ") and "สระยาวเท่าไหร่", whose answer
+#: (the 155 m lagoon) is on an approved slide. So the bare word counts only
+#: when nothing in the question measures something. A real money word
+#: (ราคา, ค่าส่วนกลาง, งบ, ผ่อน...) still catches the question on its own —
+#: "ห้องใหญ่ราคาเท่าไหร่" is commercial because of ราคา, not เท่าไหร่.
+_BARE_AMOUNT = frozenset({"เท่าไหร่", "เท่าไร"})
+#: Matched INSIDE tokens: the segmenter is taught the deck's keywords, so
+#: "ขนาดห้อง" can arrive as one token (it did, in the test suite's order).
+#: Loosening the guard on a false hit only means the question reaches the
+#: slide search — any real money word still refuses it first.
+_MEASURE_PARTS = ("ห่าง", "ไกล", "ระยะ", "ยาว", "กว้าง", "สูง", "ลึก", "ใหญ่",
+                  "ขนาด", "พื้นที่", "เมตร", "กิโล", "ใช้เวลา", "นาที", "ชั่วโมง",
+                  "ความจุ")
+#: Whole tokens only: จุ (holds) sits inside จุด (point) and much else.
+_MEASURE_EXACT = frozenset({"จุ"})
+
+
+def _measures_something(words: list[str]) -> bool:
+    return any(w in _MEASURE_EXACT or any(p in w for p in _MEASURE_PARTS) for w in words)
+
+
+#: Review 12 Oct: matched inside tokens, the exemption also let real price
+#: questions about a unit through -- "ห้องวิวทะเลชั้นสูงเท่าไหร่" (ชั้นสูง),
+#: "ห้องขนาด 30 ตารางเมตรเท่าไหร่", "ตารางเมตรละเท่าไหร่", "ห้องใหญ่สุดเท่าไหร่".
+#: The bare word is still "how much" when the question is priced per
+#: something (ละ), or is about a unit and either states its measure already
+#: (a number: the size is given, so the size is not what is asked) or
+#: measures it only with the words that pick WHICH unit (high floor, biggest).
+#: "ห้องขนาดเท่าไหร่", "ห้องห่างจากลิฟต์เท่าไหร่", "ตึกสูงเท่าไหร่" stay measures.
+_UNIT_WORDS = frozenset({"ห้อง", "ยูนิต", "คอนโด", "ห้องชุด", "ห้องนอน"})
+_PICKING_PARTS = ("ใหญ่", "สูง")
+
+
+def _asks_a_price_anyway(words: list[str]) -> bool:
+    if "ละ" in words:
+        return True
+    if not any(w in _UNIT_WORDS for w in words):
+        return False
+    if any(ch.isdigit() for w in words for ch in w):
+        return True
+    measuring = [w for w in words if w in _MEASURE_EXACT or any(p in w for p in _MEASURE_PARTS)]
+    return all(any(a in w for a in _PICKING_PARTS) for w in measuring)
+
 
 def is_commercial(query: str) -> bool:
     """Never answerable from slide captions, in any language.
@@ -880,9 +1088,12 @@ def is_commercial(query: str) -> bool:
     if not words:
         return False
     haystack = " %s " % " ".join(words)
+    measures = _measures_something(words) and not _asks_a_price_anyway(words)
     for term in _THAI_TERMS:
         needle = " %s " % " ".join(tokenize(term))
         if needle in haystack:
+            if term in _BARE_AMOUNT and measures:
+                continue   # "how far/long/big", not "how much" — see _BARE_AMOUNT
             return True
     return False
 

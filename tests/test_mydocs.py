@@ -220,6 +220,33 @@ def test_a_file_in_a_subfolder_is_searchable_without_a_restart(_own_folder):
         "the file id must say which collection it came from"
 
 
+def test_underscore_prefixed_files_and_folders_are_never_indexed(_own_folder):
+    """Internal material must not leak into a customer answer. Found 2026-09-29:
+    an owner-review file (project-research) whose own header said "ห้าม Emma พูด
+    ข้อมูลในไฟล์นี้กับลูกค้า" was in the searchable set, and a plain location
+    question surfaced the very rental-yield figure Emma is told never to say.
+    Anything under a "_" name (folder OR file) is skipped -- fail closed, so a
+    note dropped into the docs folder cannot reach a guest even if the project
+    fence (MYDOCS_INCLUDE) is later cleared."""
+    _write(_own_folder, "public.md", "สระว่ายน้ำอยู่ชั้นสาม เปิดทุกวัน")
+    internal = _own_folder / "_internal"
+    internal.mkdir()
+    _write(internal, "research.md",
+           "ห้าม Emma พูด ผลตอบแทนค่าเช่า หกถึงแปดเปอร์เซ็นต์ต่อปี ห้ามพูดกับลูกค้า")
+    _write(_own_folder, "_draft.md", "ผลตอบแทนค่าเช่า ร่างภายใน ห้ามพูด")
+
+    files = {p.name for p in mydocs._doc_files(mydocs._docs_dir())}
+    assert "public.md" in files                       # ordinary file still indexed
+    assert "research.md" not in files                 # under _internal/ -> skipped
+    assert "_draft.md" not in files                   # _-prefixed file -> skipped
+
+    # a query that could only match the internal note finds nothing internal
+    out = mydocs.search_my_documents("ผลตอบแทนค่าเช่ากี่เปอร์เซ็นต์")
+    if out["found"]:
+        assert "ห้าม Emma" not in out["results"][0]["text"]
+        assert "ผลตอบแทน" not in out["results"][0]["text"]
+
+
 def test_the_prompt_names_the_collection_not_its_54_filenames(_own_folder):
     """The doc list in the prompt is capped at 15 names, sorted — 54 slug
     filenames would either flood the budget or hide behind the cap. A

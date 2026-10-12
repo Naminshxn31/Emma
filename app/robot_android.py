@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import re
 
+from app import adb_target
 from app.config import settings
 
 
@@ -22,35 +23,38 @@ BRIGHTNESS_PRESETS = frozenset({0, 25, 50, 80, 100})
 
 
 async def _run(args: list[str], timeout: float | None = None) -> tuple[int, str]:
-    proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-    )
-    try:
-        out, _ = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout or settings.robot_arm_timeout_s)
-    except asyncio.TimeoutError:
-        proc.kill()
-        raise
-    return proc.returncode or 0, (out or b"").decode("utf-8", "replace").strip()
+    # A thread, not asyncio subprocesses: see app/adb_target.py (DEV_RELOAD's
+    # SelectorEventLoop on Windows cannot start one).
+    return await adb_target.run(args, timeout or settings.robot_arm_timeout_s)
 
 
 def _adb(*args: str) -> list[str]:
-    command = [settings.robot_arm_adb]
+    command = [adb_target.executable(settings.robot_arm_adb)]
     if settings.robot_arm_adb_serial:
-        command += ["-s", settings.robot_arm_adb_serial]
+        command += ["-s", adb_target.current(settings.robot_arm_adb_serial)]
     return command + list(args)
 
 
+async def _on_robot(*args: str) -> tuple[int, str]:
+    """`_run(_adb(...))`, re-finding the robot once if adb no longer knows
+    the name it was reached by — the same rule as robot_arm."""
+    code, out = await _run(_adb(*args))
+    serial = settings.robot_arm_adb_serial
+    if code and serial and adb_target.looks_missing(out):
+        if await adb_target.find(adb_target.executable(settings.robot_arm_adb), serial,
+                                 settings.robot_arm_timeout_s):
+            code, out = await _run(_adb(*args))
+    return code, out
+
+
 async def _shell(command: str) -> tuple[int, str]:
-    return await _run(_adb("shell", command))
+    return await _on_robot("shell", command)
 
 
 async def state() -> dict:
     """Read the Android controls and device inventory visible right now."""
     try:
-        code, connection = await _run(_adb("get-state"))
+        code, connection = await _on_robot("get-state")
     except Exception as exc:
         return {"connected": False, "error": f"{type(exc).__name__}: {exc}"}
     if code or connection.strip() != "device":

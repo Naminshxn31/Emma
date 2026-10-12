@@ -537,8 +537,13 @@ async function post(url, body, lane, urgent) {
       signal: AbortSignal.timeout(25000),
     });
     const out = await res.json();
-    const failed = !res.ok || !out.ok || out.stop_write_ok === false;
-    const status = failed ? 'ไม่สำเร็จ' : lane === 'arm' && body.action !== 'arm' ? 'เชลล์รายงานว่าเขียนสำเร็จ' : 'เซิร์ฟเวอร์ตอบรับ';
+    // stop_unconfirmed (review 2, #0-#2): only the board's pause went out
+    // (face gone, or not on a call so a walk cannot be ruled out) — never
+    // "accepted", whatever `ok` says; the hint says press the robot's stop.
+    const failed = !res.ok || !out.ok || out.stop_write_ok === false || out.did === 'stop_unconfirmed';
+    // stop_requested: a route run stopped through the robot face (finding
+    // #0) — sent, not stopped; the server's note says so in the detail.
+    const status = failed ? (out.did === 'stop_unconfirmed' ? 'ยังยืนยันการหยุดไม่ได้' : 'ไม่สำเร็จ') : out.did === 'stop_requested' ? 'ส่งคำสั่งหยุดแล้ว' : lane === 'arm' && body.action !== 'arm' ? 'เชลล์รายงานว่าเขียนสำเร็จ' : 'เซิร์ฟเวอร์ตอบรับ';
     const detail = failed
       ? `${out.error || res.status}${out.hint ? ' · ' + out.hint : ''}${out.note ? ' · ' + out.note : ''}`
       : `${out.at != null ? 'สั่งไว้ที่ ' + out.at + ' · ' : ''}${out.note || (lane === 'arm' ? 'ยังไม่ยืนยันการเคลื่อนไหวหรือการหยุดจริง' : lane === 'base' ? 'ดูสถานะแชสซีประกอบ · การตอบรับไม่ใช่การถึงจุดหมาย' : 'อ่านสถานะจริงซ้ำหลังคำสั่งแล้ว')}`;

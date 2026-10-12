@@ -130,6 +130,16 @@ def _doc_files(d: Path) -> list[Path]:
         if not (p.is_file() and p.suffix.lower() in (".txt", ".md", ".pdf")):
             continue
         rel_path = p.relative_to(d)
+        # Internal material never gets indexed: any file OR folder whose name
+        # starts with "_" is skipped (e.g. _internal/, _draft.md). This is the
+        # fail-closed guard so a research/review note dropped into the docs
+        # folder cannot leak to Emma even if MYDOCS_INCLUDE is later cleared.
+        # Found 2026-09-29: an owner-review file (project-research), which says
+        # in its own header "ห้าม Emma พูดข้อมูลในไฟล์นี้กับลูกค้า", was in the
+        # searchable set and a plain location question surfaced the very rental
+        # yield figure Emma is told never to say.
+        if any(part.startswith("_") for part in rel_path.parts):
+            continue
         if gallery_project and (not rel_path.parts or rel_path.parts[0].lower() != gallery_project):
             continue
         if scope:

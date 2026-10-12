@@ -130,6 +130,26 @@ def test_a_photo_with_no_face_enrols_nobody(monkeypatch, tmp_path: Path):
     assert faces.embed_file(tmp_path / "empty.jpg") is None
 
 
+def test_a_crop_the_face_fills_is_retried_with_a_border(monkeypatch, tmp_path: Path):
+    """The scan saves crops cut tight around the face, and SCRFD misses a
+    face that fills the whole image — a real front shot was dropped from
+    every rebuild until it was padded (2026-10-08). The retry must see the
+    same pixels, centred, on a canvas twice the size."""
+    crop = np.full((6, 4, 3), 200, np.uint8)
+    monkeypatch.setattr(faces, "read_image", lambda p: crop)
+    subject = faces.Face((0, 0, 100, 100), 0.85, _unit(1))
+    seen = []
+
+    def detect(img, det_size=640):
+        seen.append(img)
+        return [subject] if img.shape[:2] == (12, 8) else []
+
+    monkeypatch.setattr(faces, "detect", detect)
+    assert faces.embed_file(tmp_path / "tight.jpg") is subject
+    assert len(seen) == 2
+    assert (seen[1][3:9, 2:6] == crop).all() and seen[1].sum() == crop.sum()
+
+
 def test_unreadable_file_enrols_nobody(tmp_path: Path):
     assert faces.embed_file(tmp_path / "does_not_exist.jpg") is None
 
@@ -211,3 +231,202 @@ def test_the_age_and_gender_models_are_never_loaded():
     assert "detection" in body and "recognition" in body
     assert "genderage" not in body
     assert "genderage" not in src.replace("age and gender estimators", "")
+
+
+# -- a gallery file is read by a live server while something rewrites it ------
+
+def _saved(tmp_path: Path, name: str = "gallery.npz") -> Path:
+    path = tmp_path / name
+    faces.Gallery(["a", "b"], np.stack([_unit(1), _unit(0, 1)]), [{}, {}]).save(path)
+    return path
+
+
+@pytest.mark.parametrize("damage", ["truncated", "garbage", "empty", "missing", "bare-npy",
+                                    "lengths"])
+def test_a_damaged_gallery_is_a_value_error_never_a_crash(tmp_path: Path, damage):
+    """Every caller treats ValueError as "no usable gallery" — the greeter
+    at boot, the enrolment endpoint mid-save. A BadZipFile or EOFError
+    escaping instead is a crash in exactly those two places."""
+    path = _saved(tmp_path)
+    if damage == "truncated":
+        path.write_bytes(path.read_bytes()[:300])
+    elif damage == "garbage":
+        path.write_bytes(b"PK\x03\x04 but not really")
+    elif damage == "empty":
+        path.write_bytes(b"")
+    elif damage == "missing":
+        path.unlink()
+    elif damage == "bare-npy":
+        with path.open("wb") as fh:
+            np.save(fh, np.zeros((2, 4), np.float32))
+    else:
+        with path.open("wb") as fh:
+            np.savez(fh, names=np.array(["a", "b", "c"]), vecs=np.zeros((2, 4), np.float32),
+                     meta=np.array(["{}", "{}"]), model_tag=np.array(faces.MODEL_TAG))
+
+    with pytest.raises(ValueError) as exc:
+        faces.Gallery.load(path)
+    assert "build-face-gallery.cmd" in str(exc.value)
+
+
+def test_a_save_that_dies_halfway_leaves_the_old_gallery(monkeypatch, tmp_path: Path):
+    """Written in place, a crash between truncate and the last byte is a
+    torn file for every later load — the greeter's gallery gone."""
+    path = _saved(tmp_path)
+    before = path.read_bytes()
+
+    def torn(file, **arrays):
+        if hasattr(file, "write"):
+            file.write(b"PK\x03\x04 half a zip")
+        else:
+            Path(file).write_bytes(b"PK\x03\x04 half a zip")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(faces.np, "savez", torn)
+    with pytest.raises(OSError):
+        faces.Gallery(["c"], np.stack([_unit(1)]), [{}]).save(path)
+
+    assert path.read_bytes() == before
+    assert [p.name for p in tmp_path.iterdir()] == [path.name], "a temp file was left behind"
+
+
+def test_save_writes_exactly_the_path_it_was_given(tmp_path: Path):
+    """np.savez appends ".npz" to a bare path; the temp file would have been
+    written under a name nothing then renamed."""
+    path = _saved(tmp_path, "gallery.current")
+    assert path.is_file()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["gallery.current"]
+    assert faces.Gallery.load(path).names == ["a", "b"]
+
+
+def test_a_replace_windows_refuses_for_a_moment_is_retried(monkeypatch, tmp_path: Path):
+    """Measured here: os.replace onto a file another handle has open is
+    PermissionError on Windows. The watcher reads people.json every
+    decision, so that instant is a real one."""
+    path = _saved(tmp_path)
+    real_replace = faces.os.replace
+    refusals = []
+
+    def busy(src, dst):
+        if len(refusals) < 2:
+            refusals.append(dst)
+            raise PermissionError(13, "in use")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(faces.os, "replace", busy)
+    monkeypatch.setattr(faces, "_REPLACE_PAUSE_S", 0.0)
+    faces.Gallery(["c"], np.stack([_unit(1)]), [{}]).save(path)
+
+    assert len(refusals) == 2
+    assert faces.Gallery.load(path).names == ["c"]
+
+
+def test_a_replace_that_never_succeeds_gives_up_and_cleans_up(monkeypatch, tmp_path: Path):
+    path = _saved(tmp_path)
+    before = path.read_bytes()
+
+    def always_busy(src, dst):
+        raise PermissionError(13, "in use")
+
+    monkeypatch.setattr(faces.os, "replace", always_busy)
+    monkeypatch.setattr(faces, "_REPLACE_PAUSE_S", 0.0)
+    with pytest.raises(PermissionError):
+        faces.Gallery(["c"], np.stack([_unit(1)]), [{}]).save(path)
+
+    assert path.read_bytes() == before
+    assert [p.name for p in tmp_path.iterdir()] == [path.name]
+
+
+def test_appended_is_a_new_gallery_and_the_old_one_is_untouched():
+    """The old one may be what a live watcher is matching against."""
+    old = faces.Gallery(["a"], np.stack([_unit(1)]), [{"group": "staff"}])
+    new = old.appended(["b", "b"], np.stack([_unit(0, 1), _unit(0, 0, 1)]),
+                       [{"group": "enrolled"}, {"group": "enrolled"}])
+
+    assert new is not old
+    assert old.names == ["a"] and len(old.vecs) == 1 and old.meta == [{"group": "staff"}]
+    assert new.names == ["a", "b", "b"] and new.vecs.shape == (3, 512)
+    assert new.meta[0] == {"group": "staff"} and new.model_tag == old.model_tag
+    new.meta[0]["group"] = "changed"
+    assert old.meta[0]["group"] == "staff"
+
+
+def test_appended_onto_an_empty_gallery():
+    empty = faces.Gallery([], np.zeros((0, 512), np.float32))
+    assert empty.appended(["a"], _unit(1), [{}]).names == ["a"]
+
+
+def test_appended_refuses_rows_that_do_not_line_up():
+    g = faces.Gallery(["a"], np.stack([_unit(1)]))
+    with pytest.raises(ValueError):
+        g.appended(["b", "c"], np.stack([_unit(0, 1)]), [{}, {}])
+    with pytest.raises(ValueError):
+        g.appended(["b"], np.zeros((1, 128), np.float32), [{}])
+
+
+# -- the cross-process lock around load-modify-save -----------------------------
+#
+# gallery.npz and people.json each have writers in more than one process
+# (the server's scan, the rebuild, the station, revoke_face.py). A
+# threading.Lock orders one process; these pin that `file_lock` orders all
+# of them, and that running out of patience is a refusal, never a write.
+
+_HOLDER = r"""
+import sys, time
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from app import faces
+with faces.file_lock(Path(sys.argv[2]), 5.0, "busy"):
+    Path(sys.argv[3]).write_text("held", encoding="utf-8")
+    time.sleep(60)
+"""
+
+
+def test_the_lock_file_is_not_named_like_a_leftover_temp_file():
+    """`write_atomically`'s temp files start with "<name>." — a lock file
+    named "gallery.npz.lock" would read as one left behind."""
+    assert faces.lock_path(Path("x") / "gallery.npz").name == "gallery.lock"
+    assert faces.lock_path(Path("x") / "people.json").name == "people.lock"
+
+
+def test_a_second_holder_waits_then_refuses_in_the_callers_words(tmp_path: Path):
+    target = tmp_path / "gallery.npz"
+    with faces.file_lock(target, 1.0, "unused"):
+        with pytest.raises(faces.LockBusy) as exc:
+            with faces.file_lock(target, 0.2, "กำลังเขียนอยู่"):
+                pytest.fail("two holders at once")
+    assert str(exc.value) == "กำลังเขียนอยู่"
+    assert isinstance(exc.value, ValueError), "callers already turn ValueError into a refusal"
+    with faces.file_lock(target, 0.2, "unused"):
+        pass                                            # released on the way out
+
+
+def test_the_lock_holds_across_processes_and_dies_with_its_holder(tmp_path: Path):
+    """Another process — the rebuild, the station — is who the lock is for.
+    And a holder killed mid-run (Ctrl+C on a rebuild) must not leave a lock
+    that refuses every enrolment until somebody deletes a file by hand."""
+    import os
+    import subprocess
+    import sys
+    import time
+
+    root = Path(__file__).resolve().parent.parent
+    target, held = tmp_path / "gallery.npz", tmp_path / "held.txt"
+    child = subprocess.Popen(
+        [sys.executable, "-c", _HOLDER, str(root), str(target), str(held)],
+        cwd=root, env={**os.environ, "PYTHONUTF8": "1"},
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    try:
+        deadline = time.monotonic() + 30
+        while not held.exists():
+            assert child.poll() is None, child.communicate()[1]
+            assert time.monotonic() < deadline, "the child never took the lock"
+            time.sleep(0.02)
+        with pytest.raises(faces.LockBusy):
+            with faces.file_lock(target, 0.3, "busy"):
+                pytest.fail("the lock did not hold across processes")
+    finally:
+        child.kill()
+        child.communicate(timeout=30)
+    with faces.file_lock(target, 5.0, "the dead holder's lock was never released"):
+        pass

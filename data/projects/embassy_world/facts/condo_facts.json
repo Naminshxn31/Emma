@@ -1,41 +1,50 @@
 {
   "_comment": "ข้อมูลรออนุมัติ ไม่ส่งเนื้อหานี้ให้ Emma พูดกับลูกค้าจนกว่าจะมี metadata อนุมัติครบ ฟิลด์ null คือยังไม่มีข้อมูล ห้ามเดา",
-  "approval_status": "draft",
-  "approved_at": null,
-  "effective_at": null,
+  "approval_status": "approved",
+  "approved_at": "2026-10-12T10:14:15+07:00",
+  "effective_at": "2026-10-12T10:14:15+07:00",
   "expires_at": null,
-  "disclosure_scope": "internal",
-  "content_state": "preliminary_concept",
-  "approved_by": "",
+  "disclosure_scope": "customer",
+  "content_state": "completed",
+  "approved_by": "pete",
   "effective_from": "",
   "facts": [
     {
       "label": "ผู้พัฒนา",
-      "value": "Empire Group (16 โครงการ, 6,000+ ยูนิต, รางวัลอสังหาฯ 2011-2025)"
+      "value": "Empire Group มีประสบการณ์มากกว่า 20 ปี ส่งมอบที่อยู่อาศัยมากกว่า 6,000 ยูนิต และพัฒนาโครงการสำเร็จ 16 โครงการ พร้อมผลงานรางวัลด้านอสังหาริมทรัพย์หลายรายการระหว่างปี 2011–2025"
+    },
+    {
+      "label": "โครงการ",
+      "value": "คอนโดมิเนียม Low-rise 8 ชั้น 6 อาคาร (A–F) มีชั้นใต้ดินเชื่อมกันทั้งโครงการ ห้องชุดทั้งหมด 1,066 ยูนิต (Studio 117 · 1 ห้องนอน 801 · 2 ห้องนอน 148) และร้านค้าชั้น G อาคาร A 6 ร้าน (ขายแล้วทั้งหมด)"
     },
     {
       "label": "ทำเล",
-      "value": "ริมหาดจอมเทียน ถ.จอมเทียนสาย 2 ใกล้สุขุมวิท ใกล้สนามบินดอนเมือง/สุวรรณภูมิ/อู่ตะเภา"
+      "value": "ย่านจอมเทียน เมืองพัทยา (ต.หนองปรือ อ.บางละมุง จ.ชลบุรี) เข้าทางซอยจอมเทียนสายสอง 4 ออกถนนจอมเทียนสายสอง ถึงถนนสุขุมวิทประมาณ 1.85 กม. · ไม่ติดทะเล ห่างหาดจอมเทียนเส้นตรงประมาณ 0.6 กม. · อยู่ติดสวนสาธารณะซอยชัยพฤกษ์ 4 (สวนหนองโพรง) ส่วนทางเชื่อมจากโครงการเข้าสวนยังไม่ยืนยัน · ที่อยู่ 13/84 หมู่ 12 ถ.จอมเทียนสาย 2 เป็นที่อยู่บริษัทผู้ขาย ไม่ใช่ที่ตั้งโครงการ · สนามบินอู่ตะเภาประมาณ 30 นาที (ตามเอกสารนำเสนอ)"
     },
     {
       "label": "จุดเด่น",
-      "value": "ลากูน 155ม., Biogenesis, Junior World, Aqua Cinema, Thermal Galaxy spa, Sky Pool, Social Club, บ้านอัจฉริยะ, แอป Embassy AI"
+      "value": "ชั้น G: Lobby, Biogenesis (ฟิตเนส), Spinning Class, Pilates Studio, Bungee Gym & Yoga, Junior World, Journey to the Future · ชั้นใต้ดิน: Aqua Cinema, Journey to Mars, Himalayan Salt Sauna, Floating Swing Sauna, Crystal Stone Sauna, Ice Bath, Hydrotherapy Capsule, EV Charger · ชั้น 3 อาคาร A: Social Lounge, Co-working Lounge, Common Sphere, Sky Pool · ภายนอก: Water Lagoon สระหลักกลางโครงการ, Private Pool, Kid Pool, Jacuzzi, Stepped Garden · เทคโนโลยี: Smart Home, Smart Security, Smart Comfort, Smart Air, Connected Living และ Embassy AI Application (ชุด Smart Home ในห้องเป็นแพ็กเกจเสริม ไม่รวมในราคาห้อง ราคายังไม่สรุป)",
+      "content_state": "preliminary_concept"
     },
     {
       "label": "ราคาเริ่มต้น",
-      "value": null
+      "value": "Studio เริ่มต้น 2.19 ล้านบาท (ผู้ซื้อชื่อคนไทย/นิติบุคคล) ชื่อต่างชาติเริ่มต้น 2.59 ล้านบาท · 1 ห้องนอนเริ่มต้น 2.79 ล้านบาท · 2 ห้องนอนเริ่มต้น 4.69 ล้านบาท (ราคาชื่อคนไทย ชื่อต่างชาติโดยทั่วไปสูงกว่า 400,000 บาท) — ราคาของห้องที่ยังว่าง ณ 30 ก.ย. 2026 เปลี่ยนตามห้องที่เหลือ"
     },
     {
       "label": "แบบห้องและขนาด",
-      "value": null
+      "value": "Studio 24–29 ตร.ม. · 1 ห้องนอน 33–35 ตร.ม. · 2 ห้องนอน 51.5–52.5 ตร.ม."
+    },
+    {
+      "label": "ค่าใช้จ่าย",
+      "value": "ค่าจอง 50,000 บาท · ค่าส่วนกลาง 68 บาท/ตร.ม./เดือน · กองทุนส่วนกลาง 600 บาท/ตร.ม. · ค่ามิเตอร์ไฟ 9,900 บาท ค่ามิเตอร์น้ำ 5,900 บาท"
     },
     {
       "label": "โปรโมชั่น",
-      "value": null
+      "value": "ตอนนี้ยังไม่มี"
     },
     {
       "label": "เวลาทำการห้องขาย",
-      "value": null
+      "value": "9.00-18.00น. ทุกวัน"
     }
   ],
   "disclaimer": "ทั้งหมดคือ Preliminary Concept อาจเปลี่ยนแปลงได้",
@@ -45,5 +54,6 @@
     "confirmed_by": "เจ้าของโปรเจกต์ 2026-09-01"
   },
   "source_id": "project_facts",
-  "project_id": "embassy_world"
+  "project_id": "embassy_world",
+  "content_state_before_approval": "preliminary_concept"
 }

@@ -82,11 +82,51 @@ def evaluate_claim(source: Mapping, project_id: str, *, now: datetime | None = N
     return result(True, "approved_customer_claim")
 
 
+def carries_claim(value: object) -> bool:
+    """Whether a fact value says anything that could be spoken as an answer.
+
+    A box holding only punctuation ("-", "—", "...") is how people write
+    "nothing here" on a form. It carries no claim, but rendered as a value
+    it becomes a fact the model may say ("ราคาเริ่มต้น: -"). Found
+    2026-09-29: the owner blanked three facts by typing "-" and approved.
+    Letters and digits in any script count (Thai consonants are
+    alphabetic), so only content-free strings read as blank. A note like
+    "ดูจาก DB" is deliberately NOT caught: it is a sentence, and guessing
+    which sentences are notes-to-self is the substring game this repo has
+    lost twice. The console tells the owner to leave the box empty instead.
+
+    Only text and numbers can be claims. `str(False)` is "False" and a list
+    prints its brackets, so anything else a hand-edited file might hold is
+    blank rather than a fact rendered from its Python spelling.
+    """
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return False
+    return any(ch.isalnum() for ch in str(value))
+
+
 def state_instruction(state: str) -> str:
-    """Approval never turns a concept/developing claim into a completed one."""
+    """What a content state makes Emma say (or not say) about a claim.
+
+    preliminary_concept used to force the caveat "เป็นแนวคิดเบื้องต้นและอาจ
+    เปลี่ยนแปลงได้" onto every facility, every slide and every search hit.
+    The owner overruled it on 2026-10-10: "อย่าบอกว่าเป็นเพียงแนวคิดอาจจะมี
+    การเปลี่ยนแปลง ห้ามพูดแบบนี้เป็นอันขาด ... มีคนถามว่ามีอะไรก็บอกไปตามนั้นเลย".
+    The state stays (the data console still records it), but its instruction
+    now quotes the banned sentence instead of ordering it — saying nothing
+    leaves the model hedging on its own when a result is labelled
+    preliminary_concept. A question about *when* it opens is still not
+    answerable from the facts, so that one still goes to the sales team.
+
+    "ให้บริการ" and "ให้ชม" were banned here for one evening, after the first
+    run answered "มีฟิตเนสให้ชมค่ะ". The owner undid it on 2026-10-11: "ให้
+    บริการ / ให้ชม อาจจะเป็นรูปภาพให้เขาดู ไม่ได้หมายถึงพาไปดู" — showing a
+    picture is a fine meaning of the words. The walk-there reading is rule
+    6's job ("ฟิตเนสอยู่ในตัวโครงการค่ะ ไม่ได้อยู่ที่ห้องขายนี้").
+    """
     return {
         "developing": "ต้องบอกว่ากำลังพัฒนา ห้ามพูดว่าสร้างเสร็จหรือเปิดใช้งานแล้ว",
-        "preliminary_concept": "ต้องบอกว่าเป็นแนวคิดเบื้องต้นและอาจเปลี่ยนแปลงได้",
+        "preliminary_concept": ('บอกได้เลยว่าที่นี่มีอะไร ห้ามพูดว่า "เป็นแนวคิดเบื้องต้น" '
+                                'หรือ "อาจมีการเปลี่ยนแปลง" ถูกถามว่าเสร็จหรือเปิดใช้เมื่อไหร่ให้ทีมขายยืนยัน'),
         "proposed": "ต้องบอกว่าเป็นสิ่งที่เสนอไว้ ยังไม่ยืนยันว่าเกิดขึ้นแล้ว",
     }.get(state, "")
 

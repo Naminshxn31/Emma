@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/emma_local_ca" />
+        </trust-anchors>
+    </base-config>
+    <!-- The SLAMTEC chassis board speaks plain HTTP on the robot's internal LAN
+         (http://192.168.11.1:1448). Emma's own origin stays HTTPS-only above;
+         this is the one cleartext exception, scoped to the chassis board, so the
+         release build's operator/chassis REST does not silently fail. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.11.1</domain>
+    </domain-config>
+</network-security-config>

@@ -12,15 +12,40 @@ message to send back, because Gemini already discarded the unsent audio.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
+import time
 from collections.abc import AsyncIterator
+from pathlib import Path
 
+from app import heard
 from app.config import settings
 from app.providers.base import ProviderError, ProviderEvent, VoiceProvider
 from app.providers.thai_spacing import ThaiSpacing
-from app.providers.transcript_filter import TranscriptFilter
+from app.providers.transcript_filter import TranscriptBudget, TranscriptFilter
 
 logger = logging.getLogger("condo_voice.gemini")
+
+
+def _tracking_tools() -> bool:
+    """`tool_dropped` and `reconnected` exist for TURN_IDLE_TRACKS_TOOLS and
+    are emitted only while it is on, so with the default the event stream is
+    exactly what it was (tests/test_gemini_streaming.py pins it)."""
+    return bool(settings.turn_idle_tracks_tools)
+
+
+def _with_call_id(event: ProviderEvent, call_id: str | None) -> ProviderEvent:
+    """Attach the model's call id to a tool event.
+
+    An attribute rather than a key in `data`, because a `tool_result`'s data
+    IS the result — it goes to the browser and the turn log as is, and a
+    stray key there would change what both see. `ProviderEvent.call_id` is the
+    field; `session.py` reads it with `getattr(event, "call_id", None)` so a
+    provider that never sets it (OpenAI) reads as None.
+    """
+    event.call_id = call_id
+    return event
 
 
 def _sensitivity(enum_cls, prefix: str, value: str):
@@ -29,15 +54,38 @@ def _sensitivity(enum_cls, prefix: str, value: str):
     return getattr(enum_cls, name, getattr(enum_cls, f"{prefix}_SENSITIVITY_UNSPECIFIED"))
 
 
-#: Words that are English but not names — they turn up inside slide titles
-#: and marketing slogans and are no use as vocabulary hints.
-_NOT_A_NAME = {
-    "ALL", "BUILD", "BETTER", "THE", "AND", "FOR", "FLOOR", "PLAN", "AWARDS",
-    "LIFE", "NEW", "QUESTION", "IS", "HOW", "WE", "DO", "MORE", "BUILDINGS",
-    "GROUND", "BASEMENT", "ENTRANCE", "UNITS", "TOWER", "TYPE", "ROOM",
-    "VIEW", "CONCEPT", "PRELIMINARY", "DREAM", "EVERYBODY", "HAS", "NOT",
-    "JUST", "ONE", "PLACE", "THREE", "ZONES", "JUNIOR", "UNDER", "HERE",
-}
+#: Small words that sit *inside* a name without being capitalised —
+#: "Journey to Mars", "Bungee Gym & Yoga", "Journey to the Future". Never a
+#: name on their own: trailing ones are trimmed ("Sky Pool on the 3rd Floor"
+#: names the Sky Pool, not "Sky Pool on the").
+_NAME_JOINERS = {"to", "of", "the", "and", "&", "for", "in", "on", "at", "a", "an"}
+
+#: Slide `type` whose title opens with the name of a place a guest can ask
+#: for. The deck's own classification — the same one TOURS["facilities"]
+#: walks — rather than a list of English words that are "not names".
+_FACILITY_SLIDE_TYPES = {"facility"}
+
+#: Ceiling on deck-derived names. The google-genai SDK (2.24) documents no
+#: limit for `custom_vocabulary` ("a list of custom vocabulary phrases, which
+#: biases the ASR model"), so this is a choice, not a quota: biasing toward
+#: everything is biasing toward nothing — measured on the wake word, where
+#: adding spellings to one beam made recognition *worse* (CLAUDE.md, 25 ส.ค.).
+#: With the ~40 built-in phrases the whole list stays under ~100.
+_FACILITY_MAX = 60
+
+#: A run of capitalised Latin words, joiners allowed between them. The
+#: look-behind is not `\b`: Thai letters are word characters to `re`, so
+#: "ชั้นG" has no word boundary and "\bG" would never match inside Thai.
+_LATIN_NAME = re.compile(
+    r"(?<![A-Za-z0-9])[A-Z][A-Za-z0-9'\-]*"
+    r"(?:\s+(?:(?:to|of|the|and|&|for|in|on|at|a|an)\s+)*[A-Z][A-Za-z0-9'\-]*)*"
+)
+
+#: Metadata a single fact may carry to narrow its file's approval — the
+#: same merge `prompts._render_facts` applies, so a fact the prompt would
+#: not state is not a fact the recogniser is told about either.
+_CLAIM_FIELDS = ("approval_status", "approved_by", "approved_at", "effective_at",
+                 "expires_at", "disclosure_scope", "content_state")
 
 
 def supports_native_audio_extras(model: str | None = None) -> bool:
@@ -55,33 +103,130 @@ def supports_non_blocking(model: str | None = None) -> bool:
     return not name.startswith("gemini-3.1-")
 
 
+def _leading_name(title: str) -> str:
+    """The name a facility slide's English title opens with.
+
+    The deck writes these as "<Name> <description>": "Ice Bath
+    (Underground)", "Sky Pool on the 3rd Floor", "BIOGENESIS curved-glass
+    fitness ...", "Himalayan Salt Sauna / Salt Cave". The name is the
+    capitalised run before the first separator or lowercase word.
+    """
+    head = re.split(r"\s[—–-]\s|[/(:,]", title or "", maxsplit=1)[0]
+    words: list[str] = []
+    for word in head.split():
+        if word[:1].isupper():
+            words.append(word)
+        elif words and word.lower() in _NAME_JOINERS:
+            words.append(word)
+        else:
+            break
+    while words and words[-1].lower() in _NAME_JOINERS:
+        words.pop()
+    return " ".join(words)
+
+
+def _latin_names(text: str) -> list[str]:
+    """Multi-word English names written inside a (Thai) sentence.
+
+    A Thai sentence keeps a phrase in English when it is a name — "ชั้น
+    ใต้ดิน: Aqua Cinema, Journey to Mars, ... Ice Bath". Single words are
+    left out: "Lobby", "Studio", "Jacuzzi" are as often ordinary nouns as
+    names, and the recogniser knows ordinary nouns already.
+    """
+    names = []
+    for match in _LATIN_NAME.findall(text or ""):
+        words = [w for w in match.split() if w.lower() not in _NAME_JOINERS]
+        if len(words) >= 2:
+            names.append(" ".join(match.split()))
+    return names
+
+
+def _facts_path() -> Path:
+    from app.data_sources import source_path
+
+    return source_path("project_facts", settings.project_id)
+
+
+def _approved_fact_texts() -> list[str]:
+    """Values of the facts this project may state, through the same gate
+    the prompt uses: project/source identity, the file's approval, and each
+    fact's own narrowing of it. Anything unreadable is simply no facts."""
+    from app.data_sources import require_project_payload
+    from app.knowledge_policy import carries_claim, evaluate_claim
+
+    try:
+        data = json.loads(_facts_path().read_text(encoding="utf-8"))
+        require_project_payload(data, "project_facts", settings.project_id)
+    except Exception:
+        logger.warning("vocabulary: project facts unreadable — deck names only",
+                       exc_info=True)
+        return []
+    if not evaluate_claim(data, settings.project_id).allowed:
+        return []
+    texts = []
+    for item in data.get("facts") or []:
+        if not isinstance(item, dict):
+            continue
+        scoped = {**data, **{key: item[key] for key in _CLAIM_FIELDS if key in item}}
+        if (evaluate_claim(scoped, settings.project_id).allowed
+                and carries_claim(item.get("value"))):
+            texts.append(str(item["value"]))
+    return texts
+
+
 def facility_names() -> list[str]:
-    """The project's own English facility names, read out of the deck.
+    """The project's own English facility names, from its approved sources.
 
     A guest asked for the **ice bath**. The recogniser — biased toward Thai,
     because that's the language most of them speak — heard "ไอ้บ้า", which is
     an insult, and the robot apologised for having offended them.
 
-    These names are the project's vocabulary and they're already written down
-    in the slide index, so the deck supplies them and stays current as slides
-    are added. Same idea as the tokeniser's custom dictionary.
-    """
-    import re
+    These names are already written down, so the project data supplies them
+    and stays current. Two sources, both through the approval gate that
+    decides what may reach a customer (this list leaves the building in the
+    session config, so draft copy must not ride along in it):
 
+    - the deck's facility slides (`type == "facility"`), whose English title
+      opens with the facility's name;
+    - the approved project facts, which list the facilities by their English
+      names inside Thai sentences.
+
+    `routing/project_knowledge.json` is deliberately *not* a source: it is a
+    routing file with no approval metadata (evaluate_claim says
+    missing_metadata), its search hints are glued keywords ("BIOGENESIS
+    FITNESS"), and every facility name in it is already in the two above.
+
+    The previous version scraped ALL-CAPS words from every slide title and
+    dropped a hand-kept list of "not a name" words. When the library moved
+    to mixed-case titles (6 Oct 2026, intro-001..048) it found 8 terms —
+    three of them junk ("PARK", "WORLD", "YOGA", made by stripping "THE"
+    and "JUNIOR" off real names) — and Ice Bath, Sky Pool and every sauna
+    fell out of the recogniser's vocabulary without anything failing but
+    one test.
+    """
+    from app.knowledge_policy import evaluate_claim
     from app.tools.slides import load_slides
 
-    found: dict[str, str] = {}
+    candidates: list[str] = []
     for slide in load_slides():
-        for field in ("title_en", "title_th"):
-            text = slide.get(field) or ""
-            for match in re.findall(r"\b[A-Z][A-Z0-9&]{2,}(?:\s+[A-Z][A-Z0-9&]{1,})*\b", text):
-                words = [w for w in match.split() if w not in _NOT_A_NAME]
-                if not words or len(words) > 3:
-                    continue
-                name = " ".join(words)
-                if len(name) >= 4:
-                    found.setdefault(name.lower(), name)
-    return sorted(found.values())
+        if (slide.get("type") in _FACILITY_SLIDE_TYPES
+                and evaluate_claim(slide, settings.project_id).allowed):
+            candidates.append(_leading_name(slide.get("title_en") or ""))
+    for text in _approved_fact_texts():
+        candidates += _latin_names(text)
+
+    # One entry per name however it is spelled ("Hydro Therapy Capsule" /
+    # "Hydrotherapy Capsule", "Co-Working" / "Co-working"); the deck's ALL-CAPS
+    # styling gives way to an ordinary spelling from another source.
+    found: dict[str, str] = {}
+    for name in candidates:
+        if sum(ch.isalpha() for ch in name) < 4:
+            continue
+        key = re.sub(r"[^a-z0-9]", "", name.lower())
+        if key not in found or (found[key].isupper() and not name.isupper()):
+            found[key] = name
+    names = list(found.values())[:_FACILITY_MAX]
+    return sorted(names, key=str.casefold)
 
 
 def adaptation_phrases() -> list[str]:
@@ -91,14 +236,15 @@ def adaptation_phrases() -> list[str]:
     and the project name as "Ambassador World". These are the terms that
     actually come up at a sales-gallery desk.
     """
-    phrases = [settings.project_name]
+    head = [settings.project_name]
     if settings.robot_name:
-        phrases.append(settings.robot_name)
+        head.append(settings.robot_name)
+    facilities: list[str] = []
     try:
-        phrases += facility_names()
+        facilities = facility_names()
     except Exception:
         logger.warning("could not read facility names from the deck", exc_info=True)
-    phrases += [
+    fixed = [
         # Commands wired to real hardware — worth getting right.
         "เปิดไฟ", "ปิดไฟ", "เปิดแอร์", "ปิดแอร์",
         "ปรับอุณหภูมิ", "ลดอุณหภูมิ", "เพิ่มอุณหภูมิ", "องศา",
@@ -116,7 +262,120 @@ def adaptation_phrases() -> list[str]:
         "แต่ละห้อง", "ต่างกันยังไง", "ห้องว่าง", "ผังโครงการ", "ผังชั้น",
         "ตึกไหน", "ห้องมุม", "วิวทะเล", "วิวสระ", "งบเท่าไหร่", "กี่ล้าน",
     ]
-    return [p for p in phrases if p and not p.startswith("[")]
+
+    def keep(p: str) -> bool:
+        return bool(p) and not p.startswith("[")
+
+    robot = _robot_phrases()
+    if not robot:
+        # Both switches off, or not the robot face: the list the sales room
+        # has always sent.
+        return [p for p in head + facilities + fixed if keep(p)]
+    # The robot face talks to the public through EmmaJoke, which has no
+    # project tools — biasing its recogniser toward "Sky Pool" and "Ice Bath"
+    # only turns a guest's small talk into facility names it may not discuss
+    # (known issue, CHANGELOG 8 Oct: "โปรไฟล์ joke ยังส่งชื่อ facility เป็น
+    # hint"). Fixed only where the robot words go in, so the room is untouched.
+    if _session_profile() == "joke":
+        facilities = []
+    lead: list[str] = []
+    tail: list[str] = []
+    for part, items in ((lead, head), (tail, fixed + robot)):
+        for p in items:
+            if keep(p) and p not in lead and p not in tail:
+                part.append(p)
+    # Facility names give way first: the robot words feed the heard guard
+    # (robot_contracts.heard_matches reads these captions), the deck names
+    # only the captions.
+    room = max(0, _PHRASE_MAX - len(lead) - len(tail))
+    facilities = [f for f in facilities
+                  if keep(f) and f not in lead and f not in tail][:room]
+    out = lead + facilities + tail
+    if len(out) > _PHRASE_MAX:
+        logger.warning("vocabulary: %d robot phrase(s) over the %d ceiling dropped",
+                       len(out) - _PHRASE_MAX, _PHRASE_MAX)
+        out = out[:_PHRASE_MAX]
+    return out
+
+
+#: Ceiling on the whole list once robot words are in. A choice, not an SDK
+#: quota (see _FACILITY_MAX): the wake word measured that biasing toward
+#: everything is biasing toward nothing, and the design holds it to 100.
+_PHRASE_MAX = 100
+
+#: The phrasings of move_body's description (design §2d), as people say
+#: them. Whole phrases, not the bare verbs of BODY_HEARD: "ยก" or "ลง" alone
+#: would bias every sentence that contains them (ยกเลิก, ลดราคา). Each one
+#: must pass `robot_contracts.heard_matches` for its own action, or the
+#: caption it produces could never authorise the gesture it names — a test
+#: holds that. Honest scope: these bias the *captions* only; the model hears
+#: raw audio. Their value is the heard guard and the logs.
+BODY_PHRASES = (
+    "ก้มหน้า", "เงยหน้า", "พยักหน้า", "ส่ายหน้า", "หันซ้าย", "หันขวา", "มองตรง",
+    "ยกแขนซ้าย", "ยกแขนขวา", "โบกมือ", "ยกมือทักทาย", "จับมือ",
+    "ขยับมือไปทางซ้าย", "ขยับมือไปทางขวา", "เอาแขนลง", "ท่าพัก", "หยุด",
+)
+
+#: The words of a walk that are not place names (design §5 P6 item 3).
+NAV_PHRASES = ("หยุด", "พาไป", "กลับแท่นชาร์จ")
+
+
+def _session_profile() -> str:
+    from app.tools.registry import session_profile
+
+    return session_profile.get() or settings.assistant_profile
+
+
+def _place_phrases() -> list[str]:
+    """Names and aliases from the server's copy of the places file.
+
+    Read through robot_places.load, the parser that refuses a bad file by
+    field, so a half-valid table cannot bias the recogniser toward a place
+    the launcher would refuse. No file (conftest pins it blank) or a bad one
+    = no place names, said in the log — never a guess.
+    """
+    path = (settings.robot_nav_places_file or "").strip()
+    if not path:
+        return []
+    from app import robot_places
+
+    file = Path(path)
+    if not file.is_absolute():
+        file = Path(__file__).resolve().parents[2] / file
+    try:
+        places = robot_places.load(file)
+    except (OSError, ValueError):
+        logger.warning("vocabulary: places file %s unreadable — no place names", file)
+        return []
+    names: list[str] = []
+    for place in places.places:
+        names += place.names()
+    return names
+
+
+def _robot_phrases() -> list[str]:
+    """Body and walk words, each behind its own switch — and only for the
+    robot face. Empty when both are off, which is what keeps the room's list
+    byte-identical.
+
+    The face gate is review #36: the robot face and the sales-room desk share
+    one server and one .env, so a switch alone added 31 robot phrases
+    ("หยุด", "base", "แท่น" ...) to the *desk's* recogniser and let them push
+    facility names out under the 100 cap. Only the face has a body or legs;
+    `session.run` sets `robot_face_session` before the provider connects and
+    builds this list, so the face still gets its words and every other
+    session's list is the room's, whatever the switches say.
+    """
+    from app.tools.registry import robot_face_session
+
+    if robot_face_session.get() is None:
+        return []
+    out: list[str] = []
+    if settings.robot_body_enabled:
+        out += BODY_PHRASES
+    if settings.robot_nav_routes_enabled:
+        out += _place_phrases() + list(NAV_PHRASES)
+    return out
 
 
 def language_codes() -> list[str]:
@@ -219,6 +478,18 @@ _UNAVAILABLE_SIGNS = (
 )
 
 
+#: Listening focus speaker notes (FOCUS_SPEAKER_LABELS): how long after the
+#: activity_end of a labelled turn the reply may take to show ANY sign of
+#: life (a tool call, audio, an output transcript, turn_complete) before the
+#: note is taken to have stalled the turn. Median first audio is 1.19 s
+#: after the gate closes (measured 2026-10-07); a tool call is announced
+#: before it runs. Six seconds of nothing at all is not a slow model.
+NOTE_STALL_S = 6.0
+#: Latched for the life of the process the first time a note stalls a turn:
+#: once is evidence enough, and a second customer must not pay for it too.
+_NOTE_STATE = {"stalled": False}
+
+
 def _model_is_unavailable(exc: Exception) -> bool:
     """Is this the model's fault, or the network's?
 
@@ -238,7 +509,7 @@ class GeminiProvider(VoiceProvider):
     auto_resumes = True          # ...but we rejoin with a handle past it
 
     def __init__(self, voice: str, instructions: str, greeting: str | None = None,
-                 use_tools: bool = True) -> None:
+                 use_tools: bool = True, vad_floor: float | None = None) -> None:
         super().__init__(voice, instructions)
         #: Spoken once, on the *initial* connect only. This parameter rode in
         #: from session.py since the beginning and was silently dropped here
@@ -271,6 +542,9 @@ class GeminiProvider(VoiceProvider):
         # Affective dialogue mixes emotion labels into the output transcript;
         # they're internal signals, not speech, so keep them off the screen.
         self._out_filter = TranscriptFilter()
+        #: Model reasoning once arrived as output transcript (2026-10-11):
+        #: text with no audio behind it is cut here — see TranscriptBudget.
+        self._out_budget = TranscriptBudget(self.output_sample_rate * 2)
         #: Local VAD gate, or None for Gemini-side detection. Created here —
         #: before _build_config runs — because the config's
         #: automatic_activity_detection block has to describe the arrangement
@@ -280,7 +554,22 @@ class GeminiProvider(VoiceProvider):
         #: every utterance.
         from app import vad_gate
 
-        self._vad_gate = vad_gate.for_session()
+        # The floor is the MODE's (settings.call_vad_floor): near modes keep
+        # VAD_MIN_RMS, far-listening ones open with VAD_MIN_RMS_FAR.
+        self._vad_gate = vad_gate.for_session(min_rms=vad_floor)
+        #: When the gate last closed a segment, and whether reply audio has
+        #: arrived since. Together they say whether the next segment is a new
+        #: question or the guest carrying on — see `_note_reopen`.
+        self._speech_ended_at: float | None = None
+        self._replied_since_end = False
+        #: Listening focus: told about every closed segment (watch_segments).
+        self._segment_hook = None
+        self._warned_no_note = False
+        #: When the activity_end of a turn that carried a speaker note went
+        #: out, until the reply shows a sign of life — and the task that
+        #: releases the turn if it never does (`_note_stall_guard`).
+        self._note_wait: float | None = None
+        self._note_guard: asyncio.Task | None = None
         # The recogniser word-spaces Thai; undo that for display. Separate
         # instances because the two transcript streams interleave and each
         # needs its own held-back character.
@@ -530,6 +819,9 @@ class GeminiProvider(VoiceProvider):
 
     async def __aexit__(self, *exc) -> None:
         self._closing = True
+        guard = getattr(self, "_note_guard", None)
+        if guard is not None and not guard.done():
+            guard.cancel()
         await self._stop_event_tasks()
         if self._cm is not None:
             try:
@@ -553,7 +845,13 @@ class GeminiProvider(VoiceProvider):
         # `我们走吧` or metered.
         for kind, data in self._vad_gate.feed(pcm16):
             if kind == "start":
+                self._note_reopen()
                 await self._event_queue.put(ProviderEvent(kind="speech_started"))
+                # New speech begins: every caption already recorded belongs
+                # to an earlier utterance and may no longer authorise motion
+                # (design §2d step 4 — a caption landing *after* a tool call
+                # used to leave the previous sentence in charge).
+                heard.mark_activity()
                 await self._session.send_realtime_input(
                     activity_start=types.ActivityStart())
             elif kind == "end":
@@ -561,17 +859,178 @@ class GeminiProvider(VoiceProvider):
 
                 if active.get() is not None:
                     active.get().speech_end("gemini_local_vad_decision")
+                self._speech_ended_at = time.monotonic()
+                self._replied_since_end = False
+                # Before activity_end, never after: the model starts its
+                # reply the moment the activity ends, and client content
+                # arriving during a reply interrupts it (the Live API's own
+                # rule) — the nudge-cuts-the-tour bug in a new place. Inside
+                # the open activity nothing is being generated.
+                noted = await self._report_segment()
                 await self._session.send_realtime_input(
                     activity_end=types.ActivityEnd())
+                if noted:
+                    self._arm_note_guard()
             else:
                 await self._session.send_realtime_input(
                     audio=types.Blob(data=data,
                                      mime_type=f"audio/pcm;rate={self.input_sample_rate}")
                 )
 
+    def _note_reopen(self) -> None:
+        """Record a guest who started again before Emma said anything.
+
+        VAD_SILENCE_MS is the robot's patience: it was raised from 500 to
+        900 because 500 cut Thai speakers off mid-sentence, and it is now
+        the largest single piece of the wait for a reply — measured
+        2026-10-07, the gate closes ~1.0 s after the last syllable against
+        a median 1.19 s from there to Emma's first audio. Whether it can
+        come down depends on how often it is *already* too short, and
+        nothing recorded that: a guest who pauses past the hangover and
+        carries on just resets `pending_end`, silently. A segment that
+        opens after an end with no reply audio in between is exactly that
+        case (or the model choosing silence — the gap tells them apart).
+        Numbers only: the gap and the patience it was measured under, so a
+        day at 700 can be compared with a day at 900.
+        """
+        ended, self._speech_ended_at = self._speech_ended_at, None
+        if ended is None or self._replied_since_end:
+            return
+        try:
+            from app.metrics import active
+
+            observer = active.get()
+            if observer is not None:
+                observer.record("metric_vad_reopen",
+                                gap_ms=round((time.monotonic() - ended) * 1000),
+                                silence_ms=settings.vad_silence_ms)
+        except Exception:
+            logger.debug("could not record a VAD reopen", exc_info=True)
+
     def stand_down_floor(self) -> None:
         if self._vad_gate is not None:
             self._vad_gate.stand_down()
+
+    def watch_segments(self, hook, *, keep_audio: bool = False) -> bool:
+        if self._vad_gate is None:
+            return False
+        self._segment_hook = hook
+        self._vad_gate.keep_audio = bool(keep_audio)
+        return True
+
+    async def _report_segment(self) -> bool:
+        """Hand the segment that just closed to the session's hook, and send
+        the context note it returns. True = a note went out. Never raises
+        into the audio path."""
+        hook = getattr(self, "_segment_hook", None)
+        gate = self._vad_gate
+        if hook is None or gate is None:
+            return False
+        closed = gate.take_closed()
+        if closed is None:
+            return False
+        try:
+            note = hook(*closed)
+        except Exception:
+            logger.exception("segment hook failed — the turn goes on unlabelled")
+            return False
+        if note:
+            return await self.send_context_note(note)
+        return False
+
+    def _arm_note_guard(self) -> None:
+        """A labelled turn just ended: watch for its reply (`_note_stall_guard`)."""
+        since = time.monotonic()
+        self._note_wait = since
+        old = getattr(self, "_note_guard", None)
+        if old is not None and not old.done():
+            old.cancel()
+        self._note_guard = asyncio.create_task(self._note_stall_guard(self._session, since))
+
+    def _reply_seen(self) -> None:
+        """Any sign the model is answering: the labelled turn did not stall."""
+        self._note_wait = None
+
+    async def _note_stall_guard(self, session, since: float) -> None:
+        """Release a turn the speaker note may be holding open.
+
+        The SDK's own words for `turn_complete=False` (google-genai 2.24,
+        LiveSession.send_client_content): "the model will wait for you to
+        send additional client_content, and will not return until you send
+        turn_complete=True"; the Live API reference: "the server awaits
+        additional messages before starting generation". Every labelled
+        turn carries such a note ahead of its activity_end, so if the server
+        honours it, NO reply ever comes — a robot that hears and never
+        answers, every turn, while the page says it is listening (the
+        "หน้าตาเหมือนกันหมด" shape). Nothing has measured which way the server
+        goes, and the eval harness sends text, never a labelled segment.
+
+        So: if nothing at all comes back within NOTE_STALL_S, complete the
+        held turn with an empty `turn_complete=True` (the reply then comes,
+        late), latch notes off for the life of the process, and say so in
+        the log and the turn log. Worst case of switching the labels on
+        unmeasured: one reply NOTE_STALL_S late, once — not a dead call.
+        """
+        try:
+            await asyncio.sleep(NOTE_STALL_S)
+        except asyncio.CancelledError:
+            return
+        if (getattr(self, "_note_wait", None) != since or self._closing
+                or self._session is not session or session is None):
+            return
+        self._note_wait = None
+        _NOTE_STATE["stalled"] = True
+        logger.warning("FOCUS_SPEAKER_LABELS: no reply %.0fs after a labelled turn — the "
+                       "note held the turn open; completing it and sending no more notes "
+                       "until restart (%s)", NOTE_STALL_S, self.model)
+        try:
+            from app import turnlog
+
+            turnlog.record("focus_note_stalled", wait_s=NOTE_STALL_S)
+        except Exception:                                  # pragma: no cover - belt
+            pass
+        try:
+            await session.send_client_content(turn_complete=True)
+        except Exception:
+            logger.exception("could not release the held turn")
+
+    async def send_context_note(self, text: str) -> bool:
+        """A context note that is not a turn: `send_client_content` with
+        `turn_complete=False`, which appends to the history without asking
+        for a reply.
+
+        NOT measured live. The same SDK docstring says the model "will not
+        return until you send turn_complete=True" and warns that
+        interleaving client content with realtime input "can lead to
+        unexpected results" — so a stalled reply is a real possibility, and
+        `_note_stall_guard` bounds it to one late reply, after which notes
+        stay off (`_NOTE_STATE`). Whether the model reads the bracket aloud
+        is a prompt question only a live run can answer. The switch that
+        calls this (FOCUS_SPEAKER_LABELS) is off by default.
+
+        Gemini 3.1 Flash Live accepts client content only as initial
+        history, and its realtime text IS a turn (that is why `send_text`
+        uses it there) — so on 3.1 there is no non-turn road: not sent.
+        """
+        from google.genai import types
+
+        if self._session is None or _NOTE_STATE["stalled"]:
+            return False
+        if self.model.removeprefix("models/").startswith("gemini-3.1-flash-live"):
+            if not getattr(self, "_warned_no_note", False):
+                self._warned_no_note = True
+                logger.warning("FOCUS_SPEAKER_LABELS: %s has no way to add context "
+                               "without starting a turn — labels are not sent", self.model)
+            return False
+        try:
+            await self._session.send_client_content(
+                turns=types.Content(role="user", parts=[types.Part(text=text)]),
+                turn_complete=False,
+            )
+        except Exception:
+            logger.exception("could not send the speaker note")
+            return False
+        return True
 
     async def send_text(self, text: str) -> None:
         """Push a server-side instruction in as its own turn.
@@ -605,7 +1064,14 @@ class GeminiProvider(VoiceProvider):
             (getattr(fc, "id", None), fc.name, dict(fc.args or {}))
             for fc in function_calls
         ]
-        for _cid, name, args in calls:
+        #: The id each announced call is known by, for `turn_idle` tracking
+        #: (TURN_IDLE_TRACKS_TOOLS). Gemini supplies one; a call without one
+        #: gets a local id so `tool_call` and its `tool_result`/`tool_dropped`
+        #: still pair up. Every announced id ends in exactly one of the two:
+        #: a skipped call that left no event behind is how a counter stuck
+        #: above zero and parked every announcement (safety review #8).
+        announced: dict[int, str] = {}
+        for index, (_cid, name, args) in enumerate(calls):
             if _cid in self._cancelled_tool_ids:
                 continue
             # Names of the arguments, never their values: the values are
@@ -616,10 +1082,13 @@ class GeminiProvider(VoiceProvider):
             # Each tool's turnlog line records the specific fields that
             # are worth keeping, by name, under TURN_LOG_KEEP_DAYS.
             logger.info("tool call: %s(%s)", name, ", ".join(sorted(args)))
-            yield ProviderEvent(kind="tool_call", text=name)
+            announced[index] = _cid or self._local_call_id()
+            yield _with_call_id(ProviderEvent(kind="tool_call", text=name),
+                                announced[index])
 
         results = []
-        for cid, name, args in calls:
+        ran: list[int] = []
+        for index, (cid, name, args) in enumerate(calls):
             if (self._closing or self._session is not session
                     or cid in self._cancelled_tool_ids):
                 continue
@@ -627,7 +1096,10 @@ class GeminiProvider(VoiceProvider):
             # An action already executing cannot necessarily be undone.
             results.extend(await tools.dispatch_all([(cid, name, args)]) if self.use_tools else
                            [(cid, name, {"ok": False, "error": "tools disabled for this session"})])
-        results = [r for r in results if r[0] not in self._cancelled_tool_ids]
+            ran.append(index)
+        kept = [(index, r) for index, r in zip(ran, results)
+                if r[0] not in self._cancelled_tool_ids]
+        results = [r for _index, r in kept]
 
         responses = [
             types.FunctionResponse(id=cid, name=name, response=result)
@@ -635,12 +1107,31 @@ class GeminiProvider(VoiceProvider):
         ]
         # A result from a retired connection must not enter its replacement.
         if self._closing or self._session is not session:
+            for index in announced:
+                if _tracking_tools():
+                    yield self._dropped(calls[index][1], announced[index])
             return
         if session is not None and responses:
             await session.send_tool_response(function_responses=responses)
 
-        for _cid, name, result in results:
-            yield ProviderEvent(kind="tool_result", text=name, data=result)
+        delivered = set()
+        for index, (_cid, name, result) in kept:
+            delivered.add(index)
+            yield _with_call_id(ProviderEvent(kind="tool_result", text=name, data=result),
+                                announced.get(index))
+        for index in announced:
+            if index not in delivered and _tracking_tools():
+                yield self._dropped(calls[index][1], announced[index])
+
+    def _local_call_id(self) -> str:
+        self._local_call_serial = getattr(self, "_local_call_serial", 0) + 1
+        return "local-%d" % self._local_call_serial
+
+    @staticmethod
+    def _dropped(name: str, call_id: str) -> ProviderEvent:
+        """A call that was announced and will never have a result here."""
+        return _with_call_id(ProviderEvent(kind="tool_dropped", text=name,
+                                           data={"call_id": call_id}), call_id)
 
     def _input_event(self, text: str) -> ProviderEvent:
         if self._input_turn_id is None:
@@ -794,6 +1285,7 @@ class GeminiProvider(VoiceProvider):
                             & self._pending_tool_ids)
                     tool_call = getattr(message, "tool_call", None)
                     if tool_call and getattr(tool_call, "function_calls", None):
+                        self._reply_seen()
                         self._pending_tool_ids.update(
                             fc.id for fc in tool_call.function_calls if getattr(fc, "id", None))
                         await self._tool_batches.put(
@@ -802,11 +1294,19 @@ class GeminiProvider(VoiceProvider):
                     content = getattr(message, "server_content", None)
                     if content is None:
                         continue
+                    # The reply side, not the input transcript: a stalled turn
+                    # still gets its user audio transcribed (_note_stall_guard).
+                    if (getattr(content, "model_turn", None) is not None
+                            or getattr(content, "output_transcription", None) is not None
+                            or getattr(content, "turn_complete", False)
+                            or getattr(content, "interrupted", False)):
+                        self._reply_seen()
 
                     # Barge-in: Gemini already cancelled its own generation
                     # and dropped the unsent audio, so the client only stops.
                     if getattr(content, "interrupted", False):
                         self._out_filter.reset()
+                        self._out_budget.reset()
                         self._out_spacing.reset()
                         yield ProviderEvent(kind="interrupted")
 
@@ -830,6 +1330,7 @@ class GeminiProvider(VoiceProvider):
                         text = content.output_transcription.text
                         if text:
                             clean = self._out_spacing.feed(self._out_filter.feed(text))
+                            clean = self._out_budget.allow(clean)
                             if clean:
                                 yield ProviderEvent(kind="assistant_transcript", text=clean)
 
@@ -838,6 +1339,8 @@ class GeminiProvider(VoiceProvider):
                         for part in model_turn.parts:
                             blob = getattr(part, "inline_data", None)
                             if blob is not None and blob.data:
+                                self._out_budget.add_audio(len(blob.data))
+                                self._replied_since_end = True
                                 yield ProviderEvent(kind="audio", audio=blob.data)
 
                     if getattr(content, "turn_complete", False):
@@ -845,8 +1348,17 @@ class GeminiProvider(VoiceProvider):
                         # a possible marker prefix, and a possible word space.
                         tail = self._out_spacing.feed(self._out_filter.flush())
                         tail += self._out_spacing.flush()
+                        tail = self._out_budget.allow(tail)
                         if tail:
                             yield ProviderEvent(kind="assistant_transcript", text=tail)
+                        if self._out_budget.dropped:
+                            logger.warning("output transcript ran %d chars ahead of its audio "
+                                           "(model reasoning in the transcript?) — not shown",
+                                           self._out_budget.dropped)
+                            from app import turnlog
+
+                            turnlog.record("transcript_overrun", dropped=self._out_budget.dropped)
+                        self._out_budget.reset()
                         # Output completion must not split an input transcript
                         # explicitly marked unfinished by the provider. Older
                         # models omit finished, so retain the turn fallback.
@@ -863,6 +1375,12 @@ class GeminiProvider(VoiceProvider):
                     # goodbye — rejoin and carry the conversation across it.
                     if not just_reconnected and await self._reconnect():
                         just_reconnected = True
+                        # Event plumbing only: the session clears what it
+                        # tracks per connection (TURN_IDLE_TRACKS_TOOLS).
+                        # Not "resumed" — that one restarts a tour, and the
+                        # reconnect behaviour must not change.
+                        if _tracking_tools():
+                            yield ProviderEvent(kind="reconnected")
                         continue
                     logger.info("Gemini Live session closed upstream")
                     return
@@ -873,6 +1391,8 @@ class GeminiProvider(VoiceProvider):
                 # from fatal into the same cutover as a clean cap.
                 if not just_reconnected and await self._reconnect():
                     just_reconnected = True
+                    if _tracking_tools():
+                        yield ProviderEvent(kind="reconnected")
                     continue
                 logger.exception("Gemini Live session ended with an error")
                 yield ProviderEvent(kind="error", text=str(exc))

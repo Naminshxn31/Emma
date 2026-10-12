@@ -356,3 +356,136 @@ def test_a_real_stranger_behind_a_greeted_colleague_is_still_greeted(monkeypatch
     monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [other])
     w.see(FRAME, now=1)
     assert w.see(FRAME, now=2).kind == "stranger"
+
+
+def test_every_refusal_leaves_a_verdict_the_debug_panel_can_show(monkeypatch):
+    """Owner 2026-09-30: "อยากรู้ว่ามันจับคนได้ไหม" — from the doorway,
+    "ไกลเกิน", "คะแนนต่ำ", "ติด cooldown" all look identical (the WAKE_DEBUG
+    lesson wearing a face), so every exit of see() says which one happened.
+    Diagnostic only: nothing may read `status` back into a decision."""
+    w = _watcher(confirm_frames=3)
+    assert "ยังไม่มีภาพ" in w.status["verdict"]
+
+    _sees_nothing(monkeypatch)
+    assert w.see(FRAME, now=0) is None
+    assert w.status["verdict"] == "ไม่เห็นหน้า"
+
+    _sees(monkeypatch, ALICE, width=40)
+    assert w.see(FRAME, now=1) is None
+    assert "ไกลเกิน" in w.status["verdict"] and "40px" in w.status["verdict"]
+
+    _sees(monkeypatch, ALICE)
+    assert w.see(FRAME, now=2) is None
+    assert "ยืนยัน 1/3" in w.status["verdict"]
+    assert w.status["name"] == "ต้า"
+
+    assert w.see(FRAME, now=3) is None
+    assert w.see(FRAME, now=4) is not None
+    assert w.status["verdict"].startswith("ทัก ต้า")
+    assert w.status["greeting"] is True
+
+    # Still standing there: the refusal names the cooldown, not silence.
+    assert w.see(FRAME, now=5) is None
+    assert "ทักไปแล้ว" in w.status["verdict"]
+
+
+# -- the arrival wait (FACE_TRACK_WAIT_S) ---------------------------------
+
+#: A face region with texture (sharp) and one without (as blurred as it
+#: gets). The face box is (0, 0, 200, 200), so only that corner matters.
+SHARP = np.random.default_rng(7).integers(0, 255, (480, 640, 3), dtype=np.uint8)
+BLURRED = np.full((480, 640, 3), 120, np.uint8)
+UNKNOWN = _unit(0.2, 0.2, 1)              # ~0.19 against ต้า: a real stranger
+LOOKALIKE = _unit(0.43, 0, 0.903)         # 0.43: just under the 0.45 bar
+#: SCRFD's five points with the nose well off the eyes' midpoint (yaw 0.75).
+TURNED = np.array([[60, 80], [140, 80], [160, 120], [70, 160], [130, 160]], np.float32)
+
+
+def _sees_face(monkeypatch, vec, kps=None, width=200):
+    face = faces.Face((0, 0, width, width), 0.9, vec, kps)
+    monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [face])
+
+
+def test_a_blurred_arrival_is_not_a_stranger_until_the_wait_runs_out(monkeypatch):
+    """Blur that drops a colleague's 0.73 to 0.46 (measured 2026-10-08) is
+    a stranger to the per-frame rule. Inside the wait it counts for nothing;
+    past it, it counts again — the delay to a real stranger is bounded."""
+    _sees_face(monkeypatch, UNKNOWN)
+    w = _watcher(confirm_frames=1, track_wait_s=3.0)
+    assert w.see(BLURRED, now=0.0) is None
+    assert w.see(BLURRED, now=1.0) is None
+    assert "ภาพเบลอ" in w.status["verdict"] and w.status["held"] is True
+    assert w.see(BLURRED, now=2.0) is None
+    assert w.see(BLURRED, now=3.0) is None          # wait over: frame 1 of 2
+    seen = w.see(BLURRED, now=3.5)
+    assert seen is not None and seen.kind == "stranger"
+    assert seen.track_s == 3.5 and seen.held == 3
+
+
+def test_the_wait_off_is_the_old_per_frame_rule(monkeypatch):
+    _sees_face(monkeypatch, UNKNOWN)
+    w = _watcher(confirm_frames=1, track_wait_s=0)
+    assert w.see(BLURRED, now=0.0) is None
+    seen = w.see(BLURRED, now=0.2)
+    assert seen is not None and seen.kind == "stranger"
+    assert seen.track_s is None and seen.held == 0
+
+
+def test_a_clear_stranger_is_greeted_as_fast_as_before(monkeypatch):
+    """The owner asked for passers-by to be greeted faster (2026-09-30).
+    A sharp, frontal, low-scoring face is evidence, wait or no wait."""
+    _sees_face(monkeypatch, UNKNOWN)
+    w = _watcher(confirm_frames=1, track_wait_s=3.0)
+    assert w.see(SHARP, now=0.0) is None
+    seen = w.see(SHARP, now=0.2)
+    assert seen is not None and seen.kind == "stranger" and seen.held == 0
+
+
+def test_a_score_just_under_the_bar_waits_for_a_clearer_frame(monkeypatch):
+    """0.40-0.49 "strangers" in the logs are where a colleague at a bad
+    angle lands. Given the wait, the clear frame that follows names them."""
+    w = _watcher(confirm_frames=2, track_wait_s=3.0)
+    _sees_face(monkeypatch, LOOKALIKE)
+    for t in (0.0, 0.2, 0.4, 0.6):
+        assert w.see(SHARP, now=t) is None
+    assert "คล้ายคนที่รู้จัก" in w.status["verdict"]
+    assert "ต้า" not in w.status["verdict"]       # the chest screen faces the room
+    _sees_face(monkeypatch, ALICE)
+    assert w.see(SHARP, now=0.8) is None
+    seen = w.see(SHARP, now=1.0)
+    assert seen is not None and seen.name == "ต้า" and seen.held == 4
+
+
+def test_a_turned_head_is_held_back(monkeypatch):
+    _sees_face(monkeypatch, UNKNOWN, kps=TURNED)
+    w = _watcher(confirm_frames=1, track_wait_s=3.0)
+    assert w.see(SHARP, now=0.0) is None
+    assert w.see(SHARP, now=0.2) is None
+    assert "หันข้าง" in w.status["verdict"]
+
+
+def test_a_held_frame_does_not_break_a_colleagues_streak(monkeypatch):
+    """Named, blurred, named: the blur used to reset the streak to a
+    stranger's, and the colleague started counting again from one."""
+    w = _watcher(confirm_frames=2, track_wait_s=3.0)
+    _sees_face(monkeypatch, ALICE)
+    assert w.see(SHARP, now=0.0) is None
+    _sees_face(monkeypatch, UNKNOWN)
+    assert w.see(BLURRED, now=0.2) is None
+    _sees_face(monkeypatch, ALICE)
+    seen = w.see(SHARP, now=0.4)
+    assert seen is not None and seen.name == "ต้า"
+
+
+def test_a_new_arrival_gets_a_new_wait(monkeypatch):
+    """The wait belongs to somebody who has just walked up: an empty frame
+    in between ends the arrival, and the next face starts its own clock."""
+    _sees_face(monkeypatch, UNKNOWN)
+    w = _watcher(confirm_frames=1, track_wait_s=3.0)
+    for t in (0.0, 1.0, 2.0, 3.0):
+        w.see(BLURRED, now=t)
+    _sees_nothing(monkeypatch)
+    w.see(BLURRED, now=3.2)
+    _sees_face(monkeypatch, UNKNOWN)
+    assert w.see(BLURRED, now=3.4) is None
+    assert w.status.get("held") is True

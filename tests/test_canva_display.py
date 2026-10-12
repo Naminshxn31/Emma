@@ -30,6 +30,19 @@ def _catalog_for_mapping(tmp_path):
     shutil.copy(Path(settings.slides_dir) / "index.json", tmp_path / "index.json")
 
 
+def _on(page: int) -> str:
+    """The slide the real measured map puts on Canva page `page`.
+
+    These tests used to name `ew-NNN`, i.e. assume slide N is page N of a
+    library that has since been replaced. Asking the map keeps them about
+    navigation — whatever id is on page 4, moving one page forward is one
+    keypress — and fails loudly if the map ever stops covering the page.
+    """
+    slide_id = canva_display.slide_on_page(page)
+    assert slide_id, "the measured Canva map has nothing on page %d" % page
+    return slide_id
+
+
 @pytest.fixture(autouse=True)
 def _reset(monkeypatch):
     # Exercise display timing with hypothetical approved copy; production
@@ -68,6 +81,11 @@ def _reset(monkeypatch):
         encoding="utf-8"))["deck_url"]
     design = canva_display._design_id(registered)
     monkeypatch.setattr(settings, "canva_url", f"https://canva.test/design/{design}/view")
+    # Deliberately the gallery's .env value, which no longer matches the ids
+    # (intro-NNN since 2026-10-06). `_page_number` used to require the id to
+    # read "{prefix}-NNN" before it would consult the measured map, so with
+    # this pin every navigation test below asked for a page that could never
+    # be found. The map is the authority; this pin keeps it proven.
     monkeypatch.setattr(settings, "canva_deck_prefix", "ew")
 
 
@@ -133,7 +151,7 @@ def test_goto_returns_before_the_window_is_ready(monkeypatch):
 
     async def body():
         started = asyncio.get_event_loop().time()
-        await canva_display.goto("ew-042")
+        await canva_display.goto(_on(42))
         elapsed = asyncio.get_event_loop().time() - started
 
         assert elapsed < 0.1, "goto() waited %.2fs for the browser" % elapsed
@@ -154,7 +172,7 @@ def test_only_the_newest_slide_is_navigated_to(monkeypatch):
 
     async def body():
         for n in (10, 11, 12, 13):
-            await canva_display.goto("ew-%03d" % n)
+            await canva_display.goto(_on(n))
         await asyncio.sleep(0.6)
         assert page.visited == ["13"], "expected only page 13, got %r" % page.visited
 
@@ -169,7 +187,7 @@ def test_a_broken_window_never_raises_into_the_tool(monkeypatch):
     monkeypatch.setattr(canva_display, "_ensure_page", _launcher(Broken()))
 
     async def body():
-        await canva_display.goto("ew-001")
+        await canva_display.goto(_on(1))
         await asyncio.sleep(0.1)  # the failure happens out here, and is swallowed
 
     run(body())
@@ -206,35 +224,35 @@ def test_an_unmeasured_page_is_not_guessed_from_the_id(
     _catalog_for_mapping(tmp_path)
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
-    assert canva_display._page_number("ew-042") is None
-    assert canva_display._page_number("ew-001") is None
+    assert canva_display._page_number("intro-042") is None
+    assert canva_display._page_number("intro-001") is None
     assert canva_display._page_number("picture-42") is None
 
 
 def test_a_measured_mapping_beats_the_arithmetic(monkeypatch, tmp_path):
     """The whole point. Our export has 59 frames, the live deck has fewer
-    pages, so `ew-047` is not page 47 — and only a measurement can say what
-    it is."""
+    pages, so `ew-047` was not page 47 — and only a measurement can say what
+    it is. (The ids are the 2026-10-06 library's intro-NNN now.)"""
     _catalog_for_mapping(tmp_path)
     (tmp_path / "canva_pages.json").write_text(json.dumps(
         {"source_id": "canva_page_mapping", "project_id": settings.project_id,
          "deck_url": settings.canva_url,
-         "total": 50, "pages": {"ew-001": 1, "ew-047": 40}}), encoding="utf-8")
+         "total": 50, "pages": {"intro-001": 1, "intro-047": 40}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
-    assert canva_display._page_number("ew-047") == 40
-    assert canva_display._page_number("ew-001") == 1
+    assert canva_display._page_number("intro-047") == 40
+    assert canva_display._page_number("intro-001") == 1
 
 
 def test_a_foreign_project_mapping_never_moves_the_canva_window(monkeypatch, tmp_path):
     _catalog_for_mapping(tmp_path)
     (tmp_path / "canva_pages.json").write_text(json.dumps({
         "source_id": "canva_page_mapping", "project_id": "embassy_life",
-        "deck_url": settings.canva_url, "total": 50, "pages": {"ew-001": 1},
+        "deck_url": settings.canva_url, "total": 50, "pages": {"intro-001": 1},
     }), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
-    assert canva_display._page_number("ew-001") is None
+    assert canva_display._page_number("intro-001") is None
 
 
 def test_a_slide_missing_from_the_measured_mapping_moves_nothing(
@@ -249,11 +267,11 @@ def test_a_slide_missing_from_the_measured_mapping_moves_nothing(
     (tmp_path / "canva_pages.json").write_text(json.dumps(
         {"source_id": "canva_page_mapping", "project_id": settings.project_id,
          "deck_url": settings.canva_url,
-         "total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
+         "total": 50, "pages": {"intro-001": 1}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
-    assert canva_display._page_number("ew-059") is None
-    assert canva_display._page_number("ew-018") is None
+    assert canva_display._page_number("intro-048") is None
+    assert canva_display._page_number("intro-018") is None
 
 
 def test_a_slide_with_no_canva_page_never_opens_the_window(monkeypatch, tmp_path):
@@ -262,7 +280,7 @@ def test_a_slide_with_no_canva_page_never_opens_the_window(monkeypatch, tmp_path
     (tmp_path / "canva_pages.json").write_text(json.dumps(
         {"source_id": "canva_page_mapping", "project_id": settings.project_id,
          "deck_url": settings.canva_url,
-         "total": 50, "pages": {"ew-001": 1}}), encoding="utf-8")
+         "total": 50, "pages": {"intro-001": 1}}), encoding="utf-8")
     monkeypatch.setattr(settings, "slides_dir", str(tmp_path))
     canva_display.load_page_map(force=True)
 
@@ -270,7 +288,7 @@ def test_a_slide_with_no_canva_page_never_opens_the_window(monkeypatch, tmp_path
         raise AssertionError("must not launch for an unmapped slide")
 
     monkeypatch.setattr(canva_display, "_ensure_page", explode)
-    run(canva_display.goto("ew-059"))
+    run(canva_display.goto("intro-048"))
 
 
 def test_a_page_baked_into_the_link_is_ignored(monkeypatch):
@@ -355,7 +373,7 @@ def test_one_slide_forward_is_a_keypress_not_a_reload(monkeypatch):
     monkeypatch.setattr(canva_display, "_at_page", 3)
 
     async def body():
-        await canva_display.goto("ew-004")
+        await canva_display.goto(_on(4))
         await asyncio.sleep(0.3)
         assert page.keys == ["ArrowRight"]
         assert page.visited == [], "must not have re-navigated"
@@ -369,7 +387,7 @@ def test_going_back_presses_the_other_arrow(monkeypatch):
     monkeypatch.setattr(canva_display, "_at_page", 8)
 
     async def body():
-        await canva_display.goto("ew-006")
+        await canva_display.goto(_on(6))
         await asyncio.sleep(0.6)
         assert page.keys == ["ArrowLeft", "ArrowLeft"]
 
@@ -384,7 +402,7 @@ def test_a_long_jump_reloads_instead_of_arrowing(monkeypatch):
     monkeypatch.setattr(canva_display, "_at_page", 2)
 
     async def body():
-        await canva_display.goto("ew-045")
+        await canva_display.goto(_on(45))
         await asyncio.sleep(0.4)
         assert page.keys == []
         assert page.visited == ["45"]
@@ -425,7 +443,7 @@ def test_a_swallowed_keypress_is_caught_and_corrected(monkeypatch):
     monkeypatch.setattr(canva_display, "_at_page", 3)
 
     async def body():
-        await canva_display.goto("ew-004")
+        await canva_display.goto(_on(4))
         await asyncio.sleep(0.4)
         assert page.visited == ["4"], "should have deep-linked after the key failed"
         assert canva_display._at_page == 4
@@ -441,7 +459,7 @@ def test_someone_clicking_canva_by_hand_is_noticed(monkeypatch):
     monkeypatch.setattr(canva_display, "_at_page", 3)   # stale
 
     async def body():
-        await canva_display.goto("ew-031")
+        await canva_display.goto(_on(31))
         await asyncio.sleep(0.4)
         # 30 -> 31 is one step, not the 28 our stale number implied.
         assert page.keys == ["ArrowRight"]
@@ -458,7 +476,7 @@ def test_a_silent_window_still_works(monkeypatch):
     monkeypatch.setattr(canva_display, "_at_page", 5)
 
     async def body():
-        await canva_display.goto("ew-006")
+        await canva_display.goto(_on(6))
         await asyncio.sleep(0.4)
         assert page.keys == ["ArrowRight"]
 
@@ -476,7 +494,7 @@ def test_a_failed_move_forgets_where_it_was(monkeypatch):
     monkeypatch.setattr(canva_display, "_at_page", 3)
 
     async def body():
-        await canva_display.goto("ew-004")
+        await canva_display.goto(_on(4))
         await asyncio.sleep(0.3)
         assert canva_display._at_page is None
 
@@ -505,7 +523,7 @@ def test_next_slide_holds_until_canva_is_on_the_page(monkeypatch):
     async def body():
         await registry.dispatch("start_presentation", {"tour": "deck"})
         out = await registry.dispatch("next_slide", {})
-        assert out["slide"]["id"] == "ew-002"
+        assert out["slide"]["id"] == _on(2)
         assert page.page == 2, "canva should already be there when this returns"
 
     run(body())
@@ -551,7 +569,7 @@ def test_starting_a_tour_also_waits_for_canva(monkeypatch):
 
     async def body():
         out = await registry.dispatch("start_presentation", {"tour": "deck"})
-        assert out["slide"]["id"] == "ew-001"
+        assert out["slide"]["id"] == _on(1)
         assert page.page == 1, "canva should be on the cover before it speaks"
 
     run(body())
@@ -580,7 +598,7 @@ def test_the_cover_is_up_before_a_cold_started_tour_speaks(monkeypatch):
         started = asyncio.get_event_loop().time()
         out = await registry.dispatch("start_presentation", {"tour": "deck"})
         elapsed = asyncio.get_event_loop().time() - started
-        assert out["slide"]["id"] == "ew-001"
+        assert out["slide"]["id"] == _on(1)
         assert page.page == 1, "the cover must be up before the call returns"
         assert elapsed >= 0.4, (
             "returned in %.2fs — it did not wait for the slow window" % elapsed
@@ -604,7 +622,7 @@ def test_a_stuck_window_does_not_hold_the_conversation(monkeypatch):
 
     async def body():
         started = asyncio.get_event_loop().time()
-        arrived = await canva_display.arrive("ew-002", timeout=0.4)
+        arrived = await canva_display.arrive(_on(2), timeout=0.4)
         assert arrived is False
         assert asyncio.get_event_loop().time() - started < 1.5
 
@@ -743,18 +761,37 @@ def test_a_page_outside_the_deck_is_ignored():
 
 
 def test_following_a_page_hands_over_that_page_s_script():
+    """Fixture scripts: the shipped deck has none (see the next test)."""
     from app.tools import load_tools, slides
 
     load_tools()
     slides.reload_slides()
-    from tests.approval_fixture import approved_slides
-    slides._slides = approved_slides(slides.load_slides())
+    from tests.approval_fixture import scripted_slides
+    slides._slides = scripted_slides(slides.load_slides())
     order = slides.follow_external_page(5)
     assert order is not None
     assert order["slide"]["position"] == 5
     assert slides.STATE["index"] == 4, "the tour moves with the screen"
     assert order["slide"]["script"] in order["text"]
     assert "ห้ามแต่งใหม่" in order["text"]
+
+
+def test_following_a_page_of_the_real_deck_presents_its_approved_summary():
+    """A salesperson clicking through the shipped deck (no scripts anywhere)
+    used to get a robot that followed the screen and said nothing: no script
+    meant no order at all. The order is its own turn, so it has to carry the
+    approved text itself — and the presenting rules with it."""
+    from app.tools import load_tools, slides
+
+    load_tools()
+    slides.reload_slides()
+    order = slides.follow_external_page(5)
+    assert order is not None and not order["slide"].get("script")
+    assert order["slide"]["position"] == 5
+    assert slides.PRESENT_FROM_SUMMARY in order["text"]
+    assert order["slide"]["summary_th"] in order["text"]
+    assert "ห้ามถาม" in order["text"] and 'ห้ามพูดว่า "เป็นแนวคิดเบื้องต้น"' in order["text"]
+    assert "next_slide" not in order["text"], "a click is not a tour"
 
 
 def test_startup_does_not_put_a_window_on_the_screen(monkeypatch):
@@ -810,7 +847,7 @@ def test_shutdown_cancels_work_in_flight(monkeypatch):
     monkeypatch.setattr(canva_display, "_ensure_page", _launcher(page, delay=5.0))
 
     async def body():
-        await canva_display.goto("ew-007")
+        await canva_display.goto(_on(7))
         assert canva_display._task is not None
         await asyncio.wait_for(canva_display.shutdown(), timeout=2.0)
         assert canva_display._task is None
@@ -1002,7 +1039,7 @@ def test_a_tour_starts_the_window_even_with_the_greeting_still_queued(monkeypatc
 
     async def body():
         out = await registry.dispatch("start_presentation", {"tour": "deck"})
-        assert out["slide"]["id"] == "ew-001"
+        assert out["slide"]["id"] == _on(1)
         assert page.page == 1, (
             "the cover was skipped because the greeting was still playing"
         )

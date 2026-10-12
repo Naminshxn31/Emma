@@ -154,9 +154,18 @@ def _page_number(slide_id: str) -> int | None:
 
     An unmeasured or mismatched design is now unavailable; numeric IDs are
     not evidence of a page in a different Canva design.
+
+    There used to be a second gate here, the id had to read
+    `{CANVA_DECK_PREFIX}-NNN`, left over from the arithmetic days. On
+    2026-10-06 the library became intro-001..048 while the gallery's .env
+    still says CANVA_DECK_PREFIX=ew, so every slide failed the regex before
+    the mapping was even read: the measured map (48/48 pages matched at
+    correlation >= 0.999) existed, and the Canva window would never have
+    moved. The id spelling was never evidence of anything; the measured,
+    project- and design-scoped map plus the display policy below are the
+    gates. The prefix now only names new imports (scripts/).
     """
-    match = re.match(rf"^{re.escape(settings.canva_deck_prefix)}-(\d+)$", slide_id)
-    if not match:
+    if not isinstance(slide_id, str) or not slide_id:
         return None
     mapping = load_page_map()
     if not mapping:

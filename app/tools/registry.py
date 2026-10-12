@@ -93,6 +93,21 @@ class Tool:
     group: str | None = None
     blocking: bool = False
     exclusive: bool = False
+    #: Called with the call's arguments; True means "this call must never be
+    #: answered busy" — the in-flight check of an exclusive tool is skipped
+    #: and the call is not recorded in `_inflight`, so it cannot block
+    #: anything either. For stops: `move_body(stop)` during a pending `nod`
+    #: ack would otherwise have come back "busy" (safety review #1, design
+    #: §2d). Never part of the declaration sent to the model.
+    preempt: Callable[[dict], bool] | None = None
+    #: Returns (description, parameters) for THIS machine, read each time the
+    #: declarations are built (once per connection). Only for a tool whose
+    #: surface depends on local files — set_air_conditioner grows a `unit`
+    #: argument once a second AC's codes are learned here. It must hand back
+    #: the static `description`/`parameters` objects themselves whenever
+    #: nothing extra is configured, so a machine without the extra files (the
+    #: sales room) declares byte-identically. See `declaration`.
+    declare: Callable[[], tuple[str, dict[str, Any]]] | None = None
 
 
 _REGISTRY: dict[str, Tool] = {}
@@ -120,6 +135,8 @@ def tool(
     tags: list[str] | None = None,
     blocking: bool = False,
     exclusive: bool = False,
+    preempt: Callable[[dict], bool] | None = None,
+    declare: Callable[[], tuple[str, dict[str, Any]]] | None = None,
 ) -> Callable:
     def decorate(fn: Callable) -> Callable:
         if name in _REGISTRY:
@@ -137,6 +154,8 @@ def tool(
             if fn.__module__.startswith("app.tools.") else None,
             blocking=blocking,
             exclusive=exclusive,
+            preempt=preempt,
+            declare=declare,
         )
         return fn
 
@@ -149,6 +168,10 @@ def tool(
 #: .env would hand both the same tools. A ContextVar is per-task, and every
 #: session runs in its own task, so each one asks and answers for itself.
 session_profile: ContextVar[str | None] = ContextVar("session_profile", default=None)
+# Only the Android face owns the verified arm SDK path. Keep the owning
+# session in the provider task's context so a model tool cannot move the arm
+# from a desktop tab or from another simultaneous conversation.
+robot_face_session: ContextVar[object | None] = ContextVar("robot_face_session", default=None)
 
 #: Everything EmmaJoke must not be able to reach (owner, 2026-09-24: "อย่าไป
 #: ยุ่งข้อมูลโครงการหรือเอกสาร"). The project groups, plus the owner's private
@@ -163,6 +186,20 @@ def allowed(entry: Tool) -> bool:
     from app.tools import _OPT_IN
 
     if not settings.tools_enabled:
+        return False
+    if entry.name == "request_handshake":
+        if robot_face_session.get() is None:
+            return False
+        # One path to the handshake: while move_body is offered, its
+        # `handshake` action is that path (design §2d).
+        body = _REGISTRY.get("move_body")
+        if body is not None and body is not entry and allowed(body):
+            return False
+    # The body group moves the robot's own head and arms through the face
+    # page's bridge. Visible only on the robot face's own session and with
+    # the server key on; the robot's `body_enabled` is the second key.
+    if entry.group == "body" and (robot_face_session.get() is None
+                                  or not settings.robot_body_enabled):
         return False
     profile = session_profile.get() or settings.assistant_profile
     # Optional personal/web/computer tools have no condo source-approval
@@ -214,6 +251,16 @@ async def dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
                         elapsed_ms=round((observer.clock()-started)*1000, 3))
 
 
+def _preempts(entry: Tool, args: dict[str, Any] | None) -> bool:
+    if entry.preempt is None:
+        return False
+    try:
+        return bool(entry.preempt(dict(args or {})))
+    except Exception:
+        logger.warning("preempt check of %s failed", entry.name)
+        return False
+
+
 async def _dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
     """Run a tool by name. Always returns a dict, never raises."""
     entry = _REGISTRY.get(name)
@@ -228,7 +275,9 @@ async def _dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
     # physical exclusive jobs (printing) remain owned by the whole machine.
     scope = session_id.get()
     job_key = name if entry.exclusive or scope is None else (scope, name)
-    if job_key in _inflight and not _inflight[job_key].done():
+    preempting = _preempts(entry, args)
+    if (not preempting and job_key in _inflight
+            and not _inflight[job_key].done()):
         return {"ok": False, "error": "busy",
                 "instruction": "คำสั่งก่อนยังไม่จบ ห้ามสั่งซ้ำ ให้รอหรือติดต่อเจ้าหน้าที่"}
 
@@ -257,7 +306,8 @@ async def _dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
             task = asyncio.create_task(
                 run_blocking(entry.handler, _abandoned=abandoned, **args)
                 if entry.blocking else entry.handler(**args))
-            _inflight[job_key] = task
+            if not preempting:
+                _inflight[job_key] = task
 
             def finished(job):
                 if _inflight.get(job_key) is job:
@@ -377,17 +427,36 @@ async def dispatch_all(calls: list[tuple[str, str, dict]]) -> list[tuple[str, st
 # ---- provider-specific views of the same registry ----
 
 
+def declaration(t: Tool) -> tuple[str, dict[str, Any]]:
+    """(description, parameters) the model is handed for `t` on this machine.
+
+    Both provider views below go through here, so a tool's `declare` hook
+    cannot reach one provider and miss the other. A hook that raises falls
+    back to the static declaration — the one every machine had before the
+    hook existed.
+    """
+    if t.declare is None:
+        return t.description, t.parameters
+    try:
+        description, parameters = t.declare()
+        return description, parameters
+    except Exception:
+        logger.exception("declaration hook of %s failed; using the static one", t.name)
+        return t.description, t.parameters
+
+
 def as_openai_tools() -> list[dict[str, Any]]:
     """OpenAI Realtime `session.tools` shape."""
-    return [
-        {
+    out = []
+    for t in all_tools():
+        description, parameters = declaration(t)
+        out.append({
             "type": "function",
             "name": t.name,
-            "description": t.description,
-            "parameters": t.parameters,
-        }
-        for t in all_tools()
-    ]
+            "description": description,
+            "parameters": parameters,
+        })
+    return out
 
 
 def as_gemini_tool():
@@ -400,15 +469,16 @@ def as_gemini_tool():
 
     declarations = []
     for t in all_tools():
+        description, parameters = declaration(t)
         kwargs: dict[str, Any] = {
             "name": t.name,
-            "description": t.description,
+            "description": description,
             # Must be `parameters`, not `parameters_json_schema`. The former
             # is converted into a typed Schema the Live API actually sends to
             # the model; with the latter the model saw a function with no
             # declared arguments and invented its own names
             # (set_lights(lights_on=...) instead of set_lights(on=...)).
-            "parameters": t.parameters,
+            "parameters": parameters,
         }
         if t.long_running:
             # Lets the conversation continue while the action runs, instead

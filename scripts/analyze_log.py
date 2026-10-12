@@ -49,6 +49,32 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 
+def is_internal(row: dict) -> bool:
+    """A row the machine caused, not a guest.
+
+    Marked at the source since 2026-10-07 (`turnlog.origin`, set by the
+    startup search warm-up). Older logs carry no mark, and the warm-up was
+    most of their "lookups": over 2026-09-29..10-01 the top "customer query"
+    was "warm up", the boot-time call that loads the search model. Those
+    unmarked rows are recognised the only way they can be — the warm-up's
+    fixed query outside any voice session. That half of the test can go once
+    the last unmarked log ages out (TURN_LOG_KEEP_DAYS).
+    """
+    if row.get("origin"):
+        return True
+    return (row.get("event") == "lookup" and row.get("query") == "warm up"
+            and not row.get("session_id"))
+
+
+def _pct(values: list[float], p: float) -> float:
+    """Linear-interpolated percentile; `values` must be non-empty."""
+    xs = sorted(values)
+    k = (len(xs) - 1) * p / 100
+    lo = int(k)
+    hi = min(lo + 1, len(xs) - 1)
+    return xs[lo] + (xs[hi] - xs[lo]) * (k - lo)
+
+
 def load(paths: list[Path]) -> list[dict]:
     rows: list[dict] = []
     for path in paths:
@@ -85,7 +111,162 @@ def section(title: str) -> None:
     print("-" * len(title))
 
 
+def latency(rows: list[dict]) -> None:
+    """How long a guest waits, from the numbers the session records.
+
+    `end_signal_to_audio_ms` starts when the local VAD gate closes the
+    segment — which is already VAD_SILENCE_MS (+~0.1 s of detector decay,
+    measured with the real model) after their last syllable — and stops at
+    the first reply audio reaching this server. Both halves are printed
+    because they are tuned in different places: the first is a .env knob,
+    the second is the model.
+    """
+    firsts = [r for r in rows if r.get("event") == "metric_first_audio"
+              and isinstance(r.get("end_signal_to_audio_ms"), (int, float))]
+    reopens = [r for r in rows if r.get("event") == "metric_vad_reopen"
+               and isinstance(r.get("gap_ms"), (int, float))]
+    if not firsts and not reopens:
+        return
+    section("จังหวะการตอบ (ลูกค้าพูดจบ -> เสียงแรกของ Emma)")
+    if firsts:
+        lat = [r["end_signal_to_audio_ms"] for r in firsts]
+        print("  ด่าน VAD ตัดจบ -> เสียงแรกถึงเซิร์ฟเวอร์: n=%d  p50 %.0f ms  p90 %.0f ms"
+              % (len(lat), _pct(lat, 50), _pct(lat, 90)))
+        print("  (บวกเวลารอเงียบของด่าน VAD ก่อนหน้านั้นอีก ≈ VAD_SILENCE_MS + 100 ms"
+              " และเวลาเล่นเสียงฝั่งเบราว์เซอร์ที่ไม่ได้วัด)")
+        thoughts: dict[str, int] = {}
+        for r in rows:
+            tid, n = r.get("observed_turn_id"), r.get("thoughts_token_count")
+            if r.get("event") == "metric_usage" and tid and type(n) is int:
+                thoughts[tid] = max(n, thoughts.get(tid, 0))
+        paired = [(r["end_signal_to_audio_ms"], thoughts[r["turn_id"]])
+                  for r in firsts if r.get("turn_id") in thoughts]
+        if len(paired) >= 10:
+            cut = _pct([t for _, t in paired], 50)
+            low = [ms for ms, t in paired if t <= cut]
+            high = [ms for ms, t in paired if t > cut]
+            if low and high:
+                print("  thinking tokens <= %.0f: p50 %.0f ms (n=%d) / > %.0f: p50 %.0f ms (n=%d)"
+                      % (cut, _pct(low, 50), len(low), cut, _pct(high, 50), len(high)))
+                print("  → ส่วนที่แกว่งคือการคิดของโมเดล ไม่ใช่ท่อเสียงของเรา")
+    if reopens:
+        gaps = [r["gap_ms"] for r in reopens]
+        quick = [g for g in gaps if g <= 3000]
+        ends = len(firsts) + len(reopens)
+        knobs = sorted({str(r.get("silence_ms")) for r in reopens})
+        print("  ลูกค้าพูดต่อทั้งที่ Emma ยังไม่ได้ตอบ: %d ครั้ง (ภายใน 3 วิ %d = %.0f%% ของการตัดจบ)"
+              " ที่ VAD_SILENCE_MS=%s"
+              % (len(gaps), len(quick), 100 * len(quick) / ends if ends else 0,
+                 "/".join(knobs)))
+        print("  → แต่ละครั้งคือคนที่ยังพูดไม่จบแต่ด่าน VAD ตัดสินว่าจบแล้ว"
+              " ใช้ตัวเลขนี้เทียบก่อน/หลังปรับ VAD_SILENCE_MS")
+
+
+def focus(rows: list[dict]) -> None:
+    """Listening focus (docs/listening-focus-2026-10-09.md): what it let
+    through, what it held back and why, hour by hour. Numbers only — the
+    rows carry no text, and nothing here prints a name.
+
+    The thresholds (FOCUS_FACE_MIN_PX, FOCUS_YAW_MAX_DEG, the far floor)
+    are tuned from these lines, not from theory: `px`/`yaw` of opens is
+    where the people the robot did talk to stood, and `rms` of opens is the
+    level a floor would have to stay under.
+    """
+    opens = [r for r in rows if r.get("event") == "focus_open"]
+    denies = [r for r in rows if r.get("event") == "focus_deny"]
+    labels = [r for r in rows if r.get("event") == "focus_label"]
+    away = [r for r in rows if r.get("event") == "idle_timeout" and r.get("why") == "no_face"]
+    missing = [r for r in rows if r.get("event") == "focus_unavailable"]
+    stalled = [r for r in rows if r.get("event") == "focus_note_stalled"]
+    engaged = [r for r in rows if r.get("event") in
+               ("focus_wake", "focus_wake_cpu", "focus_release", "focus_gap", "focus_goodbye")]
+    if not (opens or denies or labels or away or missing or stalled or engaged):
+        return
+    section("โฟกัสการฟัง (ฟังเฉพาะคนหน้าหุ่น)")
+    if missing:
+        print("  เปิด FOCUS แต่ไม่มี VAD ในเครื่อง %d เซสชัน — ด่านนี้ไม่ได้ทำงานเลย"
+              " (ต้อง VAD_MODE=local)" % len(missing))
+    print("  เปิดให้ฟัง %d ช่วงพูด / ไม่ฟัง %d ครั้ง (นับเป็นช่วงที่ถูกปัด ไม่ใช่เฟรม)"
+          % (len(opens), len(denies)))
+    for reason, n in Counter(r.get("reason") for r in denies).most_common():
+        print("    ไม่ฟังเพราะ %-28s %4d" % (reason, n))
+    hours = sorted({str(r.get("t", ""))[:2] for r in opens + denies if r.get("t")})
+    if hours:
+        print("  รายชั่วโมง (เปิด/ไม่ฟัง):")
+        for h in hours:
+            o = sum(1 for r in opens if str(r.get("t", "")).startswith(h))
+            d = sum(1 for r in denies if str(r.get("t", "")).startswith(h))
+            print("    %s:00  %4d / %4d" % (h, o, d))
+    for key, label in (("px", "ความกว้างหน้า (px)"), ("yaw", "หน้าหัน (องศา)"),
+                       ("rms", "ระดับเสียงตอนเริ่มพูด (rms)")):
+        for name, group in (("เปิด", opens), ("ไม่ฟัง", denies)):
+            xs = [r[key] for r in group if isinstance(r.get(key), (int, float))]
+            if xs:
+                print("  %s ตอน%s: n=%d  p10 %.3g  p50 %.3g  p90 %.3g"
+                      % (label, name, len(xs), _pct(xs, 10), _pct(xs, 50), _pct(xs, 90)))
+    if labels:
+        whys = Counter(r.get("why") for r in labels)
+        named = sum(1 for r in labels if r.get("named"))
+        print("  ระบุผู้พูดแล้ว %d ช่วง: %s | มีชื่อ %d"
+              % (len(labels), ", ".join("%s %d" % kv for kv in whys.most_common()), named))
+    if away:
+        print("  วางสายเพราะไม่มีใครหน้ากล้อง %d ครั้ง" % len(away))
+    if stalled:
+        # The speaker note held a turn open (gemini._note_stall_guard): that
+        # reply came NOTE_STALL_S late and notes are off until restart.
+        print("  !! บันทึกผู้พูดทำให้หุ่นค้างไม่ตอบ %d ครั้ง — ปิด FOCUS_SPEAKER_LABELS"
+              " (ระบบหยุดส่งเองจนรีสตาร์ต)" % len(stalled))
+    print("  → ไม่ฟังเพราะ 'no face in front' ทั้งที่มีคนคุยอยู่จริง = FOCUS_FACE_MIN_PX/YAW แน่นเกิน"
+          " ดู px/yaw ตอนเปิดเทียบ")
+    _engagement(rows)
+
+
+def _engagement(rows: list[dict]) -> None:
+    """The reception-robot pieces (docs/listening-focus-2026-10-09.md,
+    "Engagement"): the in-call name, invitations, full-mode releases, the
+    goodbye — and the two numbers the robot's own log must supply: what the
+    in-call ear costs on its CPU, and how long a guest goes missing from the
+    camera while still there (the goodbye's bar)."""
+    def of(event):
+        return [r for r in rows if r.get("event") == event]
+
+    wake, cpu, gaps = of("focus_wake"), of("focus_wake_cpu"), of("focus_gap")
+    releases, goodbyes = of("focus_release"), of("focus_goodbye")
+    said = Counter((r.get("source"), bool(r.get("sent"))) for r in of("announce")
+                   if r.get("source") in ("focus_invite", "focus_goodbye"))
+    if not (wake or cpu or gaps or releases or goodbyes or said):
+        return
+    if wake:
+        own = sum(1 for r in wake if r.get("ignored") == "own_voice")
+        out = sum(1 for r in wake if r.get("in_view") is False)
+        print("  ได้ยินชื่อระหว่างสาย %d ครั้ง (นอกกล้อง %d, เสียงตัวเอง %d)"
+              % (len(wake), out, own))
+    ms = [r["ms_per_s"] for r in cpu if isinstance(r.get("ms_per_s"), (int, float))]
+    if ms:
+        print("  หูฟังชื่อในสาย ใช้ CPU p50 %.1f / p90 %.1f ms ต่อเสียง 1 วินาที (%d สาย)"
+              % (_pct(ms, 50), _pct(ms, 90), len(ms)))
+    for source, label in (("focus_invite", "เชิญมายืนหน้าหุ่น"), ("focus_goodbye", "กล่าวลา")):
+        if said[(source, True)] or said[(source, False)]:
+            print("  %s: พูด %d / ไม่พูด (สถานการณ์เปลี่ยน) %d"
+                  % (label, said[(source, True)], said[(source, False)]))
+    if releases:
+        print("  โหมด full: คนหลักเดินออกแล้วปล่อยให้คนอื่นคุย %d ครั้ง" % len(releases))
+    ended = sum(1 for r in goodbyes if r.get("ended"))
+    if goodbyes:
+        print("  กล่าวลาแล้ววางสาย %d / กลับมาคุยต่อ %d" % (ended, len(goodbyes) - ended))
+    xs = [r["gap_s"] for r in gaps if isinstance(r.get("gap_s"), (int, float))]
+    if xs:
+        print("  หน้าหายจากกล้องแล้วกลับมา: n=%d  p50 %.1f  p90 %.1f  สูงสุด %.1f วินาที"
+              % (len(xs), _pct(xs, 50), _pct(xs, 90), max(xs)))
+        print("  → FOCUS_GOODBYE_AFTER_S ต้องสูงกว่าช่วงที่คนเดิมยังยืนอยู่ (ดู p90)")
+
+
 def main() -> int:
+    # Thai on a stdout that is not UTF-8 — a pipe, a redirect, a cp1252
+    # console — raised UnicodeEncodeError on the first header and the
+    # script printed nothing at all. Same fix as audit_data_sources.py.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("files", nargs="*", help="log files (default: today's)")
     ap.add_argument("--days", type=int, default=1, help="how many days back")
@@ -102,10 +283,14 @@ def main() -> int:
         print("(ที่หา: %s)" % ", ".join(str(p) for p in paths))
         return 1
 
+    internal = [r for r in rows if is_internal(r)]
+    rows = [r for r in rows if not is_internal(r)]
     kinds = Counter(r.get("event") for r in rows)
     sessions = kinds.get("session_start", 0)
     print("อ่าน %d บรรทัด จาก %d ไฟล์ / %d เซสชัน"
           % (len(rows), len({r["_file"] for r in rows}), sessions))
+    if internal:
+        print("  ไม่นับ %d บรรทัดที่เครื่องทำเอง (เช่น warm-up การค้นตอนบูต)" % len(internal))
     if kinds.get("session_takeover"):
         print("  มีการยึดเซสชัน %d ครั้ง (เปิดหลายแท็บ)" % kinds["session_takeover"])
 
@@ -205,6 +390,9 @@ def main() -> int:
         print("  → เครื่องมือที่ถูกเรียกจากปุ่มพวกนี้ก็นับรวมอยู่ในหัวข้อด้านบนด้วย")
         print("    ถ้าตัวเลขสองฝั่งใกล้กันมาก แปลว่าเกือบทุกอย่างมาจากคน ไม่ใช่จากบทสนทนา")
 
+    latency(rows)
+    focus(rows)
+
     # ---- mishearings ------------------------------------------------------
     heard = [r.get("text", "") for r in rows if r.get("event") == "heard"]
     section("สิ่งที่หุ่นยนต์ได้ยิน")
@@ -263,6 +451,10 @@ def _save_summary(rows: list[dict]) -> None:
         "screen_changes": kinds.get("screen", 0),
         "prints": kinds.get("print", 0),
         "remote_presses": kinds.get("remote", 0),
+        # Listening focus, as counts: reasons are fixed machine strings.
+        "focus_opens": kinds.get("focus_open", 0),
+        "focus_denies": dict(Counter(r.get("reason") for r in rows
+                                     if r.get("event") == "focus_deny")),
     }
     path = out_dir / name
     path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")

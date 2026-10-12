@@ -54,7 +54,9 @@ DEFAULT_QUESTIONS = [
     ("ขอดูห้องนอน", "ห้องนอน"),
     ("ห้องน้ำเป็นยังไง", "ห้องน้ำ"),
     ("ทำเลอยู่ตรงไหน", "ทำเล"),
-    ("ใครเป็นเจ้าของโครงการ", "ผู้บริหาร"),
+    # "ผู้พัฒนา": the old deck answered this with an executives slide;
+    # the 2026-10-06 one has "ประวัติผู้พัฒนา Empire Group".
+    ("ใครเป็นเจ้าของโครงการ", "ผู้พัฒนา"),
     # Cross-language: the point of the semantic half. None of these share a
     # character with the Thai titles they should reach.
     ("do you have a gym", "BIOGENESIS"),
@@ -268,8 +270,14 @@ def evaluate_questions(questions, search, commercial):
                 else:
                     top = hits[0]
                     title = top.slide.get("title_th") or top.slide.get("title_en") or ""
+                    # Both titles, as tests/test_slides.py checks expectations:
+                    # the 2026-10-06 deck spells facility names in title_en
+                    # ("Aqua Cinema") and Thai transliteration in title_th
+                    # ("อควาซีเนม่า"), so a th-only match failed correct hits.
+                    titles = " | ".join(t for t in (top.slide.get("title_th"),
+                                                    top.slide.get("title_en")) if t)
                     passed = (not top.found if negative else top.found and
-                              (not expected or expected.casefold() in title.casefold()))
+                              (not expected or expected.casefold() in titles.casefold()))
                     row.update(status="pass" if passed else "fail", reason="ranked_result",
                                title=title, similarity=top.similarity, coverage=top.coverage,
                                standout=top.standout)
@@ -292,6 +300,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", type=Path, help="question list")
     parser.add_argument("--lexical", action="store_true", help="disable embeddings")
+    parser.add_argument("--images", action="store_true",
+                        help="measure show_slide's image index (lexical by design) "
+                             "instead of search_condo_info's approved-text index")
     parser.add_argument("--split", choices=("train", "test", "all"), default="train")
     parser.add_argument("--manifest", type=Path, default=ROOT / "data/eval/splits-v1.json")
     parser.add_argument("--json-output", type=Path, help="write reproducible per-case report")
@@ -314,14 +325,35 @@ def main() -> int:
     if args.lexical:
         settings.search_semantic = False
 
+    from app.knowledge_policy import evaluate_claim
     from app.tools import slide_search
     from app.tools.knowledge import _is_commercial
-    from app.tools.slides import load_slides, search_slides
+    from app.tools.slides import load_slides, search_disclosed_slide_text, search_slides
 
     slides = load_slides()
     if not slides:
         print("No slides indexed. Run scripts/import_slides.py first.")
         return 1
+
+    # Measure the layer the guest meets. Since M0.3 there are two indexes:
+    # `search_slides` (show_slide's image discovery) is lexical-only on
+    # purpose — draft labels must never reach an embedding service — and
+    # `search_disclosed_slide_text` (search_condo_info) indexes approved text
+    # with embeddings, and is the only place the similarity thresholds act.
+    # This script kept calling the image index while asking for semantic
+    # mode, so every non-commercial case was "skipped" (2026-10-07: 90 of
+    # 104) and the eval measured nothing. CLAUDE.md, "วัดให้ตรงชั้นที่ลูกค้าเจอ".
+    if args.images:
+        settings.search_semantic = False
+        index = slide_search.get_index(slides)
+        layer_search, layer_guard = search_slides, (lambda _q: False)
+        layer = "show_slide image index"
+    else:
+        approved = [s for s in slides if s.get("source_id") == "slide_catalog"
+                    and evaluate_claim(s, settings.project_id).allowed]
+        index = slide_search.get_text_index(approved)
+        layer_search, layer_guard = search_disclosed_slide_text, _is_commercial
+        layer = "search_condo_info approved-text index (%d approved)" % len(approved)
 
     # Re-runs must be free and complete. See `retrieval.use_query_cache`: the
     # first full run of 127 questions tripped the free tier's 100-embeddings-
@@ -332,10 +364,18 @@ def main() -> int:
     if not args.lexical:
         use_query_cache(ROOT / "data" / "eval_query_cache.npz")
 
-    index = slide_search.get_index(slides)
     mode = "hybrid (BM25 + embeddings)" if index.semantic_enabled else "lexical only (BM25)"
-    print("%d slides | %s\n" % (len(slides), mode))
-    if not index.semantic_enabled and not args.lexical:
+    provider = index.semantic.provider if index.semantic_enabled else "off"
+    if provider == "local":
+        thresholds = ("SEARCH_LOCAL_MIN_SIMILARITY=%.3f SEARCH_LOCAL_MIN_COVERAGE=%.2f"
+                      % (settings.search_local_min_similarity,
+                         settings.search_local_min_coverage))
+    else:
+        thresholds = ("SEARCH_MIN_SIMILARITY=%.3f MIN_COVERAGE=%.2f"
+                      % (settings.search_min_similarity, slide_search.MIN_COVERAGE))
+    print("%d slides | %s | %s | embeddings=%s | in force: %s\n"
+          % (len(slides), layer, mode, provider, thresholds))
+    if not index.semantic_enabled and not args.lexical and not args.images:
         print("  NOTE: embeddings unavailable — cross-language questions will fail.")
         print("  Check GEMINI_API_KEY and network, or pass --lexical to silence this.\n")
 
@@ -345,17 +385,19 @@ def main() -> int:
     print("%-6s %-30s %s %s" % ("status", "question", "reason", "top candidate"))
     print("-" * 104)
 
+    semantic_wanted = not args.lexical and not args.images
+
     def measured_search(query):
-        if not args.lexical and not index.semantic_enabled:
+        if semantic_wanted and not index.semantic_enabled:
             raise RuntimeError("Requested semantic search is unavailable")
-        hits = search_slides(query)
-        if not args.lexical and not index.semantic_enabled:
+        hits = layer_search(query)
+        if semantic_wanted and not index.semantic_enabled:
             raise RuntimeError("Semantic search failed during evaluation")
         if settings.search_reranker_model and slide_search._reranker_failed:
             raise RuntimeError("Requested reranker is unavailable")
         return hits
 
-    rows = evaluate_questions(questions, measured_search, _is_commercial)
+    rows = evaluate_questions(questions, measured_search, layer_guard)
     summary = result_counts(rows)
     for row in rows:
         print("%-6s %-30s %s %s" % (row["status"], row["question"][:30], row["reason"], row["title"][:34]))

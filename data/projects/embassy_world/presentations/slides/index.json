@@ -34,7 +34,13 @@
     "preliminary concept"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-002",
@@ -70,7 +76,13 @@
     "company"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-003",
@@ -104,7 +116,13 @@
     "highly commended"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-004",
@@ -137,7 +155,13 @@
     "vision"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-005",
@@ -174,7 +198,13 @@
     "nothing feels missing"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-006",
@@ -206,7 +236,13 @@
     "quality of life"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-007",
@@ -243,7 +279,13 @@
     "essentials"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-008",
@@ -251,8 +293,8 @@
    "type": "location",
    "title_th": "ทำเลและการเดินทาง สนามบินสามแห่ง",
    "title_en": "Location — connectivity to three airports",
-   "summary_th": "หน้าทำเลและการเดินทาง ฝั่งซ้ายเป็นแผนที่ชายฝั่งจากกรุงเทพฯ ลงมาถึงพัทยาและจอมเทียน ปักหมุดสนามบินดอนเมือง สนามบินสุวรรณภูมิ และสนามบินอู่ตะเภา ระยอง-พัทยา พร้อมคำอธิบายสั้นของแต่ละแห่งและถนนสุขุมวิทที่เชื่อมตรงเข้ากรุงเทพฯ ฝั่งขวาเป็นภาพสี่แถบ คือเครื่องบินที่อาคารผู้โดยสาร รถไฟความเร็วสูงในเมือง ชายหาดมีร่มและเก้าอี้ยามพระอาทิตย์ตก และโต๊ะอาหารริมน้ำยามค่ำ แถบล่างสุดสรุปเวลาเดินทางจาก Embassy World ไปสนามบินสามแห่งและถนนสุขุมวิท คือ ดอนเมือง 2 ชั่วโมงทางมอเตอร์เวย์ สุวรรณภูมิ 1.5 ชั่วโมงทางมอเตอร์เวย์ อู่ตะเภา 30 นาทีทางหลวง 331 และถนนสุขุมวิท 5 นาทีทางถนนเทพประสิทธิ์",
-   "summary_en": "Location and connectivity page. On the left a stylised coastal map from Bangkok down to Pattaya and Jomtien pins Don Mueang, Suvarnabhumi and U-Tapao Rayong-Pattaya airports, with a short note on each plus Sukhumvit Road. On the right four photo bands: a jet at a terminal, a high-speed train in the city, a sunset beach with loungers and umbrellas, and a candlelit waterfront dining table. A bar across the bottom gives drive times from Embassy World: Don Mueang 2 hr via motorway, Suvarnabhumi 1.5 hr via motorway, U-Tapao 30 min via Highway 331 and Sukhumvit Road 5 min via Thepprasit Rd.",
+   "summary_th": "หน้าทำเลและการเดินทาง ฝั่งซ้ายเป็นแผนที่ชายฝั่งจากกรุงเทพฯ ลงมาถึงพัทยาและจอมเทียน ปักหมุดสนามบินดอนเมือง สนามบินสุวรรณภูมิ และสนามบินอู่ตะเภา ระยอง-พัทยา พร้อมคำอธิบายสั้นของแต่ละแห่งและถนนสุขุมวิทที่เชื่อมตรงเข้ากรุงเทพฯ ฝั่งขวาเป็นภาพสี่แถบ คือเครื่องบินที่อาคารผู้โดยสาร รถไฟความเร็วสูงในเมือง ชายหาดมีร่มและเก้าอี้ยามพระอาทิตย์ตก และโต๊ะอาหารริมน้ำยามค่ำ แถบล่างสุดสรุปเวลาเดินทางจาก Embassy World ไปสนามบินสามแห่งและถนนสุขุมวิท คือ ดอนเมือง 2 ชั่วโมงทางมอเตอร์เวย์ สุวรรณภูมิ 1.5 ชั่วโมงทางมอเตอร์เวย์ อู่ตะเภา 30 นาทีทางหลวง 331 และถนนสุขุมวิท 5 นาทีทางถนนเทพประสิทธิ์ · หมายเหตุจากรายงานโครงการ (6 ต.ค. 2026): เวลาในแถบล่างเป็นตัวเลขของเด็ค ประมาณการจากแผนที่คือ อู่ตะเภาประมาณ 40–60 นาที สุวรรณภูมิประมาณ 1.5–2 ชั่วโมง ดอนเมืองประมาณ 2–3 ชั่วโมง ถนนสุขุมวิทประมาณ 4–6 นาที",
+   "summary_en": "Location and connectivity page. On the left a stylised coastal map from Bangkok down to Pattaya and Jomtien pins Don Mueang, Suvarnabhumi and U-Tapao Rayong-Pattaya airports, with a short note on each plus Sukhumvit Road. On the right four photo bands: a jet at a terminal, a high-speed train in the city, a sunset beach with loungers and umbrellas, and a candlelit waterfront dining table. A bar across the bottom gives drive times from Embassy World: Don Mueang 2 hr via motorway, Suvarnabhumi 1.5 hr via motorway, U-Tapao 30 min via Highway 331 and Sukhumvit Road 5 min via Thepprasit Rd. Note from the project report (6 Oct 2026): the bottom bar repeats the deck's figures; map estimates are U-Tapao about 40–60 min, Suvarnabhumi about 1.5–2 hr, Don Mueang about 2–3 hr, Sukhumvit Road about 4–6 min.",
    "keywords_th": [
     "ทำเล",
     "ที่ตั้ง",
@@ -289,7 +331,13 @@
     "access"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-009",
@@ -331,7 +379,13 @@
     "coastline"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-010",
@@ -374,7 +428,13 @@
     "surroundings"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-011",
@@ -415,7 +475,13 @@
     "nature"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-012",
@@ -458,7 +524,13 @@
     "wellbeing"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-013",
@@ -520,7 +592,13 @@
     "limitless possibilities"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-014",
@@ -565,7 +643,13 @@
     "dusk"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-015",
@@ -612,7 +696,13 @@
     "smart systems"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-016",
@@ -663,7 +753,13 @@
     "chapter"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-017",
@@ -706,7 +802,13 @@
     "masterplan"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-018",
@@ -746,7 +848,13 @@
     "floor plan"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-019",
@@ -784,7 +892,13 @@
     "sunset view"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-020",
@@ -829,7 +943,13 @@
     "floor location"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-021",
@@ -872,7 +992,13 @@
     "floor location"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-022",
@@ -916,7 +1042,13 @@
     "floor location"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-023",
@@ -960,7 +1092,13 @@
     "floor location"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-024",
@@ -1004,7 +1142,13 @@
     "floor location"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-025",
@@ -1043,7 +1187,13 @@
     "chapter"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-026",
@@ -1081,7 +1231,13 @@
     "parking bays"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-027",
@@ -1126,7 +1282,13 @@
     "layout"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-028",
@@ -1165,7 +1327,13 @@
     "poolside"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-029",
@@ -1205,7 +1373,13 @@
     "movie screen"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-030",
@@ -1247,7 +1421,13 @@
     "immersive"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-031",
@@ -1286,7 +1466,13 @@
     "therapy"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-032",
@@ -1325,7 +1511,13 @@
     "copper"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-033",
@@ -1363,7 +1555,13 @@
     "basement facility"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-034",
@@ -1399,7 +1597,13 @@
     "plunge pool"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-035",
@@ -1437,7 +1641,13 @@
     "relaxation"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-036",
@@ -1478,7 +1688,13 @@
     "overview"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-037",
@@ -1521,7 +1737,13 @@
     "toilets"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-038",
@@ -1560,7 +1782,13 @@
     "business area"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-039",
@@ -1598,7 +1826,13 @@
     "glass meeting pod"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-040",
@@ -1639,7 +1873,13 @@
     "private club"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-041",
@@ -1683,7 +1923,13 @@
     "common sphere"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-042",
@@ -1728,7 +1974,13 @@
     "smartphone"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-043",
@@ -1736,8 +1988,8 @@
    "type": "service",
    "title_th": "สมาร์ทโฮมในห้องพัก ระบบอัจฉริยะห้าอย่าง",
    "title_en": "Smart Home Technology Inside the Unit",
-   "summary_th": "หน้าหัวข้อ THE FUTURE BEGINS INSIDE YOUR HOME. ระบุว่าห้องพักคือฟาซิลิตี้แรกของ Embassy World (YOUR HOME IS THE FIRST FACILITY OF EMBASSY WORLD.) ใต้ลงมาเป็นคำโปรยว่า เทคโนโลยีอัจฉริยะถูกผสานเข้าด้วยกันอย่างไร้รอยต่อเพื่อยกระดับทุกช่วงเวลาของการใช้ชีวิตประจำวัน (Smart technologies seamlessly integrated to elevate every moment of everyday living) ฝั่งซ้ายไล่ระบบอัจฉริยะห้าข้อพร้อมไอคอน และแต่ละข้อมีคำอธิบายกำกับหนึ่งบรรทัด คือ SMART HOME สมาร์ทโฮม ออกแบบการควบคุมรอบการใช้ชีวิตประจำวัน (Control designed around everyday living) · SMART SECURITY ความปลอดภัย การเข้าออกแบบดิจิทัลและเทคโนโลยีกล้องหน้าประตู (Digital access and video door technology) · SMART COMFORT ความสบาย ควบคุมอุณหภูมิและสภาพแวดล้อมในห้อง (Temperature and environmental control) · SMART AIR อากาศ การฟอกอากาศและการรู้เท่าทันคุณภาพอากาศ (Air purification and air-quality awareness) · CONNECTED LIVING การเชื่อมต่อ เข้าถึงสภาพแวดล้อมในที่พักผ่านมือถือ (Mobile access to your residential environment) ฝั่งขวาเป็นภาพเรนเดอร์ห้องนั่งเล่นและรับประทานอาหารโทนฟ้าเทา เพดานฝังไฟดาว โคมระย้าคริสตัลทรงกลีบ โซฟาผ้าสีอ่อน พรมกลม และโต๊ะอาหารหินอ่อนจัดโต๊ะไว้ ด้านล่างเป็นแถบภาพอุปกรณ์ห้าช่อง ได้แก่ กลอนประตูดิจิทัล ระบบกล้องหน้าประตู แผงควบคุมอัจฉริยะ เครื่องฟอกอากาศ และแอปมือถือ",
-   "summary_en": "A section page titled \"THE FUTURE BEGINS INSIDE YOUR HOME.\", claiming \"YOUR HOME IS THE FIRST FACILITY OF EMBASSY WORLD.\" and subheaded \"Smart technologies seamlessly integrated to elevate every moment of everyday living\". Five smart-system items run down the left with icons and a one-line explanation each: SMART HOME — \"Control designed around everyday living.\"; SMART SECURITY — \"Digital access and video door technology.\"; SMART COMFORT — \"Temperature and environmental control\"; SMART AIR — \"Air purification and air-quality awareness.\"; CONNECTED LIVING — \"Mobile access to your residential environment.\" The right is a rendering of a blue-grey living/dining room with a star-lit ceiling cove, petal crystal chandelier, pale sofa, round rug and a set marble dining table. A strip of five device photos runs along the bottom: digital door lock, video door system, smart control panel, air purification and mobile application.",
+   "summary_th": "หน้าหัวข้อ THE FUTURE BEGINS INSIDE YOUR HOME. ระบุว่าห้องพักคือฟาซิลิตี้แรกของ Embassy World (YOUR HOME IS THE FIRST FACILITY OF EMBASSY WORLD.) ใต้ลงมาเป็นคำโปรยว่า เทคโนโลยีอัจฉริยะถูกผสานเข้าด้วยกันอย่างไร้รอยต่อเพื่อยกระดับทุกช่วงเวลาของการใช้ชีวิตประจำวัน (Smart technologies seamlessly integrated to elevate every moment of everyday living) ฝั่งซ้ายไล่ระบบอัจฉริยะห้าข้อพร้อมไอคอน และแต่ละข้อมีคำอธิบายกำกับหนึ่งบรรทัด คือ SMART HOME สมาร์ทโฮม ออกแบบการควบคุมรอบการใช้ชีวิตประจำวัน (Control designed around everyday living) · SMART SECURITY ความปลอดภัย การเข้าออกแบบดิจิทัลและเทคโนโลยีกล้องหน้าประตู (Digital access and video door technology) · SMART COMFORT ความสบาย ควบคุมอุณหภูมิและสภาพแวดล้อมในห้อง (Temperature and environmental control) · SMART AIR อากาศ การฟอกอากาศและการรู้เท่าทันคุณภาพอากาศ (Air purification and air-quality awareness) · CONNECTED LIVING การเชื่อมต่อ เข้าถึงสภาพแวดล้อมในที่พักผ่านมือถือ (Mobile access to your residential environment) ฝั่งขวาเป็นภาพเรนเดอร์ห้องนั่งเล่นและรับประทานอาหารโทนฟ้าเทา เพดานฝังไฟดาว โคมระย้าคริสตัลทรงกลีบ โซฟาผ้าสีอ่อน พรมกลม และโต๊ะอาหารหินอ่อนจัดโต๊ะไว้ ด้านล่างเป็นแถบภาพอุปกรณ์ห้าช่อง ได้แก่ กลอนประตูดิจิทัล ระบบกล้องหน้าประตู แผงควบคุมอัจฉริยะ เครื่องฟอกอากาศ และแอปมือถือ · หมายเหตุจากรายงานโครงการ (6 ต.ค. 2026): ผู้บริหารแจ้งว่าไม่มี video door system แยก กล้องอยู่ที่มือจับของกลอนประตูดิจิทัล (Digital Door Lock พร้อมกล้องเห็นหน้า ให้ทุกห้องตามการนำเสนอ)",
+   "summary_en": "A section page titled \"THE FUTURE BEGINS INSIDE YOUR HOME.\", claiming \"YOUR HOME IS THE FIRST FACILITY OF EMBASSY WORLD.\" and subheaded \"Smart technologies seamlessly integrated to elevate every moment of everyday living\". Five smart-system items run down the left with icons and a one-line explanation each: SMART HOME — \"Control designed around everyday living.\"; SMART SECURITY — \"Digital access and video door technology.\"; SMART COMFORT — \"Temperature and environmental control\"; SMART AIR — \"Air purification and air-quality awareness.\"; CONNECTED LIVING — \"Mobile access to your residential environment.\" The right is a rendering of a blue-grey living/dining room with a star-lit ceiling cove, petal crystal chandelier, pale sofa, round rug and a set marble dining table. A strip of five device photos runs along the bottom: digital door lock, video door system, smart control panel, air purification and mobile application. Note from the project report (6 Oct 2026): management says there is no separate video door system — the camera is in the handle of the digital door lock (fitted to every unit, per the sales presentation).",
    "keywords_th": [
     "สมาร์ทโฮม",
     "บ้านอัจฉริยะ",
@@ -1745,7 +1997,6 @@
     "ดิจิทัลล็อก",
     "กลอนประตูดิจิทัล",
     "กล้องหน้าประตู",
-    "อินเตอร์คอม",
     "ความปลอดภัย",
     "แอร์",
     "ปรับอุณหภูมิ",
@@ -1769,7 +2020,13 @@
     "technology"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-044",
@@ -1813,7 +2070,13 @@
     "show unit"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-045",
@@ -1855,7 +2118,13 @@
     "show unit"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-046",
@@ -1895,7 +2164,13 @@
     "show unit"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-047",
@@ -1936,7 +2211,13 @@
     "unit"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   },
   {
    "id": "intro-048",
@@ -1971,7 +2252,20 @@
     "final slide"
    ],
    "source_id": "slide_catalog",
-   "project_id": "embassy_world"
+   "project_id": "embassy_world",
+   "approval_status": "approved",
+   "approved_by": "pete",
+   "approved_at": "2026-10-06T17:09:27+07:00",
+   "effective_at": "2026-10-06T17:09:27+07:00",
+   "disclosure_scope": "customer",
+   "content_state": "preliminary_concept"
   }
- ]
+ ],
+ "approval_status": "approved",
+ "approved_by": "pete",
+ "approved_at": "2026-10-06T17:09:27+07:00",
+ "effective_at": "2026-10-06T17:09:27+07:00",
+ "disclosure_scope": "customer",
+ "content_state": "preliminary_concept",
+ "content_state_before_approval": null
 }

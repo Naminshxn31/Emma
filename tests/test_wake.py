@@ -623,3 +623,22 @@ def test_debug_mode_keeps_the_hit_clip_too(monkeypatch, tmp_path):
     assert hit == "EMMA"
     clips = list(tmp_path.glob("hit-*.wav"))
     assert len(clips) == 1, "the firing audio must be kept, not cleared"
+
+
+def test_spellings_dropped_for_want_of_sentencepiece_are_said_once(monkeypatch, caplog):
+    """The robot runtime had no sentencepiece until 10 Oct: WAKE_SPELLINGS
+    beyond the three precomputed encodings were silently not listened for.
+    Now the drop is logged — once per list, not once per encoder call."""
+    import logging
+    import sys
+
+    monkeypatch.setitem(sys.modules, "sentencepiece", None)  # import -> error
+    monkeypatch.setattr(settings, "wake_spellings", "EMMA,EMMAH,A MA")
+    monkeypatch.setattr(wake, "_DROP_WARNED", set())
+    with caplog.at_level(logging.WARNING, logger=wake.logger.name):
+        out = wake._encode_keyword("emma")
+        wake._encode_keyword("emma", threshold=0.05)       # the shadow's call
+    assert out is not None
+    assert "▁E M MA" in out and "▁A ▁MA" in out and "EMMAH" not in out
+    said = [r.getMessage() for r in caplog.records if "NOT listened for" in r.getMessage()]
+    assert len(said) == 1 and "EMMAH" in said[0], said

@@ -12,11 +12,25 @@ android {
         targetSdk 34
         versionCode 1
         versionName '0.1.0'
+        manifestPlaceholders = [
+                usesCleartextTraffic : 'false',
+                networkSecurityConfig: '@xml/network_security_config'
+        ]
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders = [
+                    usesCleartextTraffic : 'true',
+                    networkSecurityConfig: '@xml/network_security_config_debug'
+            ]
+        }
         release {
             minifyEnabled false
+            manifestPlaceholders = [
+                    usesCleartextTraffic : 'false',
+                    networkSecurityConfig: '@xml/network_security_config'
+            ]
         }
     }
 

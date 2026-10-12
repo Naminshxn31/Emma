@@ -64,6 +64,9 @@ def live(monkeypatch):
     monkeypatch.setattr(settings, "inventory_url", "https://x.supabase.co")
     monkeypatch.setattr(settings, "inventory_key", "k")
     monkeypatch.setattr(settings, "units_show_price", False)
+    # The promotion paths are what these tests are about; the default (off)
+    # has its own test below.
+    monkeypatch.setattr(settings, "units_promotions", True)
     monkeypatch.setattr(units, "_live_get", fake_get)
     units.reset()
     calls.answers = answers
@@ -71,6 +74,39 @@ def live(monkeypatch):
 
 
 # ==================== 5. promotions ====================
+
+def test_promotions_off_never_reads_the_table(live, monkeypatch):
+    """2026-10-06: the table held 20 active "NET PRICE" rows the owner says
+    are tests ("ของจริงไม่มี") while the approved facts say no promotion.
+    Off must mean the rows cannot reach Emma, the card or the tap at all —
+    not "read and then hidden"."""
+    monkeypatch.setattr(settings, "units_promotions", False)
+    out = units.list_promotions()
+    assert out["ok"] and out["count"] == 0 and out["promotions"] == []
+    assert "ยังไม่มีโปรโมชั่น" in out["instruction"]
+    card = units.show_unit("A203")["unit"]
+    assert "promo" not in card
+    pair = units.price_pair("A203")
+    assert pair["thai"] == 3290000.0 and "promo_thai" not in pair
+    assert not any(table == "pricing_unit_promotions" for table, _ in live), \
+        "the promotions table was queried with promotions off"
+
+
+def test_promotions_default_off():
+    """The shipped default, read from a clean environment — not the pinned
+    suite value, which would pass whatever config.py said."""
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "UNITS_PROMOTIONS"}
+    code = ("import os; os.environ.pop('UNITS_PROMOTIONS', None);"
+            "import dotenv; dotenv.load_dotenv = lambda *a, **k: False;"
+            "from app.config import Settings; print(Settings().units_promotions)")
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                            encoding="utf-8", env=env,
+                            cwd=str(Path(__file__).resolve().parents[1]))
+    assert result.stdout.strip().splitlines()[-1] == "False", result.stderr
 
 def test_promotions_come_from_the_applied_rows_only(live):
     out = units.list_promotions()

@@ -41,6 +41,7 @@ import asyncio
 import logging
 import math
 import struct
+import time
 from typing import Any
 
 logger = logging.getLogger("condo_voice.robot")
@@ -105,6 +106,100 @@ MAP_STCM = "/api/core/slam/v1/maps/stcm"
 _ARC_FRONT = math.radians(35)
 _ARC_BACK = math.pi - _ARC_FRONT
 _ARC_SIDE = (math.radians(55), math.radians(125))
+
+
+#: Why a fenced primitive refused (docs/emma-body-nav-design-2026-10-08.md
+#: §4, P2). Thai for the desk pages that show it; the code is what the
+#: endpoints return as `error`.
+FENCE_REASONS = {
+    "routes_own_the_base": "ระบบนำทางตามเส้นทางเป็นเจ้าของฐานล้อบนเครื่องนี้ "
+                           "(ROBOT_NAV_ROUTES_ENABLED) — สั่งเดินจากแผนที่ไม่ได้",
+    "run_active": "หุ่นกำลังเดินตามเส้นทางอยู่ — หยุดจากปุ่มหยุดฉุกเฉิน (E-stop) บนตัวหุ่นก่อน",
+    "run_unknown": "เซิร์ฟเวอร์มองไม่เห็นว่าหุ่นกำลังเดินตามเส้นทางอยู่หรือไม่ (หน้าหุ่นไม่ได้เชื่อมต่อ "
+                   "หรือไม่ได้รายงานสถานะการเดิน) — เปิดแอปหน้าหุ่นบนหุ่นให้รายงานสถานะก่อน "
+                   "หรือถ้าหุ่นกำลังเดินอยู่ให้หยุดจากปุ่มหยุดฉุกเฉิน (E-stop) บนตัวหุ่น",
+    "relocalize": "ระบบระบุตำแหน่งปิดอยู่หรืออ่านไม่ได้ — กดตั้งตำแหน่งใหม่ก่อน",
+}
+
+
+class Fenced(PermissionError):
+    """A primitive refused because something else owns the wheels.
+
+    A PermissionError, so every existing `except PermissionError` (the motion
+    lock) still refuses rather than crashing; endpoints that know this class
+    return its `code` so the page can say *why*.
+    """
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+        self.thai = FENCE_REASONS.get(code, code)
+
+
+def run_fence() -> None:
+    """Refuse while the robot face reports a leg run active or stale.
+
+    **Whatever the switches say** (safety review #3): two drivers on the
+    wheels is the hazard, and a run started from the face page — or a PC
+    `robot_python run` the face's poller sees — is a driver the planner knows
+    nothing about. Stale counts as running: silence is not a stopped robot.
+    `drive_stop` and `cancel` never call this; a fence on the brake would be
+    worse than no fence.
+
+    "unknown" counts too when ROBOT_NAV_ROUTES_ENABLED is on (review 2,
+    finding #3): before the face's status link, a panel-tap walk started
+    between calls read "unknown", and the joystick's MoveBy, a nudge or a
+    relocalize was a second driver on the wheels mid-leg. The link reports
+    such walks (and a PC run the app's poller sees) as active now; "unknown"
+    is what is left — no face page connected, its link silent, the app's
+    poll stale. Only with routes on, as before; with routes off "unknown"
+    stays open (a PC `robot_python run` with no face page is the operator
+    at the PC).
+    """
+    from app import robot_face_link
+    from app.config import settings
+
+    activity = robot_face_link.nav_activity()
+    if activity in ("active", "stale"):
+        logger.warning("chassis primitive refused — a route run is active on the robot")
+        raise Fenced("run_active")
+    if activity == "unknown" and settings.robot_nav_routes_enabled:
+        logger.warning("chassis primitive refused — the robot face is not reporting, "
+                       "a route run cannot be ruled out")
+        raise Fenced("run_unknown")
+
+
+async def planner_fence() -> None:
+    """Everything that posts a `MoveToAction` or `GoHomeAction` checks this.
+
+    Routes mode makes the leg runner the one navigation system on this
+    machine, so the board's planner refuses. And independently of that
+    switch: drive_route leaves board localization OFF on purpose, and a
+    MoveTo/GoHome on that board walks to where the target would be if
+    odometry were the map — so False *and* None (unreadable is not "on")
+    refuse until someone relocalizes. Same rule `go_home` already applies
+    to localization quality, one level further down.
+    """
+    from app.config import settings
+
+    try:
+        run_fence()
+    except Fenced as exc:
+        # run_unknown only exists with routes on, and with routes on the
+        # planner is refused whatever the face reports: "start a call so the
+        # face reports" would send the operator after something that would
+        # not unlock this button anyway.
+        if exc.code != "run_unknown":
+            raise
+    if settings.robot_nav_routes_enabled:
+        raise Fenced("routes_own_the_base")
+    try:
+        enabled = await localization_enabled()
+    except Exception:
+        enabled = None
+    if enabled is not True:
+        logger.warning("planner move refused — board localization is %s", enabled)
+        raise Fenced("relocalize")
 
 
 class ObstacleError(RuntimeError):
@@ -251,11 +346,19 @@ def status() -> dict:
     }
 
 
+#: monotonic time of the last desk STOP (main.py's stop buttons, reason
+#: "stop button..."), None = never. Review 12 Oct: on the "board" plan a desk
+#: STOP never reaches the app, so the app's 60 s latch -- the only stop the
+#: greeter's own turn (FACE_TURN_TO_CHECK) looked at -- never saw it.
+_last_desk_stop_at: float | None = None
+
+
 def reset_state() -> None:
     """One definition, so tests and code cannot drift apart —
     `robot_link.reset_state` exists for exactly this reason."""
     global _pending, _poi_countdown, _map_bounds, _map_cells, _map_read_at
-    global _drive_task, _drive_direction
+    global _drive_task, _drive_direction, _last_desk_stop_at
+    _last_desk_stop_at = None
     task, _drive_task = _drive_task, None
     _drive_direction = None
     if task is not None and not task.done():
@@ -642,6 +745,9 @@ async def move_to(x: float, y: float, yaw: float = 0.0) -> Any:
     `mode: 0` is navigation with obstacle avoidance rather than track
     following — the only mode that makes sense in a room with customers in it.
     """
+    # In the primitive, not in `send()`: /robot/command reaches nudge, undock
+    # and goto without passing through send (safety review #3).
+    await planner_fence()
     action = await request("POST", "/api/core/motion/v1/actions", {
         "action_name": MOVE_TO,
         "options": {
@@ -669,6 +775,7 @@ async def go_home() -> Any:
     """
     from app.config import settings
 
+    await planner_fence()
     quality = await localization_quality()
     if quality is None or quality < settings.robot_poi_min_quality:
         raise ValueError("หุ่นยังไม่รู้ตำแหน่งตัวเองพอที่จะหาแท่น (localization_quality=%s ต้อง ≥ %d) — กดปรับตำแหน่งก่อน"
@@ -721,6 +828,8 @@ async def nudge(forward_m: float = 0.0, turn_rad: float = 0.0) -> Any:
     if not settings.robot_chassis_motion_enabled:
         logger.warning("chassis motion is locked pending hardware acceptance")
         raise PermissionError("motion locked")
+    # Before the pose read: a refused step must not touch the board at all.
+    await planner_fence()
     where = await pose()
     x = float(where.get("x") or 0.0)
     y = float(where.get("y") or 0.0)
@@ -753,6 +862,9 @@ async def drive(direction: str) -> bool:
     if not settings.robot_chassis_motion_enabled:
         logger.warning("chassis motion is locked pending hardware acceptance")
         raise PermissionError("motion locked")
+    # MoveBy is remote control, not the planner: only a live run fences it
+    # (or, with routes on, one the server cannot rule out — run_fence).
+    run_fence()
 
     started = _drive_task is None or _drive_task.done()
     await _refuse_if_blocked(direction, running=not started)
@@ -865,13 +977,19 @@ async def _drive_deadman() -> None:
     await drive_stop(reason="deadman")
 
 
+def desk_stopped_within(seconds: float) -> bool:
+    return _last_desk_stop_at is not None and time.monotonic() - _last_desk_stop_at < seconds
+
+
 async def drive_stop(reason: str = "release") -> None:
     """End a drive burst now: disarm the deadman, cancel the board's action.
 
     Safe to call when nothing is being driven — it is what the stop button
     does, and a stop button that has to check first is not a stop button.
     """
-    global _drive_task, _drive_direction
+    global _drive_task, _drive_direction, _last_desk_stop_at
+    if reason.startswith("stop button"):
+        _last_desk_stop_at = time.monotonic()
     task, _drive_task = _drive_task, None
     was = _drive_direction
     _drive_direction = None
@@ -914,6 +1032,10 @@ async def relocalize(mode: str = "dock") -> dict[str, Any]:
         raise ValueError("ไม่รู้จักโหมด relocalize %r" % (mode,))
     if mode == "rotate" and not settings.robot_chassis_motion_enabled:
         raise PermissionError("motion locked")
+    # Not one of the design's five, fenced anyway: every mode switches
+    # localization back on and `dock` rewrites the pose, which is the frame
+    # a running leg is steering by.
+    run_fence()
 
     report: dict[str, Any] = {"mode": mode}
     report["quality_before"] = await localization_quality()
@@ -1106,6 +1228,8 @@ async def undock() -> dict[str, Any]:
     """
     from app.config import settings
 
+    # First, before the power read: it ends in a MoveTo (via goto_xy).
+    await planner_fence()
     reading = await power()
     if reading.get("dockingStatus") != "on_dock":
         raise ValueError("หุ่นไม่ได้อยู่บนแท่น (dockingStatus=%s) — ใช้จอยหรือ goto ได้เลย" % reading.get("dockingStatus"))
@@ -1142,6 +1266,10 @@ async def goto_xy(x: float, y: float) -> str:
     x, y = float(x), float(y)
     if not (math.isfinite(x) and math.isfinite(y)):
         raise ValueError("พิกัดไม่ใช่ตัวเลข")
+    # Raised here rather than inside `send()`, which turns every failure
+    # into "failed": /mapview must be able to say "relocalize", not a
+    # silent "failed" (design §4, S10).
+    await planner_fence()
     if _map_bounds is None or \
             asyncio.get_running_loop().time() - _map_read_at > MAP_MAX_AGE_S:
         await explore_map()
@@ -1157,6 +1285,13 @@ async def goto_xy(x: float, y: float) -> str:
     if kind == CELL_UNKNOWN:
         raise ValueError("จุดนี้หุ่นยังไม่เคยเห็น (ยังไม่ได้สำรวจ) — เลือกจุดในพื้นที่ที่แมพว่างแล้ว")
     return await send("move_to_xy", x=x, y=y)
+
+
+async def _localization_enabled_or_none() -> bool | None:
+    try:
+        return await localization_enabled()
+    except Exception:
+        return None
 
 
 async def live_state() -> dict:
@@ -1192,6 +1327,14 @@ async def live_state() -> dict:
             if isinstance(action.get("state"), dict) else None,
         },
         "places": list(PLACES),
+        # For /mapview's "relocalize" notice (design §4): drive_route leaves
+        # localization off, and the planner primitives refuse until it is on.
+        "localization_enabled": await _localization_enabled_or_none(),
+        # Names WITH their map poses, so the map page can draw every saved
+        # spot where it actually is (owner 2026-09-30: "มาร์กตำแหน่ง...ให้มัน
+        # ขยับ" — a map you can only click blind on is the vendor app again).
+        "place_poses": [{"name": name, **_POSES[name]}
+                        for name in PLACES if name in _POSES],
         "model": STATE.get("model"),
     }
 
@@ -1243,6 +1386,11 @@ async def send(action: str, **args: Any) -> str:
             await cancel()
             _pending = None
             return "ok"
+    except Fenced as exc:
+        # A refusal by design, not a broken link: marking the chassis
+        # disconnected here would flip every later answer to "mock".
+        logger.warning("chassis command %r refused: %s", action, exc.code)
+        return "failed"
     except Exception:
         logger.exception("chassis command %r failed", action)
         STATE["connected"] = False

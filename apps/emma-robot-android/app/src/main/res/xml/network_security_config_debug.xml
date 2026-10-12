@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/emma_local_ca" />
+        </trust-anchors>
+    </base-config>
+    <!-- Same chassis cleartext exception as release; base-config already permits
+         cleartext in debug (for a http://localhost dev server), but this keeps the
+         two configs parallel and documents the chassis board as an intended peer. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.11.1</domain>
+    </domain-config>
+</network-security-config>

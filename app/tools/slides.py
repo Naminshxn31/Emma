@@ -35,15 +35,31 @@ TOURS: dict[str, list[str]] = {
     # The official sales deck, in its authored order — this is what a sales
     # person would actually walk a guest through.
     "deck": ["deck"],
-    "overview": ["cover", "branding", "location-map", "facility", "unit-plan"],
+    # "location" next to "location-map": the 2026-10-06 library (intro-NNN)
+    # types its three map pages "location". Without it `tour="location"`
+    # built an empty deck and start_presentation quietly fell back to the
+    # overview, so "ขอดูทำเล" walked twenty-one slides of everything else.
+    "overview": ["cover", "branding", "location-map", "location", "facility", "unit-plan"],
     "facilities": ["facility"],
     "floorplans": ["floor-plan", "unit-plan"],
-    "location": ["location-map"],
+    "location": ["location-map", "location"],
 }
 
 #: Tour used when the guest just says "แนะนำโครงการหน่อย". Falls back to the
 #: assembled overview if no official deck has been imported yet.
 DEFAULT_TOUR = "deck"
+
+#: The two halves every advancing instruction shares, scripted or not, held
+#: once so the script path and the summary path cannot drift apart. The
+#: quoted hand-offs are what the model actually said (see KEEP_GOING).
+_NO_HANDOFF = (
+    "ห้ามลงท้ายด้วยการบอกว่าจะไปดูอะไรต่อ เช่น 'เดี๋ยวไปดู...กันต่อนะคะ' "
+    "'ต่อไปจะเป็น...' 'สไลด์ถัดไป...'"
+)
+_ADVANCE = (
+    "พูดจบแล้วเรียก next_slide ทันทีโดยไม่ต้องพูดอะไรคั่น "
+    "ห้ามถามว่าจะไปสไลด์ถัดไปไหม ห้ามรอคำตอบ ลูกค้าจะพูดแทรกเองถ้าต้องการ"
+)
 
 #: Repeated on every advance, because a rule sitting near the top of the
 #: system prompt loses to whatever the model feels like doing sixty slides
@@ -65,8 +81,7 @@ KEEP_GOING = (
     # land; "don't preview" is abstract, "don't say เดี๋ยวไป...กันต่อนะคะ" is
     # a string it can match against what it was about to emit.
     "พูดเฉพาะเนื้อหาในฟิลด์ script เท่านั้น ห้ามเติมประโยคใดๆ ก่อนหรือหลังบท "
-    "ห้ามลงท้ายด้วยการบอกว่าจะไปดูอะไรต่อ เช่น 'เดี๋ยวไปดู...กันต่อนะคะ' "
-    "'ต่อไปจะเป็น...' 'สไลด์ถัดไป...' — จบที่ประโยคสุดท้ายของบทแล้วหยุดพูด "
+    + _NO_HANDOFF + " — จบที่ประโยคสุดท้ายของบทแล้วหยุดพูด "
     "ห้ามขึ้นต้นด้วยการประกาศชื่อหัวข้อสไลด์ "
     # Now the rest: fidelity to the script, then the mechanics.
     # The scripts are Thai only, and the assistant answers in whatever
@@ -79,9 +94,14 @@ KEEP_GOING = (
     "ห้ามเพิ่มหรือตัดเนื้อหาระหว่างแปล "
     "ปรับถ้อยคำให้ลื่นสำหรับการพูดได้ แต่ห้ามแต่งเนื้อหาใหม่ ห้ามข้ามเนื้อหา "
     "ห้ามเพิ่มตัวเลขหรือข้อมูลนอกบท "
-    "ถ้าสไลด์นี้ไม่มี script ให้บรรยายสั้นๆ 2-3 ประโยคจากข้อมูลสไลด์ "
-    "พูดจบแล้วเรียก next_slide ทันทีโดยไม่ต้องพูดอะไรคั่น "
-    "ห้ามถามว่าจะไปสไลด์ถัดไปไหม ห้ามรอคำตอบ ลูกค้าจะพูดแทรกเองถ้าต้องการ"
+    # There was a clause here: "ถ้าสไลด์นี้ไม่มี script ให้บรรยายสั้นๆ 2-3
+    # ประโยคจากข้อมูลสไลด์". KEEP_GOING only ever goes out with a slide that
+    # has an approved script (`_narration_instruction`), so the clause could
+    # only fire on the one path that bypassed that function — resuming after
+    # a barge-in — and there it licensed "narrate from slide data" on a slide
+    # whose only data is a description of the picture. Slides without a
+    # script now get PRESENT_FROM_SUMMARY, which says how.
+    + _ADVANCE
 )
 
 _slides: list[dict] | None = None
@@ -133,15 +153,20 @@ def reset_state() -> None:
 #: in: KEEP_GOING says call next_slide the moment you stop talking, and it
 #: says so on every single advance. A question asked under that instruction
 #: is not a question, it's a rhetorical flourish on the way past.
-ASK_AND_WAIT = (
-    "พูดตามฟิลด์ script ก่อน แล้วถามคำถามในฟิลด์ ask ต่อท้ายด้วยน้ำเสียงเป็นกันเอง "
-    "ปรับถ้อยคำคำถามให้เป็นธรรมชาติได้ แต่ต้องถามเรื่องเดียวกับที่เขียนไว้ "
-    "ถ้าลูกค้าพูดภาษาอื่น ให้แปลทั้งบทและคำถามเป็นภาษานั้นโดยคงเนื้อหาครบถ้วน "
+#: The waiting half, shared with a summary slide that carries a question.
+_WAIT_FOR_ANSWER = (
     # The whole point, stated as the boundary it is.
     "ถามแล้วหยุด ห้ามเรียก next_slide ห้ามพูดต่อ ห้ามตอบคำถามตัวเอง รอให้ลูกค้าตอบ "
     "พอลูกค้าตอบ ให้รับคำตอบสั้นๆ อย่างเป็นธรรมชาติก่อน 1 ประโยค "
     "เชื่อมโยงกับโครงการถ้าเชื่อมได้ แล้วค่อยเรียก next_slide ไปต่อ "
     "ถ้าลูกค้าเงียบ ระบบจะบอกให้ไปต่อเอง ไม่ต้องถามซ้ำ ไม่ต้องทวง"
+)
+
+ASK_AND_WAIT = (
+    "พูดตามฟิลด์ script ก่อน แล้วถามคำถามในฟิลด์ ask ต่อท้ายด้วยน้ำเสียงเป็นกันเอง "
+    "ปรับถ้อยคำคำถามให้เป็นธรรมชาติได้ แต่ต้องถามเรื่องเดียวกับที่เขียนไว้ "
+    "ถ้าลูกค้าพูดภาษาอื่น ให้แปลทั้งบทและคำถามเป็นภาษานั้นโดยคงเนื้อหาครบถ้วน "
+    + _WAIT_FOR_ANSWER
 )
 
 
@@ -241,6 +266,16 @@ def _public(slide: dict, position: dict | None = None) -> dict:
     from app.data_sources import ROOT
     from app.knowledge_policy import evaluate_claim, state_instruction
     from app.presentation_policy import authorize_slide, customer_slide_trace
+    # The policy search_condo_info already applied (knowledge._entry and
+    # `_sanitize_now_showing`) and this path did not: pool/lagoon/common-area
+    # measurements never reach a model. Harmless while the slide tools only
+    # showed pictures; once an approved summary became something Emma
+    # presents, intro-015's "ลากูน 155 เมตร" would have been spoken on a tour
+    # while the same question asked in words had it stripped.
+    from app.tools.retrieval import sanitize_common_area_dimensions
+
+    def clean(value):
+        return sanitize_common_area_dimensions(value) if value else value
 
     try:
         manifest = json.loads((ROOT / "data/registry/external_asset_manifest.json").read_text(
@@ -262,8 +297,8 @@ def _public(slide: dict, position: dict | None = None) -> dict:
         "source_id": "slide_catalog",
         "capabilities": asset.trace()["capabilities"],
         # A display identifier is not authority to narrate words on an image.
-        "title_th": slide.get("title_th") if decision.allowed else "ภาพประกอบ",
-        "title_en": slide.get("title_en") if decision.allowed else "Presentation image",
+        "title_th": clean(slide.get("title_th")) if decision.allowed else "ภาพประกอบ",
+        "title_en": clean(slide.get("title_en")) if decision.allowed else "Presentation image",
         "url": asset.asset["url"],
         "asset_policy_trace": asset.trace(),
         "policy_trace": public_trace,
@@ -274,8 +309,8 @@ def _public(slide: dict, position: dict | None = None) -> dict:
             out.update(position)
         return out
     out["type"] = slide.get("type")
-    out["summary_th"] = slide.get("summary_th")
-    out["summary_en"] = slide.get("summary_en")
+    out["summary_th"] = clean(slide.get("summary_th"))
+    out["summary_en"] = clean(slide.get("summary_en"))
     out["content_state"] = decision.content_state
     if state_instruction(decision.content_state):
         out["content_state_instruction"] = state_instruction(decision.content_state)
@@ -299,7 +334,7 @@ def _public(slide: dict, position: dict | None = None) -> dict:
     # source metadata and script-level sign-off are mandatory.
     script = slide.get("script_th") or slide.get("script_en")
     if script and slide.get("script_approved") and slide.get("script_approved_by"):
-        out["script"] = script
+        out["script"] = clean(script)
         out["script_is_approved_copy"] = True
         out["script_approved_by"] = slide["script_approved_by"]
     elif script:
@@ -492,6 +527,95 @@ FOLLOW_PAGE = (
     "สคริปต์: %s"
 )
 
+#: For a slide whose approved copy is a summary rather than a script.
+#:
+#: That is the whole 2026-10-06 library (intro-001..048): every record
+#: approved for customers, none carrying script_th. The only instruction
+#: such a slide used to get was "สไลด์นี้ไม่มีบทที่อนุมัติให้พูด ห้ามบรรยาย",
+#: on all 48 — a re-enabled tour would have walked the deck with Emma under
+#: orders to say nothing, which is the silent self-walking tour this file
+#: has already paid for once, this time caused by an instruction rather
+#: than by the nudge. Approval is what makes a summary speakable.
+#:
+#: But the summaries were written as descriptions of the *picture* — "หน้าปก
+#: ของชุดนำเสนอ พื้นหลังดำสนิท มีโลโก้...", "ภาพเรนเดอร์...", "ฝั่งซ้ายเป็น...",
+#: "มุมขวาบนมีผังย่อ..." — so "speak the summary" would be a guided tour of
+#: the slide layout. The order is to present the subject, and the layout
+#: talk it must not produce is quoted, because quoting the exact wrong
+#: phrase is what made KEEP_GOING's hand-off rule land. Boundary first for
+#: the same reason. Three dividers' summaries say "กำลังจะพาไปดู...", which
+#: is the physical-tour wording prompt rule 6 bans, so that is quoted too.
+#:
+#: Numbers: only what the approved title/summary carries, and not all of
+#: it — a host does not recite six figures in three sentences. Translation
+#: is allowed without the scripts' "ครบถ้วน", deliberately: completeness is
+#: what a script owes, a summary is source material.
+PRESENT_FROM_SUMMARY = (
+    "สไลด์นี้ไม่มี script ห้ามอ่าน summary ตามตัว เพราะเขียนเป็นคำบรรยายภาพ "
+    "ห้ามพูดถึงองค์ประกอบของภาพ เช่น 'หน้านี้มี...' 'ภาพนี้แสดง...' 'ภาพเรนเดอร์...' "
+    "'ฝั่งซ้ายเป็น...' 'มุมขวาบนมีผังย่อ...' 'พื้นหลังสีดำ' หรือสี ตำแหน่งซ้ายขวา "
+    "ไอคอน โลโก้ ป้ายในภาพ "
+    "ให้นำเสนอแบบเจ้าบ้าน 2-3 ประโยค ว่าสิ่งนี้คืออะไรและให้อะไรกับการใช้ชีวิตของลูกค้า "
+    "(แนวคิด สถานที่ หรือสิ่งอำนวยความสะดวก) "
+    "ใช้เฉพาะข้อมูลใน title และ summary ของสไลด์นี้ ห้ามเดา ห้ามเพิ่มข้อเท็จจริงหรือตัวเลขที่ไม่มีในนั้น "
+    "ไม่ต้องพูดตัวเลขครบทุกตัว ห้ามพูดว่า 'พาไปดู' หรือ 'พาชม' เพราะหุ่นไม่ได้เดินพาไป "
+    "ถ้าลูกค้าพูดภาษาอื่น ให้นำเสนอเป็นภาษานั้นโดยไม่เพิ่มเนื้อหา "
+)
+
+
+def _speaks_from_summary(shown: dict | None) -> bool:
+    """Approved text, no script, something to present, and not a frame."""
+    if not shown or shown.get("script") or shown.get("silent"):
+        return False
+    if not (shown.get("capabilities") or {}).get("model_text"):
+        return False
+    return bool(str(shown.get("summary_th") or "").strip()
+                or str(shown.get("summary_en") or "").strip())
+
+
+def _state_clause(shown: dict) -> str:
+    """The content_state instruction, restated where the presenting happens.
+
+    The payload already carries `content_state_instruction`; it is repeated
+    in the order itself because the order is what the model follows. Until
+    2026-10-10 this added "ห้ามพูดเหมือนสร้างเสร็จหรือเปิดใช้แล้ว" on every
+    page (the draft Q&A's q07: "พูดกำกับทุกครั้ง"), and the model obliged with
+    "ยังเป็นแนวคิดเบื้องต้น อาจเปลี่ยนแปลงได้" slide after slide. The owner
+    banned that sentence outright, so the state's own instruction — which now
+    quotes it as forbidden — is the whole clause.
+    """
+    caution = shown.get("content_state_instruction") or ""
+    return (caution + " ") if caution else ""
+
+
+def _summary_instruction(shown: dict, mode: str) -> str:
+    """PRESENT_FROM_SUMMARY plus what the calling path needs.
+
+    `tour`  — advancing: the same hand-off ban and advance order as KEEP_GOING.
+    `ask`   — advancing slide that carries a question: present, ask, wait.
+    `single` — show_slide / go_to_page: one page, never the advance order
+               (that is how "อธิบายหน้า 50" became a tour from page 50).
+    """
+    text = PRESENT_FROM_SUMMARY + _state_clause(shown)
+    if mode == "tour":
+        return text + _NO_HANDOFF + " ห้ามขึ้นต้นด้วยการประกาศชื่อหัวข้อสไลด์ " + _ADVANCE
+    if mode == "ask":
+        return (text + "จบแล้วถามคำถามในฟิลด์ ask ต่อท้ายด้วยน้ำเสียงเป็นกันเอง "
+                "ปรับถ้อยคำได้แต่ต้องถามเรื่องเดียวกับที่เขียนไว้ แปลเป็นภาษาของลูกค้าได้ "
+                + _WAIT_FOR_ANSWER)
+    return text
+
+
+def _follow_summary_text(shown: dict) -> str:
+    """FOLLOW_PAGE's summary twin. Sent as its own turn, so it carries the
+    approved text itself — there is no tool result for the model to read."""
+    title = shown.get("title_th") or shown.get("title_en") or ""
+    summary = shown.get("summary_th") or shown.get("summary_en") or ""
+    return ("ตอนนี้จอแสดงสไลด์ %d จาก %d: %s\n" % (shown["position"], shown["total"], title)
+            + PRESENT_FROM_SUMMARY + _state_clause(shown)
+            + "ห้ามถาม ห้ามพูดถึงสไลด์อื่น\n"
+            + "title: %s\nsummary: %s" % (title, summary))
+
 
 def _page_number_of(slide_id: str) -> int | None:
     """Which live Canva page shows this slide? Not the tour position.
@@ -562,18 +686,23 @@ def follow_external_page(page_number: int) -> dict | None:
     shown = move_to_deck_page(page_number)
     if shown is None:
         return None
-    slide = _by_id(shown["id"])
     script = shown.get("script") or ""
-    if not script:
-        return None
-    return {
-        "slide": shown,
-        "text": FOLLOW_PAGE % (
+    if script:
+        # Title from the authorised payload, not the raw record: the same
+        # text the screen and the tool results carry, sanitised the same way.
+        text = FOLLOW_PAGE % (
             shown["position"], shown["total"],
-            slide.get("title_th") or slide.get("title_en") or "",
+            shown.get("title_th") or shown.get("title_en") or "",
             script,
-        ),
-    }
+        )
+    elif _speaks_from_summary(shown):
+        # The 2026-10-06 deck has no scripts, so without this a salesperson
+        # clicking through Canva got a robot that followed the screen and
+        # never said a word about any page.
+        text = _follow_summary_text(shown)
+    else:
+        return None
+    return {"slide": shown, "text": text}
 
 
 def should_continue_tour() -> bool:
@@ -674,25 +803,38 @@ def is_silent(slide: dict | None) -> bool:
     return bool(slide and slide.get("silent"))
 
 
-def _narration_instruction(slide: dict | None) -> str:
+def _narration_instruction(slide: dict | None, *, ask: bool = True) -> str:
     """Which set of orders goes out with this slide, and arm the wait.
 
     Kept in one place on purpose: four call sites hand a slide to the model,
     and a slide whose question is honoured on three of them is worse than one
     that is never asked at all — the guest learns the robot sometimes waits
     and sometimes talks over them.
+
+    `ask=False` is the resume after a barge-in: the slide is said again, its
+    question is not (asking again what the guest walked away from reads as
+    nagging). That path used to hard-code KEEP_GOING instead of coming here,
+    which handed "speak only the script field" to slides that have none.
     """
     if is_silent(slide):
         _arm_question(None)
         return PASS_THROUGH
-    if slide and not _public(slide)["policy_trace"]["allowed"]:
+    shown = _public(slide) if slide else None
+    # capabilities, not policy_trace["allowed"]: a slide whose *asset* is
+    # refused comes back from `_public` with the asset trace, which has no
+    # "allowed" key — a revoked image mid-tour was a KeyError in next_slide.
+    if shown is not None and not (shown.get("capabilities") or {}).get("model_text"):
         _arm_question(None)
         return "สไลด์นี้ยังไม่มีเนื้อหาที่อนุมัติให้ลูกค้าฟัง ห้ามบรรยายหรือเดาจากภาพ"
-    if slide and not _public(slide).get("script"):
-        _arm_question(None)
-        return "สไลด์นี้ไม่มีบทที่อนุมัติให้พูด ห้ามบรรยายหรือเดาจากภาพ"
-    _arm_question(slide)
-    if slide and (slide.get("ask_th") or slide.get("ask_en")):
+    asks = bool(ask and slide and (slide.get("ask_th") or slide.get("ask_en")))
+    if shown is not None and not shown.get("script"):
+        if not _speaks_from_summary(shown):
+            _arm_question(None)
+            return "สไลด์นี้ไม่มีบทที่อนุมัติให้พูด ห้ามบรรยายหรือเดาจากภาพ"
+        _arm_question(slide if asks else None)
+        return _summary_instruction(shown, "ask" if asks else "tour")
+    _arm_question(slide if ask else None)
+    if asks:
         return ASK_AND_WAIT
     return KEEP_GOING
 
@@ -828,6 +970,11 @@ def show_slide(query: str) -> dict:
     out = {"ok": True, "slide": shown, "alternatives": alternatives}
     if shown.get("script"):
         out["instruction"] = SPEAK_SCRIPT
+    elif _speaks_from_summary(shown):
+        # Same trust on every route in: the tour presents an approved summary,
+        # so "ขอดูฟิตเนส" must not get "ภาพนี้ไม่มีบทที่อนุมัติ" — an order to
+        # say nothing — about the very same page.
+        out["instruction"] = _summary_instruction(shown, "single")
     else:
         out["instruction"] = shown.get("instruction", "ภาพนี้ไม่มีบทที่อนุมัติ ห้ามเดารายละเอียดจากภาพ")
     resume = on_loop(resume_hint)
@@ -949,8 +1096,13 @@ async def next_slide() -> dict:
             )
             await _point_canva_at(deck[STATE["index"]])
             STATE["awaiting"] = None
+            # Through `_narration_instruction`, not a hard-coded KEEP_GOING:
+            # on a slide with no script KEEP_GOING says "speak only the
+            # script field", and the resumed slide is the one the guest
+            # most needs to hear properly. ask=False: no second asking.
             return {"ok": True, "finished": False, "resumed": True,
-                    "slide": shown, "instruction": KEEP_GOING}
+                    "slide": shown,
+                    "instruction": _narration_instruction(slide, ask=False)}
 
     if STATE["index"] + 1 >= len(deck):
         # A finished deck stops being a deck.
@@ -1029,8 +1181,10 @@ async def go_to_page(page: int) -> dict:
 
     shown = move_to_deck_page(number)
     if shown is None:
-        total = len(STATE["deck"] or [s["id"] for s in load_slides()
-                                      if s.get("type") == "deck"])
+        # The deck the tour would present, not the slides typed "deck": the
+        # 2026-10-06 library has no such type, so this said "มี 0 หน้า" about a
+        # 48-page presentation — the robot telling a guest the deck is empty.
+        total = len(STATE["deck"] or _build_deck(DEFAULT_TOUR))
         return {
             "ok": False,
             "error": "no such page",
@@ -1045,8 +1199,13 @@ async def go_to_page(page: int) -> dict:
     # slide 50: the model answered the question and then kept going, page
     # after page, because the answer carried the instruction to.
     STATE["manual"] = True
-    out["instruction"] = SPEAK_SCRIPT if shown.get("script") else shown.get(
-        "instruction", "ภาพนี้ไม่มีบทที่อนุมัติ ห้ามเดารายละเอียดจากภาพ")
+    if shown.get("script"):
+        out["instruction"] = SPEAK_SCRIPT
+    elif _speaks_from_summary(shown):
+        out["instruction"] = _summary_instruction(shown, "single")
+    else:
+        out["instruction"] = shown.get(
+            "instruction", "ภาพนี้ไม่มีบทที่อนุมัติ ห้ามเดารายละเอียดจากภาพ")
     ask = shown.get("ask")
     if ask:
         out["instruction"] += " ถามคำถามในฟิลด์ ask ต่อท้ายด้วย แล้วรอคำตอบ"

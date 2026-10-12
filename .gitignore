@@ -5,6 +5,9 @@ vendor/aobo/incoming/
 # Scratch extractions — Android SDK/Gradle/toolchain + robot SDK dumps (~15k files,
 # hundreds of MB). Never tracked; this is what made the SCM show "10000 changes".
 .tmp/
+# Emma -> UE5 package (~20 MB of FBX/GLB/PNG). One command rebuilds it:
+# blender --background --python scripts/export-emma-ue5.py
+/exports/
 tools/android/platform-tools/
 tools/android/*.zip
 tools/android/download-receipt.json
@@ -27,6 +30,10 @@ venv/
 
 # Hub identity (MAC/IP of the Broadlink device on your network)
 data/broadlink_device.json
+# scripts/learn_ir.py: the codes file as it was before a learning session
+# (the undo), and the half-written file of an interrupted atomic save.
+data/ir_codes.json.bak
+data/ir_codes.json.tmp
 
 # Cached slide embeddings — rebuilt from the deck on first run
 data/slides/embeddings.npz
@@ -34,6 +41,8 @@ data/projects/*/presentations/slides/embeddings.npz
 
 # Turn logs contain what visitors said out loud — never commit them.
 data/logs/
+# ผังโชว์รูมที่เจ้าของอัพโหลดเอง + ค่าจับคู่ตำแหน่ง (/mapview) — ของเครื่องนี้
+data/robot/
 data/documents/*.pdf
 
 # Coverage output
@@ -53,6 +62,9 @@ data/projects/*/presentations/slides/*.jpg
 data/projects/*/presentations/slides/*.jpeg
 data/projects/*/presentations/slides/*.png
 data/projects/*/presentations/slides/index.json.bak
+# Per-unit plan crops + their index (scripts/build_unit_plans.py, generated
+# from the sales team's furniture PDFs — ~1,066 images, rebuilt not tracked).
+data/projects/*/sales/unit-plans/
 # Backups the data console keeps beside any file it rewrites (app/data_console.py).
 # The .bak is the undo for a wrong approval; it is local evidence, not history.
 data/projects/*/facts/*.json.bak
@@ -91,6 +103,17 @@ data/emma-corpus/
 data/reminders.json
 data/memory.json
 data/personal-docs/
+# The mic array's learned lag->bearing map (app/doa.py): written by the
+# server on the robot itself. Untracked-but-not-ignored would ride the next
+# robot_server deploy and overwrite the robot's own calibration.
+data/doa_calibration.json
+data/doa_calibration.json.tmp
+# ARRAY_CAPTURE8: raw 8-channel room audio for the channels 4-7 test, deleted
+# by the server after ARRAY_CAPTURE8_KEEP_MIN — and never in the history.
+data/array_capture8/
+# ENHANCE_ENABLED's GTCRN model (535 KB, sha256-pinned):
+#   python scripts/fetch_enhance_model.py
+data/enhance/
 
 # Face models (280MB, restored with one command) and everything built from
 # the enrolment photographs. The gallery is a file of vectors, not pictures,
@@ -98,6 +121,11 @@ data/personal-docs/
 # owner's data, like data/memory.json, not the repo's.
 #   python scripts/fetch_face_model.py
 data/faces/
+
+# ONNX export of the local embedding model (480 MB, sha256-pinned in
+# app/embed_onnx.py; the robot downloads it itself on deploy):
+#   python scripts/fetch_embed_model.py
+data/models/
 
 # The push-deploy target list (scripts/deploy_room_agents.ps1): internal
 # hostnames/IPs of approved company PCs, hand-maintained. Names infrastructure,
@@ -131,3 +159,11 @@ data/robot-inspection/
 # Generated Gradle state and Android build output for the Emma voice app.
 apps/emma-ai-voice/.gradle/
 apps/emma-ai-voice/app/build/
+# Android build artefacts for every app module (source stays tracked)
+apps/*/.gradle/
+apps/*/app/build/
+apps/*/build/
+apps/*/local.properties
+
+tools/android/scrcpy/
+.tmp/scrcpy-*.zip

@@ -307,3 +307,150 @@ def test_cancelled_queued_tools_never_execute_and_running_result_is_not_sent(mon
         finally:
             await stream.aclose()
     asyncio.run(scenario())
+
+
+class _Scripted:
+    def __init__(self, answers):
+        self.answers = iter(answers)
+
+    def accept_waveform(self, _):
+        pass
+
+    def is_speech_detected(self):
+        return next(self.answers)
+
+
+class _Observer:
+    """Stands in for app.metrics.SessionMetrics; keeps what is recorded."""
+
+    def __init__(self):
+        self.rows = []
+
+    def record(self, event, **fields):
+        self.rows.append((event, fields))
+
+    def speech_end(self, source):
+        pass
+
+
+def _with_observer(scenario):
+    from app.metrics import active
+
+    observer = _Observer()
+    token = active.set(observer)
+    try:
+        asyncio.run(scenario())
+    finally:
+        active.reset(token)
+    return [row for row in observer.rows if row[0] == "metric_vad_reopen"]
+
+
+LOUD = b"\x00\x10" * 160
+
+
+def test_a_guest_who_carries_on_before_any_reply_is_counted():
+    """VAD_SILENCE_MS decides when a guest is "done". Whether 900 ms can come
+    down depends on how often it is already too short — a guest who starts
+    again before Emma has said a word was not done — and nothing recorded
+    that: the next speech_started just reset pending_end in silence."""
+    from app.config import settings
+
+    async def scenario():
+        provider = GeminiProvider("voice", "test")
+        provider._session = LiveSession()
+        provider._vad_gate = VadGate(_Scripted([True, False, True]),
+                                     prefix_padding_ms=0, floor_grace_s=0)
+        for _ in range(3):                    # start, end, start again
+            await provider.send_audio(LOUD)
+
+    rows = _with_observer(scenario)
+    assert len(rows) == 1, rows
+    assert rows[0][1]["silence_ms"] == settings.vad_silence_ms
+    assert rows[0][1]["gap_ms"] >= 0
+
+
+def test_a_new_question_after_her_reply_is_not_a_reopen():
+    """The ordinary rhythm — she answered, then they spoke — must not be
+    counted, or the number means nothing."""
+    async def scenario():
+        provider = GeminiProvider("voice", "test")
+        provider._session = session = LiveSession()
+        provider._vad_gate = VadGate(_Scripted([True, False, True]),
+                                     prefix_padding_ms=0, floor_grace_s=0)
+        await provider.send_audio(LOUD)       # start
+        await provider.send_audio(LOUD)       # end
+        session.incoming.put_nowait(content(model_turn=N(parts=[N(inline_data=N(data=b"hi"))])))
+        stream = provider.events()
+        try:
+            await take_until(stream, "audio")
+        finally:
+            await stream.aclose()
+        await provider.send_audio(LOUD)       # the next question
+
+    assert _with_observer(scenario) == []
+
+
+def test_reasoning_text_with_no_audio_behind_it_never_reaches_the_screen():
+    """2026-10-11 FAQ eval: one turn's output transcript carried 2,241 chars
+    of the model's own planning ("1. **Analyze User Request**: ...") over
+    7.5 s of audio. The transcript is a transcription of speech, so text far
+    ahead of the audio is not speech: it is cut and logged, while a normal
+    spoken reply passes untouched."""
+    async def scenario():
+        provider = GeminiProvider("voice", "test")
+        provider._session = session = LiveSession()
+        second = b"\x00" * (provider.output_sample_rate * 2)          # 1 s of 16-bit audio
+        spoken = "ทางเดินน้ำตื้นอยู่โซนภายนอกค่ะ "
+        leak = "1.  **Analyze User Request**: The user is asking about specific amenities. " * 30
+        session.incoming.put_nowait(content(
+            model_turn=N(parts=[N(inline_data=N(data=second * 3))]),
+            output_transcription=N(text=spoken)))
+        session.incoming.put_nowait(content(output_transcription=N(text=leak)))
+        session.incoming.put_nowait(content(turn_complete=True))
+        stream = provider.events()
+        try:
+            events = await take_until(stream, "turn_complete")
+        finally:
+            await stream.aclose()
+        shown = "".join(e.text for e in events if e.kind == "assistant_transcript")
+        assert shown.strip() == spoken.strip()
+        assert "Analyze" not in shown and "**" not in shown
+        assert provider._out_budget.dropped == 0          # reset for the next turn
+
+    asyncio.run(scenario())
+
+
+def test_the_transcript_budget_lets_real_speech_through():
+    from app.providers.transcript_filter import TranscriptBudget
+
+    budget = TranscriptBudget(48000)
+    budget.add_audio(48000 * 10)                       # 10 s of audio
+    thai = "โครงการของเราเป็นคอนโดมิเนียม Low-rise 8 ชั้น 6 อาคาร ย่านจอมเทียน เมืองพัทยาค่ะ " * 2
+    assert budget.allow(thai) == thai and budget.dropped == 0     # ~170 chars in 10 s
+    assert budget.allow("x" * 1000) == "x" * (120 + 400 - len(thai))
+    assert budget.dropped == 1000 - (120 + 400 - len(thai))
+    budget.reset()
+    assert budget.allow("สวัสดีค่ะ") == "สวัสดีค่ะ"          # opening words before any audio
+    # Markdown is not speech: the rest of the turn is cut.
+    budget.add_audio(48000 * 30)
+    assert budget.allow("Let me check." + chr(10) * 2 + "1. **Analyze**") == ""
+    assert budget.allow(" และสระว่ายน้ำ") == ""
+    budget.reset()
+    assert budget.allow("และสระว่ายน้ำ") == "และสระว่ายน้ำ"
+
+
+def test_a_silent_verse_block_still_reaches_the_session_through_the_budget():
+    """Review 12 Oct: the budget used to taint on a paragraph break, and the
+    2026-08-26 verse block (one atomic chunk, no audio) was dropped whole --
+    session.py never saw the chunk it keys `_respeak_silent_block` on, so the
+    guest got silence instead of a respoken verse. Run through the real chain
+    (filter, Thai spacing, budget) it must keep that shape: >= 2 newlines and
+    >= 40 characters."""
+    from app.providers.thai_spacing import ThaiSpacing
+    from app.providers.transcript_filter import TranscriptBudget, TranscriptFilter
+
+    block = chr(10) * 2 + '"เจสซี่ แม่งโคตรดิบ จิตใจซาดิสม์' + chr(10) + 'กูแร็ปกระแทกหน้า ไม่ต้องอ้อมค้อม"' + chr(10)
+    budget = TranscriptBudget(48000)                 # no audio at all this turn
+    shown = budget.allow(ThaiSpacing(enabled=True).feed(TranscriptFilter().feed(block)))   # as gemini.py
+    assert shown.count(chr(10)) >= 2 and len(shown) >= 40, repr(shown)
+    assert budget.dropped == 0

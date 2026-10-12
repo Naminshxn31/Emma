@@ -11,8 +11,10 @@ def test_slide_intent_distinguishes_location_from_visual_request():
     assert project_knowledge.intent("สระว่ายน้ำอยู่ที่ไหน") == "locate"
     assert project_knowledge.intent("ขอดูสระว่ายน้ำหน่อย") == "show"
     assert project_knowledge.intent("สระว่ายน้ำมีอะไรบ้าง") == "explain"
-    assert project_knowledge.preferred_slide_ids("สระว่ายน้ำอยู่ที่ไหน")[0] == "ew-054"
-    assert project_knowledge.preferred_slide_ids("ขอดูสระว่ายน้ำหน่อย")[0] == "ew-055"
+    # The deck is intro-001..048 since the re-ingest (1fa6762): the 3rd-floor
+    # plan answers "where", the Sky Pool rendering answers "show me".
+    assert project_knowledge.preferred_slide_ids("สระว่ายน้ำอยู่ที่ไหน")[0] == "intro-037"
+    assert project_knowledge.preferred_slide_ids("ขอดูสระว่ายน้ำหน่อย")[0] == "intro-041"
 
 
 def test_absent_facility_is_an_explicit_fact():

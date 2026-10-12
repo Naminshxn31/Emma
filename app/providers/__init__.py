@@ -12,17 +12,18 @@ def default_voice_for(provider: str) -> str:
 
 
 def get_provider(provider: str, voice: str, instructions: str, greeting: str | None = None,
-                 use_tools: bool = True) -> VoiceProvider:
+                 use_tools: bool = True, vad_floor: float | None = None) -> VoiceProvider:
     """Construct (but don't open) a session for `provider`.
 
     Imports are deferred so installing only one provider's SDK is enough to
-    run the app with that provider.
+    run the app with that provider. `vad_floor` only means something to the
+    provider with a local VAD gate (Gemini); OpenAI's detection is its own.
     """
     if provider == "gemini":
         from app.providers.gemini import GeminiProvider
 
         return GeminiProvider(voice, instructions, greeting=greeting,
-                              use_tools=use_tools)
+                              use_tools=use_tools, vad_floor=vad_floor)
     if provider == "openai":
         from app.providers.openai_realtime import OpenAIProvider
 

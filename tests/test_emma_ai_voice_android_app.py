@@ -99,8 +99,10 @@ def test_voice_app_uses_media_volume_and_boosts_only_its_reply_audio():
     preview = PREVIEW.read_text(encoding="utf-8")
 
     assert "setVolumeControlStream(AudioManager.STREAM_MUSIC)" in source
-    assert "if (!appShell) return ctx.destination" in preview
-    assert "playbackGainNode.gain.value = 1.75" in preview
+    assert "playbackBaseGain = appShell ? 1.75 : 1" in preview
+    assert "playbackGainNode.gain.value = playbackBaseGain" in preview
+    assert "if (appShell) {" in preview
+    assert "playbackGainNode.connect(ctx.destination)" in preview
     assert "createDynamicsCompressor()" in preview
     assert "src.connect(playbackOutput(audioCtx))" in preview
     assert "setMicLabel('Listening')" in preview
@@ -116,5 +118,8 @@ def test_preview_has_the_android_home_layout_without_forking_the_engine():
     assert "'กดเพื่อพูด'" in preview
     assert "'ข้อความ'" in preview
     assert "'จบ'" in preview
-    assert preview.count("new WebSocket(") == 1
+    # One call engine. The robot camera sender after it (?cam=1, for the
+    # greeter) is a second socket on purpose and is not an engine.
+    engine = preview.split("// ---- the robot's own camera, sent to the server (`?cam=1`) ----", 1)[0]
+    assert engine.count("new WebSocket(") == 1
     assert "/ws?voice=" in preview

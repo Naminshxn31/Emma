@@ -9,7 +9,44 @@ stranger in a sales gallery.
 """
 from __future__ import annotations
 
+import json
+
+import pytest
+
 from app.prompts import EMMA_GREETING, GREETING, build_instructions, greeting_for
+
+
+@pytest.fixture
+def sales_context(monkeypatch, tmp_path):
+    """Pin the sales-context source to a copy of the real file in a chosen
+    approval state, so a test states which state it is about.
+
+    These tests used to read the real file and assumed it was a draft; the
+    owner approved it on 2026-10-06 and four of them turned red although
+    nothing was wrong — the gate had done exactly its job. A test of the
+    gate must not change colour when somebody signs the file."""
+    from app import prompts
+    from app.config import ACTIVE_PROJECT_ID
+    from app.data_console import PERMISSION_DRAFT
+
+    real_path = prompts.source_path
+
+    def use(approved: bool) -> None:
+        data = json.loads(real_path("project_sales_context", ACTIVE_PROJECT_ID)
+                          .read_text(encoding="utf-8"))
+        if approved:
+            data.update(approval_status="approved", approved_by="test",
+                        approved_at="2026-01-01T00:00:00+07:00",
+                        effective_at="2026-01-01T00:00:00+07:00",
+                        disclosure_scope="customer", content_state="preliminary_concept")
+        else:
+            data.update(PERMISSION_DRAFT)
+        copy = tmp_path / "sales_context.json"
+        copy.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        monkeypatch.setattr(prompts, "source_path", lambda sid, pid: (
+            copy if sid == "project_sales_context" else real_path(sid, pid)))
+
+    return use
 
 
 # ==================== the default must be the gallery ====================
@@ -103,12 +140,17 @@ def test_emma_has_real_memory_rules_now():
 # ==================== the sales host (2026-09-11) ====================
 
 
-def test_the_gallery_prompt_carries_the_sales_host_voice():
+def test_the_gallery_prompt_carries_the_sales_host_voice(sales_context):
     """Keep generic host style while draft sales copy stays outside prompt."""
+    sales_context(approved=False)
     text = build_instructions("X")
     assert "ตัวตนและน้ำเสียง" in text
     assert "ขายชีวิตที่ดีขึ้นก่อน" not in text
-    assert "กำลังพัฒนา" in text and "ห้ามพูดเหมือนเสร็จแล้ว" in text
+    # Owner 2026-10-10: the concept caveat is banned, quoted so the model
+    # matches it against what it is about to say (the old rule "แนวคิดหรือ
+    # กำลังพัฒนาห้ามพูดเหมือนเสร็จแล้ว" is what produced it).
+    assert 'ห้ามพูดว่า "เป็นแนวคิดเบื้องต้น" หรือ "อาจมีการเปลี่ยนแปลง"' in text
+    assert "ห้ามพูดเหมือนเสร็จแล้ว" not in text
     assert "ห้ามนำข้อมูลจากโครงการอื่น" in text
 
 
@@ -124,7 +166,133 @@ def test_the_sales_host_block_carries_no_numbers():
     assert not re.search(r"\d", SALES_HOST_BLOCK), "numbers belong in condo_facts.json"
 
 
-def test_the_sales_host_block_keeps_embassy_world_apart_from_other_projects():
+def test_a_broad_facilities_question_offers_the_floors_instead_of_the_list():
+    """Owner 2026-10-10: instead of reciting every facility, offer a choice of
+    floor. The floor names come from the approved "จุดเด่น" fact (this block
+    carries no numbers), and the follow-up question is written as an
+    exception to "ค่าเริ่มต้นคือไม่ถามต่อ" — two rules racing for one turn is
+    a failure this prompt has paid for twice."""
+    from app.prompts import SALES_HOST_BLOCK
+
+    line = next(ln for ln in SALES_HOST_BLOCK.splitlines() if ln.startswith("- สิ่งอำนวยความสะดวก:"))
+    # Owner 2026-10-11: one inviting sentence ("มากมายถึง 3 ชั้น ลูกค้าอยาก
+    # เห็นชั้นไหนเป็นพิเศษไหมคะ"), then only what the guest picks — built by
+    # facility_hook from the facts, so the block itself stays digit-free.
+    assert "ห้ามไล่ชื่อ" in line and '"[ประโยคสิ่งอำนวยความสะดวก]"' in line
+    assert "แล้วค่อยเล่าเฉพาะชั้นหรือสิ่งที่ลูกค้าเลือก" in line
+    assert "ถามว่ามีอะไรอีกค่อยบอกโซนภายนอกและเทคโนโลยี" in line
+    # Facilities only: the re-run turned "แนะนำโครงการหน่อย" into the menu.
+    assert "ถามกว้างว่ามีสิ่งอำนวยความสะดวกอะไรบ้าง" in line
+    # 203-case run 2026-10-11: "Can you tell me about this project?" got only
+    # "Welcome to Embassy World.", and "มีสระไหม ฟิตเนสไหม" got the menu.
+    assert 'ให้บอกว่าเป็นคอนโดแบบไหน กี่ชั้น กี่อาคาร ย่านไหน จาก "โครงการ" และ "ทำเล" ก่อนเล่าแนวคิด' in line
+    # Re-run: "มีค่ะ ... อยู่ในตัวโครงการนะคะ" — rule 6's walk answer leaking in.
+    assert 'ถามว่ามีสิ่งใดไหม เช่น "มีสระไหม" เป็นคำถามเฉพาะ ตอบว่ามีและอยู่ชั้นไหนตาม "จุดเด่น" (ห้ามตอบแค่ว่าอยู่ในตัวโครงการ)' in line
+    assert 'ข้อยกเว้นของ "ไม่ถามต่อ"' in line
+    # The exception is written into the default rule itself too: the v2
+    # layout puts that rule under a header that outranks everything below it.
+    default = next(ln for ln in SALES_HOST_BLOCK.splitlines() if ln.startswith("- ค่าเริ่มต้นคือไม่ถามต่อ"))
+    assert "ถามกว้างว่ามีสิ่งอำนวยความสะดวกอะไร" in default
+    # Banned for one evening and undone by the owner (2026-10-11): "ให้ชม"
+    # can mean showing a picture, not walking there.
+    assert "ให้ชม" not in line and "ให้บริการ" not in line
+
+
+def test_the_203_case_review_fixes_are_in_the_condo_prompt():
+    """2026-10-11, 203 scenarios judged against the approved sources. Each
+    line quotes what went wrong: refusals ending "How can I help you today?"
+    (the commonest flag), "ไปสนามบินอู่ตะเภานานไหม" refused as off-topic though
+    a slide has it, gibberish called off-topic, "โครงการของเราได้รับรางวัล"
+    (the developer's awards), "ตามกฎหมาย" for foreign ownership, "เรียนเชิญ
+    พนักงานขายมาดูแล" with no way to call anyone, find_units' rooms never
+    named, and "ไม่ใช่ครับ ตึก C" opening floor 1 instead of the room."""
+    text = build_instructions("X")
+    assert "ไม่ใช่นอกเรื่อง: ทำเลและการเดินทางจากโครงการ (สนามบิน หาด ห้าง โรงพยาบาล) ให้ค้นด้วย search_condo_info ก่อน" in text
+    assert "ห้ามด้อยค่าหรือจัดอันดับที่อื่น" in text
+    assert "เสียงหรือคำที่ไม่มีความหมาย ให้ขอให้พูดอีกครั้ง ห้ามตอบว่าเป็นเรื่องนอกขอบเขต" in text
+    assert 'ห้ามพูดว่าโครงการนี้ได้รางวัล' in text
+    assert "กฎหมาย สิทธิ์ถือครอง หรือโควตาต่างชาติ ไม่มีในข้อมูล ให้ทีมขายยืนยัน" in text
+    assert 'ห้ามพูดว่า "เรียนเชิญพนักงานขายมาดูแล"' in text
+    assert "find_units ได้ห้องมา ให้บอกแบบห้องและเลขห้องจากผล ไม่ต้องพูดราคา ห้ามเลี่ยงไปทีมขาย" in text
+    assert "ลูกค้าแก้ตึกหรือเลขห้อง ให้เรียก show_unit ห้องที่แก้แล้ว" in text
+    # condo only: the owner's other profiles keep their own rule 3
+    emma = build_instructions("X", profile="emma")
+    assert "เสียงหรือคำที่ไม่มีความหมาย" not in emma
+
+
+def test_the_364_faq_review_fixes_are_in_the_condo_prompt():
+    """2026-10-11, the report's 364 FAQ judged: Thai questions carrying an
+    English term ("Freehold หรือ...", "Google Home") answered in English;
+    refund, resale and document questions refused as off-topic; corner and
+    Pool Access rooms declined without asking the sales system; and "เปิด
+    กี่โมง ค่าใช้เท่าไหร่" answered with the floor invitation."""
+    text = build_instructions("X")
+    assert "ประโยคไทยที่มีคำอังกฤษปน (เช่น Freehold, Studio, Google Home) คือภาษาไทย ตอบไทย" in text
+    assert "การซื้อ สัญญา เอกสาร การยกเลิก คืนเงินจอง ขายต่อ และศัพท์หรือข้อมูลของโครงการ ก็ไม่ใช่นอกเรื่อง" in text
+    assert "ถามรายละเอียด (เวลาเปิด ค่าใช้ ขนาด จำนวน สิทธิ์ใช้) ไม่ใช่คำถามกว้าง" in text
+    # Owner 2026-10-12: Utapao is 30 min as the slide says (now in the facts);
+    # captions also print "40-60 นาที" and cannot be edited in the console.
+    assert "ห้ามพูดว่า \"ไม่ติดทะเล\"" in text   # owner 12 Oct: lead with the distance
+    assert "ข้อมูลโครงการกับคำบรรยายภาพขัดกันให้ใช้ข้อมูลโครงการ" in text
+    assert "ห้ามใช้ประโยคชวนเลือกชั้น" in text
+    # Re-run: told to ask the system about corner/Pool Access rooms, Emma
+    # read 132 AVAILABLE corner rooms as the total (217) and decoded view
+    # codes the report says have no official meaning.
+    assert "ถามจำนวนห้องว่างตามแบบ ตึก หรือวิว ให้เรียก compare_unit_types หรือ find_units ก่อน" in text
+    assert "ตัวเลขที่ได้คือห้องว่าง ณ ตอนนี้ ไม่ใช่จำนวนทั้งหมด" in text
+    assert "รหัสวิวหรือคอลเลกชันในระบบห้ามตีความเอง" in text
+
+
+def test_the_facility_sentence_counts_floors_from_the_approved_facts(monkeypatch):
+    """The "3 ชั้น" of the owner's sentence is read from the approved
+    "จุดเด่น" fact (its floor sections — the outdoor zone and the technology
+    are not floors), never typed into the persona; no fact, no number. "เห็น"
+    only where answering can put a picture up."""
+    from app.config import settings
+    from app.prompts import facility_hook
+
+    facts = "\n".join(["## ข้อมูลโครงการ",
+                       "- จุดเด่น: ชั้น G: Lobby, ฟิตเนส · ชั้นใต้ดิน: ซาวน่า · ชั้น 3 อาคาร A: Sky Pool "
+                       "· ภายนอก: Water Lagoon · เทคโนโลยี: Smart Home", ""])
+    monkeypatch.setattr(settings, "tool_groups", "knowledge,units")
+    monkeypatch.setattr(settings, "answer_images", True)
+    assert facility_hook(facts) == "ในโครงการของเรามีสิ่งอำนวยความสะดวกมากมายถึง 3 ชั้น ลูกค้าอยากเห็นชั้นไหนเป็นพิเศษไหมคะ"
+    monkeypatch.setattr(settings, "answer_images", False)
+    assert "ลูกค้าอยากรู้จักชั้นไหนเป็นพิเศษไหมคะ" in facility_hook(facts)
+    monkeypatch.setattr(settings, "tool_groups", "")          # gallery default: slides loaded
+    assert "อยากเห็น" in facility_hook(facts)
+    bare = facility_hook("\n".join(["## ข้อมูลโครงการ", "- ทำเล: จอมเทียน", ""]))
+    assert "มากมายหลายชั้น" in bare and not any(ch.isdigit() for ch in bare)
+    assert "[ประโยคสิ่งอำนวยความสะดวก]" not in build_instructions("X", extra_facts=facts)
+    assert "มากมายถึง 3 ชั้น" in build_instructions("X", extra_facts=facts)
+
+
+def test_asked_to_walk_to_a_facility_she_says_it_is_in_the_project():
+    """Rule 6's right answer ("มีห้องตัวอย่างให้ชมค่ะ แต่ตอนนี้เอ็มม่ายัง
+    ไม่สามารถพาเดินไป...") is true of the show unit in the gallery and was
+    copied onto the gym: "มีฟิตเนสให้บริการค่ะ แต่ตอนนี้...ไปยังฟิตเนสได้ค่ะ"
+    (eval 2026-10-10) — a gym a short walk away, in a building not yet
+    built. Rule 6 quotes that line as wrong and says where it is, with no
+    concept caveat (owner, same day)."""
+    text = build_instructions("X")
+    rule6 = next(ln for ln in text.splitlines() if ln.startswith("6. "))
+    assert 'ผิด: "มีฟิตเนสให้บริการค่ะ' in rule6
+    assert 'ถูก: "ฟิตเนสอยู่ในตัวโครงการค่ะ ไม่ได้อยู่ที่ห้องขายนี้"' in rule6
+    assert "แนวคิด" not in rule6
+
+
+def test_approved_sales_context_reaches_the_prompt(sales_context):
+    """The other half of the gate: once signed (pete, 2026-10-06) the story
+    and scope rules ride in the prompt — including the line that names
+    Embassy Life as a different project, the boundary the 2026-09-14
+    mix-up was fixed with."""
+    sales_context(approved=True)
+    text = build_instructions("Embassy World")
+    assert "ขายชีวิตที่ดีขึ้นก่อน" in text
+    assert "Embassy Life" in text and "คนละโครงการ" in text
+
+
+def test_the_sales_host_block_keeps_embassy_world_apart_from_other_projects(sales_context):
     """The mydocs corpus mixes Empire projects: Embassy Life (Pattaya) sits
     next to Embassy World. Measured 2026-09-14 the model answered an Embassy
     World facilities question from Embassy Life chunks, and injected facility
@@ -136,6 +304,7 @@ def test_the_sales_host_block_keeps_embassy_world_apart_from_other_projects():
     the proxy model. Both rules must stay in the persona, re-read every turn."""
     from app.prompts import SALES_HOST_BLOCK
 
+    sales_context(approved=False)
     text = build_instructions("Embassy World")
     assert "Embassy Life" not in text and "Embassy World" in text
     assert "Biogenesis" not in SALES_HOST_BLOCK, "project facts belong in project data"
@@ -159,7 +328,8 @@ def test_sales_host_keeps_a_no_intent_opening_brief():
     assert "ห้าม" in SALES_HOST_BLOCK and "ทำเล แนวคิด facility" in SALES_HOST_BLOCK
 
 
-def test_sales_host_uses_a_personal_clue_once_then_stops():
+def test_sales_host_uses_a_personal_clue_once_then_stops(sales_context):
+    sales_context(approved=False)
     text = build_instructions("Embassy World")
     assert "เหมาะกับการใช้เวลาพักผ่อนร่วมกันทั้งครอบครัว" not in text
     assert "ตอบสิ่งที่ลูกค้าพูดก่อนเสมอ" in text
@@ -236,7 +406,8 @@ def test_sales_host_does_not_narrate_every_tool_result():
     assert "ห้ามนำข้อมูลข้างเคียงมาต่อเติม" in SALES_HOST_BLOCK
 
 
-def test_sales_host_compares_room_use_before_numbers():
+def test_sales_host_compares_room_use_before_numbers(sales_context):
+    sales_context(approved=False)
     text = build_instructions("Embassy World")
     assert "อธิบายความต่างด้านพื้นที่และการใช้งานก่อน" not in text
     assert "ขนาด/แบบห้องและโซน/ชั้นให้ค้นแล้วตอบตามผลจริง" in text
@@ -478,6 +649,37 @@ def test_the_gallery_prompt_drops_the_slide_rules_with_the_slides_group(monkeypa
     assert "search_condo_info" in bare, "the surviving lookup rule still routes unknowns"
 
 
+def test_answer_images_let_a_picture_request_through_without_the_deck(monkeypatch):
+    """Owner 2026-10-11: pictures with answers, not the presentation. With
+    ANSWER_IMAGES on, "ถูกขอดูสไลด์ให้บอกว่าวันนี้ยังไม่มี" would turn away "ขอดู
+    รูปสระ" — so the rule sends the request to search (which puts the picture
+    up) and lets "มีภาพให้ชม" be said only after the result says it is on
+    screen. Off, the prompt is the sales room's, byte for byte."""
+    from app.config import settings
+    from app.prompts import _NO_SLIDES_RULE
+
+    monkeypatch.setattr(settings, "assistant_profile", "condo")
+    monkeypatch.setattr(settings, "tool_groups", "knowledge,units,mydocs")
+    monkeypatch.setattr(settings, "answer_images", False)
+    off = build_instructions("X", extra_facts="")
+    assert _NO_SLIDES_RULE.strip() in off
+    monkeypatch.setattr(settings, "answer_images", True)
+    on = build_instructions("X", extra_facts="")
+    assert _NO_SLIDES_RULE.strip() not in on
+    assert "ถูกขอดูรูป หรือถาม/พูดถึงสิ่งอำนวยความสะดวกหรือสถานที่เฉพาะอย่าง ให้เรียก search_condo_info" in on
+    assert "ด้วยแม้รู้คำตอบแล้ว" in on   # facts answered "มีสระไหม" with no search, no picture
+    assert "พูดว่ามีภาพให้ชมบนจอได้เฉพาะเมื่อผลค้นบอกว่าแสดงภาพบนจอแล้ว" in on
+    assert "ห้ามพูดว่าเปิดสไลด์หรือพรีเซนต์ให้" in on
+    for name in ("show_slide", "start_presentation", "next_slide"):
+        assert name not in on
+    # Two differences and only two: that rule, and the facility sentence's
+    # "เห็น" (a picture can come up) for "รู้จัก".
+    assert "ลูกค้าอยากเห็นชั้นไหน" in on and "ลูกค้าอยากรู้จักชั้นไหน" in off
+    assert off.replace(_NO_SLIDES_RULE.strip(), "") == on.replace(
+        on[on.index("ไม่มีพรีเซนต์ทั้งชุด"):on.index("บนจอแล้ว", on.index("ไม่มีพรีเซนต์ทั้งชุด")) + len("บนจอแล้ว")], ""
+    ).replace("ลูกค้าอยากเห็นชั้นไหน", "ลูกค้าอยากรู้จักชั้นไหน")
+
+
 # ==================== the translator switch on the page ====================
 
 
@@ -648,3 +850,33 @@ def test_emmajoke_cannot_reach_a_single_project_tool(monkeypatch):
     assert "search_condo_info" in condo            # the gate is per profile
     for tool in joke:
         assert registry.get(tool).group in {"smarthome", "robot", "reminders"}, tool
+
+
+def test_approved_starting_prices_may_be_said_unit_prices_still_go_to_sales():
+    """Owner, 2026-10-08: Emma may give the approved starting prices ("พูด
+    เป็นช่วงได้ หรือเริ่มต้น"). Before this the block said only "refuse",
+    and the live eval measured 0 of 30 price questions answered while
+    condo_facts.json and qa_script q04 (both approved) carried the prices.
+    A specific unit's price still goes to the sales team, a range never
+    invents a top price, and the block itself still carries no numbers."""
+    from app.prompts import SALES_HOST_BLOCK
+
+    line = [l for l in SALES_HOST_BLOCK.splitlines() if l.startswith("- ราคา:")][0]
+    assert 'ให้ตอบตาม "ราคาเริ่มต้น" ในข้อมูลโครงการ' in line
+    assert "ห้ามเดาราคาสูงสุด" in line
+    # Re-test: "one-bedroom units start at 3.19 million" — 2.79 + the
+    # "generally ~400,000 higher" note, added up into a figure nobody approved.
+    assert "ห้ามบวกลบเป็นตัวเลขใหม่" in line
+    # Re-test: asked the garden/pool-view price, answered with the type
+    # starting prices as if they were the view prices.
+    assert "ราคาตามวิวหรือชั้นไม่มีในข้อมูลให้บอกตรงๆ" in line
+    # The first wording said "starting price questions" only, and the live
+    # re-test (2026-10-08) still refused "ราคาเท่าไหร่" / "สองห้องนอนราคา
+    # เท่าไหร่" / "How much is a one-bedroom?" — read as the unit example.
+    # The questions it must answer are quoted, like the one it must not.
+    for asked in ('"ราคาเท่าไหร่"', '"สองห้องนอนราคาเท่าไหร่"', '"How much is a one-bedroom?"'):
+        assert asked in line, asked
+    assert "ราคาของห้องเจาะจง (มีเลขห้อง)" in line
+    assert "ห้ามถามหรือเปิดเรื่องราคาเอง" in line
+    assert '"ราคาขอให้ทีมขายยืนยันนะคะ ดิฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อน" แล้วหยุด' in line
+    assert not any(ch.isdigit() for ch in line)

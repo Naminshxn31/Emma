@@ -480,7 +480,7 @@ def test_thinking_budget_is_raisable(monkeypatch):
     assert GeminiProvider("Kore", "x")._build_config()["thinking_config"].thinking_budget == 1024
 
 
-def test_system_instruction_stays_short():
+def test_system_instruction_stays_short(tmp_path, monkeypatch):
     """It is re-processed and re-billed every single turn, so length is
     latency. Raise this only for a capability that earns it, and trim
     elsewhere first.
@@ -547,8 +547,37 @@ def test_system_instruction_stays_short():
     # search because it shapes every sentence. Later additions grew the full
     # prompt to 6,460 characters; the 2026-09-21 compaction brought the
     # all-tools form to 4,375 while retaining the regression clauses below.
+    #
+    # Raised a ninth time (4700 -> 5500) for the owner's approved facts, the
+    # first approved project facts that ever reached the prompt (2026-09-28/29
+    # in /data-console): a longer developer line and 9 -> 23 facility names,
+    # with the facility line carrying its own "แนวคิดเบื้องต้น" caveat. The
+    # owner was told the cost (~18% on every turn) and chose it over cutting
+    # the list. 4700 had been measured with the facts still draft, i.e. with
+    # the one-line fallback, which hid their cost: this test passed on the
+    # day the facts were approved only because an edit had just withdrawn the
+    # approval. So it now measures the facts as customers get them once
+    # signed, stamped with the state that adds the most words
+    # (preliminary_concept on every line): 5,372 today. Any approval choice
+    # fits under this; an owner edit that makes the facts longer is exactly
+    # what this test is here to surface.
+    import json
+
+    import app.prompts as prompts
+
+    facts = json.loads(open(prompts.CONDO_FACTS_FILE, encoding="utf-8").read())
+    facts.update(approval_status="approved", approved_by="test_reviewer",
+                 approved_at="2026-01-01T00:00:00+07:00",
+                 effective_at="2026-01-01T00:00:00+07:00",
+                 disclosure_scope="customer", content_state="preliminary_concept")
+    signed = tmp_path / "facts.json"
+    signed.write_text(json.dumps(facts, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(prompts, "CONDO_FACTS_FILE", str(signed))
+    assert prompts.load_facts() != prompts.FALLBACK_FACTS, \
+        "measured the fallback, not the facts"
+
     text = build_instructions("Test Condo")
-    assert len(text) < 4700, "system instruction grew to %d chars" % len(text)
+    assert len(text) < 5500, "system instruction grew to %d chars" % len(text)
 
 
 def test_every_tool_is_registered_under_its_own_handler():
@@ -726,8 +755,91 @@ def test_ready_event_advertises_half_duplex(client, monkeypatch):
     """The browser gates its own mic, so it has to be told the mode."""
     _fake_gemini(monkeypatch, [_Msg(_Content(turn_complete=True))])
     monkeypatch.setattr(settings, "half_duplex", True)
-    with client.websocket_connect("/ws") as ws:
-        assert ws.receive_json()["half_duplex"] is True
+    with client.websocket_connect("/ws?profile=condo") as ws:
+        ready = ws.receive_json()
+        assert ready["half_duplex"] is True
+        assert ready["barge_in"] is False
+
+
+def test_joke_mode_can_interrupt_while_other_modes_remain_half_duplex(client, monkeypatch):
+    _fake_gemini(monkeypatch, [_Msg(_Content(turn_complete=True))])
+    monkeypatch.setattr(settings, "half_duplex", True)
+    monkeypatch.setattr(settings, "echo_barge", True)
+    with client.websocket_connect("/ws?profile=joke&echo_barge=1") as ws:
+        ready = ws.receive_json()
+        assert ready["profile"] == "joke"
+        assert ready["half_duplex"] is False
+        assert ready["barge_in"] is True
+    with client.websocket_connect("/ws?profile=joke") as ws:
+        old_page = ws.receive_json()
+        assert old_page["half_duplex"] is True
+        assert old_page["barge_in"] is False
+
+
+def test_hold_speech_rides_on_half_duplex_and_defaults_off(client, monkeypatch):
+    """Owner 2026-09-30: people talk over Emma and their words were dropped.
+    hold_speech tells a capable page to QUEUE what is said during her speech
+    and send it when her audio ends — she is still uninterruptible. It only
+    means anything in half-duplex without barge-in, and it defaults off so
+    every other machine keeps dropping exactly as before."""
+    _fake_gemini(monkeypatch, [_Msg(_Content(turn_complete=True))])
+    monkeypatch.setattr(settings, "half_duplex", True)
+    with client.websocket_connect("/ws?profile=joke") as ws:
+        assert ws.receive_json()["hold_speech"] is False
+
+    monkeypatch.setattr(settings, "hold_speech", True)
+    with client.websocket_connect("/ws?profile=joke") as ws:
+        ready = ws.receive_json()
+        assert ready["hold_speech"] is True
+        assert ready["half_duplex"] is True
+        assert ready["hold_floor"] == pytest.approx(0.04)
+
+    # Barge-in (when somebody turns it back on) takes the frames live —
+    # holding them too would answer everything twice.
+    monkeypatch.setattr(settings, "echo_barge", True)
+    with client.websocket_connect("/ws?profile=joke&echo_barge=1") as ws:
+        assert ws.receive_json()["hold_speech"] is False
+
+    # And without half-duplex there is no speech-time drop to rescue.
+    monkeypatch.setattr(settings, "echo_barge", False)
+    monkeypatch.setattr(settings, "half_duplex", False)
+    with client.websocket_connect("/ws?profile=joke") as ws:
+        assert ws.receive_json()["hold_speech"] is False
+
+
+def test_hold_speech_is_off_when_the_profile_listens_far(client, monkeypatch):
+    """A far-listening profile hears its own speaker. On the robot (joke, far)
+    the omnidirectional array picked up her reply at peak 0.13–0.28 — above the
+    0.04 hold floor — so hold_speech queued her echo and flushed it as the next
+    turn, and she answered herself for whole paragraphs (owner 2026-10-01:
+    "emma ได้ยินเสียงตัวเองทำให้เพี้ยนพูดเองยาวๆ"). hold_speech tells echo from
+    a person by "echo is under the floor"; a far mic breaks that premise, so
+    hold is off there. half_duplex alone still drops the mic while she speaks."""
+    _fake_gemini(monkeypatch, [_Msg(_Content(turn_complete=True))])
+    monkeypatch.setattr(settings, "half_duplex", True)
+    monkeypatch.setattr(settings, "hold_speech", True)
+    # Near-field profile: hold_speech still rides on half-duplex.
+    with client.websocket_connect("/ws?profile=condo") as ws:
+        assert ws.receive_json()["hold_speech"] is True
+    # Same settings, but the profile now listens to the whole room.
+    monkeypatch.setattr(settings, "listen_far_profiles", frozenset({"joke"}))
+    with client.websocket_connect("/ws?profile=joke") as ws:
+        ready = ws.receive_json()
+        assert ready["hold_speech"] is False
+        assert ready["half_duplex"] is True  # the mic is still gated during playback
+
+
+def test_barge_in_is_off_by_default_even_for_a_capable_joke_page(client, monkeypatch):
+    """Owner, 2026-09-30, after one morning with it on: "เอาพูดแทรกออก" —
+    the duck-and-check stuttered her voice. The page may advertise the gate
+    all it likes; without ECHO_BARGE=true the server answers half-duplex,
+    which is also what keeps an already-open page on the old behaviour."""
+    _fake_gemini(monkeypatch, [_Msg(_Content(turn_complete=True))])
+    monkeypatch.setattr(settings, "half_duplex", True)
+    with client.websocket_connect("/ws?profile=joke&echo_barge=1") as ws:
+        ready = ws.receive_json()
+        assert ready["half_duplex"] is True
+        assert ready["barge_in"] is False
 
 
 def test_half_duplex_defaults_off(client, monkeypatch):
@@ -1505,6 +1617,34 @@ def test_robot_can_introduce_itself_by_name():
     assert text.startswith('คุณคือ "เอ็มม่า"')
 
 
+def test_robot_face_profiles_know_verified_camera_and_handshake(monkeypatch):
+    from app.prompts import build_instructions
+
+    monkeypatch.setattr(settings, "tools_enabled", True)
+    monkeypatch.setattr(settings, "tool_groups", "robot")
+    for profile in ("joke", "emma", "condo"):
+        face = build_instructions("Embassy World", profile=profile, robot_face=True)
+        desk = build_instructions("Embassy World", profile=profile)
+        assert "ตัวหุ่นมีกล้องจริง" in face
+        assert "โมเดลสนทนาไม่ได้รับภาพสด" in face
+        assert "แขนหุ่นทำท่าจับมือจริงได้" in face
+        assert "request_handshake" in face
+        assert "ตัวหุ่นมีกล้องจริง" not in desk
+    condo = build_instructions("Embassy World", profile="condo", robot_face=True)
+    assert 'และตอบคำถามเกี่ยวกับตัวหุ่น Emma กล้อง และการจับมือได้' in condo
+    assert "ตัวหุ่นมีกล้องจริง" not in build_instructions(
+        "Embassy World", profile="translator", robot_face=True)
+
+
+def test_robot_face_does_not_advertise_a_disabled_handshake_tool(monkeypatch):
+    from app.prompts import build_instructions
+
+    monkeypatch.setattr(settings, "tool_groups", "knowledge")
+    face = build_instructions("X", profile="joke", robot_face=True)
+    assert "ไม่มีเครื่องมือสั่งแขน" in face
+    assert "ให้เรียก request_handshake" not in face
+
+
 def test_robot_name_is_optional():
     from app.prompts import build_instructions
 
@@ -1603,7 +1743,8 @@ def test_instructions_forbid_inventing_prices():
     text = build_instructions("เดอะ เทสต์ คอนโด")
     assert "เดอะ เทสต์ คอนโด" in text
     assert "ห้ามเดา" in text  # must not guess prices/promotions
-    assert "ติดต่อฝ่ายขาย" in text  # refer to sales staff instead
+    # refer to the sales team instead -- naturally, never "ไม่มีข้อมูล" (owner 12 Oct)
+    assert "ห้ามพูดว่าไม่มีข้อมูลหรือไม่ทราบ ให้ส่งต่อทีมขายอย่างเป็นธรรมชาติ" in text
 
 
 def test_provider_event_defaults():
@@ -1847,6 +1988,133 @@ def test_blank_facts_are_named_in_the_prompt_not_omitted(tmp_path):
     assert "จอมเทียน" in out
     assert "ราคาเริ่มต้น" in out and "โปรโมชั่น" in out, "blank fields vanished"
     assert "ห้ามแต่งเอง" in out
+
+
+def _approved_facts(tmp_path, facts):
+    import json
+
+    path = tmp_path / "facts.json"
+    path.write_text(json.dumps({
+        "source_id": "project_facts", "project_id": "embassy_world",
+        "approval_status": "approved", "approved_by": "test_reviewer",
+        "approved_at": "2026-01-01T00:00:00+07:00",
+        "effective_at": "2026-01-01T00:00:00+07:00",
+        "disclosure_scope": "customer", "content_state": "existing",
+        "facts": facts,
+    }, ensure_ascii=False), encoding="utf-8")
+    return str(path)
+
+
+def test_a_concept_disclaimer_is_not_rendered_but_another_is(tmp_path):
+    """The approved file's disclaimer, "ทั้งหมดคือ Preliminary Concept อาจ
+    เปลี่ยนแปลงได้", was the last line of the facts on every turn while the
+    host block banned saying it (owner 2026-10-10). It is left out whole —
+    cut by clause it would leave "ทั้งหมดคือ" behind — and a disclaimer that
+    is not the banned caveat still reaches the model."""
+    import json
+
+    from app.prompts import load_facts
+
+    path = _approved_facts(tmp_path, [{"label": "ทำเล", "value": "จอมเทียน"}])
+    data = json.loads(open(path, encoding="utf-8").read())
+    data["disclaimer"] = "ทั้งหมดคือ Preliminary Concept อาจเปลี่ยนแปลงได้"
+    open(path, "w", encoding="utf-8").write(json.dumps(data, ensure_ascii=False))
+    out = load_facts(path)
+    assert "จอมเทียน" in out
+    assert "Preliminary" not in out and "อาจเปลี่ยนแปลง" not in out and "ทั้งหมดคือ" not in out
+
+    data["disclaimer"] = "ภาพทั้งหมดใช้ประกอบการขาย"
+    open(path, "w", encoding="utf-8").write(json.dumps(data, ensure_ascii=False))
+    assert "ภาพทั้งหมดใช้ประกอบการขาย" in load_facts(path)
+
+
+def test_a_blank_fact_sends_the_model_to_its_tools_before_sales(tmp_path):
+    """"Not in this file" is not "nobody knows". Room types and promotions
+    live in the sales system, and the prompt tells the model to search them
+    with show_unit/find_units. The old blank line said "refer to sales",
+    contradicting that — so on 2026-09-28 the owner typed "ดูจาก DB" into
+    the boxes to say where the answer is, and approved it, and the prompt
+    carried "ราคาเริ่มต้น: ดูจาก DB" as a fact Emma could say aloud."""
+    from app.prompts import load_facts
+
+    out = load_facts(_approved_facts(tmp_path, [
+        {"label": "ทำเล", "value": "จอมเทียน"},
+        {"label": "แบบห้องและขนาด", "value": None},
+    ]))
+    blank = next(line for line in out.splitlines() if "แบบห้องและขนาด" in line)
+    assert "ใช้เครื่องมือที่ตอบได้ก่อน" in blank
+    assert "ส่งต่อทีมขาย" in blank and "ห้ามแต่งเอง" in blank, "the honest fallback is gone"
+    # Price keeps its own, more specific rule (scripted answer, then stop).
+    assert "ราคาให้ทำตามกฎเรื่องราคา" in blank
+
+
+def test_unapproved_facts_fall_back_to_tools_first_not_could_not_load(tmp_path):
+    """Unapproved is the usual state, and the fallback is what customers get
+    then. It used to say "could not load" (false: it loaded, and the policy
+    refused it) and carried the blanket "refer to sales" that contradicted
+    the rule to search room types with the units tools."""
+    import json
+
+    from app.prompts import FALLBACK_FACTS, load_facts
+
+    path = _approved_facts(tmp_path, [{"label": "ทำเล", "value": "จอมเทียน"}])
+    data = json.loads(open(path, encoding="utf-8").read())
+    data["approval_status"] = "draft"
+    open(path, "w", encoding="utf-8").write(json.dumps(data, ensure_ascii=False))
+
+    out = load_facts(path)
+    assert out == FALLBACK_FACTS and "จอมเทียน" not in out
+    assert "โหลดข้อมูลโครงการไม่ได้" not in out
+    assert "ใช้เครื่องมือที่ตอบได้ก่อน" in out and "ราคาให้ทำตามกฎเรื่องราคา" in out
+    assert "ยังไม่มีข้อมูล" in out and "ส่งต่อทีมขาย" in out
+
+
+def test_a_line_state_overrides_the_file_state_both_ways(tmp_path):
+    """The developer and the address are real today; the facility list is a
+    concept. Each line's own state wins over the file's, in either direction,
+    so neither "Empire Group (แนวคิดเบื้องต้น)" nor an uncaveated concept."""
+    import json
+
+    from app.prompts import load_facts
+
+    path = _approved_facts(tmp_path, [
+        {"label": "ผู้พัฒนา", "value": "บริษัททดสอบ", "content_state": "existing"},
+        {"label": "จุดเด่น", "value": "สระทดสอบ"},
+    ])
+    data = json.loads(open(path, encoding="utf-8").read())
+    data["content_state"] = "preliminary_concept"
+    open(path, "w", encoding="utf-8").write(json.dumps(data, ensure_ascii=False))
+
+    lines = load_facts(path).splitlines()
+    developer = next(line for line in lines if line.startswith("- ผู้พัฒนา:"))
+    highlight = next(line for line in lines if line.startswith("- จุดเด่น:"))
+    assert "แนวคิดเบื้องต้น" not in developer
+    assert "แนวคิดเบื้องต้น" in highlight
+
+
+def test_a_dash_in_a_hand_edited_facts_file_is_blank_not_a_value(tmp_path):
+    """The console stores "-" as null; a file edited by hand never passed
+    through it. "- ราคาเริ่มต้น: -" in the prompt is a fact the model may
+    speak, so the renderer applies the same test."""
+    from app.prompts import load_facts
+
+    out = load_facts(_approved_facts(tmp_path, [
+        {"label": "ทำเล", "value": "จอมเทียน"},
+        {"label": "ราคาเริ่มต้น", "value": "-"},
+        {"label": "เวลาทำการห้องขาย", "value": " — "},
+        {"label": "โปรโมชั่น", "value": False},
+        {"label": "จำนวนอาคาร", "value": 0},
+    ]))
+    # On the line shape, not a substring: the value is rendered unstripped,
+    # so " — " would print as ":  — " and a substring check could never fail.
+    lines = out.splitlines()
+    for label in ("ราคาเริ่มต้น", "เวลาทำการห้องขาย", "โปรโมชั่น"):
+        assert not any(line.startswith(f"- {label}:") for line in lines), label
+    assert "False" not in out
+    blank = next(line for line in out.splitlines() if "ราคาเริ่มต้น" in line)
+    assert "เวลาทำการห้องขาย" in blank and "โปรโมชั่น" in blank and "ห้ามแต่งเอง" in blank
+    # A number is a claim, and must not be rendered as an empty line.
+    assert "- จำนวนอาคาร: 0" in out
 
 
 def test_unapproved_facts_say_so_in_the_prompt(tmp_path):
@@ -2162,8 +2430,11 @@ def test_the_idle_watcher_is_not_even_started_when_switched_off(monkeypatch):
         encoding="utf-8")
     guarded = source.split("jobs = {up, down, unanswered}", 1)[1]
     creation = guarded.split("asyncio.wait", 1)[0]
-    assert "if settings.idle_timeout_s or self.summoned:" in creation, (
-        "the idle watcher must be created only when it is switched on")
+    # FOCUS_ENABLED is the third switch (listening focus, 2026-10-09: a
+    # conversation nobody faces any more ends sooner). Still a switch — off
+    # by default — so the rule is unchanged: no switch, no task.
+    assert ("if settings.idle_timeout_s or self.summoned or settings.focus_enabled:"
+            in creation), "the idle watcher must be created only when it is switched on"
 
 
 def test_the_canva_follower_is_not_even_started_without_a_canva_url(monkeypatch):
@@ -2222,10 +2493,14 @@ def test_only_guest_speech_resets_the_idle_clock(monkeypatch):
     source = (Path(__file__).resolve().parent.parent / "app" / "session.py").read_text(
         encoding="utf-8")
     resets = [line for line in source.splitlines() if "_last_heard_at = " in line]
-    # One in __init__, one on the heard event. Any third is suspicious.
-    assert len(resets) == 2, resets
+    # One in __init__, one on the heard event, one on a topic the guest
+    # TAPPED on the robot face (10 Oct: a tap is the guest, like speech --
+    # still never her own audio). Any fourth is suspicious.
+    assert len(resets) == 3, resets
     heard_block = source.split('elif event.kind == "user_transcript":', 1)[1]
     assert "_last_heard_at" in heard_block.split("elif event.kind", 1)[0]
+    tap_block = source.split("async def _quick_ask(self, event: dict)", 1)[1].split("\n    async def ", 1)[0]
+    assert "self._last_heard_at = now" in tap_block
 
 
 # ============ the LAN gate ============
@@ -2991,3 +3266,32 @@ def test_the_page_lets_a_url_override_mic_agc_per_client():
     assert "micNS = micq.get('ns') === '1'" in src
     # Only an explicit 0/1 overrides — a stray ?agc=yes must not flip anything.
     assert "['0', '1'].includes(micq.get('agc'))" in src
+
+
+def test_the_guests_first_sentence_sets_the_language_not_the_greeting():
+    """Live eval 2026-10-07: after the gallery's English greeting, 43 of 465
+    Thai turns got no Thai at all — mostly refusals ("I'm sorry, I can only
+    provide..."). The one-stray-utterance guard read the guest's first Thai
+    sentence as a stray. Now the first sentence decides, the guard applies
+    after it, and the observed English openings are quoted."""
+    from app.prompts import GREETING, build_instructions
+
+    text = build_instructions("Test Condo", profile="condo")
+    assert "ประโยคแรกของลูกค้ากำหนดภาษาทันที" in text
+    assert "คำทักของคุณไม่ใช่ภาษาของลูกค้า" in text
+    # The quote lives in the OFF-TOPIC rule, where the refusal is defined:
+    # with it only in rule 2, the re-test still answered "พยากรณ์อากาศ" and
+    # "ร้องเพลง Happy Birthday" with this exact English line.
+    # 2026-10-11 (203-case run): the quote alone still let four first Thai
+    # turns through in English, so the rule now also gives the Thai line to
+    # say, and ends the refusal there (the "ชวนกลับ" questions after it were
+    # the run's most common filler).
+    assert ('ลูกค้าพูดไทยต้องปฏิเสธเป็นไทย ถูก: "ขออภัยค่ะ ดิฉันดูแลเฉพาะโครงการ Test Condo ค่ะ" '
+            'ผิด: "I apologize, but I can only provide information about..." แล้วจบแค่นั้น') in text
+    assert '"How can I help you today?"' in text
+    assert "หลังจากนั้นคำต่างภาษาโผล่ประโยคเดียว" in text
+    # Language-neutral on purpose: the first version said only "Thai", and
+    # the re-test's Chinese question was then answered in English.
+    assert "ถ้าลูกค้าพูดภาษาอื่น เช่น ไทย จีน" in GREETING
+    assert "ไม่ใช่อังกฤษ" in GREETING
+    assert "Hello, I'm Emma. Welcome to Embassy World." in GREETING  # still opens in English

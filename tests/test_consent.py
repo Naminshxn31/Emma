@@ -11,6 +11,8 @@ the greeting only, because nothing here can tell who is talking afterwards.
 from __future__ import annotations
 
 import inspect
+import json
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -357,3 +359,301 @@ def test_a_colleague_walking_in_behind_a_stranger_is_still_named(monkeypatch):
     behind = faces.Face((400, 0, 600, 200), 0.9, ALICE)
     monkeypatch.setattr(faces, "locate", lambda frame, det_size=640: [behind])
     assert w.see(FRAME, now=2.0).kind == "known"
+
+
+# -- people.json is read every frame while enrolment rewrites it ----------------
+
+def test_the_record_file_is_replaced_in_one_step(monkeypatch):
+    """`status()` is read at decision time on every frame. A torn read makes
+    `load()` answer "everybody unrecorded" — and for somebody who revoked,
+    that is their name spoken again. The atomic writer's own behaviour is
+    tested in test_faces; this pins that consent goes through it."""
+    calls = []
+    real = faces.write_atomically
+
+    def spy(path, write):
+        calls.append(Path(path))
+        return real(path, write)
+
+    monkeypatch.setattr(faces, "write_atomically", spy)
+    consent.record("ทดสอบ", by="ทดสอบ")
+
+    assert calls == [consent.people_path()]
+    assert consent.status("ทดสอบ") == consent.OK
+
+
+def test_the_file_format_did_not_change(tmp_path):
+    """Same bytes the old write_text produced — UTF-8, indent 2, the
+    platform's newline — so a diff of people.json shows people, not a
+    reformat."""
+    people = {"ทดสอบ": {"consent_at": "2026-09-01T10:00:00+07:00", "consent_by": "ทดสอบ",
+                         "consent_version": consent.VERSION,
+                         "expires_at": "2027-09-01T10:00:00+07:00", "revoked_at": None}}
+    reference = tmp_path / "reference.json"
+    reference.write_text(json.dumps(people, ensure_ascii=False, indent=2) + "\n",
+                         encoding="utf-8")
+
+    consent.save(people)
+
+    assert consent.people_path().read_bytes() == reference.read_bytes()
+
+
+def test_a_write_that_dies_leaves_the_old_records(monkeypatch):
+    consent.record("ทดสอบ", by="ทดสอบ")
+    consent.revoke("ทดสอบ")
+    before = consent.people_path().read_bytes()
+
+    def dies(fd):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(faces.os, "fsync", dies)
+    with pytest.raises(OSError):
+        consent.record("อีกคน", by="อีกคน")
+
+    assert consent.people_path().read_bytes() == before
+    assert consent.status("ทดสอบ") == consent.REVOKED
+    leftovers = [p.name for p in consent.people_path().parent.iterdir()
+                 if p.name.startswith("people.json.")]
+    assert leftovers == []
+
+
+def test_two_records_at_once_lose_neither(monkeypatch):
+    """Load, add, save — twice at the same moment is one person's record
+    silently gone. Atomic replace stops a torn file, not a lost update."""
+    import threading
+    import time
+
+    real_load = consent.load
+
+    def slow_load():
+        people = real_load()
+        time.sleep(0.05)
+        return people
+
+    monkeypatch.setattr(consent, "load", slow_load)
+    names = [f"ทดสอบ{i}" for i in range(6)]
+    threads = [threading.Thread(target=consent.record, args=(n,), kwargs={"by": n}) for n in names]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+
+    assert sorted(real_load()) == sorted(names)
+
+
+# -- a file that is there but cannot be read is not an empty file -------------
+#
+# load() used to answer every read or parse error with {} — "everybody
+# unrecorded". A revoked person then read as MISSING, which is tolerated,
+# and the next record() saved {} plus one entry: every other record and
+# every revocation gone in one write (review, 2026-09-29).
+
+def _revoked_and_recorded() -> bytes:
+    consent.record("ทดสอบก", by="ทดสอบก")
+    consent.revoke("ทดสอบข")
+    return consent.people_path().read_bytes()
+
+
+_DAMAGED = {
+    "trailing comma": lambda good: good.rstrip().rstrip(b"}").rstrip() + b",\n}\n",
+    "not utf-8": lambda good: good.replace("ทดสอบก".encode("utf-8"), "ทดสอบก".encode("cp874")),
+    "a list": lambda good: b"[]\n",
+    "a record that is not an object": lambda good: b'{"\xe0\xb8\x97": "yes"}\n',
+    "half a file": lambda good: good[: len(good) // 2],
+}
+
+
+@pytest.mark.parametrize("damage", sorted(_DAMAGED))
+def test_an_unreadable_file_is_refused_not_written_over(damage):
+    path = consent.people_path()
+    path.write_bytes(_DAMAGED[damage](_revoked_and_recorded()))
+    before = path.read_bytes()
+
+    for write in (lambda: consent.record("ทดสอบค", by="ทดสอบค"),
+                  lambda: consent.revoke("ทดสอบค")):
+        with pytest.raises(ValueError) as exc:
+            write()
+        assert isinstance(exc.value, consent.Unreadable)
+        assert re.search(r"[฀-๿]", str(exc.value)), "the reason is read by a person"
+        assert "ทดสอบ" not in str(exc.value), "and it names nobody"
+
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("damage", sorted(_DAMAGED))
+def test_an_unreadable_file_names_nobody(monkeypatch, damage):
+    """Fails closed: the file may be exactly where the revocation is, so
+    'unrecorded' (tolerated by default) is the wrong answer for everyone."""
+    consent.people_path().write_bytes(_DAMAGED[damage](_revoked_and_recorded()))
+    monkeypatch.setattr(settings, "face_require_consent", False)
+
+    for name in ("ทดสอบก", "ทดสอบข", "ไม่มีใคร"):
+        assert consent.status(name) == consent.UNREADABLE
+        assert consent.may_name(name) == (False, consent.UNREADABLE)
+
+
+def test_the_watcher_greets_without_a_name_while_the_file_is_unreadable(monkeypatch):
+    w = _watcher()
+    _frame_with(monkeypatch, ALICE)
+    consent.revoke("ต้า")
+    consent.people_path().write_bytes(b"{ not json")
+
+    s = _twice(w, 0.0)
+
+    assert s is not None and s.kind == "stranger"
+    assert s.meta["unnamed"] == "consent unreadable"
+
+
+def test_a_missing_file_is_still_nobody_recorded(monkeypatch):
+    """The one case that *is* empty: no file at all."""
+    assert not consent.people_path().exists()
+    assert consent.load() == {}
+    assert consent.may_name("ต้า") == (True, consent.MISSING)
+
+
+def test_a_bom_is_not_a_reason_to_lose_the_file():
+    """Notepad's "UTF-8 with BOM" is a plausible hand save. It used to make
+    load() answer {} — and the next record() deleted the revocation."""
+    path = consent.people_path()
+    path.write_bytes(b"\xef\xbb\xbf" + _revoked_and_recorded())
+
+    assert consent.status("ทดสอบข") == consent.REVOKED
+    consent.record("ทดสอบค", by="ทดสอบค")
+
+    assert consent.status("ทดสอบข") == consent.REVOKED
+    assert consent.status("ทดสอบก") == consent.OK
+    assert consent.status("ทดสอบค") == consent.OK
+
+
+def test_a_read_windows_refuses_for_a_moment_is_retried(monkeypatch):
+    """A reader that opens the file during another process's os.replace gets
+    PermissionError on Windows (measured: 141 against 74 writes). That is
+    microseconds, not a broken file — and not a reason to name a revoked
+    person as unrecorded."""
+    _revoked_and_recorded()
+    real = Path.read_bytes
+    refusals = []
+
+    def busy(self):
+        if self.name == "people.json" and len(refusals) < 3:
+            refusals.append(1)
+            raise PermissionError(13, "in use")
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", busy)
+    monkeypatch.setattr(consent, "_READ_PAUSE_S", 0.0)
+
+    assert consent.status("ทดสอบข") == consent.REVOKED
+    assert len(refusals) == 3
+
+
+def test_a_read_windows_keeps_refusing_fails_closed(monkeypatch):
+    _revoked_and_recorded()
+    before = consent.people_path().read_bytes()
+    real = Path.read_bytes
+
+    def always_busy(self):
+        if self.name == "people.json":
+            raise PermissionError(13, "in use")
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", always_busy)
+    monkeypatch.setattr(consent, "_READ_PAUSE_S", 0.0)
+
+    assert consent.may_name("ทดสอบก") == (False, consent.UNREADABLE)
+    with pytest.raises(consent.Unreadable):
+        consent.record("ทดสอบค", by="ทดสอบค")
+    assert real(consent.people_path()) == before
+
+
+# -- one file, several processes writing it ---------------------------------------
+
+def test_a_writer_that_cannot_get_the_lock_refuses_and_writes_nothing(monkeypatch):
+    """Another process holding the file past the wait is a refusal in Thai,
+    never a write over whatever it is in the middle of."""
+    before = _revoked_and_recorded()
+    monkeypatch.setattr(consent, "LOCK_WAIT_S", 0.2)
+
+    with faces.file_lock(consent.people_path(), 1.0, "unused"):
+        with pytest.raises(faces.LockBusy) as exc:
+            consent.record("ทดสอบค", by="ทดสอบค")
+        assert re.search(r"[฀-๿]", str(exc.value))
+        with pytest.raises(faces.LockBusy):
+            consent.revoke("ทดสอบก")
+
+    assert consent.people_path().read_bytes() == before
+
+
+_REVOKER = r"""
+import sys, time
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from app import consent, enrollment
+enrollment.ENROLLED = Path(sys.argv[2])
+flags = Path(sys.argv[3])
+(flags / "ready").write_text("", encoding="utf-8")
+deadline = time.monotonic() + 30
+while not (flags / "go").exists():
+    if time.monotonic() > deadline:
+        sys.exit("never told to go")
+    time.sleep(0.005)
+consent.revoke(sys.argv[4])
+(flags / "done").write_text("", encoding="utf-8")
+"""
+
+
+def test_a_revoke_from_another_process_is_not_written_over(tmp_path):
+    """revoke-face.cmd while a scan is being saved: the review forced the
+    revoke between the server's load and its save, and the server's stale
+    copy put the revoked person back to OK — named again from the next
+    frame. With the cross-process lock the revoke waits for the save and
+    then lands on top of it; both survive."""
+    import os
+    import subprocess
+    import sys
+    import time
+
+    root = Path(__file__).resolve().parent.parent
+    consent.record("ทดสอบก", by="ทดสอบก")
+    consent.record("ทดสอบข", by="ทดสอบข")
+    flags = tmp_path / "flags"
+    flags.mkdir()
+    child = subprocess.Popen(
+        [sys.executable, "-c", _REVOKER, str(root), str(enrollment.ENROLLED), str(flags),
+         "ทดสอบข"],
+        cwd=root, env={**os.environ, "PYTHONUTF8": "1"},
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    try:
+        deadline = time.monotonic() + 30
+        while not (flags / "ready").exists():
+            assert child.poll() is None, child.communicate()[1]
+            assert time.monotonic() < deadline, "the child never started"
+            time.sleep(0.01)
+
+        real_load = consent.load
+
+        def load_then_let_the_revoke_run():
+            people = real_load()
+            # Between this save's load and its replace: tell the other
+            # process to revoke, and give it a full second to do so.
+            (flags / "go").write_text("", encoding="utf-8")
+            until = time.monotonic() + 1.0
+            while time.monotonic() < until and not (flags / "done").exists():
+                time.sleep(0.01)
+            return people
+
+        consent.load = load_then_let_the_revoke_run
+        try:
+            consent.record("ทดสอบค", by="ทดสอบค")
+        finally:
+            consent.load = real_load
+        _, err = child.communicate(timeout=30)
+        assert child.returncode == 0, err
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.communicate(timeout=30)
+
+    assert consent.status("ทดสอบข") == consent.REVOKED, "the revocation was written over"
+    assert consent.status("ทดสอบค") == consent.OK
+    assert consent.status("ทดสอบก") == consent.OK

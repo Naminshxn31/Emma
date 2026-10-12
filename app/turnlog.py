@@ -36,6 +36,14 @@ _fh = None
 _path: Path | None = None
 _warned = False
 session_id: ContextVar[str | None] = ContextVar("turnlog_session_id", default=None)
+#: Set by machine-made work that runs through customer-facing code, so its
+#: rows say so (`"origin": ...`). The startup search warm-up calls the real
+#: lookup tool and logs a real `lookup` row — most of the "lookups" in the
+#: log were it ("warm up" ranked as the top customer query), and on
+#: 2026-09-15/17 its row was also the only trace that it had put a slide on
+#: the screen at boot. Marked, not muted: the evidence stays, and
+#: scripts/analyze_log.py keeps it out of the customer statistics.
+origin: ContextVar[str | None] = ContextVar("turnlog_origin", default=None)
 _write_lock = RLock()
 
 
@@ -125,6 +133,8 @@ def _record(event: str, fields: dict) -> None:
     row = {"t": time.strftime("%H:%M:%S"), "event": event}
     if (sid := session_id.get()) is not None:
         row["session_id"] = sid
+    if (who := origin.get()) is not None:
+        row["origin"] = who
     row.update({k: v for k, v in fields.items() if v is not None})
     try:
         fh.write(json.dumps(row, ensure_ascii=False) + "\n")

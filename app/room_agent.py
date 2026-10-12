@@ -40,12 +40,14 @@ turns them on by copying a line.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 import logging
 import os
 import sys
-from dataclasses import dataclass, field
+import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -278,8 +280,33 @@ def monitor(state: str) -> dict:
     if want not in {"off", "on"}:
         return {"ok": False, "error": "unknown state", "known": ["off", "on"]}
     HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER = 0xFFFF, 0x0112, 0xF170
-    ctypes.windll.user32.SendMessageW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER,
-                                      2 if want == "off" else -1)
+    SMTO_ABORTIFHUNG = 0x0002
+    lparam = 2 if want == "off" else -1
+    # A plain SendMessageW broadcast is synchronous: it blocks until EVERY
+    # top-level window answers, and one hung window froze the whole agent
+    # (seen 2026-09-25 — the console click never returned). Time-box it and
+    # abort on a hung window so a stuck app cannot take the agent down with it.
+    #
+    # The prototype is spelled out on purpose. Without argtypes/restype ctypes
+    # marshals every argument as a 32-bit int on Win64: the out-buffer would be
+    # written as an 8-byte DWORD_PTR into a 4-byte c_ulong (an out-of-bounds
+    # write), and the "on" value -1 would be zero-extended instead of
+    # sign-extended, so "wake the display" carried the wrong LPARAM while the
+    # call still returned success.
+    fn = ctypes.windll.user32.SendMessageTimeoutW
+    fn.restype = ctypes.c_ssize_t                    # LRESULT
+    fn.argtypes = [ctypes.c_void_p,                  # HWND
+                   ctypes.c_uint,                    # UINT  message
+                   ctypes.c_size_t,                  # WPARAM
+                   ctypes.c_ssize_t,                 # LPARAM (signed: -1 sign-extends)
+                   ctypes.c_uint,                    # fuFlags
+                   ctypes.c_uint,                    # uTimeout (ms)
+                   ctypes.POINTER(ctypes.c_size_t)]  # PDWORD_PTR (out)
+    result = ctypes.c_size_t(0)
+    sent = fn(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, lparam,
+              SMTO_ABORTIFHUNG, 3000, ctypes.byref(result))
+    if sent == 0:
+        return {"ok": False, "error": "monitor command did not complete — a window was busy"}
     return {"ok": True, "monitor": want}
 
 
@@ -365,6 +392,218 @@ class Capability:
 
 #: The whole surface. A name that is not here does not exist, and the server
 #: cannot invent one. Everything is off until ROOM_AGENT_ALLOW names it.
+#: The exit code the running agent uses to ask its supervisor (run_room_agent.py)
+#: to relaunch it into freshly-applied code. Kept in step with the launcher.
+UPDATE_EXIT_CODE = 97
+
+
+def _code_version() -> str:
+    """A short hash of the code this agent is running, so the console can tell a
+    self-update actually took (health before != health after). Not a
+    compatibility contract -- the capability list is that; this only answers
+    'did the new code load'."""
+    import hashlib
+
+    h = hashlib.sha256()
+    for rel in ("run_room_agent.py", "app/room_agent.py"):
+        try:
+            h.update((ROOT / rel).read_bytes())
+        except OSError:
+            pass
+    return h.hexdigest()[:12]
+
+
+def _mac_hint() -> str:
+    """This PC's primary MAC, so the console can fill rooms.json's "mac" for
+    Wake-on-LAN WHILE the machine is still on -- you can't read it once it's off,
+    which is exactly when WoL is used. uuid.getnode() returns the primary
+    adapter; on a multi-NIC PC confirm it is the LAN one. Blank if it could only
+    produce a random fallback (multicast bit set), so a guess never ships."""
+    import uuid
+
+    node = uuid.getnode()
+    if (node >> 40) & 1:
+        return ""
+    return ":".join("%02X" % ((node >> (8 * i)) & 0xFF) for i in range(5, -1, -1))
+
+
+def _verify_staged_agent(staging: Path) -> str:
+    """Import the staged agent in a FRESH subprocess. Returns "" if it imports,
+    else the error. This is the gate that makes self-update safe: broken code (a
+    syntax error, or an import the room PC does not have) is caught BEFORE it
+    replaces the running agent, not discovered after the swap when the agent is
+    already down and nobody is at the machine."""
+    import subprocess
+
+    code = "import sys; sys.path.insert(0, r'%s'); import app.room_agent" % str(staging)
+    try:
+        out = subprocess.run([sys.executable, "-c", code], cwd=str(staging),
+                             capture_output=True, timeout=60,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception as exc:                          # pragma: no cover - env shape
+        return f"could not run the check: {exc}"
+    if out.returncode != 0:
+        return (out.stderr or b"").decode("utf-8", "replace").strip()[-400:] or "import failed"
+    return ""
+
+
+def _swap_in(staging: Path, target: Path) -> None:
+    """Replace the live app/ with the staged one, keeping the old code in
+    app.prev so the supervisor can roll back if the new code will not boot.
+    Same-volume renames, and on any error the old app/ is put straight back."""
+    import shutil
+
+    new_app, live_app, prev_app = staging / "app", target / "app", target / "app.prev"
+    if new_app.is_dir():
+        shutil.rmtree(prev_app, ignore_errors=True)
+        moved = False
+        if live_app.exists():
+            os.replace(live_app, prev_app)            # keep the old code for rollback
+            moved = True
+        try:
+            os.replace(new_app, live_app)
+        except OSError:
+            if moved:
+                os.replace(prev_app, live_app)        # put the old code back
+            raise
+    # The launcher (run_room_agent.py) is only re-read at the next full restart;
+    # copy it in but keep a .prev for manual recovery, and never gate on it.
+    new_run = staging / "run_room_agent.py"
+    if new_run.is_file():
+        live_run = target / "run_room_agent.py"
+        if live_run.is_file():
+            shutil.copy2(live_run, target / "run_room_agent.py.prev")
+        shutil.copy2(new_run, live_run)
+
+
+def _apply_update_bundle(data: bytes, target: Path) -> dict:
+    """Validate an agent-code bundle and swap it in atomically. Pure file work
+    (no network, no restart) so it is unit-tested with a temp dir. Rejects
+    anything that is not clearly an agent bundle, any path that escapes the tree,
+    an over-large expansion, and -- the important one -- code that does not
+    import."""
+    import io
+    import shutil
+    import zipfile
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except Exception:
+        return {"ok": False, "error": "update bundle is not a zip"}
+    infos = zf.infolist()
+    names = [i.filename for i in infos]
+    if "run_room_agent.py" not in names or "app/room_agent.py" not in names:
+        return {"ok": False, "error": "update bundle is not an agent (missing files)"}
+    for name in names:
+        p = name.replace("\\", "/")
+        # No absolute path, no parent escape, and no drive letter / colon
+        # (C:/…, C:evil) -- the bundle is code about to run, checked before a byte
+        # is written even though extractall would also sanitise.
+        if p.startswith("/") or ".." in p.split("/") or ":" in p:
+            return {"ok": False, "error": "update bundle has unsafe paths"}
+    # Zip-bomb guard: only the download was capped, not what it expands to.
+    if sum(i.file_size for i in infos) > 200_000_000 or len(infos) > 5000:
+        return {"ok": False, "error": "update bundle is too large when unpacked"}
+
+    staging = target / ".update-staging"              # inside target: same-volume swap
+    shutil.rmtree(staging, ignore_errors=True)
+    try:
+        zf.extractall(staging)
+        broken = _verify_staged_agent(staging)
+        if broken:
+            return {"ok": False, "error": "update bundle does not run", "detail": broken,
+                    "instruction": "โค้ดใหม่รันไม่ได้ ยกเลิกอัปเดต (ของเดิมยังอยู่) ห้ามบอกว่าอัปเดตแล้ว"}
+        _swap_in(staging, target)
+    except Exception as exc:                          # pragma: no cover - disk shape
+        return {"ok": False, "error": "could not apply update", "detail": str(exc)}
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    return {"ok": True}
+
+
+def update(sha256: str = "") -> dict:
+    """Pull the latest agent code from the management PC and restart into it.
+
+    The source is FIXED in this machine's .env (ROOM_AGENT_UPDATE_URL): a caller
+    with the room token can trigger an update but cannot point it at other code.
+    `sha256`, when the console supplies it, is the hash that machine built the
+    bundle to -- so a rogue host answering the office PC's IP over plain HTTP
+    cannot substitute code. The bundle is verified (it must import) and staged
+    before it replaces anything; the restart is the supervisor relaunching this
+    process, which rolls back to app.prev if the new code will not boot."""
+    import hashlib
+    import threading
+    import urllib.request
+
+    url = os.getenv("ROOM_AGENT_UPDATE_URL", "").strip()
+    if not url:
+        return {"ok": False, "error": "no update source configured on this machine",
+                "instruction": "เครื่องนี้ยังไม่ได้ตั้ง ROOM_AGENT_UPDATE_URL"}
+    try:
+        with urllib.request.urlopen(url, timeout=30) as response:
+            data = response.read(50_000_001)          # 50 MB cap (+1 to notice overflow)
+    except Exception as exc:
+        return {"ok": False, "error": "could not fetch the update", "detail": str(exc)}
+    if len(data) > 50_000_000:
+        return {"ok": False, "error": "update bundle is too large"}
+    want = (sha256 or "").strip().lower()
+    if want:
+        got = hashlib.sha256(data).hexdigest()
+        if got != want:
+            return {"ok": False, "error": "update bundle failed the integrity check",
+                    "detail": "expected %s…, got %s…" % (want[:12], got[:12]),
+                    "instruction": "ไฟล์อัปเดตไม่ตรงกับที่เครื่องคุมสร้าง ยกเลิกแล้ว ห้ามบอกว่าอัปเดตแล้ว"}
+    applied = _apply_update_bundle(data, ROOT)
+    if not applied.get("ok"):
+        return applied
+    # The reply has to reach the console before the process exits. A daemon
+    # thread gives it a moment, then exits with the code the supervisor
+    # relaunches on. If the new code does not boot, the supervisor restores
+    # app.prev -- so a bad update self-heals instead of stranding the agent.
+    def _restart() -> None:
+        time.sleep(1.0)
+        os._exit(UPDATE_EXIT_CODE)
+
+    threading.Thread(target=_restart, daemon=True).start()
+    return {"ok": True, "updated": True,
+            "instruction": "อัปเดตโค้ดแล้ว กำลังรีสตาร์ต agent (~2 วิ) — เช็ก health อีกที "
+                           "ถ้าโค้ดใหม่มีปัญหา ตัวคุมจะถอยกลับให้เอง"}
+
+
+def reboot() -> dict:
+    """Restart this PC. It comes back on its own -- no Wake-on-LAN needed, which
+    is why this is the safe one to use on a stuck machine from the console."""
+    if not WINDOWS:
+        return _unsupported("reboot")
+    import subprocess
+
+    r = subprocess.run(["shutdown", "/r", "/t", "3"], capture_output=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if r.returncode != 0:                             # e.g. the privilege is missing
+        return {"ok": False, "error": "restart command was refused",
+                "detail": (r.stderr or b"").decode("utf-8", "replace").strip()[:200],
+                "instruction": "สั่งรีสตาร์ทเครื่องไม่สำเร็จ ให้บอกตรงๆ ห้ามบอกว่าทำแล้ว"}
+    return {"ok": True, "power": "restart",
+            "instruction": "สั่งรีสตาร์ทแล้ว เครื่องจะปิดแล้วเปิดกลับมาเอง"}
+
+
+def shutdown() -> dict:
+    """Shut this PC down. It will NOT power back on from here -- that needs
+    Wake-on-LAN or someone at the machine. Say so; do not imply otherwise."""
+    if not WINDOWS:
+        return _unsupported("shutdown")
+    import subprocess
+
+    r = subprocess.run(["shutdown", "/s", "/t", "3"], capture_output=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if r.returncode != 0:
+        return {"ok": False, "error": "shutdown command was refused",
+                "detail": (r.stderr or b"").decode("utf-8", "replace").strip()[:200],
+                "instruction": "สั่งปิดเครื่องไม่สำเร็จ ให้บอกตรงๆ ห้ามบอกว่าทำแล้ว"}
+    return {"ok": True, "power": "shutdown",
+            "instruction": "สั่งปิดเครื่องแล้ว เปิดกลับจากที่นี่ไม่ได้ (ต้อง Wake-on-LAN หรือกดเปิดที่เครื่อง)"}
+
+
 CAPABILITIES: dict[str, Capability] = {
     "list_windows": Capability(list_windows, risk="read", what="รายชื่อหน้าต่างที่เปิดอยู่"),
     "screenshot": Capability(screenshot, risk="read", what="เก็บภาพหน้าจอไว้ในเครื่องนั้น"),
@@ -382,6 +621,10 @@ CAPABILITIES: dict[str, Capability] = {
     "focus_window": Capability(focus_window, args=("title",), what="ดึงหน้าต่างขึ้นมาข้างหน้า"),
     "lock_screen": Capability(lock_screen, what="ล็อกหน้าจอ"),
     "monitor": Capability(monitor, args=("state",), what="ปิด/เปิดจอ"),
+    "reboot": Capability(reboot, what="รีสตาร์ทเครื่อง (กลับมาเอง)"),
+    "shutdown": Capability(shutdown, what="ปิดเครื่อง (เปิดกลับต้อง WoL/กดเอง)"),
+    "update": Capability(update, optional=("sha256",),
+                         what="อัปเดตโค้ด agent จากเครื่องคุมแล้วรีสตาร์ต"),
     "type_text": Capability(type_text, args=("text",), risk="input", what="พิมพ์ข้อความ (คุมคีย์บอร์ดจริง)"),
     "mouse_click": Capability(mouse_click, args=("x", "y"), risk="input", what="คลิกเมาส์ (คุมเมาส์จริง)"),
 }
@@ -433,9 +676,20 @@ async def run_action(action: str, args: dict[str, Any]) -> dict:
 
     kwargs = {a: args[a] for a in cap.args}
     kwargs.update({a: args[a] for a in cap.optional if a in args})
-    result = cap.run(**kwargs)
-    if inspect.isawaitable(result):
-        result = await result
+    # Run the capability OFF the event loop and inside a guard. A blocking
+    # ctypes call (monitor's window broadcast) must not freeze the agent for
+    # every other request, and a raised exception must come back as JSON, not a
+    # bare 500 the console (or Emma) cannot read — both seen 2026-09-25.
+    try:
+        if inspect.iscoroutinefunction(cap.run):
+            result = await cap.run(**kwargs)
+        else:
+            result = await asyncio.to_thread(cap.run, **kwargs)
+    except Exception as exc:
+        logger.exception("action %r crashed on this machine", name)
+        return {"ok": False, "error": "action failed on this machine",
+                "detail": "%s: %s" % (type(exc).__name__, exc),
+                "instruction": "คำสั่งนี้ทำงานผิดพลาดบนเครื่องนั้น ให้บอกตรงๆ ห้ามบอกว่าทำแล้ว"}
     return result if isinstance(result, dict) else {"ok": True, "result": result}
 
 
@@ -458,6 +712,13 @@ def create_app() -> FastAPI:
             "catalogue": {n: {"risk": c.risk, "what": c.what} for n, c in sorted(CAPABILITIES.items())},
             "programs": sorted(PROGRAMS),
             "input_control": INPUT_ENABLED,
+            # Not a compatibility contract (the catalogue is that) -- just enough
+            # for the console to see a self-update took: this changes when the
+            # code does.
+            "code_version": _code_version(),
+            # The LAN MAC, so the console can fill rooms.json's "mac" for
+            # Wake-on-LAN while this PC is on (it can't be read once it's off).
+            "mac_hint": _mac_hint(),
         }
 
     @app.post("/do")

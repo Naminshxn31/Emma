@@ -3,14 +3,32 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- The chest screen used to be Chrome on /?kiosk=1&cam=1, and that page
+         was what fed the greeter (FACE_CAMERA_SOURCE=robot) through /ws/camera.
+         Once the face moved into this app's WebView (/preview?app=1) it held
+         the robot's only USB camera and nothing fed the greeter at all. So the
+         WebView needs the camera too - EmmaFace hands it to the trusted origin
+         only, and the face scan reuses that same stream. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- CAMERA implies camera + camera.autofocus as REQUIRED features. The
+         robot's lenses are USB (external, both report "facing back") and the
+         voice face must install and run on a body with no lens at all: a
+         camera is an extra, never a precondition for Emma to listen. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
         android:allowBackup="false"
+        android:hardwareAccelerated="true"
         android:icon="@drawable/ic_controller"
         android:label="Emma Robot"
+        android:networkSecurityConfig="${networkSecurityConfig}"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="${usesCleartextTraffic}"
         tools:ignore="DataExtractionRules">
         <activity
             android:name=".MainActivity"

@@ -25,22 +25,292 @@ speech, but we can tell "ปิดสไลด์" from "bit like".
 """
 from __future__ import annotations
 
+import time
+from contextvars import ContextVar
+from dataclasses import dataclass
+
 #: The most recent thing the provider reported hearing. Empty until the
 #: guest says something, and reset per session by `forget`.
 _LAST: str = ""
 
+# ---- per-session captions, for the body/nav guards (design §2d step 4) ----
+#
+# `_LAST` is one global holding the latest *chunk*, from whichever session
+# spoke last. Good enough for "did anybody say ปิดสไลด์", wrong for motion:
+# a caption that lands *after* the tool call leaves the previous utterance in
+# place — "ยกแขนได้ไหม" (a question) would have authorised the arm the model
+# raised on the next sentence (safety review #7). So the motion guards read a
+# store keyed by session, with the time each caption began and the time of
+# the session's latest `activity_start`. The slide tools keep `_LAST`/`last()`
+# exactly as they were.
 
-def record(text: str) -> None:
+
+@dataclass(frozen=True)
+class Caption:
+    """One utterance of one session, as the recogniser captioned it.
+
+    `at` is the monotonic time its *first* chunk arrived: the moment the
+    words began reaching us. Freshness and single use are both judged on it,
+    so a long sentence cannot keep renewing itself chunk by chunk.
+    """
+
+    text: str
+    at: float
+    utterance: str | None = None
+    raw: str = ""
+
+
+#: id(session) -> (session, Caption). Keyed by id with the object kept for an
+#: identity check, not a WeakKeyDictionary: test doubles and the eval harness
+#: use bare `object()`, which cannot be weakly referenced. Entries are
+#: dropped by `forget(session)` when a session ends.
+_CAPTIONS: dict[int, tuple[object, Caption]] = {}
+#: id(session) -> (session, monotonic time of the latest activity_start).
+_ACTIVITY: dict[int, tuple[object, float]] = {}
+#: id(session) -> (session, `at` of the newest caption already spent).
+_CONSUMED: dict[int, tuple[object, float]] = {}
+
+#: The session this task belongs to. `VoiceSession.run` binds it before the
+#: pumps start, so the provider (which has no reference to its session) can
+#: mark `activity_start` against the right conversation — the same per-task
+#: mechanism as `registry.session_profile`.
+_bound: ContextVar[object | None] = ContextVar("heard_session", default=None)
+
+
+def bind_session(session: object | None) -> None:
+    _bound.set(session)
+
+
+def _resolve(session: object | None) -> object | None:
+    return session if session is not None else _bound.get()
+
+
+def _get(store: dict, session: object):
+    entry = store.get(id(session))
+    if entry is None or entry[0] is not session:
+        return None
+    return entry[1]
+
+
+def record(text: str, session: object | None = None, *,
+           utterance_id: str | None = None, now: float | None = None) -> None:
+    """Remember a caption chunk.
+
+    The global `_LAST` keeps today's meaning (the latest chunk, any session).
+    With a session (explicit or bound), the chunk also joins that session's
+    current caption — but only while it is the same utterance *and* no
+    `activity_start` came after the caption began. A new segment of speech
+    always starts a new caption, even when the provider keeps the same
+    utterance id across it, so "ยกแขนได้ไหม … เอาเลย" cannot become one old
+    caption that a later tool call reads as fresh.
+    """
     _LAST = (text or "").strip()
     globals()["_LAST"] = _LAST
+    owner = _resolve(session)
+    if owner is None or not text:
+        return
+    at = time.monotonic() if now is None else now
+    prev = _get(_CAPTIONS, owner)
+    act = _get(_ACTIVITY, owner)
+    same = (prev is not None and utterance_id is not None
+            and prev.utterance == utterance_id
+            and not (act is not None and act > prev.at))
+    if same:
+        raw = prev.raw + text
+        caption = Caption(text=raw.strip(), at=prev.at, utterance=utterance_id, raw=raw)
+    else:
+        caption = Caption(text=text.strip(), at=at, utterance=utterance_id, raw=text)
+    _CAPTIONS[id(owner)] = (owner, caption)
+
+
+def mark_activity(session: object | None = None, *, now: float | None = None) -> None:
+    """The provider sent `activity_start` (VAD local): new speech begins.
+
+    Every caption recorded before this moment belongs to an earlier
+    utterance and can no longer authorise motion.
+    """
+    owner = _resolve(session)
+    if owner is None:
+        return
+    _ACTIVITY[id(owner)] = (owner, time.monotonic() if now is None else now)
+
+
+def latest_caption(session: object | None = None) -> Caption | None:
+    """The session's newest caption, fresh or not (for logs and tests)."""
+    owner = _resolve(session)
+    return None if owner is None else _get(_CAPTIONS, owner)
+
+
+def caption_for(session: object | None = None, *, max_age_s: float | None = None,
+                now: float | None = None) -> Caption | None:
+    """The session's latest caption, **only if it may still authorise an action**.
+
+    None unless it began after the session's latest `activity_start` and is
+    at most `max_age_s` old (default ROBOT_HEARD_MAX_AGE_S). With server-side
+    VAD there are no activity marks and only the age bound applies — the
+    weaker case, named in tests/test_heard_fresh.py. Whether it was already
+    spent is `consume`'s question, not this one's.
+    """
+    owner = _resolve(session)
+    if owner is None:
+        return None
+    caption = _get(_CAPTIONS, owner)
+    if caption is None:
+        return None
+    act = _get(_ACTIVITY, owner)
+    if act is not None and act > caption.at:
+        return None
+    if max_age_s is None:
+        from app.config import settings
+
+        max_age_s = settings.robot_heard_max_age_s
+    clock = time.monotonic() if now is None else now
+    if clock - caption.at > max_age_s:
+        return None
+    return caption
+
+
+def consume(session: object | None, caption: Caption) -> bool:
+    """Spend a caption on one action. False if it (or a later one) was spent.
+
+    One sentence authorises at most one motion: without this a model that
+    retries — or calls `move_body` and then `go_to_place` — would move twice
+    on one "ยกแขนซ้าย". Shared by body and nav on purpose, so the two guards
+    cannot each spend the same caption once.
+    """
+    owner = _resolve(session)
+    if owner is None or caption is None:
+        return False
+    spent = _get(_CONSUMED, owner)
+    if spent is not None and caption.at <= spent:
+        return False
+    _CONSUMED[id(owner)] = (owner, caption.at)
+    return True
+
+
+def has_words(text: str, terms) -> bool:
+    """Does `text` contain one of `terms` as whole words?
+
+    Every term is tokenized the way the text is, and must appear as a run of
+    whole tokens. Never a substring: `ยก` sits inside `ยกเลิก` and `ราคา`
+    shares `าคา` with `อาคาร` (CLAUDE.md, twice). Latin terms go through the
+    same path, so "stop" does not match "stopwatch".
+    """
+    from app.tools.retrieval import tokenize
+
+    words = tokenize((text or "").lower())
+    if not words:
+        return False
+    padded = " %s " % " ".join(words)
+    for term in terms or ():
+        parts = tokenize((term or "").lower())
+        if parts and (" %s " % " ".join(parts)) in padded:
+            return True
+    return False
+
+
+#: A place named in a sentence that refuses or asks about it is not a request
+#: to go there (review #18): "อย่าไปห้องประชุมใหญ่", "ไม่ต้องไปห้องประชุม" and
+#: "ห้องประชุมใหญ่อยู่ไหน" all named big_room and passed the place guard.
+#: Whole words only, like every list in this module.
+#: Review 2 #11 (real tokenizer + floor2.json, 9 Oct) added "not that one"
+#: and "not back": "ไม่ใช่ห้องประชุมใหญ่" is ไม่ ใช่ (bare ไม่ is not a decline
+#: word — "ไม่ไกล"), and "ยังไม่กลับแท่นชาร์จ" passed the dock branch because
+#: only ไม่ไป was listed. ไม่ต้องการ is one token, so ไม่ต้อง never matched it.
+_DECLINE_WORDS = ("อย่า", "ไม่ต้อง", "ไม่ต้องการ", "ไม่ไป", "ไม่กลับ", "ไม่เดิน",
+                  "ไม่เอา", "ไม่อยาก", "ไม่ใช่", "ยังไม่", "ห้าม",
+                  "don't", "dont", "do not", "not", "never", "didn't", "won't")
+#: Asking the robot to stop, cancel or wait names the place as often as a go
+#: does, and is the worst sentence to read as one: the guard is there to catch
+#: the model that hears "หยุดไปห้องประชุมใหญ่" / "cancel the big meeting room"
+#: and calls go_to_place (review 2 #11). Stop itself is never guarded — this
+#: only stops the *walk* from being authorised by it.
+_STOP_WORDS = ("หยุด", "ยกเลิก", "เลิก", "พอ", "พอแล้ว", "เดี๋ยวก่อน", "รอก่อน",
+               "เดี๋ยวค่อย", "ไว้ก่อน", "ทีหลัง",
+               "stop", "cancel", "never mind", "nevermind", "hold on", "wait")
+#: A trip that already happened (or is asked about) is news, not a request:
+#: "ผมเพิ่งไปห้องประชุมใหญ่มา", "เคยไปห้องประชุมใหญ่ไหม", "เมื่อกี้ไป
+#: ห้องประชุมมา", "I just came from the big meeting room". Refused even with
+#: a take-word: "เคยพาลูกค้าไปห้องประชุมใหญ่ไหม" asks about the past too.
+#: เมื่อกี๊ splits into เมื่อ กี๊; a term is tokenized like the text, so the
+#: run matches.
+_PAST_WORDS = ("เคย", "เพิ่ง", "เมื่อกี้", "เมื่อกี๊", "ตะกี้", "เมื่อวาน", "เมื่อเช้า",
+               "came", "been", "went", "visited")
+#: ...and so is a sentence that *ends* in มา / มาแล้ว ("ไปห้องประชุมใหญ่มา" =
+#: "went there and came back"), once trailing particles are skipped. Only
+#: the last word: "กลับมา" is its own token, so "ไปห้องประชุมใหญ่แล้วกลับมา"
+#: (go and come back) still walks.
+_PAST_TAILS = (("มา",), ("มา", "แล้ว"))
+#: A where-question asks for directions. Walking the guest there is a bigger
+#: answer than the one asked for, so it needs a word that asks to be taken.
+#: The integrator's check of #18 added the questions *about* the place that
+#: still named big_room: "ห้องประชุมใหญ่ไปยังไง", "...ไกลไหม", "...มีกี่ที่นั่ง",
+#: "Is the big meeting room far?". Same rule: without a take-word they ask,
+#: they do not request ("พาไปห้องประชุมใหญ่ ไม่ไกลใช่ไหม" still walks).
+_WHERE_WORDS = ("ไหน", "ที่ไหน", "อยู่ไหน", "ทางไหน", "where",
+                "ยังไง", "อย่างไร", "ไกล", "กี่", "how", "far")
+#: Deliberately not ไป: "ห้องประชุมใหญ่ไปทางไหน" is the question, not the
+#: request. พา / take / bring are what a guest says when he wants company.
+_TAKE_WORDS = ("พา", "พาไป", "take", "bring", "lead")
+
+
+def _ends_with(text: str, tails) -> bool:
+    """Does the caption end in one of `tails` (word tuples), past particles?"""
+    from app import robot_contracts as rc
+    from app.tools.retrieval import tokenize
+
+    core = rc.strip_particles(tokenize((text or "").lower()))
+    return any(len(core) >= len(t) and tuple(core[-len(t):]) == t for t in tails)
+
+
+def declines_or_asks_where(text: str | None) -> bool:
+    """Does this caption refuse, stop or recall the walk, or only ask about
+    the place?
+
+    For the place-name heard guard (`robot_nav._heard_place`): a caption
+    for which this is True must not authorise a walk, whatever place it
+    names. Errs toward True — a refused walk costs one question, a wrong
+    one walks a guest who said "don't" across the building.
+
+    Two tiers, on purpose. A refusal, a stop/cancel/wait or the past wins
+    over everything, a take-word included ("หยุด ไม่ต้องพาไปห้องประชุมใหญ่").
+    A where-question, a yes/no question (`robot_contracts.asks_yes_no`:
+    "ห้องประชุมใหญ่สวยไหม", "ต้องกลับแท่นไหม", "Is the big meeting room
+    nice?") only asks — unless the guest also asked to be taken there.
+    "...ได้ไหม" (please may I) and "...กันไหม" (shall we) are requests.
+    """
+    if not text or not text.strip():
+        return False
+    if (has_words(text, _DECLINE_WORDS) or has_words(text, _STOP_WORDS)
+            or has_words(text, _PAST_WORDS) or _ends_with(text, _PAST_TAILS)):
+        return True
+    if has_words(text, _TAKE_WORDS):
+        return False
+    if has_words(text, _WHERE_WORDS):
+        return True
+    from app import robot_contracts as rc
+    from app.tools.retrieval import tokenize
+
+    return rc.asks_yes_no(tokenize(text.lower()))
 
 
 def last() -> str:
     return _LAST
 
 
-def forget() -> None:
-    globals()["_LAST"] = ""
+def forget(session: object | None = None) -> None:
+    """No argument: forget everything (a new conversation owns the room).
+    With a session: drop only that session's captions and marks."""
+    if session is None:
+        globals()["_LAST"] = ""
+        _CAPTIONS.clear()
+        _ACTIVITY.clear()
+        _CONSUMED.clear()
+        return
+    for store in (_CAPTIONS, _ACTIVITY, _CONSUMED):
+        entry = store.get(id(session))
+        if entry is not None and entry[0] is session:
+            del store[id(session)]
 
 
 #: Words that ask for the screen to stop. Kept short and literal: this is a

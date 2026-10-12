@@ -19,8 +19,15 @@
     gap:12px; padding:16px; }
   .wrap { position:relative; max-width:100%; overflow:auto;
     border:1px solid var(--line); border-radius:12px; background:#000; }
+  /* Scaled UP for human eyes (owner 2026-09-30 "ไม่รู้เรื่อง" at native
+     460px): CSS height only — the click handler already converts through
+     getBoundingClientRect, so scaling never skews a goto. */
   canvas { display:block; image-rendering:pixelated; touch-action:none;
-    cursor:crosshair; }
+    cursor:crosshair; height:min(80vh, 1100px); width:auto; max-width:92vw; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; justify-content:center;
+    color:var(--muted); font-size:13px; }
+  .legend .sw { display:inline-block; width:12px; height:12px;
+    border-radius:3px; vertical-align:-1px; margin-right:5px; }
   .note { color:var(--muted); font-size:13px; text-align:center; max-width:440px; }
   .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
     justify-content:center; }
@@ -31,6 +38,11 @@
   .foot { color:var(--muted); font-size:12px; text-align:center; padding:10px;
     border-top:1px solid var(--line); }
   code { color:#7fb0ff; }
+  .reloc { display:none; max-width:520px; padding:10px 14px; border-radius:10px;
+    border:1px solid var(--lock); background:rgba(107,90,30,.22); color:#f0dca0;
+    text-align:center; gap:10px; align-items:center; justify-content:center;
+    flex-wrap:wrap; }
+  .reloc.show { display:flex; }
 </style>
 
 <header>
@@ -41,12 +53,40 @@
 </header>
 
 <main>
-  <div class="note" id="hint">แผนที่จากฐานนำทาง (SLAM) จุดสีเขียวคือหุ่น คลิกจุดหมายเพื่อสั่งไป</div>
+  <div class="note" id="hint">แผนที่ที่หุ่นสแกนไว้เอง — คลิกบนพื้นสีขาวเพื่อเลือกจุดหมาย แล้วกด "สั่งไปจุดนี้"</div>
+  <div class="legend">
+    <span><span class="sw" style="background:#e8e8e8"></span>พื้นที่เดินได้</span>
+    <span><span class="sw" style="background:#c83c3c"></span>กำแพง/สิ่งกีดขวาง</span>
+    <span><span class="sw" style="background:#2d2d2d;border:1px solid #555"></span>ยังไม่เคยสำรวจ</span>
+    <span><span class="sw" style="background:#3a844a;border-radius:50%"></span>หุ่น (ลูกศร = ทิศที่หัน)</span>
+    <span><span class="sw" style="background:#57c7ff;border-radius:50%"></span>จุดที่บันทึกไว้</span>
+  </div>
+  <!-- drive_route leaves board localization OFF on purpose, and the server
+       then refuses every planner walk (design §4, S10) — said here, with the
+       fix one press away, instead of a goto that fails with no reason. -->
+  <div class="reloc" id="reloc">
+    <span>ระบบระบุตำแหน่งปิดอยู่ — กดตั้งตำแหน่งใหม่</span>
+    <button id="relocBtn">ตั้งตำแหน่งใหม่</button>
+  </div>
   <div class="wrap"><canvas id="map" width="200" height="200"></canvas></div>
   <div class="row">
     <button id="go" disabled>ยังไม่ได้เลือกจุด</button>
     <button id="stop" class="stop">หยุด</button>
     <button id="reload">โหลดแผนที่ใหม่</button>
+  </div>
+  <div class="row">
+    <input id="poiName" type="text" placeholder="ชื่อจุด เช่น ห้องตัวอย่าง"
+           style="border:1px solid var(--line); background:var(--panel); color:var(--ink);
+                  border-radius:10px; padding:9px 12px; font-size:14px; width:200px;">
+    <button id="savePoi">บันทึกจุดที่หุ่นยืนอยู่</button>
+    <button id="undock">ออกจากแท่นชาร์จ</button>
+    <button id="home">กลับแท่นชาร์จ</button>
+  </div>
+  <div class="row">
+    <input id="planFile" type="file" accept="image/png,image/jpeg" style="display:none">
+    <button id="planUpload">อัพโหลดผังโชว์รูม</button>
+    <button id="planCalib" disabled>จับคู่ตำแหน่งผัง</button>
+    <button id="planToggle" disabled>ดูภาพสแกน</button>
   </div>
   <div class="note" id="msg"></div>
 </main>
@@ -72,10 +112,59 @@ const q = token ? '?token=' + encodeURIComponent(token) : '';
 const canvas = $('map');
 const ctx = canvas.getContext('2d');
 
+// Free cells at or above this confidence are floor; below it they are laser
+// rays through glass/doorways (measured 2026-09-30: floor clusters at 127,
+// rays scatter over 10..110 — see the histogram note in drawMap).
+const FLOOR_CONFIDENT = 112;
+
 let map = null;            // {origin_x, origin_y, width, height, resolution, cells}
 let motionEnabled = false;
 let target = null;         // {x, y} in metres, chosen by a click
 let lastPose = null;
+let placePoses = [];       // [{name, x, y, yaw}] — every saved spot, drawn by name
+let docking = null;        // the board's dockingStatus, for the relocalize mode
+
+// The localization notice: shown when /robot/state reads it off (false) OR
+// cannot read it (null) — unreadable is not "on", the server's own rule —
+// and when a walk comes back refused with error 'relocalize'.
+function showReloc(on) { $('reloc').classList.toggle('show', !!on); }
+
+// Server-side refusals carry a Thai `hint` (run_active, relocalize,
+// routes_own_the_base); the code alone tells the operator nothing.
+function why(r) { return (r && (r.hint || r.error)) || 'ไม่ทราบสาเหตุ'; }
+
+// ---- the owner's own showroom plan over the grid (2026-09-30 "อัพผังให้
+// ง่ายกว่าใหม่"). The image + a TWO-POINT calibration live on the server so
+// every device sees the same plan. Calibration is a similarity transform
+// found from two matched points, done with complex numbers: plan pixels are
+// read as z = px - i·py (the sign flip because image y grows down and world
+// y grows up — without it the plan comes out mirrored), world as w = wx +
+// i·wy, and w = α·z + β. Two pairs pin α and β exactly.
+let planImg = null;        // ImageBitmap of the uploaded plan
+let planCalib = null;      // {alpha:{re,im}, beta:{re,im}}
+let planVisible = true;    // toggle: plan view vs raw scan view
+let calibWizard = null;    // {pairs:[], pending:{px,py}|null, view:'plan'|'scan'}
+let planFit = null;        // how the plan was fitted for wizard clicks
+let gridCanvas = null;     // offscreen: the full occupancy rendering
+let wallsCanvas = null;    // offscreen: walls only, for drawing over the plan
+
+function planReady() { return !!(planImg && planCalib); }
+
+function computeCalib(pairs) {
+  const z1 = { re: pairs[0].px, im: -pairs[0].py };
+  const z2 = { re: pairs[1].px, im: -pairs[1].py };
+  const w1 = { re: pairs[0].wx, im: pairs[0].wy };
+  const w2 = { re: pairs[1].wx, im: pairs[1].wy };
+  const dz = { re: z2.re - z1.re, im: z2.im - z1.im };
+  const dw = { re: w2.re - w1.re, im: w2.im - w1.im };
+  const d = dz.re * dz.re + dz.im * dz.im;
+  if (!d) return null;
+  const alpha = { re: (dw.re * dz.re + dw.im * dz.im) / d,
+                  im: (dw.im * dz.re - dw.re * dz.im) / d };
+  const beta = { re: w1.re - (alpha.re * z1.re - alpha.im * z1.im),
+                 im: w1.im - (alpha.re * z1.im + alpha.im * z1.re) };
+  return { alpha, beta };
+}
 
 function msg(text, bad) { const el = $('msg'); el.textContent = text || '';
   el.style.color = bad ? '#f0b3bd' : ''; }
@@ -92,6 +181,7 @@ async function loadMap() {
     for (let i = 0; i < bin.length; i++) cells[i] = bin.charCodeAt(i);
     map = { origin_x: m.origin_x, origin_y: m.origin_y, width: m.width,
             height: m.height, resolution: m.resolution, cells };
+    buildGridLayers();
     drawMap();
     msg('โหลดแผนที่แล้ว ' + m.width + '×' + m.height +
         ' (ช่องละ ' + m.resolution.toFixed(3) + ' ม.)');
@@ -105,11 +195,19 @@ async function loadMap() {
   $('reload').disabled = false;
 }
 
-function drawMap() {
+// The grid is rendered once per map load into two offscreen layers: the full
+// occupancy picture, and a walls-only layer that rides on top of the owner's
+// plan so reality (a couch someone moved) still shows through the drawing.
+function buildGridLayers() {
   if (!map) return;
-  canvas.width = map.width;
-  canvas.height = map.height;
-  const img = ctx.createImageData(map.width, map.height);
+  gridCanvas = document.createElement('canvas');
+  gridCanvas.width = map.width; gridCanvas.height = map.height;
+  const gctx = gridCanvas.getContext('2d');
+  wallsCanvas = document.createElement('canvas');
+  wallsCanvas.width = map.width; wallsCanvas.height = map.height;
+  const wctx = wallsCanvas.getContext('2d');
+  const img = gctx.createImageData(map.width, map.height);
+  const walls = wctx.createImageData(map.width, map.height);
   for (let row = 0; row < map.height; row++) {
     // grid row 0 is lowest world-y; canvas row 0 is the top → flip.
     const canvasRow = map.height - 1 - row;
@@ -119,22 +217,89 @@ function drawMap() {
       // seen, 1..127 = free (127 the most confident), 128..255 = occupied.
       // A plain grayscale drew it inverted: floor came out mid-grey and
       // walls near-white, the worst possible reading for click-to-go.
+      //
+      // And confidence is bimodal, measured on THIS showroom's map
+      // (2026-09-30 histogram): real floor sits at 127 (27,491 cells ≈ 69m²,
+      // showroom-sized) with a small 112-126 fringe, while a long sparse
+      // tail at 10..110 is laser rays through glass and doorways — the
+      // white "spikes" that made the owner say ไม่รู้เรื่อง. Low-confidence
+      // free is therefore drawn as barely-there, not as floor.
       const v = map.cells[row * map.width + col];
       const o = (canvasRow * map.width + col) * 4;
       let r, g, b;
       if (v === 0) {                     // unknown — never explored
         r = g = b = 45;
-      } else if (v <= 127) {             // free — lighter = more confident
-        r = g = b = 128 + Math.round((v / 127) * 127);
+      } else if (v <= 127) {             // free
+        if (v >= FLOOR_CONFIDENT) {      // walkable floor: solid white
+          r = g = b = 216 + Math.round(((v - FLOOR_CONFIDENT) / (127 - FLOOR_CONFIDENT)) * 39);
+        } else {                         // ray junk: visible if you look, never "floor"
+          r = g = b = 58;
+        }
       } else {                           // occupied — a wall, do not drive here
         r = 200; g = 60; b = 60;
+        walls.data[o] = 200; walls.data[o + 1] = 60; walls.data[o + 2] = 60;
+        walls.data[o + 3] = 235;
       }
       img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b;
       img.data[o + 3] = 255;
     }
   }
-  ctx.putImageData(img, 0, 0);
+  gctx.putImageData(img, 0, 0);
+  wctx.putImageData(walls, 0, 0);
+}
+
+function drawMap() {
+  if (!map || !gridCanvas) return;
+  canvas.width = map.width;            // also resets any leftover transform
+  canvas.height = map.height;
+  if (calibWizard && calibWizard.view === 'plan' && planImg) {
+    drawPlanFitted();
+    return;                            // no markers: this view is unmapped pixels
+  }
+  if (planReady() && planVisible && !calibWizard) {
+    ctx.fillStyle = '#14181d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawPlanCalibrated();
+    ctx.drawImage(wallsCanvas, 0, 0);
+  } else {
+    ctx.drawImage(gridCanvas, 0, 0);
+  }
   drawOverlay();
+}
+
+// plan pixel -> world -> canvas, composed into one setTransform. Derivation:
+// w = α·(px - i·py) + β gives wx = α.re·px + α.im·py + β.re and
+// wy = α.im·px - α.re·py + β.im; the canvas mapping is worldToCanvas().
+function drawPlanCalibrated() {
+  const a = planCalib.alpha, b = planCalib.beta, res = map.resolution;
+  ctx.setTransform(a.re / res, -a.im / res, a.im / res, a.re / res,
+                   (b.re - map.origin_x) / res - 0.5,
+                   (map.height - 0.5) + (map.origin_y - b.im) / res);
+  ctx.drawImage(planImg, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+// The wizard's plan view: the image fitted whole into the canvas, remembering
+// the fit so a click converts back to a plan pixel.
+function drawPlanFitted() {
+  ctx.fillStyle = '#0d0f12';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const s = Math.min(canvas.width / planImg.width, canvas.height / planImg.height);
+  const ox = (canvas.width - planImg.width * s) / 2;
+  const oy = (canvas.height - planImg.height * s) / 2;
+  planFit = { s, ox, oy };
+  ctx.drawImage(planImg, ox, oy, planImg.width * s, planImg.height * s);
+  for (const pair of calibWizard.pairs) {
+    drawCross(pair.px * s + ox, pair.py * s + oy, '#57c7ff');
+  }
+}
+
+function drawCross(cx, cy, colour) {
+  ctx.strokeStyle = colour; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - 7, cy); ctx.lineTo(cx + 7, cy);
+  ctx.moveTo(cx, cy - 7); ctx.lineTo(cx, cy + 7);
+  ctx.stroke();
 }
 
 function worldToCanvas(x, y) {
@@ -154,14 +319,29 @@ function canvasToWorld(cx, cy) {
 function drawOverlay() {
   if (!map) return;
   drawMap._base = drawMap._base;    // (bitmap already in the canvas)
+  // Saved spots first, under the robot marker: a cyan dot + its name, so
+  // the owner sees where "ห้องตัวอย่าง" actually is instead of clicking blind.
+  for (const poi of placePoses) {
+    const p = worldToCanvas(poi.x, poi.y);
+    ctx.fillStyle = '#57c7ff';
+    ctx.beginPath(); ctx.arc(p.cx, p.cy, 4, 0, 7); ctx.fill();
+    // Name painted twice — dark stroke under light fill — so it reads on
+    // white floor and dark unknown alike.
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,13,16,.85)';
+    ctx.strokeText(poi.name, p.cx + 6, p.cy + 4);
+    ctx.fillStyle = '#bfe6ff';
+    ctx.fillText(poi.name, p.cx + 6, p.cy + 4);
+  }
   if (lastPose) {
     const p = worldToCanvas(lastPose.x, lastPose.y);
     ctx.fillStyle = '#3a844a';
-    ctx.beginPath(); ctx.arc(p.cx, p.cy, 3, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#3a844a'; ctx.lineWidth = 1;
+    ctx.strokeStyle = '#eafff0'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(p.cx, p.cy, 5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#3a844a'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(p.cx, p.cy);
-    ctx.lineTo(p.cx + Math.cos(-lastPose.yaw) * 8,
-               p.cy + Math.sin(-lastPose.yaw) * 8); ctx.stroke();
+    ctx.lineTo(p.cx + Math.cos(-lastPose.yaw) * 12,
+               p.cy + Math.sin(-lastPose.yaw) * 12); ctx.stroke();
   }
   if (target) {
     const t = worldToCanvas(target.x, target.y);
@@ -177,6 +357,7 @@ canvas.addEventListener('click', (e) => {
   const r = canvas.getBoundingClientRect();
   const cx = (e.clientX - r.left) * (canvas.width / r.width);
   const cy = (e.clientY - r.top) * (canvas.height / r.height);
+  if (calibWizard) { calibClick(cx, cy); return; }
   target = canvasToWorld(cx, cy);
   $('sel').textContent = 'จุดหมาย x ' + target.x.toFixed(2) + '  y ' + target.y.toFixed(2);
   $('go').disabled = !(motionEnabled);
@@ -199,8 +380,9 @@ $('go').addEventListener('click', async () => {
   $('go').disabled = true;
   try {
     const r = await command({ action: 'goto', x: target.x, y: target.y });
+    if (r.error === 'relocalize') showReloc(true);
     msg(r.ok ? 'ส่งคำสั่งไปจุดหมายแล้ว — ติดตามจุดเขียว หยุดได้ทุกเมื่อ'
-             : 'สั่งไม่ได้: ' + (r.error || 'ไม่ทราบสาเหตุ'),
+             : 'สั่งไม่ได้: ' + why(r),
         !r.ok);
   } catch (e) {
     msg('ส่งคำสั่งไม่ได้: ' + e.message, true);
@@ -210,11 +392,186 @@ $('go').addEventListener('click', async () => {
 
 $('stop').addEventListener('click', async () => {
   try { const r = await command({ action: 'stop' });
-    msg(r.ok ? 'สั่งหยุดแล้ว' : 'สั่งหยุดไม่ได้: ' + (r.error || ''), !r.ok);
+    // A route run is stopped through the robot face (finding #0): the ack
+    // says the app queued the stop, not that the wheels stopped.
+    // stop_unconfirmed (review 2, #0-#2): only the board's pause went out —
+    // the face is gone, or not on a call so a walk cannot be ruled out. The
+    // server's hint (press the robot's own stop) is the whole message.
+    msg(r.did === 'stop_unconfirmed' ? 'ยังยืนยันไม่ได้ว่าหุ่นหยุด: ' + why(r)
+        : r.ok ? (r.did === 'stop_requested' ? 'ส่งคำสั่งหยุดแล้ว — ยังไม่ยืนยันว่าหุ่นหยุด ดูที่ตัวหุ่น'
+                                              : 'สั่งหยุดแล้ว')
+             : 'สั่งหยุดไม่ได้: ' + why(r), r.did === 'stop_unconfirmed' || !r.ok);
   } catch (e) { msg('สั่งหยุดไม่ได้: ' + e.message, true); }
 });
 
 $('reload').addEventListener('click', loadMap);
+
+// The existing /robot/command action=relocalize: `dock` when the board says
+// it is on the dock (sets the pose to the registered dock), `static`
+// otherwise (confirms from where it stands). Neither moves the robot.
+$('relocBtn').addEventListener('click', async () => {
+  $('relocBtn').disabled = true;
+  try {
+    const mode = docking === 'on_dock' ? 'dock' : 'static';
+    const r = await command({ action: 'relocalize', mode });
+    msg(r.ok ? 'สั่งตั้งตำแหน่งใหม่แล้ว — รอสักครู่ให้หุ่นยืนยันตำแหน่ง'
+             : 'ตั้งตำแหน่งไม่ได้: ' + why(r), !r.ok);
+  } catch (e) { msg('ตั้งตำแหน่งไม่ได้: ' + e.message, true); }
+  $('relocBtn').disabled = false;
+});
+
+// Save the robot's CURRENT position under a typed name. The server refuses
+// it while the robot is not localized (a spot saved from odometry lies to
+// every future navigation), so failure here comes back with the reason.
+$('savePoi').addEventListener('click', async () => {
+  const name = $('poiName').value.trim();
+  if (!name) { msg('ตั้งชื่อจุดก่อน เช่น "ห้องตัวอย่าง"', true); return; }
+  $('savePoi').disabled = true;
+  try {
+    const r = await command({ action: 'save_poi', name });
+    msg(r.ok ? 'บันทึก "' + name + '" แล้ว — Emma พาไปจุดนี้ได้เลย'
+             : 'บันทึกไม่ได้: ' + (r.error || r.hint || 'ไม่ทราบสาเหตุ'), !r.ok);
+    if (r.ok) $('poiName').value = '';
+  } catch (e) { msg('บันทึกไม่ได้: ' + e.message, true); }
+  $('savePoi').disabled = false;
+});
+
+$('undock').addEventListener('click', async () => {
+  $('undock').disabled = true;
+  try {
+    const r = await command({ action: 'undock' });
+    msg(r.ok ? 'กำลังถอยออกจากแท่น — รอสักครู่แล้วค่อยสั่งเดิน'
+             : 'ออกจากแท่นไม่ได้: ' + (r.error || ''), !r.ok);
+  } catch (e) { msg('ออกจากแท่นไม่ได้: ' + e.message, true); }
+  $('undock').disabled = false;
+});
+
+$('home').addEventListener('click', async () => {
+  $('home').disabled = true;
+  try {
+    const r = await command({ action: 'home' });
+    if (r.error === 'relocalize') showReloc(true);
+    msg(r.ok ? 'สั่งกลับแท่นชาร์จแล้ว' : 'สั่งไม่ได้: ' + why(r), !r.ok);
+  } catch (e) { msg('สั่งไม่ได้: ' + e.message, true); }
+  $('home').disabled = false;
+});
+
+// --- the owner's plan: upload, two-point calibration, toggle ---
+
+function refreshPlanButtons() {
+  $('planCalib').disabled = !planImg;
+  $('planCalib').textContent = calibWizard ? 'ยกเลิกการจับคู่' : 'จับคู่ตำแหน่งผัง';
+  $('planToggle').disabled = !planReady();
+  $('planToggle').textContent = (planReady() && planVisible) ? 'ดูภาพสแกน' : 'ดูผังโชว์รูม';
+}
+
+async function loadPlan() {
+  planImg = null;
+  planCalib = null;
+  try {
+    const res = await fetch('/robot/plan' + q);
+    if (res.ok) planImg = await createImageBitmap(await res.blob());
+  } catch (e) { /* no plan yet */ }
+  try {
+    const out = await (await fetch('/robot/plan/calibration' + q)).json();
+    if (out.ok && out.calibration && Array.isArray(out.calibration.pairs)) {
+      planCalib = computeCalib(out.calibration.pairs);
+    }
+  } catch (e) { /* uncalibrated */ }
+  refreshPlanButtons();
+  if (map) drawMap();
+}
+
+$('planUpload').addEventListener('click', () => $('planFile').click());
+
+$('planFile').addEventListener('change', async () => {
+  const file = $('planFile').files && $('planFile').files[0];
+  $('planFile').value = '';
+  if (!file) return;
+  $('planUpload').disabled = true;
+  try {
+    const res = await fetch('/robot/plan' + q, {
+      method: 'POST', headers: { 'Content-Type': file.type }, body: file,
+    });
+    const out = await res.json();
+    if (!out.ok) { msg('อัพโหลดไม่ได้: ' + (out.error || ''), true); }
+    else {
+      await loadPlan();
+      msg('อัพโหลดผังแล้ว — กด "จับคู่ตำแหน่งผัง" เพื่อบอกว่าผังวางทับแผนที่ยังไง');
+    }
+  } catch (e) { msg('อัพโหลดไม่ได้: ' + e.message, true); }
+  $('planUpload').disabled = false;
+});
+
+$('planCalib').addEventListener('click', () => {
+  if (calibWizard) {                    // cancel
+    calibWizard = null;
+    refreshPlanButtons();
+    msg('ยกเลิกการจับคู่แล้ว');
+    drawMap();
+    return;
+  }
+  if (!planImg) return;
+  calibWizard = { pairs: [], pending: null, view: 'plan' };
+  refreshPlanButtons();
+  msg('จุดที่ 1/2 — คลิกจุดที่จำง่ายบน "ผัง" (มุมห้อง เสา ประตู)');
+  drawMap();
+});
+
+function calibClick(cx, cy) {
+  const w = calibWizard;
+  if (w.view === 'plan') {
+    if (!planFit) return;
+    const px = (cx - planFit.ox) / planFit.s;
+    const py = (cy - planFit.oy) / planFit.s;
+    if (px < 0 || py < 0 || px > planImg.width || py > planImg.height) return;
+    w.pending = { px, py };
+    w.view = 'scan';
+    msg('ตอนนี้คลิก "จุดเดียวกัน" บนแผนที่สแกน (ภาพขาว-แดง)');
+  } else {
+    const world = canvasToWorld(cx, cy);
+    w.pairs.push({ px: w.pending.px, py: w.pending.py, wx: world.x, wy: world.y });
+    w.pending = null;
+    if (w.pairs.length < 2) {
+      w.view = 'plan';
+      msg('จุดที่ 2/2 — คลิกอีกจุดบนผัง ให้ห่างจากจุดแรกมากๆ (คนละมุมห้อง)');
+    } else {
+      submitCalibration(w.pairs);
+      return;
+    }
+  }
+  drawMap();
+}
+
+async function submitCalibration(pairs) {
+  try {
+    const res = await fetch('/robot/plan/calibration', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, pairs }),
+    });
+    const out = await res.json();
+    if (!out.ok) {
+      msg('จับคู่ไม่สำเร็จ: ' + (out.error || '') + ' — เริ่มใหม่', true);
+      calibWizard = { pairs: [], pending: null, view: 'plan' };
+      drawMap();
+      return;
+    }
+    planCalib = computeCalib(pairs);
+    calibWizard = null;
+    planVisible = true;
+    refreshPlanButtons();
+    msg('จับคู่สำเร็จ — ตอนนี้เห็นหุ่นเดินบนผังโชว์รูมแล้ว (คลิกสั่งเดินได้เหมือนเดิม)');
+    drawMap();
+  } catch (e) {
+    msg('ส่งค่าจับคู่ไม่ได้: ' + e.message, true);
+  }
+}
+
+$('planToggle').addEventListener('click', () => {
+  planVisible = !planVisible;
+  refreshPlanButtons();
+  drawMap();
+});
 
 // --- live state: robot marker + lock indicator ---
 async function poll() {
@@ -234,10 +591,14 @@ async function poll() {
   $('lock').textContent = motionEnabled ? 'การขยับ: ปลดล็อก' : 'การขยับ: ล็อก';
   if (target) $('go').disabled = !motionEnabled;
   lastPose = s.pose || null;
+  docking = s.docking || null;
+  showReloc(s.connected && s.localization_enabled !== true);
+  placePoses = Array.isArray(s.place_poses) ? s.place_poses : [];
   if (map) drawMap();
 }
 
 loadMap();
+loadPlan();
 poll();
 setInterval(poll, 1500);
 </script>
