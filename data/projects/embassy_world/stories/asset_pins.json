@@ -1,0 +1,1326 @@
+{
+ "bld_c_holo": {
+  "file": "bld_c_holo.webp",
+  "sha256": "4569058e4ddd0ae2db8c33adfc41d1dedf0f0a85e2ab126d5220a63bb906d3bc",
+  "bytes": 116048,
+  "w": 1080,
+  "h": 581,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/C_01_hologram_overview.png",
+  "crop": [
+   690,
+   330,
+   2270,
+   1180
+  ],
+  "alpha": false
+ },
+ "bld_c_real": {
+  "file": "bld_c_real.webp",
+  "sha256": "a07f07775435462c702516a8ef87fe75e0422ddda0145ce88a3a3735c82267c9",
+  "bytes": 54844,
+  "w": 1080,
+  "h": 581,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/C_02_realistic_overview.png",
+  "crop": [
+   690,
+   330,
+   2270,
+   1180
+  ],
+  "alpha": false
+ },
+ "campus_holo_f1060": {
+  "file": "campus_holo_f1060.webp",
+  "sha256": "6c96a6a09820c20879f3a3d74ecafce2573e3564cf1e9748cf047863e6b5668e",
+  "bytes": 1838,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1060.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_holo_f1120": {
+  "file": "campus_holo_f1120.webp",
+  "sha256": "32d90c16323eb23fd7de2e7e663a95b2c2a8ec71313ec666d66eb73bcaa6960f",
+  "bytes": 11490,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1120.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_holo_f1180": {
+  "file": "campus_holo_f1180.webp",
+  "sha256": "951e067a09193cb6cc450a08a3f9dd710da035bccffa4043fa882198776d2409",
+  "bytes": 24050,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1180.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_holo_f1240": {
+  "file": "campus_holo_f1240.webp",
+  "sha256": "6e0009811d6abad1e60ac1b0e252dfd1dad0a602f426e387c20a263d2371f916",
+  "bytes": 32126,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1240.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_holo_f1300": {
+  "file": "campus_holo_f1300.webp",
+  "sha256": "9afafe0610ec094ce4a6bacec58c5ad9a8da3851632d313c73106fedfa27207f",
+  "bytes": 38082,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1300.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_holo_f1500": {
+  "file": "campus_holo_f1500.webp",
+  "sha256": "50cf44e7fbf727c2983ad964d75c34a3a42e3e32eef306e7d4b53c9d03e4c227",
+  "bytes": 74096,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1500.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_holo_f1814": {
+  "file": "campus_holo_f1814.webp",
+  "sha256": "1b43d8e1fc4af681d530e589be23e94fe6506cbbe68abce72b6b47b8ab965abd",
+  "bytes": 86888,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1814.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_holo_f1900": {
+  "file": "campus_holo_f1900.webp",
+  "sha256": "7ce99ddab539ffdbb47f2c496af3ca1fd1c4abd8f0cc099a02f0ad326c553e54",
+  "bytes": 97344,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1900.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_holo_f2054": {
+  "file": "campus_holo_f2054.webp",
+  "sha256": "68998738d5a0a4a269a4b628c7071ec1056c3c9a692e9763e9392469ea6d879a",
+  "bytes": 96802,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f2054.png",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "alpha": false
+ },
+ "campus_real": {
+  "file": "campus_real.webp",
+  "sha256": "3cc35e3dd6c8866ebcc56bd8a36a7acf04af442ba32f7d1357d97a662017c9f6",
+  "bytes": 45286,
+  "w": 1060,
+  "h": 420,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/HologramTransition/ViewportCapture_20260924_115211/cycle_01_outward_08_reveal_0.990.png",
+  "crop": [
+   354,
+   368,
+   3088,
+   1451
+  ],
+  "alpha": false
+ },
+ "fac_3_common_sphere": {
+  "file": "fac_3_common_sphere.webp",
+  "sha256": "0ec85bbcc068befab1840f48d5fb8ab1a5bc1b3ad687ea3f0c2e2463d2ebfc61",
+  "bytes": 61978,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/18.jpg",
+  "crop": [
+   480,
+   100,
+   1920,
+   1000
+  ],
+  "alpha": false
+ },
+ "fac_3_coworking": {
+  "file": "fac_3_coworking.webp",
+  "sha256": "6a30cb2320038b8cbcba6ed9a513b70af4ec54a58e3b6c0a1d19b827873807d6",
+  "bytes": 53172,
+  "w": 1080,
+  "h": 782,
+  "format": "webp",
+  "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/25.jpg",
+  "crop": [
+   0,
+   110,
+   1270,
+   1030
+  ],
+  "alpha": false
+ },
+ "fac_3_sky_pool": {
+  "file": "fac_3_sky_pool.webp",
+  "sha256": "ac1320f422c03402407eb025ddbf71365ea6d6d7ef92463f0b421b921f8020c6",
+  "bytes": 140476,
+  "w": 1080,
+  "h": 741,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_041.jpg",
+  "crop": [
+   0,
+   160,
+   1340,
+   1080
+  ],
+  "alpha": false
+ },
+ "fac_3_social": {
+  "file": "fac_3_social.webp",
+  "sha256": "7707243f5d64da5ec386245f40a7cba9a60c97c58129307dcf977fd3074a33b9",
+  "bytes": 70206,
+  "w": 1020,
+  "h": 765,
+  "format": "webp",
+  "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/29.jpg",
+  "crop": [
+   900,
+   300,
+   1920,
+   1065
+  ],
+  "alpha": false
+ },
+ "fac_b_aqua_cinema": {
+  "file": "fac_b_aqua_cinema.webp",
+  "sha256": "83f3d0e0099fc04534cfe32f70c42774005bdca369234ff736d5fbca3b4129a6",
+  "bytes": 61480,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/16.jpg",
+  "crop": [
+   240,
+   100,
+   1680,
+   1000
+  ],
+  "alpha": false
+ },
+ "fac_b_crystal_sauna": {
+  "file": "fac_b_crystal_sauna.webp",
+  "sha256": "0154f2aa61a88eb60d084c974ce44b41a371e54b2335fd6507a65f93fb06f81b",
+  "bytes": 52874,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/37.jpg",
+  "crop": [
+   240,
+   100,
+   1680,
+   1000
+  ],
+  "alpha": false
+ },
+ "fac_b_hydro_capsule": {
+  "file": "fac_b_hydro_capsule.webp",
+  "sha256": "235cc65c518f1d7f74a0ff2cccffe43833b6f1e4352fe0cf4bfa25d2b63af753",
+  "bytes": 75224,
+  "w": 1080,
+  "h": 495,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_035.jpg",
+  "crop": [
+   150,
+   300,
+   1460,
+   900
+  ],
+  "alpha": false
+ },
+ "fac_b_ice_bath": {
+  "file": "fac_b_ice_bath.webp",
+  "sha256": "caacebe2543300f8a133ff1abfcbf0d644c2352ad8528c8be179cac85964a6a1",
+  "bytes": 70630,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/33.jpg",
+  "crop": [
+   150,
+   100,
+   1590,
+   1000
+  ],
+  "alpha": false
+ },
+ "fac_b_journey_mars": {
+  "file": "fac_b_journey_mars.webp",
+  "sha256": "74df32d024136cb48967c73e34c64fab1b9dcfb380210dfe635f9dfbe6fcd015",
+  "bytes": 154962,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/21.jpg",
+  "crop": [
+   240,
+   100,
+   1680,
+   1000
+  ],
+  "alpha": false
+ },
+ "fac_b_salt_sauna": {
+  "file": "fac_b_salt_sauna.webp",
+  "sha256": "b19ead03d65982e3090ec37b0d67287863663b0e2a7a3d8f319c00cf0cf70ffe",
+  "bytes": 58850,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/27.jpg",
+  "crop": [
+   400,
+   100,
+   1840,
+   1000
+  ],
+  "alpha": false
+ },
+ "fac_b_swing_sauna": {
+  "file": "fac_b_swing_sauna.webp",
+  "sha256": "8588ee30d2e8e338fa23e552d6034166dd7e2b594274246f1c08451bbdb32677",
+  "bytes": 50286,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/29.jpg",
+  "crop": [
+   240,
+   100,
+   1680,
+   1000
+  ],
+  "alpha": false
+ },
+ "fac_g_biogenesis": {
+  "file": "fac_g_biogenesis.webp",
+  "sha256": "30822d425d157788223e926d35a7468d16b42994800a3ebe0472a8bcbb90bf27",
+  "bytes": 119928,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - Biogenesis 01.jpg",
+  "crop": [
+   454,
+   0,
+   2297,
+   1152
+  ],
+  "alpha": false
+ },
+ "fac_g_bungee": {
+  "file": "fac_g_bungee.webp",
+  "sha256": "0b3c30b94732ec7451c626e0c99cd801c5764ec9c06ff84f902db06657e494bd",
+  "bytes": 88620,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - Bungee Gym&Yoga 01.jpg",
+  "crop": [
+   147,
+   0,
+   2605,
+   1536
+  ],
+  "alpha": false
+ },
+ "fac_g_bungee_02": {
+  "file": "fac_g_bungee_02.webp",
+  "sha256": "5335848f94d83132844312687e71abacbbda02f3b33369769556099c799d534e",
+  "bytes": 85314,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - Bungee Gym&Yoga 02.jpg",
+  "crop": [
+   147,
+   0,
+   2605,
+   1536
+  ],
+  "alpha": false
+ },
+ "fac_g_junior": {
+  "file": "fac_g_junior.webp",
+  "sha256": "5693f9c59baf8a2eea3a2bd4ba5091a971e8c997025fdfaa20b7599e54320d9d",
+  "bytes": 116672,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - JUNIOR WORLD 01.jpg",
+  "crop": [
+   296,
+   0,
+   2456,
+   1350
+  ],
+  "alpha": false
+ },
+ "fac_g_junior_ballpit": {
+  "file": "fac_g_junior_ballpit.webp",
+  "sha256": "bf03e8a0ffae74d43c16f48ae429b8c139dabd58ae919ff095ed5db293a6f80f",
+  "bytes": 107404,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - JUNIOR WORLD 02.jpg",
+  "crop": [
+   147,
+   0,
+   2605,
+   1536
+  ],
+  "alpha": false
+ },
+ "fac_g_pilates": {
+  "file": "fac_g_pilates.webp",
+  "sha256": "7c4dce3744caf6089870910086d86d26061039518b5cb8841be038804071bbc5",
+  "bytes": 63102,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - Pilates Studio.jpg",
+  "crop": [
+   147,
+   0,
+   2605,
+   1536
+  ],
+  "alpha": false
+ },
+ "fac_g_spinning": {
+  "file": "fac_g_spinning.webp",
+  "sha256": "5e29b78d08cb6a9350537e7dd32760addf076dfd4fd7093a42c005e7cb5a3693",
+  "bytes": 90864,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - Cycling Studio.jpg",
+  "crop": [
+   119,
+   0,
+   2577,
+   1536
+  ],
+  "alpha": false
+ },
+ "fac_plan_b": {
+  "file": "fac_plan_b.webp",
+  "sha256": "60ce7581ca4b3bb1eab66e752ea255a714c58f2bc32f553be022c20f8cb654bb",
+  "bytes": 65068,
+  "w": 1440,
+  "h": 445,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_027.jpg",
+  "crop": [
+   200,
+   330,
+   1720,
+   800
+  ],
+  "alpha": false
+ },
+ "fac_plan_g": {
+  "file": "fac_plan_g.webp",
+  "sha256": "8cffc2c03966059b800b5206a7307a6aa819db7f834ca4eef135f56a3516331f",
+  "bytes": 81448,
+  "w": 1330,
+  "h": 620,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_018.jpg",
+  "crop": [
+   290,
+   180,
+   1620,
+   800
+  ],
+  "alpha": false
+ },
+ "fac_plan_g_west": {
+  "file": "fac_plan_g_west.webp",
+  "sha256": "a8e729ffbd3a8a02fc1afc18905a9684f816817a50dff3ac73e7ea241eb93f54",
+  "bytes": 52658,
+  "w": 815,
+  "h": 610,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_018.jpg",
+  "crop": [
+   295,
+   190,
+   1110,
+   800
+  ],
+  "alpha": false
+ },
+ "fac_plan_l3": {
+  "file": "fac_plan_l3.webp",
+  "sha256": "ee3acec0b7fbd5a058bbb709dd4bb0e9ae41a125b39300acdae08083f63377de",
+  "bytes": 92574,
+  "w": 1240,
+  "h": 600,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_037.jpg",
+  "crop": [
+   340,
+   230,
+   1580,
+   830
+  ],
+  "alpha": false
+ },
+ "fac_ue_building_a": {
+  "file": "fac_ue_building_a.webp",
+  "sha256": "9261198c59045bc7b4e2eb3cbfd8ecbc229212f438c8fd7008cca2c420566ce0",
+  "bytes": 149770,
+  "w": 1440,
+  "h": 805,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/A_08_return_regression.png",
+  "crop": [
+   740,
+   380,
+   2260,
+   1230
+  ],
+  "alpha": false
+ },
+ "lagoon_islands_aerial": {
+  "file": "lagoon_islands_aerial.webp",
+  "sha256": "2ec088a6eb720aa764eff0eb22acc24700e9be832beb6108babb74a7601f74ec",
+  "bytes": 181268,
+  "w": 1080,
+  "h": 608,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/CD03/Scene 58.png",
+  "crop": [
+   0,
+   132,
+   2560,
+   1572
+  ],
+  "alpha": false
+ },
+ "lagoon_scene58": {
+  "file": "lagoon_scene58.webp",
+  "sha256": "627d798061b77e8dda279ac1c5c8892b7db674f895a878d80e8f056eb4781495",
+  "bytes": 232534,
+  "w": 1080,
+  "h": 810,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/CD03/Scene 58.png",
+  "crop": [
+   143,
+   0,
+   2416,
+   1705
+  ],
+  "alpha": false
+ },
+ "liv_courtyard_top": {
+  "file": "liv_courtyard_top.webp",
+  "sha256": "b5be3b6cf10c262766c3777f9fa4b624f724022f07c8d85df20edddb9c2b07f7",
+  "bytes": 56758,
+  "w": 920,
+  "h": 620,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png",
+  "crop": [
+   230,
+   240,
+   1150,
+   860
+  ],
+  "alpha": false
+ },
+ "liv_garden": {
+  "file": "liv_garden.webp",
+  "sha256": "8b38a7262bbfb5a784c4a0d3b85ac29b04bb4658eb7c589646b9fa08d82a5276",
+  "bytes": 222892,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/CD03/Scene 43.png",
+  "crop": [
+   0,
+   104,
+   2560,
+   1704
+  ],
+  "alpha": false
+ },
+ "liv_kid_pool": {
+  "file": "liv_kid_pool.webp",
+  "sha256": "b9be5550386defbb5103203286c58a4e4a6bb87bcd9bdb4883d662c833e509b8",
+  "bytes": 121826,
+  "w": 1080,
+  "h": 540,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/Playscape/Scene 55.png",
+  "crop": [
+   700,
+   630,
+   2300,
+   1430
+  ],
+  "alpha": false
+ },
+ "liv_lagoon_night": {
+  "file": "liv_lagoon_night.webp",
+  "sha256": "548f85dd346655850ae357f085c4cabfde3a61b1a3a8dd18a2016d9ccdece242",
+  "bytes": 183530,
+  "w": 1080,
+  "h": 815,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/CD03/Scene 40.png",
+  "crop": [
+   240,
+   0,
+   2500,
+   1705
+  ],
+  "alpha": false
+ },
+ "liv_lawn": {
+  "file": "liv_lawn.webp",
+  "sha256": "b24ccf63c3c08a0791d7b49fc2bd339955ef11b81e2fe5cbbb2d9a396e8dac84",
+  "bytes": 205944,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/CD03/Scene 37.png",
+  "crop": [
+   0,
+   104,
+   2560,
+   1704
+  ],
+  "alpha": false
+ },
+ "liv_park": {
+  "file": "liv_park.webp",
+  "sha256": "c3e8a060989c0466c54ba52b71cd0a64e54b295e584c28e557f149562025ffb3",
+  "bytes": 103404,
+  "w": 1080,
+  "h": 693,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
+  "crop": [
+   0,
+   220,
+   1340,
+   1080
+  ],
+  "alpha": false
+ },
+ "liv_playscape": {
+  "file": "liv_playscape.webp",
+  "sha256": "aac55304747ab18d91950ff51663b02cb7020bd08db92bfb36a561b307cefb1d",
+  "bytes": 200678,
+  "w": 1080,
+  "h": 720,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/Playscape/Scene 50.png",
+  "crop": [
+   160,
+   104,
+   2560,
+   1704
+  ],
+  "alpha": false
+ },
+ "liv_trees": {
+  "file": "liv_trees.webp",
+  "sha256": "1e2c64f541efb4475d797f1772f5f05643cdd8f0e6880ed4f96d023b775431e3",
+  "bytes": 181156,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/CD03/Scene 38.png",
+  "crop": [
+   0,
+   60,
+   2560,
+   1660
+  ],
+  "alpha": false
+ },
+ "map_jomtien": {
+  "file": "map_jomtien.jpg",
+  "sha256": "c46fd5dc65184301f6df6834ff08b5c90ebe1c07418f2e8d75ac8556b77a2974",
+  "bytes": 128783,
+  "w": 1080,
+  "h": 810,
+  "format": "jpg",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_010.jpg",
+  "crop": [
+   40,
+   40,
+   1240,
+   940
+  ],
+  "alpha": false
+ },
+ "map_pattaya_zones": {
+  "file": "map_pattaya_zones.jpg",
+  "sha256": "ecb0c26c543dd45c27f7671553aa8b3d8ae855adbc9289770aadd7c1fcc4d081",
+  "bytes": 119798,
+  "w": 840,
+  "h": 870,
+  "format": "jpg",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_009.jpg",
+  "crop": [
+   420,
+   30,
+   1260,
+   900
+  ],
+  "alpha": false
+ },
+ "mood_bathroom": {
+  "file": "mood_bathroom.webp",
+  "sha256": "5ac033c7ce07a3e736f0fcc70c1303bc80e60f2f8951341dad0347708d1e7ca3",
+  "bytes": 23482,
+  "w": 720,
+  "h": 900,
+  "format": "webp",
+  "source": "web/6.gallery/ีunit/Bathroom PS_0.jpg",
+  "crop": [
+   750,
+   0,
+   4750,
+   5000
+  ],
+  "alpha": false
+ },
+ "mood_bedroom": {
+  "file": "mood_bedroom.webp",
+  "sha256": "feb4067abbbbe7c7b06f148f26425487371144c6982af873b7c669e67645c41a",
+  "bytes": 79730,
+  "w": 720,
+  "h": 900,
+  "format": "webp",
+  "source": "web/6.gallery/ีunit/Bedroom PS_0.jpg",
+  "crop": [
+   480,
+   750,
+   2280,
+   3000
+  ],
+  "alpha": false
+ },
+ "mood_dining": {
+  "file": "mood_dining.webp",
+  "sha256": "5151e49b6996599d0914b01326d22729a61acf867d727ad5042e172f997dbaf8",
+  "bytes": 50750,
+  "w": 720,
+  "h": 900,
+  "format": "webp",
+  "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
+  "crop": [
+   1500,
+   750,
+   4900,
+   5000
+  ],
+  "alpha": false
+ },
+ "mood_living": {
+  "file": "mood_living.webp",
+  "sha256": "aaf91e63323315557113f22d562a414f27808393ed40e1fda9938d26d871bbd3",
+  "bytes": 71820,
+  "w": 720,
+  "h": 900,
+  "format": "webp",
+  "source": "web/6.gallery/ีunit/Living view a ps_0.jpg",
+  "crop": [
+   400,
+   1000,
+   3600,
+   5000
+  ],
+  "alpha": false
+ },
+ "parking_plan": {
+  "file": "parking_plan.webp",
+  "sha256": "adaa27bc733a3dcff5f4556e38e4179f79097442eea48e560a5292e4a6493ee6",
+  "bytes": 40552,
+  "w": 1600,
+  "h": 646,
+  "format": "webp",
+  "source": "drawn/parking_plan.png",
+  "crop": null,
+  "alpha": false
+ },
+ "plan_1br": {
+  "file": "plan_1br.webp",
+  "sha256": "4f4bfc3e61fd53bce76c1729f31a500f797203db3f0cfd24887e6e2a95f8ef6d",
+  "bytes": 44246,
+  "w": 780,
+  "h": 845,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/sales/unit-plans/F-113.webp",
+  "crop": null,
+  "alpha": true
+ },
+ "plan_2br": {
+  "file": "plan_2br.webp",
+  "sha256": "faf1685378689c584935f18c9ae7dc570296f3dddf7b30a75c90d08048aef73e",
+  "bytes": 96998,
+  "w": 1080,
+  "h": 768,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/sales/unit-plans/C-309.webp",
+  "crop": null,
+  "alpha": true
+ },
+ "plan_ground_site": {
+  "file": "plan_ground_site.webp",
+  "sha256": "33ec703fd50788465d2ae1f84f6366abc5b4cd8e14299602c5caa1de0d0970f3",
+  "bytes": 181338,
+  "w": 1440,
+  "h": 575,
+  "format": "webp",
+  "source": "web/3.project details/master plan/_Embassy World  Floor Plan/3.png",
+  "crop": [
+   35,
+   425,
+   1990,
+   1205
+  ],
+  "alpha": false
+ },
+ "plan_studio": {
+  "file": "plan_studio.webp",
+  "sha256": "0316a9f418525803f38fc6722dee4fe426ad969ee3de9ce08b808575a3cfbe5f",
+  "bytes": 35614,
+  "w": 785,
+  "h": 825,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/sales/unit-plans/A-316.webp",
+  "crop": null,
+  "alpha": true
+ },
+ "prj_app": {
+  "file": "prj_app.webp",
+  "sha256": "ac34d09e0eebaf8acff89e46a91fb8813e4bb767e83d71da18692e1f9f9c9945",
+  "bytes": 31796,
+  "w": 800,
+  "h": 500,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_042.jpg",
+  "crop": [
+   190,
+   232,
+   1285,
+   916
+  ],
+  "alpha": false
+ },
+ "prj_dev_awards": {
+  "file": "prj_dev_awards.webp",
+  "sha256": "fe1fd36f6281a496e9de40cf9166517f0d7f02a1b49d3e3eafa41a1a7bc01a4f",
+  "bytes": 64182,
+  "w": 1080,
+  "h": 576,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_003.jpg",
+  "crop": [
+   190,
+   198,
+   1730,
+   1020
+  ],
+  "alpha": false
+ },
+ "prj_dev_logo": {
+  "file": "prj_dev_logo.webp",
+  "sha256": "44e5f3e453e2f284bab518cc2d61126caca563a4c0dac3ec60f5f52e250bbe31",
+  "bytes": 11112,
+  "w": 531,
+  "h": 283,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_002.jpg",
+  "crop": [
+   695,
+   35,
+   1226,
+   318
+  ],
+  "alpha": false
+ },
+ "prj_life_fitness": {
+  "file": "prj_life_fitness.webp",
+  "sha256": "aba2e6d7d68cf1b2f0187afbe7c93ba9705e1657bb74386e202b66f231e196fd",
+  "bytes": 73470,
+  "w": 800,
+  "h": 500,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - Biogenesis 01.jpg",
+  "crop": [
+   454,
+   0,
+   2297,
+   1152
+  ],
+  "alpha": false
+ },
+ "prj_life_kids": {
+  "file": "prj_life_kids.webp",
+  "sha256": "9abf485c168a7f264052e3ecfb8732a54cacaa43b76b8ee8b41d21c76f5a1dbe",
+  "bytes": 72754,
+  "w": 800,
+  "h": 500,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - JUNIOR WORLD 01.jpg",
+  "crop": [
+   296,
+   0,
+   2456,
+   1350
+  ],
+  "alpha": false
+ },
+ "prj_life_lagoon": {
+  "file": "prj_life_lagoon.webp",
+  "sha256": "5522444fe88ec5ab9ac3abb5658be1c89d0e791cceb03ac9bdc57add97d2f566",
+  "bytes": 87964,
+  "w": 800,
+  "h": 500,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/CD03/Scene 36.png",
+  "crop": [
+   0,
+   64,
+   2560,
+   1664
+  ],
+  "alpha": false
+ },
+ "prj_life_park": {
+  "file": "prj_life_park.webp",
+  "sha256": "be67f9b0baa3cdc15ad069cca25e02233be080cab8e63c397e88f468fa39e4bb",
+  "bytes": 66878,
+  "w": 800,
+  "h": 500,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
+  "crop": [
+   0,
+   230,
+   1232,
+   1000
+  ],
+  "alpha": false
+ },
+ "prj_sec_lock": {
+  "file": "prj_sec_lock.webp",
+  "sha256": "9d194a03de2ef4e2759d47c0bbb4b07da05e59644cce0f40e9ce3efcdc0ad839",
+  "bytes": 1578,
+  "w": 208,
+  "h": 130,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_043.jpg",
+  "crop": [
+   692,
+   880,
+   900,
+   1010
+  ],
+  "alpha": false
+ },
+ "prj_sec_phone": {
+  "file": "prj_sec_phone.webp",
+  "sha256": "b8792beb361e4d7bd44aa7887fc7f3d4e9c3ea702e18967a23a1252f769bfbf4",
+  "bytes": 3010,
+  "w": 256,
+  "h": 160,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_043.jpg",
+  "crop": [
+   1652,
+   852,
+   1908,
+   1012
+  ],
+  "alpha": false
+ },
+ "prj_tech_ev": {
+  "file": "prj_tech_ev.webp",
+  "sha256": "8377736adaa073165ae3cf4d6fbedbbda6544c3cefe660ff902689b827009c89",
+  "bytes": 10806,
+  "w": 760,
+  "h": 475,
+  "format": "webp",
+  "source": "web/3.project details/master plan/_Embassy World  Floor Plan/2.png",
+  "crop": [
+   230,
+   782,
+   990,
+   1257
+  ],
+  "alpha": true
+ },
+ "prj_tech_garden": {
+  "file": "prj_tech_garden.webp",
+  "sha256": "67cd6f38bf1e241bad81799d4532ea6cc99e4be8748b2bd59f56eb03685f3355",
+  "bytes": 123034,
+  "w": 800,
+  "h": 500,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/CD03/Scene 43.png",
+  "crop": [
+   0,
+   104,
+   2560,
+   1704
+  ],
+  "alpha": false
+ },
+ "prj_tech_home": {
+  "file": "prj_tech_home.webp",
+  "sha256": "16a53d2b82d0153cf9e1bd1fcd37fbbe7ccb6e16450aae7aa723b7a012fcb8e0",
+  "bytes": 44160,
+  "w": 800,
+  "h": 500,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_043.jpg",
+  "crop": [
+   700,
+   0,
+   1800,
+   688
+  ],
+  "alpha": false
+ },
+ "rm_breeze": {
+  "file": "rm_breeze.webp",
+  "sha256": "817c3e9a2420bace4a2f6933fa358ad101b9737521cb987c7f22120b82b96cab",
+  "bytes": 45814,
+  "w": 1080,
+  "h": 540,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/E_02_realistic_overview.png",
+  "crop": [
+   800,
+   400,
+   2300,
+   1150
+  ],
+  "alpha": false
+ },
+ "rm_corridor": {
+  "file": "rm_corridor.webp",
+  "sha256": "9008cfb72781bf50f899cd7d930678d1e93ef5cf961e885ded61289949c9e11e",
+  "bytes": 81238,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - CORRIDOR.jpg",
+  "crop": [
+   0,
+   520,
+   1792,
+   1640
+  ],
+  "alpha": false
+ },
+ "rm_lobby": {
+  "file": "rm_lobby.webp",
+  "sha256": "b64f53c698290aedc09e3a17a72764bfccd4869b699ca0a2c331e33c08c793b4",
+  "bytes": 87714,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - LOBBY 01.jpg",
+  "crop": [
+   147,
+   0,
+   2605,
+   1536
+  ],
+  "alpha": false
+ },
+ "rm_parkside": {
+  "file": "rm_parkside.webp",
+  "sha256": "abb07045c45a73457cffc8f15960b0c530cd90a0b005d4dc5f9e458002b460bd",
+  "bytes": 100664,
+  "w": 1080,
+  "h": 682,
+  "format": "webp",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
+  "crop": [
+   0,
+   215,
+   1330,
+   1055
+  ],
+  "alpha": false
+ },
+ "rm_playscape": {
+  "file": "rm_playscape.webp",
+  "sha256": "40dcdc7f2a44b13446ff0aedde202b75556be34cfdb47cf86d80efbc6f580fa7",
+  "bytes": 201682,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/Playscape/Scene 64(2).png",
+  "crop": [
+   0,
+   52,
+   2560,
+   1652
+  ],
+  "alpha": false
+ },
+ "rm_playscape_aerial": {
+  "file": "rm_playscape_aerial.webp",
+  "sha256": "65e7684ae1b58232b2ec0751e36f3cbdf87c5ec0efb04de4e8ff66adbf71b021",
+  "bytes": 106696,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/Playscape/Scene 55.png",
+  "crop": [
+   0,
+   0,
+   2560,
+   1600
+  ],
+  "alpha": false
+ },
+ "rm_signature": {
+  "file": "rm_signature.webp",
+  "sha256": "7b18a0d127845f79141bd90c8e9cc6edb09d7af77e0fa0f9ef38f03ec815efe0",
+  "bytes": 131778,
+  "w": 1080,
+  "h": 675,
+  "format": "webp",
+  "source": "web/6.gallery/exterior/Entrance/Scene 61(2).png",
+  "crop": [
+   0,
+   31,
+   2560,
+   1631
+  ],
+  "alpha": false
+ },
+ "rm_window": {
+  "file": "rm_window.webp",
+  "sha256": "341f29923f6846b46155315322d4bd1e336576ef8b0869476821399245b18632",
+  "bytes": 50372,
+  "w": 720,
+  "h": 900,
+  "format": "webp",
+  "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
+  "crop": [
+   0,
+   1250,
+   2400,
+   4250
+  ],
+  "alpha": false
+ },
+ "room_1br_solid": {
+  "file": "room_1br_solid.webp",
+  "sha256": "5279932103bde096515757d1c3dba3612cee672b4ff4dbf6273f7972f83d25ac",
+  "bytes": 32842,
+  "w": 1042,
+  "h": 834,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_overview.png",
+  "crop": [
+   858,
+   634,
+   1900,
+   1468
+  ],
+  "alpha": false
+ },
+ "room_1br_wire": {
+  "file": "room_1br_wire.webp",
+  "sha256": "cfa210305c4cf5231a9c7a75ec4cf91e998c2be0d9d5bcfc4a6499e4aa615f4b",
+  "bytes": 82312,
+  "w": 1058,
+  "h": 847,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_hologram.png",
+  "crop": [
+   850,
+   621,
+   1908,
+   1468
+  ],
+  "alpha": false
+ },
+ "room_2br_solid": {
+  "file": "room_2br_solid.webp",
+  "sha256": "a98751acadb9dd180ba1626a0eb52ea70b9fc4546f4d4249b26b5046df9d2c88",
+  "bytes": 36478,
+  "w": 950,
+  "h": 760,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_overview.png",
+  "crop": [
+   936,
+   638,
+   1886,
+   1398
+  ],
+  "alpha": false
+ },
+ "room_2br_wire": {
+  "file": "room_2br_wire.webp",
+  "sha256": "713124f502146c0e65c5c656dbe00dd2e4889678b228f40fb840791a5fcbb7bf",
+  "bytes": 98962,
+  "w": 984,
+  "h": 787,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_hologram.png",
+  "crop": [
+   912,
+   621,
+   1896,
+   1408
+  ],
+  "alpha": false
+ },
+ "room_studio_solid": {
+  "file": "room_studio_solid.webp",
+  "sha256": "41ab64ccf1d6c95e19d0f633de1b8455c416b59eed26f35ce855c0658d784588",
+  "bytes": 28766,
+  "w": 869,
+  "h": 695,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_overview.png",
+  "crop": [
+   958,
+   642,
+   1827,
+   1337
+  ],
+  "alpha": false
+ },
+ "room_studio_wire": {
+  "file": "room_studio_wire.webp",
+  "sha256": "7c26f371181844254bed37dc0bba92a35fa3690430124cf06c7e78049d842560",
+  "bytes": 72168,
+  "w": 905,
+  "h": 724,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_hologram.png",
+  "crop": [
+   934,
+   621,
+   1839,
+   1345
+  ],
+  "alpha": false
+ },
+ "sh_aircon": {
+  "file": "sh_aircon.webp",
+  "sha256": "b1bb3b2b3d7895a92b914845dc3c3800e7ee79043af7902e6d0c9b5f1ee6fc01",
+  "bytes": 16402,
+  "w": 960,
+  "h": 666,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_open.png",
+  "crop": [
+   60,
+   560,
+   1300,
+   1420
+  ],
+  "alpha": false
+ },
+ "sh_curtain": {
+  "file": "sh_curtain.webp",
+  "sha256": "3e37db1ac21d792a1afa7e7740383d21263e50fdb1f3c1f03df5edf10ad869ad",
+  "bytes": 16014,
+  "w": 960,
+  "h": 693,
+  "format": "webp",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_closed.png",
+  "crop": [
+   680,
+   280,
+   2120,
+   1320
+  ],
+  "alpha": false
+ }
+}

@@ -234,9 +234,9 @@ def test_a_ranking_with_no_signal_gets_no_vote(index):
     # the test failed for describing a situation it never created.
     index.semantic = None
     hits = index.search("бассейн")
-    assert hits and "pool" in (
-        "%s %s" % (hits[0].slide.get("title_th", ""), hits[0].slide.get("title_en", ""))
-    ).lower(), "a configured project alias is real lexical evidence"
+    names = ("%s %s" % (hits[0].slide.get("title_th", ""), hits[0].slide.get("title_en", ""))).lower() if hits else ""
+    # a bare pool is the main pool, the lagoon (owner 12 Oct)
+    assert hits and ("pool" in names or "lagoon" in names), "a configured project alias is real lexical evidence"
 
 
 def test_competitor_slides_do_not_win(index):
@@ -247,12 +247,13 @@ def test_competitor_slides_do_not_win(index):
 
 
 @pytest.mark.parametrize("query,title", [
-    ("มีสระว่ายน้ำไหม", "pool"),
+    ("มีสระว่ายน้ำไหม", "lagoon"),             # the main pool (owner 12 Oct)
     # "Where is ..." is a *locate* question, and the 2026-10-06 routing
     # (project_knowledge.json, preferred_slides.locate) answers it with the
     # floor plan — intro-037 "3rd Floor Plan", intro-018 "Entrance Floor
     # plan" — not the facility render. The floor is the answer to "where".
-    ("游泳池在哪里", "3rd floor"),
+    ("游泳池在哪里", "water lagoon"),          # a bare pool is the lagoon (owner 12 Oct)
+    ("sky pool อยู่ที่ไหน", "3rd floor"),
     ("где тренажерный зал", "entrance floor"),
     # "basement" is what the guest says and what the alias file carries;
     # the 2026-10-06 deck calls the same floor "Under Ground" (two words).
@@ -729,4 +730,26 @@ def test_how_much_without_a_measure_is_still_money():
     for query in ("ห้องละเท่าไหร่", "สตูดิโอเท่าไหร่", "ค่าจองเท่าไหร่",
                   "ห้องใหญ่ราคาเท่าไหร่", "ขนาดใหญ่สุดราคาเท่าไร",
                   "ค่าส่วนกลางห้องขนาด 34 ตารางเมตรเท่าไหร่"):
+        assert is_commercial(query), query
+
+
+
+def test_the_reports_own_faq_questions_are_not_price_questions():
+    """12 Oct: walked the approved report's 316 FAQ questions through this
+    gate. 11 that are not about money went to the sales team as price
+    questions -- a "ห้อง" of the PROJECT (Spinning Class, a bathroom, the
+    meeting rooms of Common Sphere) read as a unit for sale, the digit in
+    "1-Bedroom" read as a stated size, "อย่างละ" (of each) as per-something,
+    "ร้อน" was no measure. The report answers every one of them."""
+    from app.tools.retrieval import is_commercial
+
+    for query in ("เพดานห้องสูงเท่าไร", "มีซาวน่ากี่ห้อง ร้อนเท่าไร", "1-Bedroom ขนาดเท่าไร มีกี่ห้อง",
+                  "2-Bedroom ขนาดเท่าไร มีกี่ห้อง อยู่อาคารไหน", "โครงการมีห้องกี่แบบ อย่างละกี่ห้อง ขนาดเท่าไร",
+                  "ห้อง Spinning Class (Cycling Studio) ใหญ่เท่าไร มีจักรยานกี่คัน", "ห้องน้ำชั้น 3 อยู่ตรงไหน ใหญ่เท่าไร",
+                  "Common Sphere ใหญ่เท่าไร มีที่นั่งและห้องประชุมกี่ห้อง", "ระเบียงห้องกว้างเท่าไหร่"):
+        assert not is_commercial(query), query
+    # ...and the price questions the review of 12 Oct closed stay closed
+    for query in ("ห้องวิวทะเลชั้นสูงเท่าไหร่", "ห้องขนาด 30 ตารางเมตรเท่าไหร่", "ตารางเมตรละเท่าไหร่",
+                  "ห้องใหญ่สุดเท่าไหร่", "ห้องชั้น 8 ใหญ่เท่าไหร่", "ห้องละเท่าไหร่", "1 ห้องนอนเท่าไหร่",
+                  "ห้องสำหรับครอบครัวเท่าไหร่", "ห้องที่มีระเบียงราคาเท่าไหร่"):
         assert is_commercial(query), query

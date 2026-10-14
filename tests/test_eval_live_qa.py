@@ -8,6 +8,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -120,3 +122,79 @@ def test_flags_catch_telling_the_guest_there_is_no_information():
     for said in ("เรื่องนี้ทีมขายของเราจะให้รายละเอียดได้ครบที่สุดค่ะ สอบถามที่โต๊ะทีมขายได้เลยนะคะ",
                  "ไม่ทราบว่าสนใจห้องแบบไหนคะ"):
         assert "t0:says_no_info" not in harness.flags_for({"expect": {}}, [dict(base, said=said)], "")
+
+
+def test_a_one_word_reply_is_flagged():
+    """Owner 12 Oct on the robot: a compliment and a remark both got "ค่ะ"."""
+    base = {"user": "เยี่ยมมาก", "complete": True, "audio_s": 1.0, "tools": []}
+    for said in ("ค่ะ", " ค่ะ ", "ครับ.", "Okay!"):
+        assert "t0:bare_ack" in harness.flags_for({"expect": {}}, [dict(base, said=said)], ""), said
+    for said in ("ขอบคุณมากค่ะ ดีใจที่ชอบนะคะ", "ได้เลยค่ะ", "Thank you so much!"):
+        assert "t0:bare_ack" not in harness.flags_for({"expect": {}}, [dict(base, said=said)], ""), said
+
+
+def test_a_story_case_turns_the_stories_on_in_memory_and_puts_everything_back():
+    """Story cases (cat 27) measure a DRAFT catalog: the approval check answers
+    "approved" in this process for as long as the case runs, and nothing is
+    written -- approved_by stays a person's to fill (scripts/approve_stories.py)."""
+    from app import stories
+    from app.config import settings
+
+    catalog_file = stories.catalog_path()
+    on_disk = catalog_file.read_bytes() if catalog_file.exists() else None
+    real = stories.approval_problem
+    before = {key: getattr(settings, key) for key in harness.STORY_CASE_SETTINGS}
+    with harness.case_settings({"id": "S27-x", "stories": True}):
+        assert settings.stories_enabled is True and settings.answer_images is True
+        assert "stories" in settings.enabled_tool_groups()
+        assert stories.approval_problem({"stories": []}) is None
+        assert stories.approval_problem(None) == "no_catalog"
+    assert stories.approval_problem is real
+    assert {key: getattr(settings, key) for key in before} == before
+    with pytest.raises(RuntimeError):
+        with harness.case_settings({"id": "S27-y", "stories": True}):
+            raise RuntimeError("a case that dies")
+    assert stories.approval_problem is real
+    assert {key: getattr(settings, key) for key in before} == before
+    assert (catalog_file.read_bytes() if catalog_file.exists() else None) == on_disk
+    # a story case changes process-wide settings: it never runs beside another
+    assert harness.split_serial([{"id": "S27-z", "stories": True}]) == ([], [{"id": "S27-z", "stories": True}])
+
+
+def test_every_story_has_exactly_one_live_case():
+    data = json.loads(harness.SCENARIOS.read_text(encoding="utf-8"))
+    story_cases = [c for c in data["cases"] if c.get("stories")]
+    cases = [c for c in story_cases if c["cat"].startswith("27")]
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    topics = [c["expect"]["args"]["present_story"]["topic"] for c in cases]
+    assert sorted(topics) == sorted(s["id"] for s in catalog["stories"])
+    for case in cases:
+        assert case["expect"]["tools_any"] == ["present_story"], case["id"]
+        assert not case.get("held_out") and len(case["turns"]) == 1, case["id"]
+    # Beside 27 (one per story) and 28 (held out) the only story cases are the
+    # follow-ups from the robot log (cat 29, 14 Oct: the second question of a
+    # pair was answered from memory) -- more than one turn, so never a story's
+    # single live case.
+    for case in story_cases:
+        if not case["cat"].startswith(("27", "28")):
+            assert case["cat"].startswith("29") and len(case["turns"]) > 1, case["id"]
+
+
+def test_every_story_has_a_held_out_question_in_the_guests_words():
+    """Review 12 Oct: 19 of the 20 cat-27 questions are word for word in the
+    tool's own description, so their rate shows string matching, not how a
+    guest's wording routes. Cat 28 asks each story in other words -- never a
+    string from the story's questions_th / questions_en -- plus English and
+    Chinese, and its rate is reported apart."""
+    data = json.loads(harness.SCENARIOS.read_text(encoding="utf-8"))
+    held = [c for c in data["cases"] if c.get("held_out")]
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    by_id = {s["id"]: s for s in catalog["stories"]}
+    assert {c["expect"]["args"]["present_story"]["topic"] for c in held} == set(by_id)
+    assert {c["lang"] for c in held} >= {"th", "en", "zh"}
+    norm = lambda q: "".join(q.lower().split()).rstrip("?？")
+    for case in held:
+        assert case["stories"] is True and case["cat"].startswith("28") and len(case["turns"]) == 1, case["id"]
+        story = by_id[case["expect"]["args"]["present_story"]["topic"]]
+        listed = {norm(q) for q in story.get("questions_th", []) + story.get("questions_en", [])}
+        assert norm(case["turns"][0]) not in listed, case["id"]

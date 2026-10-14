@@ -1,0 +1,295 @@
+[
+  {
+    "id": "fac_plan_g",
+    "source": "../../data/projects/embassy_world/presentations/slides/intro_018.jpg",
+    "crop": [
+      290,
+      180,
+      1620,
+      800
+    ],
+    "max_w": 1440,
+    "format": "webp",
+    "why": "Ground-floor plan of building A from the approved slide intro-018 (deck p.18, matches the DWG per report 9.1). Used as the G slab texture, the G drill base and the base of the fitness / kids-room spotlights. Crop drops the 'ENTRANCE FLOOR' title and the PRELIMINARY CONCEPT badge (owner forbids that wording). Kept at 1440 wide (not 1080) because the spotlights zoom into it about 2x; the room labels are printed on the plan, so every hotspot is read off a printed label."
+  },
+  {
+    "id": "fac_plan_g_west",
+    "source": "../../data/projects/embassy_world/presentations/slides/intro_018.jpg",
+    "crop": [
+      295,
+      190,
+      1110,
+      800
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "West half of the same approved ground-floor plan (intro-018), about 4:3, as the base of the kids-room spotlight. Junior World sits at 17% of the full plan's width; in a portrait/4:3 stage an object-fit: cover of the 2.15:1 full plan cuts it off the left edge (seen in the storyboard), so this crop puts it inside the frame. Junior World is read off its printed label."
+  },
+  {
+    "id": "fac_plan_b",
+    "source": "../../data/projects/embassy_world/presentations/slides/intro_027.jpg",
+    "crop": [
+      200,
+      330,
+      1720,
+      800
+    ],
+    "max_w": 1440,
+    "format": "webp",
+    "post": [
+      "inpaint:787,0,792,196",
+      "fill:788,197,791,213@786,194",
+      "inpaint:787,214,792,252",
+      "inpaint:781,251,798,266",
+      "insert:729,195,893,211@763:840,849"
+    ],
+    "why": "Basement wellness-zone plan from the approved slide intro-027 (deck p.33; report 10.1.2: the real room layout per the owner, use it for room positions). Basement slab texture and drill base. Crop drops the 'UNDER GROUND' title, the AQUA CINEMA callout pill and the PRELIMINARY CONCEPT badge. The callout's thin leader line (crop x 789-790, from the top edge down to y 252) and its ring dot inside the Aqua Cinema pool (x 783-796, y 253-263) are painted out row by row from their neighbours (`inpaint`; across the label's letters, the label's own ground colour, `fill`, review 12 Oct: it read as a pointer stuck in the pool on the robot screen). The slide's own misspelling 'CRYTAL STONE SAUNA' is corrected in the picture (owner 13 Oct: fix it, keep the slide's look -- a redrawn plan was tried and turned down): `insert` copies the S of SAUNA (crop x 840-849, same line, same font) in after the Y (x 763) and squeezes the label back into its own pill (x 729-893)."
+  },
+  {
+    "id": "fac_plan_l3",
+    "source": "../../data/projects/embassy_world/presentations/slides/intro_037.jpg",
+    "crop": [
+      340,
+      230,
+      1580,
+      830
+    ],
+    "max_w": 1440,
+    "format": "webp",
+    "why": "Level-3 plan of building A from the approved slide intro-037 (deck p.43; report 11.1.2: usable as reference). Level-3 slab texture and drill base. The semicircle at the bottom is the Sky Pool (report 11.1.2 table, 11.5.1). Crop drops the '3RD FLOOR' title and the PRELIMINARY CONCEPT badge."
+  },
+  {
+    "id": "fac_ue_building_a",
+    "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/A_08_return_regression.png",
+    "crop": [
+      740,
+      380,
+      2260,
+      1230
+    ],
+    "max_w": 1440,
+    "format": "webp",
+    "why": "The owner's UE5 hologram of building A seen from the lagoon side: eight floor bands and the round two-storey glass drum (Biogenesis) whose roof carries the Sky Pool. Base of the Sky Pool spotlight. Crop removes the baked UE UI: the BASEMENT..8TH FLOOR menu on the right and the REALISTIC VIEW / WIREFRAME VIEW buttons at the bottom."
+  },
+  {
+    "id": "fac_g_biogenesis",
+    "source": "web/4.facilities/G FLOOR/G FLOOR - Biogenesis 01.jpg",
+    "crop": [
+      454,
+      0,
+      2297,
+      1152
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Final render of Biogenesis (report 9.1.2: the 19 G-floor web images are the final renders, newer than the deck). Daytime, glass wall onto the lagoon, glass-bottom pool overhead. Drill item and fitness-spotlight photo. 16:10 centre crop of a 2.39:1 panorama; no baked text."
+  },
+  {
+    "id": "fac_g_spinning",
+    "source": "web/4.facilities/G FLOOR/G FLOOR - Cycling Studio.jpg",
+    "crop": [
+      119,
+      0,
+      2577,
+      1536
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Final render of the Spinning Class room (the render calls it Cycling Studio; report 8.2 #3 / 9.4). 16:10 centre crop, no baked text besides the room's own wall lettering."
+  },
+  {
+    "id": "fac_g_pilates",
+    "source": "web/4.facilities/G FLOOR/G FLOOR - Pilates Studio.jpg",
+    "crop": [
+      147,
+      0,
+      2605,
+      1536
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Final render of the Pilates Studio (report 9.5). 16:10 centre crop."
+  },
+  {
+    "id": "fac_g_bungee",
+    "source": "web/4.facilities/G FLOOR/G FLOOR - Bungee Gym&Yoga 01.jpg",
+    "crop": [
+      147,
+      0,
+      2605,
+      1536
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Final render of Bungee Gym & Yoga (report 9.6). 16:10 centre crop."
+  },
+  {
+    "id": "fac_g_junior",
+    "source": "web/4.facilities/G FLOOR/G FLOOR - JUNIOR WORLD 01.jpg",
+    "crop": [
+      296,
+      0,
+      2456,
+      1350
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Final render of Junior World, space-station play room (report 9.7). Drill item. Crop removes the strip of lawn pasted under the render."
+  },
+  {
+    "id": "fac_g_junior_ballpit",
+    "source": "web/4.facilities/G FLOOR/G FLOOR - JUNIOR WORLD 02.jpg",
+    "crop": [
+      147,
+      0,
+      2605,
+      1536
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Final render of Junior World: ball pit and the GALACTIC SHOT game wall (report 9.7). Kids-room spotlight photo; a different image from the drill so moving from the drill to the spotlight shows something new."
+  },
+  {
+    "id": "fac_b_aqua_cinema",
+    "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/16.jpg",
+    "crop": [
+      240,
+      100,
+      1680,
+      1000
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Web-pack basement render whose own title pill reads AQUA CINEMA (checked by enlarging the pill). Crop removes that pill, the 'EMBASSY WORLD' / 'JOMTIEN' corner text and the 'BEYOND MODELS' credit at the bottom. Chosen over 18.jpg, whose big screen reads as a sea window."
+  },
+  {
+    "id": "fac_b_journey_mars",
+    "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/21.jpg",
+    "crop": [
+      240,
+      100,
+      1680,
+      1000
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Web-pack render, title pill reads JOURNEY TO THE MARS (sic). The tunnel pool with jellyfish projections. Crop removes the pill, corner text and the 'BEYOND MODELS' credit at the bottom, so the misspelt name never shows."
+  },
+  {
+    "id": "fac_b_salt_sauna",
+    "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/27.jpg",
+    "crop": [
+      400,
+      100,
+      1840,
+      1000
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Web-pack render, pill reads HIMALAYAN SALT SAUNA. Crop removes the pill, corner text, the 'BEYOND MODELS' credit and the small text panel on the far-left wall (the engraved room sign by the door stays)."
+  },
+  {
+    "id": "fac_b_ice_bath",
+    "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/33.jpg",
+    "crop": [
+      150,
+      100,
+      1590,
+      1000
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Web-pack render, pill reads ICE BATH. Crop removes the pill, corner text and the 'BEYOND MODELS' credit at the bottom."
+  },
+  {
+    "id": "fac_b_swing_sauna",
+    "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/29.jpg",
+    "crop": [
+      240,
+      100,
+      1680,
+      1000
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Web-pack render, pill reads FLOATING SWING SAUNA (hanging swing loungers). Crop removes the pill, corner text and the 'BEYOND MODELS' credit at the bottom."
+  },
+  {
+    "id": "fac_b_crystal_sauna",
+    "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/37.jpg",
+    "crop": [
+      240,
+      100,
+      1680,
+      1000
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Web-pack render, pill reads CYSTAL STONE SAUNA SAUNA (sic). Crop removes the misspelt pill, corner text and the 'BEYOND MODELS' credit at the bottom."
+  },
+  {
+    "id": "fac_b_hydro_capsule",
+    "source": "../../data/projects/embassy_world/presentations/slides/intro_035.jpg",
+    "crop": [
+      150,
+      300,
+      1460,
+      900
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Approved slide intro-035 (Hydro Therapy Capsule). Used instead of web-pack 42.jpg because the capsules in 42.jpg carry a product brand name ('aquamassage SPA'), which would be an unapproved product claim. Crop removes the title pill, key plan, the logo watermark and the PRELIMINARY CONCEPT badge."
+  },
+  {
+    "id": "fac_3_social",
+    "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/29.jpg",
+    "crop": [
+      900,
+      300,
+      1920,
+      1065
+    ],
+    "max_w": 1020,
+    "format": "webp",
+    "why": "Web-pack level-3 render of the dark lounge bar with the Embassy World logo wall. It has no title pill; it is identified as Social Lounge (report 11.2: lounge / bar; DWG 'Bar & Cigar') because it is the only bar image in the level-3 folder and the others are pill-labelled HALL / COMMON SPHERE / CO-WORKING LOUNGE. Crop keeps the right side only: it leaves out the humanoid robot bartender (robots are not an approved claim) and the night high-rise window view."
+  },
+  {
+    "id": "fac_3_coworking",
+    "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/25.jpg",
+    "crop": [
+      0,
+      110,
+      1270,
+      1030
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Web-pack render, pill reads CO-WORKING LOUNGE (25.jpg). Chosen over 24.jpg, which has an 'OPTION 2' pill and a robot bartender visible through the arch. Crop removes the pill, corner text, the 'BEYOND MODELS' credit and the right-hand windows that show a high-rise sea and skyline view a level-3 lounge 600 m from the beach does not have."
+  },
+  {
+    "id": "fac_3_common_sphere",
+    "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/18.jpg",
+    "crop": [
+      480,
+      100,
+      1920,
+      1000
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Web-pack render, pill reads COMMON SPHERE: glass meeting room inside the shared hall (report 11.4). Crop removes the pill, corner text and most of the high-rise city window on the left."
+  },
+  {
+    "id": "fac_3_sky_pool",
+    "source": "../../data/projects/embassy_world/presentations/slides/intro_041.jpg",
+    "crop": [
+      0,
+      160,
+      1340,
+      1080
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Approved slide intro-041 (Sky Pool): aerial of the pool, whirlpool seats, loungers and the glass floor looking down into the gym. Used instead of web-pack 3rd-floor 14.jpg, which shows the pool high above the sea and the Pattaya skyline (misleading for a level-3 pool 600 m from the beach). Crop removes the SKY POOL pill, logo, key plan and the PRELIMINARY CONCEPT badge."
+  }
+]

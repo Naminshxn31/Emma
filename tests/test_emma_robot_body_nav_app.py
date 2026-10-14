@@ -789,10 +789,11 @@ def test_operator_screen_additions():
     play = method(code, "private void playDraftMotion()")
     assert play.index("final int editsAtStart = motionDraft.startPlayback();") \
         < play.index("motionDraft.markPlayed(editsAtStart);")
-    # robot-side switches all default OFF, the arm rest ON
+    # robot-side switches: walking OFF by default, the arm rest ON; gestures by
+    # voice ON unless the operator turned them off (owner, 13 Oct)
     body = code_only(read(BODY))
     nav = code_only(read(NAV))
-    assert "prefs.getBoolean(PREF_ENABLED, false)" in body and "prefs.getBoolean(PREF_ENABLED, false)" in nav
+    assert "prefs.getBoolean(PREF_ENABLED, true)" in body and "prefs.getBoolean(PREF_ENABLED, false)" in nav
     assert "prefs.getBoolean(PREF_ALLOW_DIRECTION_KNOWN, false)" in body
     assert 'PREFS = "emma_body_nav";' in body and "PREFS = BodyController.PREFS;" in nav
     for key in ('"body_enabled"', '"allow_direction_known"', '"voice_channels"', '"nav_enabled"',

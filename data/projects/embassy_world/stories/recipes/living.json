@@ -1,0 +1,128 @@
+[
+ {
+  "id": "liv_lagoon_night",
+  "source": "web/6.gallery/exterior/CD03/Scene 40.png",
+  "source_sha256": "43c86f3e7507312129d477bdf34980c77ad0bdeed91ce29d43e4038f4d076d75",
+  "crop": [
+   240,
+   0,
+   2500,
+   1705
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 40 (dusk, high view straight down the Water Lagoon between the wings: the pod pavilion, islands, a separate pool bottom-left). The pools_all 'Water Lagoon' row: the one picture that shows how long the lagoon runs (155 m). 4:3 crop; no people, no baked text. Not Scene 58 on purpose: masterplan_lagoon (the row's tap) already uses it."
+ },
+ {
+  "id": "liv_courtyard_top",
+  "source": "ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png",
+  "source_sha256": "7237469b68e5b7e505b37507fcb4135e5e64f4b59c55f28467f0acea35b36893",
+  "crop": [
+   230,
+   240,
+   1150,
+   860
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Owner's UE model, top view of the site (SiteEnvironment, UI collapsed). Crop = the west courtyard with the printed BUILDING E / F / D labels, where the landscape plan puts the labelled Private Pools (beside the E wing, under F; report 12.3). Drops the UE control buttons and the room walls of the viewer. The pools_all 'Private Pools' row: shows where they are, does not point at one pool."
+ },
+ {
+  "id": "liv_kid_pool",
+  "source": "web/6.gallery/exterior/Playscape/Scene 55.png",
+  "source_sha256": "5ca44fb3e87e377dbb67719b40b9272cc077e0fa75961baac4ba2fe8e83ae1ac",
+  "crop": [
+   700,
+   630,
+   2300,
+   1430
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website gallery Playscape Scene 55 (aerial): the space-dome playground, the polished sculpture slide into the pool and the ring of the Kid's Pool beside it (report 9.9 / 12.10: Kid's Pool next to the Playscape). Crop starts right of x=700 and below y=630 so the small figures on the path and at the Junior World door are out of the picture. Used by pools_all and for_families."
+ },
+ {
+  "id": "liv_playscape",
+  "source": "web/6.gallery/exterior/Playscape/Scene 50.png",
+  "source_sha256": "b87dbfe9fa731f661964593101e22ec87b0741a8dd14c83dea1297bbf3894179",
+  "crop": [
+   160,
+   104,
+   2560,
+   1704
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website gallery Playscape Scene 50 (eye level): the 'Space Playground' dome on legs, the steel tube slide, the planet-pattern floor (report 9.9). for_families 'Space Playground' row. No people, no text; 3:2 crop."
+ },
+ {
+  "id": "liv_park",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
+  "source_sha256": "bd9e370fbe6ec0293356bd500948b843eaef0062eef89e3ba5c533db9872bb15",
+  "crop": [
+   0,
+   220,
+   1340,
+   1080
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Approved slide intro-011 'THE PARK' (deck p.11): dusk view across the park lake with the low-rise blocks behind. Crop keeps the lake and trees and drops the slide title, the logo and the bottom-right badge (owner forbids that wording on screen). The developer's illustration of the park next door, not a photo of it: the card says 'The Park' (the deck's word) and names the real park in its small line."
+ },
+ {
+  "id": "liv_garden",
+  "source": "web/6.gallery/exterior/CD03/Scene 43.png",
+  "source_sha256": "782e441d030ac37cd0647baec5f061f30cf8d175c08533668c46a7b346372f83",
+  "crop": [
+   0,
+   104,
+   2560,
+   1704
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 43: a paved path between dense shrub beds, trees and the lagoon. park_green 'Green area' card (Softscape 4,256 sq.m.). 16:10 crop for the features card; no people."
+ },
+ {
+  "id": "liv_trees",
+  "source": "web/6.gallery/exterior/CD03/Scene 38.png",
+  "source_sha256": "5d8c442cf3f911beca691e42a1cedc6fd3b9fcb1085d180f18b88854dea06e46",
+  "crop": [
+   0,
+   60,
+   2560,
+   1660
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 38: large shade trees, a white-flowering tree, shrub beds along the lagoon. park_green '34 plant species' card. 16:10 crop; no people."
+ },
+ {
+  "id": "liv_lawn",
+  "source": "web/6.gallery/exterior/CD03/Scene 37.png",
+  "source_sha256": "55d6daa98565e4fd7bf125de824d5e56c4bc79edd6263c41796f999e1b9c5ab1",
+  "crop": [
+   0,
+   104,
+   2560,
+   1704
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 37: stepped lawn terraces with white daybeds under the mirror-steel canopies, pool behind (report 12.11: Stepped Garden, daybeds). park_green 'Stepped Garden' card. 16:10 crop; no people."
+ },
+ {
+  "id": "lagoon_islands_aerial",
+  "source": "web/6.gallery/exterior/CD03/Scene 58.png",
+  "source_sha256": "d538efeb1a7bc05d1b890c50acc3144fdb9375eedc829cbc8d854b22beceb016",
+  "crop": [
+   0,
+   132,
+   2560,
+   1572
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 58 (daylight, high view down the Water Lagoon): several of its islands with trees, the shell-shaped pavilion island, the glass bridges. 16:9 so the number sits under the picture. Base of lagoon_islands (owner 14 Oct: the islands question had no motion)."
+ }
+]

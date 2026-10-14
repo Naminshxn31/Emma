@@ -24,6 +24,8 @@ import itertools
 import json
 import logging
 import queue
+import math
+import re
 import threading
 import time
 from pathlib import Path
@@ -103,6 +105,41 @@ GOODBYE_TEXT = ("คนที่คุยอยู่เพิ่งเดิน
                 "เช่น 'ขอบคุณที่แวะมานะคะ' ใช้ภาษาเดียวกับที่คุยกันอยู่ "
                 "ห้ามถามคำถาม ห้ามเล่าเรื่องที่ค้างอยู่ต่อ ห้ามพูดถึงกล้อง "
                 "และห้ามพูดว่า 'ระบบตรวจพบ'")
+#: The follow-up after silence (FOLLOW_UP_AFTER_S). An instruction, the
+#: model's own words: one question that carries the topic on, never a
+#: "anything else?" -- and explicitly the "ไม่ถามต่อ" rule's exception.
+FOLLOW_UP_TEXT = ("ระบบแจ้ง: ลูกค้าเงียบไปหลังคำตอบล่าสุด ให้ถามต่อหนึ่งประโยคสั้นๆ "
+                  "ที่ต่อจากเรื่องที่เพิ่งคุย ชวนไปขั้นถัดไปที่ทำได้จริงด้วยเครื่องมือที่มี "
+                  "หรือถามความต้องการของลูกค้า (นี่คือข้อยกเว้นของกฎไม่ถามต่อ) ใช้ภาษาเดียวกับลูกค้า "
+                  "ห้ามทวนคำตอบเดิม ห้ามถามว่า 'มีอะไรให้ช่วยอีกไหมคะ' ห้ามเปิดเรื่องราคาเอง "
+                  "และห้ามเอ่ยถึงข้อความแจ้งนี้")
+#: Her answer already ends on a question: the guest's silence is them
+#: thinking about it, not an opening for a second one.
+_ENDS_ON_QUESTION = re.compile(
+    # คะ (high tone) is the question particle; ค่ะ (falling, with ่) the
+    # statement one, so it never matches -- nor does นะคะ ("...ได้เลยนะคะ").
+    # Review 12 Oct: the first version listed question words and matched
+    # "เกี่ยว" through "กี่" (Thai has no spaces) while missing "...แบบไหนดีคะ".
+    r"(?<!นะ)คะ\s*[?？.!]*\s*$"
+    r"|(ไหม|มั้ย|หรือเปล่า|หรือยัง)\s*[?？.!]*\s*$"
+    r"|[?？]\s*$")
+#: The guest closed the topic or the visit: a follow-up is selling at them.
+#: Thai is matched as WORDS (retrieval.tokenize), never as substrings --
+#: บาย sits inside สบาย ("อยู่สบายไหม" is a question, not a goodbye), the same
+#: trap as ราคา inside อาคาร (CLAUDE.md). Latin has spaces, so a regex.
+_CLOSING_TH = ("ขอบคุณ", "ไม่เป็นไร", "แค่นี้", "พอแล้ว", "ไว้ก่อน", "ไปก่อน", "บาย", "ลาก่อน",
+               "ไม่สนใจ")
+_CLOSING_EN = re.compile(r"\bthank|that'?s all|that is all|\bbye\b|no thanks|not interested",
+                         re.IGNORECASE)
+
+
+def _guest_closed(text: str) -> bool:
+    if _CLOSING_EN.search(text or ""):
+        return True
+    from app.tools.retrieval import tokenize
+
+    hay = " %s " % " ".join(tokenize(text or ""))
+    return any(" %s " % " ".join(tokenize(term)) in hay for term in _CLOSING_TH)
 CALL_DEBUG_KEEP = 12
 CALL_DEBUG_RATE = 16000
 
@@ -143,7 +180,9 @@ class VoiceSession:
         #: session that stays deaf forever is this bug with the sign
         #: flipped. One clock, read where the audio arrives; no task.
         self._ears_closed_until: float | None = (
-            time.monotonic() + self.SUMMONED_HOLD_MAX_S if summoned else None
+            time.monotonic() + float(getattr(settings, "summoned_hold_max_s",
+                                             self.SUMMONED_HOLD_MAX_S))
+            if summoned else None
         )
         self._greeting_turn_seen = False
         #: Set while the model is not in the middle of answering a
@@ -217,6 +256,19 @@ class VoiceSession:
         #: Gemini wrote but never voiced. See `_respeak_silent_block`.
         self._silent_block_seen = False
         self._respeak_fired = False
+        #: Follow-up after silence (FOLLOW_UP_AFTER_S): a guest question is
+        #: awaiting its follow-up decision; the generation every guest voice
+        #: bumps (a pending follow-up whose generation moved is void); what
+        #: she said since the guest last spoke, and what the guest said.
+        self._answer_pending = False
+        self._follow_up_gen = 0
+        self._follow_up_task: asyncio.Task | None = None
+        self._said_since_guest = ""
+        self._guest_text = ""
+        # The choice buttons under her own question (_offer_choices): what she
+        # said since the last turn_complete, and which set is on screen now.
+        self._said_this_turn = ""
+        self._choices_offered: str | None = None
         #: Engagement (FOCUS_WAKE / FOCUS_INVITE / FOCUS_GOODBYE /
         #: FOCUS_ATTENTION): all None/False unless a switch is on.
         self._began_at = time.monotonic()
@@ -427,7 +479,8 @@ class VoiceSession:
                 self._array_tap.report()
             self.metrics.finish("session_closed")
             active.reset(metrics_token)
-            for name in ("_nudge_task", "_respeak_task", "_ears_task", "_invite_task"):
+            for name in ("_nudge_task", "_respeak_task", "_ears_task", "_invite_task",
+                         "_follow_up_task"):
                 task = getattr(self, name, None)
                 if task is not None and not task.done():
                     task.cancel()
@@ -1193,6 +1246,9 @@ class VoiceSession:
                     if event.get("type") == "quick_ask":
                         await self._quick_ask(event)
                         continue
+                    if event.get("type") == "story_report":
+                        self._story_report(event.get("report"))
+                        continue
                     if event.get("type") == "mic_state":
                         # The browser half of the `call audio:` report:
                         # which device, whether the OS muted it, whether
@@ -1288,7 +1344,15 @@ class VoiceSession:
                         continue
                     if event.get("type") == "played":
                         # Browser reporting how much reply audio it actually
-                        # played before the guest cut in. Only OpenAI needs it.
+                        # played before the guest cut in. Only OpenAI needs it
+                        # for truncation -- but the page has STOPPED her voice
+                        # (a tap over her, a barge-in): the server's playback
+                        # clock ends now too. Gemini sends no `interrupted`
+                        # once generation is done, so without this the next
+                        # answer was queued behind audio nobody heard and the
+                        # reply window, follow-up and idle hold all ran late
+                        # (review 13 Oct).
+                        self._play_until = min(getattr(self, "_play_until", 0.0), time.monotonic())
                         truncate = getattr(self.provider, "truncate", None)
                         if truncate is not None:
                             await truncate(int(event.get("heard_ms", 0)))
@@ -1338,6 +1402,7 @@ class VoiceSession:
                 elif event.kind == "speech_started":
                     self.metrics.finish("new_speech")
                     self.metrics.pending_end = None
+                    self._guest_started_turn()
                     # Close the question the moment a voice starts, not when
                     # the transcript lands. A guest thinking out loud through
                     # "เอ่อ... เคยมาค่ะ ตอนเด็กๆ" takes several seconds, and
@@ -1360,6 +1425,7 @@ class VoiceSession:
                     # array's playback clock (its tail still runs).
                     self._play_until = min(getattr(self, "_play_until", 0.0), time.monotonic())
                     self._spoke_this_turn = False
+                    self._said_this_turn = ""
                     # A barge-in mid-tour is a pause, not a skip: keep the deck
                     # on the current slide so the advance nudge resumes it
                     # rather than stepping over a slide nobody finished hearing.
@@ -1399,9 +1465,20 @@ class VoiceSession:
                     if self._spoke_this_turn and self._sent_audio_ms < 200:
                         turnlog.record("silent_turn",
                                        audio_ms=round(self._sent_audio_ms))
-                    self._sent_audio_ms = 0.0
+                    audio_ms, self._sent_audio_ms = self._sent_audio_ms, 0.0
                     display.end_turn()
                     self._greeting_turn_done()
+                    if self._spoke_this_turn or audio_ms >= 200:
+                        # The guest's reply window (FOCUS_REPLY_WINDOW_S)
+                        # starts when her voice has played out -- the server's
+                        # own playback clock, since the robot face reports no
+                        # audio lead (`remaining_lead` reads 0 there).
+                        from app import focus
+
+                        now = time.monotonic()
+                        focus.her_turn_ended(max(now + display.remaining_lead(),
+                                                 getattr(self, "_play_until", 0.0) or 0.0),
+                                             epoch=getattr(self, "_focus_epoch", None))
                     idle = getattr(self, "turn_idle", None)
                     if idle is not None:
                         if settings.turn_idle_tracks_tools and getattr(
@@ -1415,7 +1492,13 @@ class VoiceSession:
                             idle.set()
                             self._idle_held_by_tools = False
                     await self._send_json({"type": "turn_complete"})
+                    if getattr(self, "_screen_owed", False) and not getattr(self, "_screen_staged", False):
+                        # The page clears its stage on this same event; the
+                        # story's taps go with it.
+                        self._story_taps = set()
+                    await self._offer_choices()
                     await self._nudge_tour_if_stalled()
+                    self._maybe_schedule_follow_up()
                     self._spoke_this_turn = False
                     if getattr(self, "_silent_block_seen", False):
                         self._silent_block_seen = False
@@ -1433,6 +1516,7 @@ class VoiceSession:
                     # answered the spoken request correctly. Keep it useful
                     # for diagnostics without treating it as model truth.
                     turnlog.record("heard", text=event.text or "")
+                    self._guest_text = (getattr(self, "_guest_text", "") + " " + (event.text or ""))[-300:]
                     # Kept so the destructive slide tools can check whether
                     # anybody asked for what they are about to do. See
                     # `app/heard.py` — this is the field that decides. Per
@@ -1465,6 +1549,8 @@ class VoiceSession:
                         self._silent_block_seen = True
                         turnlog.record("silent_block", chars=len(_chunk))
                     turnlog.record("said", text=event.text or "")
+                    self._said_since_guest = (getattr(self, "_said_since_guest", "") + (event.text or ""))[-400:]
+                    self._said_this_turn = (getattr(self, "_said_this_turn", "") + (event.text or ""))[-400:]
                     await self._send_json({"type": "assistant_transcript", "text": event.text or ""})
                     # ...and to the robot's own screen, which unlike this tab
                     # is being read by the guest — so it goes through the
@@ -1483,6 +1569,11 @@ class VoiceSession:
 
                 elif event.kind == "tool_call":
                     self._tool_started(event)
+                    # Review 12 Oct: a follow-up must not land while a tool runs
+                    # (gemini-3.8 completes a turn BEFORE its call; with
+                    # TURN_IDLE_TRACKS_TOOLS off nothing else holds it). The
+                    # answer stays pending: the tool's spoken reply re-arms it.
+                    self._follow_up_gen = getattr(self, "_follow_up_gen", 0) + 1
                     turnlog.record("tool", name=event.text or "")
                     await self._send_json({"type": "tool_call", "name": event.text or ""})
 
@@ -1531,6 +1622,7 @@ class VoiceSession:
                             position=shown.get("position"),
                             audio_lead_s=round(display.remaining_lead(), 1),
                         )
+                    self._note_screen(event.text or "", data, bool(changed_screen))
                     await self._send_json(payload)
 
                 elif event.kind == "error":
@@ -1734,6 +1826,11 @@ class VoiceSession:
         except asyncio.CancelledError:
             raise
 
+    #: How long past the guest's last words her voice may hold the idle
+    #: clock (`_close_when_nobody_is_there`): longer than any one answer
+    #: (stories run 20-35 s), short of a tour narrated to an empty room.
+    ANSWER_HOLDS_IDLE_S = 90.0
+
     async def _close_when_nobody_is_there(self) -> None:
         """Hang up on an empty room.
 
@@ -1799,8 +1896,17 @@ class VoiceSession:
                         why = "no_face"
                 if not limit:
                     continue
-                quiet = time.monotonic() - max(self._last_heard_at,
-                                               getattr(self, "_idle_from", 0.0))
+                now = time.monotonic()
+                # Her voice holds the clock: a guest listening to a long
+                # answer is not an empty room. 13 Oct, live on the robot: a
+                # tapped facilities question, her 31 s answer with its story,
+                # hung up "no_face" at 30 s mid-sentence (the guest stood under
+                # the head camera), story and all. Held only so far past the
+                # guest's last words, so narration to nobody still ends (the
+                # deck case in the docstring).
+                held = min(self._array_audible_until(now),
+                           self._last_heard_at + self.ANSWER_HOLDS_IDLE_S)
+                quiet = now - max(self._last_heard_at, getattr(self, "_idle_from", 0.0), held)
                 if quiet < limit:
                     continue
                 logger.info("no guest speech for %.0fs%s — ending the session", quiet,
@@ -1816,6 +1922,132 @@ class VoiceSession:
                 return
         except asyncio.CancelledError:
             raise
+
+    # ---- follow-up after silence (FOLLOW_UP_AFTER_S, owner 12 Oct) ----
+    #: How long the watcher may wait in all (her answer playing, a tool
+    #: running, then the silence itself) before it gives the answer up.
+    FOLLOW_UP_MAX_WAIT_S = 90.0
+    #: With a live camera, nobody engaged in front for this long = nobody to ask.
+    FOLLOW_UP_FACE_GONE_S = 3.0
+
+    def _guest_started_turn(self) -> None:
+        """The guest spoke (or tapped a topic): whatever follow-up was
+        pending is void -- they are talking; the next answer gets its own."""
+        task = getattr(self, "_follow_up_task", None)
+        if task is not None and not task.done() and getattr(self, "_answer_pending", False):
+            turnlog.record("follow_up", sent=False, why="guest_spoke")
+        self._follow_up_gen = getattr(self, "_follow_up_gen", 0) + 1
+        self._answer_pending = True
+        self._said_since_guest = ""
+        self._guest_text = ""
+        self._said_this_turn = ""
+        self._choices_offered = None     # the page drops its buttons on the same events
+        # Each answer owns the screen (voice-preview.html answerOwed/answerStaged):
+        # mirrored here so a story's taps live exactly as long as its overview.
+        self._screen_owed = True
+        self._screen_staged = False
+        self._story_owns_answer = False
+
+    def _void_follow_up(self) -> None:
+        """Something else spoke for her (an announcement): the pending answer
+        is not hers to follow up any more, and that turn must not arm one
+        (review 12 Oct: robot_arrived / follow_canva / an invite completing
+        while an answer was pending re-armed it 4 s after her own news)."""
+        self._answer_pending = False
+        self._follow_up_gen = getattr(self, "_follow_up_gen", 0) + 1
+
+    def _maybe_schedule_follow_up(self) -> None:
+        """At a turn_complete that carried her answer to the guest: (re)start
+        the silence watcher for it. Re-armed by a later turn_complete of the
+        same answer (gemini-3.8 completes a turn before its tool call, then
+        again after the tool's reply), and never armed by her own follow-up,
+        greeting or announcements -- only a guest turn sets `_answer_pending`."""
+        if settings.follow_up_after_s <= 0 or getattr(self, "profile", "condo") != "condo":
+            return
+        if not (getattr(self, "_answer_pending", False) and self._spoke_this_turn):
+            return
+        if getattr(getattr(self, "provider", None), "_vad_gate", None) is None:
+            # VAD_MODE=gemini: no local gate, so neither speech_started nor
+            # `_guest_speaking` can see the guest -- it would talk over them.
+            if not getattr(self, "_follow_up_blind_logged", False):
+                self._follow_up_blind_logged = True
+                logger.info("follow-up after silence: off for this call -- needs VAD_MODE=local")
+            return
+        self._follow_up_gen = getattr(self, "_follow_up_gen", 0) + 1
+        old = getattr(self, "_follow_up_task", None)
+        if old is not None and not old.done():
+            old.cancel()
+        self._follow_up_task = asyncio.create_task(self._follow_up_after_silence(self._follow_up_gen))
+
+    def _follow_up_veto(self, now: float) -> str | None:
+        """Why this silence must not be followed up, or None."""
+        from app import focus
+        from app.tools import slides
+
+        if _ENDS_ON_QUESTION.search((getattr(self, "_said_since_guest", "") or "").strip()):
+            return "she_asked"
+        if _guest_closed(getattr(self, "_guest_text", "") or ""):
+            return "guest_closed"
+        if slides.STATE.get("deck") or slides.STATE.get("awaiting"):
+            return "tour"
+        if focus._robot_moving():
+            return "robot_moving"
+        if focus.enabled():
+            away = focus.engaged_age(now)
+            if away is not None and away >= self.FOLLOW_UP_FACE_GONE_S:
+                return "nobody_in_front"     # the goodbye is the walk-away's answer
+        return None
+
+    async def _follow_up_after_silence(self, gen: int) -> None:
+        """Owner 12 Oct: answer completely; if then nothing is heard for
+        FOLLOW_UP_AFTER_S, ask one short follow-up; if a voice is heard,
+        listen and answer instead -- no follow-up for that answer at all.
+
+        The clock starts when her voice has PLAYED OUT (`_she_is_audible`),
+        not at turn_complete: the model generates 4-6x faster than she speaks.
+        A tool still running or an answer still owed is not silence. Any
+        voice, even one focus refused (`_guest_speaking`), cancels: the guest
+        talking to a friend beside her is not a pause to fill."""
+        from app import events
+
+        wait_s = float(settings.follow_up_after_s)
+        start = time.monotonic()
+        quiet_since: float | None = None
+        while True:
+            await asyncio.sleep(0.2)
+            if gen != getattr(self, "_follow_up_gen", 0):
+                return
+            now = time.monotonic()
+            if now - start > self.FOLLOW_UP_MAX_WAIT_S:
+                return
+            if self._guest_speaking():
+                self._answer_pending = False
+                turnlog.record("follow_up", sent=False, why="voice_heard")
+                return
+            if (getattr(self, "_tools_in_flight", None) or self._she_is_audible(now)
+                    or self._reply_owed(now)):
+                quiet_since = None
+                continue
+            if quiet_since is None:
+                quiet_since = now
+                continue
+            if now - quiet_since >= wait_s:
+                break
+        why = self._follow_up_veto(now)
+        if why is None and _active is not self:
+            why = "superseded"          # a newer call owns the robot now
+        self._answer_pending = False
+        if why:
+            turnlog.record("follow_up", sent=False, why=why)
+            return
+
+        def still_quiet() -> bool:
+            return (gen == getattr(self, "_follow_up_gen", 0) and _active is self
+                    and not self._guest_speaking()
+                    and not self._she_is_audible(time.monotonic()))
+
+        sent = await events.announce(FOLLOW_UP_TEXT, source="follow_up", still_relevant=still_quiet)
+        turnlog.record("follow_up", sent=bool(sent), after_s=round(wait_s, 1))
 
     async def _respeak_silent_block(self) -> None:
         """Ask the model to say out loud what it only wrote.
@@ -1969,6 +2201,110 @@ class VoiceSession:
     #: Two taps closer than this are one finger, not two questions.
     QUICK_ASK_MIN_GAP_S = 1.2
 
+    def _note_screen(self, name: str, data: object, changed_screen: bool) -> None:
+        """What a tool result put on the robot face's stage, as the page will
+        see it (voice-preview.html tool_result): a story brings its taps; any
+        other picture replaces it -- except an answer picture (ANSWER_IMAGES)
+        inside an answer a story already owns, which the page ignores."""
+        if not isinstance(data, dict) or not getattr(self, "_robot_face_claim", False):
+            return
+        if name == "present_story":
+            if data.get("ok") and data.get("screen") == "story":
+                from app import stories
+
+                self._story_topic = data.get("topic")
+                self._story_taps = stories.tap_ids(data)
+                self._story_owns_answer = True
+                self._screen_staged = True
+            return
+        if changed_screen and getattr(self, "_story_owns_answer", False):
+            return                       # the story wins this answer's screen
+        # Only what the robot face actually draws over a story: the unit card,
+        # a floor plan, an embed, a clear (the text tables are not ported there).
+        if changed_screen or data.get("embed") or data.get("screen") in ("unit", "plan", "clear"):
+            self._screen_staged = True
+            self._story_taps = set()
+
+    async def _offer_choices(self) -> None:
+        """Owner 12 Oct: "ลูกค้ากำลังมองหาห้องแบบสตูดิโอ หนึ่งห้องนอน หรือสองห้องนอนคะ
+        คำพวกนี้อยากให้ขึ้นเป็นตัวเลือกบนจอด้วยให้ลูกค้ากดเข้าไปดูได้".
+
+        Decided at every turn_complete that carried her voice, from what she
+        said in that stretch (gemini-3.8 completes a turn before its tool call
+        too -- a stretch with no words changes nothing). Her question gets its
+        buttons; her next spoken line without one takes them down, so the
+        buttons always belong to the last thing she asked. Robot face, condo,
+        and only when the tool a tap leads to is visible here."""
+        from app import quick_asks
+        from app.prompts import _tool_visible
+
+        said, self._said_this_turn = getattr(self, "_said_this_turn", ""), ""
+        if not said.strip() or not getattr(self, "_robot_face_claim", False):
+            return
+        name = None
+        if getattr(self, "profile", "condo") == "condo" and _ENDS_ON_QUESTION.search(said.strip()):
+            name = quick_asks.choices_asked(said)
+            if name and not _tool_visible(quick_asks.CHOICES[name]["tool"]):
+                name = None
+            if name and getattr(self, "_story_owns_answer", False) and getattr(self, "_story_taps", None):
+                # The story's overview already holds this choice as taps; a
+                # second row of the same buttons under it is noise.
+                name = None
+        if name == getattr(self, "_choices_offered", None):
+            return
+        self._choices_offered = name
+        if name:
+            turnlog.record("choices", set=name)
+            await self._send_json(quick_asks.choices_for_page(name))
+        else:
+            await self._send_json({"type": "choices", "set": None, "items": []})
+
+    #: A story id as the catalog writes them (app/stories.py ids).
+    _STORY_ID = re.compile(r"[a-z0-9_]{1,64}")
+
+    def _story_report(self, report) -> None:
+        """The story engine's own report from the robot face (emma-story.js
+        `Story.report`), one per story: per beat when it went up and where
+        its cue word fell in her voice (seconds of her voice played), and the
+        frame times while it played with her voice and the 3D Emma running.
+        The reviewer (13 Oct) could not judge picture-to-voice timing or
+        smoothness from silent screen recordings; this is that evidence from
+        real conversations. Numbers and the story id only -- anything else in
+        the message is dropped, and a malformed report writes nothing."""
+        if not isinstance(report, dict):
+            return
+        sid = report.get("id")
+        if not isinstance(sid, str) or not self._STORY_ID.fullmatch(sid):
+            return
+        beats = report.get("beats")
+        if not isinstance(beats, list):
+            return
+
+        def number(value, high):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return None
+            try:
+                value = float(value)      # an int past 1e308 raises: the call must not end
+            except (OverflowError, ValueError):
+                return None
+            return round(value, 2) if math.isfinite(value) and 0 <= value <= high else None
+
+        at_s, cue_s, lag_ms = [], [], []
+        for beat in beats[:24]:
+            beat = beat if isinstance(beat, dict) else {}
+            at, cue = number(beat.get("at"), 600), number(beat.get("cue"), 600)
+            at_s.append(at)
+            cue_s.append(cue)
+            lag_ms.append(None if at is None or cue is None else round((at - cue) * 1000))
+        frames = number(report.get("frames"), 100000)
+        long_frames = number(report.get("long_frames"), 100000)
+        turnlog.record("story_report", topic=sid, beats=len(at_s), at_s=at_s, cue_s=cue_s,
+                       lag_ms=lag_ms, interrupted=report.get("interrupted") is True,
+                       audio_s=number(report.get("audio_s"), 600),
+                       frames=None if frames is None else int(frames),
+                       fps=number(report.get("fps"), 240), p95_ms=number(report.get("p95_ms"), 10000),
+                       long_frames=None if long_frames is None else int(long_frames))
+
     async def _quick_ask(self, event: dict) -> None:
         """A topic tapped on the robot face (app/quick_asks.py): an id and a
         language code in, the server's own words out as a user turn. An id
@@ -1979,9 +2315,28 @@ class VoiceSession:
         from app import quick_asks
 
         ask_id = event.get("id")
-        text = quick_asks.text_for(self.profile, ask_id, event.get("lang"))
-        if text is None:
-            return
+        if isinstance(ask_id, str) and ask_id.startswith("story_"):
+            # A tap on a story's own overview (app/stories.py): only an id of
+            # the story this session put on screen last, and the words are the
+            # catalog's -- the same rule as a choice under her question.
+            text = None
+            if ask_id in getattr(self, "_story_taps", ()):
+                from app import stories
+
+                tap = stories.find_tap(getattr(self, "_story_topic", None), ask_id)
+                text = stories.tap_text(tap, event.get("lang")) if tap is not None else None
+            if text is None:
+                return
+        else:
+            text = quick_asks.text_for(self.profile, ask_id, event.get("lang"))
+            if text is None:
+                return
+            choice_set = quick_asks.choice_set_of(ask_id)
+            if choice_set is not None and choice_set != getattr(self, "_choices_offered", None):
+                # A choice is an answer to her question -- only while that
+                # question's buttons are on screen (a stale page, or a crafted
+                # frame, does not get to make her call the tool).
+                return
         now = time.monotonic()
         if now - getattr(self, "_quick_ask_at", -1e9) < self.QUICK_ASK_MIN_GAP_S:
             return
@@ -2000,6 +2355,7 @@ class VoiceSession:
             turnlog.record("ears_open", greeted=False, why="quick_ask")
         lang = event.get("lang")
         turnlog.record("quick_ask", id=ask_id, lang=lang if lang in quick_asks.LANGS else None)
+        self._guest_started_turn()        # a tapped question is a question
         await self.provider.send_text(text)
 
     async def _send_json(self, payload: dict) -> None:

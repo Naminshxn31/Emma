@@ -710,6 +710,16 @@ class Settings:
     #: the robot turns it on in data/robot-server/robot.env, and
     #: scripts/robot_server.py then ships the 48 manifest-pinned pictures.
     answer_images: bool = _get_bool("ANSWER_IMAGES", False)
+    #: The Interactive Presentation Engine on the robot face (owner 12 Oct
+    #: 2026: a question answered by voice AND a motion story on the portrait
+    #: screen, beat by beat with her voice, ending on an overview the guest can
+    #: tap). `present_story(topic)` -- the model picks WHICH story, never a
+    #: number (app/stories.py, docs/emma-story-engine.md). Off by default so a
+    #: pull leaves every machine byte-identical; also needs `stories` named in
+    #: TOOL_GROUPS (opt-in, like `body`), the robot face's own session, the
+    #: condo profile and an approved catalog. `robot_server.py deploy` ships the
+    #: story pictures only while this is on in robot.env.
+    stories_enabled: bool = _get_bool("STORIES_ENABLED", False)
     #: How long a slide's question waits for an answer before the tour moves
     #: on by itself. Long enough that a guest who is thinking isn't cut off,
     #: short enough that a room full of people who won't talk to a robot
@@ -882,6 +892,30 @@ class Settings:
     #: TOOL_GROUPS (it is opt-in), the robot must have `body_enabled`, and the
     #: ROBOT_ARM_* interlock above still applies — this adds a key, it never
     #: replaces one.
+    # Follow-up after silence (owner 12 Oct: answer completely, then if the
+    # guest says nothing for a while, ask ONE short follow-up; any voice in
+    # that window cancels it and she listens). Seconds of real silence after
+    # her voice has played out. Research: peers leave ~0.1-0.3 s between turns
+    # and ~1 s already feels long (Stivers 2009, Jefferson 1989), but a guest
+    # who has just been told something needs time to think -- 3 s+ of wait
+    # time multiplies answers (Rowe), and voice assistants keep listening 5 s
+    # (Alexa) to 8 s (Google). 0 = off, the default: the sales room's PC
+    # behaves exactly as before; the robot turns it on in robot.env.
+    follow_up_after_s: float = float(os.getenv("FOLLOW_UP_AFTER_S", "0"))
+    # A heard question Gemini never answers (robot, 14 Oct 13:19: three
+    # questions transcribed, then 146 s of nothing from the server -- no
+    # reply, no usage, no error -- before it answered one; once in 104
+    # replies over three days, the rest started 1-2 s after the guest's last
+    # word, slowest 6 s; eval 361 turns, slowest 3.6 s). Seconds after
+    # activity_end, with words transcribed and no sign of a reply, before the
+    # provider completes the turn again (an empty turn_complete); then
+    # REPLY_STALL_RECONNECT_S more before it rejoins the conversation on a new
+    # socket (the resumption handle) and asks the question again as text.
+    # Never for a segment with no words: silence is the right answer to room
+    # noise. 0 = off, the default (the sales room's PC is unchanged); the
+    # robot turns it on in robot.env. Evidence: `reply_stall` rows.
+    reply_stall_s: float = float(os.getenv("REPLY_STALL_S", "0"))
+    reply_stall_reconnect_s: float = float(os.getenv("REPLY_STALL_RECONNECT_S", "8"))
     robot_body_enabled: bool = _get_bool("ROBOT_BODY_ENABLED", False)
     robot_body_ack_timeout_s: float = float(os.getenv("ROBOT_BODY_ACK_TIMEOUT_S", "2.5"))
     #: The heard-word guard (the `heard.py` precedent: "bit like" closed the
@@ -1116,6 +1150,24 @@ class Settings:
     focus_face_min_px: int = int(os.getenv("FOCUS_FACE_MIN_PX", "90"))
     focus_yaw_max_deg: float = float(os.getenv("FOCUS_YAW_MAX_DEG", "35"))
     focus_hold_s: float = float(os.getenv("FOCUS_HOLD_S", "1.5"))
+    #: Rule 2 waivers (13 Oct: on the robot 1,065 segments were denied "no face
+    #: in front" to 86 opened; the guest at the chest screen is under the head
+    #: camera, or so close the face is lost after a frame). Both 0 = off =
+    #: today's rule. CONVERSE_HOLD_S: after a segment opens, a face is not
+    #: required for this long (each open renews it). NEAR_RMS: a segment
+    #: this loud opens without a face -- room chatter measured 0.02-0.04,
+    #: opened segments p50 0.057; tune from focus_* rows, never by guess.
+    focus_converse_hold_s: float = float(os.getenv("FOCUS_CONVERSE_HOLD_S", "0"))
+    focus_near_rms: float = float(os.getenv("FOCUS_NEAR_RMS", "0"))
+    #: Third waiver: a segment opening within this many seconds after her
+    #: voice ended (greeting or answer) is the guest's reply -- turn-taking
+    #: needs no camera. 0 = off. focus.her_turn_ended has the measurement.
+    focus_reply_window_s: float = float(os.getenv("FOCUS_REPLY_WINDOW_S", "0"))
+    #: A camera-summoned call is deaf until its greeting is heard, or this
+    #: long if no greeting comes (the face was lost before it was judged).
+    #: 13 Oct robot logs: ears opened 9-10 s after the dial on call after
+    #: call -- a guest who spoke first was not heard at all in that window.
+    summoned_hold_max_s: float = float(os.getenv("SUMMONED_HOLD_MAX_S", "10"))
     #: Tell the model who is speaking each turn ("ผู้พูด: คนที่ 1 / คุณ…").
     focus_speaker_labels: bool = _get_bool("FOCUS_SPEAKER_LABELS", False)
     # ---- engagement: behave like an established reception robot ----

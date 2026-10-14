@@ -781,6 +781,10 @@ _SAYS_NO_INFO = re.compile(
 #: "อยากทราบรายละเอียดส่วนไหนเพิ่มเติมไหมคะ" is the filler it always was.
 _BROAD_ASK = re.compile(r"(มีอะไร|อะไรบ้าง|สิ่งอำนวยความสะดวก|facilit|what.{0,20}(have|there))", re.IGNORECASE)
 _SECTION_CHOICE = re.compile(r"(ส่วนไหน|ชั้นไหน|โซนไหน|which\s+(floor|area|part|section|zone))", re.IGNORECASE)
+#: Owner 12 Oct: after a meaningless line or an off-topic refusal she asks ONE
+#: discovery question about the project -- wanted, not filler. Generic
+#: invitations ("มีอะไรให้ช่วยไหมคะ") still match _FILLER and are still flagged.
+_DISCOVERY = re.compile(r"(ห้องแบบไหน|อยู่เองหรือ|ไว้ลงทุน|ชั้นไหน|for yourself or|which (room|unit) type)", re.IGNORECASE)
 
 
 def _numbers(text: str) -> set[str]:
@@ -792,6 +796,17 @@ def _numbers(text: str) -> set[str]:
             if "." in tok:
                 out.add(tok.rstrip("0").rstrip("."))
     return out
+
+
+#: A whole reply that is only a politeness particle (owner 12 Oct on the
+#: robot: "เยี่ยมมาก" -> "ค่ะ", a remark -> "ค่ะ"). Short answers are wanted;
+#: one word is not an answer.
+_BARE_ACKS = {"ค่ะ", "คะ", "ครับ", "ค่า", "จ้า", "ok", "okay", "yes", "sure"}
+
+
+def _bare_ack(said: str) -> bool:
+    core = re.sub(r"[\s.!?,。！？…~]+", "", said or "").lower()
+    return core in _BARE_ACKS
 
 
 def flags_for(case: dict, turns: list[dict], allowed_text: str) -> list[str]:
@@ -810,7 +825,8 @@ def flags_for(case: dict, turns: list[dict], allowed_text: str) -> list[str]:
         # The content suite has its own, wider offer flag that knows which
         # turns may end on a question (a greeting) — one flag per offence.
         if (_FILLER.search(tail) and case.get("suite") != "content"
-                and not (_SECTION_CHOICE.search(tail) and _BROAD_ASK.search(turn.get("user") or ""))):
+                and not (_SECTION_CHOICE.search(tail) and _BROAD_ASK.search(turn.get("user") or ""))
+                and not _DISCOVERY.search(tail)):
             flags.append(f"t{i}:filler_question_at_end")
         if turn.get("audio_s", 0) > 25:
             flags.append(f"t{i}:long_{turn['audio_s']:.0f}s")
@@ -820,6 +836,8 @@ def flags_for(case: dict, turns: list[dict], allowed_text: str) -> list[str]:
             flags.append(f"t{i}:concept_caveat")
         if _SAYS_NO_INFO.search(said):
             flags.append(f"t{i}:says_no_info")
+        if _bare_ack(said):
+            flags.append(f"t{i}:bare_ack")
         if re.search(r"\d+\s*(นาที|minutes?\b|mins?\b)", said, re.IGNORECASE):
             flags.append(f"t{i}:mentions_minutes")
         tool_text = json.dumps([t.get("result") for t in turn.get("tools", [])], ensure_ascii=False)
@@ -1264,10 +1282,47 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
 def split_serial(todo: list[dict]) -> tuple[list[dict], list[dict]]:
     """(parallel, serial). A case that overrides a setting changes it for the
     whole process — every session running beside it would be measured under
-    it — so it runs alone, after the rest."""
-    parallel = [c for c in todo if not c.get("serial") and not c.get("settings")]
-    serial = [c for c in todo if c.get("serial") or c.get("settings")]
+    it — so it runs alone, after the rest. A story case is one of those."""
+    parallel = [c for c in todo if not c.get("serial") and not c.get("settings")
+                and not c.get("stories")]
+    serial = [c for c in todo if c.get("serial") or c.get("settings") or c.get("stories")]
     return parallel, serial
+
+
+#: A story case (`"stories": true`, data/eval/qa_live_scenarios.json, cat 27)
+#: runs the robot face's motion stories (app/stories.py) the way the robot's
+#: server would with them switched on: STORIES_ENABLED, `stories` in the
+#: tool groups beside the robot.env groups that answer project questions,
+#: and ANSWER_IMAGES on (robot.env) -- the picture a story must not fight.
+#: The robot/body groups stay out: they are stubbed anyway, and not what a
+#: story case measures. In this process only, never .env.
+STORY_CASE_SETTINGS = {"stories_enabled": True, "answer_images": True,
+                       "tool_groups": "knowledge,mydocs,units,calc,stories"}
+
+
+@contextlib.contextmanager
+def stories_approved_in_memory():
+    """The story catalog is a DRAFT until a person approves it (deny by
+    default; scripts/approve_stories.py --by NAME). The eval has to measure
+    the stories before anyone may approve them, so for a story case -- and
+    only in this process, for as long as the case runs -- the approval check
+    answers "approved" for this project's catalog. Nothing is written: the
+    catalog on disk keeps approved_by empty, and the patch is undone after
+    the case whatever happens."""
+    from app import stories
+
+    real = stories.approval_problem
+
+    def approved_for_this_eval(catalog):
+        return "no_catalog" if not catalog else None
+
+    stories.approval_problem = approved_for_this_eval
+    stories.reset()
+    try:
+        yield
+    finally:
+        stories.approval_problem = real
+        stories.reset()
 
 
 @contextlib.contextmanager
@@ -1277,15 +1332,19 @@ def case_settings(case: dict):
     after it (they would all measure voice_disabled)."""
     from app.config import settings
 
-    overrides = case.get("settings") or {}
+    overrides = dict(STORY_CASE_SETTINGS) if case.get("stories") else {}
+    overrides.update(case.get("settings") or {})
     saved = {key: getattr(settings, key) for key in overrides}
-    try:
-        for key, value in overrides.items():
-            setattr(settings, key, value)
-        yield
-    finally:
-        for key, value in saved.items():
-            setattr(settings, key, value)
+    with contextlib.ExitStack() as stack:
+        try:
+            for key, value in overrides.items():
+                setattr(settings, key, value)
+            if case.get("stories"):
+                stack.enter_context(stories_approved_in_memory())
+            yield
+        finally:
+            for key, value in saved.items():
+                setattr(settings, key, value)
 
 
 def resolve_profile(suite: str, profile: str | None) -> str:
@@ -1365,6 +1424,11 @@ async def main_async(args) -> int:
         cases = [c for c in cases if args.cat.lower() in (c.get("cat") or "").lower()]
     if args.limit:
         cases = cases[: args.limit]
+    if getattr(args, "stories", False):
+        # --stories: every selected case as a story case -- what the robot face
+        # answers once the stories are on, for the cases that are NOT stories
+        # (a price, a chosen room type, a room number must not become one)
+        cases = [dict(c, stories=True) for c in cases]
 
     out = Path(args.resume) if args.resume else OUT_DIR / (
         "live-qa-%s.jsonl" % dt.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -1489,6 +1553,9 @@ def main() -> int:
     ap.add_argument("--faq", default=str(FAQ), help="path to the report's FAQ chapter")
     ap.add_argument("--ids", help="comma-separated case ids")
     ap.add_argument("--cat", help="substring of the category")
+    ap.add_argument("--stories", action="store_true",
+                    help="run every selected case with the robot face's stories on (approved in memory "
+                         "for this process only; nothing is written)")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--concurrency", type=int, default=2,
                     help="parallel Live sessions (free tier allows ~3 in total, and the "

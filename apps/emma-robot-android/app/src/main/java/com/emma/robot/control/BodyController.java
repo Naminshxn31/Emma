@@ -114,8 +114,15 @@ final class BodyController {
 
     // ---- robot-side switches (operator screen only) ---------------------------
 
+    /** Gestures by voice: ON unless the operator turned them off (owner,
+     *  13 Oct: "ท่าทางให้ emma สั่งการไม่ได้หรอ ... ทำเลย"). A robot that never
+     *  touched the switch used to read it as off, so "ขอจับมือ" reached the
+     *  model and the arm never moved. The operator screen's switch still turns
+     *  it off and that choice is kept; walking (NavLauncher nav_enabled) stays
+     *  OFF by default. Every other gate -- foreground, operator screen, stop
+     *  latch, walking, cooldown, the server's heard guard -- is unchanged. */
     boolean enabled() {
-        return prefs.getBoolean(PREF_ENABLED, false);
+        return prefs.getBoolean(PREF_ENABLED, true);
     }
 
     boolean allowDirectionKnown() {

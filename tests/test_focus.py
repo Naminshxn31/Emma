@@ -91,6 +91,82 @@ def test_no_face_in_front_denies(on, rows):
     assert focus.may_open(T + 0.3) == (True, focus.OK)
 
 
+def test_a_conversation_under_way_is_heard_when_the_camera_loses_the_face(on, rows, monkeypatch):
+    """13 Oct, robot logs: 1,065 segments denied "no face in front" to 86
+    opened -- a guest at the chest screen is under the head camera, or so
+    close the face is found for one frame and lost. After a segment the rules
+    let through, FOCUS_CONVERSE_HOLD_S waives the face; only such a segment
+    renews it (chained on its own opens, one word kept the room open)."""
+    monkeypatch.setattr(settings, "focus_converse_hold_s", 20.0)
+    focus.observe_faces([face(t=T)], T)
+    assert focus.may_open(T + 0.1) == (True, focus.OK)
+    focus.observe_faces([], T + 5.0)                 # the face is lost
+    assert focus.may_open(T + 5.1) == (True, focus.CONVERSING)
+    focus.observe_faces([], T + 19.0)                # the camera still runs
+    assert focus.may_open(T + 19.0) == (True, focus.CONVERSING)
+    # its own opens do not renew it: 20 s after the face-verified one, over
+    focus.observe_faces([], T + 20.4)
+    assert focus.may_open(T + 20.5) == (False, focus.NO_FACE)
+    # and a new session starts without one
+    focus.observe_faces([face(t=T + 30)], T + 30)
+    assert focus.may_open(T + 30.1)[0]
+    focus.reset()
+    focus.observe_faces([], T + 33)                  # past FOCUS_HOLD_S of that face
+    assert focus.may_open(T + 33.1) == (False, focus.NO_FACE)
+    assert any(r.get("reason") == focus.CONVERSING and r.get("conversing") for r in rows)
+
+
+def test_a_voice_at_the_robot_is_heard_without_a_face(on, monkeypatch):
+    """FOCUS_NEAR_RMS: room chatter measured 0.02-0.04, opened segments p50
+    0.057 -- a voice this loud is somebody at the robot. It never starts a
+    conversation hold of its own."""
+    monkeypatch.setattr(settings, "focus_near_rms", 0.06)
+    monkeypatch.setattr(settings, "focus_converse_hold_s", 20.0)
+    focus.observe_faces([], T)
+    assert focus.may_open(T + 0.1, rms=0.03) == (False, focus.NO_FACE)
+    assert focus.may_open(T + 0.2, rms=0.09) == (True, focus.NEAR_VOICE)
+    assert focus.may_open(T + 2.0, rms=0.03) == (False, focus.NO_FACE)
+
+
+def test_the_guest_answering_her_is_heard_without_a_face(on, rows, monkeypatch):
+    """13 Oct, robot logs: every one of 983 "no face in front" denials had
+    no face at all -- the converse hold, renewed only by a face-verified
+    open, rarely started. FOCUS_REPLY_WINDOW_S: a voice that starts within
+    the window after her voice ends (greeting or answer) is the reply. Her
+    next turn renews it; a quiet guest past the window needs a face again."""
+    monkeypatch.setattr(settings, "focus_reply_window_s", 10.0)
+    focus.observe_faces([], T)
+    assert focus.may_open(T + 0.1) == (False, focus.NO_FACE)
+    focus.her_turn_ended(T + 3.0)                    # the greeting plays out at +3 s
+    assert focus.may_open(T + 2.0) == (True, focus.REPLY)
+    focus.observe_faces([], T + 12.5)
+    assert focus.may_open(T + 12.9) == (True, focus.REPLY)
+    focus.observe_faces([], T + 13.2)
+    assert focus.may_open(T + 13.2) == (False, focus.NO_FACE)
+    focus.her_turn_ended(T + 20.0)                   # she answered again
+    focus.observe_faces([], T + 25.0)
+    assert focus.may_open(T + 25.0) == (True, focus.REPLY)
+    assert any(r.get("reason") == focus.REPLY and r.get("reply") for r in rows)
+    focus.reset()                                    # a new call starts without one
+    focus.observe_faces([], T + 26.0)
+    assert focus.may_open(T + 26.0) == (False, focus.NO_FACE)
+
+
+def test_the_reply_window_is_off_by_default(on):
+    assert settings.focus_reply_window_s == 0
+    focus.observe_faces([], T)
+    focus.her_turn_ended(T)
+    assert focus.may_open(T + 0.5) == (False, focus.NO_FACE)
+
+
+def test_both_waivers_are_off_by_default(on):
+    assert settings.focus_converse_hold_s == 0 and settings.focus_near_rms == 0
+    focus.observe_faces([face(t=T)], T)
+    assert focus.may_open(T + 0.1)[0]
+    focus.observe_faces([], T + 5.0)
+    assert focus.may_open(T + 5.1, rms=0.5) == (False, focus.NO_FACE)
+
+
 def test_a_face_too_small_or_turned_away_is_not_engaged(on, monkeypatch):
     monkeypatch.setattr(settings, "focus_face_min_px", 90)
     monkeypatch.setattr(settings, "focus_yaw_max_deg", 35.0)
@@ -905,6 +981,34 @@ def test_nobody_in_front_ends_the_conversation_sooner(on, monkeypatch, rows):
     assert [r for r in rows if r["event"] == "idle_timeout"][0]["why"] == "no_face"
 
 
+def test_her_long_answer_is_not_an_empty_room(on, monkeypatch, rows):
+    """13 Oct, live on the robot: a tapped facilities question, her 31 s
+    answer and its story -- hung up "no_face" at 30 s, mid-sentence, because
+    the clock ran from the guest's tap. Her voice holds it; the quiet counts
+    from when she stops. Not for ever: past ANSWER_HOLDS_IDLE_S after the
+    guest's last words, narration to nobody still ends."""
+    monkeypatch.setattr(settings, "idle_timeout_s", 120)
+    sess = _session()
+    sess.summoned = True
+    sess._greeting_turn_seen = True
+    now = time.monotonic()
+    sess._last_heard_at = now - (sess.FOCUS_AWAY_S + 1)
+    sess._play_until = now + 4.0                      # she is still talking
+    focus.observe_faces([], now)                      # camera working, nobody
+    assert _idle_run(monkeypatch, sess) == []
+    sess._play_until = now - (sess.FOCUS_AWAY_S + 1)  # she stopped long ago
+    sent = _idle_run(monkeypatch, sess)
+    assert sent and sent[-1]["type"] == "idle_timeout"
+    sess2 = _session()
+    sess2.summoned = True
+    sess2._greeting_turn_seen = True
+    sess2._last_heard_at = now - (sess2.ANSWER_HOLDS_IDLE_S + sess2.FOCUS_AWAY_S + 1)
+    sess2._play_until = now + 30.0                    # a narration to nobody
+    focus.observe_faces([], time.monotonic())
+    sent = _idle_run(monkeypatch, sess2)
+    assert sent and sent[-1]["type"] == "idle_timeout"
+
+
 def test_a_call_a_person_started_is_not_ended_for_being_out_of_the_lens(on, monkeypatch, rows):
     """Rule 2's line, kept by the idle clock too: a button call is heard from
     outside the lens, so 30 s after its last words (mid-answer, when Emma's
@@ -1194,3 +1298,37 @@ def test_a_superseded_sessions_last_segment_is_not_attributed_to_the_next(
     sess._segment_closed(3, now - 2.0, now, b"\x01\x00" * 3200)
     assert len(submitted) == 1
     assert [r for r in rows if r["event"] == "focus_label"]
+
+
+def test_the_reply_window_does_not_chain_on_chatter_for_ever(on, rows, monkeypatch):
+    """Review 13 Oct, replayed on 12 Oct's denials: every answer renewed the
+    window, so chatter within 10 s of her voice chained up to 5 answers and
+    the call never idled out. After MAX_REPLY_CHAIN turns that answered only
+    window-admitted voices it stops renewing; a face (or a near voice, or her
+    name) starts the count again."""
+    monkeypatch.setattr(settings, "focus_reply_window_s", 10.0)
+    t = T
+    focus.her_turn_ended(t)                           # the greeting
+    assert focus.MAX_REPLY_CHAIN == 3
+    for _ in range(3):
+        focus.observe_faces([], t + 1)
+        assert focus.may_open(t + 1) == (True, focus.REPLY)
+        t += 5
+        focus.her_turn_ended(t)                       # she answered the chatter
+    focus.observe_faces([], t + 1)
+    assert focus.may_open(t + 1) == (False, focus.NO_FACE), "the chain stops"
+    # a face in front is a guest: the window serves them again
+    focus.observe_faces([face(t=t + 2)], t + 2)
+    assert focus.may_open(t + 2) == (True, focus.OK)
+    focus.her_turn_ended(t + 5)
+    focus.observe_faces([], t + 20)                   # the face has gone
+    assert focus.may_open(t + 6) == (True, focus.REPLY)
+
+
+def test_a_superseded_calls_turn_does_not_open_the_new_calls_window(on, monkeypatch):
+    monkeypatch.setattr(settings, "focus_reply_window_s", 10.0)
+    old = focus.epoch()
+    focus.reset()                                     # a new call took the robot
+    focus.her_turn_ended(T, epoch=old)                # the old call's late turn
+    focus.observe_faces([], T)
+    assert focus.may_open(T + 1) == (False, focus.NO_FACE)

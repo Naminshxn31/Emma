@@ -65,6 +65,10 @@ data/projects/*/presentations/slides/index.json.bak
 # Per-unit plan crops + their index (scripts/build_unit_plans.py, generated
 # from the sales team's furniture PDFs — ~1,066 images, rebuilt not tracked).
 data/projects/*/sales/unit-plans/
+# The robot face's story pictures (scripts/build_story_assets.py): cut from the
+# owner's renders and the website pack in .tmp/story-sources. The recipes,
+# designs, asset_pins.json and stories.json are tracked; the pictures rebuild.
+data/projects/*/stories/assets/
 # Backups the data console keeps beside any file it rewrites (app/data_console.py).
 # The .bak is the undo for a wrong approval; it is local evidence, not history.
 data/projects/*/facts/*.json.bak
@@ -167,3 +171,6 @@ apps/*/local.properties
 
 tools/android/scrcpy/
 .tmp/scrcpy-*.zip
+
+# The project report FAQ question embeddings (app/project_report.py), rebuilt on demand
+data/projects/*/sales/faq_embeddings.npz

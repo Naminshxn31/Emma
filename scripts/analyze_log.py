@@ -221,6 +221,34 @@ def focus(rows: list[dict]) -> None:
     _engagement(rows)
 
 
+def stories(rows: list[dict]) -> None:
+    """The robot face's stories in real conversations (`story_report`, one
+    per story): how far each picture went up after the word that cues it
+    (`lag_ms`, + = after the word; her voice's own text/audio ratio places
+    the word), and the frame times with her voice and the 3D Emma running.
+    The answer to "does the picture follow her voice on the robot" that a
+    silent screen recording cannot give (reviewer, 13 Oct)."""
+    reports = [r for r in rows if r.get("event") == "story_report"]
+    if not reports:
+        return
+    section("Stories on the robot face (story_report)")
+    lags = [v for r in reports for v in (r.get("lag_ms") or []) if isinstance(v, (int, float))]
+    cut = sum(1 for r in reports if r.get("interrupted"))
+    print(f"  stories: {len(reports)} ({cut} cut short by the guest)")
+    if lags:
+        print(f"  picture after its word: p10 {_pct(lags, 10):.0f} ms  p50 {_pct(lags, 50):.0f} ms  "
+              f"p90 {_pct(lags, 90):.0f} ms  (n={len(lags)}; under 0 = before the word)")
+    fps = [r["fps"] for r in reports if isinstance(r.get("fps"), (int, float))]
+    p95 = [r["p95_ms"] for r in reports if isinstance(r.get("p95_ms"), (int, float))]
+    longs = sum(int(r.get("long_frames") or 0) for r in reports)
+    if fps:
+        p95_text = f"{_pct(p95, 50):.1f} ms" if p95 else "—"
+        print(f"  fps: p50 {_pct(fps, 50):.1f}  worst {min(fps):.1f}  · frame p95 p50 {p95_text}"
+              f"  · frames over 50 ms: {longs}")
+    by = Counter(r.get("topic") for r in reports)
+    print("  most shown: " + ", ".join(f"{k} {v}" for k, v in by.most_common(8)))
+
+
 def _engagement(rows: list[dict]) -> None:
     """The reception-robot pieces (docs/listening-focus-2026-10-09.md,
     "Engagement"): the in-call name, invitations, full-mode releases, the
@@ -392,6 +420,7 @@ def main() -> int:
 
     latency(rows)
     focus(rows)
+    stories(rows)
 
     # ---- mishearings ------------------------------------------------------
     heard = [r.get("text", "") for r in rows if r.get("event") == "heard"]

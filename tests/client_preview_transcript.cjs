@@ -12,6 +12,10 @@ const c = vm.createContext({
   outputRate: 24000, playChunk() { playedChunks += 1; },
   // tap-to-ask state (outside the slices): no topics on this call
   quickAsks: null, setUiLang() {}, scriptLang() { return null; },
+  choiceSet: null, renderQuick() {},
+  // each answer owns the stage (owner 12 Oct): outside the slices too
+  answerOwed: false, answerStaged: false, clearStage() {},
+  document: { body: { classList: { contains() { return false; } } } },
 });
 vm.runInContext(handler + helpers, c);
 const event = (type, text, utterance_id) => c.onMessage({ data: JSON.stringify({ type, text, utterance_id }) });

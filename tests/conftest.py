@@ -159,6 +159,14 @@ def _fresh_async_state():
     # Answer pictures without the slides group (2026-10-11) are on in the
     # robot's env; the suite tests both settings explicitly.
     _settings.answer_images = False
+    # The motion stories (app/stories.py): the robot's env will turn them on,
+    # and then every robot-face test would see present_story and its prompt
+    # line -- the snapshots would change colour by .env. Tests that mean the
+    # stories turn them on and point the catalog at their own tmp folder.
+    _settings.stories_enabled = False
+    _stories_mod = __import__("sys").modules.get("app.stories")
+    if _stories_mod is not None:
+        _stories_mod.reset()
     _settings.searxng_url = ""       # เครื่องที่มี SearXNG ต้องไม่เปลี่ยนสี suite   # นโยบายราคา: default ปิด
     # MULTI_SESSION on the office test server would un-supersede every
     # takeover test and strip the tool groups the robot/slide tests need —
@@ -494,6 +502,21 @@ def _no_machine_unit_plans(monkeypatch):
     monkeypatch.setattr(unit_plans, "_folder", lambda: None)
     yield
     unit_plans.reset()
+
+
+@pytest.fixture(autouse=True)
+def _no_machine_project_report(monkeypatch, tmp_path):
+    """The approved project report's chapters live in data/personal-docs/
+    (gitignored): present on the owner's PC and the robot, absent on CI. A
+    knowledge test must not gain report passages because of which machine
+    runs it. tests/test_project_report.py builds its own folder + manifest."""
+    from app import project_report
+
+    project_report.reset()
+    monkeypatch.setattr(project_report, "manifest_path",
+                        lambda project_id=None: tmp_path / "no_project_report_approval.json")
+    yield
+    project_report.reset()
 
 
 @pytest.fixture(autouse=True)

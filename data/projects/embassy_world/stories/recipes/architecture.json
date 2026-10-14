@@ -1,0 +1,233 @@
+[
+ {
+  "id": "campus_holo_f1060",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1060.png",
+  "source_sha256": "5da847b2a7330511fabe239f60f68c1abcd818af2ab99ff113d814db9fa125b7",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 1/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump."
+ },
+ {
+  "id": "campus_holo_f1120",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1120.png",
+  "source_sha256": "0aa7ff326fe8bb3a2da7785d23916f1b1243ba462d1046619117e6586452c9e9",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 2/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump."
+ },
+ {
+  "id": "campus_holo_f1180",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1180.png",
+  "source_sha256": "fee444cd50eed633db30ea256f9dd9f5b290a575a66bbfa75b11d765da72a72f",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 3/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump."
+ },
+ {
+  "id": "campus_holo_f1240",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1240.png",
+  "source_sha256": "42497eed39982b1345226c1812f272b49b083179e73cd35514e5ab4691fba8d5",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 4/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump."
+ },
+ {
+  "id": "campus_holo_f1300",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1300.png",
+  "source_sha256": "18f792b27ad9229f788aebe6f4aad7725760111520a0e5592eebd91ca231574e",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 5/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump."
+ },
+ {
+  "id": "campus_holo_f1500",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1500.png",
+  "source_sha256": "dcec647a156451c7a0c72b55d6c4f291f77d54f8bd0e41cd1b6cbc247124b87b",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 6/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump."
+ },
+ {
+  "id": "campus_holo_f1814",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1814.png",
+  "source_sha256": "481d7f45dfc06399746b80dccf023aed3a1253d18ae14b27c904a54036d1a3cd",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 7/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump."
+ },
+ {
+  "id": "campus_holo_f1900",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f1900.png",
+  "source_sha256": "a584f2d8867e2d93ff648d012f5a3ccc280ffcdb542de3bd8a16a9e64dfff162",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 8/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump."
+ },
+ {
+  "id": "campus_holo_f2054",
+  "source": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2/Build_f2054.png",
+  "source_sha256": "da7a93319d8d3a93ab8020fce5bce42897deb2a8126466521093d44028424c6e",
+  "crop": [
+   170,
+   230,
+   1230,
+   650
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Frame 9/9 of the owner's UE5 hologram build (Saved/CondoHologram/Assembly/AnimatePreview/Wave2): site outline -> lagoon -> the six buildings rise -> windows light up. Same crop on all 9 frames so the flipbook does not jump. Also the background of the unit-count metric: the lit windows of the whole campus read as 'homes'. Note: the roof of the front-right building carries a mirrored 'BUILDING F' label baked by UE (see notes)."
+ },
+ {
+  "id": "campus_real",
+  "source": "ue/embassyworld3/Saved/HologramTransition/ViewportCapture_20260924_115211/cycle_01_outward_08_reveal_0.990.png",
+  "source_sha256": "b77134c96e985f83be378d634dea810ceed42141244c2afb96eb3d07348adf2e",
+  "crop": [
+   354,
+   368,
+   3088,
+   1451
+  ],
+  "max_w": 1060,
+  "format": "webp",
+  "why": "Realistic campus from the same UE model (HologramTransition/ViewportCapture, reveal 0.99). It is a different camera from the Wave2 hologram, so it is FRAMED to match (same 2.524 aspect, buildings at the same width and height in the box), not registered: crossfade into it, do not wipe. ground_y/roof_y of the assembly are read off THIS asset. The UE roof labels 'BUILDING A/C/D/F' are baked in MIRRORED; they cannot be cropped out without losing the roofs (open question for the owner: re-render without labels)."
+ },
+ {
+  "id": "bld_c_holo",
+  "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/C_01_hologram_overview.png",
+  "source_sha256": "59de0abff9433532c46ee4ab23cf7a32bc8685406579a70dc22a23602ad14e70",
+  "crop": [
+   690,
+   330,
+   2270,
+   1180
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Building C elevation as a blue hologram (UE BuildingExperience, 2929x1513). Crop drops the baked UE floor-picker panel (x >= 2360) and the REALISTIC/WIREFRAME VIEW buttons (y >= 1255). Same camera and crop as bld_c_real, so the real render can wipe up over it pixel for pixel. 8 room bands (G + 2-8) above an open basement band - the 8 floor ticks land on real slabs."
+ },
+ {
+  "id": "bld_c_real",
+  "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/C_02_realistic_overview.png",
+  "source_sha256": "44fdaf9e2bfc433c76088f538e29e385a2f2f2ba91f3470f77d3bbc04774fb60",
+  "crop": [
+   690,
+   330,
+   2270,
+   1180
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Building C elevation, realistic (UE BuildingExperience). Same crop as bld_c_holo. No roof label is visible from this camera."
+ },
+ {
+  "id": "map_jomtien",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_010.jpg",
+  "source_sha256": "e92bf7336ca74a855096bc96354fb77f4e3609c8b56408ffc95eb22af61fd120",
+  "crop": [
+   40,
+   40,
+   1240,
+   940
+  ],
+  "max_w": 1080,
+  "format": "jpg",
+  "why": "Approved slide intro-010 (site map: Jomtien Beach, Jomtien Sai 1/2, Chaiyapruk 1, the park lake). 4:3 crop keeps the JOMTIEN BEACH and CHAIYAPRUK 1 labels, the beach, the project and the park but drops the slide's concept-disclaimer badge (owner forbids that wording), the 'SOI WAT BUN' label and Sukhumvit Rd at the far right (Sukhumvit is a list row instead)."
+ },
+ {
+  "id": "map_pattaya_zones",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_009.jpg",
+  "source_sha256": "b49e5ad192925d9899d3bbe85429339eac7dc6f2d4472b444211c31a3fa0251d",
+  "crop": [
+   420,
+   30,
+   1260,
+   900
+  ],
+  "max_w": 1080,
+  "format": "jpg",
+  "why": "Approved slide intro-009 (Pattaya zones: Nuae / Klang / Tai / Jomtien on a satellite view). Near-square crop keeps all four zone labels and their baked circle markers, drops the slide's concept-disclaimer badge (x >= 1340) and the island on the left."
+ },
+ {
+  "id": "plan_ground_site",
+  "source": "web/3.project details/master plan/_Embassy World  Floor Plan/3.png",
+  "source_sha256": "f61659541924dfb29f00cb957b781db295391f9ce1c28d297578c1c05e17d853",
+  "crop": [
+   35,
+   425,
+   1990,
+   1205
+  ],
+  "max_w": 1440,
+  "format": "webp",
+  "why": "Website pack GROUND FLOOR PLAN (colour landscape plan): all six buildings labelled (BUILDING A-F) around the lagoon. Crop drops the logo/title/legend/key plan header. 1440 wide because the spotlight zooms ~1.8x into the lagoon. NUMBERS BAKED INTO THE PICTURE (the build's number gate reads story text, never pixels -- review 12 Oct; an approval of this picture is an approval of these): ~150 unit codes with their sizes, e.g. 'C-109 51.5', 'B-114 35.0', 'E-101 33.5' (spot checks match report ch.14 and facts 'แบบห้องและขนาด': studio 24-29, 1BR 33-35, 2BR 51.5-52.5), shop sizes 'SHOP-1 77.0', 'SHOP-2 29.5', 'SHOP-5 29.5' (report ch.14), and the label 'SOUL SPACE' (not in the approved facility list; owner to confirm). No prices, no sale status. The website pack is the owner's material but not one of the approved sources: the owner confirms this picture as approved, or it is replaced."
+ },
+ {
+  "id": "lagoon_scene58",
+  "source": "web/6.gallery/exterior/CD03/Scene 58.png",
+  "source_sha256": "d538efeb1a7bc05d1b890c50acc3144fdb9375eedc829cbc8d854b22beceb016",
+  "crop": [
+   143,
+   0,
+   2416,
+   1705
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 58 (daylight, high view down the lagoon between two buildings: islands with trees, a bridge, the pod pavilion, sun loungers). 4:3 crop of the 2560x1705 render. Dusk twin Scene 40 exists if the owner prefers night."
+ },
+ {
+  "id": "parking_plan",
+  "source": "drawn/parking_plan.png",
+  "max_w": 1600,
+  "format": "webp",
+  "why": "Basement parking, drawn (owner 13 Oct: \"ที่อยากให้เขียนขึ้นคือที่จอดรถ\"; the earlier picture was a thin-line crop of one corner of the website sheet). Source of truth is the tracked SVG stories/drawn/parking_plan.svg, rendered at 2x by scripts/draw_story_plans.py. Traced from the website pack's BASEMENT FLOOR PLAN (its pixels are the SVG's units): the one-level ring round the courtyard, building letters from the sheet's own key plan, EV CHARGING on the south-west lane where the sheet prints 'WITH EV CHARGER' (report 7.6: under building D), stall rows as texture only. No facility names in the block under building A (the sheet's names include ones the owner removed and rooms the approved facts place elsewhere), no ramps, no motorbike bays, no charger count."
+ }
+]

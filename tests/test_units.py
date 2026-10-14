@@ -9,6 +9,8 @@ number and inventing one.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.config import settings
@@ -579,6 +581,35 @@ def test_a_budget_question_reads_best_first_with_a_size_spread(monkeypatch):
     assert "คละขนาด" in out["instruction"]
 
 
+def test_a_full_page_stays_full_after_the_exclusions(monkeypatch):
+    """Review 14 Oct: PostgREST applies `limit` before the exclusions are
+    filtered out here, so a full 48-row page holding 5 of C-723..C-732 came
+    back as 43 rows -- read as a short page: no cheap-end query, and the
+    guest was told an exact "ทั้งหมด 43 ห้องในงบ". Fullness is the server's
+    count."""
+    raw = [_live_row(f"C-7{i:02d}", 52.0, 7_000_000 - i * 1000) for i in range(23, 71)]
+    assert len(raw) == 48
+    gone = frozenset(f"C-7{i}" for i in range(23, 28))
+    calls = []
+
+    def fake_get(params):
+        calls.append(dict(params))
+        return units._without_excluded(list(raw))
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "inventory_url", "https://x.supabase.co")
+    monkeypatch.setattr(settings, "inventory_key", "k")
+    monkeypatch.setattr(units, "_excluded_units", lambda: gone)
+    monkeypatch.setattr(units, "_live_get", fake_get)
+
+    out = units.find_units(max_price_thb=10_000_000)
+    assert len(calls) == 2, "a full page fetches the cheap end too"
+    assert out["total"] is None and out["capped"] is True
+    assert "หลายสิบห้องในงบ" in out["instruction"] and "ทั้งหมด 43" not in out["instruction"]
+    assert not {u["room"] for u in out["units"]} & gone, "the excluded units still never show"
+
+
 def test_a_short_budget_answer_reports_its_exact_total(monkeypatch):
     """Fewer rows than the page means the list IS the answer — say the real
     total instead of hedging. The cap once got spoken as the total; the
@@ -775,3 +806,86 @@ def test_a_blank_project_setting_means_ours_not_everything():
         cwd=str(__import__("pathlib").Path(__file__).resolve().parent.parent))
     assert out.returncode == 0, out.stderr[-800:]
     assert out.stdout.strip() == "embassy-world"
+
+
+
+# ============ show_room_type: the room-type buttons (owner 12 Oct 2026) ============
+
+def _typed_row(no, msize, kind="Studio"):
+    row = _live_row(no, msize, 2_500_000)
+    row["unit_types"] = {"name": kind}
+    return row
+
+
+def test_show_room_type_takes_only_a_kind():
+    """The model picks a KIND, the server picks the room: no room number to
+    mishear, and never a size or a price."""
+    from app.tools import registry
+
+    entry = registry.get("show_room_type")
+    assert entry is not None
+    assert set(entry.parameters["properties"]) == {"type"}
+    assert entry.parameters["properties"]["type"]["enum"] == ["studio", "1br", "2br"]
+    assert entry.parameters["required"] == ["type"]
+
+
+def test_show_room_type_shows_a_typical_available_room_with_its_plan(monkeypatch):
+    from app import unit_plans
+
+    rows = [_typed_row("A-201", 29.0), _typed_row("A-202", 25.0), _typed_row("A-203", 25.0),
+            _typed_row("A-204", 25.0), _typed_row("B-101", 24.0)]
+    calls = _live_on(monkeypatch, rows)
+    # A-202 has no sheet; A-203 does -- the typical size (25) with a plan wins.
+    monkeypatch.setattr(unit_plans, "plan_url",
+                        lambda room: "/unit-plan/" + "a" * 64 if room in ("A-203", "A-201") else None)
+
+    out = units.show_room_type("studio")
+
+    params = calls[0]
+    assert params["status"] == "eq.available"
+    assert params["unit_types.name"] == "eq.Studio"
+    assert "unit_types!inner(name)" in params["select"]
+    assert out["ok"] is True and out["screen"] == "unit"
+    card = out["unit"]
+    assert card["room"] == "A-203" and card["floorplan"] and card["example_of"] == "Studio"
+    assert "price_thb" not in card and "base_price_thb" not in card, "prices never leave the server"
+    assert out["room_type"] == {"type": "Studio", "sqm_min": 24.0, "sqm_max": 29.0}
+    assert "ห้อง A-203" in out["instruction"] and "24 ถึง 29 ตร.ม." in out["instruction"]
+    # live eval 12 Oct: "ยังว่าง 586 ห้อง", unasked -- the count stays here
+    assert "5 ห้อง" not in json.dumps(out, ensure_ascii=False)
+    assert "ห้ามพูดจำนวนห้องที่เหลือ" in out["instruction"]
+    assert "ห้ามบรรยายสิ่งที่อยู่ในผัง" in out["instruction"] and "ห้ามพูดราคา" in out["instruction"]
+
+
+def test_show_room_type_without_a_plan_never_claims_one(monkeypatch):
+    from app import unit_plans
+
+    _live_on(monkeypatch, [_typed_row("C-301", 52.0, "2 Bedroom")])
+    monkeypatch.setattr(unit_plans, "plan_url", lambda room: None)
+    out = units.show_room_type("2br")
+    assert out["unit"]["room"] == "C-301" and not out["unit"].get("floorplan")
+    assert "ห้ามพูดว่ามีผังให้ดู" in out["instruction"]
+
+
+def test_show_room_type_refuses_to_guess(monkeypatch):
+    out = units.show_room_type("penthouse")
+    assert out["ok"] is False and "ห้ามเดา" in out["instruction"]
+    # no live link: the approved sizes, the sales team, no "no data" and no screen claim
+    monkeypatch.setattr(settings, "inventory_url", "")
+    out = units.show_room_type("studio")
+    assert out["ok"] is False and "แบบห้องและขนาด" in out["instruction"]
+    assert "ห้ามพูดว่าไม่มีข้อมูล" in out["instruction"]
+    # sold out: say so, offer the others, never "on screen"
+    _live_on(monkeypatch, [])
+    out = units.show_room_type("1br")
+    assert out["ok"] is True and out["room_type"]["available"] == 0 and out["screen"] is None
+    assert "ไม่มีห้องว่าง" in out["instruction"]
+    assert "ห้ามบอกว่าขึ้นผังบนจอแล้ว" in out["instruction"]
+
+
+def test_show_room_type_is_named_in_the_units_paragraph():
+    """A tool the prompt never mentions is one the model reaches past: after
+    "สตูดิโอค่ะ" it would call find_units and never show the plan."""
+    from app import prompts
+
+    assert "show_room_type" in prompts.UNITS_TOOLS_BLOCK

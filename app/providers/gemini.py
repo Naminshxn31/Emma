@@ -485,6 +485,11 @@ _UNAVAILABLE_SIGNS = (
 #: after the gate closes (measured 2026-10-07); a tool call is announced
 #: before it runs. Six seconds of nothing at all is not a slow model.
 NOTE_STALL_S = 6.0
+#: The question asked again after rejoining (REPLY_STALL_S, stage 2): the
+#: guest's own transcribed words, the language rule, and the tools rule --
+#: a question that is a story's topic still gets its story.
+STALL_ASK = ("ลูกค้าพูดว่า \"%s\" แล้วยังไม่ได้คำตอบ ตอบตอนนี้ตามกฎเดิมทุกข้อ เป็นภาษาเดียวกับที่ลูกค้าพูด "
+             "ถ้าต้องใช้เครื่องมือให้เรียกก่อนตอบ ห้ามพูดถึงระบบหรือความล่าช้า")
 #: Latched for the life of the process the first time a note stalls a turn:
 #: once is evidence enough, and a second customer must not pay for it too.
 _NOTE_STATE = {"stalled": False}
@@ -570,6 +575,17 @@ class GeminiProvider(VoiceProvider):
         #: releases the turn if it never does (`_note_stall_guard`).
         self._note_wait: float | None = None
         self._note_guard: asyncio.Task | None = None
+        #: REPLY_STALL_S: when the activity_end of a heard question went out,
+        #: until any sign of a reply (`_reply_seen`) or new speech; the words
+        #: transcribed since that segment began (only a question with words
+        #: is chased); the guard task; and how far the guard went, so the
+        #: reply that finally comes is logged against it.
+        self._stall_wait: float | None = None
+        self._stall_heard = ""
+        self._stall_guard: asyncio.Task | None = None
+        self._stall_stage: str | None = None
+        self._reconnecting = False
+        self._cut_over_from = None
         # The recogniser word-spaces Thai; undo that for display. Separate
         # instances because the two transcript streams interleave and each
         # needs its own held-back character.
@@ -803,25 +819,32 @@ class GeminiProvider(VoiceProvider):
         """
         if self._closing or not self._resume_handle:
             return False
-        old = self._cm
+        # Marked, so the REPLY_STALL_S cut-over never runs on top of it (review
+        # 14 Oct: both took `self._cm` mid-connect and one resumed socket was
+        # never closed).
+        self._reconnecting = True
         try:
-            await self._connect()   # _build_config now carries the handle
-        except Exception:
-            logger.exception("session resumption failed — ending the session")
-            return False
-        if old is not None:
+            old = self._cm
             try:
-                await old.__aexit__(None, None, None)
+                await self._connect()   # _build_config now carries the handle
             except Exception:
-                pass
-        logger.info("resumed the Gemini Live session past the duration cap")
-        return True
+                logger.exception("session resumption failed — ending the session")
+                return False
+            if old is not None:
+                try:
+                    await old.__aexit__(None, None, None)
+                except Exception:
+                    pass
+            logger.info("resumed the Gemini Live session past the duration cap")
+            return True
+        finally:
+            self._reconnecting = False
 
     async def __aexit__(self, *exc) -> None:
         self._closing = True
-        guard = getattr(self, "_note_guard", None)
-        if guard is not None and not guard.done():
-            guard.cancel()
+        for guard in (getattr(self, "_note_guard", None), getattr(self, "_stall_guard", None)):
+            if guard is not None and not guard.done():
+                guard.cancel()
         await self._stop_event_tasks()
         if self._cm is not None:
             try:
@@ -846,6 +869,7 @@ class GeminiProvider(VoiceProvider):
         for kind, data in self._vad_gate.feed(pcm16):
             if kind == "start":
                 self._note_reopen()
+                self._stall_restart()
                 await self._event_queue.put(ProviderEvent(kind="speech_started"))
                 # New speech begins: every caption already recorded belongs
                 # to an earlier utterance and may no longer authorise motion
@@ -871,6 +895,8 @@ class GeminiProvider(VoiceProvider):
                     activity_end=types.ActivityEnd())
                 if noted:
                     self._arm_note_guard()
+                if settings.reply_stall_s > 0:
+                    self._arm_stall_guard()
             else:
                 await self._session.send_realtime_input(
                     audio=types.Blob(data=data,
@@ -950,6 +976,185 @@ class GeminiProvider(VoiceProvider):
     def _reply_seen(self) -> None:
         """Any sign the model is answering: the labelled turn did not stall."""
         self._note_wait = None
+        self._stall_wait = None
+        if getattr(self, "_stall_stage", None):
+            self._stall_log("answered")
+
+    # ---- REPLY_STALL_S: a heard question the server never answers ----------
+
+    def _stall_restart(self) -> None:
+        """New speech: the guest is talking again, and the next activity_end
+        starts the wait over. Words of a question still unanswered are kept
+        (on 14 Oct "Is there a hospital near" / " by?" were two segments, and
+        the guest asked again twice) -- they are what gets asked again."""
+        stage = getattr(self, "_stall_stage", None)
+        pending = getattr(self, "_stall_wait", None) is not None or bool(stage)
+        if stage:
+            self._stall_log("guest_spoke")
+        self._stall_wait = None
+        self._stall_heard = (getattr(self, "_stall_heard", "") + " ") if pending else ""
+
+    def _stall_log(self, stage: str, **fields) -> None:
+        wait = round(time.monotonic() - self._stall_t0, 1) if getattr(self, "_stall_t0", None) else None
+        if stage in ("answered", "guest_spoke"):
+            fields["after"] = self._stall_stage
+            self._stall_stage = None
+        try:
+            from app import turnlog
+
+            turnlog.record("reply_stall", stage=stage, wait_s=wait, **fields)
+        except Exception:                                  # pragma: no cover - belt
+            pass
+
+    def _arm_stall_guard(self) -> None:
+        since = time.monotonic()
+        self._stall_wait = since
+        self._stall_t0 = since
+        old = getattr(self, "_stall_guard", None)
+        if old is not None and not old.done():
+            old.cancel()
+        self._stall_guard = asyncio.create_task(self._reply_stall_guard(self._session, since))
+
+    def _stall_pending(self, session, since: float) -> bool:
+        return (self._stall_wait == since and not self._closing
+                and self._session is session and session is not None)
+
+    async def _reply_stall_guard(self, session, since: float) -> None:
+        """Chase a heard question the server has not answered.
+
+        Robot, 14 Oct 13:19: after "Is there a hospital nearby?" the server
+        sent nothing for 146 s -- no reply, no usage, no error -- while it
+        kept transcribing the next two questions, then answered one of them.
+        Our side had sent the activity_end like every other turn. Nothing has
+        shown which step unsticks a server in that state, so two, each logged
+        (`reply_stall` rows, and `answered` with how far it took):
+
+        1. REPLY_STALL_S after the activity_end, an empty turn_complete=True --
+           the release `_note_stall_guard` uses: one more "your turn" on the
+           same socket.
+        2. REPLY_STALL_RECONNECT_S later, rejoin the conversation on a new
+           socket with the resumption handle (the go_away road) and ask what
+           the guest said again, as text. The old socket is closed, so a
+           reply it was sitting on can never arrive as a second answer.
+
+        Only for a segment that was transcribed into words: the model staying
+        quiet after room noise is right, and making her answer it is the
+        "ค่ะ"-to-chatter bug.
+        """
+        try:
+            await asyncio.sleep(settings.reply_stall_s)
+        except asyncio.CancelledError:
+            return
+        if await self._stall_rotated(session, since):
+            return
+        if not self._stall_pending(session, since):
+            return
+        heard = " ".join(self._stall_heard.split())
+        if not heard:
+            self._stall_wait = None
+            return
+        logger.warning("no reply %.0fs after a heard question — completing the turn again",
+                       settings.reply_stall_s)
+        self._stall_stage = "nudge"
+        self._stall_log("nudge", chars=len(heard))
+        try:
+            await session.send_client_content(turn_complete=True)
+        except Exception:
+            logger.exception("could not nudge the stalled turn")
+        if settings.reply_stall_reconnect_s <= 0:
+            return
+        try:
+            await asyncio.sleep(settings.reply_stall_reconnect_s)
+        except asyncio.CancelledError:
+            return
+        while self._reconnecting:               # the loop is rotating the socket itself
+            await asyncio.sleep(0.05)
+        if await self._stall_rotated(session, since):
+            return
+        if not self._stall_pending(session, since):
+            return
+        if not await self._cut_over():
+            stage = "no_handle" if not self._resume_handle else "rejoin_failed"
+            logger.warning("no reply after the nudge, and the session could not be rejoined (%s)", stage)
+            self._stall_log(stage)
+            self._stall_stage = None
+            return
+        if self._stall_wait != since:            # the reply came while we rejoined
+            return
+        self._stall_stage = "reconnect"
+        self._stall_log("reconnect")
+        try:
+            await self.send_text(STALL_ASK % heard[-300:])
+        except Exception:
+            logger.exception("could not ask the question again after rejoining")
+
+    async def _stall_rotated(self, session, since: float) -> bool:
+        """The socket rotated under a still-unanswered question (go_away, a
+        dropped stream, the duration cap -- the receive loop's own
+        `_reconnect`). The resumed model is idle and the question's reply, if
+        any, died with the old socket: ask it again on the new one (review
+        14 Oct: the guard used to just stop, silently). True = handled."""
+        if (self._stall_wait != since or self._closing or self._reconnecting
+                or self._session is None or self._session is session):
+            return False
+        heard = " ".join(self._stall_heard.split())
+        if not heard:
+            self._stall_wait = None
+            return True
+        self._stall_stage = "rotated"
+        self._stall_log("rotated", chars=len(heard))
+        try:
+            await self.send_text(STALL_ASK % heard[-300:])
+        except Exception:
+            logger.exception("could not ask the question again after the socket rotated")
+        return True
+
+    async def _cut_over(self) -> bool:
+        """Rejoin the conversation on a new socket, from outside the receive
+        loop (`_receive_events` waits for it and reads the new session rather
+        than reconnecting a second time).
+
+        Close first, then resume: measured live 14 Oct, resuming with the
+        handle while the old socket is still open is refused -- "1008
+        BidiGenerateContent session is already connected to an existing
+        client" (go_away's `_reconnect` opens first; there the server is
+        already letting go). For the second or so between, `_session` is
+        None, so `send_audio` drops the mic instead of writing into a closed
+        socket -- which raises in the pump and ends the whole call.
+        """
+        if self._reconnecting or self._closing or not self._resume_handle:
+            return False
+        self._reconnecting = True
+        old_cm, old = self._cm, self._session
+        self._cut_over_from = old
+        self._session = None
+        try:
+            try:
+                await old_cm.__aexit__(None, None, None)
+            except Exception:
+                pass
+            try:
+                await self._connect()     # _build_config carries the handle
+            except Exception:
+                logger.exception("could not rejoin the Gemini Live session after a stalled reply")
+                return False
+            logger.info("rejoined the Gemini Live session after a stalled reply")
+            return True
+        finally:
+            self._reconnecting = False
+
+    async def _cut_over_elsewhere(self, reading) -> bool:
+        """Did `_cut_over` retire the session the receive loop was reading?
+        Waits for a cut-over in progress. True = read the new session; False
+        = carry on as before (a failed cut-over then gets the loop's own
+        reconnect, like any upstream drop). Only that road: go_away's own
+        reconnect inside the loop keeps the loop's old behaviour."""
+        if reading is None or reading is not getattr(self, "_cut_over_from", None):
+            return False
+        while self._reconnecting:
+            await asyncio.sleep(0.05)
+        self._cut_over_from = None
+        return self._session is not None and self._session is not reading
 
     async def _note_stall_guard(self, session, since: float) -> None:
         """Release a turn the speaker note may be holding open.
@@ -1102,7 +1307,7 @@ class GeminiProvider(VoiceProvider):
         results = [r for _index, r in kept]
 
         responses = [
-            types.FunctionResponse(id=cid, name=name, response=result)
+            types.FunctionResponse(id=cid, name=name, response=tools.model_view(name, result))
             for cid, name, result in results
         ]
         # A result from a retired connection must not enter its replacement.
@@ -1134,6 +1339,9 @@ class GeminiProvider(VoiceProvider):
                                            data={"call_id": call_id}), call_id)
 
     def _input_event(self, text: str) -> ProviderEvent:
+        heard = getattr(self, "_stall_heard", "")
+        if settings.reply_stall_s > 0 and text.strip() and len(heard) < 600:
+            self._stall_heard = heard + text
         if self._input_turn_id is None:
             self._input_serial += 1
             self._input_turn_id = str(self._input_serial)
@@ -1214,9 +1422,16 @@ class GeminiProvider(VoiceProvider):
         # duration cap still gets its own resume.
         just_reconnected = False
         while True:
+            # The session this pass reads. `_cut_over` (REPLY_STALL_S) may
+            # replace it from outside this loop; then the old stream's end,
+            # or its error as the socket closes, means "read the new one" --
+            # not a drop to reconnect from a second time.
+            reading = self._session
             try:
                 received_anything = False
-                async for message in self._session.receive():
+                async for message in reading.receive():
+                    if self._session is not reading:
+                        break
                     received_anything = True
                     just_reconnected = False
 
@@ -1369,6 +1584,11 @@ class GeminiProvider(VoiceProvider):
                             self._input_turn_id = None
                         yield ProviderEvent(kind="turn_complete")
 
+                if await self._cut_over_elsewhere(reading):
+                    just_reconnected = True
+                    if _tracking_tools():
+                        yield ProviderEvent(kind="reconnected")
+                    continue
                 if not received_anything:
                     # The stream ended. If the server had given us a handle,
                     # this is almost always the duration cap rather than a real
@@ -1387,6 +1607,11 @@ class GeminiProvider(VoiceProvider):
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
+                if await self._cut_over_elsewhere(reading):
+                    just_reconnected = True
+                    if _tracking_tools():
+                        yield ProviderEvent(kind="reconnected")
+                    continue
                 # An upstream drop mid-stream. A resumption handle turns it
                 # from fatal into the same cutover as a clean cap.
                 if not just_reconnected and await self._reconnect():

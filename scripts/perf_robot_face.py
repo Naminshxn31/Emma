@@ -18,8 +18,9 @@ states: listening, and speaking with mouth-level events at 30 Hz.
 
 WebGL is off by default on purpose: headless renders Emma's 3D body in
 software (SwiftShader), which takes the whole throttled CPU (2-3 fps for
-every variant) and hides everything else. With it off the page falls back to
-the puppet and what is measured is the page around her. `--webgl` keeps it.
+every variant) and hides everything else. With it off her spot is empty (the
+SVG puppet that stood in was deleted, 14 Oct) and what is measured is the page
+around her. `--webgl` keeps it.
 
 Nothing here talks to the server, Gemini or the robot. Needs playwright.
 """

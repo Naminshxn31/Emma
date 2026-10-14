@@ -108,6 +108,12 @@ class Tool:
     #: nothing extra is configured, so a machine without the extra files (the
     #: sales room) declares byte-identically. See `declaration`.
     declare: Callable[[], tuple[str, dict[str, Any]]] | None = None
+    #: Result keys for the screen only, never sent to the model (`model_view`).
+    #: present_story's page payload is 2-5 KB of picture URLs, geometry and
+    #: labels per call: in the model's copy it would sit in the conversation
+    #: history for the rest of the call and hand her a screen to narrate.
+    #: The page and the session still get the whole result.
+    screen_only: tuple[str, ...] = ()
 
 
 _REGISTRY: dict[str, Tool] = {}
@@ -137,6 +143,7 @@ def tool(
     exclusive: bool = False,
     preempt: Callable[[dict], bool] | None = None,
     declare: Callable[[], tuple[str, dict[str, Any]]] | None = None,
+    screen_only: tuple[str, ...] = (),
 ) -> Callable:
     def decorate(fn: Callable) -> Callable:
         if name in _REGISTRY:
@@ -156,6 +163,7 @@ def tool(
             exclusive=exclusive,
             preempt=preempt,
             declare=declare,
+            screen_only=tuple(screen_only),
         )
         return fn
 
@@ -178,7 +186,7 @@ robot_face_session: ContextVar[object | None] = ContextVar("robot_face_session",
 #: ones — a public mode on a robot in a showroom is the last place to hand out
 #: memory or control of his computer.
 _JOKE_DENIED = {"knowledge", "mydocs", "documents", "slides", "units", "calc",
-                "memory", "computer", "websearch"}
+                "memory", "computer", "websearch", "stories"}
 
 
 def allowed(entry: Tool) -> bool:
@@ -201,7 +209,15 @@ def allowed(entry: Tool) -> bool:
     if entry.group == "body" and (robot_face_session.get() is None
                                   or not settings.robot_body_enabled):
         return False
+    # The motion stories draw on the robot face's own screen, so the robot
+    # face's own session only, with the server key on (app/stories.py).
+    if entry.group == "stories" and (robot_face_session.get() is None
+                                     or not settings.stories_enabled):
+        return False
     profile = session_profile.get() or settings.assistant_profile
+    # The stories are the sales host's: the project's approved pictures.
+    if entry.group == "stories" and profile != "condo":
+        return False
     # Optional personal/web/computer tools have no condo source-approval
     # contract. TOOL_GROUPS may not turn them into an alternate knowledge or
     # file/display path for a sales session.
@@ -215,7 +231,14 @@ def allowed(entry: Tool) -> bool:
     groups = settings.enabled_tool_groups()
     if entry.group is None:
         return True
-    return entry.group not in _OPT_IN if groups is None else entry.group in groups
+    visible = entry.group not in _OPT_IN if groups is None else entry.group in groups
+    if visible and entry.group == "stories":
+        # Last, being the one check that reads files: an approved catalog
+        # with at least one complete story (deny by default, app/stories.py).
+        from app import stories
+
+        visible = stories.offered()
+    return visible
 
 
 def all_tools() -> list[Tool]:
@@ -404,6 +427,18 @@ async def _push_to_displays() -> None:
         await display.show(slides.current_slide())
     except Exception:
         logger.exception("could not update the slide display")
+
+
+def model_view(name: str, result: object) -> object:
+    """What the MODEL is handed for a tool's result: the result itself, minus
+    the tool's `screen_only` keys. Every tool without them gets the very same
+    object back -- their function responses are byte-identical."""
+    entry = _REGISTRY.get(name)
+    if entry is None or not entry.screen_only or not isinstance(result, dict):
+        return result
+    if not any(key in result for key in entry.screen_only):
+        return result
+    return {k: v for k, v in result.items() if k not in entry.screen_only}
 
 
 async def dispatch_all(calls: list[tuple[str, str, dict]]) -> list[tuple[str, str, dict]]:

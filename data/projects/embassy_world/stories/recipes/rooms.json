@@ -1,0 +1,106 @@
+[
+ {
+  "id": "rm_lobby",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - LOBBY 01.jpg",
+  "crop": [
+   147,
+   0,
+   2605,
+   1536
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Final render Lobby 01 (report 9.2: symmetric view from the reception counter -- liquid-metal counter, the flowing silver wall with the EMBASSY WORLD logo, the ringed ceiling, marble walls, blue-grey sofas). Photo of the lobby_where spotlight. Same 16:10 centre crop as the other G-floor finals; no baked text besides the project's own logo on the wall. Lobby 03 (mezzanine gallery) not used: report 9.2 says the ground-floor plan shows no mezzanine, so a picture of one would show something not confirmed."
+ },
+ {
+  "id": "rm_corridor",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - CORRIDOR.jpg",
+  "crop": [
+   0,
+   520,
+   1792,
+   1640
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Final render CORRIDOR = Journey to the Future (report 9.8: starry ceiling, curved glass walls around an indoor garden on one side, metal-ribbed arches on the other). The source is portrait 1792x2400; a 16:10 band through the middle keeps the star field, the garden glass and the arches (the spotlight photo frame is landscape -- a portrait photo would be a narrow strip)."
+ },
+ {
+  "id": "rm_playscape_aerial",
+  "source": "web/6.gallery/exterior/Playscape/Scene 55.png",
+  "crop": [
+   0,
+   0,
+   2560,
+   1600
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website exterior render (6.gallery/exterior/Playscape) looking down on the Playscape: the Space Playground dome with its stainless tube slide, the splash pond with jets, the ring swing, the sculpture slide into the pool, Junior World's glass front above (report 9.9 / 12.10: the play court by the lagoon below Junior World). Base picture of playground_where: the ring sits on the dome itself, read off this picture -- the ground-floor plan (fac_plan_g) draws the building only and has no Playground label to point at. Only the bottom 104 px of water cut (16:10). Two tiny figures on the paths, not subjects."
+ },
+ {
+  "id": "rm_playscape",
+  "source": "web/6.gallery/exterior/Playscape/Scene 64(2).png",
+  "crop": [
+   0,
+   52,
+   2560,
+   1652
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website exterior render of the Playscape at eye level: the spaceship climber on stainless legs with the rope-net cone, the polished sculpture slide arch, the ring swing behind, ground jets on the planet-pattern floor, the pool at left (report 9.9 elements). Photo of playground_where. Centre 16:10 crop; a small child far back by the slide is not a subject."
+ },
+ {
+  "id": "rm_parkside",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
+  "crop": [
+   0,
+   215,
+   1330,
+   1055
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Approved slide intro-011 'THE PARK': the park lake and its planted banks with the low-rise buildings beside it. Card picture of PARKSIDE in views_collections (the collection of rooms on the park side, report 15.6). Cropped below the 'THE PARK' title (y<=190), right of the slide's concept box (x>=1345) and clear of the logo -- no text left in the picture."
+ },
+ {
+  "id": "rm_signature",
+  "source": "web/6.gallery/exterior/Entrance/Scene 61(2).png",
+  "crop": [
+   0,
+   31,
+   2560,
+   1631
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Website exterior render of building A's front from the road, with the drop-off court. Card picture of SIGNATURE in views_collections: A's rooms on this side (stack S12-S23, view ORT Far) are SIGNATURE rooms (report 15.4, 15.6), and the card says only 'mostly buildings A, B and F' -- no claim about what the rooms look out on. 16:10 centre crop, no text in the picture."
+ },
+ {
+  "id": "rm_breeze",
+  "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/E_02_realistic_overview.png",
+  "crop": [
+   800,
+   400,
+   2300,
+   1150
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "UE realistic overview of building E (the BuildingExperience set, as bld_c_real is for building C). Card picture of BREEZE in views_collections: all 87 BREEZE rooms are in building E (report 15.6). Crop keeps the building only: the floor-list panel (x>=2440) and the REALISTIC / WIREFRAME VIEW buttons (y>=1260) are cut away. No room numbers, no prices -- not a UnitInventory or quotation screen."
+ },
+ {
+  "id": "rm_window",
+  "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
+  "crop": [
+   0,
+   1250,
+   2400,
+   4250
+  ],
+  "max_w": 720,
+  "format": "webp",
+  "why": "Website unit render ('Living view b'), the LEFT part: the tall glass door to the balcony with its curtains, sofa and TV wall. mood_dining already uses the right part of the same render (dining table); this crop is the other half, so the two never show the same thing. Mood picture of unit_details (windows / balcony door), always under the 'Interior mood' tag. 4:5 portrait like the other mood pictures."
+ }
+]

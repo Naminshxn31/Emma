@@ -1,0 +1,878 @@
+[
+ {
+  "id": "room_types",
+  "template": "stack",
+  "questions_th": [
+   "มีห้องแบบไหนบ้าง",
+   "มีห้องขนาดไหนบ้าง",
+   "มีแบบห้องอะไรบ้าง",
+   "ห้องกี่ตารางเมตร",
+   "มีกี่แบบห้อง",
+   "ห้องมีขนาดเท่าไหร่บ้าง"
+  ],
+  "questions_en": [
+   "What room types do you have?",
+   "What sizes are the units?",
+   "How big are the rooms?",
+   "What kinds of units are there?",
+   "What layouts can I choose from?"
+  ],
+  "lines": [
+   {
+    "th": "ที่นี่มีห้องให้เลือกสามแบบค่ะ",
+    "en": "We have three room types:",
+    "cue_th": [
+     "สามแบบ",
+     "3 แบบ"
+    ],
+    "cue_en": [
+     "three"
+    ],
+    "cue_zh": [
+     "三种",
+     "三类",
+     "3种"
+    ]
+   },
+   {
+    "th": "สตูดิโอ 24 ถึง 29 ตารางเมตร",
+    "en": "a studio, 24 to 29 square metres,",
+    "cue_th": [
+     "สตูดิโอ"
+    ],
+    "cue_en": [
+     "studio"
+    ],
+    "cue_zh": [
+     "开间",
+     "单间",
+     "工作室"
+    ]
+   },
+   {
+    "th": "หนึ่งห้องนอน 33 ถึง 35 ตารางเมตร",
+    "en": "a one-bedroom, 33 to 35,",
+    "cue_th": [
+     "หนึ่งห้องนอน",
+     "1 ห้องนอน",
+     "ห้องนอนเดียว"
+    ],
+    "cue_en": [
+     "one bedroom",
+     "one-bedroom",
+     "1 bedroom",
+     "1-bedroom"
+    ],
+    "cue_zh": [
+     "一室",
+     "一房",
+     "一居"
+    ]
+   },
+   {
+    "th": "และสองห้องนอน 51.5 ถึง 52.5 ตารางเมตรค่ะ",
+    "en": "and a two-bedroom, 51.5 to 52.5 square metres.",
+    "cue_th": [
+     "สองห้องนอน",
+     "2 ห้องนอน"
+    ],
+    "cue_en": [
+     "two bedroom",
+     "two-bedroom",
+     "2 bedroom",
+     "2-bedroom"
+    ],
+    "cue_zh": [
+     "两室",
+     "两房",
+     "两居",
+     "二室"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "Studio",
+     "sub_en": "Open plan · 1 bathroom",
+     "asset": "plan_studio",
+     "asset_kind": "plan",
+     "value": {
+      "from": 24,
+      "to": 29,
+      "unit_en": "sq.m."
+     },
+     "line": 1
+    },
+    {
+     "label_en": "1 Bedroom",
+     "sub_en": "1 bedroom · 1 bathroom",
+     "asset": "plan_1br",
+     "asset_kind": "plan",
+     "value": {
+      "from": 33,
+      "to": 35,
+      "unit_en": "sq.m."
+     },
+     "line": 2
+    },
+    {
+     "label_en": "2 Bedrooms",
+     "sub_en": "2 bedrooms · 2 baths",
+     "asset": "plan_2br",
+     "asset_kind": "plan",
+     "value": {
+      "from": 51.5,
+      "to": 52.5,
+      "unit_en": "sq.m."
+     },
+     "line": 3
+    }
+   ],
+   "end_hint_en": "Tap a room type to look inside"
+  },
+  "taps": [
+   {
+    "id": "story_room_types_studio",
+    "label_en": "Studio",
+    "label_th": "สตูดิโอ",
+    "next_story": "unit_studio",
+    "tool": null
+   },
+   {
+    "id": "story_room_types_1br",
+    "label_en": "1 Bedroom",
+    "label_th": "1 ห้องนอน",
+    "next_story": "unit_one_bedroom",
+    "tool": null
+   },
+   {
+    "id": "story_room_types_2br",
+    "label_en": "2 Bedrooms",
+    "label_th": "2 ห้องนอน",
+    "next_story": "unit_two_bedroom",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:แบบห้องและขนาด (Studio 24–29 · 1 ห้องนอน 33–35 · 2 ห้องนอน 51.5–52.5 ตร.ม.)",
+   "facts:โครงการ (three types: Studio · 1 ห้องนอน · 2 ห้องนอน)",
+   "report:14_units.md#14.1 line 20 (ขนาดที่แสดง 24.0–29.0 / 33.0–35.0 / 51.5–52.5)",
+   "report:14_units.md#14.1 line 25 (Studio ห้องโล่งเดียว ไม่มีห้องนอนแยก · 1-BR 1 ห้องนอน + นั่งเล่น/ครัว · 2-BR 2 ห้องนอน + นั่งเล่น/ครัว)",
+   "report:14_units.md#14.1 line 26 (ห้องน้ำ 1 / 1 / 2)",
+   "plans:sales/unit-plans/index.json A-316 'STUDIO 25.0 SQ.M.', F-113 '1 BEDROOM 34.0 SQ.M.', C-309 '2 BEDROOM 51.5 SQ.M.' (label: pete ถูกต้องทั้งหมด)",
+   "sales:qa_script.json q05 answer_after (เล่าความต่างของการใช้งานก่อน ตัวเลขเป็นข้อมูลประกอบ ห้ามเหมาว่าแบบไหนไว้ลงทุนหรืออยู่เอง)"
+  ],
+  "notes_th": "เรื่องของเจ้าของข้อ 1: ผังแต่ละแบบขึ้นใหญ่ตอน Emma เอ่ยชื่อแบบ ตัวเลขช่วงขนาดนับขึ้น แล้วย่อลงไปเกาะเป็นแถว จบที่รายการสามแถวที่แตะได้ ผังเป็นผังรายยูนิตจริงจากระบบผังขาย (ห้องเดียวกับโมเดล UE ในเรื่อง details จึงตรงกัน) ไม่มีเลขห้องบนจอ บรรทัดแรกไม่มีภาพใหญ่ (แค่แถวว่างสามแถวรอ) ไม่มีประโยคถามปิดท้ายเพราะ prompt สั่งค่าเริ่มต้นไม่ถามต่อ ปล่อยให้ end_hint บนจอเชิญแตะแทน ไม่พูดเรื่องลงทุน/อยู่เองตาม qa_script q05"
+ },
+ {
+  "id": "unit_studio",
+  "template": "details",
+  "questions_th": [
+   "ห้องสตูดิโอเป็นยังไง",
+   "สตูดิโอขนาดเท่าไหร่",
+   "สตูดิโอกี่ตารางเมตร",
+   "ห้องสตูดิโอข้างในเป็นแบบไหน",
+   "ห้องสตูดิโอมีห้องนอนแยกไหม"
+  ],
+  "questions_en": [
+   "What is the studio like?",
+   "How big is the studio?",
+   "What does the studio look like inside?",
+   "Does the studio have a separate bedroom?"
+  ],
+  "lines": [
+   {
+    "th": "นี่คือห้องสตูดิโอของเราค่ะ",
+    "en": "This is our studio.",
+    "cue_th": [
+     "สตูดิโอ"
+    ],
+    "cue_en": [
+     "studio"
+    ],
+    "cue_zh": [
+     "开间",
+     "单间",
+     "工作室"
+    ]
+   },
+   {
+    "th": "เป็นห้องโล่ง ไม่มีห้องนอนแยก",
+    "en": "It's open plan, with no separate bedroom.",
+    "cue_th": [
+     "ห้องโล่ง",
+     "ห้องนอนแยก",
+     "โล่ง"
+    ],
+    "cue_en": [
+     "open plan",
+     "open-plan",
+     "separate"
+    ],
+    "cue_zh": [
+     "开放",
+     "开敞",
+     "没有独立"
+    ]
+   },
+   {
+    "th": "ขนาด 24 ถึง 29 ตารางเมตรค่ะ",
+    "en": "It's 24 to 29 square metres,",
+    "cue_th": [
+     "ขนาด",
+     "ตารางเมตร",
+     "ตร.ม."
+    ],
+    "cue_en": [
+     "square met",
+     "sq"
+    ],
+    "cue_zh": [
+     "平方米",
+     "平米"
+    ]
+   },
+   {
+    "th": "บรรยากาศการตกแต่งเป็นแบบนี้ค่ะ",
+    "en": "and this is the interior mood.",
+    "cue_th": [
+     "บรรยากาศ",
+     "ตกแต่ง"
+    ],
+    "cue_en": [
+     "mood",
+     "interior"
+    ],
+    "cue_zh": [
+     "氛围",
+     "装修",
+     "室内"
+    ]
+   }
+  ],
+  "params": {
+   "wire_asset": "room_studio_wire",
+   "solid_asset": "room_studio_solid",
+   "value": {
+    "from": 24,
+    "to": 29,
+    "unit_en": "sq.m."
+   },
+   "meta_en": [
+    "Open plan · no separate bedroom",
+    "1 bathroom",
+    "117 units in the project",
+    "3D model: one studio layout"
+   ],
+   "mood_assets": [
+    "mood_dining",
+    "mood_bathroom"
+   ],
+   "mood_tag_en": "Interior mood · design style",
+   "lines": [
+    0,
+    1,
+    2,
+    3
+   ]
+  },
+  "taps": [
+   {
+    "id": "story_unit_studio_available",
+    "label_en": "Available studios",
+    "label_th": "ดูห้องสตูดิโอที่ยังว่าง",
+    "next_story": null,
+    "tool": {
+     "name": "show_room_type",
+     "args": {
+      "type": "studio"
+     }
+    }
+   },
+   {
+    "id": "story_unit_studio_types",
+    "label_en": "All room types",
+    "label_th": "แบบห้องทั้งหมด",
+    "next_story": "room_types",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:แบบห้องและขนาด (Studio 24–29 ตร.ม.)",
+   "facts:โครงการ (Studio 117)",
+   "report:14_units.md#14.1 line 25 (ห้องโล่งเดียว ไม่มีห้องนอนแยก)",
+   "report:14_units.md#14.1 line 26 (ห้องน้ำ 1)",
+   "report:14_units.md#14.2.5 (Studio package has no sofa: mood images avoid the bedroom render and keep the sofa small)",
+   "ue:RoomExperience 03_A-316_Studio24 = appendix A-316 Studio 25.0 (design area 24.79) — evidence only, appendix not shown"
+  ],
+  "notes_th": "ลำดับ: โครงลวดฟ้าของห้องวาดขึ้น (คำ 'สตูดิโอ') → โมเดลขาวจางทับตรงตำแหน่งเดิม (คำ 'ห้องโล่ง') → ตัวเลข 24–29 นับขึ้นพร้อมข้อมูลประกอบ (คำ 'ตารางเมตร') → แถบภาพบรรยากาศสองภาพพร้อมป้าย Interior mood (คำ 'บรรยากาศ') โมเดล UE คือห้อง A-316 (Studio มาตรฐาน 25 ตร.ม.) ตัดแผง UI ที่มีเลขห้องและ 24.83 SQ.M. ออกแล้ว ภาพบรรยากาศใช้ห้องทานข้าวกับห้องน้ำ ไม่ใช้ภาพห้องนอนแยกเพราะสตูดิโอไม่มีห้องนอนแยก ปุ่ม 'ดูห้องสตูดิโอที่ยังว่าง' เรียก show_room_type(studio) ที่ลงหุ่นแล้ว (เซิร์ฟเวอร์เลือกห้องว่างจริง ราคาไม่ออกจอ) · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด"
+ },
+ {
+  "id": "unit_one_bedroom",
+  "template": "details",
+  "questions_th": [
+   "ห้องหนึ่งห้องนอนเป็นยังไง",
+   "1 ห้องนอนกี่ตารางเมตร",
+   "ห้อง 34 ตารางเมตรเป็นยังไง",
+   "ห้องหนึ่งห้องนอนข้างในเป็นแบบไหน",
+   "ห้องนอนเดียวขนาดเท่าไหร่"
+  ],
+  "questions_en": [
+   "What is the one-bedroom like?",
+   "How big is the 1 bedroom?",
+   "What does the one-bedroom look like inside?",
+   "What is the 34 square metre room?"
+  ],
+  "lines": [
+   {
+    "th": "นี่คือห้องหนึ่งห้องนอนค่ะ",
+    "en": "This is the one-bedroom.",
+    "cue_th": [
+     "หนึ่งห้องนอน",
+     "1 ห้องนอน",
+     "ห้องนอนเดียว"
+    ],
+    "cue_en": [
+     "one bedroom",
+     "one-bedroom",
+     "1 bedroom",
+     "1-bedroom"
+    ],
+    "cue_zh": [
+     "一室",
+     "一房",
+     "一居"
+    ]
+   },
+   {
+    "th": "มีห้องนอนแยก กับมุมนั่งเล่นและครัว",
+    "en": "It has a separate bedroom, plus a living area and kitchen.",
+    "cue_th": [
+     "ห้องนอนแยก",
+     "นั่งเล่น",
+     "ครัว"
+    ],
+    "cue_en": [
+     "separate",
+     "living",
+     "kitchen"
+    ],
+    "cue_zh": [
+     "独立",
+     "客厅",
+     "厨房"
+    ]
+   },
+   {
+    "th": "ขนาด 33 ถึง 35 ตารางเมตร",
+    "en": "It's 33 to 35 square metres,",
+    "cue_th": [
+     "ขนาด",
+     "ตารางเมตร",
+     "ตร.ม."
+    ],
+    "cue_en": [
+     "square met",
+     "sq"
+    ],
+    "cue_zh": [
+     "平方米",
+     "平米"
+    ]
+   },
+   {
+    "th": "บรรยากาศภายในเป็นแบบนี้ค่ะ",
+    "en": "and this is the interior mood.",
+    "cue_th": [
+     "บรรยากาศ",
+     "ภายใน"
+    ],
+    "cue_en": [
+     "mood",
+     "interior"
+    ],
+    "cue_zh": [
+     "氛围",
+     "室内",
+     "装修"
+    ]
+   }
+  ],
+  "params": {
+   "wire_asset": "room_1br_wire",
+   "solid_asset": "room_1br_solid",
+   "value": {
+    "from": 33,
+    "to": 35,
+    "unit_en": "sq.m."
+   },
+   "meta_en": [
+    "1 bedroom + living & kitchen",
+    "1 bathroom",
+    "801 units · our most common type",
+    "3D model: one 1‑bedroom layout"
+   ],
+   "mood_assets": [
+    "mood_living",
+    "mood_bedroom",
+    "mood_bathroom"
+   ],
+   "mood_tag_en": "Interior mood · design style",
+   "lines": [
+    0,
+    1,
+    2,
+    3
+   ]
+  },
+  "taps": [
+   {
+    "id": "story_unit_one_bedroom_available",
+    "label_en": "Available 1BR",
+    "label_th": "ดูห้อง 1 ห้องนอนที่ยังว่าง",
+    "next_story": null,
+    "tool": {
+     "name": "show_room_type",
+     "args": {
+      "type": "1br"
+     }
+    }
+   },
+   {
+    "id": "story_unit_one_bedroom_compare",
+    "label_en": "Compare 2BR",
+    "label_th": "เทียบกับ 2 ห้องนอน",
+    "next_story": "unit_compare_1br_2br",
+    "tool": null
+   },
+   {
+    "id": "story_unit_one_bedroom_types",
+    "label_en": "All room types",
+    "label_th": "แบบห้องทั้งหมด",
+    "next_story": "room_types",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:แบบห้องและขนาด (1 ห้องนอน 33–35 ตร.ม.)",
+   "facts:โครงการ (1 ห้องนอน 801 of 1,066)",
+   "report:14_units.md#14.1 line 19 (801 = 75%, the main type)",
+   "report:14_units.md#14.1 line 25 (1 ห้องนอน + นั่งเล่น/ครัว)",
+   "report:14_units.md#14.1 line 26 (ห้องน้ำ 1)",
+   "report:14_units.md#14.8.1 (the '34 sq.m. room' the sales team names = 1-Bedroom; its interior is the designed one)",
+   "ue:RoomExperience 01_F-113_Room34 = appendix F-113 1 ห้องนอน 34.0 — evidence only, appendix not shown"
+  ],
+  "notes_th": "ลำดับเหมือนสตูดิโอ: โครงลวด (คำ 'หนึ่งห้องนอน') → โมเดลขาว (คำ 'ห้องนอนแยก/นั่งเล่น') → 33–35 นับขึ้น + '801 units · our most common type' (คำ 'ตารางเมตร') → ภาพบรรยากาศสามภาพ นั่งเล่น ห้องนอน ห้องน้ำ (คำ 'บรรยากาศ') โมเดล UE คือ F-113 (34.0 ตร.ม. ขนาดที่พบมากสุด) ภาพบรรยากาศเป็นชุดเว็บ ซึ่งรายงาน 14.8.1 บอกว่าการออกแบบภายในนี้คือของแบบ 1 ห้องนอน ปุ่มเทียบนำไปเรื่อง unit_compare_1br_2br · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด"
+ },
+ {
+  "id": "unit_two_bedroom",
+  "template": "details",
+  "questions_th": [
+   "ห้องสองห้องนอนเป็นยังไง",
+   "2 ห้องนอนกี่ตารางเมตร",
+   "ห้องสองห้องนอนข้างในเป็นแบบไหน",
+   "สองห้องนอนมีกี่ห้องน้ำ",
+   "ห้องใหญ่สุดขนาดเท่าไหร่"
+  ],
+  "questions_en": [
+   "What is the two-bedroom like?",
+   "How big is the 2 bedroom?",
+   "How many bathrooms does the two-bedroom have?",
+   "What is your biggest unit?"
+  ],
+  "lines": [
+   {
+    "th": "นี่คือห้องสองห้องนอนค่ะ",
+    "en": "This is the two-bedroom.",
+    "cue_th": [
+     "สองห้องนอน",
+     "2 ห้องนอน"
+    ],
+    "cue_en": [
+     "two bedroom",
+     "two-bedroom",
+     "2 bedroom",
+     "2-bedroom"
+    ],
+    "cue_zh": [
+     "两室",
+     "两房",
+     "两居",
+     "二室"
+    ]
+   },
+   {
+    "th": "มีสองห้องนอน และสองห้องน้ำ",
+    "en": "It has two bedrooms and two bathrooms.",
+    "cue_th": [
+     "ห้องน้ำ"
+    ],
+    "cue_en": [
+     "bathroom"
+    ],
+    "cue_zh": [
+     "卫生间",
+     "浴室",
+     "洗手间"
+    ]
+   },
+   {
+    "th": "ขนาด 51.5 ถึง 52.5 ตารางเมตร",
+    "en": "It's 51.5 to 52.5 square metres,",
+    "cue_th": [
+     "ขนาด",
+     "ตารางเมตร",
+     "ตร.ม."
+    ],
+    "cue_en": [
+     "square met",
+     "sq"
+    ],
+    "cue_zh": [
+     "平方米",
+     "平米"
+    ]
+   },
+   {
+    "th": "บรรยากาศภายในเป็นแบบนี้ค่ะ",
+    "en": "and this is the interior mood.",
+    "cue_th": [
+     "บรรยากาศ",
+     "ภายใน"
+    ],
+    "cue_en": [
+     "mood",
+     "interior"
+    ],
+    "cue_zh": [
+     "氛围",
+     "室内",
+     "装修"
+    ]
+   }
+  ],
+  "params": {
+   "wire_asset": "room_2br_wire",
+   "solid_asset": "room_2br_solid",
+   "value": {
+    "from": 51.5,
+    "to": 52.5,
+    "unit_en": "sq.m."
+   },
+   "meta_en": [
+    "2 bedrooms + living & kitchen",
+    "2 bathrooms",
+    "148 units in the project",
+    "3D model: one 2‑bedroom layout"
+   ],
+   "mood_assets": [
+    "mood_dining",
+    "mood_bedroom",
+    "mood_bathroom"
+   ],
+   "mood_tag_en": "Interior mood · design style",
+   "lines": [
+    0,
+    1,
+    2,
+    3
+   ]
+  },
+  "taps": [
+   {
+    "id": "story_unit_two_bedroom_available",
+    "label_en": "Available 2BR",
+    "label_th": "ดูห้อง 2 ห้องนอนที่ยังว่าง",
+    "next_story": null,
+    "tool": {
+     "name": "show_room_type",
+     "args": {
+      "type": "2br"
+     }
+    }
+   },
+   {
+    "id": "story_unit_two_bedroom_compare",
+    "label_en": "Compare 1BR",
+    "label_th": "เทียบกับ 1 ห้องนอน",
+    "next_story": "unit_compare_1br_2br",
+    "tool": null
+   },
+   {
+    "id": "story_unit_two_bedroom_types",
+    "label_en": "All room types",
+    "label_th": "แบบห้องทั้งหมด",
+    "next_story": "room_types",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:แบบห้องและขนาด (2 ห้องนอน 51.5–52.5 ตร.ม.)",
+   "facts:โครงการ (2 ห้องนอน 148)",
+   "report:14_units.md#14.1 line 25 (2 ห้องนอน + นั่งเล่น/ครัว)",
+   "report:14_units.md#14.1 line 26 (ห้องน้ำ 2)",
+   "report:14_units.md#14.4.4 (\"มีห้องนอน 2 ห้อง ห้องน้ำ 2 ห้อง\" as the suggested answer)",
+   "ue:RoomExperience 08_C-309_TwoBed51 = appendix C-309 2 ห้องนอน 51.5 — evidence only, appendix not shown"
+  ],
+  "notes_th": "ลำดับเหมือนสองเรื่องก่อน ประโยคที่สองบอกสองห้องนอนสองห้องน้ำ (จุดต่างที่ลูกค้าถามบ่อย) ตัวเลข 51.5–52.5 นับขึ้นแบบทศนิยมหนึ่งตำแหน่ง โมเดล UE คือ C-309 (51.5 ตร.ม. แบบย่อยเล็กสุดของ 2 ห้องนอน 8 ห้อง — โปรเจกต์ UE มีโมเดลครบชุดเฉพาะห้องนี้) ไม่ใช้ 09_C-309_OneBed51 เพราะเป็นแบบหนึ่งห้องนอนบนผังเดียวกัน ตรงกับแบบเก่ามิถุนายน '1BR 51' ที่รายงานบอกว่าไม่ได้ขายจริง ห้องใหญ่สุดของห้องชุดคือแบบนี้ (ร้านค้าไม่นับ) · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด"
+ },
+ {
+  "id": "unit_compare_1br_2br",
+  "template": "stack",
+  "questions_th": [
+   "1 ห้องนอนกับ 2 ห้องนอนต่างกันยังไง",
+   "หนึ่งห้องนอนกับสองห้องนอนต่างกันตรงไหน",
+   "เทียบห้องหนึ่งห้องนอนกับสองห้องนอนให้หน่อย",
+   "ห้องนอนเดียวกับสองห้องนอนต่างกันไหม"
+  ],
+  "questions_en": [
+   "What's the difference between the one- and two-bedroom?",
+   "Compare the 1 bedroom and the 2 bedroom",
+   "How is the two-bedroom different from the one-bedroom?"
+  ],
+  "lines": [
+   {
+    "th": "ต่างกันหลักๆ ที่ขนาดกับจำนวนห้องนอนค่ะ",
+    "en": "The main differences are size and the number of bedrooms.",
+    "cue_th": [
+     "ต่างกัน",
+     "ขนาด"
+    ],
+    "cue_en": [
+     "difference",
+     "differ",
+     "size"
+    ],
+    "cue_zh": [
+     "区别",
+     "不同",
+     "面积"
+    ]
+   },
+   {
+    "th": "หนึ่งห้องนอน 33 ถึง 35 ตารางเมตร",
+    "en": "The one-bedroom is 33 to 35 square metres,",
+    "cue_th": [
+     "หนึ่งห้องนอน",
+     "1 ห้องนอน",
+     "ห้องนอนเดียว"
+    ],
+    "cue_en": [
+     "one bedroom",
+     "one-bedroom",
+     "1 bedroom",
+     "1-bedroom"
+    ],
+    "cue_zh": [
+     "一室",
+     "一房",
+     "一居"
+    ]
+   },
+   {
+    "th": "สองห้องนอน 51.5 ถึง 52.5 ตารางเมตร",
+    "en": "the two-bedroom 51.5 to 52.5,",
+    "cue_th": [
+     "สองห้องนอน",
+     "2 ห้องนอน"
+    ],
+    "cue_en": [
+     "two bedroom",
+     "two-bedroom",
+     "2 bedroom",
+     "2-bedroom"
+    ],
+    "cue_zh": [
+     "两室",
+     "两房",
+     "两居",
+     "二室"
+    ]
+   },
+   {
+    "th": "และสองห้องนอนมีสองห้องน้ำค่ะ",
+    "en": "and the two-bedroom has two bathrooms.",
+    "cue_th": [
+     "ห้องน้ำ"
+    ],
+    "cue_en": [
+     "bathroom"
+    ],
+    "cue_zh": [
+     "卫生间",
+     "浴室",
+     "洗手间"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "1 Bedroom",
+     "sub_en": "1 bedroom · 1 bathroom",
+     "asset": "plan_1br",
+     "asset_kind": "plan",
+     "value": {
+      "from": 33,
+      "to": 35,
+      "unit_en": "sq.m."
+     },
+     "line": 1
+    },
+    {
+     "label_en": "2 Bedrooms",
+     "sub_en": "2 bedrooms · 2 baths",
+     "asset": "plan_2br",
+     "asset_kind": "plan",
+     "value": {
+      "from": 51.5,
+      "to": 52.5,
+      "unit_en": "sq.m."
+     },
+     "line": 2
+    }
+   ],
+   "end_hint_en": "Tap one to look inside"
+  },
+  "taps": [
+   {
+    "id": "story_unit_compare_1br",
+    "label_en": "1 Bedroom",
+    "label_th": "1 ห้องนอน",
+    "next_story": "unit_one_bedroom",
+    "tool": null
+   },
+   {
+    "id": "story_unit_compare_2br",
+    "label_en": "2 Bedrooms",
+    "label_th": "2 ห้องนอน",
+    "next_story": "unit_two_bedroom",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:แบบห้องและขนาด (1 ห้องนอน 33–35 · 2 ห้องนอน 51.5–52.5 ตร.ม.)",
+   "report:14_units.md#14.1 line 25 (1 ห้องนอน vs 2 ห้องนอน + นั่งเล่น/ครัว)",
+   "report:14_units.md#14.1 line 26 (ห้องน้ำ 1 vs 2)"
+  ],
+  "notes_th": "ใช้แม่แบบ stack เดียวกับเรื่องแบบห้อง แต่มีสองแถว: ผัง 1 ห้องนอนขึ้นใหญ่ นับ 33–35 แล้วเกาะเป็นแถวบน ผัง 2 ห้องนอนขึ้นใหญ่ นับ 51.5–52.5 แล้วเกาะเป็นแถวล่าง ประโยคสุดท้ายเรื่องห้องน้ำไม่มีภาพใหม่ (ชี้ที่บรรทัดย่อยของแถวที่เขียนจำนวนห้องน้ำอยู่แล้ว) จุดต่างที่ใช้มีแค่ขนาด จำนวนห้องนอน และจำนวนห้องน้ำ ซึ่งอยู่ในบทที่ 14 ที่อนุมัติ ไม่คำนวณส่วนต่างตารางเมตร ไม่พูดเรื่องเฟอร์นิเจอร์ (ข้อมูลว่ารวมราคาไหมยังไม่ยืนยัน) ไม่พูดเรื่องราคาหรือลงทุน"
+ },
+ {
+  "id": "smart_home",
+  "template": "features",
+  "questions_th": [
+   "มี smart home อะไรบ้าง",
+   "ห้องมีสมาร์ทโฮมไหม",
+   "สั่งงานในห้องผ่านมือถือได้ไหม",
+   "ม่านไฟฟ้ามีไหม",
+   "แอปควบคุมห้องได้ไหม"
+  ],
+  "questions_en": [
+   "What smart home features are there?",
+   "Is there smart home in the room?",
+   "Can I control the room from my phone?",
+   "Do you have motorised curtains?"
+  ],
+  "lines": [
+   {
+    "th": "ห้องของเราเพิ่มชุด Smart Home ได้ค่ะ",
+    "en": "You can add a Smart Home set to your room.",
+    "cue_th": [
+     "Smart Home",
+     "สมาร์ทโฮม",
+     "สมาร์ตโฮม"
+    ],
+    "cue_en": [
+     "smart home"
+    ],
+    "cue_zh": [
+     "智能家居",
+     "智能"
+    ]
+   },
+   {
+    "th": "มีมอเตอร์ม่าน สั่งเปิดปิดได้",
+    "en": "It has a curtain motor you can open and close on command,",
+    "cue_th": [
+     "ม่าน"
+    ],
+    "cue_en": [
+     "curtain"
+    ],
+    "cue_zh": [
+     "窗帘"
+    ]
+   },
+   {
+    "th": "และควบคุมแอร์ผ่านระบบ Smart Air",
+    "en": "and Smart Air control for the air-con.",
+    "cue_th": [
+     "แอร์",
+     "Smart Air"
+    ],
+    "cue_en": [
+     "air",
+     "Smart Air"
+    ],
+    "cue_zh": [
+     "空调"
+    ]
+   },
+   {
+    "th": "ชุดนี้เป็นแพ็กเกจเสริม ไม่รวมในราคาห้องค่ะ",
+    "en": "It's an optional package, not included in the room price.",
+    "cue_th": [
+     "แพ็กเกจ",
+     "เสริม"
+    ],
+    "cue_en": [
+     "optional",
+     "package"
+    ],
+    "cue_zh": [
+     "选配",
+     "套餐",
+     "不包含",
+     "另购"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "Curtain motor",
+     "asset": "sh_curtain",
+     "note_en": "Open and close on command",
+     "line": 1
+    },
+    {
+     "label_en": "Air-con & Smart Air",
+     "asset": "sh_aircon",
+     "note_en": "Temperature control",
+     "line": 2
+    }
+   ],
+   "footnote_en": "In-room Smart Home set: optional package, not included in the room price",
+   "footnote_line": 3
+  },
+  "taps": [
+   {
+    "id": "story_smart_home_types",
+    "label_en": "Room types",
+    "label_th": "แบบห้อง",
+    "next_story": "room_types",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น (เทคโนโลยี: Smart Home, Smart Security, Smart Comfort, Smart Air, Connected Living · ชุด Smart Home ในห้องเป็นแพ็กเกจเสริม ไม่รวมในราคาห้อง)",
+   "report:13_technology.md#13.8.3 line 173 (Smart Home Package: air-con, lights, curtains, TV, air purification via the app; optional, not included in the room price)",
+   "report:13_technology.md#13.8.3 line 174 (curtains: with the package a motor on the curtain rail opens/closes them from the phone)",
+   "report:13_technology.md#13.8.2 line 164-166 (control panel: temperature, air-con, curtains, lights, TV; purification is a filter inside the air-con; mobile application)",
+   "report:14_units.md#14.8.3 line 416-417 (without the package the app only opens the door; air-con/lights/TV/curtain/purification are the add-on; not free, not in the room price)",
+   "slides:intro-043 (Smart Home Technology Inside the Unit: the five Smart pillars)"
+  ],
+  "notes_th": "ภาพสามช่องเด้งขึ้นทีละช่องตามคำ: ม่าน (ภาพ UE ห้อง 1 ห้องนอนม่านปิด) → แอร์ (ภาพ UE แอร์พร้อมสายลมฟ้า) → แอป (การ์ด Devices จากดีไซน์แอป Smart Home ใน Figma) แล้ว footnote 'แพ็กเกจเสริม ไม่รวมในราคาห้อง' ขึ้นพร้อมประโยคสุดท้าย และ Emma พูดเองด้วย ตามที่ต้องบอกทุกครั้ง ไม่ใช้ภาพเครื่องฟอกอากาศตั้งพื้นจาก UE เพราะรายงานบอกว่าระบบฟอกอากาศอยู่ในเครื่องแอร์ ไม่ใช่เครื่องแยก ไม่อ้างสรรพคุณสุขภาพ ไม่พูดคำว่าผ้าม่านรวมอยู่ (รายงาน: ผ้าม่านไม่แถม แพ็กเกจติดมอเตอร์ที่ราง) ไม่ใส่ประตูดิจิทัลเป็นช่องแยก เพราะ 'ทุกห้องมี' มาจากคำพูดในการนำเสนอเท่านั้น ยังไม่มีเอกสาร · แก้ตามรีวิว 12 ต.ค.: ภาพแอป (sh_app) ครอปเหลือแค่ไทล์ Lights + Curtains — เดิมบนจอเห็น Door Lock ซึ่งมีให้ทุกห้องอยู่แล้ว ไม่ใช่ของแพ็กเกจเสริมที่เรื่องนี้พูดถึง · 13 ต.ค. เจ้าของ: ไม่ใช้ภาพแอป, ข้ามเครื่องฟอกอากาศไปก่อน"
+ }
+]

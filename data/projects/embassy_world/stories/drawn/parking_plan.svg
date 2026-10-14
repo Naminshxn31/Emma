@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="30 400 1980 800" width="1584" height="640">
+  <!--
+    Basement parking, drawn for the robot face (owner, 13 Oct: "ที่อยากให้
+    เขียนขึ้นคือที่จอดรถ" -- the earlier picture was a thin-line crop of one
+    corner). Traced from the website pack's BASEMENT FLOOR PLAN (web/3.project
+    details/master plan/_Embassy World  Floor Plan/2.png): the SVG's units ARE
+    that sheet's pixels, so a point can be checked against it directly.
+    What it shows, and where each comes from:
+      - the one-level ring and the courtyard it wraps: the sheet's walls,
+        simplified (cores and stairs left out);
+      - building letters: the sheet's own KEY PLAN, mapped onto the ring
+        (E west, F north-west, A north, B east, C south-east, D south-west);
+      - EV CHARGING on the south-west lane: the sheet prints "WITH EV CHARGER"
+        there, and report 7.6 puts EV charging under building D;
+      - stall rows: where the sheet draws stalls, as texture -- NOT a count
+        (the number on screen is the story's own: report 7.1, approximate).
+    Left out on purpose: every facility name in the block under building A
+    (the sheet's names include ones the owner removed, deny_terms, and place
+    rooms in the basement that the approved facts do not), ramps/entrances
+    (the sheet does not say which way they run), motorbike bays (not marked),
+    any number of chargers (not given).
+    Written by a one-off generator; edit this file directly from now on.
+    Rendered by scripts/draw_story_plans.py.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e1438"/>
+      <stop offset="1" stop-color="#090d29"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse" x="30" y="400">
+      <path d="M40 0H0V40" fill="none" stroke="#28316c" stroke-width="1" opacity="0.5"/>
+    </pattern>
+    <pattern id="hatch" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="18" stroke="#6c7fd6" stroke-width="2" opacity="0.35"/>
+    </pattern>
+    <linearGradient id="band" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c2768"/>
+      <stop offset="1" stop-color="#18205a"/>
+    </linearGradient>
+    <clipPath id="ring"><path d="M118 488L352 488L352 470L955 470L955 465L1670 467L1900 470L1900 500L1912 500L1950 590L1875 980L1460 1135L910 1135L910 1095L318 1095L318 1055L242 1055L242 1070L90 1070L90 848L103 848L103 625L118 625Z"/></clipPath>
+    <filter id="glow" x="-5%" y="-20%" width="110%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="30" y="400" width="1980" height="800" fill="url(#bg)"/>
+  <rect x="30" y="400" width="1980" height="800" fill="url(#grid)"/>
+
+  <!-- the ring: one basement level under all six buildings -->
+  <path d="M118 488L352 488L352 470L955 470L955 465L1670 467L1900 470L1900 500L1912 500L1950 590L1875 980L1460 1135L910 1135L910 1095L318 1095L318 1055L242 1055L242 1070L90 1070L90 848L103 848L103 625L118 625Z" fill="url(#band)"/>
+  <!-- the courtyard it wraps (not dug out) -->
+  <path d="M258 615L665 615L665 745L965 745L965 705L1600 705L1600 620L1790 610L1740 870L1570 950L1440 985L905 990L905 948L245 948L245 848L258 848Z" fill="#0b102f"/>
+  <path d="M258 615L665 615L665 745L965 745L965 705L1600 705L1600 620L1790 610L1740 870L1570 950L1440 985L905 990L905 948L245 948L245 848L258 848Z" fill="url(#grid)"/>
+  <!-- the wellness block under building A: no names here (see above) -->
+  <rect x="1000" y="595" width="600" height="110" fill="#141b4a"/>
+  <rect x="1000" y="595" width="600" height="110" fill="url(#hatch)" stroke="#5f6fc0" stroke-width="3"/>
+
+  <!-- stall rows (texture, not a count) -->
+  <g clip-path="url(#ring)">
+    <path d="M118 505l48 0M118 530l48 0M118 555l48 0M118 580l48 0M118 605l48 0M166 505L166 615M103 640l48 0M103 665l48 0M103 690l48 0M103 715l48 0M103 740l48 0M103 765l48 0M103 790l48 0M103 815l48 0M151 640L151 838M90 862l48 0M90 887l48 0M90 912l48 0M90 937l48 0M90 962l48 0M90 987l48 0M90 1012l48 0M90 1037l48 0M138 862L138 1052M258 632l-48 0M258 657l-48 0M258 682l-48 0M258 707l-48 0M258 732l-48 0M258 757l-48 0M258 782l-48 0M258 807l-48 0M258 832l-48 0M210 632L210 838M245 862l-48 0M245 887l-48 0M245 912l-48 0M197 862L197 934M172 488l0 48M197 488l0 48M222 488l0 48M247 488l0 48M272 488l0 48M297 488l0 48M322 488l0 48M172 536L345 536M372 470l0 48M397 470l0 48M422 470l0 48M447 470l0 48M472 470l0 48M497 470l0 48M522 470l0 48M547 470l0 48M572 470l0 48M597 470l0 48M622 470l0 48M647 470l0 48M672 470l0 48M697 470l0 48M722 470l0 48M747 470l0 48M772 470l0 48M797 470l0 48M822 470l0 48M847 470l0 48M872 470l0 48M897 470l0 48M922 470l0 48M947 470l0 48M372 518L948 518M372 615l0 -48M397 615l0 -48M422 615l0 -48M447 615l0 -48M472 615l0 -48M497 615l0 -48M522 615l0 -48M547 615l0 -48M572 615l0 -48M597 615l0 -48M622 615l0 -48M647 615l0 -48M372 567L652 567M684 745l0 -48M709 745l0 -48M734 745l0 -48M759 745l0 -48M784 745l0 -48M809 745l0 -48M834 745l0 -48M859 745l0 -48M884 745l0 -48M909 745l0 -48M934 745l0 -48M684 697L950 697M1030 520l0 48M1055 520l0 48M1080 520l0 48M1105 520l0 48M1130 520l0 48M1155 520l0 48M1180 520l0 48M1205 520l0 48M1030 568L1206 568M1440 520l0 48M1465 520l0 48M1490 520l0 48M1515 520l0 48M1540 520l0 48M1565 520l0 48M1590 520l0 48M1440 568L1612 568M1652 468l0 48M1677 468l0 48M1702 468l0 48M1727 469l0 48M1752 469l0 48M1777 469l0 48M1802 469l0 48M1827 469l0 48M1852 470l0 48M1877 470l0 48M1652 516L1890 518M1612 619l0 -48M1637 618l0 -48M1662 616l0 -48M1687 615l0 -48M1712 614l0 -48M1737 613l0 -48M1762 611l0 -48M1612 571L1768 563M1946 610l-47 -9M1941 635l-47 -9M1937 659l-47 -9M1932 684l-47 -9M1927 708l-47 -9M1923 733l-47 -9M1918 757l-47 -9M1914 782l-47 -9M1909 807l-47 -9M1904 831l-47 -9M1900 856l-47 -9M1895 880l-47 -9M1890 905l-47 -9M1886 929l-47 -9M1881 954l-47 -9M1899 601L1833 951M1786 630l47 9M1781 655l47 9M1777 679l47 9M1772 704l47 9M1767 728l47 9M1763 753l47 9M1758 777l47 9M1753 802l47 9M1748 826l47 9M1833 639L1791 859M1855 988l-17 -45M1832 997l-17 -45M1808 1005l-17 -45M1785 1014l-17 -45M1761 1023l-17 -45M1738 1032l-17 -45M1714 1040l-17 -45M1691 1049l-17 -45M1668 1058l-17 -45M1644 1066l-17 -45M1621 1075l-17 -45M1597 1084l-17 -45M1574 1092l-17 -45M1550 1101l-17 -45M1527 1110l-17 -45M1503 1119l-17 -45M1480 1127l-17 -45M1838 943L1461 1083M1722 879l20 43M1699 890l20 43M1677 900l20 43M1654 911l20 43M1632 922l20 43M1609 932l20 43M1742 922L1608 985M922 1135l0 -48M947 1135l0 -48M972 1135l0 -48M997 1135l0 -48M1022 1135l0 -48M1047 1135l0 -48M1072 1135l0 -48M1097 1135l0 -48M1122 1135l0 -48M1147 1135l0 -48M1172 1135l0 -48M1197 1135l0 -48M1222 1135l0 -48M1247 1135l0 -48M1272 1135l0 -48M1297 1135l0 -48M1322 1135l0 -48M1347 1135l0 -48M1372 1135l0 -48M1397 1135l0 -48M1422 1135l0 -48M1447 1135l0 -48M922 1087L1448 1087M918 990l0 48M943 990l0 48M968 990l0 48M993 989l0 48M1018 989l0 48M1043 989l0 48M1068 989l0 48M1093 989l0 48M1118 988l0 48M1143 988l0 48M1168 988l0 48M1193 988l0 48M1218 988l0 48M1243 987l0 48M1268 987l0 48M1293 987l0 48M1318 987l0 48M1343 987l0 48M1368 986l0 48M1393 986l0 48M1418 986l0 48M918 1038L1428 1034" fill="none" stroke="#7d8fe0" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+    <!-- EV charging lane, south-west, under building D -->
+    <path d="M318 948H905V1095H318Z" fill="#5ff2c8" opacity="0.10"/>
+    <path d="M332 1095l0 -48M357 1095l0 -48M382 1095l0 -48M407 1095l0 -48M432 1095l0 -48M457 1095l0 -48M482 1095l0 -48M507 1095l0 -48M532 1095l0 -48M557 1095l0 -48M582 1095l0 -48M607 1095l0 -48M632 1095l0 -48M657 1095l0 -48M682 1095l0 -48M707 1095l0 -48M732 1095l0 -48M757 1095l0 -48M782 1095l0 -48M807 1095l0 -48M832 1095l0 -48M857 1095l0 -48M882 1095l0 -48M332 1047L898 1047M268 948l0 48M293 948l0 48M318 948l0 48M343 948l0 48M368 948l0 48M393 948l0 48M418 948l0 48M443 948l0 48M468 948l0 48M493 948l0 48M518 948l0 48M543 948l0 48M568 948l0 48M593 948l0 48M618 948l0 48M643 948l0 48M668 948l0 48M693 948l0 48M718 948l0 48M743 948l0 48M768 948l0 48M793 948l0 48M818 948l0 48M843 948l0 48M868 948l0 48M893 948l0 48M268 996L894 996" fill="none" stroke="#5ff2c8" stroke-width="3.4" stroke-linecap="round" filter="url(#glow)"/>
+  </g>
+
+  <!-- the drive aisle round the ring -->
+  <path d="M175 1021L175 545L955 545L990 582L1612 582L1645 545L1838 545L1806 930L1512 1052L935 1060L905 1021Z" fill="none" stroke="#b8c6ff" stroke-width="4" stroke-dasharray="22 18" stroke-linejoin="round" opacity="0.55"/>
+
+  <!-- walls -->
+  <path d="M118 488L352 488L352 470L955 470L955 465L1670 467L1900 470L1900 500L1912 500L1950 590L1875 980L1460 1135L910 1135L910 1095L318 1095L318 1055L242 1055L242 1070L90 1070L90 848L103 848L103 625L118 625Z" fill="none" stroke="#a9bcff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M258 615L665 615L665 745L965 745L965 705L1600 705L1600 620L1790 610L1740 870L1570 950L1440 985L905 990L905 948L245 948L245 848L258 848Z" fill="none" stroke="#a9bcff" stroke-width="6" stroke-linejoin="round"/>
+  <!-- the two short walls north of the wellness block (the stalls under them hang off these) -->
+  <path d="M1020 520H1215M1430 520H1620" fill="none" stroke="#a9bcff" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- EV badge in the lane's aisle -->
+  <g transform="translate(640 1021)">
+    <rect x="-112" y="-38" width="224" height="76" rx="38" fill="#0b2a2c" stroke="#5ff2c8" stroke-width="4" filter="url(#glow)"/>
+    <path d="M-60 -24L-82 6H-66L-74 28L-48 -6H-64L-54 -24Z" fill="#5ff2c8"/>
+    <text x="18" y="17" font-family="Segoe UI, Arial, sans-serif" font-weight="800" font-size="48" fill="#ffffff" text-anchor="middle" letter-spacing="2">EV</text>
+  </g>
+
+  <!-- buildings above (the sheet's key plan) -->
+  <g transform="translate(175 745)"><circle r="40" fill="#101744" stroke="#c9bdff" stroke-width="4"/><text y="17" font-family="Segoe UI, Arial, sans-serif" font-weight="800" font-size="48" fill="#ffffff" text-anchor="middle">E</text></g>
+  <g transform="translate(540 545)"><circle r="40" fill="#101744" stroke="#c9bdff" stroke-width="4"/><text y="17" font-family="Segoe UI, Arial, sans-serif" font-weight="800" font-size="48" fill="#ffffff" text-anchor="middle">F</text></g>
+  <g transform="translate(1300 650)"><circle r="40" fill="#101744" stroke="#c9bdff" stroke-width="4"/><text y="17" font-family="Segoe UI, Arial, sans-serif" font-weight="800" font-size="48" fill="#ffffff" text-anchor="middle">A</text></g>
+  <g transform="translate(1840 770)"><circle r="40" fill="#101744" stroke="#c9bdff" stroke-width="4"/><text y="17" font-family="Segoe UI, Arial, sans-serif" font-weight="800" font-size="48" fill="#ffffff" text-anchor="middle">B</text></g>
+  <g transform="translate(1250 1060)"><circle r="40" fill="#101744" stroke="#c9bdff" stroke-width="4"/><text y="17" font-family="Segoe UI, Arial, sans-serif" font-weight="800" font-size="48" fill="#ffffff" text-anchor="middle">C</text></g>
+  <g transform="translate(390 1021)"><circle r="40" fill="#101744" stroke="#c9bdff" stroke-width="4"/><text y="17" font-family="Segoe UI, Arial, sans-serif" font-weight="800" font-size="48" fill="#ffffff" text-anchor="middle">D</text></g>
+</svg>

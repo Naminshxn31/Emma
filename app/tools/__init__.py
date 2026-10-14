@@ -20,6 +20,7 @@ from app.tools.registry import (  # noqa: F401  (re-exported)
     dispatch,
     dispatch_all,
     get,
+    model_view,
     tool,
 )
 
@@ -52,6 +53,10 @@ _TOOL_MODULES = {
     # §2d, docs/emma-body-nav-design-2026-10-08.md). Opt-in below: it moves
     # the robot, so blank TOOL_GROUPS must never load it.
     "app.tools.body": "body",
+    # The robot face's motion stories (app/stories.py, owner 12 Oct 2026).
+    # Opt-in below: a new screen on a public robot is never on by omission,
+    # and STORIES_ENABLED is the second key (app/tools/registry.py).
+    "app.tools.stories": "stories",
 }
 
 #: Groups that load only when *named* in the enabled set. "Everything"
@@ -61,7 +66,10 @@ _TOOL_MODULES = {
 _OPT_IN = {"reminders", "memory", "mydocs", "websearch", "computer",
            # Moves the robot. Never on by omission, and never on a machine
            # whose TOOL_GROUPS was written before it existed.
-           "body"}
+           "body",
+           # A story on the robot face's screen. Never on by omission either:
+           # the sales room's tool list must not change on a pull.
+           "stories"}
 
 
 def unknown_groups(enabled: set[str] | None) -> set[str]:

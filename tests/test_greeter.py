@@ -88,6 +88,27 @@ def test_the_robot_in_project_mode_opens_with_the_owners_greeting(monkeypatch):
         assert GREETING not in text and "ถามว่าให้ช่วยอะไรไหม" in text
 
 
+def test_a_known_face_on_the_robot_is_asked_about_the_project_not_live_or_invest(monkeypatch):
+    """Owner, 14 Oct: the camera's greeting asks whether they know the project
+    or whether she can help -- "ต้องถามว่ารู้จักโครงการนี้ไหม หรือมีอะไรให้ช่วย
+    ไหม" -- never live-or-invest (robot log 16:08 asked it right after the
+    greeting; too early)."""
+    monkeypatch.setattr(settings, "assistant_profile", "condo")
+    monkeypatch.setattr(settings, "face_camera_source", "robot")
+    text = greeter.greeting_for(_sighting())
+    assert "ต้า" in text and "รู้จักโครงการของเรามาก่อนไหมคะ" in text and "มีอะไรให้ช่วยไหมคะ" in text
+    assert "ห้ามถามว่าสนใจห้องไว้อยู่เองหรือลงทุน" in text
+    assert "ห้ามพูดถึงกล้อง" in text and "ห้ามเรียกชื่ออีก" in text
+    # the sales room's camera: the line it always had, byte for byte
+    monkeypatch.setattr(settings, "face_camera_source", "local")
+    assert greeter.greeting_for(_sighting()) == (
+        "ต้า เพิ่งเดินเข้ามาหน้าหุ่น (staff) — ทักทายด้วยชื่อสั้นๆ แล้วถามว่า"
+        "ให้ช่วยอะไรไหม ห้ามพูดถึงกล้อง ห้ามพูดว่า "
+        "'ระบบจดจำใบหน้าตรวจพบ' หรือ 'สแกนเจอ' "
+        "ใช้ชื่อเฉพาะในประโยคทักนี้เท่านั้น หลังจากนี้ห้ามเรียกชื่ออีก "
+        "และห้ามถือว่าคนที่พูดคือต้า — ไม่มีระบบจำเสียง อาจเป็นคนอื่นที่ยืนอยู่ด้วย")
+
+
 # -- the switch -------------------------------------------------------------
 
 def test_nothing_watches_unless_the_machine_was_told_to(monkeypatch):

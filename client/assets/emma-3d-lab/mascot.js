@@ -36,10 +36,11 @@
 //      writes. Those are lab furniture.
 //
 // Failure contract: this module NEVER throws out to the page. If WebGL is
-// missing or the GLB fails, it returns quietly and the inline SVG puppet —
-// which is still fully wired to every data-emma-* attribute — stays visible.
+// missing or the GLB fails, it returns quietly and her spot stays empty
+// (the inline SVG puppet that used to stand in was deleted, owner 14 Oct:
+// it popped up on every load before this model faded in).
 // The ready class (emma-3d-ready) is added only when the renderer AND the
-// model have both succeeded, and it is the class that hides the SVG rig.
+// model have both succeeded, and it is the class that shows this canvas.
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -50,13 +51,13 @@ if (!wrap || !canvas) throw new Error('emma-3d: no mascot canvas');
 
 // WebGLRenderer construction is the one call viewer.js leaves unguarded; a
 // machine without a GL context dies there, before its own try/catch around the
-// GLB load is ever reached. Here a failure just leaves the SVG puppet up.
+// GLB load is ever reached. Here a failure just leaves her spot empty.
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas,
                                        powerPreference: 'high-performance' });
 } catch (error) {
-  console.warn('emma-3d: WebGL unavailable, keeping the SVG mascot', error);
+  console.warn('emma-3d: WebGL unavailable, Emma is not drawn', error);
   throw error;
 }
 
@@ -478,7 +479,7 @@ function renderStep(dt, handDt = dt) {
     // looking at a model that faces +z (the attention block above), so the
     // screen's right is +x — her own left — and looking at the pointer is a
     // POSITIVE turn, the same sign the attention cue uses for a person on her
-    // left (and the SVG face's translate(+--gaze-x)). This read -smoothX
+    // left. This read -smoothX
     // until review 10 Oct: the two paths turned the same bone in opposite
     // directions, and the pointer one was the mirrored one.
     if (neck) neck.rotateY(smoothX * .45);
@@ -842,10 +843,10 @@ try {
   wrap.classList.add('emma-3d-ready');
   wrap.dispatchEvent(new CustomEvent('emma-3d-ready'));
 } catch (error) {
-  // One warning, no spam, no broken canvas: the SVG puppet is still up because
-  // emma-3d-ready was never added, and the wrap keeps its full drag/resize
+  // One warning, no spam, no broken canvas: emma-3d-ready is never added, so
+  // the canvas stays invisible, and the wrap keeps its full drag/resize
   // behaviour either way.
-  console.warn('emma-3d: model failed to load, keeping the SVG mascot', error);
+  console.warn('emma-3d: model failed to load, Emma is not drawn', error);
   throw error;
 }
 

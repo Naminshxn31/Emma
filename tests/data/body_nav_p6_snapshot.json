@@ -6,10 +6,10 @@
   "translator": "e66b02637e8a49324df48e2cc89a2495d27ae817b3374d6bf4a2e3bbc0195662"
  },
  "prompts": {
-  "condo/face=False": "5e3655ea7ab3e9f7f0c7ae36b22ac6dd36df783140ae4bf2ed88982d132f8413",
-  "condo/face=True": "9515dffccb3a524e165b800d8025e1a32cd8aab2a3e5b9411338cde05095df40",
-  "emma/face=False": "f719fda68d4248dd2f2e0b1b4c04fffa3a6bbebc5a21d866e686b92da2923bc9",
-  "emma/face=True": "a39845c8ae6a403c6b710657a72d9b612be111f665b401cb4f19a7414d9ea6cd",
+  "condo/face=False": "00d6437523e1bcaec2abedfcf6a0d1e407759b6df483c1cdfaa12d7ff74a2cb1",
+  "condo/face=True": "76441fca67bac5c70ed6f6cc2c28179c9581a7a5dce965d1380cd8c58fa7f8fb",
+  "emma/face=False": "5077b7d489660f631ec19b3a43a4d5a337a67362e08325f5732064c1c7c6394a",
+  "emma/face=True": "683f00e977ae66556f766111d6674834dfd704f1b41f6d7c36f40af30a62c4b6",
   "joke/face=False": "cf3899a32614a0b5edde5b2d9b35678c3dbf1d6cfb39f891254ef94cea491d35",
   "joke/face=True": "2d81fa11d13ab28648aa3693ac1c4f948f143e2415ee10b1b6da66c9560c8424",
   "translator/face=False": "69ba3274bb8be7174def16c3fb5b5b3a2e9427958cf81851abfdd935d7ff4f55",

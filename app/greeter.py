@@ -323,6 +323,16 @@ def greeting_for(sighting) -> str:
         role = sighting.group
         from app import focus
 
+        ask = "ถามว่าให้ช่วยอะไรไหม"
+        if settings.face_camera_source == "robot" and settings.assistant_profile == "condo":
+            # Owner, 14 Oct: the greeting asks whether they know the project
+            # or whether she can help -- "ต้องถามว่ารู้จักโครงการนี้ไหม หรือมี
+            # อะไรให้ช่วยไหม" -- never "อยู่เองหรือลงทุน" (robot log 16:08: it
+            # came straight after the greeting, too early; an hour of this
+            # line asking it was the wrong reading of his "ไม่ควรถาม...ก่อน
+            # ไหม" and he corrected it). The sales room's camera keeps its line.
+            ask = ("ถามคำถามเปิดเบาๆ ข้อเดียว เช่น \"รู้จักโครงการของเรามาก่อนไหมคะ\" "
+                   "หรือ \"มีอะไรให้ช่วยไหมคะ\" ห้ามถามว่าสนใจห้องไว้อยู่เองหรือลงทุนในคำทักนี้")
         if focus.labels_deliverable():
             # With speaker labels there IS a way to know who is speaking,
             # and the default sentence below ("ไม่มีระบบจำเสียง", never use
@@ -331,12 +341,11 @@ def greeting_for(sighting) -> str:
             # "คำสั่งที่ขัดกันเอง" trap. The name is allowed back exactly
             # where a label carries it, and nowhere else.
             return (
-                "%s เพิ่งเดินเข้ามาหน้าหุ่น%s — ทักทายด้วยชื่อสั้นๆ แล้วถามว่า"
-                "ให้ช่วยอะไรไหม ห้ามพูดถึงกล้อง ห้ามพูดว่า "
+                "%s เพิ่งเดินเข้ามาหน้าหุ่น%s — ทักทายด้วยชื่อสั้นๆ แล้ว%s ห้ามพูดถึงกล้อง ห้ามพูดว่า "
                 "'ระบบจดจำใบหน้าตรวจพบ' หรือ 'สแกนเจอ' "
                 "หลังจากนี้เรียกชื่อได้เฉพาะเทิร์นที่มีบันทึก [ผู้พูด: คุณ%s] "
                 "เทิร์นอื่นอาจเป็นคนอื่นที่ยืนอยู่ด้วย"
-                % (who, (" (%s)" % role) if role else "", who)
+                % (who, (" (%s)" % role) if role else "", ask, who)
             )
         # The name is for this one sentence. There is no speaker
         # identification in this system: after the greeting the model has
@@ -346,12 +355,11 @@ def greeting_for(sighting) -> str:
         # were theirs. Quoted rather than described, because that is what
         # has worked on this model every time.
         return (
-            "%s เพิ่งเดินเข้ามาหน้าหุ่น%s — ทักทายด้วยชื่อสั้นๆ แล้วถามว่า"
-            "ให้ช่วยอะไรไหม ห้ามพูดถึงกล้อง ห้ามพูดว่า "
+            "%s เพิ่งเดินเข้ามาหน้าหุ่น%s — ทักทายด้วยชื่อสั้นๆ แล้ว%s ห้ามพูดถึงกล้อง ห้ามพูดว่า "
             "'ระบบจดจำใบหน้าตรวจพบ' หรือ 'สแกนเจอ' "
             "ใช้ชื่อเฉพาะในประโยคทักนี้เท่านั้น หลังจากนี้ห้ามเรียกชื่ออีก "
             "และห้ามถือว่าคนที่พูดคือ%s — ไม่มีระบบจำเสียง อาจเป็นคนอื่นที่ยืนอยู่ด้วย"
-            % (who, (" (%s)" % role) if role else "", who)
+            % (who, (" (%s)" % role) if role else "", ask, who)
         )
     if settings.face_camera_source == "robot" and settings.assistant_profile == "condo":
         # The robot in project mode (owner 10 Oct) greets a stranger with the

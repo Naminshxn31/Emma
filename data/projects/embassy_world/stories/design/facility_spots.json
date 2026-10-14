@@ -1,0 +1,1667 @@
+[
+ {
+  "id": "spinning_class_where",
+  "template": "spotlight",
+  "questions_th": [
+   "ห้อง Spinning อยู่ไหน",
+   "มีห้องปั่นจักรยานไหม",
+   "Spinning Class คืออะไร",
+   "Cycling Studio อยู่ชั้นไหน",
+   "ห้องปั่นจักรยานใหญ่แค่ไหน"
+  ],
+  "questions_en": [
+   "Is there a cycling studio?",
+   "Where is the spinning room?",
+   "What is the Spinning Class?",
+   "How big is the spinning room?"
+  ],
+  "lines": [
+   {
+    "th": "ห้องปั่นจักรยาน Spinning Class อยู่ชั้น G อาคาร A ค่ะ",
+    "en": "The Spinning Class cycling studio is on the ground floor of Building A.",
+    "cue_th": [
+     "Spinning",
+     "สปินนิ่ง",
+     "ปั่นจักรยาน"
+    ],
+    "cue_en": [
+     "Spinning",
+     "cycling"
+    ],
+    "cue_zh": [
+     "Spinning",
+     "动感单车",
+     "单车"
+    ]
+   },
+   {
+    "th": "จักรยานแต่ละคันหันเข้าหาจอ LED โค้งที่แสดงวิวการปั่นค่ะ",
+    "en": "Each bike faces curved LED screens that show a riding view.",
+    "cue_th": [
+     "LED",
+     "จอโค้ง",
+     "วิว"
+    ],
+    "cue_en": [
+     "LED",
+     "screens"
+    ],
+    "cue_zh": [
+     "LED",
+     "屏幕"
+    ]
+   },
+   {
+    "th": "ห้องขนาด 33.7 ตารางเมตร ถัดไปเป็น Pilates Studio ค่ะ",
+    "en": "The room is 33.7 square metres, with the Pilates Studio next door.",
+    "cue_th": [
+     "ตารางเมตร",
+     "Pilates",
+     "พิลาทิส"
+    ],
+    "cue_en": [
+     "square metres",
+     "Pilates"
+    ],
+    "cue_zh": [
+     "平方米",
+     "普拉提"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_g",
+   "zoom": {
+    "x": 42.6,
+    "y": 59.8,
+    "scale": 1.8
+   },
+   "spot": {
+    "x": 42.6,
+    "y": 59.8,
+    "label_en": "SPINNING CLASS",
+    "sub_en": "Ground floor · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_g_spinning",
+    "title_en": "SPINNING CLASS",
+    "sub_en": "Cycling studio · Ground floor",
+    "chips_en": [
+     {
+      "label_en": "Area",
+      "value_en": "33.7 sq.m."
+     },
+     "Curved LED screens",
+     "Pilates Studio next door"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_spinning_class_where_ground",
+    "label_en": "All of the ground floor",
+    "label_th": "ดูทั้งชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_spinning_class_where_pilates",
+    "label_en": "Pilates Studio",
+    "label_th": "Pilates Studio ข้างๆ",
+    "next_story": "pilates_where",
+    "tool": null
+   },
+   {
+    "id": "story_spinning_class_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:09_facilities_ground.md#9.4",
+   "report:09_facilities_ground.md#9.1.1",
+   "report:09_facilities_ground.md#9.5",
+   "slides:intro-018",
+   "slides:intro-021"
+  ],
+  "notes_th": "คำถามแคบ (เจ้าของ 13 ต.ค.): ผังชั้น G (fac_plan_g ตัวเดียวกับ drill) → ซูม 1.8× ที่ห้อง → วงชี้ที่จุดเดียวกับการ์ด Spinning ใน facilities_ground (อ่านจากป้าย SPINNING CLASS ที่พิมพ์บนผัง ไม่ใช่การเดา) → ตัดไปภาพไฟนอล Cycling Studio (ภาพเดียวกับการ์ด) · 33.7 ตร.ม. ตามแผ่นแปลน facility รายงาน 9.4 / 9.1.1 (✅ ใช้ได้เฉพาะขนาด) · จอ LED โค้งตามภาพไฟนอล 9.4 · 'ถัดไปเป็น Pilates Studio' ตาม 9.5 ('ถัดจาก Spinning Class') · ไม่พูดจำนวนจักรยาน ความจุ ตารางคลาส ค่าบริการ · บอก 'ชั้น G อาคาร A' = อยู่ในโครงการ ไม่ใช่ห้องขาย"
+ },
+ {
+  "id": "pilates_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Pilates อยู่ไหน",
+   "มีห้องพิลาทิสไหม",
+   "Pilates Studio อยู่ชั้นไหน",
+   "ห้องพิลาทิสใหญ่แค่ไหน",
+   "มีเตียง Reformer ไหม"
+  ],
+  "questions_en": [
+   "Is there a Pilates studio?",
+   "Where is the Pilates studio?",
+   "How big is the Pilates studio?"
+  ],
+  "lines": [
+   {
+    "th": "Pilates Studio อยู่ชั้น G อาคาร A ค่ะ",
+    "en": "The Pilates Studio is on the ground floor of Building A,",
+    "cue_th": [
+     "Pilates",
+     "พิลาทิส"
+    ],
+    "cue_en": [
+     "Pilates"
+    ],
+    "cue_zh": [
+     "普拉提",
+     "Pilates"
+    ]
+   },
+   {
+    "th": "มีเตียง Reformer กับแผงท้องฟ้ายามอาทิตย์ตกค่ะ",
+    "en": "with Reformer beds and sunset sky panels.",
+    "cue_th": [
+     "Reformer",
+     "รีฟอร์มเมอร์",
+     "อาทิตย์ตก"
+    ],
+    "cue_en": [
+     "Reformer",
+     "sunset"
+    ],
+    "cue_zh": [
+     "Reformer",
+     "日落"
+    ]
+   },
+   {
+    "th": "ห้องขนาด 33.7 ตารางเมตร ผนังกระจกมองเห็นฟิตเนส Biogenesis ค่ะ",
+    "en": "The room is 33.7 square metres, with a glass wall onto the Biogenesis gym.",
+    "cue_th": [
+     "ตารางเมตร",
+     "Biogenesis",
+     "ไบโอเจเนซิส"
+    ],
+    "cue_en": [
+     "square metres",
+     "Biogenesis"
+    ],
+    "cue_zh": [
+     "平方米",
+     "Biogenesis"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_g",
+   "zoom": {
+    "x": 57.2,
+    "y": 59.8,
+    "scale": 1.8
+   },
+   "spot": {
+    "x": 57.2,
+    "y": 59.8,
+    "label_en": "PILATES STUDIO",
+    "sub_en": "Ground floor · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_g_pilates",
+    "title_en": "PILATES STUDIO",
+    "sub_en": "Reformer studio · Ground floor",
+    "chips_en": [
+     {
+      "label_en": "Area",
+      "value_en": "33.7 sq.m."
+     },
+     "Reformer beds",
+     "Sunset sky panels",
+     "Glass wall to Biogenesis"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_pilates_where_ground",
+    "label_en": "All of the ground floor",
+    "label_th": "ดูทั้งชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_pilates_where_fitness",
+    "label_en": "Biogenesis next door",
+    "label_th": "ฟิตเนส Biogenesis",
+    "next_story": "fitness_where",
+    "tool": null
+   },
+   {
+    "id": "story_pilates_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:09_facilities_ground.md#9.5",
+   "report:09_facilities_ground.md#9.1.1",
+   "slides:intro-018",
+   "slides:intro-022"
+  ],
+  "notes_th": "ผังชั้น G → ซูม 1.8× → วงชี้จุดเดียวกับการ์ด Pilates ใน facilities_ground (ป้าย PILATES STUDIO บนผัง) → ภาพไฟนอล Pilates Studio (ภาพเดียวกับการ์ด) · เตียง Reformer + แผงท้องฟ้ายามอาทิตย์ตก + ผนังกระจกเห็นยิม Biogenesis ตามภาพไฟนอล รายงาน 9.5 (ไม่พูดจำนวนเตียง) · 33.7 ตร.ม. ✅ แผ่นแปลน (ขนาดเท่านั้น) · ไม่พูดเรื่องครู/จองห้อง/Prime1/ค่าใช้ (คำทีมขาย ยังไม่ยืนยัน)"
+ },
+ {
+  "id": "bungee_yoga_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Bungee Gym คืออะไร",
+   "บันจี้ยิมอยู่ไหน",
+   "มีห้องโยคะไหม",
+   "ห้องโยคะอยู่ตรงไหน",
+   "Bungee Gym ใหญ่แค่ไหน"
+  ],
+  "questions_en": [
+   "What is the Bungee Gym?",
+   "Is there a yoga room?",
+   "Where is Bungee Gym & Yoga?"
+  ],
+  "lines": [
+   {
+    "th": "Bungee Gym & Yoga อยู่ชั้น G อาคาร A ค่ะ",
+    "en": "Bungee Gym & Yoga is on the ground floor of Building A.",
+    "cue_th": [
+     "Bungee",
+     "บันจี้"
+    ],
+    "cue_en": [
+     "Bungee"
+    ],
+    "cue_zh": [
+     "Bungee",
+     "蹦极"
+    ]
+   },
+   {
+    "th": "ออกกำลังกายโดยสวมสายรัดเอว ต่อกับสายยางยืดที่แขวนจากเพดานค่ะ",
+    "en": "You work out in a waist harness on elastic cords hung from the ceiling.",
+    "cue_th": [
+     "สายรัดเอว",
+     "สายยางยืด",
+     "เพดาน"
+    ],
+    "cue_en": [
+     "harness",
+     "elastic",
+     "ceiling"
+    ],
+    "cue_zh": [
+     "弹力绳",
+     "安全带",
+     "天花板"
+    ]
+   },
+   {
+    "th": "ห้องเดียวกันใช้เล่นโยคะได้ ขนาด 94 ตารางเมตร มองเห็นลากูนค่ะ",
+    "en": "The same room is also used for yoga. It's 94 square metres and looks out to the lagoon.",
+    "cue_th": [
+     "ตารางเมตร",
+     "ลากูน"
+    ],
+    "cue_en": [
+     "square metres",
+     "lagoon"
+    ],
+    "cue_zh": [
+     "平方米",
+     "泻湖"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_g",
+   "zoom": {
+    "x": 86.5,
+    "y": 58.9,
+    "scale": 1.8
+   },
+   "spot": {
+    "x": 86.5,
+    "y": 58.9,
+    "label_en": "BUNGEE GYM & YOGA",
+    "sub_en": "Ground floor · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_g_bungee_02",
+    "title_en": "BUNGEE GYM & YOGA",
+    "sub_en": "Ground floor · Building A",
+    "chips_en": [
+     {
+      "label_en": "Area",
+      "value_en": "94 sq.m."
+     },
+     "Elastic cords from the ceiling",
+     "Also used for yoga",
+     "Glass wall to the lagoon"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_bungee_yoga_where_ground",
+    "label_en": "All of the ground floor",
+    "label_th": "ดูทั้งชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_bungee_yoga_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:09_facilities_ground.md#9.6",
+   "report:09_facilities_ground.md#9.1.1",
+   "slides:intro-018",
+   "slides:intro-023"
+  ],
+  "notes_th": "ผังชั้น G → ซูม 1.8× ที่ปลายขวาของแถว facility → วงชี้จุดเดียวกับการ์ด Bungee ใน facilities_ground (ห้องที่มีป้าย BUNGEE GYM & YOGA บนผัง วงอยู่เหนือป้าย) → ภาพไฟนอล Bungee Gym&Yoga 02 (ภาพใหม่ fac_g_bungee_02 — คนสวมสายรัดเอวต่อสายยางยืดจากคาน) เพราะคำถามคือ 'Bungee Gym คืออะไร' ส่วนการ์ดใน drill เป็นภาพ 01 คลาสโยคะ · คำอธิบายบันจี้ + โยคะ + กระจกมองลากูนตามรายงาน 9.6 (สรุปจากภาพไฟนอล) · 94 ตร.ม. ✅ แผ่นแปลน · ไม่พูดจำนวนอุปกรณ์ ความจุ ครู ความปลอดภัย"
+ },
+ {
+  "id": "aqua_cinema_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Aqua Cinema คืออะไร",
+   "Aqua Cinema อยู่ไหน",
+   "มีสระในร่มไหม",
+   "สระในร่มอยู่ตรงไหน",
+   "Aqua Cinema ยาวเท่าไหร่"
+  ],
+  "questions_en": [
+   "Do you have an indoor pool?",
+   "What is the Aqua Cinema?",
+   "Where is the indoor pool?",
+   "How long is the Aqua Cinema pool?"
+  ],
+  "lines": [
+   {
+    "th": "Aqua Cinema คือสระว่ายน้ำในร่มที่ชั้นใต้ดิน ใต้อาคาร A ค่ะ",
+    "en": "Aqua Cinema is our indoor pool, in the basement under Building A,",
+    "cue_th": [
+     "Aqua Cinema",
+     "อควา",
+     "สระว่ายน้ำในร่ม"
+    ],
+    "cue_en": [
+     "Aqua Cinema",
+     "indoor pool"
+    ],
+    "cue_zh": [
+     "Aqua Cinema",
+     "室内泳池"
+    ]
+   },
+   {
+    "th": "ริมสระมีจอภาพขนาดใหญ่ และเตียงอาบแดดค่ะ",
+    "en": "with a big screen along the pool and sun loungers.",
+    "cue_th": [
+     "จอภาพ",
+     "เตียงอาบแดด"
+    ],
+    "cue_en": [
+     "screen",
+     "loungers"
+    ],
+    "cue_zh": [
+     "屏幕",
+     "躺椅"
+    ]
+   },
+   {
+    "th": "ยาวประมาณ 33 เมตร ต่อเนื่องไปถึง Journey to Mars ค่ะ",
+    "en": "It's about 33 metres long and flows on into Journey to Mars.",
+    "cue_th": [
+     "Journey to Mars",
+     "มาร์ส",
+     "เมตร"
+    ],
+    "cue_en": [
+     "Journey to Mars",
+     "Mars",
+     "metres"
+    ],
+    "cue_zh": [
+     "Journey to Mars",
+     "火星"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "zoom": {
+    "x": 57.0,
+    "y": 79.4,
+    "scale": 1.6
+   },
+   "spot": {
+    "x": 57.0,
+    "y": 79.4,
+    "label_en": "AQUA CINEMA",
+    "sub_en": "Indoor pool · Basement"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_b_aqua_cinema",
+    "title_en": "AQUA CINEMA",
+    "sub_en": "Indoor pool · Basement · Building A",
+    "chips_en": [
+     {
+      "label_en": "Length",
+      "value_en": "≈ 33 m"
+     },
+     "Big screen by the pool",
+     "Sun loungers",
+     "Flows into Journey to Mars"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_aqua_cinema_where_mars",
+    "label_en": "Journey to Mars",
+    "label_th": "Journey to Mars",
+    "next_story": "journey_mars_where",
+    "tool": null
+   },
+   {
+    "id": "story_aqua_cinema_where_basement",
+    "label_en": "The whole basement",
+    "label_th": "ดูทั้งชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_aqua_cinema_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.2",
+   "report:10_facilities_underground.md#10.1.1",
+   "report:10_facilities_underground.md#10.1.3",
+   "slides:intro-027",
+   "slides:intro-028",
+   "slides:intro-029"
+  ],
+  "notes_th": "ผังโซน wellness ใต้ดิน (fac_plan_b ตัวเดียวกับ drill) → ซูม 1.6× (สระยาวเกือบครึ่งผัง ซูมน้อยกว่าห้องซาวน่า) → วงชี้จุดเดียวกับการ์ด Aqua Cinema ใน facilities_basement (ป้าย AQUA CINEMA บนผัง) → ภาพเว็บแพ็ก 16 (ภาพเดียวกับการ์ด) · 'สระว่ายน้ำในร่มใต้อาคาร A' + จอภาพ (ผังระบุ SCREEN PROJECTOR) + เตียงอาบแดด ตามรายงาน 10.2 · ยาว ≈ 33 ม. ตามรายงาน 10.2 (คำนวณจากเส้นบอกระยะของแผ่นแปลน 32.9–33.7) ห้ามใช้ '~45 ม.' ของผู้นำเสนอ · ไม่พูดความลึก ความจุ อุณหภูมิ · รับคำถาม 'มีสระในร่มไหม' ที่ย้ายออกจาก facilities_basement"
+ },
+ {
+  "id": "journey_mars_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Journey to Mars คืออะไร",
+   "Journey to Mars อยู่ไหน",
+   "สระธีมอวกาศอยู่ตรงไหน",
+   "อุโมงค์ดาวอังคารคืออะไร"
+  ],
+  "questions_en": [
+   "What is Journey to Mars?",
+   "Where is Journey to Mars?"
+  ],
+  "lines": [
+   {
+    "th": "Journey to Mars อยู่ชั้นใต้ดิน ต่อจากสระ Aqua Cinema ค่ะ",
+    "en": "Journey to Mars is in the basement, carrying on from the Aqua Cinema pool.",
+    "cue_th": [
+     "Journey to Mars",
+     "มาร์ส"
+    ],
+    "cue_en": [
+     "Journey to Mars",
+     "Mars"
+    ],
+    "cue_zh": [
+     "Journey to Mars",
+     "火星"
+    ]
+   },
+   {
+    "th": "เป็นทางน้ำธีมอวกาศ พื้นสระมีลายแมงกะพรุนเรืองแสงค่ะ",
+    "en": "It's a space-themed waterway with a glowing jellyfish pattern on the pool floor,",
+    "cue_th": [
+     "อวกาศ",
+     "แมงกะพรุน"
+    ],
+    "cue_en": [
+     "space",
+     "jellyfish"
+    ],
+    "cue_zh": [
+     "太空",
+     "水母"
+    ]
+   },
+   {
+    "th": "ปลายทางเป็นอุโมงค์ลายกาแล็กซีค่ะ",
+    "en": "leading into a galaxy tunnel.",
+    "cue_th": [
+     "อุโมงค์",
+     "กาแล็กซี"
+    ],
+    "cue_en": [
+     "tunnel",
+     "galaxy"
+    ],
+    "cue_zh": [
+     "隧道",
+     "银河"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "zoom": {
+    "x": 87.0,
+    "y": 80.4,
+    "scale": 1.8
+   },
+   "spot": {
+    "x": 87.0,
+    "y": 80.4,
+    "label_en": "JOURNEY TO MARS",
+    "sub_en": "Basement · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_b_journey_mars",
+    "title_en": "JOURNEY TO MARS",
+    "sub_en": "Space-themed waterway · Basement",
+    "chips_en": [
+     "Glowing jellyfish-pattern floor",
+     "Galaxy tunnel",
+     "Linked to the Aqua Cinema pool"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_journey_mars_where_aqua",
+    "label_en": "Aqua Cinema",
+    "label_th": "Aqua Cinema",
+    "next_story": "aqua_cinema_where",
+    "tool": null
+   },
+   {
+    "id": "story_journey_mars_where_basement",
+    "label_en": "The whole basement",
+    "label_th": "ดูทั้งชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_journey_mars_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.3",
+   "report:10_facilities_underground.md#10.1.3",
+   "slides:intro-027",
+   "slides:intro-030"
+  ],
+  "notes_th": "ผังใต้ดิน → ซูม 1.8× ที่ปลายขวา → วงชี้จุดเดียวกับการ์ด Journey to Mars ใน drill (ป้าย JOURNEY TO MARS บนผัง) → ภาพเว็บแพ็ก 21 (ภาพเดียวกับการ์ด ป้ายสะกดผิดถูกครอปออกแล้ว) · ทางน้ำธีมอวกาศ ลายแมงกะพรุนเรืองแสงที่พื้นสระ อุโมงค์ลายกาแล็กซี ตามภาพแนวคิดรายงาน 10.3 (เล่าตามที่เห็น ไม่สัญญาเทคโนโลยีฉายภาพ — รายงาน 10.3 เตือนไว้) · ไม่พูดขนาดโถง (≈16 × 7.84 เป็นค่าคำนวณ 🔎) จากุซซี่ 2 อ่างไม่อยู่ในรายการทางการ ไม่พูด"
+ },
+ {
+  "id": "salt_sauna_where",
+  "template": "spotlight",
+  "questions_th": [
+   "ซาวน่าเกลือหิมาลัยอยู่ไหน",
+   "มีห้องเกลือไหม",
+   "Himalayan Salt Sauna คืออะไร",
+   "ห้องเกลือหิมาลัยเป็นยังไง"
+  ],
+  "questions_en": [
+   "Is there a salt room?",
+   "What is the Himalayan Salt Sauna?"
+  ],
+  "lines": [
+   {
+    "th": "ซาวน่าเกลือหิมาลัยอยู่ชั้นใต้ดิน เป็นห้องแรกติดโถงลิฟต์ค่ะ",
+    "en": "The Himalayan Salt Sauna is in the basement, the first room by the lift lobby.",
+    "cue_th": [
+     "หิมาลัย",
+     "Himalayan",
+     "เกลือ"
+    ],
+    "cue_en": [
+     "Himalayan",
+     "salt"
+    ],
+    "cue_zh": [
+     "喜马拉雅",
+     "盐"
+    ]
+   },
+   {
+    "th": "ผนังเป็นหินเกลือเรืองแสงโทนส้มอบอุ่นค่ะ",
+    "en": "Its walls are glowing, warm-orange salt stone.",
+    "cue_th": [
+     "เรืองแสง",
+     "โทนส้ม"
+    ],
+    "cue_en": [
+     "glowing",
+     "orange"
+    ],
+    "cue_zh": [
+     "发光",
+     "橙色"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "zoom": {
+    "x": 22.2,
+    "y": 70.0,
+    "scale": 2.0
+   },
+   "spot": {
+    "x": 22.2,
+    "y": 49.8,
+    "label_en": "HIMALAYAN SALT SAUNA",
+    "sub_en": "Basement · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_b_salt_sauna",
+    "title_en": "HIMALAYAN SALT SAUNA",
+    "sub_en": "Basement · Building A",
+    "chips_en": [
+     "Glowing salt-stone walls",
+     "First room by the lift lobby",
+     "Basement wellness row"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_salt_sauna_where_basement",
+    "label_en": "The whole basement",
+    "label_th": "ดูทั้งชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_salt_sauna_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.5",
+   "report:10_facilities_underground.md#10.1.3",
+   "slides:intro-027",
+   "slides:intro-031"
+  ],
+  "notes_th": "ผังใต้ดิน → ซูม 2× โดยจุดศูนย์ซูมอยู่ใต้แถวห้อง (y 70) ให้วงลอยขึ้นไปด้านบนของกรอบและป้ายวางใต้วงได้ (กรอบผังสูง ~300 px) → วงชี้จุดเดียวกับการ์ดใน drill (ป้าย HIMALAYAN SALT SAUNA บนผัง) → ภาพเว็บแพ็ก 27 (ภาพเดียวกับการ์ด) · 'ห้องแรกติดโถงลิฟต์' ตามรายงาน 10.5 ('ห้องซ้ายสุดของแถวห้องบำบัด ติดลิฟต์') · ผนังหินเกลือเรืองแสงโทนส้มตามรายงาน 10.5 · สองบรรทัดพอ: ขนาดห้องขัดกัน (5.55 vs 10.36 ม. ⚠️) จึงไม่พูด · ห้ามคำอ้างสุขภาพ (10.10) และไม่ยืนยันว่าเป็นซาวน่าร้อน/อุณหภูมิ"
+ },
+ {
+  "id": "ice_bath_where",
+  "template": "spotlight",
+  "questions_th": [
+   "มี Ice Bath ไหม",
+   "ห้องแช่น้ำแข็งอยู่ไหน",
+   "Ice Bath อยู่ชั้นไหน",
+   "มีอ่างแช่น้ำเย็นไหม"
+  ],
+  "questions_en": [
+   "Is there an ice bath?",
+   "Where is the ice bath?"
+  ],
+  "lines": [
+   {
+    "th": "Ice Bath ห้องแช่น้ำแข็ง อยู่ชั้นใต้ดิน ถัดจากซาวน่าเกลือหิมาลัยค่ะ",
+    "en": "The Ice Bath is in the basement, next to the Himalayan Salt Sauna.",
+    "cue_th": [
+     "Ice Bath",
+     "ไอซ์บาธ",
+     "น้ำแข็ง"
+    ],
+    "cue_en": [
+     "Ice Bath",
+     "ice"
+    ],
+    "cue_zh": [
+     "冰浴"
+    ]
+   },
+   {
+    "th": "ห้องโทนขาวฟ้า มีอ่างแช่ทรงกลมค่ะ",
+    "en": "It's a white-and-blue room with round plunge tubs.",
+    "cue_th": [
+     "ขาวฟ้า",
+     "อ่างแช่",
+     "ทรงกลม"
+    ],
+    "cue_en": [
+     "plunge",
+     "tubs"
+    ],
+    "cue_zh": [
+     "圆形",
+     "浴池"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "zoom": {
+    "x": 31.6,
+    "y": 65.0,
+    "scale": 2.0
+   },
+   "spot": {
+    "x": 31.6,
+    "y": 43.2,
+    "label_en": "ICE BATH",
+    "sub_en": "Basement · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_b_ice_bath",
+    "title_en": "ICE BATH",
+    "sub_en": "Basement · Building A",
+    "chips_en": [
+     "Round plunge tubs",
+     "Next to the salt sauna",
+     "Basement wellness row"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_ice_bath_where_basement",
+    "label_en": "The whole basement",
+    "label_th": "ดูทั้งชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_ice_bath_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.6",
+   "report:10_facilities_underground.md#10.1.3",
+   "slides:intro-027",
+   "slides:intro-034"
+  ],
+  "notes_th": "ผังใต้ดิน → ซูม 2× (ศูนย์ซูม y 65 ใต้แถวห้อง ดู salt_sauna_where) → วงชี้จุดเดียวกับการ์ด Ice Bath ใน drill (ป้าย ICE BATH บนผัง) → ภาพเว็บแพ็ก 33 (ภาพเดียวกับการ์ด) · 'ถัดจากซาวน่าเกลือ' ตามรายงาน 10.6 · ห้องโทนขาวฟ้า อ่างแช่ทรงกลม ตรงทั้งภาพแนวคิดในรายงาน 10.6 และภาพเว็บ (ไม่พูดจำนวนอ่าง) · ไม่พูดอุณหภูมิ เวลาแช่ ขนาด"
+ },
+ {
+  "id": "swing_sauna_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Floating Swing Sauna คืออะไร",
+   "ซาวน่าเตียงแขวนอยู่ไหน",
+   "ซาวน่าชิงช้าคืออะไร",
+   "Floating Swing Sauna อยู่ไหน"
+  ],
+  "questions_en": [
+   "What is the Floating Swing Sauna?",
+   "Where is the swing sauna?"
+  ],
+  "lines": [
+   {
+    "th": "Floating Swing Sauna อยู่ชั้นใต้ดิน ถัดจาก Ice Bath ค่ะ",
+    "en": "The Floating Swing Sauna is in the basement, next to the Ice Bath.",
+    "cue_th": [
+     "Floating",
+     "ฟลอตติ้ง",
+     "Swing"
+    ],
+    "cue_en": [
+     "Floating",
+     "Swing"
+    ],
+    "cue_zh": [
+     "悬浮",
+     "秋千"
+    ]
+   },
+   {
+    "th": "เป็นซาวน่าที่มีเก้าอี้นอนแขวนจากเพดาน โยกไปมาได้เหมือนชิงช้าค่ะ",
+    "en": "Its loungers hang from the ceiling and sway like a swing.",
+    "cue_th": [
+     "แขวน",
+     "เพดาน",
+     "ชิงช้า"
+    ],
+    "cue_en": [
+     "hang",
+     "ceiling",
+     "sway"
+    ],
+    "cue_zh": [
+     "悬挂",
+     "天花板"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "zoom": {
+    "x": 42.4,
+    "y": 65.0,
+    "scale": 2.0
+   },
+   "spot": {
+    "x": 42.4,
+    "y": 43.4,
+    "label_en": "FLOATING SWING SAUNA",
+    "sub_en": "Basement · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_b_swing_sauna",
+    "title_en": "FLOATING SWING SAUNA",
+    "sub_en": "Basement · Building A",
+    "chips_en": [
+     "Loungers hung from the ceiling",
+     "Next to the Ice Bath",
+     "Basement wellness row"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_swing_sauna_where_basement",
+    "label_en": "The whole basement",
+    "label_th": "ดูทั้งชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_swing_sauna_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.7",
+   "report:10_facilities_underground.md#10.1.3",
+   "slides:intro-027",
+   "slides:intro-032"
+  ],
+  "notes_th": "ผังใต้ดิน → ซูม 2× (ศูนย์ซูม y 65) → วงชี้จุดเดียวกับการ์ดใน drill (ป้าย FLOATING SWING SAUNA บนผัง) → ภาพเว็บแพ็ก 29 (ภาพเดียวกับการ์ด) · 'ถัดจาก Ice Bath' = ห้องที่ 3 จากซ้ายตามรายงาน 10.7 / ลำดับในตาราง 10.1.3 · เก้าอี้นอนแขวนจากเพดาน โยกเหมือนชิงช้า ตามรายงาน 10.7 (ภาพแนวคิด + คำผู้นำเสนอ 'swing sauna เหมือนตอนเด็ก') · ไม่พูดจำนวนเก้าอี้ อุณหภูมิ ความจุ"
+ },
+ {
+  "id": "crystal_sauna_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Crystal Stone Sauna คืออะไร",
+   "ซาวน่าหินคริสตัลอยู่ไหน",
+   "ซาวน่าคริสตัลเป็นยังไง"
+  ],
+  "questions_en": [
+   "What is the Crystal Stone Sauna?",
+   "Where is the crystal sauna?"
+  ],
+  "lines": [
+   {
+    "th": "Crystal Stone Sauna ซาวน่าหินคริสตัล อยู่ชั้นใต้ดิน ใต้อาคาร A ค่ะ",
+    "en": "The Crystal Stone Sauna is in the basement, under Building A,",
+    "cue_th": [
+     "Crystal",
+     "คริสตัล"
+    ],
+    "cue_en": [
+     "Crystal"
+    ],
+    "cue_zh": [
+     "水晶"
+    ]
+   },
+   {
+    "th": "มีแท่นนอนปูด้วยหินคริสตัลไว้เอนพักค่ะ",
+    "en": "with beds laid with crystal stones to lie back on.",
+    "cue_th": [
+     "แท่นนอน",
+     "เอนพัก"
+    ],
+    "cue_en": [
+     "beds",
+     "lie back"
+    ],
+    "cue_zh": [
+     "石床",
+     "躺"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "zoom": {
+    "x": 53.5,
+    "y": 65.0,
+    "scale": 2.0
+   },
+   "spot": {
+    "x": 53.5,
+    "y": 43.2,
+    "label_en": "CRYSTAL STONE SAUNA",
+    "sub_en": "Basement · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_b_crystal_sauna",
+    "title_en": "CRYSTAL STONE SAUNA",
+    "sub_en": "Basement · Building A",
+    "chips_en": [
+     "Beds of crystal stones",
+     "Basement wellness row"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_crystal_sauna_where_basement",
+    "label_en": "The whole basement",
+    "label_th": "ดูทั้งชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_crystal_sauna_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.8",
+   "report:10_facilities_underground.md#10.1.3",
+   "slides:intro-027",
+   "slides:intro-033"
+  ],
+  "notes_th": "มีภาพที่อนุมัติ (สไลด์ intro-033) จึงทำเรื่องนี้ แต่ใช้ภาพเว็บแพ็ก 37 ตัวเดียวกับการ์ดใน drill (fac_b_crystal_sauna — ป้าย สะกดผิดถูกครอปออก) · ผังใต้ดิน → ซูม 2× (ศูนย์ซูม y 65) → วงชี้จุดเดียวกับการ์ด (ป้าย CRYTAL STONE SAUNA บนผัง — ผังสะกดผิด บนจอเขียนถูก) · แท่นนอนปูหินคริสตัลตามรายงาน 10.8 (ตรงทั้งภาพแนวคิดและภาพเว็บ ไม่พูดจำนวนแท่น) · ห้ามคำอ้างพลังงาน/ล้างพิษ (10.10)"
+ },
+ {
+  "id": "hydro_capsule_where",
+  "template": "spotlight",
+  "questions_th": [
+   "แคปซูลไฮโดรเทอราพีคืออะไร",
+   "Hydrotherapy Capsule อยู่ไหน",
+   "มีแคปซูลสปาไหม",
+   "แคปซูลบำบัดอยู่ตรงไหน"
+  ],
+  "questions_en": [
+   "What is the Hydrotherapy Capsule?",
+   "Is there a spa capsule?"
+  ],
+  "lines": [
+   {
+    "th": "แคปซูลไฮโดรเทอราพีอยู่ชั้นใต้ดิน ห้องสุดท้ายของแถวซาวน่าค่ะ",
+    "en": "The Hydrotherapy Capsule room is in the basement, the last room in the sauna row.",
+    "cue_th": [
+     "ไฮโดร",
+     "Hydrotherapy",
+     "แคปซูล"
+    ],
+    "cue_en": [
+     "Hydrotherapy",
+     "capsule"
+    ],
+    "cue_zh": [
+     "水疗",
+     "胶囊"
+    ]
+   },
+   {
+    "th": "เป็นห้องธีมอวกาศ มีแคปซูลสปาสีขาวสองเครื่องค่ะ",
+    "en": "It's a space-themed room with two white spa capsules.",
+    "cue_th": [
+     "อวกาศ",
+     "สีขาว"
+    ],
+    "cue_en": [
+     "space",
+     "white"
+    ],
+    "cue_zh": [
+     "太空",
+     "白色"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "zoom": {
+    "x": 65.2,
+    "y": 65.0,
+    "scale": 2.0
+   },
+   "spot": {
+    "x": 65.2,
+    "y": 43.6,
+    "label_en": "HYDROTHERAPY CAPSULE",
+    "sub_en": "Basement · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_b_hydro_capsule",
+    "title_en": "HYDROTHERAPY CAPSULE",
+    "sub_en": "Basement · Building A",
+    "chips_en": [
+     "Space-themed room",
+     "Two white spa capsules",
+     "End of the wellness row"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_hydro_capsule_where_basement",
+    "label_en": "The whole basement",
+    "label_th": "ดูทั้งชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_hydro_capsule_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.9",
+   "report:10_facilities_underground.md#10.1.3",
+   "slides:intro-027",
+   "slides:intro-035"
+  ],
+  "notes_th": "ภาพคือสไลด์ที่อนุมัติ intro-035 (fac_b_hydro_capsule ตัวเดียวกับการ์ด) ไม่ใช่เว็บ 42.jpg (มียี่ห้อสปา) · ผังใต้ดิน → ซูม 2× (ศูนย์ซูม y 65) → วงชี้จุดเดียวกับการ์ดใน drill (ป้าย HYDRO THERAPY CAPSULE บนผัง) · 'ห้องสุดท้ายของแถวซาวน่า' = ห้องที่ 5 ขวาสุดตามรายงาน 10.9 · ห้องธีมอวกาศ + แคปซูลสีขาวสองเครื่อง ตามสรุปสไลด์ intro-035 และรายงาน 10.9 ('2 แคปซูล') · ไม่พูดฟังก์ชันไอน้ำ/เจ็ตน้ำ (ถอดเสียงเพี้ยน) และห้ามคำอ้างอินฟราเรด/ลดอายุ (10.10)"
+ },
+ {
+  "id": "social_lounge_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Social Lounge คืออะไร",
+   "Social Lounge อยู่ไหน",
+   "Social Club อยู่ชั้นไหน",
+   "Social Lounge ใหญ่แค่ไหน"
+  ],
+  "questions_en": [
+   "What is the Social Lounge?",
+   "Where is the Social Lounge?"
+  ],
+  "lines": [
+   {
+    "th": "Social Lounge อยู่ชั้น 3 อาคาร A ค่ะ",
+    "en": "The Social Lounge is on level 3 of Building A.",
+    "cue_th": [
+     "Social",
+     "โซเชียล"
+    ],
+    "cue_en": [
+     "Social"
+    ],
+    "cue_zh": [
+     "Social",
+     "社交"
+    ]
+   },
+   {
+    "th": "เป็นเลานจ์โทนดำน้ำเงิน ไว้นั่งพบปะพูดคุยกันค่ะ",
+    "en": "It's a dark-blue lounge for meeting up and talking.",
+    "cue_th": [
+     "ดำน้ำเงิน",
+     "พบปะ"
+    ],
+    "cue_en": [
+     "dark",
+     "meeting"
+    ],
+    "cue_zh": [
+     "深蓝",
+     "聚会"
+    ]
+   },
+   {
+    "th": "ห้องขนาด 12.70 × 5.85 เมตร อยู่ติดโถงลิฟต์ค่ะ",
+    "en": "The room is 12.70 by 5.85 metres, next to the lift lobby.",
+    "cue_th": [
+     "เมตร",
+     "ลิฟต์"
+    ],
+    "cue_en": [
+     "metres",
+     "lift"
+    ],
+    "cue_zh": [
+     "电梯"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_l3",
+   "zoom": {
+    "x": 17.0,
+    "y": 56.7,
+    "scale": 1.8
+   },
+   "spot": {
+    "x": 17.0,
+    "y": 56.7,
+    "label_en": "SOCIAL LOUNGE",
+    "sub_en": "Level 3 · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_3_social",
+    "title_en": "SOCIAL LOUNGE",
+    "sub_en": "Level 3 · Building A",
+    "chips_en": [
+     {
+      "label_en": "Size",
+      "value_en": "12.70 × 5.85 m"
+     },
+     "Dark-blue lounge",
+     "Next to the lift lobby"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_social_lounge_where_level3",
+    "label_en": "All of level 3",
+    "label_th": "ดูทั้งชั้น 3",
+    "next_story": "facilities_level3",
+    "tool": null
+   },
+   {
+    "id": "story_social_lounge_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:11_facilities_3rd_floor.md#11.2",
+   "report:11_facilities_3rd_floor.md#11.1.2",
+   "slides:intro-037",
+   "slides:intro-040"
+  ],
+  "notes_th": "ผังชั้น 3 อาคาร A (fac_plan_l3 ตัวเดียวกับ drill) → ซูม 1.8× → วงชี้จุดเดียวกับการ์ด Social Lounge ใน drill (ป้าย SOCIAL LOUNGE บนผัง) → ภาพเว็บชั้น 3 ไฟล์ 29 (ภาพเดียวกับการ์ด ครอปหุ่นยนต์บาร์เทนเดอร์ออกแล้ว — ภาพนี้ไม่มีป้ายชื่อ ดูคำถามข้อ 3 ใน facilities.notes.md) · โทนดำน้ำเงินตามรายงาน 11.2 · 12.70 × 5.85 ม. ✅ แผ่นแปลน (ขนาดเท่านั้น) · ติดโถงลิฟต์ตาม 11.2 · ไม่พูดบาร์/ซิการ์/เครื่องดื่ม/หุ่นยนต์ (รายงาน 11.2: ห้ามตอบเรื่องกฎ และหุ่นยนต์เป็นแผนอนาคต)"
+ },
+ {
+  "id": "coworking_where",
+  "template": "spotlight",
+  "questions_th": [
+   "มี co-working ไหม",
+   "มีที่นั่งทำงานไหม",
+   "Co-working Lounge อยู่ไหน",
+   "มุมทำงานส่วนกลางอยู่ชั้นไหน",
+   "Co-working ใหญ่แค่ไหน"
+  ],
+  "questions_en": [
+   "Is there a co-working space?",
+   "Where is the co-working lounge?",
+   "How big is the co-working lounge?"
+  ],
+  "lines": [
+   {
+    "th": "Co-working Lounge อยู่ชั้น 3 อาคาร A ถัดจาก Social Lounge ค่ะ",
+    "en": "The Co-working Lounge is on level 3 of Building A, next to the Social Lounge.",
+    "cue_th": [
+     "Co-working",
+     "โคเวิร์กกิ้ง",
+     "โคเวิร์คกิ้ง"
+    ],
+    "cue_en": [
+     "Co-working",
+     "coworking"
+    ],
+    "cue_zh": [
+     "Co-working",
+     "共享办公"
+    ]
+   },
+   {
+    "th": "เป็นเลานจ์โทนครีม มีบูธนั่งกับโซฟาไว้นั่งทำงานค่ะ",
+    "en": "It's a cream-toned lounge with booths and sofas to work from.",
+    "cue_th": [
+     "โทนครีม",
+     "บูธ",
+     "โซฟา"
+    ],
+    "cue_en": [
+     "cream",
+     "booths",
+     "sofas"
+    ],
+    "cue_zh": [
+     "奶油色",
+     "卡座",
+     "沙发"
+    ]
+   },
+   {
+    "th": "ห้องขนาด 13.925 × 5.85 เมตรค่ะ",
+    "en": "The room is 13.925 by 5.85 metres.",
+    "cue_th": [
+     "เมตร"
+    ],
+    "cue_en": [
+     "metres"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_l3",
+   "zoom": {
+    "x": 34.7,
+    "y": 56.7,
+    "scale": 1.8
+   },
+   "spot": {
+    "x": 34.7,
+    "y": 56.7,
+    "label_en": "CO-WORKING LOUNGE",
+    "sub_en": "Level 3 · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_3_coworking",
+    "title_en": "CO-WORKING LOUNGE",
+    "sub_en": "Level 3 · Building A",
+    "chips_en": [
+     {
+      "label_en": "Size",
+      "value_en": "13.925 × 5.85 m"
+     },
+     "Booths and sofas",
+     "Next to the Social Lounge"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_coworking_where_level3",
+    "label_en": "All of level 3",
+    "label_th": "ดูทั้งชั้น 3",
+    "next_story": "facilities_level3",
+    "tool": null
+   },
+   {
+    "id": "story_coworking_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:11_facilities_3rd_floor.md#11.3",
+   "report:11_facilities_3rd_floor.md#11.1.2",
+   "slides:intro-037",
+   "slides:intro-038"
+  ],
+  "notes_th": "ผังชั้น 3 → ซูม 1.8× → วงชี้จุดเดียวกับการ์ด Co-working ใน drill (ป้าย CO-WORKING LOUNGE บนผัง) → ภาพเว็บชั้น 3 ไฟล์ 25 (ภาพเดียวกับการ์ด) · ถัดจาก Social Lounge ตาม 11.3 · โทนครีม บูธนั่ง โซฟา ตามภาพแนวคิด 11.3 · 13.925 × 5.85 ม. ✅ แผ่นแปลน (ตัวเลขตามรายงานเป๊ะ ไม่ปัด) · ไม่พูด 'ใช้ฟรี' / Wi-Fi / มุมวิดีโอคอล (คำทีมขาย ยังไม่มีเอกสารยืนยัน) · รับคำถาม 'มี co-working ไหม' / 'มีที่นั่งทำงานไหม' ที่ย้ายออกจาก facilities_level3"
+ },
+ {
+  "id": "common_sphere_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Common Sphere คืออะไร",
+   "Common Sphere อยู่ไหน",
+   "มีห้องประชุมไหม",
+   "Common Sphere ใหญ่แค่ไหน"
+  ],
+  "questions_en": [
+   "What is the Common Sphere?",
+   "Is there a meeting room?"
+  ],
+  "lines": [
+   {
+    "th": "Common Sphere อยู่ชั้น 3 อาคาร A ค่ะ",
+    "en": "The Common Sphere is on level 3 of Building A.",
+    "cue_th": [
+     "Common Sphere",
+     "คอมมอน"
+    ],
+    "cue_en": [
+     "Common Sphere",
+     "common"
+    ],
+    "cue_zh": [
+     "Common Sphere",
+     "公共"
+    ]
+   },
+   {
+    "th": "เป็นโถงส่วนกลางโทนครีม มีโต๊ะวงรีไว้นั่งพบปะ และห้องประชุมผนังกระจกโค้งค่ะ",
+    "en": "It's a cream-toned shared hall with oval tables for meeting up, and curved-glass meeting rooms.",
+    "cue_th": [
+     "โต๊ะวงรี",
+     "ห้องประชุม",
+     "กระจกโค้ง"
+    ],
+    "cue_en": [
+     "oval",
+     "meeting"
+    ],
+    "cue_zh": [
+     "椭圆",
+     "会议室"
+    ]
+   },
+   {
+    "th": "ห้องขนาด 17.30 × 5.85 เมตรค่ะ",
+    "en": "The room is 17.30 by 5.85 metres.",
+    "cue_th": [
+     "เมตร"
+    ],
+    "cue_en": [
+     "metres"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_l3",
+   "zoom": {
+    "x": 63.1,
+    "y": 56.7,
+    "scale": 1.8
+   },
+   "spot": {
+    "x": 63.1,
+    "y": 56.7,
+    "label_en": "COMMON SPHERE",
+    "sub_en": "Level 3 · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_3_common_sphere",
+    "title_en": "COMMON SPHERE",
+    "sub_en": "Level 3 · Building A",
+    "chips_en": [
+     {
+      "label_en": "Size",
+      "value_en": "17.30 × 5.85 m"
+     },
+     "Oval tables",
+     "Curved-glass meeting rooms"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_common_sphere_where_level3",
+    "label_en": "All of level 3",
+    "label_th": "ดูทั้งชั้น 3",
+    "next_story": "facilities_level3",
+    "tool": null
+   },
+   {
+    "id": "story_common_sphere_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:11_facilities_3rd_floor.md#11.4",
+   "report:11_facilities_3rd_floor.md#11.1.2",
+   "slides:intro-037",
+   "slides:intro-039"
+  ],
+  "notes_th": "ผังชั้น 3 → ซูม 1.8× → วงชี้จุดเดียวกับการ์ด Common Sphere ใน drill (ป้าย COMMON SPHERE บนผัง) → ภาพเว็บชั้น 3 ไฟล์ 18 (ภาพเดียวกับการ์ด) · โถงโทนครีม โต๊ะวงรี ห้องประชุมผนังกระจกโค้ง ตามภาพแนวคิดรายงาน 11.4 (ไม่พูดจำนวนห้องประชุม/ที่นั่ง) · 17.30 × 5.85 ม. ✅ แผ่นแปลน · ผู้พัฒนายังไม่อธิบายการใช้งานทางการ จึงเล่าแค่ที่เห็น"
+ },
+ {
+  "id": "saunas_where",
+  "template": "drill",
+  "questions_th": [
+   "มีซาวน่าไหม",
+   "ซาวน่ามีกี่แบบ",
+   "ซาวน่าอยู่ไหน",
+   "มีซาวน่าอะไรบ้าง"
+  ],
+  "questions_en": [
+   "Is there a sauna?",
+   "What saunas are there?"
+  ],
+  "lines": [
+   {
+    "th": "ชั้นใต้ดินอาคาร A มีซาวน่าสามแบบค่ะ",
+    "en": "The basement of Building A has three kinds of sauna:",
+    "cue_th": [
+     "ซาวน่า"
+    ],
+    "cue_en": [
+     "sauna"
+    ],
+    "cue_zh": [
+     "桑拿"
+    ]
+   },
+   {
+    "th": "ซาวน่าเกลือหิมาลัย",
+    "en": "a Himalayan Salt Sauna,",
+    "cue_th": [
+     "เกลือ",
+     "หิมาลัย",
+     "Himalayan"
+    ],
+    "cue_en": [
+     "Himalayan",
+     "salt"
+    ],
+    "cue_zh": [
+     "喜马拉雅",
+     "盐"
+    ]
+   },
+   {
+    "th": "Floating Swing Sauna ซาวน่าเตียงแขวน",
+    "en": "a Floating Swing Sauna,",
+    "cue_th": [
+     "เตียงแขวน",
+     "แขวน",
+     "Floating",
+     "Swing"
+    ],
+    "cue_en": [
+     "Floating",
+     "Swing"
+    ],
+    "cue_zh": [
+     "悬浮",
+     "秋千"
+    ]
+   },
+   {
+    "th": "และซาวน่าหินคริสตัล",
+    "en": "and a Crystal Stone Sauna,",
+    "cue_th": [
+     "คริสตัล",
+     "Crystal"
+    ],
+    "cue_en": [
+     "Crystal"
+    ],
+    "cue_zh": [
+     "水晶",
+     "Crystal"
+    ]
+   },
+   {
+    "th": "ในแถวเดียวกันมีห้องแช่น้ำแข็งด้วยค่ะ",
+    "en": "with an Ice Bath in the same row.",
+    "cue_th": [
+     "น้ำแข็ง",
+     "Ice Bath",
+     "ไอซ์บาธ"
+    ],
+    "cue_en": [
+     "Ice Bath",
+     "ice"
+    ],
+    "cue_zh": [
+     "冰浴",
+     "冰"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "items": [
+    {
+     "label_en": "Himalayan Salt Sauna",
+     "asset": "fac_b_salt_sauna",
+     "at": [
+      22.2,
+      49.8
+     ],
+     "line": 1,
+     "tap": "story_saunas_where_salt",
+     "sub_en": "Glowing salt-stone walls"
+    },
+    {
+     "label_en": "Floating Swing Sauna",
+     "asset": "fac_b_swing_sauna",
+     "at": [
+      42.4,
+      43.4
+     ],
+     "line": 2,
+     "tap": "story_saunas_where_swing",
+     "sub_en": "Loungers hung from the ceiling"
+    },
+    {
+     "label_en": "Crystal Stone Sauna",
+     "asset": "fac_b_crystal_sauna",
+     "at": [
+      53.5,
+      43.2
+     ],
+     "line": 3,
+     "tap": "story_saunas_where_crystal",
+     "sub_en": "Beds of crystal stones"
+    },
+    {
+     "label_en": "Ice Bath",
+     "asset": "fac_b_ice_bath",
+     "at": [
+      31.6,
+      43.2
+     ],
+     "line": 4,
+     "tap": "story_saunas_where_ice",
+     "sub_en": "Round plunge tubs"
+    }
+   ],
+   "tap_label_en": "Tap for details"
+  },
+  "taps": [
+   {
+    "id": "story_saunas_where_salt",
+    "label_en": "Himalayan Salt Sauna",
+    "label_th": "ซาวน่าเกลือหิมาลัย",
+    "next_story": "salt_sauna_where",
+    "tool": null
+   },
+   {
+    "id": "story_saunas_where_swing",
+    "label_en": "Floating Swing Sauna",
+    "label_th": "ซาวน่าเตียงแขวน",
+    "next_story": "swing_sauna_where",
+    "tool": null
+   },
+   {
+    "id": "story_saunas_where_crystal",
+    "label_en": "Crystal Stone Sauna",
+    "label_th": "ซาวน่าหินคริสตัล",
+    "next_story": "crystal_sauna_where",
+    "tool": null
+   },
+   {
+    "id": "story_saunas_where_ice",
+    "label_en": "Ice Bath",
+    "label_th": "ห้องแช่น้ำแข็ง",
+    "next_story": "ice_bath_where",
+    "tool": null
+   },
+   {
+    "id": "story_saunas_where_basement",
+    "label_en": "The whole basement",
+    "label_th": "ดูทั้งชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.1.3",
+   "report:10_facilities_underground.md#10.5",
+   "report:10_facilities_underground.md#10.6",
+   "report:10_facilities_underground.md#10.7",
+   "report:10_facilities_underground.md#10.8",
+   "slides:intro-027"
+  ],
+  "notes_th": "13 ต.ค.: 'มีซาวน่าไหม' ครอบสามห้อง — หลังแยกเรื่องย่อยรายห้อง โมเดลไม่เรียกเรื่องไหนเลย (0/4 ไปค้นแทน) จึงมีเรื่องนี้: ผังใต้ดิน วงชี้ทีละห้องตามที่เอ่ยชื่อ (จุดเดียวกับ drill ชั้นใต้ดิน) การ์ดแตะไปเรื่องย่อยของห้องนั้น · Ice Bath ไม่ใช่ซาวน่าแต่อยู่แถวเดียวกัน (รายงาน 10.1.3) จึงบอกท้าย · ไม่พูดอุณหภูมิ/ขนาด/สุขภาพ (ขนาดห้องเกลือขัดกันในรายงาน, ห้ามคำอ้างสุขภาพ 10.10)"
+ }
+]

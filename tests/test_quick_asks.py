@@ -271,5 +271,185 @@ def test_the_anime_theme_stays_light_on_the_robot():
     # On the stage the reply is the caption band, not the white card.
     assert "html.app-shell body.emma-staging .reply {" in code
     assert "html.app-shell body.emma-staging .reply::before { content: none; }" in code
-    # A ready 3D body pauses the hidden puppet's loops (the glint repainted).
-    assert ".mascot-wrap.emma-3d-ready .mascot-rig * { animation-play-state: paused !important; }" in page
+    # The hidden SVG puppet's loops used to be paused under the 3D body (the
+    # glint repainted for nobody); since 14 Oct there is no puppet to pause.
+    assert "mascot-rig" not in page and "@keyframes glint" not in page
+
+
+
+# ---- choices under her own question (owner 12 Oct 2026) ----------------------
+#
+# "ลูกค้ากำลังมองหาห้องแบบสตูดิโอ หนึ่งห้องนอน หรือสองห้องนอนคะ คำพวกนี้อยากให้ขึ้นเป็น
+# ตัวเลือกบนจอด้วยให้ลูกค้ากดเข้าไปดูได้ ... พอกดไปเราก็อาจจะขึ้นผังหรือรูปห้องนั้น"
+
+def test_her_room_type_question_is_read_as_a_choice():
+    asked = [
+        "ยินดีต้อนรับค่ะ ลูกค้ากำลังมองหาห้องแบบสตูดิโอ หนึ่งห้องนอน หรือสองห้องนอนคะ",   # live 12 Oct
+        "สนใจห้องแบบไหนเป็นพิเศษไหมคะ สตูดิโอ หนึ่งห้องนอน หรือสองห้องนอนคะ",          # the prompt's example
+        "สนใจสตูดิโอ หรือ 1 ห้องนอนคะ",
+        "Are you looking for a studio, one-bedroom or two-bedroom unit?",
+        "Would you prefer a 2-bedroom or a studio?",
+        "您想看开间、一室还是两室呢？",
+        # the types listed, then "which kind?"
+        "เรามีห้องสตูดิโอ 25 ตร.ม. หนึ่งห้องนอน 34 ตร.ม. และสองห้องนอน 52 ตร.ม. ค่ะ ลูกค้าสนใจห้องแบบไหนคะ",
+        "We have studios, 1-bedroom and 2-bedroom units. Which one would you like to see?",
+    ]
+    for line in asked:
+        assert quick_asks.choices_asked(line) == "room_types", line
+    not_asked = [
+        "ลูกค้ากำลังมองหาห้องไว้อยู่เองหรือไว้ลงทุนคะ",                    # a choice with nothing to show
+        "มี Pilates Studio และ Bungee Gym ลูกค้าอยากเห็นชั้นไหนคะ",        # a facility, not a room type
+        "We have studios and 1-bedroom units. Which floor interests you?",  # a different choice
+        "ฟิตเนสอยู่ชั้น G ค่ะ ลูกค้าสนใจห้องแบบไหนคะ",                     # "which kind" with none listed
+        "สตูดิโอ",
+        "",
+    ]
+    for line in not_asked:
+        assert quick_asks.choices_asked(line) is None, line
+
+
+def test_a_choice_tap_is_the_servers_words_and_names_the_tool():
+    page = quick_asks.choices_for_page("room_types")
+    assert page["type"] == "choices" and page["set"] == "room_types"
+    assert [i["id"] for i in page["items"]] == ["type_studio", "type_1br", "type_2br"]
+    for item in page["items"]:
+        assert set(item) == {"id", "label"}                     # no words for the model
+        assert set(item["label"]) == {"th", "en", "zh"} and all(item["label"].values())
+    assert set(page["hint"]) == {"th", "en", "zh"}
+    text = quick_asks.text_for("condo", "type_2br", "en")
+    assert text.startswith('[ลูกค้าแตะปุ่ม "2 ห้องนอน" ใต้คำถามของคุณบนจอ ไม่ได้พูด')
+    assert "ถ้ายังไม่ได้พูด ตอบเป็นภาษาอังกฤษ" in text
+    assert 'show_room_type(type="2br")' in text
+    assert quick_asks.choice_set_of("type_studio") == "room_types"
+    assert quick_asks.choice_set_of("price") is None and quick_asks.choice_set_of("lang_en") is None
+    for profile in ("joke", "emma", "translator"):
+        assert quick_asks.text_for(profile, "type_studio") is None
+    # every id a button can send leads to the tool its set names
+    from app.tools import registry, units  # noqa: F401  (registers show_room_type)
+    for name, spec in quick_asks.CHOICES.items():
+        assert registry.get(spec["tool"]) is not None, name
+        for item in spec["items"]:
+            assert spec["tool"] in quick_asks.text_for("condo", item["id"]), item["id"]
+
+
+ROOM_TYPE_QUESTION = "ยินดีต้อนรับค่ะ ลูกค้ากำลังมองหาห้องแบบสตูดิโอ หนึ่งห้องนอน หรือสองห้องนอนคะ"
+
+
+def _choice_session(monkeypatch, robot_face=True, profile="condo", visible=True):
+    from app import prompts
+
+    monkeypatch.setattr(prompts, "_tool_visible", lambda name: visible)
+    sess = _session(robot_face=robot_face, profile=profile)
+    sess.sent_json = []
+
+    async def send_json(payload):
+        sess.sent_json.append(payload)
+
+    sess._send_json = send_json
+    return sess
+
+
+def _turn(sess, said):
+    sess._said_this_turn = said
+    asyncio.run(sess._offer_choices())
+
+
+def test_her_question_puts_the_buttons_up_and_her_next_line_takes_them_down(monkeypatch):
+    sess = _choice_session(monkeypatch)
+    _turn(sess, ROOM_TYPE_QUESTION)
+    assert sess.sent_json == [quick_asks.choices_for_page("room_types")]
+    assert sess._choices_offered == "room_types" and sess._said_this_turn == ""
+    _turn(sess, "")                          # gemini-3.8's wordless turn_complete: no change
+    _turn(sess, ROOM_TYPE_QUESTION)          # asked again: already up, nothing resent
+    assert len(sess.sent_json) == 1
+    _turn(sess, "ขอบคุณที่แวะมานะคะ")         # her next line, no question in it
+    assert sess.sent_json[-1] == {"type": "choices", "set": None, "items": []}
+    assert sess._choices_offered is None
+
+
+def test_no_buttons_off_the_robot_face_off_condo_without_the_tool_or_a_question(monkeypatch):
+    for kw in ({"robot_face": False}, {"profile": "joke"}, {"visible": False}):
+        sess = _choice_session(monkeypatch, **kw)
+        _turn(sess, ROOM_TYPE_QUESTION)
+        assert sess.sent_json == [], kw
+    sess = _choice_session(monkeypatch)
+    _turn(sess, "เรามีห้องแบบสตูดิโอ หนึ่งห้องนอน และสองห้องนอนค่ะ")    # told, not asked
+    assert sess.sent_json == []
+
+
+def test_a_choice_counts_only_while_its_buttons_are_up(monkeypatch):
+    sess = _choice_session(monkeypatch)
+    asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "type_studio", "lang": "th"}))
+    assert sess.provider.sent == [], "no question asked: a stale or crafted tap goes nowhere"
+    _turn(sess, ROOM_TYPE_QUESTION)
+    asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "type_studio", "lang": "th"}))
+    assert sess.provider.sent == [quick_asks.text_for("condo", "type_studio", "th")]
+    assert sess._choices_offered is None, "answered: the buttons are gone on both sides"
+
+
+def test_the_guest_speaking_takes_the_buttons_down(monkeypatch):
+    sess = _choice_session(monkeypatch)
+    _turn(sess, ROOM_TYPE_QUESTION)
+    sess._guest_started_turn()
+    assert sess._choices_offered is None and sess._said_this_turn == ""
+
+
+def test_the_robot_face_gets_the_buttons_after_her_question(monkeypatch):
+    """End to end: her transcript, then turn_complete, then the buttons --
+    on the robot face's socket, never the desk page's."""
+    from fastapi.testclient import TestClient
+
+    from tests.test_voice import _Content, _fake_gemini, _Msg, _Text
+
+    # Her question, a line without one, and a third turn as the end marker:
+    # reading up to its turn_complete never blocks on a frame that is not
+    # coming (a missing `choices` fails the assert, it does not hang).
+    script = [[_Msg(_Content(output_transcription=_Text(ROOM_TYPE_QUESTION))),
+               _Msg(_Content(turn_complete=True))],
+              [_Msg(_Content(output_transcription=_Text("ยินดีค่ะ"))),
+               _Msg(_Content(turn_complete=True))],
+              [_Msg(_Content(output_transcription=_Text("ตกลงค่ะ"))),
+               _Msg(_Content(turn_complete=True))]]
+    monkeypatch.setattr(settings, "robot_face_token", "")
+    from app.main import app
+
+    def frames(headers):
+        _fake_gemini(monkeypatch, [list(turn) for turn in script])
+        seen, done = [], 0
+        with TestClient(app).websocket_connect("/ws", headers=headers) as ws:
+            while done < 3:
+                msg = ws.receive()
+                if not msg.get("text"):
+                    continue
+                evt = json.loads(msg["text"])
+                if evt["type"] in ("turn_complete", "choices"):
+                    seen.append(evt)
+                done += evt["type"] == "turn_complete"
+        return seen
+
+    face = frames({"user-agent": "Mozilla/5.0 EmmaRobot/0.1 EmmaBridge/1"})
+    tc = {"type": "turn_complete"}
+    assert face == [tc, quick_asks.choices_for_page("room_types"),
+                    tc, {"type": "choices", "set": None, "items": []}, tc]
+    desk = frames({})
+    assert desk == [tc, tc, tc]
+
+
+def test_the_page_draws_her_choices_and_drops_them_when_answered():
+    html = PAGE.read_text(encoding="utf-8")
+    code = _quick_code()
+    assert "var pick = !!(appShell && quickAsks && inCall && choiceSet);" in code
+    assert "var src = pick ? choiceSet : quickAsks;" in code
+    assert "if (pick) { choiceSet = null; renderQuick(); return; }" in code
+    branch = html.split("case 'choices':", 1)[1].split("break;", 1)[0]
+    assert "choiceSet = appShell && evt.items && evt.items.length ? evt : null;" in branch
+    spoke = html.split("case 'speech_started':", 1)[1].split("break;", 1)[0]
+    assert "if (choiceSet) { choiceSet = null; renderQuick(); }" in spoke
+    assert html.count("choiceSet = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();") == 3
+    ready = html.split("case 'ready':", 1)[1].split("break;", 1)[0]
+    assert "choiceSet = null;" in ready
+    # a tap is a new question: its answer owns the screen, as a spoken one's does
+    send = code[code.index("function sendQuickAsk(id)"):]
+    assert "answerOwed = true;" in send and "answerStaged = false;" in send
+    # the example room says what it is
+    assert "if (u.example_of)" in html

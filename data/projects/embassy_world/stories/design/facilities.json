@@ -1,0 +1,1259 @@
+[
+ {
+  "id": "facilities_overview",
+  "template": "slabs",
+  "questions_th": [
+   "มีสิ่งอำนวยความสะดวกอะไรบ้าง",
+   "ส่วนกลางมีอะไรบ้าง",
+   "facility มีอะไรบ้าง",
+   "โครงการมีอะไรให้ลูกบ้านใช้บ้าง",
+   "มีอะไรให้เล่นบ้าง"
+  ],
+  "questions_en": [
+   "What facilities do you have?",
+   "What amenities are there?",
+   "What can residents use here?",
+   "What's in the common areas?"
+  ],
+  "lines": [
+   {
+    "th": "ในโครงการของเรามีสิ่งอำนวยความสะดวกมากมายถึง 3 ชั้นค่ะ",
+    "en": "Our facilities are spread over three floors.",
+    "cue_th": [
+     "สิ่งอำนวยความสะดวก",
+     "3 ชั้น",
+     "สามชั้น"
+    ],
+    "cue_en": [
+     "facilities",
+     "three floors"
+    ],
+    "cue_zh": [
+     "设施",
+     "三层"
+    ]
+   },
+   {
+    "th": "ชั้นใต้ดินมีสระในร่ม Aqua Cinema, Journey to Mars, ซาวน่าเกลือหิมาลัย, Floating Swing Sauna, ซาวน่าหินคริสตัล, Ice Bath และแคปซูลไฮโดรเทอราพี",
+    "en": "The basement has the Aqua Cinema indoor pool, Journey to Mars, a Himalayan salt sauna, a floating swing sauna, a crystal stone sauna, an ice bath and a hydrotherapy capsule.",
+    "cue_th": [
+     "ใต้ดิน",
+     "Aqua Cinema"
+    ],
+    "cue_en": [
+     "basement",
+     "Aqua Cinema"
+    ],
+    "cue_zh": [
+     "地下",
+     "Aqua Cinema"
+    ]
+   },
+   {
+    "th": "ชั้น G มีฟิตเนส Biogenesis, ห้อง Spinning, Pilates Studio, Bungee Gym & Yoga และห้องเด็ก Junior World",
+    "en": "The ground floor has the Biogenesis gym, a spinning room, a Pilates studio, Bungee Gym & Yoga, and the Junior World kids' room.",
+    "cue_th": [
+     "ชั้น G",
+     "Biogenesis"
+    ],
+    "cue_en": [
+     "ground floor",
+     "Biogenesis"
+    ],
+    "cue_zh": [
+     "一楼",
+     "Biogenesis"
+    ]
+   },
+   {
+    "th": "และชั้น 3 อาคาร A มี Social Lounge, Co-working Lounge, Common Sphere และ Sky Pool",
+    "en": "And level 3 of Building A has the Social Lounge, the Co-working Lounge, the Common Sphere and the Sky Pool.",
+    "cue_th": [
+     "ชั้น 3",
+     "Social Lounge"
+    ],
+    "cue_en": [
+     "level 3",
+     "Social Lounge"
+    ],
+    "cue_zh": [
+     "三楼",
+     "Social Lounge"
+    ]
+   },
+   {
+    "th": "ลูกค้าอยากเห็นชั้นไหนเป็นพิเศษไหมคะ",
+    "en": "Which floor would you like to see?",
+    "cue_th": [
+     "ชั้นไหน",
+     "อยากเห็น"
+    ],
+    "cue_en": [
+     "which floor"
+    ],
+    "cue_zh": [
+     "哪一层"
+    ]
+   }
+  ],
+  "params": {
+   "floors": [
+    {
+     "label_en": "BASEMENT",
+     "sub_en": "Indoor pools, saunas, ice bath",
+     "asset": "fac_plan_b",
+     "line": 1,
+     "next_story": "facilities_basement"
+    },
+    {
+     "label_en": "GROUND",
+     "sub_en": "Fitness, studios, kids' room",
+     "asset": "fac_plan_g",
+     "line": 2,
+     "next_story": "facilities_ground"
+    },
+    {
+     "label_en": "LEVEL 3",
+     "sub_en": "Building A: lounges, Sky Pool",
+     "asset": "fac_plan_l3",
+     "line": 3,
+     "next_story": "facilities_level3"
+    }
+   ],
+   "order_bottom_up": [
+    0,
+    1,
+    2
+   ],
+   "end_hint_en": "Tap a floor"
+  },
+  "taps": [
+   {
+    "id": "story_facilities_overview_basement",
+    "label_en": "Basement",
+    "label_th": "ชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_overview_ground",
+    "label_en": "Ground floor",
+    "label_th": "ชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_overview_level3",
+    "label_en": "Level 3",
+    "label_th": "ชั้น 3",
+    "next_story": "facilities_level3",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:08_facilities_overview.md#8.3.1",
+   "report:08_facilities_overview.md#8.2",
+   "slides:intro-018",
+   "slides:intro-027",
+   "slides:intro-037"
+  ],
+  "notes_th": "พูดแค่ประโยคเดียวของเจ้าของ (facility hook 11 ต.ค.) แบ่งเป็น 3 จังหวะ แผ่นชั้นลอยขึ้นจากล่างขึ้นบนตามจังหวะพูด: ใต้ดินตอน 'สิ่งอำนวยความสะดวกมากมาย' · ชั้น G ตอน '3 ชั้น' · ชั้น 3 ตอน 'ชั้นไหน' แล้วค้างเป็นกองชั้นให้แตะ ไม่เล่ารายชั้นด้วยเสียง (ป้าย sub_en บนจอบอกแทน) เพื่อคงกฎ 'ค่อยๆ ทำให้ลูกค้ารู้' ตัวเลข 3 ชั้นมาจาก 'จุดเด่น' (ชั้น G · ชั้นใต้ดิน · ชั้น 3 อาคาร A) ภายนอกกับเทคโนโลยีไม่อยู่ในเรื่องนี้ (บอกเมื่อถามต่อ) ถ้าเครื่องไม่ขึ้นภาพ ประโยคของเจ้าของใช้ 'รู้จัก' แทน 'เห็น' — เรื่องนี้ขึ้นภาพเสมอจึงใช้ 'เห็น' · แก้ตามรีวิว 12 ต.ค.: ป้ายชั้นสั้นลง ('GROUND', 'LEVEL 3' + 'Building A' ย้ายไปบรรทัดรอง) — ช่องป้ายกว้าง ~400 px ชื่อยาวขึ้นสองบรรทัดและ '·' ค้างท้ายบรรทัด · 13 ต.ค. เจ้าของ: เอ่ยชื่อของแต่ละชั้นด้วย (ชื่อจาก facts:จุดเด่น) ส่วนนอกอาคารไม่พูด"
+ },
+ {
+  "id": "facilities_ground",
+  "template": "drill",
+  "questions_th": [
+   "ชั้น G มีอะไรบ้าง",
+   "ชั้นล่างมีอะไร",
+   "ชั้นล็อบบี้มีอะไรบ้าง",
+   "ชั้น 1 มีอะไรบ้าง",
+   "Entrance Floor มีอะไร"
+  ],
+  "questions_en": [
+   "What's on the ground floor?",
+   "What's on the entrance floor?",
+   "What's on the lobby level?"
+  ],
+  "lines": [
+   {
+    "th": "ชั้น G มีฟิตเนส Biogenesis ริมสระค่ะ",
+    "en": "On the ground floor there's Biogenesis, our fitness centre by the pool,",
+    "cue_th": [
+     "Biogenesis",
+     "ไบโอเจเนซิส",
+     "ฟิตเนส"
+    ],
+    "cue_en": [
+     "Biogenesis",
+     "fitness",
+     "gym"
+    ],
+    "cue_zh": [
+     "Biogenesis",
+     "健身"
+    ]
+   },
+   {
+    "th": "ห้องปั่นจักรยาน Spinning Class",
+    "en": "a Spinning Class studio,",
+    "cue_th": [
+     "Spinning",
+     "สปินนิ่ง",
+     "ปั่นจักรยาน"
+    ],
+    "cue_en": [
+     "Spinning",
+     "cycling"
+    ],
+    "cue_zh": [
+     "Spinning",
+     "单车",
+     "动感单车"
+    ]
+   },
+   {
+    "th": "พิลาทิสสตูดิโอ",
+    "en": "a Pilates Studio,",
+    "cue_th": [
+     "พิลาทิส",
+     "Pilates"
+    ],
+    "cue_en": [
+     "Pilates"
+    ],
+    "cue_zh": [
+     "普拉提",
+     "Pilates"
+    ]
+   },
+   {
+    "th": "บันจี้ยิมและโยคะ",
+    "en": "Bungee Gym & Yoga,",
+    "cue_th": [
+     "บันจี้",
+     "Bungee",
+     "โยคะ"
+    ],
+    "cue_en": [
+     "Bungee",
+     "yoga"
+    ],
+    "cue_zh": [
+     "蹦极",
+     "瑜伽",
+     "Bungee"
+    ]
+   },
+   {
+    "th": "และห้องเด็ก Junior World ค่ะ",
+    "en": "and Junior World for the kids.",
+    "cue_th": [
+     "Junior World",
+     "จูเนียร์",
+     "ห้องเด็ก"
+    ],
+    "cue_en": [
+     "Junior World",
+     "kids"
+    ],
+    "cue_zh": [
+     "Junior World",
+     "儿童"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_g",
+   "items": [
+    {
+     "label_en": "Biogenesis",
+     "asset": "fac_g_biogenesis",
+     "at": [
+      50.0,
+      82.3
+     ],
+     "line": 0,
+     "tap": "story_facilities_ground_fitness",
+     "sub_en": "Fitness · glass wall to the lagoon"
+    },
+    {
+     "label_en": "Spinning Class",
+     "asset": "fac_g_spinning",
+     "at": [
+      42.6,
+      59.8
+     ],
+     "line": 1,
+     "tap": "story_facilities_ground_spinning",
+     "sub_en": "Cycling studio · curved LED screens"
+    },
+    {
+     "label_en": "Pilates Studio",
+     "asset": "fac_g_pilates",
+     "at": [
+      57.2,
+      59.8
+     ],
+     "line": 2,
+     "tap": "story_facilities_ground_pilates",
+     "sub_en": "Reformer beds · sunset sky panels"
+    },
+    {
+     "label_en": "Bungee Gym & Yoga",
+     "asset": "fac_g_bungee",
+     "at": [
+      86.5,
+      58.9
+     ],
+     "line": 3,
+     "tap": "story_facilities_ground_bungee",
+     "sub_en": "Elastic cords from the ceiling · yoga"
+    },
+    {
+     "label_en": "Junior World",
+     "asset": "fac_g_junior",
+     "at": [
+      17.1,
+      58.4
+     ],
+     "line": 4,
+     "tap": "story_facilities_ground_kids",
+     "sub_en": "Kids' room · space-station theme"
+    }
+   ],
+   "more_en": "Also here: Lobby · Journey to the Future",
+   "tap_label_en": "Tap for details"
+  },
+  "taps": [
+   {
+    "id": "story_facilities_ground_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_ground_basement",
+    "label_en": "Basement",
+    "label_th": "ชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_ground_level3",
+    "label_en": "Level 3",
+    "label_th": "ชั้น 3",
+    "next_story": "facilities_level3",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_ground_fitness",
+    "label_en": "Biogenesis",
+    "label_th": "ฟิตเนส Biogenesis",
+    "next_story": "fitness_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_ground_kids",
+    "label_en": "Junior World",
+    "label_th": "ห้องเด็ก Junior World",
+    "next_story": "kids_room_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_ground_spinning",
+    "label_en": "Spinning Class",
+    "label_th": "ห้อง Spinning Class",
+    "next_story": "spinning_class_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_ground_pilates",
+    "label_en": "Pilates Studio",
+    "label_th": "Pilates Studio",
+    "next_story": "pilates_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_ground_bungee",
+    "label_en": "Bungee Gym & Yoga",
+    "label_th": "Bungee Gym & Yoga",
+    "next_story": "bungee_yoga_where",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:09_facilities_ground.md#9.1.1",
+   "report:09_facilities_ground.md#9.1.2",
+   "report:09_facilities_ground.md#9.3",
+   "report:08_facilities_overview.md#8.2",
+   "slides:intro-018"
+  ],
+  "notes_th": "ผังชั้น G (สไลด์ intro-018) ค้างด้านบน ทุกครั้งที่ Emma เอ่ยชื่อ วงชี้บนผังย้ายไปที่ห้องนั้นและภาพไฟนอลเด้งเข้าตาราง 5 ห้อง จุดบนผังทุกจุดอ่านจากป้ายชื่อที่พิมพ์อยู่บนผังเอง (Biogenesis วางกลางครึ่งวงกลมใต้ป้าย) 'ริมสระ' อิงรายงาน 9.3 (โถงกระจกยื่นสู่ลากูน) Lobby กับ Journey to the Future อยู่ใน 'จุดเด่น' แต่ไม่พูด ขึ้นเป็นบรรทัด more แทนเพื่อให้สั้น · แก้ตามรีวิว 12 ต.ค.: การ์ด Biogenesis และ Junior World แตะได้ (ไปเรื่อง fitness_where / kids_room_where ที่มีอยู่แล้ว) — เดิมการ์ดของที่ที่มีเรื่องของตัวเองกดไม่ได้"
+ },
+ {
+  "id": "facilities_basement",
+  "template": "drill",
+  "questions_th": [
+   "ชั้นใต้ดินมีอะไรบ้าง",
+   "ข้างล่างใต้ดินมีอะไร",
+   "โซน wellness มีอะไรบ้าง",
+   "มีสปาไหม",
+   "สปามีอะไรบ้าง",
+   "แนะนำสปาหน่อย"
+  ],
+  "questions_en": [
+   "What's in the basement?",
+   "What's underground?"
+  ],
+  "lines": [
+   {
+    "th": "ชั้นใต้ดินมีสระในร่ม Aqua Cinema",
+    "en": "Down in the basement there's Aqua Cinema, an indoor pool,",
+    "cue_th": [
+     "Aqua Cinema",
+     "อควา",
+     "สระในร่ม"
+    ],
+    "cue_en": [
+     "Aqua Cinema",
+     "indoor pool"
+    ],
+    "cue_zh": [
+     "Aqua Cinema",
+     "室内泳池"
+    ]
+   },
+   {
+    "th": "ต่อด้วย Journey to Mars",
+    "en": "flowing into Journey to Mars,",
+    "cue_th": [
+     "Journey to Mars",
+     "มาร์ส",
+     "Mars"
+    ],
+    "cue_en": [
+     "Journey to Mars",
+     "Mars"
+    ],
+    "cue_zh": [
+     "Journey to Mars",
+     "火星"
+    ]
+   },
+   {
+    "th": "ซาวน่าเกลือหิมาลัย",
+    "en": "a Himalayan Salt Sauna,",
+    "cue_th": [
+     "เกลือ",
+     "หิมาลัย",
+     "Himalayan"
+    ],
+    "cue_en": [
+     "Himalayan",
+     "salt"
+    ],
+    "cue_zh": [
+     "喜马拉雅",
+     "盐"
+    ]
+   },
+   {
+    "th": "ห้องแช่น้ำแข็ง",
+    "en": "an Ice Bath,",
+    "cue_th": [
+     "น้ำแข็ง",
+     "Ice Bath",
+     "ไอซ์บาธ"
+    ],
+    "cue_en": [
+     "Ice Bath",
+     "ice"
+    ],
+    "cue_zh": [
+     "冰浴",
+     "冰"
+    ]
+   },
+   {
+    "th": "ซาวน่าเตียงแขวน",
+    "en": "a Floating Swing Sauna,",
+    "cue_th": [
+     "เตียงแขวน",
+     "แขวน",
+     "Floating",
+     "Swing"
+    ],
+    "cue_en": [
+     "Floating",
+     "Swing"
+    ],
+    "cue_zh": [
+     "悬浮",
+     "秋千"
+    ]
+   },
+   {
+    "th": "ซาวน่าคริสตัล",
+    "en": "a Crystal Stone Sauna,",
+    "cue_th": [
+     "คริสตัล",
+     "Crystal"
+    ],
+    "cue_en": [
+     "Crystal"
+    ],
+    "cue_zh": [
+     "水晶",
+     "Crystal"
+    ]
+   },
+   {
+    "th": "และแคปซูลไฮโดรเทอราพีค่ะ",
+    "en": "and the Hydrotherapy Capsule.",
+    "cue_th": [
+     "แคปซูล",
+     "ไฮโดร",
+     "Hydrotherapy"
+    ],
+    "cue_en": [
+     "Hydrotherapy",
+     "capsule"
+    ],
+    "cue_zh": [
+     "水疗",
+     "胶囊"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_b",
+   "items": [
+    {
+     "label_en": "Aqua Cinema",
+     "asset": "fac_b_aqua_cinema",
+     "at": [
+      57.0,
+      79.4
+     ],
+     "line": 0,
+     "tap": "story_facilities_basement_aqua",
+     "sub_en": "Indoor pool · big screen by the pool"
+    },
+    {
+     "label_en": "Journey to Mars",
+     "asset": "fac_b_journey_mars",
+     "at": [
+      87.0,
+      80.4
+     ],
+     "line": 1,
+     "tap": "story_facilities_basement_mars",
+     "sub_en": "Space-themed waterway · galaxy tunnel"
+    },
+    {
+     "label_en": "Himalayan Salt Sauna",
+     "asset": "fac_b_salt_sauna",
+     "at": [
+      22.2,
+      49.8
+     ],
+     "line": 2,
+     "tap": "story_facilities_basement_salt",
+     "sub_en": "Glowing salt-stone walls"
+    },
+    {
+     "label_en": "Ice Bath",
+     "asset": "fac_b_ice_bath",
+     "at": [
+      31.6,
+      43.2
+     ],
+     "line": 3,
+     "tap": "story_facilities_basement_ice",
+     "sub_en": "Round plunge tubs"
+    },
+    {
+     "label_en": "Floating Swing Sauna",
+     "asset": "fac_b_swing_sauna",
+     "at": [
+      42.4,
+      43.4
+     ],
+     "line": 4,
+     "tap": "story_facilities_basement_swing",
+     "sub_en": "Loungers hung from the ceiling"
+    },
+    {
+     "label_en": "Crystal Stone Sauna",
+     "asset": "fac_b_crystal_sauna",
+     "at": [
+      53.5,
+      43.2
+     ],
+     "line": 5,
+     "tap": "story_facilities_basement_crystal",
+     "sub_en": "Beds of crystal stones"
+    },
+    {
+     "label_en": "Hydrotherapy Capsule",
+     "asset": "fac_b_hydro_capsule",
+     "at": [
+      65.2,
+      43.6
+     ],
+     "line": 6,
+     "tap": "story_facilities_basement_hydro",
+     "sub_en": "Two white spa capsules"
+    }
+   ],
+   "more_en": "Also on this level: EV charging",
+   "tap_label_en": "Tap for details"
+  },
+  "taps": [
+   {
+    "id": "story_facilities_basement_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_ground",
+    "label_en": "Ground floor",
+    "label_th": "ชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_level3",
+    "label_en": "Level 3",
+    "label_th": "ชั้น 3",
+    "next_story": "facilities_level3",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_aqua",
+    "label_en": "Aqua Cinema",
+    "label_th": "Aqua Cinema",
+    "next_story": "aqua_cinema_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_mars",
+    "label_en": "Journey to Mars",
+    "label_th": "Journey to Mars",
+    "next_story": "journey_mars_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_salt",
+    "label_en": "Himalayan Salt Sauna",
+    "label_th": "ซาวน่าเกลือหิมาลัย",
+    "next_story": "salt_sauna_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_ice",
+    "label_en": "Ice Bath",
+    "label_th": "Ice Bath ห้องแช่น้ำแข็ง",
+    "next_story": "ice_bath_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_swing",
+    "label_en": "Floating Swing Sauna",
+    "label_th": "Floating Swing Sauna",
+    "next_story": "swing_sauna_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_crystal",
+    "label_en": "Crystal Stone Sauna",
+    "label_th": "ซาวน่าหินคริสตัล",
+    "next_story": "crystal_sauna_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_basement_hydro",
+    "label_en": "Hydrotherapy Capsule",
+    "label_th": "แคปซูลไฮโดรเทอราพี",
+    "next_story": "hydro_capsule_where",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:10_facilities_underground.md#10.1.2",
+   "report:10_facilities_underground.md#10.1.3",
+   "report:08_facilities_overview.md#8.2",
+   "slides:intro-027",
+   "slides:intro-035"
+  ],
+  "notes_th": "ผังโซน wellness ใต้ดิน (สไลด์ intro-027 รายงาน 10.1.2: ผังเลย์เอาต์จริงตามเจ้าของ ใช้ดูตำแหน่งห้อง) ค้างด้านบน เริ่มจากสระ Aqua Cinema → Journey to Mars (แถวล่าง) แล้ววงชี้วิ่งซ้ายไปขวาตามแถวห้องบน: เกลือ → น้ำแข็ง → เตียงแขวน → คริสตัล → แคปซูล ตรงลำดับบนผังพอดี จุดทุกจุดอ่านจากป้ายบนผัง ไม่มีคำอ้างสรรพคุณสุขภาพเลย (รายงาน 10.10) EV Charger อยู่ใน 'จุดเด่น' ของชั้นใต้ดินแต่อยู่โซนจอดรถ ไม่อยู่บนผังขยายนี้ จึงขึ้นเป็นบรรทัด more ไม่มีจุด"
+ },
+ {
+  "id": "facilities_level3",
+  "template": "drill",
+  "questions_th": [
+   "ชั้น 3 มีอะไรบ้าง",
+   "ชั้นสามมีอะไร",
+   "มีเลานจ์ไหม"
+  ],
+  "questions_en": [
+   "What's on level 3?",
+   "What's on the third floor?",
+   "Is there a lounge?"
+  ],
+  "lines": [
+   {
+    "th": "ชั้น 3 อาคาร A มี Social Lounge",
+    "en": "Level 3 of Building A has the Social Lounge,",
+    "cue_th": [
+     "Social Lounge",
+     "โซเชียล",
+     "ชั้น 3"
+    ],
+    "cue_en": [
+     "Social Lounge",
+     "social"
+    ],
+    "cue_zh": [
+     "Social Lounge",
+     "社交"
+    ]
+   },
+   {
+    "th": "Co-working Lounge ไว้นั่งทำงาน",
+    "en": "a Co-working Lounge to work in,",
+    "cue_th": [
+     "Co-working",
+     "โคเวิร์กกิ้ง",
+     "ทำงาน"
+    ],
+    "cue_en": [
+     "Co-working",
+     "coworking",
+     "work"
+    ],
+    "cue_zh": [
+     "Co-working",
+     "共享办公",
+     "办公"
+    ]
+   },
+   {
+    "th": "โถงส่วนกลาง Common Sphere",
+    "en": "the Common Sphere,",
+    "cue_th": [
+     "Common Sphere",
+     "คอมมอน",
+     "โถงส่วนกลาง"
+    ],
+    "cue_en": [
+     "Common Sphere",
+     "common"
+    ],
+    "cue_zh": [
+     "Common Sphere",
+     "公共"
+    ]
+   },
+   {
+    "th": "และ Sky Pool ค่ะ",
+    "en": "and the Sky Pool.",
+    "cue_th": [
+     "Sky Pool",
+     "สกายพูล",
+     "สระ"
+    ],
+    "cue_en": [
+     "Sky Pool",
+     "pool"
+    ],
+    "cue_zh": [
+     "Sky Pool",
+     "空中泳池",
+     "泳池"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_l3",
+   "items": [
+    {
+     "label_en": "Social Lounge",
+     "asset": "fac_3_social",
+     "at": [
+      17.0,
+      56.7
+     ],
+     "line": 0,
+     "tap": "story_facilities_level3_social",
+     "sub_en": "A lounge for meeting up"
+    },
+    {
+     "label_en": "Co-working Lounge",
+     "asset": "fac_3_coworking",
+     "at": [
+      34.7,
+      56.7
+     ],
+     "line": 1,
+     "tap": "story_facilities_level3_coworking",
+     "sub_en": "Booths and sofas to work from"
+    },
+    {
+     "label_en": "Common Sphere",
+     "asset": "fac_3_common_sphere",
+     "at": [
+      63.1,
+      56.7
+     ],
+     "line": 2,
+     "tap": "story_facilities_level3_common",
+     "sub_en": "Oval tables · curved-glass meeting rooms"
+    },
+    {
+     "label_en": "Sky Pool",
+     "asset": "fac_3_sky_pool",
+     "at": [
+      50.0,
+      82.5
+     ],
+     "line": 3,
+     "tap": "story_facilities_level3_skypool",
+     "sub_en": "Glass-floor section · whirlpool seats"
+    }
+   ],
+   "more_en": null,
+   "tap_label_en": "Tap for details"
+  },
+  "taps": [
+   {
+    "id": "story_facilities_level3_skypool",
+    "label_en": "Sky Pool up close",
+    "label_th": "ดู Sky Pool",
+    "next_story": "sky_pool_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_level3_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_level3_ground",
+    "label_en": "Ground floor",
+    "label_th": "ชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_level3_social",
+    "label_en": "Social Lounge",
+    "label_th": "Social Lounge",
+    "next_story": "social_lounge_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_level3_coworking",
+    "label_en": "Co-working Lounge",
+    "label_th": "Co-working Lounge",
+    "next_story": "coworking_where",
+    "tool": null
+   },
+   {
+    "id": "story_facilities_level3_common",
+    "label_en": "Common Sphere",
+    "label_th": "Common Sphere",
+    "next_story": "common_sphere_where",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:11_facilities_3rd_floor.md#11.1.2",
+   "report:11_facilities_3rd_floor.md#11.5.1",
+   "report:08_facilities_overview.md#8.2",
+   "slides:intro-037",
+   "slides:intro-041"
+  ],
+  "notes_th": "ผังชั้น 3 อาคาร A (สไลด์ intro-037) ค้างด้านบน วงชี้ไล่ซ้ายไปขวาตามแถวห้อง แล้วลงไปที่สระครึ่งวงกลมตอนพูด Sky Pool สามห้องแรกอ่านจากป้ายเขียวบนผัง ส่วน Sky Pool ผังไม่มีป้าย ชี้ที่กลางผิวน้ำของสระครึ่งวงกลม ซึ่งรายงาน 11.1.2 ระบุว่าเป็น Sky Pool ภาพ Social Lounge ไม่มีป้ายชื่อบนภาพ (ดู notes) · แก้ตามรีวิว 12 ต.ค.: การ์ด Sky Pool แตะได้ (ปุ่ม 'Sky Pool up close' ย้ายมาอยู่ที่การ์ด)"
+ },
+ {
+  "id": "sky_pool_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Sky Pool อยู่ไหน",
+   "สกายพูลอยู่ชั้นไหน",
+   "สระลอยฟ้าอยู่ตรงไหน",
+   "Sky Pool อยู่ตึกไหน",
+   "สระพื้นกระจกอยู่ไหน"
+  ],
+  "questions_en": [
+   "Where is the Sky Pool?",
+   "Which floor is the Sky Pool on?",
+   "Which building has the Sky Pool?",
+   "Where's the pool with the glass floor?"
+  ],
+  "lines": [
+   {
+    "th": "Sky Pool อยู่ชั้น 3 อาคาร A ค่ะ",
+    "en": "The Sky Pool is on level 3 of Building A,",
+    "cue_th": [
+     "ชั้น 3",
+     "อาคาร A",
+     "Sky Pool"
+    ],
+    "cue_en": [
+     "level 3",
+     "third floor",
+     "building A"
+    ],
+    "cue_zh": [
+     "三楼",
+     "3楼",
+     "A栋"
+    ]
+   },
+   {
+    "th": "อยู่เหนือฟิตเนสพอดี",
+    "en": "right above the fitness centre,",
+    "cue_th": [
+     "เหนือ",
+     "ฟิตเนส"
+    ],
+    "cue_en": [
+     "above",
+     "fitness",
+     "gym"
+    ],
+    "cue_zh": [
+     "上方",
+     "上面",
+     "健身"
+    ]
+   },
+   {
+    "th": "พื้นสระบางส่วนเป็นกระจกค่ะ",
+    "en": "and part of the pool floor is glass.",
+    "cue_th": [
+     "กระจก",
+     "พื้นสระ"
+    ],
+    "cue_en": [
+     "glass"
+    ],
+    "cue_zh": [
+     "玻璃"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_ue_building_a",
+   "zoom": {
+    "x": 48.7,
+    "y": 57.1,
+    "scale": 1.9
+   },
+   "spot": {
+    "x": 48.7,
+    "y": 57.1,
+    "label_en": "SKY POOL",
+    "sub_en": "Level 3 · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_3_sky_pool",
+    "title_en": "SKY POOL",
+    "sub_en": "Level 3 · Building A",
+    "chips_en": [
+     "Above the fitness centre",
+     "Glass-floor section",
+     "Whirlpool seats",
+     "Sun loungers"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_sky_pool_where_level3",
+    "label_en": "All of level 3",
+    "label_th": "ดูทั้งชั้น 3",
+    "next_story": "facilities_level3",
+    "tool": null
+   },
+   {
+    "id": "story_sky_pool_where_fitness",
+    "label_en": "The gym below",
+    "label_th": "ฟิตเนสข้างล่าง",
+    "next_story": "fitness_where",
+    "tool": null
+   },
+   {
+    "id": "story_sky_pool_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:11_facilities_3rd_floor.md#11.5.1",
+   "report:11_facilities_3rd_floor.md#11.5.3",
+   "report:11_facilities_3rd_floor.md#11.5.4",
+   "report:09_facilities_ground.md#9.3",
+   "slides:intro-041"
+  ],
+  "notes_th": "ภาพโฮโลแกรมอาคาร A จาก UE ของเจ้าของ (ด้านลากูน) → ซูมเข้าโดมกระจกกลางตึก → วงชี้ที่ขอบบนของโดม (ระดับชั้น 3) ป้าย SKY POOL · Level 3 · Building A → ตัดไปภาพ Sky Pool จริง (สไลด์ intro-041 ที่เห็นพื้นกระจกมองลงไปเห็นยิม) → ชิปเด้งทีละอัน จุดบนภาพ UE เป็นการอ่านจากรูปทรงโมเดล (นับแนวพื้นจากล่าง: G, 2, 3 — โดมสูงสองชั้นและหลังคาโดมอยู่ระดับพื้นชั้น 3) ไม่ใช่ป้ายที่พิมพ์ไว้ สอดคล้องกับรายงาน 9.3 'ด้านบน (ชั้น 3) คือ Sky Pool' และผังชั้น 3 ที่สระครึ่งวงกลมอยู่แนวเดียวกับ Biogenesis — ต้องให้เจ้าของยืนยันจุดนี้ ชั้น 3 ไม่ใช่ 'ชั้นสอง' (รายงาน 11.5.4) ไม่พูดขนาด/ระดับสระเพราะตัวเลขขัดกัน"
+ },
+ {
+  "id": "fitness_where",
+  "template": "spotlight",
+  "questions_th": [
+   "ฟิตเนสอยู่ไหน",
+   "ยิมอยู่ตรงไหน",
+   "ห้องออกกำลังกายอยู่ชั้นไหน",
+   "มีฟิตเนสไหม",
+   "Biogenesis คืออะไร อยู่ไหน"
+  ],
+  "questions_en": [
+   "Where is the gym?",
+   "Where's the fitness centre?",
+   "Is there a gym?",
+   "Which floor is the fitness on?"
+  ],
+  "lines": [
+   {
+    "th": "ฟิตเนส Biogenesis อยู่ชั้น G อาคาร A ค่ะ",
+    "en": "Our fitness centre, Biogenesis, is on the ground floor of Building A,",
+    "cue_th": [
+     "Biogenesis",
+     "ไบโอเจเนซิส",
+     "ชั้น G"
+    ],
+    "cue_en": [
+     "Biogenesis",
+     "ground floor"
+    ],
+    "cue_zh": [
+     "Biogenesis",
+     "一楼",
+     "底层"
+    ]
+   },
+   {
+    "th": "ผนังกระจกโค้ง มองเห็นสระค่ะ",
+    "en": "with a curved glass wall looking out to the pool,",
+    "cue_th": [
+     "กระจก",
+     "มองเห็นสระ",
+     "สระ"
+    ],
+    "cue_en": [
+     "glass",
+     "pool"
+    ],
+    "cue_zh": [
+     "玻璃",
+     "泳池"
+    ]
+   },
+   {
+    "th": "ด้านบนเป็น Sky Pool ค่ะ",
+    "en": "and the Sky Pool sits right above it.",
+    "cue_th": [
+     "Sky Pool",
+     "ด้านบน"
+    ],
+    "cue_en": [
+     "Sky Pool",
+     "above"
+    ],
+    "cue_zh": [
+     "Sky Pool",
+     "上方",
+     "上面"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_g",
+   "zoom": {
+    "x": 50.0,
+    "y": 85.0,
+    "scale": 1.6
+   },
+   "spot": {
+    "x": 50.0,
+    "y": 82.3,
+    "label_en": "BIOGENESIS",
+    "sub_en": "Fitness · Ground floor · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_g_biogenesis",
+    "title_en": "BIOGENESIS",
+    "sub_en": "Fitness · 197 sq.m.",
+    "chips_en": [
+     "Curved glass wall to the lagoon",
+     "Sky Pool overhead",
+     "Spinning · Pilates · Bungee next door"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_fitness_where_ground",
+    "label_en": "All of the ground floor",
+    "label_th": "ดูทั้งชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_fitness_where_skypool",
+    "label_en": "The Sky Pool above",
+    "label_th": "Sky Pool ด้านบน",
+    "next_story": "sky_pool_where",
+    "tool": null
+   },
+   {
+    "id": "story_fitness_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:09_facilities_ground.md#9.1.1",
+   "report:09_facilities_ground.md#9.3",
+   "report:08_facilities_overview.md#8.10.2",
+   "slides:intro-018",
+   "slides:intro-019"
+  ],
+  "notes_th": "ผังชั้น G → ซูมลงครึ่งวงกลมด้านล่าง → วงชี้ที่ Biogenesis (อ่านจากป้าย BIOGENESIS บนผัง วางกลางครึ่งวงกลม) → ตัดไปภาพไฟนอล Biogenesis 01 (กลางวัน เห็นลากูนผ่านกระจกและท้องสระกระจกเหนือหัว) → ชิป 197 ตร.ม. มาจากแผ่นแปลน facility ตามรายงาน 9.3 / 8.10.2 (✅ ใช้ได้เฉพาะขนาด ซึ่งคือสิ่งที่ใช้อยู่) ห้องเรียนสามห้องข้างๆ อยู่แถวเดียวกันตามรายงาน 9.1.1 กฎข้อ 6: ประโยคบอก 'ชั้น G อาคาร A' ชัดเจนว่าอยู่ในโครงการ ไม่ใช่ที่ห้องขาย"
+ },
+ {
+  "id": "kids_room_where",
+  "template": "spotlight",
+  "questions_th": [
+   "ห้องเด็กอยู่ไหน",
+   "Junior World อยู่ตรงไหน",
+   "Junior World คืออะไร",
+   "ห้องเด็กเป็นยังไง"
+  ],
+  "questions_en": [
+   "Where is the kids' room?",
+   "Where is Junior World?",
+   "What is Junior World?"
+  ],
+  "lines": [
+   {
+    "th": "ห้องเด็ก Junior World อยู่ชั้น G อาคาร A ค่ะ",
+    "en": "Junior World, our kids' room, is on the ground floor of Building A.",
+    "cue_th": [
+     "Junior World",
+     "จูเนียร์",
+     "ชั้น G"
+    ],
+    "cue_en": [
+     "Junior World",
+     "ground floor"
+    ],
+    "cue_zh": [
+     "Junior World",
+     "一楼",
+     "儿童"
+    ]
+   },
+   {
+    "th": "เป็นห้องเล่นธีมอวกาศค่ะ",
+    "en": "It's a space-themed playroom",
+    "cue_th": [
+     "อวกาศ",
+     "ห้องเล่น"
+    ],
+    "cue_en": [
+     "space"
+    ],
+    "cue_zh": [
+     "太空"
+    ]
+   },
+   {
+    "th": "มีบ่อบอลให้น้องๆ เล่นด้วยค่ะ",
+    "en": "with a ball pit for the little ones.",
+    "cue_th": [
+     "บ่อบอล"
+    ],
+    "cue_en": [
+     "ball pit",
+     "balls"
+    ],
+    "cue_zh": [
+     "球池"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_g_west",
+   "zoom": {
+    "x": 27.2,
+    "y": 57.7,
+    "scale": 1.6
+   },
+   "spot": {
+    "x": 27.2,
+    "y": 57.7,
+    "label_en": "JUNIOR WORLD",
+    "sub_en": "Kids' room · Ground floor · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "fac_g_junior_ballpit",
+    "title_en": "JUNIOR WORLD",
+    "sub_en": "Kids' room · Ground floor",
+    "chips_en": [
+     "Space-station theme",
+     "Ball pit",
+     "Galactic Shot game wall"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_kids_room_where_ground",
+    "label_en": "All of the ground floor",
+    "label_th": "ดูทั้งชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_kids_room_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น",
+   "report:09_facilities_ground.md#9.7",
+   "report:08_facilities_overview.md#8.2",
+   "slides:intro-018",
+   "slides:intro-024"
+  ],
+  "notes_th": "ผังชั้น G → ซูมไปปลายซ้ายของแถวห้อง → วงชี้ที่ Junior World (อ่านจากป้าย JUNIOR WORLD บนผัง) → ตัดไปภาพไฟนอล Junior World 02 (บ่อบอล + ผนังเกม Galactic Shot) → ชิปสามอันตามรายงาน 9.7 / 8.2 ข้อ 6 ไม่พูดอายุ/ความจุ/ค่าใช้ (ยังไม่มีข้อมูล) ไม่พูดเรื่องเข้าใช้ฟรี (เป็นคำทีมขาย ยังไม่ยืนยัน) Playground กลางแจ้งกับ Kid Pool ไม่ใส่ เพราะตำแหน่งเทียบกับห้องนี้มาจากแบบภูมิสถาปัตย์ concept"
+ }
+]

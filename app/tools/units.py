@@ -241,7 +241,54 @@ def _live_get(params: dict, table: str = "units") -> list[dict]:
     r = httpx.get(f"{settings.inventory_url}/rest/v1/{table}", params=params,
                   headers=headers, timeout=8)
     r.raise_for_status()
-    return r.json()
+    return _without_excluded(r.json())
+
+
+def _excluded_units() -> frozenset[str]:
+    """Units the sales system lists but the architect's drawings do not
+    (`sales/inventory_exclusions.json`). Read per call: a line removed when
+    the sales team fixes the system takes effect without a restart."""
+    path = (Path(__file__).resolve().parent.parent.parent / "data" / "projects"
+            / settings.project_id / "sales" / "inventory_exclusions.json")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return frozenset()
+    return frozenset(str(u).strip().upper() for u in data.get("units") or [])
+
+
+def _without_excluded(rows):
+    """Drop excluded units from a PostgREST answer, whichever shape it has
+    (a unit row, or a pricing row embedding `units`). Live 12 Oct: Emma
+    offered C-727 -- one of C-723..C-732, in the sales system, not in the
+    drawings -- as the sea-view room. Not shown, counted or recommended."""
+    gone = _excluded_units()
+    if not gone or not isinstance(rows, list):
+        return rows
+
+    def unit_no(row):
+        if not isinstance(row, dict):
+            return ""
+        inner = row.get("units") if isinstance(row.get("units"), dict) else row
+        return str(inner.get("unit_no") or "").strip().upper()
+
+    return _Page((row for row in rows if unit_no(row) not in gone), raw_len=len(rows))
+
+
+class _Page(list):
+    """Rows after the exclusions, remembering how many the server sent.
+    PostgREST applied `limit` BEFORE the filter, so "is the page full" must
+    read the server's count (review 14 Oct: a full 48-row page with 5
+    excluded units read as a short page, and find_units told the guest an
+    exact "ทั้งหมด 43 ห้อง" -- the cap spoken as the total again)."""
+
+    def __init__(self, rows, raw_len: int):
+        super().__init__(rows)
+        self.raw_len = raw_len
+
+
+def _page_len(rows) -> int:
+    return getattr(rows, "raw_len", len(rows))
 
 
 #: The join path from a unit to its project, `!inner` at every hop. The
@@ -595,12 +642,13 @@ def find_units(max_price_thb: float | None = None,
                 "instruction": ("เช็คระบบผังขายไม่ได้ตอนนี้ ให้บอกลูกค้าตรงๆ "
                                 "ว่าขอตรวจสอบกับฝ่ายขาย ห้ามแต่งรายการเอง")}
     total = None
+    page = _page_len(rows)                    # what the server sent, before exclusions
     if descending:
         # Variety beats eight twins: one unit per size first (the guest is
         # choosing a room type, not a room number), then fill from the top.
         # When the 48-row page is full the cheap end is fetched too, so the
         # spread covers both ends of the budget instead of one price band.
-        total_known = len(rows) < 48
+        total_known = page < 48
         pool = list(rows)
         if not total_known:
             have = {r.get("unit_no") for r in pool}
@@ -645,7 +693,7 @@ def find_units(max_price_thb: float | None = None,
                         f"หลายสิบห้องในงบ (แสดงตัวอย่าง {len(units_found)} "
                         "ห้องคละขนาด เรียงจากราคาสูงในงบลงมา อาจมีมากกว่านี้)")
     else:
-        capped = len(rows) >= 8
+        capped = page >= 8
         count_phrase = (f"อย่างน้อย {len(units_found)} ห้อง (แสดงตัวอย่าง "
                         f"{len(units_found)} รายการ อาจมีมากกว่านี้)"
                         if capped else f"{len(units_found)} ห้อง")
@@ -668,6 +716,11 @@ def find_units(max_price_thb: float | None = None,
                 " ทุกห้องในรายการอยู่ในงบที่ถาม แต่นโยบายคือไม่เปิดเผยตัวเลขราคา "
                 "ห้ามพูดหรือเดาราคา ให้บอกว่าราคาแน่นอนคุยกับฝ่ายขายโดยตรง"
             )
+    # Owner 12 Oct on the robot: she named a room and the screen kept the
+    # last slide -- "อันนี้ต้องโชว์เป็นห้อง". The list screen is not drawn on the
+    # robot face; the room card is.
+    instruction += (" ถ้าแนะนำห้องเจาะจงหรือลูกค้าสนใจห้องใด ให้เรียก show_unit ห้องแรกที่พูดถึงทันที "
+                    "เพื่อขึ้นการ์ดห้องบนจอ")
     return {"ok": True, "screen": "unitlist", "units": units_found,
             "count": len(units_found),
             "total": total,          # known exact total, or None when capped
@@ -1131,6 +1184,120 @@ def compare_unit_types(building: str | None = None) -> dict:
                             "ห้ามแต่งขนาดหรือวิว ตอบความแตกต่างแล้วจบทันที ห้ามถามคำถามต่อท้าย "
                             + ("" if settings.units_show_price else
                                "ไม่พูดตัวเลขราคา ถ้าลูกค้าบอกงบให้ใช้ find_units แทน"))}
+
+
+#: The tool's enum -> the sales DB's unit type (names read from the live
+#: system 12 Oct 2026: "Studio", "1 Bedroom", "2 Bedroom") and how she says it.
+_ROOM_TYPES = {"studio": ("Studio", "สตูดิโอ"),
+               "1br": ("1 Bedroom", "1 ห้องนอน"),
+               "2br": ("2 Bedroom", "2 ห้องนอน")}
+
+
+@tool(
+    name="show_room_type",
+    description=(
+        "ขึ้นผังห้องตัวอย่างของแบบห้องที่ลูกค้าเลือก (สตูดิโอ / 1 ห้องนอน / 2 ห้องนอน) บนจอ "
+        "เซิร์ฟเวอร์เลือกห้องที่ยังว่างจริงจากระบบผังขายให้เอง ใช้เมื่อลูกค้าตอบหรือแตะเลือกแบบห้อง "
+        "หรือขอดูผัง/รูปห้องแบบใดแบบหนึ่งโดยไม่ระบุเลขห้อง (ระบุเลขห้อง ใช้ show_unit)"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "type": {"type": "string", "enum": list(_ROOM_TYPES),
+                     "description": "studio = สตูดิโอ, 1br = 1 ห้องนอน, 2br = 2 ห้องนอน"},
+        },
+        "required": ["type"],
+    },
+    tags=["units"],
+    blocking=True,
+)
+def show_room_type(type: str) -> dict:  # noqa: A002 -- the model-facing name
+    """Owner 12 Oct 2026: the room-type buttons under her question ("สตูดิโอ
+    หนึ่งห้องนอน หรือสองห้องนอนคะ") -- "พอกดไปเราก็อาจจะขึ้นผังหรือรูปห้องนั้น".
+
+    The model picks a KIND, the server picks the room -- show_unit's rule one
+    step further: no room number to mishear, and the room is always one the
+    sales system says is available now. The typical size of that kind (the
+    most common among those available) with a verified unit plan, lowest unit
+    number first so the same tap shows the same room. The card is built and
+    gated exactly as show_unit's (scope, freshness, prices stripped).
+    """
+    from collections import Counter
+
+    from app import unit_plans
+
+    key = (type or "").strip().lower()
+    if key not in _ROOM_TYPES:
+        return {"ok": False, "error": "unknown room type",
+                "instruction": ("แบบห้องมีสตูดิโอ 1 ห้องนอน และ 2 ห้องนอน "
+                                "ให้ถามลูกค้าว่าสนใจแบบไหน ห้ามเดา")}
+    db_name, th_name = _ROOM_TYPES[key]
+    if not live_configured():
+        return {"ok": False, "error": "no live inventory",
+                "instruction": ("เครื่องนี้ยังไม่ได้ต่อระบบผังขาย ให้บอกขนาดตาม \"แบบห้องและขนาด\" "
+                                "ในข้อมูลโครงการ แล้วชวนดูผังห้องจริงกับทีมขาย "
+                                "ห้ามพูดว่าไม่มีข้อมูล ห้ามบอกว่าขึ้นผังบนจอแล้ว")}
+    params = _scoped({"select": _LIVE_SELECT.replace("unit_types(name)", "unit_types!inner(name)"),
+                      "status": "eq.available", "unit_types.name": f"eq.{db_name}",
+                      "order": "unit_no.asc", "limit": "1000"})
+    try:
+        rows = _live_get(params)
+    except Exception:
+        logger.exception("live inventory unreachable")
+        return {"ok": False, "error": "inventory unreachable",
+                "instruction": ("เช็คระบบผังขายไม่ได้ตอนนี้ ให้บอกขนาดตาม \"แบบห้องและขนาด\" "
+                                "แล้วบอกว่าผังห้องจริงขอให้ทีมขายเปิดให้ดู ห้ามแต่งข้อมูลเอง")}
+    if any(row.get("status") != "available" for row in rows):
+        return _blocked_inventory_state("unexpected_inventory_status")
+    if not rows:
+        turnlog.record("show_room_type", type=key, room=None, available=0)
+        return {"ok": True, "screen": None, "room_type": {"type": db_name, "available": 0},
+                "instruction": (f"ห้องแบบ {th_name} ตอนนี้ไม่มีห้องว่างในระบบผังขายแล้ว "
+                                "บอกลูกค้าตรงๆ อย่างเป็นธรรมชาติ แล้วชวนดูแบบอื่นที่ยังมีห้องว่าง "
+                                "หรือให้ทีมขายช่วยเช็คห้องที่อาจว่างเพิ่ม ห้ามบอกว่าขึ้นผังบนจอแล้ว")}
+
+    def size(row: dict) -> float:
+        try:
+            return float(row.get("msize") or row.get("size_sqm") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def has_plan(row: dict) -> bool:
+        room = _normalize_room(str(row.get("unit_no") or ""))
+        return bool(room and unit_plans.plan_url(room))
+
+    counts = Counter(size(r) for r in rows if size(r) > 0)
+    typical = max(counts, key=lambda v: (counts[v], -v)) if counts else 0.0
+    pick = (next((r for r in rows if size(r) == typical and has_plan(r)), None)
+            or next((r for r in rows if has_plan(r)), None)
+            or next((r for r in rows if size(r) == typical), rows[0]))
+    prepared = _prepared_live_card(_card_from_live(pick))
+    if not prepared.allowed:
+        return _blocked_inventory(prepared)
+    card = prepared.payload
+    _attach_unit_plan(card)
+    card["example_of"] = db_name
+    sizes = sorted(counts) or [size(pick)]
+    # No count of what is left: "ยังว่าง 586 ห้อง" volunteered to a guest who
+    # asked to SEE a room type (live eval, 12 Oct) reads as "nobody buys
+    # these". How many are available stays compare_unit_types' answer, for a
+    # guest who asks it; here it is only logged.
+    room_type = {"type": db_name, "sqm_min": sizes[0], "sqm_max": sizes[-1]}
+    turnlog.record("show_room_type", type=key, room=card.get("room"), available=len(rows))
+    span = (f"{sizes[0]:g} ตร.ม." if sizes[0] == sizes[-1]
+            else f"{sizes[0]:g} ถึง {sizes[-1]:g} ตร.ม.")
+    shown = ("ผังห้องตัวอย่างขึ้นจอแล้ว" if card.get("floorplan")
+             else "การ์ดห้องตัวอย่างขึ้นจอแล้ว แต่ห้องนี้ยังไม่มีผังบนจอ ห้ามพูดว่ามีผังให้ดู")
+    return {"ok": True, "screen": "unit", "unit": card, "sample": False,
+            "room_type": room_type, "policy_trace": prepared.trace(),
+            "instruction": (f"{shown}: ห้อง {card.get('room')} ชั้น {card.get('floor')} "
+                            f"ขนาด {size(pick):g} ตร.ม. เป็นห้องแบบ {th_name} ที่ยังว่างอยู่จริง "
+                            f"ห้องแบบ {th_name} มีขนาด {span} "
+                            "เล่าสั้นๆ ว่านี่คือตัวอย่างห้องจริงที่ยังว่าง พร้อมขนาดและชั้น "
+                            "ห้ามพูดจำนวนห้องที่เหลือ "
+                            "ห้ามบรรยายสิ่งที่อยู่ในผังหรือรูปเพราะคุณมองไม่เห็น (เช่น ตำแหน่งเฟอร์นิเจอร์ ทิศ วิว) "
+                            "ห้ามสรุปว่าเหมาะลงทุนหรืออยู่เอง ห้ามพูดราคา "
+                            "ถ้าลูกค้าอยากเห็นห้องอื่นของแบบนี้ ให้ทีมขายเปิดผังขายให้ดู")}
 
 
 @tool(

@@ -1,0 +1,15 @@
+[
+  {
+    "id": "fac_g_bungee_02",
+    "source": "web/4.facilities/G FLOOR/G FLOOR - Bungee Gym&Yoga 02.jpg",
+    "crop": [
+      147,
+      0,
+      2605,
+      1536
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "Final render of Bungee Gym & Yoga, picture 2 (report 9.6: five people in waist harnesses on elastic cords hung from the ceiling beam, glass wall onto the lagoon). Photo of the bungee_yoga_where spotlight: the question it answers is 'Bungee Gym คืออะไร', and the drill card's picture (Bungee 01) shows only the yoga class. Same 16:10 centre crop as Bungee 01; no baked text."
+  }
+]

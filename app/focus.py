@@ -104,6 +104,13 @@ NOT_MAIN = "not the main speaker"
 #: The robot is walking or gesturing: every voice is let through (see
 #: `_robot_moving`).
 ROBOT_MOVING = "robot moving"
+#: Rule 2 waived: a conversation is under way (FOCUS_CONVERSE_HOLD_S), or the
+#: voice is loud enough to be standing at the robot (FOCUS_NEAR_RMS).
+CONVERSING = "in conversation"
+NEAR_VOICE = "near voice"
+#: Rule 2 waived: the segment opened within FOCUS_REPLY_WINDOW_S of her voice
+#: ending -- the guest answering what she just said (`her_turn_ended`).
+REPLY = "reply to her"
 
 # ---- tunables (constants, not settings: tune from focus_* rows first) ----
 #: Rule 3's window: mouth samples this recent count for "is anybody in front
@@ -607,7 +614,15 @@ def may_open(t: float, rms: float | None = None) -> tuple[bool, str]:
         return True, OFF                                    # rule 1
     with _lock:
         _voice_at[0] = t if _voice_at[0] is None else max(_voice_at[0], t)
-        allow, reason, inputs = _decide(t)
+        allow, reason, inputs = _decide(t, rms)
+        # Renewed only by a segment the rules themselves let through (a face
+        # in front, or the name called) -- never by the waivers: chained on
+        # its own opens, one loud word kept the room open for the rest of the
+        # call (simulated on 12-13 Oct: 555 room segments through).
+        if allow and reason == OK and settings.focus_converse_hold_s > 0:
+            _conversing["until"] = t + float(settings.focus_converse_hold_s)
+        if allow:
+            _reply["since"].add(reason)      # her next turn judges the chain
         released = inputs.pop("released", None)
         _stats["open" if allow else "deny"] += 1
         _last_decision.clear()
@@ -653,7 +668,60 @@ def _robot_moving() -> bool:
         return False
 
 
-def _decide(t: float) -> tuple[bool, str, dict]:
+#: Until when this session counts as "in conversation" (FOCUS_CONVERSE_HOLD_S
+#: after the last segment that opened). Conversation state: `reset` clears it.
+_conversing = {"until": float("-inf")}
+
+#: Until when a voice is "the reply" (her voice's end + FOCUS_REPLY_WINDOW_S),
+#: how many of her turns in a row answered only window-admitted voices
+#: (`chain`), and the reasons the segments since her last turn opened on
+#: (`since`). Conversation state: `reset` clears it.
+_reply = {"until": float("-inf"), "chain": 0, "since": set()}
+
+#: Her turns in a row that answered only voices the reply window let in (no
+#: face, no near voice, no name) before the window stops renewing. Review
+#: 13 Oct, replayed on 12 Oct's denials: renewed by every answer, chatter
+#: within 10 s of her voice chained up to 5 answers (~80 s), and each
+#: admitted transcript reset the idle clock so the call never ended. Three
+#: exchanges serve a guest who stays off camera; a face, a voice at the
+#: robot or her name starts the count again.
+MAX_REPLY_CHAIN = 3
+
+
+def her_turn_ended(voice_end: float, epoch: int | None = None) -> None:
+    """Her turn is complete and her voice plays out at `voice_end`
+    (monotonic, the same clock `may_open` is asked on).
+
+    13 Oct, robot logs: on a camera-opened call the guest at the chest
+    screen is out of the head camera -- 19 of 19 "probably known" arrivals
+    on 12 Oct were 209-577 px faces lost within seconds, and every one of
+    the 983 "no face in front" denials had no face at all. The converse
+    hold never started there (it is renewed only by a face-verified open),
+    so a guest who never shows a face was deaf the whole call. Turn-taking
+    is the evidence that needs no camera: speech that starts within the
+    window after she stopped is the answer to her, the way people take
+    turns. Room chatter only lands if it falls inside that window; the
+    loudness floor (VAD_MIN_RMS_FAR) still applies. 0 = off."""
+    window = float(getattr(settings, "focus_reply_window_s", 0) or 0)
+    if window <= 0:
+        return
+    with _lock:
+        # a superseded call's late turn_complete must not open the new call's
+        # window before its greeting (the `segment_closed` epoch rule)
+        if epoch is not None and epoch != _epoch[0]:
+            return
+        since, _reply["since"] = _reply["since"], set()
+        if since and since <= {REPLY}:
+            _reply["chain"] += 1
+        elif since & {OK, NEAR_VOICE, CONVERSING}:
+            _reply["chain"] = 0
+        if _reply["chain"] >= MAX_REPLY_CHAIN:
+            _reply["until"] = float("-inf")
+            return
+        _reply["until"] = max(_reply["until"], float(voice_end) + window)
+
+
+def _decide(t: float, rms: float | None = None) -> tuple[bool, str, dict]:
     engaged = _engaged_faces(t)
     camera = _last_frame_t is not None and (t - _last_frame_t) <= CAMERA_STALE_S
     seen = _latest_per_track(t - max(0.0, float(settings.focus_hold_s)), t + 0.5)
@@ -680,10 +748,27 @@ def _decide(t: float) -> tuple[bool, str, dict]:
     if called:
         inputs["called"] = True
     if settings.focus_require_face and _origin["summoned"] and not called:
-        if not camera:
-            return False, NO_CAMERA, inputs
-        if not engaged:
-            return False, NO_FACE, inputs
+        if not camera or not engaged:
+            # 13 Oct, robot logs of 12-13 Oct: 1,065 "no face in front" to 86
+            # opens. Most were room voices (rms 0.02-0.04, the chatter this
+            # rule exists for), but a guest standing right at the chest
+            # screen is under the head camera or fills its frame (a 540 px
+            # face seen for one frame, then lost): mid-conversation they were
+            # cut off, and "ขอเชคแฮน" never reached the model. Two waivers,
+            # each off unless set: a conversation that just had a segment
+            # open stays open, and a voice loud enough to be at the robot is
+            # heard. Rules 3-5 still judge whenever a face IS in view.
+            if t <= _conversing["until"]:
+                inputs["conversing"] = True
+                return True, CONVERSING, inputs
+            if t <= _reply["until"]:
+                inputs["reply"] = True
+                return True, REPLY, inputs
+            near = float(settings.focus_near_rms or 0.0)
+            if near > 0 and rms is not None and rms >= near:
+                inputs["near"] = True
+                return True, NEAR_VOICE, inputs
+            return False, (NO_CAMERA if not camera else NO_FACE), inputs
 
     # Full engagement (FOCUS_ENGAGE_MODE=full): the person the conversation
     # is with. None = semi, which is also full mode before anybody is main
@@ -1134,6 +1219,10 @@ def reset() -> None:
         _called.update(t=None, until=float("-inf"), bearing=None)
         _main["epoch"] = float("-inf")
         _calls.clear()
+        _conversing["until"] = float("-inf")
+        _reply["until"] = float("-inf")
+        _reply["chain"] = 0
+        _reply["since"] = set()
 
 
 def _forget_everything() -> None:

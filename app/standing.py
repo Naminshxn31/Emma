@@ -92,8 +92,12 @@ async def run() -> None:
                 # Once, not every five seconds: a robot page that is closed
                 # all evening would otherwise write this line forever.
                 said_nobody = True
-                logger.info("standing line: nobody on standby to ring — "
-                            "retrying quietly")
+                if wake.held_only():
+                    logger.info("standing line: the standby page is muted — "
+                                "not ringing it open (the camera still can)")
+                else:
+                    logger.info("standing line: nobody on standby to ring — "
+                                "retrying quietly")
     except asyncio.CancelledError:
         raise
     except Exception:

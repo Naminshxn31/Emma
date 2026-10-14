@@ -122,13 +122,57 @@ def strip_concept_caveat(text: str | None) -> str:
     return " ".join(kept).strip()
 
 
+#: What the owner overruled (12 Oct 2026, the project report's deny_terms):
+#: the rooftop garden & jacuzzi, and the old plan's Thermal Galaxy. The
+#: approved slide catalog still describes the deck's "A WORLD OF INSPIRATION"
+#: vignette as "ลานพักผ่อนบนดาดฟ้าตอนเย็น"; search handed that back as
+#: `detail`, and with stories on (review 12 Oct) "บนดาดฟ้ามีอะไร" came back as
+#: "บนดาดฟ้ามีสวนลอยฟ้า...". "ดาดฟ้า" alone is not overruled -- the roof
+#: deck's height is an approved figure -- only a garden, terrace or jacuzzi
+#: ON it.
+OVERRULED = re.compile(
+    r"roof\s*-?\s*top|รูฟ\s*ท็อป|(?:สวน|ลาน|จากุซซี่)\S*ดาดฟ้า|thermal\s*galaxy",
+    re.IGNORECASE,
+)
+
+
+def strip_overruled(text: str | None) -> str:
+    """Drop the clauses that describe something the owner overruled: a whole
+    English sentence, or the space-delimited Thai piece (with the "(CAPTION)"
+    right after it, which would be left naming nothing)."""
+    value = str(text or "")
+    if not value or not OVERRULED.search(value):
+        return value
+    kept = []
+    for sentence in re.split(r"(?<=[.!?])\s+", value):
+        if not OVERRULED.search(sentence):
+            kept.append(sentence)
+            continue
+        if not _THAI.search(sentence):
+            continue
+        pieces, out, drop_caption = sentence.split(), [], False
+        for piece in pieces:
+            if OVERRULED.search(piece):
+                drop_caption = True
+                continue
+            if drop_caption and piece.startswith("(") and piece.endswith(")"):
+                drop_caption = False
+                continue
+            drop_caption = False
+            out.append(piece)
+        if out:
+            kept.append(" ".join(out))
+    return " ".join(kept).strip()
+
+
 def sanitize_common_area_dimensions(text: str | None) -> str:
     """Hide prohibited common-area measurements while preserving locations.
 
     Also the one door every piece of project text goes through on its way to
     a model (facts, search results, slides), so the banned concept caveat is
-    cut here too (`strip_concept_caveat`)."""
-    value = strip_concept_caveat(text)
+    cut here too (`strip_concept_caveat`), and what the owner overruled
+    (`strip_overruled`)."""
+    value = strip_overruled(strip_concept_caveat(text))
     if not value or not _COMMON_AREA.search(value):
         return value
     value = _DIMENSION.sub("", value)
@@ -1021,7 +1065,10 @@ _BARE_AMOUNT = frozenset({"เท่าไหร่", "เท่าไร"})
 #: slide search — any real money word still refuses it first.
 _MEASURE_PARTS = ("ห่าง", "ไกล", "ระยะ", "ยาว", "กว้าง", "สูง", "ลึก", "ใหญ่",
                   "ขนาด", "พื้นที่", "เมตร", "กิโล", "ใช้เวลา", "นาที", "ชั่วโมง",
-                  "ความจุ")
+                  "ความจุ",
+                  # 12 Oct, the report's FAQ walked through this gate: "มีซาวน่า
+                  # กี่ห้อง ร้อนเท่าไร" went to the sales team as a price question
+                  "ร้อน", "อุณหภูมิ", "องศา")
 #: Whole tokens only: จุ (holds) sits inside จุด (point) and much else.
 _MEASURE_EXACT = frozenset({"จุ"})
 
@@ -1040,14 +1087,36 @@ def _measures_something(words: list[str]) -> bool:
 #: "ห้องขนาดเท่าไหร่", "ห้องห่างจากลิฟต์เท่าไหร่", "ตึกสูงเท่าไหร่" stay measures.
 _UNIT_WORDS = frozenset({"ห้อง", "ยูนิต", "คอนโด", "ห้องชุด", "ห้องนอน"})
 _PICKING_PARTS = ("ใหญ่", "สูง")
+#: 12 Oct, measured over the 316 questions the approved report answers in its
+#: own FAQ: the rule above sent 11 non-money ones to the sales team as price
+#: questions, because a "ห้อง" there is a ROOM OF THE PROJECT, not a unit for
+#: sale ("ห้อง Spinning Class ใหญ่เท่าไร", "ห้องน้ำชั้น 3 ใหญ่เท่าไร", "Common
+#: Sphere ... มีห้องประชุมกี่ห้อง"), or a part of the unit is measured ("เพดาน
+#: ห้องสูงเท่าไร"). A question naming one of these measures that thing.
+#: Matched in the JOINED tokens, normalised like `tokenize` (NFKC splits ำ, and
+#: newmm splits "ห้องน้ำ" into ห้อง+น้ำ and "ซาวน่า" into ซาว+น่า). No word that
+#: sits inside a common one: ครัว is in ครอบครัว, บ่อ in บ่อย -- hence บ่อบอล.
+_MEASURED_THINGS = tuple(unicodedata.normalize("NFKC", t) for t in (
+    "เพดาน", "ฝ้า", "ห้องน้ำ", "ระเบียง", "หน้าต่าง", "ประตู", "เตียง", "ห้องครัว",
+    "สระ", "ซาวน่า", "ฟิตเนส", "ห้องประชุม", "จักรยาน", "บ่อบอล", "ลิฟต์",
+    "spinning", "cycling", "pilates", "bungee", "cinema", "sphere", "lounge",
+    "junior", "biogenesis", "office", "sauna", "gym", "pool"))
+#: "the size is given, so the size is not what is asked" -- a number WITH a
+#: size unit. A bare digit is not that: it is in the type's name ("1-Bedroom
+#: ขนาดเท่าไร" was refused as a price question).
+_SIZE_GIVEN = re.compile(r"\d+(?:\.\d+)?\s*(?:ตาราง|ตร\.?\s*ม|sq|เมตร|m2|m²)", re.IGNORECASE)
 
 
-def _asks_a_price_anyway(words: list[str]) -> bool:
-    if "ละ" in words:
+def _asks_a_price_anyway(words: list[str], query: str = "") -> bool:
+    # "ตารางเมตรละเท่าไหร่" is priced per something; "อย่างละกี่ห้อง" is "of each".
+    if any(w == "ละ" and (i == 0 or words[i - 1] != "อย่าง") for i, w in enumerate(words)):
         return True
     if not any(w in _UNIT_WORDS for w in words):
         return False
-    if any(ch.isdigit() for w in words for ch in w):
+    joined = "".join(words)
+    if any(t in joined for t in _MEASURED_THINGS):
+        return False
+    if _SIZE_GIVEN.search(query or "") if query else any(ch.isdigit() for w in words for ch in w):
         return True
     measuring = [w for w in words if w in _MEASURE_EXACT or any(p in w for p in _MEASURE_PARTS)]
     return all(any(a in w for a in _PICKING_PARTS) for w in measuring)
@@ -1088,7 +1157,7 @@ def is_commercial(query: str) -> bool:
     if not words:
         return False
     haystack = " %s " % " ".join(words)
-    measures = _measures_something(words) and not _asks_a_price_anyway(words)
+    measures = _measures_something(words) and not _asks_a_price_anyway(words, q)
     for term in _THAI_TERMS:
         needle = " %s " % " ".join(tokenize(term))
         if needle in haystack:

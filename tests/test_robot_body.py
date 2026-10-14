@@ -634,3 +634,65 @@ def test_every_routes_off_stop_quotes_what_must_not_be_said(body, monkeypatch, h
     assert "ห้ามพูดว่า 'หยุดแล้ว'" in out["instruction"]
     assert ("ให้ตอบว่า 'ส่งคำสั่งหยุดแล้วค่ะ'" in out["instruction"]) == (hardware == "ok")
     assert ("เจ้าหน้าที่" in out["instruction"]) == (hardware == "failed")
+
+
+# ==================== the handshake while the robot's switch is off ====================
+
+
+def _greet_spy(monkeypatch, result=True):
+    from app import robot_arm
+
+    calls = []
+
+    async def greet(session=None):
+        calls.append(session)
+        return result
+
+    monkeypatch.setattr(robot_arm, "greet", greet)
+    monkeypatch.setattr(robot_arm, "armed", lambda: True)
+    return calls
+
+
+def test_a_voice_handshake_uses_the_greeting_path_while_the_switch_is_off(body, monkeypatch):
+    """Owner, 13 Oct: "ขอเชคแฮน" by voice and the arm never moved -- the robot's
+    "สั่งท่าทางด้วยเสียง" switch had never been turned on, so the app refused
+    every voice gesture. The camera greeting's verified handshake plays
+    without that switch; a voice handshake now goes through it. Only the
+    handshake, and only after the heard guard."""
+    calls = _greet_spy(monkeypatch)
+    face = Face(accept)
+    caps(face, enabled=False)
+    say(face, "ขอเชคแฮนหน่อยค่ะ")
+    result = run(face, lambda: body.request("handshake"))
+    assert result["ok"] is True and result["hardware"] == "requested"
+    assert calls == [face] and face.ws.commands() == []          # not the body bridge
+    assert "ห้ามพูดว่า 'ยื่นมือแล้ว'" in result["instruction"]
+    # another gesture still waits for the switch
+    say(face, "ยกแขนขวาหน่อย", utterance="u2")
+    other = run(face, lambda: body.request("raise_right_arm"))
+    assert other["ok"] is False and calls == [face]
+    # and nothing moves on a caption that did not ask
+    say(face, "เช็คบิลหน่อยค่ะ", utterance="u3")
+    refused = run(face, lambda: body.request("handshake"))
+    assert refused["reason"] == "heard_missing" and calls == [face]
+
+
+def test_a_handshake_the_app_refuses_as_disabled_takes_the_greeting_path(body, monkeypatch):
+    """The switch went off after the caps the server read: the app answers
+    "disabled" and the handshake still goes through the greeting path."""
+    calls = _greet_spy(monkeypatch)
+    face = Face(lambda frame: {"accepted": False, "reason": "disabled"})
+    caps(face, enabled=True)
+    say(face, "shake hands with me")
+    result = run(face, lambda: body.request("handshake"))
+    assert result["ok"] is True and calls == [face]
+
+
+def test_a_greeting_path_that_refuses_is_reported_not_claimed(body, monkeypatch):
+    calls = _greet_spy(monkeypatch, result=False)
+    face = Face(accept)
+    caps(face, enabled=False)
+    say(face, "จับมือหน่อย")
+    result = run(face, lambda: body.request("handshake"))
+    assert result["ok"] is False and result["hardware"] == "refused" and calls == [face]
+

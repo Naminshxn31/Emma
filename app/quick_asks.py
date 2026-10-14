@@ -22,6 +22,8 @@ sales-room desk page never sees it and its `ready` frame is unchanged.
 """
 from __future__ import annotations
 
+import re
+
 LANGS = ("th", "en", "zh")
 
 _LANG_NAMES_TH = {"th": "ไทย", "en": "อังกฤษ", "zh": "จีน"}
@@ -117,4 +119,114 @@ def text_for(profile: str, ask_id, lang=None) -> str | None:
             return ("[ลูกค้าแตะปุ่ม \"%s\" บนจอ ไม่ได้พูด — ตอบเป็นภาษาเดียวกับที่ลูกค้าพูดล่าสุด "
                     "ถ้ายังไม่ได้พูด ตอบเป็นภาษา%s] %s"
                     % (topic["label"]["th"], _LANG_NAMES_TH[code], topic["ask"][code]))
+    item = _choice(ask_id)
+    if item is not None and TOPICS.get(profile):
+        return ("[ลูกค้าแตะปุ่ม \"%s\" ใต้คำถามของคุณบนจอ ไม่ได้พูด — ตอบเป็นภาษาเดียวกับที่ลูกค้าพูดล่าสุด "
+                "ถ้ายังไม่ได้พูด ตอบเป็นภาษา%s] %s"
+                % (item["label"]["th"], _LANG_NAMES_TH[code], item["ask"]))
     return None
+
+
+# ---- choices under her own question (owner, 12 Oct 2026) ----------------------
+#
+# "ลูกค้ากำลังมองหาห้องแบบสตูดิโอ หนึ่งห้องนอน หรือสองห้องนอนคะ คำพวกนี้อยากให้ขึ้น
+# เป็นตัวเลือกบนจอด้วยให้ลูกค้ากดเข้าไปดูได้ ... พอกดไปเราก็อาจจะขึ้นผังหรือรูปห้องนั้น"
+#
+# The topics' rule again: the page gets ids and labels, a tap comes back as an
+# id, the words the model reads are these. What a tap *does* is a tool the
+# model can also reach by voice ("สตูดิโอค่ะ" after the same question), so a
+# spoken answer and a tapped one end on the same screen. The buttons follow
+# what she ASKED -- read from her own transcript by session.py -- never what
+# the guest said (their words stay off this screen).
+
+#: Each set: the tool a tap leads to (no tool on this machine = no buttons --
+#: a button that asks for a tool she cannot see is the refusing-model bug),
+#: the line above the buttons, and the buttons in on-screen order.
+CHOICES: dict[str, dict] = {
+    "room_types": {
+        "tool": "show_room_type",
+        "hint": {"th": "แตะเพื่อดูผังห้องจริง", "en": "Tap to see a real room plan",
+                 "zh": "点击查看真实户型图"},
+        "items": (
+            {"id": "type_studio", "label": {"th": "สตูดิโอ", "en": "Studio", "zh": "开间"},
+             "ask": "ลูกค้าเลือกห้องแบบสตูดิโอ — เรียก show_room_type(type=\"studio\") "
+                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์"},
+            {"id": "type_1br", "label": {"th": "1 ห้องนอน", "en": "1 Bedroom", "zh": "一室"},
+             "ask": "ลูกค้าเลือกห้องแบบ 1 ห้องนอน — เรียก show_room_type(type=\"1br\") "
+                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์"},
+            {"id": "type_2br", "label": {"th": "2 ห้องนอน", "en": "2 Bedrooms", "zh": "两室"},
+             "ask": "ลูกค้าเลือกห้องแบบ 2 ห้องนอน — เรียก show_room_type(type=\"2br\") "
+                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์"},
+        ),
+    },
+}
+
+#: The room types as she says them. Thai is matched as whole phrases built on
+#: ห้องนอน / สตูดิโอ, never a short word that can sit inside another one (the
+#: ราคา-inside-อาคาร trap); "Pilates Studio" is a facility, not a room type.
+_ROOM_TYPE_WORDS = (
+    re.compile(r"สตูดิโอ|(?<!pilates )\bstudios?\b|开间|单间", re.IGNORECASE),
+    re.compile(r"(หนึ่ง|1)\s*ห้องนอน|ห้องนอนเดียว|\b(one|1)[\s-]*bed(room)?s?\b|一室|一房|一居",
+               re.IGNORECASE),
+    re.compile(r"(สอง|2)\s*ห้องนอน|\b(two|2)[\s-]*bed(room)?s?\b|两室|两房|两居|二室|二房",
+               re.IGNORECASE),
+)
+
+
+def _choice(ask_id) -> dict | None:
+    for spec in CHOICES.values():
+        for item in spec["items"]:
+            if item["id"] == ask_id:
+                return item
+    return None
+
+
+def choice_set_of(ask_id) -> str | None:
+    """Which set a choice id belongs to, or None (a topic, a language, junk)."""
+    for name, spec in CHOICES.items():
+        if any(item["id"] == ask_id for item in spec["items"]):
+            return name
+    return None
+
+
+#: Where her sentences end: ?/! (Thai and CJK too), ". " before a capital,
+#: and the Thai particles ค่ะ/คะ before a space. Not a bare "." -- "ตร.ม." and
+#: "51.5" sit inside Thai sentences.
+_SENTENCE_END = re.compile(r"(?<=[!?。！？])\s*|\.\s+(?=[A-Z])|(?<=ค่ะ)\s+|(?<=คะ)\s+")
+
+
+def _last_sentence(text: str) -> str:
+    parts = [part for part in _SENTENCE_END.split((text or "").strip()) if part and part.strip()]
+    return parts[-1] if parts else ""
+
+
+def choices_asked(said: str) -> str | None:
+    """The set her line asks the guest to pick from, or None. The caller has
+    already checked that the line ends on a question; only that last sentence
+    is read, so an answer that listed the room types and then asked about
+    something else ("...Which floor interests you?") gets no type buttons."""
+    question = _last_sentence(said)
+    if _types_named(question) >= 2:
+        return "room_types"
+    # "...สองห้องนอน 52 ตร.ม. ค่ะ ลูกค้าสนใจห้องแบบไหนคะ": the types listed just
+    # before, and a question that asks for one of them by kind -- not "which
+    # floor", which is a different choice.
+    if _WHICH_TYPE.search(question) and _types_named((said or "").strip()[-200:]) >= 2:
+        return "room_types"
+    return None
+
+
+#: A question that asks for one of the room types just listed.
+_WHICH_TYPE = re.compile(r"แบบไหน|ห้องไหน|\bwhich\s+(one|type|unit|room)s?\b|哪种|哪一种|哪个户型",
+                         re.IGNORECASE)
+
+
+def _types_named(text: str) -> int:
+    return sum(1 for rx in _ROOM_TYPE_WORDS if rx.search(text or ""))
+
+
+def choices_for_page(name: str) -> dict:
+    """What the page draws for a set: ids and labels, never the words."""
+    spec = CHOICES[name]
+    return {"type": "choices", "set": name, "hint": dict(spec["hint"]),
+            "items": [{"id": item["id"], "label": dict(item["label"])} for item in spec["items"]]}

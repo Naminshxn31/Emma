@@ -9,6 +9,7 @@ model's context when the next visitor walks up.
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 
 import pytest
@@ -56,6 +57,43 @@ def test_the_loop_rings_only_when_no_session_is_live(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(standing.run())
     assert rings == ["standing_line", "standing_line"]
+
+
+def test_a_muted_page_is_not_rung_open_but_the_camera_still_rings_it():
+    """Owner, 14 Oct: muted = the standing line does not ring the page back
+    open (an idle line re-dialled with the mic on reached the room's chatter),
+    but "ตอน Mute ถ้ากล้องจับหน้าคนได้ จะต้องทักนะ" -- the camera's bells
+    still reach it. The page says so on its bell socket; any other text is
+    ignored, and a page that goes away takes its hold with it."""
+    from app import wake
+
+    class Sock:
+        def __init__(self):
+            self.sent = []
+
+        async def send_text(self, text):
+            self.sent.append(json.loads(text)["reason"])
+
+    wake.reset()
+    muted, plain = Sock(), Sock()
+    wake.register(muted)
+    wake.register(plain)
+    wake.note(muted, json.dumps({"type": "hold", "on": True}))
+    wake.note(plain, "not json")
+    wake.note(plain, json.dumps({"type": "something", "on": True}))
+    assert asyncio.run(wake.summon(reason="standing_line")) == 1
+    assert muted.sent == [] and plain.sent == ["standing_line"]
+    for reason in ("face_approach", "face_known", "face_stranger"):
+        asyncio.run(wake.summon(reason=reason))
+    assert muted.sent == ["face_approach", "face_known", "face_stranger"]
+    assert not wake.held_only()
+    wake.unregister(plain)
+    assert wake.held_only()
+    wake.note(muted, json.dumps({"type": "hold", "on": False}))
+    assert asyncio.run(wake.summon(reason="standing_line")) == 1 and muted.sent[-1] == "standing_line"
+    wake.unregister(muted)
+    assert not wake.held_only() and not wake._HELD
+    wake.reset()
 
 
 def test_a_virgin_standing_line_is_not_abandoned(monkeypatch):

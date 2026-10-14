@@ -24,9 +24,9 @@ def test_voice_preview_keeps_the_reference_layout_and_accessible_controls():
     assert "â€”" not in html
     assert '<div class="brand">' not in html
     assert "Listening..." in html
-    assert 'class="mascot-art"' in html
+    assert 'class="mascot-3d"' in html
     assert 'class="reply"' in html
-    assert html.index('class="mascot-art"') < html.index('class="reply"')
+    assert html.index('class="mascot-3d"') < html.index('class="reply"')
 
     # One coherent icon family: inline stroke SVGs, not platform-dependent emoji.
     # Counted in the controls bar: the hold buttons' placeholder plus is the
@@ -55,7 +55,7 @@ def _puppet_renderer_code() -> str:
     return block.split("real voice engine", 1)[0]
 
 
-def test_voice_preview_keeps_continuous_3d_motion_around_the_layered_puppet():
+def test_voice_preview_keeps_continuous_3d_motion_without_the_svg_puppet():
     html = PAGE.read_text(encoding="utf-8")
     script = _puppet_renderer_code()
     # If the slice ever mis-targets again it collapses to a few hundred
@@ -66,66 +66,34 @@ def test_voice_preview_keeps_continuous_3d_motion_around_the_layered_puppet():
     assert "function setPose(name, fromDemo)" in script
     assert "requestAnimationFrame(render)" in script
 
-    # Emma is one layered puppet: transforms interpolate between joint targets
-    # while the whole rig still floats, turns and tracks the pointer in 3D.
     # The orbit rings were removed on the owner's call — they sat on the wrap,
     # not the dragged rig, so they stayed centred as a ghost circle when Emma
-    # moved. The floating puppet keeps every other layer.
+    # moved.
     assert 'class="orbit' not in html
 
     for hook in (
         "perspective: 760px",
         "transform-style: preserve-3d",
-        'class="mascot-art"',
-        'class="rig-character"',
-        'class="puppet-head puppet-part"',
-        'class="puppet-body puppet-part"',
-        'class="puppet-arm-left puppet-part"',
-        'class="puppet-arm-right puppet-part"',
-        'class="puppet-wai-hands puppet-part"',
-        'class="eyes-smile face-part"',
-        'class="mouth-wide face-part"',
-        "transition:\n      transform .72s cubic-bezier(.2,.86,.25,1)",
-        "@keyframes puppet-blink",
-        "@keyframes puppet-wave",
         "rotateX(var(--tilt-x)) rotateY(var(--tilt-y))",
-        'class="mascot-turn"',
-        "@keyframes ambient-turn",
-        "@keyframes float-3d",
-        "@keyframes glint",
         "addEventListener('pointermove', aim",
         "requestAnimationFrame(render)",
-        'href="assets/emma/emma-puppet-atlas-reference-v2.png"',
-        'class="face-display"',
         "--state-accent",
         "--gaze-x",
-        # 'class="emma-data-orbit"' and "@keyframes emma-data-spin" left this
-        # list with the floor ring (owner, 2026-09-30 "อันนี้ลบทิ้ง...ได้เลย").
-        'class="emma-motion-prop prop-search"',
-        'class="emma-motion-prop prop-alert"',
-        'class="emma-motion-prop prop-heart"',
-        'class="emma-motion-prop prop-scan"',
-        "@keyframes emma-listen-lean",
-        "@keyframes emma-search-head",
-        "@keyframes emma-talk-head",
-        "@keyframes emma-greeting-wave",
-        "@keyframes emma-happy-bounce",
-        "@keyframes emma-frustrated-shake",
-        "@keyframes emma-thank-bow",
-        "@keyframes emma-prop-scan",
-        '<clipPath id="emma-mouth-slot">',
-        'clip-path="url(#emma-mouth-slot)"',
-        ".mouth-smile { display: none; }",
-        "transform: translateY(-72px)",
-        "transform-origin: 478px 680px",
-        "transform-origin: 744px 680px",
-        '<svg x="289" y="520" width="220" height="210"',
         'data-emma-left-hand="relaxed"',
         'data-emma-right-hand="relaxed"',
         "scene.dataset.emmaLeftHand = pose.leftHand || pose.hands",
         "scene.dataset.emmaRightHand = pose.rightHand || pose.hands",
     ):
         assert hook in html
+    # The SVG puppet that used to stand under the 3D canvas is gone (owner,
+    # 14 Oct: "หุ่นตัวเดิมนี้ลบออกจากโปรเจคได้ไหม มันชอบเด้งขึ้นมาเวลาโหลด" -- it
+    # showed for a moment on every load before the 3D Emma faded in). The
+    # renderer above still sets the same data-emma-* attributes and CSS vars,
+    # because the 3D model (mascot.js) reads them.
+    for gone in ('class="mascot-rig"', 'class="mascot-art"', "puppet-part", "face-part",
+                 "emma-motion-prop", "emma-puppet-atlas", "@keyframes puppet-",
+                 "@keyframes float-3d", "@keyframes ambient-turn", ".mascot-glint"):
+        assert gone not in html, gone
 
     assert 'class="emma-visor"' not in html
     assert 'class="emma-head-shell"' not in html
@@ -205,15 +173,11 @@ def test_voice_preview_exposes_numbered_joint_poses_and_wai_without_round_eyes()
     assert 'class="mouth-layer"' not in html
 
 
-def test_voice_preview_mascot_atlas_is_packaged_with_the_page():
+def test_voice_preview_no_longer_loads_the_puppet_atlas():
+    """The atlas was the SVG puppet's artwork; the puppet left the page on the
+    owner's word (14 Oct). Nothing on the page may still ask for it."""
     html = PAGE.read_text(encoding="utf-8")
-    asset = ROOT / "client" / "assets" / "emma" / "emma-puppet-atlas-reference-v2.png"
-
-    assert 'href="assets/emma/emma-puppet-atlas-reference-v2.png"' in html
-    assert asset.is_file()
-    data = asset.read_bytes()
-    assert data.startswith(b"\x89PNG\r\n\x1a\n")
-    assert data[25] == 6  # RGBA atlas with real transparency around the pieces.
+    assert "emma-puppet-atlas" not in html
 
 
 def test_voice_preview_packages_and_drives_the_approved_3d_mascot():
@@ -449,19 +413,19 @@ def test_voice_preview_3d_mascot_keeps_the_face_on_the_front_of_the_head():
         assert field(state, "armLift") > 0, state
 
 
-def test_voice_preview_3d_mascot_fails_back_to_the_svg_puppet():
-    """Removing Rive removed a renderer, not the fallback. If WebGL or the GLB
-    fails, the ready class is never added, the inline SVG puppet stays visible
-    and the page keeps working — one warning, no broken canvas, no spam."""
+def test_voice_preview_3d_mascot_fails_quietly():
+    """If WebGL or the GLB fails, the ready class is never added, her spot
+    stays empty (the SVG puppet that used to stand in was deleted on the
+    owner's word, 14 Oct: it popped up on every load) and the page keeps
+    working — one warning, no broken canvas, no spam."""
     html = PAGE.read_text(encoding="utf-8")
     code = (ROOT / "client" / "assets" / "emma-3d-lab" / "mascot.js").read_text(encoding="utf-8")
 
-    # The crossfade pair: nothing else hides the puppet, and no test used to
-    # assert it — without it the model and the puppet render stacked, green.
+    # The canvas stays invisible until the model is in: nothing half-built
+    # shows during the load, and nothing else stands in its place.
     assert ".mascot-wrap.emma-3d-ready .mascot-3d { opacity: 1; }" in html
-    hidden = html.split(".mascot-wrap.emma-3d-ready .mascot-rig {", 1)[1].split("}", 1)[0]
-    assert "opacity: 0" in hidden
-    assert "visibility: hidden" in hidden
+    assert "opacity: 0;" in html.split(".mascot-3d {", 1)[1].split("}", 1)[0]
+    assert 'class="mascot-rig"' not in html
 
     # The class is added only after BOTH the renderer and the model succeed —
     # i.e. inside the load block, after the model is in the scene.
@@ -476,10 +440,6 @@ def test_voice_preview_3d_mascot_fails_back_to_the_svg_puppet():
     assert "new THREE.WebGLRenderer(" in guard
     assert guard.count("console.warn") == 1
 
-    # The SVG puppet is still mounted and still driven, so the fallback is a
-    # real mascot rather than an empty box.
-    assert 'class="mascot-rig"' in html
-    assert 'class="mascot-art"' in html
 
 
 def test_voice_preview_has_retired_the_rive_mascot():
@@ -708,11 +668,9 @@ def test_press_and_hold_opens_six_action_slots_around_her():
 def test_drag_moves_the_mascot_hit_area_and_keeps_a_regrabbable_edge_visible():
     html = PAGE.read_text(encoding="utf-8")
     wrap_css = html.split(".mascot-wrap {", 1)[1].split("}", 1)[0]
-    rig_css = html.split(".mascot-rig {", 1)[1].split("}", 1)[0]
     three_css = html.split(".mascot-3d {", 1)[1].split("}", 1)[0]
 
     assert "transform: translate(var(--user-x), var(--user-y)) scale(var(--user-scale))" in wrap_css
-    assert "translate(var(--user-x)" not in rig_css
     assert "translate(var(--user-x)" not in three_css
     # ...and the 3D canvas does carry the tilt, so the pointer-tilt rAF loop
     # keeps driving it exactly as it drove the Rive canvas.
@@ -741,21 +699,21 @@ def test_preview_is_served_at_its_own_url_not_over_slash(client):
     top of it, while the showroom keeps using `/`."""
     resp = client.get("/preview")
     assert resp.status_code == 200
-    assert 'class="mascot-art"' in resp.text
+    assert 'class="mascot-3d"' in resp.text
     assert "no-cache" in resp.headers.get("cache-control", "")
 
     home = client.get("/")
     assert home.status_code == 200
     assert home.text != resp.text          # two different pages
-    assert 'class="mascot-art"' not in home.text
+    assert 'class="mascot-3d"' not in home.text
 
 
-def test_preview_mascot_atlas_is_served(client):
-    """The puppet PNG is referenced with a relative path, so it must resolve
-    to a real route — nothing serves client/assets/ otherwise."""
-    resp = client.get("/assets/emma/emma-puppet-atlas-reference-v2.png")
+def test_preview_assets_route_serves_the_3d_module(client):
+    """client/assets/ is served under /assets (the puppet atlas that this
+    test used to fetch left with the puppet, 14 Oct); the 3D Emma's module
+    is what the page loads from there now."""
+    resp = client.get("/assets/emma-3d-lab/mascot.js")
     assert resp.status_code == 200
-    assert resp.content.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def _engine_code() -> str:
@@ -1414,7 +1372,7 @@ def test_the_robot_page_answers_the_cameras_bell_through_the_one_engine():
     assert "if (q.get('cam') !== '1') return;" in bell
     assert "'/ws/wake'" in bell
     # It dials through the engine's own door, not a second engine...
-    assert "window.EmmaCall.answerSummons();" in bell
+    assert "window.EmmaCall.answerSummons(reason);" in bell     # the bell's reason: face_* rings even when muted
     assert "new WebSocket(" in bell and bell.count("new WebSocket(") == 1
     engine = html.split("// ---- the robot's own camera, sent to the server (`?cam=1`) ----", 1)[0]
     assert engine.count("new WebSocket(") == 1
@@ -2407,6 +2365,55 @@ def test_the_temporary_camera_debug_panel_is_robot_only_and_speaks_server_words(
     for forbidden in ("curUser", "heard", "transcript"):
         assert forbidden not in branch, forbidden
     assert "dbgVideo.srcObject = stream;" in html
+    # Owner 14 Oct ("ตรงนี้ขอเพิ่มขนาดหน่อย"): on the robot's app page the
+    # opened panel is read from standing height, and a tap must open it to
+    # that size, not back to the desk's 210 px.
+    app = html[html.index("if (q.get('app') === '1') {", panel):]
+    app = app[:app.index("if (document.body) document.body.appendChild(dbgPanel);")]
+    assert "dbgOpenW = '40vw';" in app and "dbgVideo.style.height = '30vw';" in app
+    assert "dbgPanel.style.width = collapsed ? dbgOpenW : '20px';" in html
+
+
+def test_a_mute_holds_across_calls_until_the_mic_is_tapped():
+    """Owner, 14 Oct: "เวลา mute ไม่ต้องให้ reconnect เพราะไม่งั้นหุ่นจะพูด
+    ตลอดเมื่อได้ยินเสียงรอบๆ". A muted call idles out, the standing line
+    rings a fresh line within seconds, and startCall() starts it unmuted --
+    the room was back in her ears. The hold must cover every door: the
+    toggle sets it, the standing line's bell is not answered while it
+    stands, a call that closes under it does not invite a redial, and only a
+    tap on the mic with no call open lifts it. Same day: "ตอน Mute ถ้ากล้อง
+    จับหน้าคนได้ จะต้องทักนะ" -- the camera's bells (face_*) still open a
+    line, so the bell socket stays open and tells the server about the hold."""
+    html = PAGE.read_text(encoding="utf-8")
+    toggle = html[html.index("function toggleMute() {"):]
+    toggle = toggle[:toggle.index("\n    }")]
+    assert "setMuteHold(muted);" in toggle
+    summons = html[html.index("answerSummons: function (reason) {"):]
+    assert summons[:summons.index("startCall();")].count(
+        "if (muteHold && !FACE_RING.test(String(reason || ''))) return false;") == 1
+    assert "if (!inCall) { if (muteHold) setMuteHold(false); startCall(); }" in html
+    # review 14 Oct: a second tap while connecting muted -- and held -- a call that
+    # then said "Listening" with every frame dropped; no mic yet = the tap does nothing
+    assert "else if (micStream) toggleMute();" in html
+    # an idle-timed-out held call rests on "Muted", and an error keeps its own words
+    assert "status(muteHold ? 'Muted' : 'Call ended — tap the mic to start again');" in html
+    assert "if (!callError) status('Muted'); return; }" in html and "callError = true;" in html
+    onclose = html[html.index("ws.onclose = function () {"):]
+    onclose = onclose[:onclose.index("function endCall()")]
+    assert onclose.index("if (muteHold) {") < onclose.index("setMicLabel('Tap to talk');")
+    assert "sessionStorage.getItem(MUTE_HOLD_KEY) === '1'" in html     # survives the app's reload on resume
+    bell = html[html.index("var RETRY_MIN_MS = 2000, RETRY_MAX_MS = 30000;"):]
+    bell = bell[:bell.index("function later()")]
+    assert "if (held() && !FACE_RING.test(reason)) return;" in bell
+    assert "window.EmmaCall.answerSummons(reason);" in bell
+    assert "sock.send(JSON.stringify({ type: 'hold', on: held() }))" in bell
+    assert "document.addEventListener('emma-mute-hold', sendHold);" in bell
+    assert "retryMs = RETRY_MIN_MS; sendHold(); return;" in bell          # told again on every reconnect
+    assert "if (stopped || sock) return;" in bell and "held()) return;" not in bell.split("function ring")[0]
+    import re as _re
+    face = _re.compile(r"^face_")
+    assert all(face.match(r) for r in ("face_approach", "face_known", "face_stranger"))
+    assert not face.match("standing_line")
 
 
 def test_the_floor_ring_is_gone_everywhere():
@@ -2509,3 +2516,69 @@ def test_the_robot_face_speaks_english_on_screen():
     for en in ("'Price — please ask our sales team'", "'Room photo — coming from our sales team'",
                "uiText('Conversation', 'บทสนทนา')", "UNIT_STATUS_EN[u.status]"):
         assert en in html, en
+
+
+def test_each_answer_owns_the_screen():
+    """Owner 12 Oct on the robot: the Sky Pool stayed up while she answered
+    the next question (a price) with no picture. A guest question opens an
+    answer; an answer that stages nothing clears the old picture at its
+    turn_complete. Her own announcements (no speech_started) clear nothing."""
+    html = PAGE.read_text(encoding="utf-8")
+    started = html.split("case 'speech_started':", 1)[1].split("break;", 1)[0]
+    assert "answerOwed = true;" in started and "answerStaged = false;" in started
+    done = html.split("case 'turn_complete':", 1)[1].split("break;", 1)[0]
+    assert "if (answerOwed && !answerStaged && document.body.classList.contains('emma-staging')) clearStage();" in done
+    opener = html.split("function openStage() {", 1)[1].split("}", 1)[0]
+    assert "answerStaged = true;" in opener
+
+
+def test_a_staged_card_puts_emma_in_the_corner_in_the_app_shell():
+    """Owner's photo, 13 Oct: the room card (show_room_type) with Emma 610 px
+    wide over its lower right. `html.app-shell .mascot-wrap` is as specific
+    as `body.emma-staging .mascot-wrap` and comes later in the file, so the
+    corner size never applied in the robot's app; the staged rule must be
+    the more specific one."""
+    html = PAGE.read_text(encoding="utf-8")
+    shell = html.index("html.app-shell .mascot-wrap {")
+    staged = html.index("html.app-shell body.emma-staging .mascot-wrap {")
+    assert staged > shell
+    assert "width: min(30vw, 300px);" in html[staged:staged + 120]
+
+
+def test_while_a_story_plays_the_pill_says_she_is_explaining_and_you_may_ask():
+    """Reviewer, 13 Oct: during a story the pill read "Listening..." /
+    "Speaking..." -- a guest could not tell she was explaining, or that a
+    question was still welcome. Both writers of the pill (status() and the
+    renderer bridge show()) go through one mapping, in every UI language."""
+    html = PAGE.read_text(encoding="utf-8")
+    fn = html[html.index("function storyStatus(key)"):]
+    fn = fn[:fn.index("\n    }\n")]
+    assert "'Speaking...'" in fn and "EmmaStory.isActive()" in fn and "'Explaining — ask anytime'" in fn
+    status = html[html.index("function status(text) {"):]
+    assert status.index("storyStatus(text)") < status.index("}")
+    show = html[html.index("function show(state) {"):]
+    assert "storyStatus(statusNode.textContent)" in show[:show.index("\n    }\n")]
+    assert html.count("'Explaining — ask anytime':") == 2          # Thai and Chinese
+
+
+def test_a_story_report_goes_to_the_server():
+    """showStory hands the engine an onReport that sends `story_report` --
+    the server's numbers-only log of timing and frame times from real use."""
+    html = PAGE.read_text(encoding="utf-8")
+    show = html[html.index("function showStory(story) {"):]
+    show = show[:show.index("\n    }\n")]
+    assert "onReport: function (r) {" in show
+    assert "type: 'story_report', report: r" in show
+
+
+def test_her_choices_put_a_storys_chips_aside_and_the_pill_follows_the_story_away():
+    """Review 13 Oct: her room-type choices (pinned at the bottom) landed on a
+    story's own chips, which took the taps; and the pill kept "Explaining"
+    after the story left the stage while she still spoke."""
+    html = PAGE.read_text(encoding="utf-8")
+    assert "html.app-shell body.emma-choices .es-taps { visibility: hidden; pointer-events: none; }" in html
+    assert "document.body.classList.toggle('emma-choices', pick);" in html
+    assert "right: calc(min(30vw, 300px) + clamp(16px, 3vw, 40px));" in html
+    end = html[html.index("function endStory() {"):]
+    end = end[:end.index("\n    }\n")]
+    assert "if (playing && lastStatusKey === 'Explaining — ask anytime') status('Speaking...');" in end

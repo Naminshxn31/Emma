@@ -4,17 +4,17 @@
       "id": "sky_pool",
       "available": true,
       "aliases": [
-        "สระว่ายน้ำ",
-        "ว่ายน้ำ",
-        "pool",
-        "swimming pool",
-        "游泳池",
-        "プール",
-        "수영장",
-        "бассейн",
-        "piscine"
+        "สกายพูล",
+        "sky pool",
+        "skypool",
+        "สระชั้น 3",
+        "สระบนชั้น 3",
+        "สระลอยฟ้า",
+        "空中泳池",
+        "スカイプール",
+        "스카이 풀"
       ],
-      "search_hint": "SKY POOL สระว่ายน้ำ",
+      "search_hint": "SKY POOL สกายพูล สระชั้น 3",
       "preferred_slides": {
         "locate": [
           "intro-037"
@@ -25,6 +25,39 @@
         "explain": [
           "intro-041",
           "intro-037"
+        ]
+      }
+    },
+    {
+      "id": "main_pool",
+      "available": true,
+      "aliases": [
+        "สระว่ายน้ำ",
+        "ว่ายน้ำ",
+        "สระใหญ่",
+        "สระกลาง",
+        "สระหลัก",
+        "ลากูน",
+        "lagoon",
+        "pool",
+        "swimming pool",
+        "游泳池",
+        "プール",
+        "수영장",
+        "бассейн",
+        "piscine"
+      ],
+      "search_hint": "WATER LAGOON ลากูน สระว่ายน้ำหลัก",
+      "preferred_slides": {
+        "locate": [
+          "intro-015"
+        ],
+        "show": [
+          "intro-014"
+        ],
+        "explain": [
+          "intro-015",
+          "intro-014"
         ]
       }
     },
@@ -186,6 +219,132 @@
         "restaurant nearby",
         "restaurants nearby"
       ]
+    },
+    {
+      "id": "resident_app",
+      "available": true,
+      "aliases": [
+        "แอปพลิเคชัน",
+        "แอป",
+        "application",
+        "mobile app",
+        "Embassy AI"
+      ],
+      "search_hint": "แอปพลิเคชัน Embassy AI สำหรับลูกบ้าน",
+      "preferred_slides": {
+        "locate": [
+          "intro-042"
+        ],
+        "show": [
+          "intro-042"
+        ],
+        "explain": [
+          "intro-042"
+        ]
+      }
+    },
+    {
+      "id": "floor_basement",
+      "available": true,
+      "aliases": [
+        "ชั้นใต้ดิน",
+        "ใต้ดิน",
+        "basement",
+        "underground",
+        "under ground"
+      ],
+      "search_hint": "ผังชั้นใต้ดิน โซนสปา ที่จอดรถ",
+      "preferred_slides": {
+        "locate": [
+          "intro-026"
+        ],
+        "show": [
+          "intro-027"
+        ],
+        "explain": [
+          "intro-027",
+          "intro-026"
+        ]
+      }
+    },
+    {
+      "id": "floor_3",
+      "available": true,
+      "aliases": [
+        "ชั้น 3",
+        "ชั้นสาม",
+        "ชั้นที่ 3",
+        "3rd floor",
+        "third floor"
+      ],
+      "search_hint": "ผังชั้น 3 โซนส่วนกลาง",
+      "preferred_slides": {
+        "locate": [
+          "intro-037"
+        ],
+        "show": [
+          "intro-037"
+        ],
+        "explain": [
+          "intro-037"
+        ]
+      }
+    },
+    {
+      "id": "floor_g",
+      "available": true,
+      "aliases": [
+        "ชั้น G",
+        "ชั้นจี",
+        "ชั้นทางเข้า",
+        "ชั้นล่าง",
+        "ชั้น 1",
+        "ground floor",
+        "entrance floor"
+      ],
+      "search_hint": "ผังชั้นทางเข้า โซนส่วนกลางและร้านค้า",
+      "preferred_slides": {
+        "locate": [
+          "intro-018"
+        ],
+        "show": [
+          "intro-018"
+        ],
+        "explain": [
+          "intro-018"
+        ]
+      }
+    },
+    {
+      "id": "location",
+      "available": true,
+      "aliases": [
+        "ทำเล",
+        "ที่ตั้ง",
+        "ตั้งอยู่",
+        "แผนที่",
+        "location",
+        "located",
+        "address",
+        "位置",
+        "場所",
+        "위치",
+        "โครงการอยู่",
+        "where is the project"
+      ],
+      "search_hint": "แผนที่ที่ตั้งโครงการ ถนนจอมเทียนสาย 2 ทำเล",
+      "preferred_slides": {
+        "locate": [
+          "intro-010"
+        ],
+        "show": [
+          "intro-010"
+        ],
+        "explain": [
+          "intro-008",
+          "intro-010"
+        ]
+      }
     }
   ],
   "source_id": "project_vocabulary",

@@ -548,6 +548,40 @@ def test_the_server_clock_runs_without_the_array(on):
     assert sess._she_is_audible(time.monotonic())
 
 
+def test_her_spoken_turn_opens_the_reply_window_from_the_server_clock(on, monkeypatch):
+    """FOCUS_REPLY_WINDOW_S counts from when her voice has PLAYED, read off
+    the server's playback clock: the robot face reports no audio lead, so
+    `remaining_lead` alone would start the window while she still speaks."""
+    from app.providers.base import ProviderEvent
+
+    _no_page_lead(monkeypatch)
+    monkeypatch.setattr(settings, "focus_reply_window_s", 10.0)
+    sess = _session()
+    chunk = b"\x00\x00" * 24000                           # 1 s at 24 kHz
+
+    class Speaking:
+        output_sample_rate = 24000
+
+        async def events(self):
+            yield ProviderEvent(kind="audio", audio=chunk)
+            yield ProviderEvent(kind="turn_complete")
+
+    class Out:
+        async def send_bytes(self, data):
+            pass
+
+        async def send_text(self, text):
+            pass
+
+    sess.provider = Speaking()
+    sess.ws = Out()
+    start = time.monotonic()
+    asyncio.run(sess._provider_to_browser())
+    assert focus._reply["until"] >= start + 1.0 + 10.0 - 0.05
+    focus.observe_faces([], time.monotonic())
+    assert focus.may_open(start + 10.5) == (True, focus.REPLY)
+
+
 def test_her_own_name_on_the_server_clock_opens_nothing(on, monkeypatch, rows):
     """The own-voice guard read only the page's lead — 0 on the robot face,
     the one page this ear runs for."""
@@ -923,8 +957,9 @@ def test_the_pointer_gaze_and_the_attention_turn_her_the_same_way():
     """Review 10 Oct: two paths turned the Neck in opposite directions — the
     attention cue +yaw for a person on her left, the pointer gaze -yaw for a
     pointer on the screen's right, which (camera on +z, model facing +z) is
-    the same side. The pointer path was the mirrored one: the SVG face moves
-    translate(+--gaze-x) toward the pointer. Executes the shipped expression."""
+    the same side. The pointer path was the mirrored one (the SVG face that
+    moved translate(+--gaze-x) toward the pointer agreed with the attention
+    cue; it left with the SVG puppet, 14 Oct). Executes the shipped expression."""
     import re
 
     mascot = (ROOT / "client" / "assets" / "emma-3d-lab" / "mascot.js").read_text(encoding="utf-8")
@@ -936,9 +971,6 @@ def test_the_pointer_gaze_and_the_attention_turn_her_the_same_way():
     pointer_right = eval(turn.replace(".45", "0.45"), {}, {"smoothX": 1.0})  # noqa: S307
     assert pointer_right > 0, ("a pointer on the screen's right (her left, +x) must turn "
                                "her toward it — the attention cue's sign: " + turn)
-    page = (ROOT / "client" / "voice-preview.html").read_text(encoding="utf-8")
-    assert "transform: translate(var(--gaze-x), var(--gaze-y));" in page
-    assert "((event.clientX / innerWidth) - .5) * 16" in page, "the SVG face: + = right"
 
 
 # ==================== 5. the goodbye ====================
@@ -1209,3 +1241,26 @@ def test_the_log_report_shows_the_engagement_numbers(tmp_path, monkeypatch, caps
     assert "ปล่อยให้คนอื่นคุย 1 ครั้ง" in out
     assert "กล่าวลาแล้ววางสาย 1 / กลับมาคุยต่อ 0" in out
     assert "n=2  p50 3.0  p90 3.8  สูงสุด 4.0" in out
+
+
+def test_a_tap_that_stops_her_voice_ends_the_server_playback_clock(on):
+    """Review 13 Oct: a tap over her stops playback on the page, which sends
+    `played`; Gemini sends no `interrupted` once generation is done, so the
+    server's clock kept her "speaking" and queued the next answer behind
+    audio nobody heard. `played` ends the clock now."""
+    sess = _session()
+    sess._play_until = time.monotonic() + 20.0
+
+    class Frames:
+        def __init__(self):
+            self.items = [{"type": "websocket.receive", "text": json.dumps({"type": "played", "heard_ms": 900})}]
+
+        async def receive(self):
+            return self.items.pop(0) if self.items else {"type": "websocket.disconnect"}
+
+        async def send_text(self, text):
+            pass
+
+    sess.ws = Frames()
+    asyncio.run(sess._browser_to_provider())
+    assert sess._play_until <= time.monotonic()

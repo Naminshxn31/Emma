@@ -611,6 +611,14 @@ class WakeStream:
 #: owner had said the name.
 _STANDBY: set = set()
 
+#: Standby pages that are muted (owner, 14 Oct: "เวลา mute ไม่ต้องให้
+#: reconnect" -- and then "ตอน Mute ถ้ากล้องจับหน้าคนได้ จะต้องทักนะ").
+#: Both halves: the standing line does not ring a muted page back open (an
+#: idle line re-dialled with an open mic is how room chatter reached her),
+#: while every other bell -- the camera's greeting above all -- still rings.
+_HELD: set = set()
+HOLD_SKIPS = frozenset({"standing_line"})
+
 
 def register(ws) -> None:
     _STANDBY.add(ws)
@@ -618,6 +626,28 @@ def register(ws) -> None:
 
 def unregister(ws) -> None:
     _STANDBY.discard(ws)
+    _HELD.discard(ws)
+
+
+def note(ws, text: object) -> None:
+    """A text message from a standby page: {"type": "hold", "on": bool} is
+    the only one there is. Anything else is ignored, never raised on."""
+    import json
+
+    try:
+        msg = json.loads(text) if isinstance(text, str) else None
+    except ValueError:
+        return
+    if isinstance(msg, dict) and msg.get("type") == "hold":
+        if msg.get("on") is True:
+            _HELD.add(ws)
+        else:
+            _HELD.discard(ws)
+
+
+def held_only() -> bool:
+    """Every standby page is muted (the standing line says so once)."""
+    return bool(_STANDBY) and _STANDBY <= _HELD
 
 
 async def summon(reason: str = "server") -> int:
@@ -630,6 +660,8 @@ async def summon(reason: str = "server") -> int:
 
     delivered = 0
     for ws in list(_STANDBY):
+        if reason in HOLD_SKIPS and ws in _HELD:
+            continue
         try:
             await ws.send_text(json.dumps(
                 {"type": "wake", "word": settings.wake_word, "reason": reason}
@@ -648,3 +680,4 @@ def reset() -> None:
     _shadow_spotter = None
     _shadow_failed = False
     _STANDBY.clear()
+    _HELD.clear()

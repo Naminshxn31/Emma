@@ -668,6 +668,33 @@ async def unit_plan(sha256: str, token: str | None = None):
                              "X-Content-Type-Options": "nosniff"})
 
 
+@app.get("/story-asset/{sha256}")
+async def story_asset(sha256: str, token: str | None = None):
+    """A picture of a robot-face story (app/stories.py), by the hash its
+    catalog pins. Same gate as /unit-plan: behind WS_TOKEN, re-hashed on
+    every read, and only for an approved catalog with STORIES_ENABLED on --
+    a draft story's pictures are not served to anyone."""
+    import asyncio
+    import hmac
+    import re
+    from fastapi import Response
+
+    if settings.ws_token and not hmac.compare_digest(
+            (token or "").encode(), settings.ws_token.encode()):
+        return Response(status_code=403)
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+        return Response(status_code=404)
+    from app import stories
+
+    found = await asyncio.to_thread(stories.asset_body, sha256)
+    if found is None:
+        return Response(status_code=404)
+    body, media_type = found
+    return Response(content=body, media_type=media_type,
+                    headers={"Cache-Control": "private, max-age=3600",
+                             "X-Content-Type-Options": "nosniff"})
+
+
 @app.get("/health")
 async def health() -> dict:
     from app.tools import robot_link
@@ -2067,6 +2094,8 @@ async def _hold_standby(websocket: WebSocket, wake) -> None:
             message = await websocket.receive()
             if message.get("type") == "websocket.disconnect":
                 return
+            if message.get("text"):
+                wake.note(websocket, message["text"])      # the page's mute hold
     except WebSocketDisconnect:
         return
     finally:
@@ -2121,6 +2150,9 @@ async def ws_wake(websocket: WebSocket, token: str | None = None) -> None:
             message = await websocket.receive()
             if message.get("type") == "websocket.disconnect":
                 return
+            if message.get("text"):
+                wake.note(websocket, message["text"])      # the page's mute hold
+                continue
             data = message.get("bytes")
             if not data:
                 continue

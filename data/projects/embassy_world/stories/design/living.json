@@ -1,0 +1,950 @@
+{
+ "stories": [
+  {
+   "id": "pools_all",
+   "template": "stack",
+   "questions_th": [
+    "มีสระว่ายน้ำกี่สระ",
+    "สระมีอะไรบ้าง",
+    "มีสระว่ายน้ำไหม",
+    "มีสระแบบไหนบ้าง",
+    "พื้นที่สระรวมเท่าไหร่",
+    "สระอยู่ตรงไหนบ้าง"
+   ],
+   "questions_en": [
+    "How many pools are there?",
+    "What pools do you have?",
+    "Is there a swimming pool?",
+    "How big are the pools altogether?"
+   ],
+   "lines": [
+    {
+     "th": "ที่นี่มีสระทั้งกลางแจ้ง บนชั้น 3 และใต้ดินค่ะ",
+     "en": "We have pools outdoors, up on level 3 and underground.",
+     "cue_th": [
+      "กลางแจ้ง"
+     ],
+     "cue_en": [
+      "outdoors"
+     ],
+     "cue_zh": [
+      "户外",
+      "室外"
+     ]
+    },
+    {
+     "th": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ยาว 155 เมตร",
+     "en": "The main one is the Water Lagoon in the middle of the project, 155 metres long.",
+     "cue_th": [
+      "Water Lagoon",
+      "ลากูน",
+      "สระหลัก",
+      "วอเตอร์ลากูน"
+     ],
+     "cue_en": [
+      "Water Lagoon",
+      "lagoon"
+     ],
+     "cue_zh": [
+      "泻湖",
+      "Water Lagoon",
+      "Lagoon"
+     ]
+    },
+    {
+     "th": "ข้างปีกอาคารมี Private Pool อีก 3 สระ",
+     "en": "Then there are three Private Pools beside the building wings,",
+     "cue_th": [
+      "Private Pool",
+      "ปีกอาคาร",
+      "ไพรเวทพูล"
+     ],
+     "cue_en": [
+      "Private Pool",
+      "private"
+     ],
+     "cue_zh": [
+      "Private Pool",
+      "私人泳池"
+     ]
+    },
+    {
+     "th": "ข้างลานเด็กเล่นมี Kid Pool สระเด็กสำหรับน้องๆ",
+     "en": "a Kid Pool for the little ones beside the playground,",
+     "cue_th": [
+      "Kid Pool",
+      "สระเด็ก",
+      "คิดพูล"
+     ],
+     "cue_en": [
+      "Kid Pool",
+      "kid"
+     ],
+     "cue_zh": [
+      "Kid Pool",
+      "儿童泳池",
+      "儿童"
+     ]
+    },
+    {
+     "th": "ชั้น 3 อาคาร A มี Sky Pool พื้นสระบางส่วนเป็นกระจก",
+     "en": "the Sky Pool on level 3 of Building A, with a partly glass floor,",
+     "cue_th": [
+      "Sky Pool",
+      "อาคาร A",
+      "สกายพูล"
+     ],
+     "cue_en": [
+      "Sky Pool"
+     ],
+     "cue_zh": [
+      "Sky Pool",
+      "空中泳池"
+     ]
+    },
+    {
+     "th": "และชั้นใต้ดินมีสระในร่ม Aqua Cinema ต่อไปถึง Journey to Mars",
+     "en": "and in the basement the indoor Aqua Cinema pool, flowing on into Journey to Mars.",
+     "cue_th": [
+      "Aqua Cinema",
+      "สระในร่ม",
+      "อควาซีเนม่า",
+      "อะควา"
+     ],
+     "cue_en": [
+      "Aqua Cinema",
+      "indoor"
+     ],
+     "cue_zh": [
+      "Aqua Cinema",
+      "室内泳池",
+      "室内"
+     ]
+    },
+    {
+     "th": "สระหลักกับ Private Pool รวมกันราว 2,157 ตารางเมตรค่ะ",
+     "en": "The lagoon and private pools together come to about 2,157 square metres.",
+     "cue_th": [
+      "ตารางเมตร",
+      "รวมกัน"
+     ],
+     "cue_en": [
+      "square metres",
+      "together"
+     ],
+     "cue_zh": [
+      "平方米",
+      "合计"
+     ]
+    }
+   ],
+   "params": {
+    "items": [
+     {
+      "label_en": "Water Lagoon",
+      "sub_en": "Main pool · centre of the project",
+      "asset": "liv_lagoon_night",
+      "asset_kind": "photo",
+      "value": {
+       "to": 155,
+       "unit_en": "m"
+      },
+      "line": 1,
+      "tap": "story_pools_all_lagoon"
+     },
+     {
+      "label_en": "Private Pools",
+      "sub_en": "Beside the building wings",
+      "asset": "liv_courtyard_top",
+      "asset_kind": "photo",
+      "value": {
+       "to": 3,
+       "unit_en": "pools"
+      },
+      "line": 2
+     },
+     {
+      "label_en": "Kid Pool",
+      "sub_en": "Beside the playground",
+      "asset": "liv_kid_pool",
+      "asset_kind": "photo",
+      "value": null,
+      "line": 3,
+      "tap": "story_pools_all_kids"
+     },
+     {
+      "label_en": "Sky Pool",
+      "sub_en": "Level 3 · Building A · glass floor",
+      "asset": "fac_3_sky_pool",
+      "asset_kind": "photo",
+      "value": null,
+      "line": 4,
+      "tap": "story_pools_all_sky"
+     },
+     {
+      "label_en": "Aqua Cinema",
+      "sub_en": "Indoor pool · Basement",
+      "asset": "fac_b_aqua_cinema",
+      "asset_kind": "photo",
+      "value": null,
+      "line": 5,
+      "tap": "story_pools_all_aqua"
+     }
+    ],
+    "end_hint_en": "Lagoon + private pools ≈ 2,157 sq.m."
+   },
+   "taps": [
+    {
+     "id": "story_pools_all_lagoon",
+     "label_en": "Water Lagoon",
+     "label_th": "Water Lagoon",
+     "next_story": "masterplan_lagoon",
+     "tool": null
+    },
+    {
+     "id": "story_pools_all_kids",
+     "label_en": "For families",
+     "label_th": "สำหรับเด็กและครอบครัว",
+     "next_story": "for_families",
+     "tool": null
+    },
+    {
+     "id": "story_pools_all_sky",
+     "label_en": "Sky Pool",
+     "label_th": "Sky Pool",
+     "next_story": "sky_pool_where",
+     "tool": null
+    },
+    {
+     "id": "story_pools_all_aqua",
+     "label_en": "Aqua Cinema",
+     "label_th": "Aqua Cinema",
+     "next_story": "aqua_cinema_where",
+     "tool": null
+    },
+    {
+     "id": "story_pools_all_mars",
+     "label_en": "Journey to Mars",
+     "label_th": "Journey to Mars",
+     "next_story": "journey_mars_where",
+     "tool": null
+    },
+    {
+     "id": "story_pools_all_overview",
+     "label_en": "All facilities",
+     "label_th": "สิ่งอำนวยความสะดวกทั้งหมด",
+     "next_story": "facilities_overview",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "facts:จุดเด่น (ภายนอก: Water Lagoon สระหลักกลางโครงการ, Private Pool, Kid Pool · ชั้น 3 อาคาร A: Sky Pool · ชั้นใต้ดิน: Aqua Cinema, Journey to Mars)",
+    "report:19_faq.md#19.15 line 646 (มีสระกี่สระ: สระหลัก 1 (155 เมตร), Private Pool 3 สระ, Kid Pool 1 สระ, Sky Pool 1 สระที่ชั้น 3 · ชั้นใต้ดินสระในร่ม Aqua Cinema ต่อกับทางน้ำ Journey to Mars · 2,157 ตร.ม.)",
+    "report:08_facilities_overview.md#8.2 rows 9, 16, 20, 21, 22, 28 (Aqua Cinema สระในร่มใต้ดิน · Journey to Mars ต่อจาก Aqua Cinema · Sky Pool ชั้น 3 อาคาร A · Main Pool 155 m. · 3 Private Pool · Kid Pool ติดลาน Playscape)",
+    "report:08_facilities_overview.md#8.3.2 (สระกลางแจ้งในลากูน Main 1 + Private 3 · Kid Pool 1 · Sky Pool 1 · ใต้ดิน 2 โซน)",
+    "report:12_landscape.md#12.2 (Main Pool + Private Pool · Pool Area 2,157 ตร.ม.)",
+    "report:12_landscape.md#12.1 line 29 (Private Pool = สระข้างปีกอาคาร · ห้ามบอกว่าเป็นสระเฉพาะห้อง)",
+    "report:12_landscape.md#12.4.1 (Main Pool 155 ม. ชื่อทางการ)",
+    "report:12_landscape.md#12.10 (Kid's Pool สระเด็กติดขอบสระหลัก ข้างลาน Playscape)",
+    "report:11_facilities_3rd_floor.md#11.5.1 (Sky Pool ชั้น 3 อาคาร A · พื้นสระ/บางส่วนผนังสระโปร่งใสตามภาพ)",
+    "report:10_facilities_underground.md#10.2 (Aqua Cinema สระในร่มใต้อาคาร A)",
+    "slides:intro-015 (155M. Water Lagoon)",
+    "slides:intro-041 (Sky Pool ชั้น 3)",
+    "slides:intro-028 (Aqua Cinema)",
+    "assets:web/6.gallery/exterior/CD03/Scene 40.png · ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png · web/6.gallery/exterior/Playscape/Scene 55.png · fac_3_sky_pool / fac_b_aqua_cinema (ภาพของกลุ่ม facilities ใช้ร่วม)"
+   ],
+   "notes_th": "ตอบ 'มีสระกี่สระ / มีสระอะไรบ้าง' ตามคำตอบ FAQ 19.15 ของรายงานเป๊ะ (สระหลัก 1 · Private Pool 3 · Kid Pool 1 · Sky Pool 1 · สระในร่มใต้ดินต่อ Journey to Mars) ไม่พูดยอดรวมเป็นตัวเลขเดียว เพราะรายงานนับเอง (🔎) และ Kid Pool ดูเป็นส่วนหนึ่งของแนวสระหลัก — เล่าทีละแบบแทน · จังหวะบนจอ: (0) แถวว่างห้าแถวรอ (บอก 'มีห้าแบบ' ก่อนภาพแรก) · (1) ภาพลากูนมุมสูงยามค่ำ Scene 40 (เห็นความยาวคดเคี้ยวของสระ) ตัวเลข 155 m นับขึ้น แล้วย่อเข้าแถว · (2) ภาพมุมบนของคอร์ทฝั่งตะวันตกจากโมเดล UE ของเจ้าของ (เห็นปีกอาคาร E/F/D ที่ Private Pool อยู่) + '3 pools' — ภาพนี้คือคอร์ทที่สระอยู่ ไม่ได้ชี้สระใดสระหนึ่ง ถ้าเจ้าของมีภาพเรนเดอร์ของ Private Pool เองให้เปลี่ยน · (3) ภาพมุมสูงลาน Playscape กับวงสระเด็ก Scene 55 (ครอปตัดคนเล็กๆ ที่ทางเดินและหน้าประตูออก) · (4) Sky Pool ภาพเดียวกับ sky_pool_where · (5) Aqua Cinema ภาพเดียวกับ aqua_cinema_where · (6) ไม่มีภาพใหม่ ประโยคพื้นที่รวม 2,157 ตร.ม. แล้วรายการขยายเต็มจอ พร้อม end_hint ตัวเลขเดียวกัน · แถวที่มีเรื่องของตัวเองแตะได้ (ลากูน→masterplan_lagoon, สระเด็ก→for_families, Sky Pool, Aqua Cinema) Journey to Mars กับ 'ทั้งหมด' เป็นชิปท้าย (taps 6 ≠ แถว 5 จงใจ ไม่ให้ระบบผูกปุ่มตามลำดับเข้าแถว Private Pool) · ไม่ใส่: ความลึก 1.30 ม. (ตามเจ้าของงาน ไม่มีในแบบ), ขนาด Sky Pool ≈143 ตร.ม. (วัดจากโมเดล), จากุซซี่ (ไม่ใช่สระ เรื่องนี้ยาวพอแล้ว), จากุซซี่บนชั้นบนสุด (เจ้าของตัดสินทับ) · ไม่พูดว่า Private Pool เป็นของห้องใด (รายงาน 12.1 ห้าม) · คำถาม 'สระใหญ่แค่ไหน / สระหลักยาวเท่าไหร่' ปล่อยให้ masterplan_lagoon (มีอยู่แล้ว) — ใส่ซ้ำสองเรื่องโมเดลจะเลือกไม่ถูก"
+  },
+  {
+   "id": "park_green",
+   "template": "features",
+   "questions_th": [
+    "ติดสวนสาธารณะไหม",
+    "ใกล้สวนสาธารณะไหม",
+    "สวนข้างโครงการเป็นยังไง",
+    "พื้นที่สีเขียวเท่าไหร่",
+    "มีต้นไม้อะไรบ้าง",
+    "ในโครงการมีสวนไหม"
+   ],
+   "questions_en": [
+    "Is it next to a park?",
+    "How much green space is there?",
+    "What trees are planted?"
+   ],
+   "lines": [
+    {
+     "th": "เราอยู่ติดสวนสาธารณะหนองโพรง ในสวนมีบึงน้ำและทางวิ่งค่ะ",
+     "en": "We're right next to Nong Phrong public park, with its lake and jogging path.",
+     "cue_th": [
+      "หนองโพรง",
+      "สวนสาธารณะ"
+     ],
+     "cue_en": [
+      "Nong Phrong",
+      "park"
+     ],
+     "cue_zh": [
+      "公园",
+      "Nong Phrong"
+     ]
+    },
+    {
+     "th": "ในโครงการเองมีพื้นที่สีเขียว 4,256 ตารางเมตร",
+     "en": "Inside the project there are 4,256 square metres of green space,",
+     "cue_th": [
+      "พื้นที่สีเขียว"
+     ],
+     "cue_en": [
+      "green space",
+      "green"
+     ],
+     "cue_zh": [
+      "绿地",
+      "绿化"
+     ]
+    },
+    {
+     "th": "ปลูกต้นไม้และไม้พุ่มรวม 34 ชนิด อย่างจิกน้ำ โมกมัน และมะฮอกกานี",
+     "en": "planted with 34 kinds of trees and shrubs, like Indian oak, water jasmine and mahogany,",
+     "cue_th": [
+      "ต้นไม้",
+      "ไม้พุ่ม"
+     ],
+     "cue_en": [
+      "trees",
+      "shrubs"
+     ],
+     "cue_zh": [
+      "树",
+      "灌木",
+      "植物"
+     ]
+    },
+    {
+     "th": "และสวนขั้นบันได Stepped Garden ริมสระ มีเตียงอาบแดดค่ะ",
+     "en": "and a Stepped Garden of lawns by the pool, with sun loungers.",
+     "cue_th": [
+      "ขั้นบันได",
+      "Stepped Garden",
+      "เตียงอาบแดด",
+      "สเต็ปการ์เด้น"
+     ],
+     "cue_en": [
+      "Stepped Garden",
+      "lawns",
+      "loungers"
+     ],
+     "cue_zh": [
+      "草坪",
+      "躺椅",
+      "阶梯"
+     ]
+    }
+   ],
+   "params": {
+    "items": [
+     {
+      "label_en": "The Park next door",
+      "asset": "liv_park",
+      "note_en": "Nong Phrong Park: lake, jogging path",
+      "line": 0
+     },
+     {
+      "label_en": "Green area",
+      "asset": "liv_garden",
+      "note_en": "4,256 sq.m. inside the project",
+      "line": 1
+     },
+     {
+      "label_en": "34 plant species",
+      "asset": "liv_trees",
+      "note_en": "11 trees · 23 shrubs & groundcovers",
+      "line": 2
+     },
+     {
+      "label_en": "Stepped Garden",
+      "asset": "liv_lawn",
+      "note_en": "Lawn terraces · 53 sun loungers",
+      "line": 3
+     }
+    ],
+    "footnote_en": "Nong Phrong Park: a Pattaya City public park, open daily 05:00–21:00, free entry"
+   },
+   "taps": [
+    {
+     "id": "story_park_green_map",
+     "label_en": "Beach & park map",
+     "label_th": "แผนที่หาดและสวน",
+     "next_story": "location_beach",
+     "tool": null
+    },
+    {
+     "id": "story_park_green_pools",
+     "label_en": "All pools",
+     "label_th": "สระทั้งหมด",
+     "next_story": "pools_all",
+     "tool": null
+    },
+    {
+     "id": "story_park_green_family",
+     "label_en": "For families",
+     "label_th": "สำหรับครอบครัว",
+     "next_story": "for_families",
+     "tool": null
+    },
+    {
+     "id": "story_park_green_plan",
+     "label_en": "Site plan",
+     "label_th": "ผังโครงการ",
+     "next_story": "masterplan_lagoon",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "facts:ทำเล (อยู่ติดสวนสาธารณะซอยชัยพฤกษ์ 4 (สวนหนองโพรง) · ทางเชื่อมจากโครงการเข้าสวนยังไม่ยืนยัน)",
+    "facts:จุดเด่น (ภายนอก: Stepped Garden)",
+    "report:04_location.md#4.6.1 (บึง/ลากูนเป็นแกนกลาง · ทางเดิน/วิ่งรอบบึง · สนามเด็กเล่น · ผู้ดำเนินการเมืองพัทยา · 05:00–21:00 ทุกวัน ฟรี)",
+    "report:04_location.md#4.6.3 (พูดได้: อยู่ถัดจากสวน มีบึงกลางสวน ทางวิ่ง เปิด 05:00–21:00 เข้าฟรี · ห้ามสัญญาประตูเชื่อมสวน)",
+    "report:12_landscape.md#12.2 (Green Area · Softscape 4,256 ตร.ม.)",
+    "report:12_landscape.md#12.11 (Stepped Garden = Stepped Lawn Terrace · Daybed 53 ชุด)",
+    "report:12_landscape.md#12.14 (พันธุ์ไม้ 34 ชื่อ: ไม้ยืนต้น 11 · ไม้พุ่ม/คลุมดิน/ไม้ใบ 23)",
+    "report:91_appendix_plants.md#ข.2 (จิกน้ำ Indian oak · โมกมัน Water jasmine · มะฮอกกานี Big-leaf mahogany) และ English summary line 131",
+    "report:19_faq.md line 658 (ต้นไม้ 34 ชื่อ) · line 234 (พื้นที่สีเขียว 4,256 ตร.ม.) · line 170 (ติดสวนสาธารณะ)",
+    "slides:intro-011 (THE PARK)",
+    "assets:slides intro_011.jpg · web/6.gallery/exterior/CD03/Scene 43.png · Scene 38.png · Scene 37.png"
+   ],
+   "notes_th": "การ์ดสี่ใบเด้งขึ้นตามคำ: (0) 'The Park next door' — ภาพ THE PARK จากสไลด์ intro-011 ที่อนุมัติแล้ว (ครอปซ้ายล่าง ตัดหัวข้อ THE PARK โลโก้ และป้ายมุมขวาล่างออก) ภาพนี้เป็นภาพประกอบของผู้พัฒนา ไม่ใช่ภาพถ่ายสวนจริง การ์ดจึงใช้คำว่า The Park ตามเด็ค แล้วบอกชื่อสวนจริงในบรรทัดเล็ก · (1) พื้นที่สีเขียว 4,256 ตร.ม. — Scene 43 ทางเดินกลางแปลงไม้พุ่มริมลากูน · (2) 34 ชนิด (ไม้ยืนต้น 11 · ไม้พุ่ม/คลุมดิน 23) — Scene 38 ต้นไม้ใหญ่ไม้ดอกขาว · (3) Stepped Garden — Scene 37 สนามหญ้าขั้นบันไดกับเตียงอาบแดด (Daybed 53 ชุดตามผัง) · footnote ขึ้นตอนจบ: สวนของเมืองพัทยา เปิดทุกวัน 05:00–21:00 เข้าฟรี · ชื่อต้นไม้: ไทยใช้ชื่อตามแบบ อังกฤษใช้ชื่อจาก English summary ของภาคผนวก ข (Indian oak, water jasmine, mahogany) · ไม่ใส่: ระยะ 40–100 ม. (อยู่ใน location_beach แล้ว และเป็นระยะจากหมุด) · คำว่า 'เดินเข้าสวนได้' / Direct Park Connection (facts: ทางเชื่อมยังไม่ยืนยัน — ห้ามสัญญา) จึงไม่ใส่คำถาม 'เดินเข้าสวนได้ไหม' ในเรื่องนี้ ปล่อยให้โมเดลตอบจาก facts · จำนวนต้นไม้ 62 ต้น (รายงานนับเอง ห้ามพูด) · ร้อยละที่เกินเกณฑ์พื้นที่สีเขียว (เกณฑ์ของสถาปนิก ห้ามอ้างข้อกฎหมาย) · ชื่อวิทยาศาสตร์ · ขนาดสวน 'กว่า 5 ไร่' (สองแหล่งไม่ตรงกัน)"
+  },
+  {
+   "id": "for_families",
+   "template": "stack",
+   "questions_th": [
+    "มีอะไรสำหรับเด็กบ้าง",
+    "เด็กๆ เล่นที่ไหนได้บ้าง",
+    "มีโซนเด็กไหม",
+    "มีที่เล่นสำหรับเด็กไหม",
+    "เหมาะกับครอบครัวไหม",
+    "มีสระเด็กไหม",
+    "เด็กๆ มีอะไรให้ทำบ้าง",
+    "เหมาะกับครอบครัวที่มีลูกไหม",
+    "มีอะไรให้ลูกเล่นบ้าง"
+   ],
+   "questions_en": [
+    "What is there for children?",
+    "Is there anything for kids?",
+    "Is there a play area for children?",
+    "Is it good for families?",
+    "Is there a kids' pool?"
+   ],
+   "lines": [
+    {
+     "th": "ที่นี่มีที่เล่นให้น้องๆ ทั้งในร่มและกลางแจ้งค่ะ",
+     "en": "We have places for children to play, indoors and out.",
+     "cue_th": [
+      "ที่เล่น"
+     ],
+     "cue_en": [
+      "children",
+      "play"
+     ],
+     "cue_zh": [
+      "儿童",
+      "孩子"
+     ]
+    },
+    {
+     "th": "ในร่มมีห้องเด็ก Junior World ธีมอวกาศ มีบ่อบอลด้วย",
+     "en": "Indoors, Junior World is a space-themed kids' room with a ball pit.",
+     "cue_th": [
+      "Junior World",
+      "ห้องเด็ก",
+      "จูเนียร์"
+     ],
+     "cue_en": [
+      "Junior World"
+     ],
+     "cue_zh": [
+      "Junior World",
+      "儿童室"
+     ]
+    },
+    {
+     "th": "ข้างนอกมีลานเด็กเล่นธีมอวกาศ 137 ตารางเมตร มีสไลเดอร์ ชิงช้า และแทรมโพลีน",
+     "en": "Outside, there's a 137-square-metre space playground with slides, a swing and trampolines,",
+     "cue_th": [
+      "ลานเด็กเล่น",
+      "สไลเดอร์"
+     ],
+     "cue_en": [
+      "playground",
+      "slides"
+     ],
+     "cue_zh": [
+      "游乐场",
+      "滑梯"
+     ]
+    },
+    {
+     "th": "ติดกันมีสระเด็ก Kid Pool และบ่อน้ำตื้นพร้อมน้ำพุ",
+     "en": "with a Kid Pool and a shallow pond with water jets right beside it,",
+     "cue_th": [
+      "Kid Pool",
+      "สระเด็ก",
+      "คิดพูล"
+     ],
+     "cue_en": [
+      "Kid Pool",
+      "shallow"
+     ],
+     "cue_zh": [
+      "Kid Pool",
+      "儿童泳池"
+     ]
+    },
+    {
+     "th": "และสวนสาธารณะข้างโครงการก็มีสนามเด็กเล่นค่ะ",
+     "en": "and the public park next door has a playground too.",
+     "cue_th": [
+      "สวนสาธารณะ"
+     ],
+     "cue_en": [
+      "park"
+     ],
+     "cue_zh": [
+      "公园"
+     ]
+    }
+   ],
+   "params": {
+    "items": [
+     {
+      "label_en": "Junior World",
+      "sub_en": "Indoor kids' room · ground floor",
+      "asset": "fac_g_junior_ballpit",
+      "asset_kind": "photo",
+      "value": null,
+      "line": 1,
+      "tap": "story_for_families_junior"
+     },
+     {
+      "label_en": "Space Playground",
+      "sub_en": "Outdoor · slides · swing",
+      "asset": "liv_playscape",
+      "asset_kind": "photo",
+      "value": {
+       "to": 137,
+       "unit_en": "sq.m."
+      },
+      "line": 2,
+      "tap": "story_for_families_playground"
+     },
+     {
+      "label_en": "Kid Pool",
+      "sub_en": "Beside the playground · water play",
+      "asset": "liv_kid_pool",
+      "asset_kind": "photo",
+      "value": null,
+      "line": 3,
+      "tap": "story_for_families_pools"
+     },
+     {
+      "label_en": "The Park next door",
+      "sub_en": "Nong Phrong Park · playground",
+      "asset": "liv_park",
+      "asset_kind": "photo",
+      "value": null,
+      "line": 4,
+      "tap": "story_for_families_park"
+     }
+    ],
+    "end_hint_en": "Tap a place to see more"
+   },
+   "taps": [
+    {
+     "id": "story_for_families_junior",
+     "label_en": "Junior World",
+     "label_th": "ห้องเด็ก Junior World",
+     "next_story": "kids_room_where",
+     "tool": null
+    },
+    {
+     "id": "story_for_families_playground",
+     "label_en": "Space Playground",
+     "label_th": "ลานเด็กเล่น Playground",
+     "next_story": "playground_where",
+     "tool": null
+    },
+    {
+     "id": "story_for_families_pools",
+     "label_en": "All pools",
+     "label_th": "สระทั้งหมด",
+     "next_story": "pools_all",
+     "tool": null
+    },
+    {
+     "id": "story_for_families_park",
+     "label_en": "Park & greenery",
+     "label_th": "สวนและพื้นที่สีเขียว",
+     "next_story": "park_green",
+     "tool": null
+    },
+    {
+     "id": "story_for_families_all",
+     "label_en": "All facilities",
+     "label_th": "สิ่งอำนวยความสะดวกทั้งหมด",
+     "next_story": "facilities_overview",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "facts:จุดเด่น (ชั้น G: Junior World · ภายนอก: Kid Pool)",
+    "facts:ทำเล (อยู่ติดสวนสาธารณะซอยชัยพฤกษ์ 4 (สวนหนองโพรง))",
+    "report:09_facilities_ground.md#9.7 (Junior World ห้องเด็กธีมอวกาศ บ่อบอล ชั้น G อาคาร A)",
+    "report:09_facilities_ground.md#9.9 (Playground = Playscape 'Space Playground' 137 ตร.ม. · สไลเดอร์ ชิงช้า แทรมโพลีน 2 จุด · บ่อน้ำตื้นพร้อมน้ำพุ · ติดกับ Kid's Pool)",
+    "report:12_landscape.md#12.10 (Playscape 137 ตร.ม. · Kid's Pool สระเด็กติดขอบสระหลัก)",
+    "report:12_landscape.md#12.5.4 (Shallow Pond บ่อน้ำตื้นมีหัวพุ่งน้ำที่พื้นในลาน Playscape)",
+    "report:04_location.md#4.6.1 (สวนหนองโพรงมีสนามเด็กเล่น)",
+    "report:19_faq.md line 1136 (Junior World · Playground 137 sq m · Kid Pool) · line 43 (ครอบครัว เด็ก)",
+    "report:03_concept.md line 219-220 (FAMILIES / CHILDREN: Junior World, Playground, Kid Pool)",
+    "slides:intro-024 (Junior World ห้องเด็กธีมอวกาศ บ่อบอล)",
+    "assets:web/6.gallery/exterior/Playscape/Scene 50.png · Scene 55.png · slides intro_011.jpg · fac_g_junior_ballpit (ภาพของกลุ่ม facilities ใช้ร่วม)"
+   ],
+   "notes_th": "รูปเดียวกับ room_types: (0) แถวว่างสี่แถวรอ · (1) Junior World ภาพบ่อบอลเดียวกับ kids_room_where · (2) Space Playground — Scene 50 โดมยานอวกาศ สไลเดอร์ท่อ พื้นลายดาวเคราะห์ 137 ตร.ม. นับขึ้น · (3) Kid Pool — Scene 55 มุมสูง ลาน Playscape กับวงสระเด็กข้างสไลเดอร์ประติมากรรม (ครอปตัดคนเล็กๆ ออก) · (4) สวนข้างโครงการ — ภาพ THE PARK (intro-011) แถวนี้แตะไป park_green · ทุกแถวแตะได้ (Junior World→kids_room_where, Playground→playground_where ของกลุ่ม rooms, สระเด็ก→pools_all, สวน→park_green) แต่ละแถวระบุ tap เอง และ taps 5 ≠ แถว 4 จงใจ ไม่ให้ระบบผูกตามลำดับ 'ทั้งหมด' เป็นชิปท้าย · ไม่ใส่: อายุ ความปลอดภัย ผู้ดูแล ความลึก Kid Pool (แบบไม่ได้ระบุ) · คำว่า 'ใช้ฟรี' ของ Junior World (คำทีมขาย ยังไม่มีเอกสาร) · ห้องแบบไหนเหมาะกับครอบครัว (แหล่งที่อนุมัติไม่ได้ระบุ และ qa_script ห้ามเหมา) · ไม่ใส่คำถาม 'มีสนามเด็กเล่นกลางแจ้งไหม' / 'ลานเด็กเล่นมีอะไรบ้าง' เพราะ playground_where (กลุ่ม rooms) ตอบเรื่องนั้นแล้ว · ทับกับ kids_room_where: เรื่องนั้นมีคำถาม 'มีที่เล่นสำหรับเด็กไหม', 'มีโซนเด็กไหม', 'เด็กๆ เล่นที่ไหนได้บ้าง', 'Is there anything for kids?' ซึ่งความจริงคือคำถามกว้างของเรื่องนี้ — ไม่ได้แก้ไฟล์ของกลุ่มอื่น เสนอให้ย้ายคำถามกว้างสี่ข้อนั้นมาที่ for_families แล้วเหลือ kids_room_where ไว้ตอบ 'ห้องเด็กอยู่ไหน'"
+  },
+  {
+   "id": "nearby_places",
+   "template": "journey",
+   "questions_th": [
+    "ใกล้โรงพยาบาลไหม",
+    "มีโรงเรียนใกล้ไหม",
+    "ใกล้ซูเปอร์มาร์เก็ตไหม",
+    "มีตลาดใกล้ไหม",
+    "ไปโรงพยาบาลกี่นาที",
+    "มีโรงเรียนนานาชาติใกล้ไหม"
+   ],
+   "questions_en": [
+    "Is there a hospital nearby?",
+    "Are there schools nearby?",
+    "Where can I buy groceries?"
+   ],
+   "lines": [
+    {
+     "th": "ซูเปอร์มาร์เก็ตโลตัสขับรถประมาณ 6 ถึง 8 นาที",
+     "en": "Lotus's supermarket is about 6 to 8 minutes by car,",
+     "cue_th": [
+      "โลตัส",
+      "ซูเปอร์มาร์เก็ต"
+     ],
+     "cue_en": [
+      "Lotus",
+      "supermarket"
+     ],
+     "cue_zh": [
+      "莲花",
+      "Lotus",
+      "超市"
+     ]
+    },
+    {
+     "th": "ตลาดโต้รุ่งจอมเทียนก็ใกล้เคียงกัน",
+     "en": "Jomtien Night Market about the same,",
+     "cue_th": [
+      "ตลาดโต้รุ่ง",
+      "ตลาด"
+     ],
+     "cue_en": [
+      "Night Market"
+     ],
+     "cue_zh": [
+      "夜市",
+      "市场"
+     ]
+    },
+    {
+     "th": "โรงพยาบาลจอมเทียนประมาณ 8 ถึง 11 นาที",
+     "en": "Jomtien Hospital about 8 to 11 minutes,",
+     "cue_th": [
+      "โรงพยาบาล"
+     ],
+     "cue_en": [
+      "hospital"
+     ],
+     "cue_zh": [
+      "医院"
+     ]
+    },
+    {
+     "th": "โรงพยาบาลกรุงเทพพัทยาประมาณ 11 ถึง 16 นาที",
+     "en": "Bangkok Hospital Pattaya about 11 to 16,",
+     "cue_th": [
+      "กรุงเทพพัทยา",
+      "กรุงเทพ"
+     ],
+     "cue_en": [
+      "Bangkok"
+     ],
+     "cue_zh": [
+      "曼谷"
+     ]
+    },
+    {
+     "th": "โรงเรียนเมืองพัทยา 7 ประมาณ 5 ถึง 7 นาที",
+     "en": "Pattaya City School 7, about 5 to 7 minutes,",
+     "cue_th": [
+      "โรงเรียน"
+     ],
+     "cue_en": [
+      "school"
+     ],
+     "cue_zh": [
+      "学校"
+     ]
+    },
+    {
+     "th": "และโรงเรียนนานาชาติ German International School ประมาณ 8 ถึง 11 นาทีค่ะ",
+     "en": "and German International School about 8 to 11 minutes.",
+     "cue_th": [
+      "นานาชาติ",
+      "German",
+      "เยอรมัน"
+     ],
+     "cue_en": [
+      "German",
+      "International"
+     ],
+     "cue_zh": [
+      "国际学校",
+      "德国"
+     ]
+    }
+   ],
+   "params": {
+    "origin_en": "EMBASSY WORLD",
+    "origin_sub_en": "Jomtien, Pattaya · by car",
+    "bar_max": 20,
+    "rows": [
+     {
+      "icon": "mall",
+      "label_en": "Lotus's",
+      "sub_en": "Supermarket · 2.9 km",
+      "value_en": "≈ 6–8 min",
+      "bar": [
+       6,
+       8
+      ],
+      "line": 0
+     },
+     {
+      "icon": "mall",
+      "label_en": "Jomtien Night Market",
+      "sub_en": "3.2 km",
+      "value_en": "≈ 6–8 min",
+      "bar": [
+       6,
+       8
+      ],
+      "line": 1
+     },
+     {
+      "icon": "hospital",
+      "label_en": "Jomtien Hospital",
+      "sub_en": "6.5 km",
+      "value_en": "≈ 8–11 min",
+      "bar": [
+       8,
+       11
+      ],
+      "line": 2
+     },
+     {
+      "icon": "hospital",
+      "label_en": "Bangkok Hospital Pattaya",
+      "sub_en": "10.2 km",
+      "value_en": "≈ 11–16 min",
+      "bar": [
+       11,
+       16
+      ],
+      "line": 3
+     },
+     {
+      "icon": "school",
+      "label_en": "Pattaya City School 7",
+      "sub_en": "2.9 km",
+      "value_en": "≈ 5–7 min",
+      "bar": [
+       5,
+       7
+      ],
+      "line": 4
+     },
+     {
+      "icon": "school",
+      "label_en": "German Int'l School",
+      "sub_en": "4.5 km",
+      "value_en": "≈ 8–11 min",
+      "bar": [
+       8,
+       11
+      ],
+      "line": 5
+     }
+    ]
+   },
+   "taps": [
+    {
+     "id": "story_nearby_places_malls",
+     "label_en": "Malls",
+     "label_th": "ห้าง",
+     "next_story": "travel_malls",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_places_airports",
+     "label_en": "Airports",
+     "label_th": "สนามบิน",
+     "next_story": "travel_airports",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_places_beach",
+     "label_en": "Beach & park",
+     "label_th": "หาดและสวน",
+     "next_story": "location_beach",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:04_location.md#4.9.2 (Lotus's ถนนชัยพฤกษ์ 2: ถนน 2.9 กม. · free-flow 6 นาที · รถติด 7–8 · ตลาดโต้รุ่งจอมเทียน 3.2 กม. · 6 · 7–8)",
+    "report:04_location.md#4.9.3 (Jomtien Hospital 6.5 กม. · 8 · 10–11 · โรงพยาบาลกรุงเทพพัทยา 10.2 กม. · 11 · 14–16)",
+    "report:04_location.md#4.9.4 (โรงเรียนเมืองพัทยา 7: 2.9 กม. · 5 · 6–7 · German International School 4.5 กม. · 8 · 10–11)",
+    "report:92_appendix_travel.md#ค.4.2 rows 14, 15 · ค.4.3 rows 33, 37 · ค.4.4 rows 42, 43 (ตัวเลขเดียวกัน · 'Pattaya City School 7 (public)')",
+    "report:19_faq.md line 128, 131, 134 (ซูเปอร์มาร์เก็ต/ตลาด · โรงพยาบาล · โรงเรียน ตามแผนที่ ขับรถ)"
+   ],
+   "notes_th": "แม่แบบ journey ไม่มีรูป สเกลเดียวทุกแถว bar_max 20 นาที (ไม่ใช่ 90 ของเรื่องสนามบิน — ที่ใกล้ๆ ทุกแถวจะสั้นจนอ่านไม่ออก) · ช่วงเวลา = รถโล่ง (OSRM) ถึงช่วงรถติด (ประมาณการของรายงาน) แบบเดียวกับ travel_malls · กม. อยู่บนจอแต่ไม่พูด · เลือก: Lotus's ชัยพฤกษ์ 2 (โลตัสใหญ่ใกล้สุด; Lotus's Go Fresh ใกล้กว่าแต่เป็นมินิมาร์ท), ตลาดโต้รุ่งจอมเทียน, โรงพยาบาลจอมเทียน + โรงพยาบาลกรุงเทพพัทยา (FAQ 4 ของรายงาน), โรงเรียนเมืองพัทยา 7 (รัฐ) + German International School (นานาชาติใกล้สุด) · ไม่ซ้ำ travel_malls / travel_airports / location_travel (ห้าง สนามบิน หาด อยู่ในเรื่องเหล่านั้น — แตะไปได้) · ไม่ใส่: 'ไม่ใช่เวลาฉุกเฉิน' เป็นบรรทัดพูด (ทุกบรรทัดพูดว่า 'ประมาณ' และเป็นเวลาขับรถอยู่แล้ว) · เวลาเปิดตลาด · Tara Pattana / Regents (ไกลกว่า เรื่องจะยาวเกิน) · ค่าเทอม/หลักสูตร (รายงานให้ติดต่อโรงเรียนเอง) · ⚠️ ไอคอน: emma-story.js มีแค่ home/mall/plane/beach/park/road — แถวโรงพยาบาลและโรงเรียนตั้ง icon เป็น 'hospital' / 'school' ซึ่งตอนนี้หน้าเว็บถอยไปวาดรูปบ้าน (ICONS[name] || ICONS.home) เหมือนหมุดโครงการ ควรเพิ่ม path สองตัวใน ICONS ก่อนอนุมัติ (ไม่ได้แก้ไฟล์นั้นเพราะอยู่นอกงานกลุ่มนี้) · คำถามแคบ ('ใกล้โรงพยาบาลไหม') จะได้ยินเรื่องตลาดก่อนสองบรรทัด — ถ้าเจ้าของต้องการตามกติกา 13 ต.ค. แยกเป็นเรื่องย่อย nearby_hospitals / nearby_schools / nearby_shopping ได้จากแถวชุดเดียวกัน"
+  },
+  {
+   "id": "lagoon_islands",
+   "template": "metric",
+   "questions_th": [
+    "มีเกาะกี่เกาะ",
+    "เกาะในสระมีอะไรบ้าง",
+    "เกาะกลางน้ำคืออะไร",
+    "ในลากูนมีเกาะไหม",
+    "บนเกาะมีอะไร",
+    "เกาะในโครงการใหญ่แค่ไหน"
+   ],
+   "questions_en": [
+    "How many islands are there in the lagoon?",
+    "What is on the islands?"
+   ],
+   "lines": [
+    {
+     "th": "ในลากูนของเรามีเกาะกลางน้ำ 5 เกาะค่ะ",
+     "en": "Our Water Lagoon has five islands,",
+     "cue_th": [
+      "5",
+      "ห้า",
+      "เกาะ"
+     ],
+     "cue_en": [
+      "five",
+      "5",
+      "islands"
+     ],
+     "cue_zh": [
+      "5",
+      "五",
+      "岛"
+     ]
+    },
+    {
+     "th": "รวมพื้นที่ 180 ตารางเมตร",
+     "en": "180 square metres in all,",
+     "cue_th": [
+      "180",
+      "ร้อยแปดสิบ"
+     ],
+     "cue_en": [
+      "180",
+      "hundred and eighty"
+     ],
+     "cue_zh": [
+      "180",
+      "一百八十"
+     ]
+    },
+    {
+     "th": "มีที่นั่งพักผ่อนแบบลดระดับกลางน้ำ",
+     "en": "with sunken seating out on the water,",
+     "cue_th": [
+      "ที่นั่ง",
+      "ลดระดับ"
+     ],
+     "cue_en": [
+      "sunken",
+      "seating"
+     ],
+     "cue_zh": [
+      "座位",
+      "下沉"
+     ]
+    },
+    {
+     "th": "และเกาะจากุซซี่ค่ะ",
+     "en": "and a jacuzzi island.",
+     "cue_th": [
+      "จากุซซี่"
+     ],
+     "cue_en": [
+      "jacuzzi"
+     ],
+     "cue_zh": [
+      "按摩池",
+      "极可意"
+     ]
+    }
+   ],
+   "params": {
+    "bg_asset": "lagoon_islands_aerial",
+    "value": {
+     "to": 5,
+     "dec": 0,
+     "unit_en": "ISLANDS"
+    },
+    "label_en": "In the Water Lagoon",
+    "parts": [
+     {
+      "label_en": "Island area in all",
+      "to": 180,
+      "unit_en": "sq.m.",
+      "line": 1
+     }
+    ],
+    "line": 0
+   },
+   "taps": [
+    {
+     "id": "story_lagoon_islands_lagoon",
+     "label_en": "The lagoon",
+     "label_th": "ลากูน",
+     "next_story": "masterplan_lagoon",
+     "tool": null
+    },
+    {
+     "id": "story_lagoon_islands_pools",
+     "label_en": "All pools",
+     "label_th": "สระทั้งหมด",
+     "next_story": "pools_all",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:06_masterplan.md line 99 (✅ เกาะในสระ 5 เกาะ รวม 180 ตร.ม. (25/25/20/35/75) เช่น Sunken Sitting Area และเกาะที่มีจากุซซี่ทรงรี 2 อ่างพร้อม water feature)",
+    "report:12_landscape.md 12.6 (Area Info หน้า 2: Island 1-3, Jacuzzi Island, Main Island)",
+    "assets:web/6.gallery/exterior/CD03/Scene 58.png (มุมสูงกลางวัน เห็นเกาะหลายเกาะ ศาลาทรงเปลือกหอย สะพาน)"
+   ],
+   "notes_th": "เจ้าของ 14 ต.ค.: คำถามเรื่องเกาะ (ในล็อกหุ่น) ไม่มีภาพ → เรื่องนี้ · ลำดับบนจอ: (0) ภาพมุมสูงลากูน ตัวเลข 5 ISLANDS (ต่ำกว่า 100 ไม่นับขึ้น) · (1) ส่วนย่อย 180 sq.m. · (2)(3) ไม่มีภาพใหม่ · พูดเฉพาะที่รายงาน ติด ✅: จำนวน 5 เกาะ รวม 180 ตร.ม. ที่นั่งลดระดับ (Sunken Sitting) และเกาะจากุซซี่ · ไม่พูด: ชื่อเกาะทีละเกาะ บาร์/Pool Terrace บนศาลา (การจับคู่ป้ายเป็นการวิเคราะห์ 🔎) ความลึกสระ (ไม่มีในแบบ) ภาพไม่ใช้ภาพแนวคิด จากรายงาน (มีคำว่า Preliminary Concept บนภาพ)"
+  }
+ ]
+}

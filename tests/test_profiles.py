@@ -193,6 +193,10 @@ def test_a_broad_facilities_question_offers_the_floors_instead_of_the_list():
     # layout puts that rule under a header that outranks everything below it.
     default = next(ln for ln in SALES_HOST_BLOCK.splitlines() if ln.startswith("- ค่าเริ่มต้นคือไม่ถามต่อ"))
     assert "ถามกว้างว่ามีสิ่งอำนวยความสะดวกอะไร" in default
+    # Owner 12 Oct on the robot: "เยี่ยมมาก" and a remark got a bare "ค่ะ" --
+    # the "ถูก: ได้เลยค่ะ" example taught the model that shortest is best.
+    assert 'ห้ามตอบคำเดียว เช่น "ค่ะ" "ครับ"' in default
+    assert '"ขอบคุณมากค่ะ ดีใจที่ชอบนะคะ"' in default
     # Banned for one evening and undone by the owner (2026-10-11): "ให้ชม"
     # can mean showing a picture, not walking there.
     assert "ให้ชม" not in line and "ให้บริการ" not in line
@@ -207,9 +211,14 @@ def test_the_203_case_review_fixes_are_in_the_condo_prompt():
     พนักงานขายมาดูแล" with no way to call anyone, find_units' rooms never
     named, and "ไม่ใช่ครับ ตึก C" opening floor 1 instead of the room."""
     text = build_instructions("X")
-    assert "ไม่ใช่นอกเรื่อง: ทำเลและการเดินทางจากโครงการ (สนามบิน หาด ห้าง โรงพยาบาล) ให้ค้นด้วย search_condo_info ก่อน" in text
+    assert "ไม่ใช่นอกเรื่อง: ทำเลและการเดินทางจากโครงการ (สนามบิน หาด ห้าง โรงพยาบาล) และข้อเท็จจริงของโครงการ (ขนาด จำนวน ความสูง ที่จอดรถ วัสดุ ระบบ) ให้ค้นด้วย search_condo_info ก่อนเสมอ ห้ามส่งต่อทีมขายโดยไม่ค้น" in text
     assert "ห้ามด้อยค่าหรือจัดอันดับที่อื่น" in text
-    assert "เสียงหรือคำที่ไม่มีความหมาย ให้ขอให้พูดอีกครั้ง ห้ามตอบว่าเป็นเรื่องนอกขอบเขต" in text
+    # owner 12 Oct: ask again AND offer the project's topics, never a bare "ค่ะ"
+    assert "เสียงหรือคำที่ฟังไม่ออก ให้ขอให้พูดอีกครั้งพร้อมเสนอหัวข้อ" in text
+    assert "ห้ามตอบว่าเป็นเรื่องนอกขอบเขต" in text
+    # filler / unrelated chatter -> acknowledge + ONE project question (owner 12 Oct)
+    assert 'ให้ตอบรับสั้นๆ แล้วชวนคุยเรื่องโครงการหนึ่งคำถาม (ข้อยกเว้นของ "ไม่ถามต่อ")' in text
+    assert "ห้ามถามซ้ำข้อที่ถามไปแล้ว ห้ามถามเรื่องงบหรือราคา" in text
     assert 'ห้ามพูดว่าโครงการนี้ได้รางวัล' in text
     assert "กฎหมาย สิทธิ์ถือครอง หรือโควตาต่างชาติ ไม่มีในข้อมูล ให้ทีมขายยืนยัน" in text
     assert 'ห้ามพูดว่า "เรียนเชิญพนักงานขายมาดูแล"' in text
@@ -410,7 +419,12 @@ def test_sales_host_compares_room_use_before_numbers(sales_context):
     sales_context(approved=False)
     text = build_instructions("Embassy World")
     assert "อธิบายความต่างด้านพื้นที่และการใช้งานก่อน" not in text
-    assert "ขนาด/แบบห้องและโซน/ชั้นให้ค้นแล้วตอบตามผลจริง" in text
+    # Owner 12 Oct ("ตอบให้ครบถ้วนพอ"): live, "มีแบบห้องอะไรบ้าง" got "each type has a different
+    # size" with the sizes sitting in the approved facts -- name them.
+    assert 'ถามแบบห้องหรือความต่าง ให้บอกแบบพร้อมขนาดตาม "แบบห้องและขนาด" ในข้อมูลโครงการ' in text
+    assert "โซน/ชั้นของห้องให้ค้นแล้วตอบตามผลจริง" in text
+    # live: "0.6 กม." came out as "สองจุดหก กิโลเมตร" -- say metres
+    assert "ระยะที่ไม่ถึงหนึ่งกิโลเมตรให้พูดเป็นเมตร ห้ามอ่านทศนิยม" in text
 
 
 def test_sales_host_has_explicit_price_and_pool_stop_examples():
@@ -869,7 +883,8 @@ def test_approved_starting_prices_may_be_said_unit_prices_still_go_to_sales():
     assert "ห้ามบวกลบเป็นตัวเลขใหม่" in line
     # Re-test: asked the garden/pool-view price, answered with the type
     # starting prices as if they were the view prices.
-    assert "ราคาตามวิวหรือชั้นไม่มีในข้อมูลให้บอกตรงๆ" in line
+    # (owner 12 Oct: never "ไม่มีข้อมูล" -- hand it to the sales team instead)
+    assert "ราคาตามวิวหรือชั้นไม่มีในข้อมูล ห้ามเดา ให้ทีมขายยืนยันอย่างเป็นธรรมชาติ" in line
     # The first wording said "starting price questions" only, and the live
     # re-test (2026-10-08) still refused "ราคาเท่าไหร่" / "สองห้องนอนราคา
     # เท่าไหร่" / "How much is a one-bedroom?" — read as the unit example.

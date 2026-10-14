@@ -277,6 +277,16 @@ async def request(action: str) -> dict:
     if not heard_ok(session, action):
         return _refuse(session, action, "refused", "heard_missing", avail=available(session))
 
+    # 4b. The handshake's second door (owner 13 Oct: "ขอเชคแฮน" by voice, and
+    #     the arm never moved -- the robot's "สั่งท่าทางด้วยเสียง" switch had
+    #     never been turned on). The camera greeting's verified group plays
+    #     without that switch (BodyController.greet: the same arm lock, stop
+    #     latch and walk gates), so a voice handshake goes through it while
+    #     the switch is off. Only the handshake: every other gesture still
+    #     waits for the switch. After the heard guard, never instead of it.
+    if action == "handshake" and _gestures_switched_off(session):
+        return await _greeting_handshake(session)
+
     # 5. what the robot already told us about this id
     if not stop:
         cached = _cached_refusal(session, action)
@@ -310,10 +320,38 @@ async def request(action: str) -> dict:
                        status=ack.get("status"), est_ms=ack.get("est_ms"),
                        avail=available(session))
     reason = ack.get("reason") or "bad_request"
+    if action == "handshake" and reason == "disabled":
+        # the switch went off after the caps we read (4b)
+        return await _greeting_handshake(session)
     hardware = "failed" if reason in _LINK_REASONS else "refused"
     return _refuse(session, action, hardware, reason,
                    avail=available(session), status=ack.get("status"),
                    stop_sent=ack.get("stop_sent") is True)
+
+
+def _gestures_switched_off(session) -> bool:
+    """The robot said its voice-gesture switch is off (`body_caps` enabled
+    false). No caps yet = not known, and the normal path asks the robot."""
+    caps = robot_face_link.caps(session, "body") if session is not None else None
+    return bool(caps) and caps.get("enabled") is False
+
+
+#: What the model is told after a handshake sent through the greeting path:
+#: the app plays that group or refuses silently (no ack), so it is "asked".
+_GREETING_HANDSHAKE_TEXT = (
+    "ส่งคำขอท่าจับมือไปยังหุ่นแล้ว แต่ยังยืนยันไม่ได้ว่าแขนยื่นออกมา (หุ่นอาจปฏิเสธเงียบๆ เช่นเพิ่งกดหยุด "
+    "หรือกำลังเดิน) ห้ามพูดว่า 'ยื่นมือแล้ว' หรือ 'กำลังยื่นมือ' ให้ชวนจับมือสั้นๆ เช่น 'จับมือกันค่ะ'")
+
+
+async def _greeting_handshake(session) -> dict:
+    from app import robot_arm
+
+    requested = await robot_arm.greet(session=session)
+    if not requested:
+        return _refuse(session, "handshake", "refused", "disabled", avail=available(session))
+    _record("body_request", action="handshake", via="greeting")
+    return _result("handshake", "requested", None, _GREETING_HANDSHAKE_TEXT, ok=True,
+                   avail=available(session))
 
 
 # ---- what the robot reports afterwards ----

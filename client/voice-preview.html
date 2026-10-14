@@ -10,6 +10,7 @@
     document.documentElement.classList.add('app-shell');
   }
 </script>
+<link rel="stylesheet" href="/assets/emma-story.css?v=20261014-a">
 <style>
   :root {
     color-scheme: dark;
@@ -167,16 +168,6 @@
     animation: orbit-two 13s linear infinite reverse;
   }
 
-  .mascot-rig {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    transform-style: preserve-3d;
-    transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
-    transition: transform .12s ease-out, opacity .24s ease;
-    will-change: transform;
-  }
-
   /* The approved 3D Emma (owner sign-off 2026-09-23; the page loads the 162k
      emma.glb again since 2026-09-29 -- the 68k reduction tore the head seams,
      see mascot.js) sits exactly where the Rive canvas sat: same box, same tilt,
@@ -196,125 +187,11 @@
   }
 
   /* emma-3d-ready is added only when BOTH the WebGL renderer and the GLB have
-     succeeded. Until then — and forever, on a machine without WebGL — the
-     inline SVG puppet underneath stays visible and fully driven by the same
-     data-emma-* attributes. That is the page's fallback, and it is why this
-     is a crossfade and not a deletion. */
+     succeeded. Until then -- and on a machine without WebGL -- the spot is
+     empty: the inline SVG puppet that used to stand in was deleted (owner,
+     14 Oct: "หุ่นตัวเดิมนี้ลบออกจากโปรเจคได้ไหม มันชอบเด้งขึ้นมาเวลาโหลด" --
+     it showed for a moment on every load before the 3D Emma faded in). */
   .mascot-wrap.emma-3d-ready .mascot-3d { opacity: 1; }
-  .mascot-wrap.emma-3d-ready .mascot-rig {
-    opacity: 0;
-    visibility: hidden;
-  }
-  /* Hidden is not idle: under a ready 3D body the puppet's loops kept
-     running, the glint repainting a moving gradient on the main thread every
-     frame for nobody (2026-10-10, the robot face's smoothness pass). Paused,
-     not removed: if WebGL is lost the class goes and the puppet resumes. */
-  .mascot-wrap.emma-3d-ready .mascot-rig,
-  .mascot-wrap.emma-3d-ready .mascot-rig * { animation-play-state: paused !important; }
-
-  .mascot-float {
-    position: absolute;
-    inset: 0;
-    transform-style: preserve-3d;
-    animation: float-3d 5.2s ease-in-out infinite;
-    will-change: transform;
-  }
-
-  .mascot-turn {
-    position: absolute;
-    inset: 0;
-    transform-style: preserve-3d;
-    animation: ambient-turn 6.4s ease-in-out infinite;
-    will-change: transform;
-  }
-
-  .mascot-art {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    transform: translateZ(34px);
-    filter: drop-shadow(0 30px 30px rgba(0,0,0,.42));
-    pointer-events: none;
-    user-select: none;
-  }
-
-  .rig-character,
-  .puppet-part,
-  .face-part {
-    transform-box: view-box;
-    will-change: transform;
-  }
-
-  .rig-character {
-    transform-origin: 50% 64%;
-    animation: robot-alive 3.4s ease-in-out infinite;
-  }
-
-  .puppet-part,
-  .face-part {
-    transition:
-      transform .72s cubic-bezier(.2,.86,.25,1),
-      opacity .28s ease;
-  }
-
-  .puppet-part > svg,
-  .face-part > svg { overflow: hidden; }
-
-  .limb-sprite {
-    opacity: 0;
-    transition: opacity .24s ease, transform .72s cubic-bezier(.2,.86,.25,1);
-  }
-  [data-emma-left-hand="relaxed"] .puppet-arm-left .limb-relaxed,
-  [data-emma-left-hand="open"] .puppet-arm-left .limb-open,
-  [data-emma-right-hand="relaxed"] .puppet-arm-right .limb-relaxed,
-  [data-emma-right-hand="open"] .puppet-arm-right .limb-open { opacity: 1; }
-
-  .puppet-head {
-    transform-origin: 611px 510px;
-    transform:
-      translate(var(--head-x), var(--head-y))
-      rotate(var(--head-rotate))
-      scale(var(--head-scale));
-  }
-
-  .puppet-body {
-    transform-origin: 611px 770px;
-    transform:
-      translate(var(--body-x), var(--body-y))
-      rotate(var(--body-rotate))
-      scale(var(--body-scale));
-  }
-
-  .puppet-arm-left {
-    transform-origin: 478px 680px;
-    transform: rotate(var(--arm-left));
-  }
-
-  .puppet-arm-right {
-    transform-origin: 744px 680px;
-    transform: rotate(var(--arm-right));
-  }
-
-  .puppet-wai-hands {
-    opacity: 0;
-    transform-origin: 611px 780px;
-    transform: translateY(28px) scale(.82);
-  }
-
-  /* .puppet-floor-ring / .emma-data-orbit deleted with their markup
-     (owner, 2026-09-30 "อันนี้ลบทิ้ง...ได้เลย"). */
-
-  .face-display {
-    transform-box: view-box;
-    transform-origin: center;
-  }
-
-  .face-display {
-    transform: translate(var(--gaze-x), var(--gaze-y));
-    transition: transform .18s ease-out;
-  }
 
   .mascot-wrap[data-emma-state="idle"] {
     --state-accent: #77e8ff;
@@ -340,186 +217,6 @@
   .mascot-wrap[data-emma-state="frustrated"] {
     --state-accent: #ff8193;
     --state-rgb: 255, 129, 147;
-  }
-
-  .puppet-aura {
-    opacity: 0;
-    transform-origin: 611px 390px;
-    transition: opacity .36s ease;
-  }
-
-  [data-emma-pose="pose-10"] .puppet-aura {
-    opacity: .86;
-    animation: puppet-aura-breathe 2.1s ease-in-out infinite;
-  }
-
-  .face-part { opacity: 0; }
-  [data-emma-eyes="smile"] .eyes-smile,
-  [data-emma-eyes="sad"] .eyes-sad,
-  [data-emma-eyes="squeeze"] .eyes-squeeze,
-  [data-emma-mouth="smile"] .mouth-smile,
-  [data-emma-mouth="small"] .mouth-small,
-  [data-emma-mouth="wide"] .mouth-wide,
-  [data-emma-mouth="sad"] .mouth-sad { opacity: 1; }
-
-  .eyes-smile {
-    transform-origin: 611px 368px;
-    animation: puppet-blink 4.6s ease-in-out infinite;
-  }
-
-  .eyes-sad { transform: rotate(180deg) translateY(-20px); transform-origin: 611px 368px; }
-  .eyes-squeeze { transform: scaleY(.62); transform-origin: 611px 368px; }
-  .mouth-small,
-  .mouth-wide { transform-origin: 611px 535px; transform: scaleY(var(--mouth-scale)); }
-  /* The silver head already contains its chrome smile plate. A second smile
-     sprite on top reads as two mouths, so neutral/happy poses use that plate
-     alone. Live speech is clipped to the small centre aperture; the sad mouth
-     sits above the plate on the white face. */
-  .mouth-smile { display: none; }
-  .mouth-sad {
-    transform: translateY(-72px);
-    transform-origin: 611px 455px;
-  }
-
-  .mascot-wrap.has-live-mouth .mouth-small,
-  .mascot-wrap.has-live-mouth .mouth-wide {
-    transition-duration: .08s;
-  }
-
-  [data-emma-pose="wai"] .puppet-arm-left,
-  [data-emma-pose="wai"] .puppet-arm-right,
-  [data-emma-pose="pose-07"] .puppet-arm-left,
-  [data-emma-pose="pose-07"] .puppet-arm-right,
-  [data-emma-pose="pose-09"] .puppet-arm-left,
-  [data-emma-pose="pose-09"] .puppet-arm-right,
-  [data-emma-pose="pose-10"] .puppet-arm-left,
-  [data-emma-pose="pose-10"] .puppet-arm-right { opacity: 0; }
-  [data-emma-pose="wai"] .puppet-wai-hands,
-  [data-emma-pose="pose-07"] .puppet-wai-hands,
-  [data-emma-pose="pose-09"] .puppet-wai-hands,
-  [data-emma-pose="pose-10"] .puppet-wai-hands {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  [data-emma-pose="wai"] .puppet-wai-hands {
-    animation: puppet-wai-hands 2.2s ease-in-out infinite .72s;
-  }
-
-  [data-emma-pose="pose-05"] .puppet-arm-right {
-    animation: puppet-wave .72s ease-in-out infinite .72s;
-  }
-  [data-emma-pose="pose-06"] .puppet-body {
-    animation: puppet-celebrate 1.05s ease-in-out infinite .72s;
-  }
-  [data-emma-pose="pose-08"] .puppet-head {
-    animation: puppet-frustrated .48s ease-in-out 3 .72s;
-  }
-
-  /* State motion uses short anticipation / action / settle loops, mirroring
-     the timing language in the supplied Rive references. The selected silver
-     artwork stays mounted; only its puppet joints and lightweight props move. */
-  .mascot-wrap[data-emma-state="idle"] .puppet-head {
-    animation: emma-idle-look 5.6s cubic-bezier(.45,0,.25,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="listening"] .puppet-head {
-    animation: emma-listen-lean 2.6s cubic-bezier(.22,.8,.28,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="listening"] .puppet-body {
-    animation: emma-listen-body 2.6s cubic-bezier(.22,.8,.28,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="thinking"] .puppet-head {
-    animation: emma-search-head 2.6s cubic-bezier(.4,0,.2,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="thinking"] .puppet-arm-right {
-    animation: emma-search-hand 2.6s cubic-bezier(.4,0,.2,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="speaking"] .puppet-head {
-    animation: emma-talk-head 1.7s cubic-bezier(.3,0,.2,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="speaking"] .puppet-body {
-    animation: emma-talk-body 1.7s cubic-bezier(.3,0,.2,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="speaking"] .puppet-arm-left {
-    animation: emma-talk-left 3.4s cubic-bezier(.22,.8,.28,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="speaking"] .puppet-arm-right {
-    animation: emma-talk-right 3.4s cubic-bezier(.22,.8,.28,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="greeting"] .puppet-arm-right {
-    animation: emma-greeting-wave 1.55s cubic-bezier(.22,.8,.28,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="happy"] .rig-character {
-    animation: emma-happy-bounce 1.85s cubic-bezier(.22,.9,.24,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="happy"] .puppet-arm-left {
-    animation: emma-happy-left 1.85s cubic-bezier(.22,.9,.24,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="happy"] .puppet-arm-right {
-    animation: emma-happy-right 1.85s cubic-bezier(.22,.9,.24,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="error"] .puppet-head {
-    animation: emma-error-drop 2.2s cubic-bezier(.22,.8,.28,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="frustrated"] .puppet-head {
-    animation: emma-frustrated-shake .62s cubic-bezier(.36,.07,.19,.97) infinite;
-  }
-  .mascot-wrap[data-emma-state="frustrated"] .puppet-arm-left {
-    animation: emma-frustrated-left 1.24s ease-in-out infinite;
-  }
-  .mascot-wrap[data-emma-state="frustrated"] .puppet-arm-right {
-    animation: emma-frustrated-right 1.24s ease-in-out infinite;
-  }
-  .mascot-wrap[data-emma-state="grateful"] .puppet-head {
-    animation: emma-thank-bow 2.2s cubic-bezier(.22,.8,.28,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="loading"] .puppet-head {
-    animation: emma-scan-look 2.6s cubic-bezier(.4,0,.2,1) infinite;
-  }
-
-  .emma-motion-prop {
-    opacity: 0;
-    color: var(--state-accent);
-    transform-box: fill-box;
-    transform-origin: center;
-    pointer-events: none;
-    transition: opacity .22s ease;
-  }
-  .mascot-wrap[data-emma-state="thinking"] .prop-search {
-    opacity: .92;
-    animation: emma-prop-search 2.6s cubic-bezier(.4,0,.2,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="error"] .prop-alert,
-  .mascot-wrap[data-emma-state="frustrated"] .prop-alert {
-    opacity: .95;
-    animation: emma-prop-alert 1.1s ease-in-out infinite;
-  }
-  .mascot-wrap[data-emma-state="happy"] .prop-heart,
-  .mascot-wrap[data-emma-state="grateful"] .prop-heart {
-    opacity: .95;
-    animation: emma-prop-heart 1.7s cubic-bezier(.22,.9,.24,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="loading"] .prop-scan {
-    opacity: .86;
-    animation: emma-prop-scan 2.6s cubic-bezier(.4,0,.2,1) infinite;
-  }
-  .mascot-wrap[data-emma-state="loading"] .prop-scan-line {
-    animation: emma-scan-line 1.35s ease-in-out infinite;
-  }
-
-  .mascot-glint {
-    position: absolute;
-    inset: 8% 25% 48%;
-    z-index: 2;
-    pointer-events: none;
-    opacity: .24;
-    transform: translateZ(46px);
-    border-radius: 50%;
-    background:
-      radial-gradient(circle at var(--light-x) var(--light-y), rgba(255,255,255,.9), transparent 16%),
-      linear-gradient(112deg, transparent 30%, rgba(255,255,255,.46) 47%, transparent 61%);
-    background-size: 100% 100%, 230% 100%;
-    mix-blend-mode: screen;
-    animation: glint 4.8s ease-in-out infinite;
   }
 
   /* Emma's line is a speech bubble (owner, 2026-09-24, with a mockup). Only
@@ -760,178 +457,7 @@
     from { transform: rotateX(76deg) rotateY(-22deg) rotateZ(0deg); }
     to { transform: rotateX(76deg) rotateY(-22deg) rotateZ(360deg); }
   }
-  @keyframes float-3d {
-    0%, 100% { transform: translate3d(0, 4px, 0) rotateZ(-.8deg) scale(1); }
-    35% { transform: translate3d(0, -9px, 10px) rotateZ(.9deg) scale(1.018); }
-    68% { transform: translate3d(0, -4px, 18px) rotateZ(-.25deg) scale(1.008); }
-  }
-  @keyframes ambient-turn {
-    0%, 100% { transform: rotateX(-3deg) rotateY(-7deg); }
-    28% { transform: rotateX(3deg) rotateY(5deg); }
-    56% { transform: rotateX(-1deg) rotateY(8deg); }
-    78% { transform: rotateX(4deg) rotateY(-3deg); }
-  }
-  @keyframes robot-alive {
-    0%, 100% { transform: translateY(5px) scale(1); }
-    38% { transform: translateY(-8px) scale(.985, 1.025); }
-    66% { transform: translateY(-1px) scale(1.018, .982); }
-  }
-  @keyframes puppet-blink {
-    0%, 43%, 47%, 100% { transform: scaleY(1); }
-    45% { transform: scaleY(.06); }
-  }
-  @keyframes puppet-wave {
-    0%, 100% { transform: rotate(var(--arm-right)); }
-    35% { transform: rotate(calc(var(--arm-right) - 18deg)); }
-    70% { transform: rotate(calc(var(--arm-right) + 12deg)); }
-  }
-  @keyframes puppet-celebrate {
-    0%, 100% {
-      transform: translate(var(--body-x), var(--body-y)) rotate(var(--body-rotate)) scale(var(--body-scale));
-    }
-    45% {
-      transform: translate(var(--body-x), calc(var(--body-y) - 15px)) rotate(var(--body-rotate)) scale(1.045, .97);
-    }
-  }
-  @keyframes puppet-frustrated {
-    0%, 100% {
-      transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale));
-    }
-    35% {
-      transform: translate(calc(var(--head-x) - 8px), var(--head-y)) rotate(calc(var(--head-rotate) - 2deg)) scale(var(--head-scale));
-    }
-    70% {
-      transform: translate(calc(var(--head-x) + 8px), var(--head-y)) rotate(calc(var(--head-rotate) + 2deg)) scale(var(--head-scale));
-    }
-  }
-  @keyframes puppet-wai-hands {
-    0%, 100% { transform: translateY(0) scale(1); }
-    45% { transform: translateY(8px) scale(.985); }
-  }
-  @keyframes emma-idle-look {
-    0%, 18%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-    34% { transform: translate(calc(var(--head-x) - 5px), calc(var(--head-y) - 2px)) rotate(calc(var(--head-rotate) - 1.8deg)) scale(var(--head-scale)); }
-    57% { transform: translate(calc(var(--head-x) + 4px), calc(var(--head-y) - 4px)) rotate(calc(var(--head-rotate) + 1.4deg)) scale(var(--head-scale)); }
-    76% { transform: translate(var(--head-x), calc(var(--head-y) + 1px)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-  }
-  @keyframes emma-listen-lean {
-    0%, 12%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-    30%, 55% { transform: translate(calc(var(--head-x) + 9px), calc(var(--head-y) - 7px)) rotate(calc(var(--head-rotate) + 4.2deg)) scale(calc(var(--head-scale) * 1.012)); }
-    72% { transform: translate(calc(var(--head-x) - 2px), calc(var(--head-y) - 2px)) rotate(calc(var(--head-rotate) - .8deg)) scale(var(--head-scale)); }
-  }
-  @keyframes emma-listen-body {
-    0%, 12%, 100% { transform: translate(var(--body-x), var(--body-y)) rotate(var(--body-rotate)) scale(var(--body-scale)); }
-    34%, 58% { transform: translate(calc(var(--body-x) + 3px), calc(var(--body-y) + 2px)) rotate(calc(var(--body-rotate) + 1.8deg)) scale(var(--body-scale)); }
-  }
-  @keyframes emma-search-head {
-    0%, 10%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-    28% { transform: translate(calc(var(--head-x) - 11px), calc(var(--head-y) - 5px)) rotate(calc(var(--head-rotate) - 4deg)) scale(calc(var(--head-scale) * 1.01)); }
-    58% { transform: translate(calc(var(--head-x) + 10px), calc(var(--head-y) - 6px)) rotate(calc(var(--head-rotate) + 4deg)) scale(calc(var(--head-scale) * 1.01)); }
-    78% { transform: translate(var(--head-x), calc(var(--head-y) - 3px)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-  }
-  @keyframes emma-search-hand {
-    0%, 10%, 100% { transform: rotate(var(--arm-right)); }
-    28%, 64% { transform: rotate(calc(var(--arm-right) - 12deg)); }
-    80% { transform: rotate(calc(var(--arm-right) + 4deg)); }
-  }
-  @keyframes emma-talk-head {
-    0%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(calc(var(--head-rotate) - 1deg)) scale(var(--head-scale)); }
-    38% { transform: translate(var(--head-x), calc(var(--head-y) - 7px)) rotate(calc(var(--head-rotate) + 1.6deg)) scale(calc(var(--head-scale) * 1.012)); }
-    68% { transform: translate(var(--head-x), calc(var(--head-y) - 2px)) rotate(calc(var(--head-rotate) - .4deg)) scale(var(--head-scale)); }
-  }
-  @keyframes emma-talk-body {
-    0%, 100% { transform: translate(var(--body-x), var(--body-y)) rotate(var(--body-rotate)) scale(var(--body-scale)); }
-    42% { transform: translate(var(--body-x), calc(var(--body-y) - 5px)) rotate(calc(var(--body-rotate) + 1deg)) scale(calc(var(--body-scale) * 1.012)); }
-  }
-  @keyframes emma-talk-left {
-    0%, 12%, 48%, 100% { transform: rotate(var(--arm-left)); }
-    23% { transform: rotate(calc(var(--arm-left) + 18deg)); }
-    36% { transform: rotate(calc(var(--arm-left) - 8deg)); }
-  }
-  @keyframes emma-talk-right {
-    0%, 50%, 100% { transform: rotate(var(--arm-right)); }
-    62% { transform: rotate(calc(var(--arm-right) - 18deg)); }
-    76% { transform: rotate(calc(var(--arm-right) + 10deg)); }
-    90% { transform: rotate(calc(var(--arm-right) - 6deg)); }
-  }
-  @keyframes emma-greeting-wave {
-    0%, 12%, 100% { transform: rotate(var(--arm-right)); }
-    27% { transform: rotate(calc(var(--arm-right) - 23deg)); }
-    43% { transform: rotate(calc(var(--arm-right) + 15deg)); }
-    59% { transform: rotate(calc(var(--arm-right) - 18deg)); }
-    75% { transform: rotate(calc(var(--arm-right) + 9deg)); }
-  }
-  @keyframes emma-happy-bounce {
-    0%, 14%, 100% { transform: translateY(4px) scale(1); }
-    34% { transform: translateY(-18px) scale(1.025, .98); }
-    52% { transform: translateY(-7px) scale(.99, 1.018); }
-    68% { transform: translateY(-12px) scale(1.012, .99); }
-    82% { transform: translateY(1px) scale(1); }
-  }
-  @keyframes emma-happy-left {
-    0%, 100% { transform: rotate(var(--arm-left)); }
-    35%, 62% { transform: rotate(calc(var(--arm-left) + 20deg)); }
-  }
-  @keyframes emma-happy-right {
-    0%, 100% { transform: rotate(var(--arm-right)); }
-    35%, 62% { transform: rotate(calc(var(--arm-right) - 20deg)); }
-  }
-  @keyframes emma-error-drop {
-    0%, 12%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-    35%, 70% { transform: translate(var(--head-x), calc(var(--head-y) + 13px)) rotate(calc(var(--head-rotate) - 2deg)) scale(calc(var(--head-scale) * .98)); }
-    82% { transform: translate(var(--head-x), calc(var(--head-y) + 5px)) rotate(calc(var(--head-rotate) + 1deg)) scale(var(--head-scale)); }
-  }
-  @keyframes emma-frustrated-shake {
-    0%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-    25% { transform: translate(calc(var(--head-x) - 8px), var(--head-y)) rotate(calc(var(--head-rotate) - 3deg)) scale(var(--head-scale)); }
-    75% { transform: translate(calc(var(--head-x) + 8px), var(--head-y)) rotate(calc(var(--head-rotate) + 3deg)) scale(var(--head-scale)); }
-  }
-  @keyframes emma-frustrated-left {
-    0%, 100% { transform: rotate(var(--arm-left)); }
-    50% { transform: rotate(calc(var(--arm-left) + 13deg)); }
-  }
-  @keyframes emma-frustrated-right {
-    0%, 100% { transform: rotate(var(--arm-right)); }
-    50% { transform: rotate(calc(var(--arm-right) - 13deg)); }
-  }
-  @keyframes emma-thank-bow {
-    0%, 16%, 100% { transform: translate(var(--head-x), var(--head-y)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-    38%, 66% { transform: translate(var(--head-x), calc(var(--head-y) + 18px)) rotate(var(--head-rotate)) scale(calc(var(--head-scale) * .975)); }
-    82% { transform: translate(var(--head-x), calc(var(--head-y) + 5px)) rotate(var(--head-rotate)) scale(var(--head-scale)); }
-  }
-  @keyframes emma-scan-look {
-    0%, 100% { transform: translate(calc(var(--head-x) - 7px), var(--head-y)) rotate(calc(var(--head-rotate) - 2deg)) scale(var(--head-scale)); }
-    50% { transform: translate(calc(var(--head-x) + 7px), var(--head-y)) rotate(calc(var(--head-rotate) + 2deg)) scale(var(--head-scale)); }
-  }
-  @keyframes emma-prop-search {
-    0%, 10%, 100% { transform: translate(-12px, 10px) rotate(-7deg) scale(.82); opacity: 0; }
-    24%, 72% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: .92; }
-    46% { transform: translate(-18px, 3px) rotate(-4deg) scale(1.03); opacity: 1; }
-    82% { transform: translate(10px, 8px) rotate(5deg) scale(.9); opacity: .45; }
-  }
-  @keyframes emma-prop-alert {
-    0%, 100% { transform: translateY(4px) scale(.92); filter: drop-shadow(0 0 7px rgba(var(--state-rgb), .45)); }
-    50% { transform: translateY(-6px) scale(1.08); filter: drop-shadow(0 0 18px rgba(var(--state-rgb), .95)); }
-  }
-  @keyframes emma-prop-heart {
-    0%, 18%, 100% { transform: translateY(8px) scale(.75); opacity: 0; }
-    34% { transform: translateY(-8px) scale(1.12); opacity: 1; }
-    48%, 72% { transform: translateY(-2px) scale(.96); opacity: .95; }
-    86% { transform: translateY(-15px) scale(.82); opacity: .25; }
-  }
-  @keyframes emma-prop-scan {
-    0%, 10%, 100% { transform: translateY(18px) scale(.94); opacity: 0; }
-    24%, 78% { transform: translateY(0) scale(1); opacity: .86; }
-    90% { transform: translateY(-8px) scale(.98); opacity: .28; }
-  }
-  @keyframes emma-scan-line {
-    0%, 100% { transform: translateY(-92px); opacity: .28; }
-    50% { transform: translateY(92px); opacity: 1; }
-  }
-  @keyframes puppet-aura-breathe {
-    0%, 100% { transform: scale(.96); opacity: .52; }
-    50% { transform: scale(1.045); opacity: 1; }
-  }
+
   @keyframes body-idle {
     0%, 100% { transform: rotate(-.8deg); }
     50% { transform: rotate(1deg); }
@@ -1078,11 +604,7 @@
     35% { transform: scale(1.04, 1); }
     68% { transform: scale(.92, .58); }
   }
-  @keyframes glint {
-    0%, 18% { background-position: 50% 50%, 115% 0; opacity: .18; }
-    52% { background-position: 50% 50%, 42% 0; opacity: .5; }
-    82%, 100% { background-position: 50% 50%, -25% 0; opacity: .2; }
-  }
+  
   @media (max-height: 760px) {
     .shell { gap: 16px; }
     .mascot-wrap { width: min(70vw, 285px); }
@@ -1100,11 +622,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .orbit { display: none; }
-    .mascot-turn { animation-duration: 14s; }
-    .mascot-float, .rig-character { animation-duration: 9s; }
-    .puppet-part, .face-part { transition-duration: 1.3s; }
-    .puppet-arm-left, .puppet-arm-right { animation-duration: 5s; }
-    .mascot-glint { animation: none; opacity: .16; }
+
   }
 
   /* ---- stage: cards / plans / photos take the centre; Emma steps to the
@@ -1315,6 +833,13 @@
   html.app-shell .mascot-wrap {
     width: min(72vw, 610px);
   }
+  /* Staged (a room card, a plan, a photo): Emma in the corner at the size a
+     story gives her. The rule above is as specific as body.emma-staging's
+     and comes later, so a room card had her 610 px wide over its lower right
+     (owner's photo of show_room_type, 13 Oct). */
+  html.app-shell body.emma-staging .mascot-wrap {
+    width: min(30vw, 300px);
+  }
 
   html.app-shell .reply {
     width: min(88vw, 720px);
@@ -1417,6 +942,22 @@
   }
   html.app-shell .quick-grid button:focus-visible,
   html.app-shell .langs button:focus-visible { outline: 2px solid #69edba; outline-offset: 2px; }
+  /* Her question's choices while a picture is up (a follow-up asked over an
+     answer's card): pinned to the bottom beside Emma's corner, where the
+     centred card does not reach -- in flow they would sit under it. */
+  html.app-shell body.emma-staging .quick.is-choices:not([hidden]) {
+    position: fixed;
+    left: clamp(10px, 2vw, 28px);
+    right: calc(min(30vw, 300px) + clamp(16px, 3vw, 40px));
+    bottom: clamp(8px, 2vh, 28px);
+    width: auto;
+    margin: 0;
+  }
+  /* ...and over a story's own chips, which sat right under them and took the
+     taps on "Studio" / "1 Bedroom" (review 13 Oct): her question is the
+     newer thing, so the story's chips step aside while it is up. Emma is
+     300 px in the corner when staged (rule above), not 150. */
+  html.app-shell body.emma-choices .es-taps { visibility: hidden; pointer-events: none; }
   /* The caption beside her (owner 24 Sep: beside Emma, following her) was
      sized for a desk browser: 1.5vw = 16px on the robot's 1080-wide portrait
      screen, read standing ~1 m away. Same bubble, same place, bigger type. */
@@ -1424,7 +965,6 @@
     font-size: calc(clamp(1.25rem, 2.1vw, 1.5rem) * var(--reply-scale));
     line-height: 1.45;
   }
-
 
   /* ==== The robot face's "anime presenter" theme (owner, 10 Oct 2026: "อยากให้
      แอพพวกหุ่นพรีเซ้นต์ดีๆ เหมือนในอนิเมะ การ์ตูนก็ได้ ให้มันดูว้าวๆ แบบสวยงาม").
@@ -2464,136 +2004,6 @@
     <section class="hero" aria-label="Emma voice assistant">
       <div class="mascot-wrap" data-emma-state="listening" data-emma-pose="pose-01" data-emma-eyes="smile" data-emma-mouth="none" data-emma-hands="relaxed" data-emma-left-hand="relaxed" data-emma-right-hand="relaxed" tabindex="0" role="img" aria-label="Emma animated assistant. Drag to turn her, shift-drag to move, pinch or use mouse wheel to resize, and press Home to reset. Press and hold her, or press the menu key, for her action buttons.">
         <canvas class="mascot-3d" data-emma-3d width="720" height="860" aria-hidden="true"></canvas>
-        <div class="mascot-rig" aria-hidden="true">
-          <div class="mascot-turn">
-            <div class="mascot-float">
-              <svg class="mascot-art" viewBox="0 0 1222 1120" focusable="false">
-                <defs>
-                  <filter id="emma-ring-glow" x="-60%" y="-200%" width="220%" height="500%">
-                    <feGaussianBlur stdDeviation="11" result="blur"/>
-                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                  </filter>
-                  <clipPath id="emma-mouth-slot">
-                    <rect x="532" y="428" width="158" height="110" rx="52"/>
-                  </clipPath>
-                </defs>
-                <g class="rig-character">
-                  <!-- The floor ring / dashed halo / spinning data orbit were
-                       deleted outright (owner, 2026-09-30 "อันนี้ลบทิ้งหรือ
-                       เอาออกไปได้เลย" — screenshot of the ring assembly under
-                       her). The 3D mascot hides its GLB hover ring to match
-                       (mascot.js). -->
-                  <g class="puppet-aura puppet-part">
-                    <circle cx="611" cy="390" r="325" fill="none" stroke="rgba(231,246,255,.86)" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 28" filter="url(#emma-ring-glow)"/>
-                  </g>
-
-                  <g class="puppet-arm-left puppet-part">
-                    <g class="limb-sprite limb-relaxed">
-                      <svg x="320" y="630" width="180" height="235" viewBox="20 580 180 235">
-                        <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                      </svg>
-                    </g>
-                    <g class="limb-sprite limb-open">
-                      <svg x="289" y="520" width="220" height="210" viewBox="640 570 210 200">
-                        <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                      </svg>
-                    </g>
-                  </g>
-                  <g class="puppet-arm-right puppet-part">
-                    <g class="limb-sprite limb-relaxed">
-                      <svg x="722" y="630" width="180" height="235" viewBox="465 580 180 235">
-                        <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                      </svg>
-                    </g>
-                    <g class="limb-sprite limb-open" transform="translate(1222 0) scale(-1 1)">
-                      <svg x="289" y="520" width="220" height="210" viewBox="640 570 210 200">
-                        <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                      </svg>
-                    </g>
-                  </g>
-
-                  <g class="puppet-body puppet-part">
-                    <svg x="461" y="615" width="300" height="300" viewBox="175 570 315 315">
-                      <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                    </svg>
-                  </g>
-
-                  <g class="puppet-head puppet-part">
-                    <svg x="286" y="50" width="650" height="610" viewBox="20 45 585 550">
-                      <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                    </svg>
-
-                    <g class="face-display">
-                      <g class="eyes-smile face-part">
-                        <svg x="430" y="300" width="360" height="130" viewBox="610 165 290 105">
-                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                        </svg>
-                      </g>
-                      <g class="eyes-sad face-part">
-                        <svg x="425" y="300" width="370" height="110" viewBox="1255 200 270 80">
-                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                        </svg>
-                      </g>
-                      <g class="eyes-squeeze face-part">
-                        <svg x="445" y="295" width="330" height="124" viewBox="945 175 280 105">
-                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                        </svg>
-                      </g>
-
-                      <g class="mouth-smile face-part">
-                        <svg x="515" y="465" width="190" height="103" viewBox="650 380 165 90">
-                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                        </svg>
-                      </g>
-                      <g class="mouth-small face-part" clip-path="url(#emma-mouth-slot)">
-                        <svg x="535" y="458" width="160" height="108" viewBox="870 365 170 115">
-                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                        </svg>
-                      </g>
-                      <g class="mouth-wide face-part" clip-path="url(#emma-mouth-slot)">
-                        <svg x="511" y="450" width="200" height="123" viewBox="1085 360 220 135">
-                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                        </svg>
-                      </g>
-                      <g class="mouth-sad face-part">
-                        <svg x="523" y="470" width="175" height="102" viewBox="1340 385 155 90">
-                          <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                        </svg>
-                      </g>
-                    </g>
-                  </g>
-
-                  <g class="puppet-wai-hands puppet-part">
-                    <svg x="491" y="650" width="240" height="246" viewBox="1310 550 205 210">
-                      <image href="assets/emma/emma-puppet-atlas-reference-v2.png" width="1536" height="1024"/>
-                    </svg>
-                  </g>
-
-                  <g class="emma-motion-props">
-                    <g class="emma-motion-prop prop-search" filter="url(#emma-ring-glow)">
-                      <circle cx="775" cy="386" r="72" fill="rgba(8,28,52,.72)" stroke="currentColor" stroke-width="10"/>
-                      <circle cx="775" cy="386" r="51" fill="none" stroke="currentColor" stroke-opacity=".42" stroke-width="4" stroke-dasharray="8 11"/>
-                      <path d="M826 437 L883 494" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round"/>
-                    </g>
-                    <g class="emma-motion-prop prop-alert" filter="url(#emma-ring-glow)">
-                      <path d="M611 102 L654 174 H568Z" fill="rgba(18,22,34,.9)" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/>
-                      <path d="M611 126 V150 M611 163 V164" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
-                    </g>
-                    <g class="emma-motion-prop prop-heart" filter="url(#emma-ring-glow)">
-                      <path d="M611 166 C579 143 557 120 566 96 C575 72 604 80 611 100 C618 80 647 72 656 96 C665 120 643 143 611 166Z" fill="currentColor"/>
-                    </g>
-                    <g class="emma-motion-prop prop-scan">
-                      <rect x="391" y="565" width="440" height="286" rx="36" fill="rgba(8,33,62,.68)" stroke="currentColor" stroke-width="7" filter="url(#emma-ring-glow)"/>
-                      <path d="M538 623 H684 M538 665 H684 M538 707 H650 M538 749 H674" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" opacity=".7"/>
-                      <path class="prop-scan-line" d="M416 708 H806" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" filter="url(#emma-ring-glow)"/>
-                    </g>
-                  </g>
-                </g>
-              </svg>
-              <span class="mascot-glint"></span>
-            </div>
-          </div>
-        </div>
       </div>
       <section class="reply" aria-label="Emma's latest reply" aria-live="polite">
         <p class="reply-text" data-emma-reply>Hi, I'm Emma — the concierge for Embassy World. How can I help you today?</p>
@@ -3179,7 +2589,8 @@
        which is the order it needs: it attaches to the finished wrap and
        observes data-emma-state rather than being called by it. If WebGL or
        the GLB fails it throws once, logs one warning, never adds the
-       emma-3d-ready class, and the inline SVG puppet stays on screen. -->
+       emma-3d-ready class, and her spot stays empty (the SVG puppet that
+       used to stand in was deleted on the owner's word, 14 Oct). -->
   <!-- ?v= is a cache buster, the same trick the Rive src used. StaticFiles
        sends an ETag but no cache-control, so Chrome caches the module on its
        own heuristic and a fixed URL kept serving the old renderer after the
@@ -3200,6 +2611,9 @@
        one is signed off. -->
   <script src="/plan-display-protocol.js"></script>
   <script src="/assets/echo-barge-gate.js?v=20260930-b"></script>
+  <!-- The robot face's motion stories (present_story, app/stories.py):
+       drawn with her voice, beat by beat; see docs/emma-story-engine.md -->
+  <script src="/assets/emma-story.js?v=20261014-b"></script>
   <script>
   (function () {
     var Emma = window.EmmaVoicePreview;
@@ -3264,6 +2678,7 @@
     // without a status() call after it (seen on the robot, 10 Oct).
     function show(state) {
       try { Emma.setState(state); } catch (e) {}
+      if (statusNode) statusNode.textContent = storyStatus(statusNode.textContent);
       if (appShell && statusNode && appStatus && appStatus[statusNode.textContent]) {
         lastStatusKey = statusNode.textContent;
         statusNode.textContent = chromeText(lastStatusKey, appStatus, appStatusZh);
@@ -3275,6 +2690,7 @@
       'Connecting...': 'กำลังเชื่อมต่อ Emma…',
       'Listening...': 'กำลังฟัง…',
       'Speaking...': 'Emma กำลังพูด…',
+      'Explaining — ask anytime': 'Emma กำลังอธิบาย · ถามได้เลยค่ะ',
       'Thinking...': 'กำลังคิด…',
       'Ready': 'พร้อมคุยแล้ว',
       'Loading...': 'กำลังเตรียมตัว…',
@@ -3293,6 +2709,7 @@
     var appStatusZh = {
       'Tap the mic to talk': '点击麦克风开始说话', 'Connecting...': '正在连接 Emma…',
       'Listening...': '正在聆听…', 'Speaking...': 'Emma 正在说话…', 'Thinking...': '正在思考…',
+      'Explaining — ask anytime': 'Emma 正在讲解 · 随时可以提问',
       'Muted': '麦克风已关闭', 'Ready': '准备好了', 'Loading...': '正在准备…',
       'Connection error': '连接失败', 'Something went wrong': '抱歉，出了点问题',
       'Disconnected — tap the mic to try again': '连接已断开 · 点击麦克风重试'
@@ -3304,7 +2721,18 @@
       if (uiLang === 'zh' && zh[key]) return zh[key];
       return thai[key] || key;
     }
+    // While a story plays she is explaining, and the guest may still ask: a
+    // tap goes at once, and a question spoken over her is held and heard the
+    // moment she stops (HOLD_SPEECH on the half-duplex robot). "Speaking..."
+    // read as "wait" (reviewer, 13 Oct).
+    function storyStatus(key) {
+      try {
+        if (key === 'Speaking...' && window.EmmaStory && window.EmmaStory.isActive()) return 'Explaining — ask anytime';
+      } catch (e) {}
+      return key;
+    }
     function status(text) {
+      text = storyStatus(text);
       lastStatusKey = text;
       if (statusNode) statusNode.textContent = chromeText(text, appStatus, appStatusZh);
     }
@@ -3519,6 +2947,31 @@
     var ws = null, audioCtx = null, micStream = null, micSource = null, worklet = null;
     var playbackGainNode = null, playbackLimiterNode = null, playbackOutputContext = null;
     var muted = false, playHead = 0, sources = [], playing = false;
+    // Mute HOLDS across calls (owner, 14 Oct: "เวลา mute ไม่ต้องให้ reconnect
+    // เพราะไม่งั้นหุ่นจะพูดตลอดเมื่อได้ยินเสียงรอบๆ"). A muted call goes quiet,
+    // idles out -- and the standing line rang a fresh line within seconds,
+    // and startCall() unmuted it: the room's chatter reached her again (log
+    // 14 Oct: five lines in ten minutes, "ค่ะ" to talk that was not hers).
+    // While held, the standing line does not ring this page (the bell tells
+    // the server, app/wake.py `_HELD`), but the camera still does: "ตอน Mute
+    // ถ้ากล้องจับหน้าคนได้ จะต้องทักนะ" (owner, same day) -- that call opens
+    // with the mic on for the person greeted, and when it ends the hold is
+    // still there. Only a tap on the mic lifts it. sessionStorage: the app
+    // reloads this page on resume, and a mute must survive that -- not an
+    // app restart.
+    var MUTE_HOLD_KEY = 'emma-mute-hold', muteHold = false, callError = false;
+    // The camera's bells (app/greeter.py: face_approach, face_known,
+    // face_stranger) still open a line under the hold; the standing line's do not.
+    var FACE_RING = /^face_/;
+    try { muteHold = sessionStorage.getItem(MUTE_HOLD_KEY) === '1'; } catch (e) { /* storage blocked */ }
+    function setMuteHold(on) {
+      muteHold = !!on;
+      try {
+        if (muteHold) sessionStorage.setItem(MUTE_HOLD_KEY, '1');
+        else sessionStorage.removeItem(MUTE_HOLD_KEY);
+      } catch (e) { /* storage blocked: the hold still lasts this page */ }
+      document.dispatchEvent(new CustomEvent('emma-mute-hold', { detail: muteHold }));
+    }
     var inputRate = 16000, outputRate = 24000, halfDuplex = false, bargeIn = false, providerName = 'gemini';
     var playbackBaseGain = 1, echoGuardUntil = 0, bargePendingUntil = 0, bargeRelayUntil = 0;
     var bargeGate = window.createEchoBargeGate ? window.createEchoBargeGate() : null;
@@ -3538,6 +2991,12 @@
     var HOLD_MAX_S = 15, HOLD_HANG_MS = 500, HOLD_PRE_FRAMES = 6;
     var holdQueue = [], holdBytes = 0, holdPre = [], holdVoicedUntil = 0;
     var sentMs = 0;
+    // Each answer owns the screen (owner 12 Oct, on the robot: the Sky Pool
+    // stayed up while she answered the next question, a price, with no
+    // picture). A guest question opens an answer; whatever that answer puts
+    // on the stage replaces the last; an answer that puts nothing up clears
+    // it at its turn_complete. Her own announcements are not answers.
+    var answerOwed = false, answerStaged = false;
     var voices = [], selectedVoice = null;
     var micCallBoost = 1, micNS = false, micAGC = true, micCompressor = true;
     // Near or far per mode (owner, 2026-09-29: "แต่ละโหมดฟังเสียงต่างกัน บาง
@@ -3674,6 +3133,7 @@
       var at = Math.max(audioCtx.currentTime, playHead);
       src.start(at);
       playHead = at + buf.duration;
+      storyHook('audio', at, buf.duration);
       var playbackContext = audioCtx;
       sources.push(src);
       playing = true;
@@ -3732,6 +3192,7 @@
     }
 
     function stopPlayback() {
+      storyHook('settle');
       var queuedMs = audioCtx ? Math.max(0, (playHead - audioCtx.currentTime) * 1000) : 0;
       sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
       sources = [];
@@ -3775,12 +3236,13 @@
       // ws = null makes the socket's own onclose return early, so its cleanup
       // happens here, as endCall does it (review 12 Oct: after a mic failure
       // the bridge kept its call sender and caps timer, the topics stayed up).
-      quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
+      choiceSet = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
       clearTranscript();
       planDisplay.reset();
       attendFromServer(null);
       if (window.EmmaRobotBridge) window.EmmaRobotBridge.detach();
       if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
+      storyHook('settle');
       releaseCallHardware();
       try { failedSocket && failedSocket.close(); } catch (e) {}
     }
@@ -4048,11 +3510,17 @@
           // fixes the tool list when the provider connects, and the hello
           // must be the first frame it reads from this page.
           if (window.EmmaRobotBridge) window.EmmaRobotBridge.ready(robotSender(ws));
+          choiceSet = null;
           quickAsks = appShell && evt.quick_asks && typeof evt.quick_asks === 'object' ? evt.quick_asks : null;
           renderQuick();
           startMic();
           break;
         case 'speech_started':
+          answerOwed = true;              // a new question: its answer owns the screen
+          answerStaged = false;
+          storyOwns = false;
+          storyHook('settle');            // the guest speaks: the story jumps to its end
+          if (choiceSet) { choiceSet = null; renderQuick(); }   // they answered her by voice
           // Gemini may report the person's start before its explicit
           // interrupted event. Keep old audio suppressed for a short beat,
           // but do not hide the person's eventual new answer for five seconds
@@ -4109,14 +3577,23 @@
           break;
         case 'assistant_transcript':
           appendAssistantTranscript(evt.text || '');
+          storyHook('transcript', evt.text || '');
           robotHeardSpeech();
           break;
         case 'turn_complete':
+          storyHook('turnComplete');
           // Don't clear curBot here: the model has stopped generating but its
           // audio can still be playing for seconds, and the reply line stays
           // up until that audio ends (see playChunk onended).
           sentMs = 0;
           resetAssistantTurn();
+          if (answerOwed && !answerStaged && document.body.classList.contains('emma-staging')) clearStage();
+          break;
+        case 'choices':
+          // ids and labels for the choice she just asked; an empty list
+          // takes them down (app/quick_asks.py CHOICES, session._offer_choices)
+          choiceSet = appShell && evt.items && evt.items.length ? evt : null;
+          renderQuick();
           break;
         case 'tool_result': {
           // Emma put something on screen. The visual displays go on the stage
@@ -4126,15 +3603,20 @@
           if (r.embed) showFrame(r.embed);
           else if (r.screen === 'unit' && r.unit) showUnit(r.unit);
           else if (r.screen === 'clear') clearStage();
-          if ('slide' in evt && evt.slide) showSlide(evt.slide);
+          else if (r.screen === 'story' && r.story && appShell) showStory(r.story);
+          // An answer picture (ANSWER_IMAGES) in an answer a story already
+          // owns: the story wins this answer's screen.
+          if ('slide' in evt && evt.slide && !storyOwns) showSlide(evt.slide);
           break;
         }
         case 'idle_timeout':
         case 'farewell':
           endCall();
-          status('Call ended — tap the mic to start again');
+          // a held page rests on "Muted" (restScreen), not an invitation to tap
+          status(muteHold ? 'Muted' : 'Call ended — tap the mic to start again');
           break;
         case 'error':
+          callError = true;
           show('error');
           if (evt.code === 'unauthorized') status(evt.message || 'A token is required');
           else if (evt.code === 'superseded') status('Another tab is using Emma');
@@ -4173,6 +3655,16 @@
       if (bridge && typeof bridge.speech === 'function') bridge.speech();
     }
 
+    // The motion story on the stage (client/assets/emma-story.js) hears her
+    // audio schedule and HER transcript -- never the guest's (user_transcript
+    // does not come through here). Guarded the same way as the bridge above.
+    var storyOwns = false;          // a story is this answer's picture
+    function storyHook(kind, a, b) {
+      var engine = typeof window === 'object' && window ? window.EmmaStory : null;
+      if (!engine || typeof engine[kind] !== 'function') return;
+      try { engine[kind](a, b); } catch (e) {}
+    }
+
     // ---- dial / hang up ----
     function startCall() {
       if (inCall) return;
@@ -4180,7 +3672,7 @@
       if (!apiKeyOK) { show('error'); return; }
       clearTranscript();
       planDisplay.reset();
-      manualEnd = false; inCall = true;
+      manualEnd = false; inCall = true; callError = false;
       if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
       try { ws && ws.close(); } catch (e) {}
       releaseCallHardware();
@@ -4210,14 +3702,18 @@
       ws.onerror = function () { if (ws !== callSocket) return; show('error'); status('Connection error'); };
       ws.onclose = function () {
         if (ws !== callSocket) return;
+        storyHook('settle');             // a story mid-answer: its overview, not a frozen half
         planDisplay.reset();
         attendFromServer(null);          // the call's gaze ends with the call
         if (window.EmmaRobotBridge) window.EmmaRobotBridge.detach();
         releaseCallHardware();
         inCall = false;
-        quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
+        choiceSet = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
         if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
         clearTranscript();
+        // held: no redial, says why -- unless the call ended on an error, whose
+        // message ("Another tab is using Emma", a token) is the real reason
+        if (muteHold) { show('idle'); setMicLabel('Muted'); if (!callError) status('Muted'); return; }
         setMicLabel('Tap to talk');
         if (!manualEnd) { show('idle'); status('Disconnected — tap the mic to try again'); }
         else { show('idle'); }
@@ -4227,7 +3723,7 @@
     function endCall() {
       manualEnd = true;
       inCall = false;
-      quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
+      choiceSet = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
       var closingSocket = ws;
       ws = null;                       // late audio from this call cannot play over a scan
       if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
@@ -4251,7 +3747,12 @@
     window.EmmaCall = Object.freeze({
       busy: function () { return inCall; },
       stopForFaceScan: function () { if (inCall || ws) endCall(); },
-      answerSummons: function () {
+      held: function () { return muteHold; },
+      // Muted: only the camera's bell opens a line -- a person is at the
+      // robot and is greeted, with the mic open so they can answer; when
+      // that call ends the hold is still there and nothing redials.
+      answerSummons: function (reason) {
+        if (muteHold && !FACE_RING.test(String(reason || ''))) return false;
         if (inCall || !apiKeyOK || (window.EmmaFaceScan && window.EmmaFaceScan.isOpen())) return false;
         summonedDial = true;
         startCall();
@@ -4268,11 +3769,17 @@
     // what they last said (read here, never shown: customer speech stays off
     // this screen). The labels follow it, so an English speaker sees English.
     var quickAsks = null, quickSentTimer = 0;
+    // The choices under her own question (owner 12 Oct: "สตูดิโอ หนึ่งห้องนอน
+    // หรือสองห้องนอนคะ ... อยากให้ขึ้นเป็นตัวเลือกบนจอ"): the server sends ids and
+    // labels when she asks (session._offer_choices), an empty list when her
+    // next line does not; the guest speaking or tapping takes them down here.
+    var choiceSet = null;
     // heard_end's "thinking" falls back to "listening" if no reply comes.
     var thinkingTimer = 0, THINKING_FALLBACK_MS = 6000;
     // One small picture per topic: the page's own decoration, never content
     // (the labels and the words are the server's).
-    var QUICK_ICONS = { about: '🏙️', price: '💎', units: '🛋️', facilities: '🏊', location: '📍', available: '🔑' };
+    var QUICK_ICONS = { about: '🏙️', price: '💎', units: '🛋️', facilities: '🏊', location: '📍', available: '🔑',
+                        type_studio: '🛋️', type_1br: '🛏️', type_2br: '🏡' };
     var quickNode = document.querySelector('[data-emma-quick]');
     var langsNode = document.querySelector('[data-emma-langs]');
     var brandNode = document.querySelector('[data-emma-brand]');
@@ -4308,13 +3815,19 @@
         });
       }
       if (!quickNode) return;
-      quickNode.hidden = !on;
+      // Her question's choices take the topics' row while they are up: they
+      // are the thing she just asked (and the topics are off on the robot).
+      var pick = !!(appShell && quickAsks && inCall && choiceSet);
+      quickNode.hidden = !(on || pick);
+      quickNode.classList.toggle('is-choices', pick);
+      document.body.classList.toggle('emma-choices', pick);
       var grid = quickNode.querySelector('.quick-grid');
       grid.textContent = '';
-      if (!on) return;
-      var hint = quickAsks.hint && typeof quickAsks.hint === 'object' ? quickAsks.hint : {};
+      if (!on && !pick) return;
+      var src = pick ? choiceSet : quickAsks;
+      var hint = src.hint && typeof src.hint === 'object' ? src.hint : {};
       quickNode.querySelector('.quick-hint').textContent = String(hint[uiLang] || hint.th || '');
-      (quickAsks.items || []).slice(0, 6).forEach(function (item) {
+      (src.items || []).slice(0, 6).forEach(function (item) {
         if (!item || typeof item.id !== 'string') return;
         var b = document.createElement('button');
         b.type = 'button';
@@ -4331,6 +3844,8 @@
         b.onclick = function () {
           if (!sendQuickAsk(item.id)) return;
           if (window.EmmaFx) window.EmmaFx.burstAt(b);
+          // A choice answers her question once: the buttons go, the plan comes.
+          if (pick) { choiceSet = null; renderQuick(); return; }
           b.classList.add('is-sent');
           clearTimeout(quickSentTimer);
           quickSentTimer = setTimeout(function () { b.classList.remove('is-sent'); }, 1600);
@@ -4377,6 +3892,9 @@
         resetAssistantTurn();
       }
       ws.send(JSON.stringify({ type: 'quick_ask', id: id, lang: uiLang }));
+      answerOwed = true;
+      answerStaged = false;
+      storyOwns = false;
       show('thinking');
       status('Thinking...');
       return true;
@@ -4384,6 +3902,7 @@
 
     function toggleMute() {
       muted = !muted;
+      setMuteHold(muted);
       setMicLabel(muted ? 'Muted' : 'Listening');
       micBtn && micBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
       if (!playing) { show('listening'); status(muted ? 'Muted' : 'Listening...'); }
@@ -4551,8 +4070,16 @@
       stageCloseBtn.onclick = clearStage;
       document.body.appendChild(stageCloseBtn);
     }
-    function openStage() { ensureStage(); stageInner.innerHTML = ''; document.body.classList.add('emma-staging'); }
+    function openStage() { answerStaged = true; ensureStage(); endStory(); stageInner.innerHTML = ''; document.body.classList.add('emma-staging'); }
+    function endStory() {
+      storyHook('teardown');
+      document.body.classList.remove('emma-story');
+      // the pill said "Explaining" for the story; with it gone and her voice
+      // still playing, it is plain "Speaking..." again (review 13 Oct)
+      if (playing && lastStatusKey === 'Explaining — ask anytime') status('Speaking...');
+    }
     function clearStage() {
+      endStory();
       if (frameWatch) { clearTimeout(frameWatch); frameWatch = 0; }
       if (stageInner) stageInner.innerHTML = '';
       document.body.classList.remove('emma-staging');
@@ -4594,6 +4121,44 @@
       stageInner.appendChild(img);
     }
 
+    // present_story (robot face only): the story engine draws on the whole
+    // stage while Emma stands in the corner. Every word, number and picture
+    // in `story` is the server's; a tap sends only the tap's id, through the
+    // same door as the topic buttons (sendQuickAsk).
+    function showStory(story) {
+      if (!window.EmmaStory || !story || !story.template) return;
+      openStage();
+      storyOwns = true;
+      document.body.classList.add('emma-story');
+      var tok = q.get('token');
+      window.EmmaStory.play(story, {
+        mount: stageInner,
+        // the clock her audio is scheduled on (playChunk -> storyHook('audio')),
+        // less the time a sample takes from the context to the speaker: the
+        // context's clock is when it is RENDERED, the guest hears it later
+        // (on Android tens of ms to more), and a beat must not lead her voice
+        clock: function () {
+          if (!audioCtx) return null;
+          var lat = (+audioCtx.outputLatency || 0) + (+audioCtx.baseLatency || 0);
+          return audioCtx.currentTime - Math.min(0.5, Math.max(0, lat));
+        },
+        assetUrl: function (src) {
+          var u = new URL(src, location.href);
+          // the token only on this server's own story pictures, never remote
+          if (tok && u.origin === location.origin && u.pathname.indexOf('/story-asset/') === 0) {
+            u.searchParams.set('token', tok);
+          }
+          return u.href;
+        },
+        onTap: function (id) { return sendQuickAsk(id); },
+        // numbers only (timing per beat, frame times): the server logs it as
+        // `story_report` -- the voice-to-picture evidence from real use
+        onReport: function (r) {
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'story_report', report: r }));
+        }
+      });
+    }
+
     var UNIT_STATUS_EN = { available: 'Available', reserved: 'Reserved', sold: 'Sold' };
     function showUnit(u) {
       openStage();
@@ -4619,6 +4184,10 @@
       else plan.textContent = uiText('Unit plan — coming from our sales team', 'แปลนรายยูนิต — รอจากฝ่ายขาย');
       top.append(shot, plan);
       card.appendChild(top);
+      // show_room_type: the server picked this room as an example of the kind
+      // the guest chose -- say so, or "Room A-208" reads as a recommendation.
+      if (u.example_of) card.appendChild(elDiv('u-who', uiText('Example of an available ' + u.example_of + ' unit',
+                                                             'ตัวอย่างห้องแบบ ' + u.example_of + ' ที่ยังว่าง')));
       card.appendChild(elDiv('u-room', uiText('Room ', 'ห้อง ') + (u.room || '—')));
       var bits = [];
       if (u.floor) bits.push(uiText('Floor ', 'ชั้น ') + u.floor);
@@ -4688,12 +4257,21 @@
       curBot = '';
       clearStage();
       show('idle');
-      status('Tap the mic to talk');
-      setMicLabel('Tap to talk');
+      status(muteHold ? 'Muted' : 'Tap the mic to talk');
+      setMicLabel(muteHold ? 'Muted' : 'Tap to talk');
     }
 
     // ---- wire the controls ----
-    if (micBtn) micBtn.onclick = function () { if (!inCall) startCall(); else toggleMute(); };
+    // A tap with no call open is the one way out of a mute hold: the person
+    // at the screen asked to be heard.
+    // While the call is still connecting (no mic yet) a second tap does
+    // nothing: it used to mute -- and hold -- a call that then came up saying
+    // "Listening" with every frame dropped (review 14 Oct).
+    if (micBtn) micBtn.onclick = function () {
+      if (!inCall) { if (muteHold) setMuteHold(false); startCall(); }
+      else if (micStream) toggleMute();
+    };
+    if (muteHold) { setMicLabel('Muted'); status('Muted'); }
     // The mascot reports the tap; the colour is painted again when the model
     // finishes loading, because setAccent() before that has nothing to paint.
     var mascotWrap = document.querySelector('.mascot-wrap');
@@ -4744,7 +4322,7 @@
       // the 3D mascot: mascot.js takes those in document capture and stops them
       // (since 2026-09-25), so this peek had silently stopped working. The
       // module reports its own hold; in staging that hold means "peek". The
-      // listeners above still serve the SVG puppet when WebGL is missing.
+      // listeners above only matter where the module never loaded.
       mascotEl.addEventListener('emma-long-press', function () {
         if (document.body.classList.contains('emma-staging')) peekControls();
       });
@@ -4842,7 +4420,7 @@
     // same (the WAKE_DEBUG lesson wearing a face). Only on ?cam=1 pages —
     // i.e. the robot — and ?camdebug=0 hides it without a new APK. A tap
     // collapses it to a dot: it sits on a customer-facing screen.
-    var dbgPanel = null, dbgVideo = null, dbgText = null, dbgSeen = false;
+    var dbgPanel = null, dbgVideo = null, dbgText = null, dbgSeen = false, dbgOpenW = '210px';
     function paintDbgDot() {
       if (!dbgPanel || !dbgVideo) return;
       var dot = dbgVideo.style.display === 'none';
@@ -4866,7 +4444,7 @@
         var collapsed = dbgVideo.style.display === 'none';
         dbgVideo.style.display = collapsed ? 'block' : 'none';
         dbgText.style.display = collapsed ? 'block' : 'none';
-        dbgPanel.style.width = collapsed ? '210px' : '20px';
+        dbgPanel.style.width = collapsed ? dbgOpenW : '20px';
         dbgPanel.style.height = collapsed ? 'auto' : '20px';
         dbgPanel.style.borderRadius = collapsed ? '10px' : '50%';
         paintDbgDot();
@@ -4877,6 +4455,15 @@
       // corner -- green while the greeter sees somebody, grey when not -- and
       // a tap still opens the lens and its verdict, as before.
       if (q.get('app') === '1') {
+        // Opened, it is read from standing height (owner, 14 Oct, screenshot
+        // of the 210 px box: "ตรงนี้ขอเพิ่มขนาดหน่อย"): 40% of the screen,
+        // the lens at 4:3, the verdict at ~2vw -- still clear of the status
+        // pill (top centre; 44% touched it on the robot) and of Emma, who
+        // starts below a third.
+        dbgOpenW = '40vw';
+        dbgVideo.style.height = '30vw';
+        dbgPanel.style.fontSize = '2vw';
+        dbgText.style.padding = '1vw 1.4vw';
         dbgPanel.style.left = '10px';
         dbgPanel.style.top = '10px';
         dbgPanel.style.bottom = 'auto';
@@ -5234,15 +4821,30 @@
     var token = q.get('token');
     var proto = location.protocol === 'https:' ? 'wss' : 'ws';
     var RETRY_MIN_MS = 2000, RETRY_MAX_MS = 30000;
+    var FACE_RING = /^face_/;          // the camera's bells: answered even when muted
     var sock = null, retryMs = RETRY_MIN_MS, stopped = false;
 
+    // A mute hold keeps the bell open and tells the server (owner, 14 Oct:
+    // muted = no line rung back open by itself, but "ถ้ากล้องจับหน้าคนได้
+    // จะต้องทักนะ"): the server stops the standing line's rings to this page,
+    // the camera's still come, and only those are answered here.
+    function held() { return !!(window.EmmaCall && window.EmmaCall.held && window.EmmaCall.held()); }
+    function sendHold() {
+      if (!sock || sock.readyState !== 1) return;
+      try { sock.send(JSON.stringify({ type: 'hold', on: held() })); } catch (e) { /* closing */ }
+    }
+    document.addEventListener('emma-mute-hold', sendHold);
+
     function ring(evt) {
+      // Muted: a face at the robot is greeted, nothing else opens a line.
+      var reason = String((evt && evt.reason) || '');
+      if (held() && !FACE_RING.test(reason)) return;
       // Not while the app is in the background, not over a face scan (the
       // greeter is paused then anyway), and never over a call already open.
       if (document.hidden) return;
       if (window.EmmaFaceScan && window.EmmaFaceScan.isOpen()) return;
       if (!window.EmmaCall || window.EmmaCall.busy()) return;
-      window.EmmaCall.answerSummons();
+      window.EmmaCall.answerSummons(reason);
     }
 
     function open() {
@@ -5253,7 +4855,7 @@
       s.onmessage = function (m) {
         var evt;
         try { evt = JSON.parse(m.data); } catch (e) { return; }
-        if (evt.type === 'standby_only' || evt.type === 'wake_listening') { retryMs = RETRY_MIN_MS; return; }
+        if (evt.type === 'standby_only' || evt.type === 'wake_listening') { retryMs = RETRY_MIN_MS; sendHold(); return; }
         if (evt.type === 'wake_unavailable' || (evt.type === 'error' && evt.code === 'unauthorized')) {
           stopped = true;
           try { s.close(); } catch (e) { /* already closing */ }
@@ -7432,7 +7034,7 @@
   // way the press that dismisses the buttons can be kept from also turning her
   // (stopImmediatePropagation reaches only listeners registered later on the
   // same node). Without WebGL the module never loads, so there is no hold and
-  // no buttons -- the SVG puppet keeps its own drag and pinch.
+  // no buttons (and, since 14 Oct, no SVG puppet either -- the wrap is empty).
   //
   // The functions come later ("ส่วนพวกฟังก์ชั่นต่างๆค่อยเพิ่มเข้าไป"). To add
   // one, fill a slot: { label: 'ชื่อปุ่ม', icon: '<svg ...>', run: function () {} }.

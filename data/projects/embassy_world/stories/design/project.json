@@ -1,0 +1,720 @@
+[
+ {
+  "id": "developer",
+  "template": "assembly",
+  "questions_th": [
+   "ใครเป็นผู้พัฒนาโครงการ",
+   "Empire Group คือใคร",
+   "บริษัทนี้มีผลงานอะไรบ้าง",
+   "ผู้พัฒนาได้รางวัลอะไรบ้าง",
+   "บริษัททำมากี่ปีแล้ว",
+   "ผู้พัฒนาน่าเชื่อถือไหม",
+   "ใครสร้างโครงการนี้",
+   "เจ้าของโครงการคือใคร"
+  ],
+  "questions_en": [
+   "Who is the developer?",
+   "Who is Empire Group?",
+   "What has the developer built before?",
+   "Has the developer won any awards?"
+  ],
+  "lines": [
+   {
+    "th": "โครงการของเราพัฒนาโดย Empire Group ค่ะ",
+    "en": "Our project is developed by Empire Group,",
+    "cue_th": [
+     "Empire Group",
+     "Empire",
+     "เอ็มไพร์"
+    ],
+    "cue_en": [
+     "Empire Group",
+     "Empire"
+    ],
+    "cue_zh": [
+     "Empire Group",
+     "帝国集团",
+     "Empire"
+    ]
+   },
+   {
+    "th": "มีประสบการณ์มากกว่า 20 ปี",
+    "en": "with more than 20 years of experience,",
+    "cue_th": [
+     "ประสบการณ์"
+    ],
+    "cue_en": [
+     "experience"
+    ],
+    "cue_zh": [
+     "经验"
+    ]
+   },
+   {
+    "th": "ส่งมอบที่อยู่อาศัยแล้วมากกว่า 6,000 ยูนิต",
+    "en": "more than 6,000 homes delivered,",
+    "cue_th": [
+     "ส่งมอบ",
+     "ที่อยู่อาศัย"
+    ],
+    "cue_en": [
+     "delivered",
+     "homes"
+    ],
+    "cue_zh": [
+     "交付",
+     "住宅"
+    ]
+   },
+   {
+    "th": "และพัฒนาโครงการสำเร็จมาแล้ว 16 โครงการ",
+    "en": "and 16 successful developments.",
+    "cue_th": [
+     "สำเร็จ",
+     "16 โครงการ"
+    ],
+    "cue_en": [
+     "successful",
+     "developments"
+    ],
+    "cue_zh": [
+     "成功",
+     "十六个",
+     "16个"
+    ]
+   },
+   {
+    "th": "ผลงานที่ผ่านมาของเรา เช่น Empire Tower, The Orient Resort & Spa และ The Vision",
+    "en": "Our past projects include Empire Tower, The Orient Resort & Spa and The Vision,",
+    "cue_th": [
+     "ผลงาน",
+     "Empire Tower",
+     "เอ็มไพร์ทาวเวอร์"
+    ],
+    "cue_en": [
+     "past projects",
+     "Empire Tower"
+    ],
+    "cue_zh": [
+     "以往",
+     "过往",
+     "Empire Tower"
+    ]
+   },
+   {
+    "th": "และได้รับรางวัลด้านอสังหาริมทรัพย์หลายรายการ ตั้งแต่ปี 2011 ถึง 2025 ค่ะ",
+    "en": "and our work has received many property awards from 2011 to 2025.",
+    "cue_th": [
+     "รางวัล"
+    ],
+    "cue_en": [
+     "award"
+    ],
+    "cue_zh": [
+     "奖"
+    ]
+   }
+  ],
+  "params": {
+   "frames": [
+    "prj_dev_logo"
+   ],
+   "frame_ms": 160,
+   "final_asset": "prj_dev_awards",
+   "final_mode": "fade",
+   "rise_line": 5,
+   "counters": [
+    {
+     "to": 20,
+     "dec": 0,
+     "unit_en": "+",
+     "label_en": "Years of experience",
+     "line": 1
+    },
+    {
+     "to": 6000,
+     "dec": 0,
+     "unit_en": "+",
+     "label_en": "Homes delivered",
+     "line": 2
+    },
+    {
+     "to": 16,
+     "dec": 0,
+     "label_en": "Successful developments",
+     "line": 3
+    }
+   ],
+   "chips": [
+    {
+     "label_en": "Empire Tower",
+     "line": 4
+    },
+    {
+     "label_en": "The Orient Resort & Spa",
+     "line": 4
+    },
+    {
+     "label_en": "The Vision",
+     "line": 4
+    },
+    {
+     "label_en": "Awards 2011–2025",
+     "line": 5
+    }
+   ]
+  },
+  "taps": [
+   {
+    "id": "story_developer_concept",
+    "label_en": "The concept",
+    "label_th": "แนวคิดโครงการ",
+    "next_story": "project_concept",
+    "tool": null
+   },
+   {
+    "id": "story_developer_buildings",
+    "label_en": "The project",
+    "label_th": "ภาพรวมโครงการ",
+    "next_story": "campus_buildings",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:ผู้พัฒนา (Empire Group: ประสบการณ์มากกว่า 20 ปี · ส่งมอบที่อยู่อาศัยมากกว่า 6,000 ยูนิต · 16 โครงการสำเร็จ · รางวัลด้านอสังหาริมทรัพย์หลายรายการระหว่างปี 2011–2025)",
+   "report:02_developer.md#2.1 (Empire Group, 20+ years, 6,000+ homes delivered, 16 Successful Developments ตามเด็คหน้า 2)",
+   "report:02_developer.md#2.2 (วิธีตอบลูกค้า: 'มากกว่า 20 ปี', 6,000+ = บ้านหรือห้องชุด ห้ามเปลี่ยนเป็น 6,000 ห้องคอนโด, ใช้ 16 ไม่ใช่ 14)",
+   "report:02_developer.md#2.5 (ป้ายรางวัล 10 ใบ 2011–2025: Thailand Property Awards / OPP Awards for Excellence · Empire Tower 2020, The Orient Resort and Spa 2018, The Vision 2014 · ไม่มีรางวัลใดระบุชื่อ Embassy World)",
+   "report:02_developer.md#2.9 (คำตอบแนะนำข้อ 1–3)",
+   "report:02_developer.md#2.10.2 (ไทม์ไลน์ผลงาน: The Vision, The Orient Resort & Spa, The Empire Tower)",
+   "slides:intro-002 (Empire Group: 20+ years, 6,000+ homes delivered, 16 Successful Developments)",
+   "slides:intro-003 (Awards: ten plaques, 2011–2025)"
+  ],
+  "notes_th": "แม่แบบ assembly ใช้เป็น 'โลโก้ → ตัวเลข → ผนังรางวัล' ไม่มีโฮโลแกรม: เฟรมเดียวคือโลโก้หัวสิงโต แล้ว final_mode fade + rise_line 5 ให้ภาพรางวัลรอบรรทัดรางวัล (ไม่มี ground_y/roof_y = ไม่มีขีดชั้นหรือเส้นวัด) · ลำดับบนจอ: (0) โลโก้ Empire Group ขึ้นในกรอบ (ครอปจากสไลด์อนุมัติ intro-002 เฉพาะโลโก้ ตัวเลขบนสไลด์ไม่เอา เพราะจอนับเลขเอง) · (1) 20+ Years of experience นับขึ้นใต้ภาพ · (2) 6,000+ Homes delivered · (3) 16 Successful developments · (4) ชิปชื่อผลงานเดิมสามโครงการ (ทั้งสามมีป้ายรางวัลของตัวเองบนภาพถัดไป) · (5) ผนังรางวัลสิบใบจาก intro-003 ค่อยๆ ซ้อนแทนโลโก้ + ชิป Awards 2011–2025 · ตัวเลขใช้ตาม facts/เด็ค: 16 (ไม่ใช่ 14 ของคลิปเสียงหรือ 15 ของ CFO), 6,000+ 'ที่อยู่อาศัย/homes' (รายงาน 2.2 ห้ามเปลี่ยนเป็น '6,000 ห้องคอนโด' และไม่ใช้ 5,400 ยูนิตของ Sales Kit Embassy Life) · รางวัล: Emma พูดว่า 'ผลงานของเรา(กลุ่ม)ได้รับรางวัล' ไม่ใช่ 'Embassy World ได้รับรางวัล' (รายงาน 2.5 ข้อ 1–2) ป้าย 'Embassy' ปี 2025 บนภาพไม่ใช่โครงการนี้ เธอไม่อ่านป้ายทีละใบ (Highly Commended ปี 2015 ไม่ใช่ผู้ชนะ — จึงไม่ไล่ชื่อรางวัล) · ไม่ใช้: รูปผู้บริหาร (2.10 มีรูป CEO/COO/GM/CFO — ห้ามคนเป็นตัวหลัก), เส้นขอบฟ้าอาคารใต้สไลด์ intro-002 (รายงาน 2.1: ไม่ได้ติดชื่อ ห้ามบอกว่าเป็น 16 โครงการของกลุ่ม), ภาพจาก web/2.about us (มีคน) · ไม่พูด: กำหนดเสร็จของทุกโครงการ (Embassy One/Life/World มีวันที่ในระบบขาย — ห้าม), 'ขายหมดทุกโครงการ/ส่งมอบก่อนกำหนด' (คำเซลส์ ไม่มีหลักฐาน รายงาน 2.8 ข้อ 9), ชื่อผู้บริหาร, นิติบุคคลผู้ขาย/ที่อยู่บริษัท (ที่อยู่ไม่ใช่ที่ตั้งโครงการ), ความสัมพันธ์ทางกฎหมายของนิติบุคคล · ข้อให้เจ้าของตัดสิน: ภาพผนังรางวัลมีชื่อ 'Embassy' บนป้ายปี 2025 (รายงาน 2.8 ข้อ 6 ไม่รู้ว่าเป็นโครงการใด) ถ้ากลัวลูกค้าเข้าใจผิดให้ครอปเหลือแถวล่าง หรือเปลี่ยนเป็นภาพอื่น"
+ },
+ {
+  "id": "project_concept",
+  "template": "features",
+  "questions_th": [
+   "แนวคิดของโครงการคืออะไร",
+   "จุดเด่นของโครงการคืออะไร",
+   "ต่างจากคอนโดทั่วไปอย่างไร",
+   "โครงการนี้เหมาะกับใคร",
+   "Embassy World คืออะไร",
+   "อยู่ที่นี่แล้วชีวิตเป็นยังไง",
+   "คอนเซ็ปต์ของโครงการ",
+   "ทำไมต้องเลือกที่นี่"
+  ],
+  "questions_en": [
+   "What is the concept of the project?",
+   "What makes this project special?",
+   "How is it different from other condos?",
+   "Who is this project for?"
+  ],
+  "lines": [
+   {
+    "th": "แนวคิดของเราคือสร้างชีวิตที่ดีกว่า ไม่ใช่แค่สร้างอาคาร โดยเริ่มจากอากาศ น้ำ และธรรมชาติค่ะ",
+    "en": "Our idea is to build a better life, not just buildings, starting from air, water and nature.",
+    "cue_th": [
+     "ชีวิตที่ดี",
+     "แนวคิด"
+    ],
+    "cue_en": [
+     "better life",
+     "idea"
+    ],
+    "cue_zh": [
+     "更好的生活",
+     "理念"
+    ]
+   },
+   {
+    "th": "ที่นี่มี Water Lagoon ยาว 155 เมตร อยู่กลางโครงการ",
+    "en": "Here, a 155-metre Water Lagoon sits in the middle of the project,",
+    "cue_th": [
+     "Water Lagoon",
+     "วอเตอร์ลากูน"
+    ],
+    "cue_en": [
+     "Water Lagoon"
+    ],
+    "cue_zh": [
+     "Water Lagoon",
+     "泻湖"
+    ]
+   },
+   {
+    "th": "และเราอยู่ติดสวนสาธารณะ",
+    "en": "and we are right next to a public park.",
+    "cue_th": [
+     "สวนสาธารณะ"
+    ],
+    "cue_en": [
+     "park"
+    ],
+    "cue_zh": [
+     "公园"
+    ]
+   },
+   {
+    "th": "มีที่ให้ออกกำลังกายและผ่อนคลาย",
+    "en": "We have places to work out and unwind,",
+    "cue_th": [
+     "ออกกำลังกาย"
+    ],
+    "cue_en": [
+     "work out"
+    ],
+    "cue_zh": [
+     "健身",
+     "锻炼"
+    ]
+   },
+   {
+    "th": "และมี Junior World ให้เด็กๆ ได้เล่น",
+    "en": "and Junior World, where children can play.",
+    "cue_th": [
+     "Junior World",
+     "เด็ก",
+     "จูเนียร์"
+    ],
+    "cue_en": [
+     "Junior World",
+     "children"
+    ],
+    "cue_zh": [
+     "Junior World",
+     "儿童",
+     "孩子"
+    ]
+   },
+   {
+    "th": "ที่นี่เหมาะกับครอบครัว คนทำงาน และผู้เกษียณค่ะ",
+    "en": "It suits families, professionals and retirees.",
+    "cue_th": [
+     "ครอบครัว"
+    ],
+    "cue_en": [
+     "families"
+    ],
+    "cue_zh": [
+     "家庭"
+    ]
+   },
+   {
+    "th": "แล้วจึงมีเทคโนโลยีอย่างแอป Embassy AI มาช่วยเรื่องชีวิตประจำวันค่ะ",
+    "en": "Then technology, like the Embassy AI app, helps with everyday life.",
+    "cue_th": [
+     "เทคโนโลยี",
+     "Embassy AI",
+     "เอ็มบาสซี่"
+    ],
+    "cue_en": [
+     "technology",
+     "Embassy AI"
+    ],
+    "cue_zh": [
+     "科技",
+     "Embassy AI"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "Water Lagoon",
+     "asset": "prj_life_lagoon",
+     "note_en": "155 m · the heart of the project",
+     "line": 1
+    },
+    {
+     "label_en": "The Park next door",
+     "asset": "prj_life_park",
+     "note_en": "A public park beside the project",
+     "line": 2
+    },
+    {
+     "label_en": "Move & unwind",
+     "asset": "prj_life_fitness",
+     "note_en": "Fitness, studios and saunas",
+     "line": 3
+    },
+    {
+     "label_en": "Junior World",
+     "asset": "prj_life_kids",
+     "note_en": "A world for children to play",
+     "line": 4
+    },
+    {
+     "label_en": "Embassy AI Application",
+     "asset": "prj_app",
+     "note_en": "Technology for everyday living",
+     "line": 6
+    }
+   ],
+   "footnote_en": "For families · professionals · retirees",
+   "footnote_line": 5
+  },
+  "taps": [
+   {
+    "id": "story_project_concept_facilities",
+    "label_en": "Facilities",
+    "label_th": "สิ่งอำนวยความสะดวก",
+    "next_story": "facilities_overview",
+    "tool": null
+   },
+   {
+    "id": "story_project_concept_location",
+    "label_en": "Location",
+    "label_th": "ทำเล",
+    "next_story": "location_beach",
+    "tool": null
+   },
+   {
+    "id": "story_project_concept_tech",
+    "label_en": "Technology",
+    "label_th": "เทคโนโลยี",
+    "next_story": "project_tech",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:03_concept.md#3.1 (HOW DO WE BUILD A BETTER LIFE? · AIR · WATER · NATURE · สระหลัก/ลากูน 155 เมตร · facility 32 รายการ)",
+   "report:03_concept.md#3.2.2 (คำถามคือจะสร้างชีวิตที่ดีขึ้นอย่างไร ไม่ใช่สร้างอาคารให้มากขึ้น)",
+   "report:03_concept.md#3.2.3 (สามองค์ประกอบ อากาศ น้ำ ธรรมชาติ)",
+   "report:03_concept.md#3.5 (FAMILIES · CHILDREN · PROFESSIONALS · RETIREES · WELLNESS FOR ALL ตามเด็คหน้า 12)",
+   "report:03_concept.md#3.9 (คำตอบแนะนำข้อ 1, 6, 7)",
+   "report:01_overview.md (low-rise 8 ชั้น 6 อาคาร ล้อมสระ/ลากูน ติดสวน)",
+   "report:18_sales_presentation.md (ลำดับการเล่า: ขายชีวิต/ลูกค้าก่อน ไม่ใช่ขายสินค้า)",
+   "facts:จุดเด่น (Biogenesis ฟิตเนส, Spinning, Pilates, ซาวน่า, Junior World, Water Lagoon สระหลักกลางโครงการ, Embassy AI Application)",
+   "facts:ทำเล (อยู่ติดสวนสาธารณะซอยชัยพฤกษ์ 4 (สวนหนองโพรง) ทางเชื่อมยังไม่ยืนยัน)",
+   "slides:intro-006 (How do we build a better life?)",
+   "slides:intro-007 (Air · Water · Nature)",
+   "slides:intro-011 (THE PARK)",
+   "slides:intro-012 (Families · Children · Professionals · Retirees · Wellness for All)",
+   "slides:intro-015 (155M. Water Lagoon)",
+   "slides:intro-042 (Embassy AI Application)",
+   "assets:web/6.gallery/exterior/CD03/Scene 36.png (ลากูน เตียงอาบแดด)",
+   "assets:web/4.facilities/G FLOOR/G FLOOR - Biogenesis 01.jpg",
+   "assets:web/4.facilities/G FLOOR/G FLOOR - JUNIOR WORLD 01.jpg"
+  ],
+  "notes_th": "ขายชีวิตก่อนเทคโนโลยี (SALES_HOST_BLOCK): ลำดับคือ แนวคิด → น้ำ → สวน → ออกกำลัง/ผ่อนคลาย → เด็ก → เหมาะกับใคร → เทคโนโลยีปิดท้าย · บนจอ: (0) เธอพูดแนวคิด 'สร้างชีวิตที่ดีกว่า ไม่ใช่แค่สร้างอาคาร' (เด็คหน้า 6) + อากาศ น้ำ ธรรมชาติ (หน้า 7) — กรอบว่างห้าช่องรอ · (1) การ์ด Water Lagoon (ภาพเว็บ CD03 Scene 36: ลากูน เกาะ เตียงอาบแดด ระหว่างอาคาร) 155 m · (2) การ์ดสวน (สไลด์อนุมัติ intro-011 THE PARK ครอปตัดหัวเรื่องและป้ายมุมขวาล่างออก) · (3) Biogenesis (ภาพเว็บชั้น G) · (4) Junior World (ภาพเว็บ ตัดแถบหญ้าล่างที่เว็บใส่มา) · (5) footnote กลุ่มผู้อยู่อาศัยตามเด็คหน้า 12 · (6) การ์ดแอป Embassy AI (สไลด์ intro-042 ครอปมือถือ + ชิปสี่ฟีเจอร์ฝั่งซ้าย ตัดหัวเรื่องและป้ายมุมขวาล่าง) · ไม่ใช้คำคุณสมบัติที่ไม่มีในข้อมูล (เงียบสงบ หรูหรา คุณภาพสูง) ไม่เปรียบเทียบกับโครงการอื่น · สวน: พูดแค่ 'อยู่ติดสวนสาธารณะ' ไม่พูด Direct Park Connection หรือทางเข้าสวน (facts: ทางเชื่อมยังไม่ยืนยัน) และไม่ใช้สไลด์ intro-015 ที่มีป้าย Direct Park Connection · ไม่ใช้ภาพวงกลม Air/Water/Nature ของ intro-007 (ป้ายมุมขวาล่างทับวงขวา ครอปแล้ววงขาด) และไม่ใช้หกวงของ intro-013 (วง INSPIRATION คือลานดาดฟ้าที่เจ้าของตัด วง TOMORROW เป็นเมืองในจินตนาการ) · 'One place. Many worlds.' / 'Wealth is a lifestyle' ไม่ใส่ เพราะเป็นสโลแกนที่ลูกค้าต้องตีความเอง ไม่ใช่ข้อเท็จจริง · ไม่ใส่ระบบพ่นละอองน้ำ หุ่นยนต์ หรือเลข facility 32 รายการ (ตามการนำเสนอ/นับรวม Rooftop) · ข้อให้เจ้าของตัดสิน: 'เหมาะกับครอบครัว คนทำงาน และผู้เกษียณ' แปลจากแถบกลุ่มผู้อยู่อาศัยของเด็คหน้า 12 (เด็คไม่ได้ระบุบริการเฉพาะกลุ่ม)"
+ },
+ {
+  "id": "security",
+  "template": "features",
+  "questions_th": [
+   "ระบบรักษาความปลอดภัยมีอะไรบ้าง",
+   "มี รปภ. ไหม",
+   "มีกล้องวงจรปิดไหม",
+   "ใช้คีย์การ์ดไหม",
+   "มีห้องรับพัสดุไหม",
+   "โครงการปลอดภัยไหม",
+   "ประตูห้องเป็นแบบไหน",
+   "ประตูห้องเป็นดิจิทัลไหม"
+  ],
+  "questions_en": [
+   "What security does the project have?",
+   "Is there a security guard?",
+   "Is there CCTV?",
+   "Do the units have digital door locks?"
+  ],
+  "lines": [
+   {
+    "th": "ความปลอดภัยอัจฉริยะ เป็นหนึ่งในสี่เสาหลักของโครงการเราค่ะ",
+    "en": "Intelligent security is one of the four pillars of our project.",
+    "cue_th": [
+     "ความปลอดภัย"
+    ],
+    "cue_en": [
+     "security"
+    ],
+    "cue_zh": [
+     "安全"
+    ]
+   },
+   {
+    "th": "ทุกห้องมี Digital Door Lock กลอนประตูดิจิทัล",
+    "en": "Every unit has a Digital Door Lock,",
+    "cue_th": [
+     "Digital Door Lock",
+     "ดิจิทัล",
+     "ดอร์ล็อก",
+     "ดิจิตอล"
+    ],
+    "cue_en": [
+     "Digital Door Lock",
+     "Door Lock"
+    ],
+    "cue_zh": [
+     "智能门锁",
+     "电子门锁",
+     "门锁"
+    ]
+   },
+   {
+    "th": "ที่มือจับมีกล้อง ให้เห็นหน้าคนที่มาหน้าห้อง",
+    "en": "with a camera in the handle, so you can see who is at your door,",
+    "cue_th": [
+     "กล้อง"
+    ],
+    "cue_en": [
+     "camera"
+    ],
+    "cue_zh": [
+     "摄像"
+    ]
+   },
+   {
+    "th": "และเปิดหรือล็อกประตูผ่านแอปได้ แม้ไม่ได้อยู่ที่ห้องค่ะ",
+    "en": "and you can open or lock it from the app, even when you are away.",
+    "cue_th": [
+     "แอป"
+    ],
+    "cue_en": [
+     "app"
+    ],
+    "cue_zh": [
+     "应用",
+     "手机"
+    ]
+   },
+   {
+    "th": "ส่วน รปภ. กล้องวงจรปิดส่วนกลาง คีย์การ์ด และห้องรับพัสดุ ทีมขายของเรายืนยันรายละเอียดให้ได้ค่ะ",
+    "en": "For security staff, common-area CCTV, key cards and parcel handling, our sales team can confirm the details.",
+    "cue_th": [
+     "รปภ",
+     "ทีมขาย",
+     "พัสดุ"
+    ],
+    "cue_en": [
+     "CCTV",
+     "sales team"
+    ],
+    "cue_zh": [
+     "保安",
+     "销售"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "Digital Door Lock",
+     "asset": "prj_sec_lock",
+     "note_en": "Every unit · a camera in the handle",
+     "line": 1
+    },
+    {
+     "label_en": "From your phone",
+     "asset": "prj_sec_phone",
+     "note_en": "Open or lock the door in the app",
+     "line": 3
+    }
+   ],
+   "footnote_en": "Intelligent Security · one of our four pillars",
+   "footnote_line": 0
+  },
+  "taps": [
+   {
+    "id": "story_security_smart_home",
+    "label_en": "Smart Home",
+    "label_th": "สมาร์ทโฮม",
+    "next_story": "smart_home",
+    "tool": null
+   },
+   {
+    "id": "story_security_tech",
+    "label_en": "Technology",
+    "label_th": "เทคโนโลยี",
+    "next_story": "project_tech",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:13_technology.md#13.2 (เด็คหน้า 12: Intelligent Security เป็น 2 ใน 4 เสาหลักร่วมกับ AI-Powered Living)",
+   "report:03_concept.md#3.2.5 (4 เสาหลัก: AI-POWERED LIVING · INTELLIGENT SECURITY · SUSTAINABLE BY DESIGN · WELLNESS AT THE CORE)",
+   "report:13_technology.md#13.8.1 (SMART SECURITY: Digital access and video door technology)",
+   "report:13_technology.md#13.8.2 (DIGITAL DOOR LOCK: ทุกห้อง มีกล้องเห็นหน้าผู้มาเยือน เปิดประตูผ่านแอปได้ · กล้องอยู่ที่มือจับ ไม่มี video door system แยก — ตามการนำเสนอ)",
+   "report:13_technology.md#13.8.3 (Digital Door Lock พร้อมกล้อง และเปิดประตูผ่านแอป ให้ทุกห้อง ตามการนำเสนอ)",
+   "report:13_technology.md#13.8.4 (ลืมล็อกประตูตอนไม่อยู่ ตรวจและล็อกผ่านแอปได้ · เห็นหน้าผู้เช่าแล้วกดเปิดจากแอป)",
+   "report:13_technology.md#13.7.4 (คีย์การ์ดเข้าอาคาร/ลิฟต์ กล้องวงจรปิดส่วนกลาง visitor pass: ไม่พบ ห้ามยืนยัน)",
+   "report:19_faq.md (ถาม: โครงการมีระบบรักษาความปลอดภัยอะไรบ้าง มี รปภ. และกล้องวงจรปิดไหม — Intelligent Security, Smart Security, Digital Door Lock พร้อมกล้อง ส่วน รปภ./CCTV ส่วนกลาง/คีย์การ์ด ไม่ยืนยัน)",
+   "report:09_facilities_ground.md (ป้อม รปภ. ห้องรับพัสดุ เจ้าหน้าที่ประจำ: แบบปัจจุบันยังไม่ระบุ)",
+   "report:07_parking.md (กล้องวงจรปิด/รักษาความปลอดภัยในชั้นใต้ดิน: ไม่ระบุ)",
+   "facts:จุดเด่น (เทคโนโลยี: Smart Home, Smart Security, Smart Comfort, Smart Air, Connected Living)",
+   "slides:intro-012 (Intelligent Security icon)",
+   "slides:intro-043 (SMART SECURITY · DIGITAL DOOR LOCK · MOBILE APPLICATION)"
+  ],
+  "notes_th": "บนจอ: (0) footnote 'Intelligent Security · one of our four pillars' ขึ้นที่ขอบล่าง กรอบว่างสองช่องรอ · (1) การ์ด Digital Door Lock (ภาพกลอนประตูจากแถบอุปกรณ์ของสไลด์อนุมัติ intro-043 ครอปเหนือคำบรรยายบนภาพ) · (2) ไม่มีภาพใหม่ — ข้อความใต้การ์ดบอกเรื่องกล้องที่มือจับอยู่แล้ว · (3) การ์ด 'From your phone' (ภาพมือถือในมือจากแถบเดียวกัน) · (4) เธอส่งต่อทีมขายเรื่อง รปภ./CCTV ส่วนกลาง/คีย์การ์ด/ห้องพัสดุ อย่างเป็นธรรมชาติ ไม่พูด 'ไม่มีข้อมูล' และไม่ขึ้นจอ (จอบอกเฉพาะสิ่งที่มี) · ไม่ใช้ภาพ VIDEO DOOR SYSTEM ของสไลด์ (กล้องโดมติดเพดาน — ผู้บริหารบอกว่าภาพผิด กล้องอยู่ที่มือจับ รายงาน 13.8.2/13.12 ข้อ 4) · ไม่ใช้ภาพล็อบบี้/ทางเข้า เพราะจะสื่อว่ามีเจ้าหน้าที่หรือจุดตรวจที่ยังไม่มีในแบบ · ไม่ใช้ภาพแอปจาก Figma (ข้อมูลจำลองบนจอ + เจ้าของไม่ใช้ภาพแอปใน smart_home) · ไม่ยืนยัน: รปภ. 24 ชม. กล้องวงจรปิดส่วนกลาง คีย์การ์ดลิฟต์/ประตูส่วนกลาง visitor pass ห้องพัสดุ ห้อง OFFICE & CONTROL ชั้นใต้ดิน (มีในแบบแต่ไม่ได้บอกว่าเป็นห้องรักษาความปลอดภัย) การบันทึกภาพ/ความเป็นส่วนตัวของกล้องหน้าห้อง · ข้อให้เจ้าของตัดสิน: 'ทุกห้องมี Digital Door Lock พร้อมกล้อง' มาจากคำผู้บริหารในคลิปนำเสนอ (รายงาน 13.8.3 'ตามการนำเสนอ') ไม่ใช่เอกสารทางการ — เรื่อง smart_home จึงจงใจไม่ใส่ แต่รายงานที่อนุมัติ 12 ต.ค. ให้คำตอบนี้กับลูกค้าแล้ว (13.8.3 แนวทางตอบ, 19 FAQ) ถ้ายังไม่อยากยืนยันให้ตัดบรรทัด 1–3 ออก"
+ },
+ {
+  "id": "project_tech",
+  "template": "features",
+  "questions_th": [
+   "โครงการมีเทคโนโลยีอะไรบ้าง",
+   "แอป Embassy AI ทำอะไรได้",
+   "Eco System Quality Dashboard คืออะไร",
+   "มีแอปสำหรับลูกบ้านไหม",
+   "มีระบบตรวจคุณภาพอากาศไหม",
+   "ระบบอัจฉริยะของโครงการมีอะไรบ้าง",
+   "AI concierge คืออะไร",
+   "มีเซ็นเซอร์อะไรบ้าง"
+  ],
+  "questions_en": [
+   "What technology does the project have?",
+   "What does the Embassy AI app do?",
+   "What is the Eco System Quality Dashboard?",
+   "Is there an app for residents?"
+  ],
+  "lines": [
+   {
+    "th": "ส่วนกลางของเรามีระบบตรวจคุณภาพสิ่งแวดล้อม ทั้งแดชบอร์ดคุณภาพอากาศ คุณภาพน้ำ และเซ็นเซอร์ CO₂ ค่ะ",
+    "en": "Our project monitors its environment: air and water quality dashboards and CO₂ sensors.",
+    "cue_th": [
+     "คุณภาพ",
+     "แดชบอร์ด"
+    ],
+    "cue_en": [
+     "quality",
+     "dashboard"
+    ],
+    "cue_zh": [
+     "质量",
+     "仪表板"
+    ]
+   },
+   {
+    "th": "มีสถานีชาร์จรถไฟฟ้าที่ชั้นใต้ดิน",
+    "en": "There are EV charging stations in the basement,",
+    "cue_th": [
+     "ชาร์จ",
+     "รถไฟฟ้า"
+    ],
+    "cue_en": [
+     "charging"
+    ],
+    "cue_zh": [
+     "充电"
+    ]
+   },
+   {
+    "th": "ระบบรดน้ำต้นไม้อัจฉริยะ และระบบวัดสภาพอากาศกับรังสียูวี",
+    "en": "a smart irrigation system, and a weather and UV monitoring system.",
+    "cue_th": [
+     "รดน้ำ"
+    ],
+    "cue_en": [
+     "irrigation"
+    ],
+    "cue_zh": [
+     "灌溉",
+     "浇水"
+    ]
+   },
+   {
+    "th": "ลูกบ้านมีแอป Embassy AI Application มีผู้ช่วย AI ตลอด 24 ชั่วโมง จองส่วนกลาง แจ้งซ่อม และเรียกแม่บ้านได้",
+    "en": "Residents have the Embassy AI Application: a 24/7 AI concierge, facility bookings, and maintenance or housekeeping requests.",
+    "cue_th": [
+     "Embassy AI",
+     "แอป",
+     "เอ็มบาสซี่"
+    ],
+    "cue_en": [
+     "Embassy AI",
+     "Application"
+    ],
+    "cue_zh": [
+     "Embassy AI",
+     "应用"
+    ]
+   },
+   {
+    "th": "ส่วนในห้อง เพิ่มชุด Smart Home ได้ค่ะ",
+    "en": "And inside your home, you can add a Smart Home set.",
+    "cue_th": [
+     "Smart Home",
+     "สมาร์ทโฮม"
+    ],
+    "cue_en": [
+     "Smart Home"
+    ],
+    "cue_zh": [
+     "智能家居"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "Air & water quality",
+     "asset": "prj_life_lagoon",
+     "note_en": "Dashboards · CO₂ sensors",
+     "line": 0
+    },
+    {
+     "label_en": "EV charging",
+     "asset": "prj_tech_ev",
+     "note_en": "Stations in the basement",
+     "line": 1
+    },
+    {
+     "label_en": "Smart irrigation",
+     "asset": "prj_tech_garden",
+     "note_en": "Plus a weather & UV system",
+     "line": 2
+    },
+    {
+     "label_en": "Embassy AI Application",
+     "asset": "prj_app",
+     "note_en": "24/7 AI concierge, bookings, requests",
+     "line": 3
+    },
+    {
+     "label_en": "Smart Home",
+     "asset": "prj_tech_home",
+     "note_en": "An optional in-room package",
+     "line": 4
+    }
+   ]
+  },
+  "taps": [
+   {
+    "id": "story_project_tech_smart_home",
+    "label_en": "Smart Home",
+    "label_th": "สมาร์ทโฮม",
+    "next_story": "smart_home",
+    "tool": null
+   },
+   {
+    "id": "story_project_tech_security",
+    "label_en": "Security",
+    "label_th": "ความปลอดภัย",
+    "next_story": "security",
+    "tool": null
+   },
+   {
+    "id": "story_project_tech_parking",
+    "label_en": "Parking & EV",
+    "label_th": "ที่จอดรถ",
+    "next_story": "parking",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:13_technology.md#13.1 (เทคโนโลยี: ระบบส่วนกลาง Future Nature 7 ระบบ รวม Eco System Quality Dashboard ข้อ 31 · Embassy AI Application · Smart Home ในห้อง)",
+   "report:13_technology.md#13.3 (Air Quality Dashboard, CO₂ Sensors, Water Quality Dashboard, Smart Irrigation System, EV Charging Stations, Weather & UV System)",
+   "report:13_technology.md#13.4 (แนวทางตอบ: เซ็นเซอร์ตรวจคุณภาพอากาศ CO₂ คุณภาพน้ำในสระ และสภาพอากาศ)",
+   "report:13_technology.md#13.7.3 (24/7 AI SMART CONCIERGE · FACILITY RESERVATIONS · HOUSEKEEPING REQUESTS · MAINTENANCE REQUESTS)",
+   "report:13_technology.md#13.8.3 (Smart Home Package เป็นตัวเลือกเสริม)",
+   "report:07_parking.md (EV Charger ชั้นใต้ดิน)",
+   "facts:จุดเด่น (ชั้นใต้ดิน: EV Charger · เทคโนโลยี: Smart Home ... Embassy AI Application · ชุด Smart Home ในห้องเป็นแพ็กเกจเสริม)",
+   "slides:intro-015 (seven systems: Air Quality Dashboard ... Weather & UV System)",
+   "slides:intro-042 (Embassy AI Application: 24/7 AI smart concierge, facility reservations, housekeeping, maintenance)",
+   "slides:intro-043 (The future begins inside your home)",
+   "assets:web/3.project details/master plan/_Embassy World  Floor Plan/2.png (แถวจอด WITH EV CHARGER ครอปใต้ y 715)",
+   "assets:web/6.gallery/exterior/CD03/Scene 43.png (ทางเดินในสวน)"
+  ],
+  "notes_th": "บนจอ (การ์ดห้าใบเด้งตามเสียง): (0) Eco System Quality — ภาพลากูน (CD03 Scene 36 ใบเดียวกับ project_concept) ใต้ภาพ 'Air & water quality dashboards · CO₂ sensors' · (1) EV charging — ผังใต้ดินเฉพาะแถวจอดที่พิมพ์ WITH EV CHARGER (เส้นฟ้าบนพื้นใส ครอปใต้ y 715 เสมอ: ข้างบนมีชื่อห้องที่เจ้าของตัด) · (2) Smart irrigation — ภาพทางเดินในสวน (CD03 Scene 43) + Weather & UV ในข้อความใต้ภาพ · (3) Embassy AI Application — สไลด์ intro-042 (ภาพเดียวกับ project_concept) · (4) Smart Home — ห้องนั่งเล่นจากสไลด์ intro-043 'An optional in-room package' แล้วปุ่ม Smart Home ไปเรื่อง smart_home (ไม่เล่าซ้ำ ม่าน/แอร์อยู่ที่นั่น) · ไม่พูด: ระบบพ่นละอองน้ำ/Fog (ไม่อยู่ในเด็ค ผู้นำเสนอว่ายังต้องเพิ่ม) Outdoor Air Quality System (ผูกกับ fog) หุ่นยนต์ Social Lounge (แนวคิดอนาคต) ฟิตเนส AI, Wi-Fi ฟรี, ตรวจช่องจอดว่างผ่านแอป, แอปฟรี/เฉพาะลูกบ้าน (คำพูดในคลิป ต้องยืนยันเป็นลายลักษณ์อักษร), Transportation Assistance (ห้ามยืนยันว่าเรียกรถได้ — ชื่อยังเห็นบนภาพแอปเพราะเป็นสไลด์ที่อนุมัติ แต่เธอไม่พูด), ช่องทางดูแดชบอร์ด (ห้ามระบุช่องทางแน่ชัด 13.12 ข้อ 10), จำนวนหัวชาร์จ EV, ค่าบริการใดๆ · ข้อให้เจ้าของตัดสิน: การ์ดแรกใช้ชื่อ 'Eco System Quality' (facility ข้อ 31) คู่กับแดชบอร์ดอากาศ/น้ำและเซ็นเซอร์ CO₂ — รายงาน 13.1/13.4 จัดไว้กลุ่มเดียวกันและบอกว่า 'น่าจะเป็นชื่อรวม' (🔎 ไม่ใช่ข้อยืนยัน) ถ้าไม่อยากผูกให้เปลี่ยนป้ายเป็น 'Air & water quality'"
+ }
+]

@@ -69,7 +69,10 @@ BODY_HEARD = {
     "raise_right_arm": (("ยก", "raise", "lift"), ("ขวา", "right")),
     "greet_arm": (("ทักทาย", "โบก", "greet", "wave"), None),
     "wave": (("โบก", "wave"), None),
-    "handshake": (("จับมือ", "handshake", "shake hands"), None),
+    # "ขอเชคแฮน" (the owner, 13 Oct) reaches the caption as เช็ค/เชค + แฮนด์/แฮน --
+    # only จับมือ was a verb, so the guard refused the robot's most-asked gesture
+    "handshake": (("จับมือ", "handshake", "shake hands", "shake hand",
+                   "เช็คแฮนด์", "เช็กแฮนด์", "เชคแฮนด์", "เช็คแฮน", "เชคแฮน"), None),
     "hands_left": (("ขยับ", "เลื่อน", "move"), ("ซ้าย", "left")),
     "hands_right": (("ขยับ", "เลื่อน", "move"), ("ขวา", "right")),
     # "เอามือลง" is how people say "hands down" (review 2 #13); มือ is not a

@@ -1,0 +1,194 @@
+[
+  {
+    "id": "plan_studio",
+    "source": "../../data/projects/embassy_world/sales/unit-plans/A-316.webp",
+    "source_sha256": "6033d30e88aa3a5c19b059a0ebaff07cdd5cdaf99122a92a1ce91c21ba23b870",
+    "crop": null,
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Real per-unit plan of a standard Studio (title in the sales Furniture PDF: 'STUDIO 25.0 SQ.M.(A-316)'; data/projects/embassy_world/sales/unit-plans/index.json, label 'pete: ถูกต้องทั้งหมด'). Same room as the UE studio model below, so plan and 3D model agree. Black lines on white become light-blue lines on transparent (alpha = darkness), the look of the prototype's plans on the dark stage. Source is outside .tmp/story-sources on purpose: the unit-plan folder is gitignored, sha-pinned, and already shipped to the robot; no room number is printed on the plan."
+  },
+  {
+    "id": "plan_1br",
+    "source": "../../data/projects/embassy_world/sales/unit-plans/F-113.webp",
+    "source_sha256": "b21b39d120bfe2e0345458e132f76d536cb161e14f284f86593929b4ba7f38f1",
+    "crop": null,
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Real per-unit plan of a 1 Bedroom at the most common size (title '1 BEDROOM 34.0 SQ.M.(F-113)'). Same room as the UE 1-bedroom model (01_F-113_Room34)."
+  },
+  {
+    "id": "plan_2br",
+    "source": "../../data/projects/embassy_world/sales/unit-plans/C-309.webp",
+    "source_sha256": "0603ff3f6be3b429dec3b38bc136260c6ab4e35fec9119830cdd511bcdd6c8fb",
+    "crop": null,
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Real per-unit plan of a 2 Bedroom (title '2 BEDROOM 51.5 SQ.M.(C-309)'). Same room as the UE 2-bedroom model (08_C-309_TwoBed51), which is the only 2-bedroom layout the UE project renders with hologram + overview + interiors."
+  },
+  {
+    "id": "room_studio_wire",
+    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_hologram.png",
+    "crop": [
+      934,
+      621,
+      1839,
+      1345
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "UE blue wireframe of the studio A-316 (appendix: Studio 25.0 sq.m.; UE calls it 'Studio24' from the design area 24.79). Crop removes the baked UE UI: room panel with 'A-316 STUDIO 24.83 SQ.M.' (x<746), readings bar with demo numbers (y<=619), phone panel (x>2039), view buttons (y>=1473). The top edge sits on the bar line: the tallest wall top is hidden behind the bar in the source. Fitted to the room's own bounding box (tools/ue_align.py) so it overlays room_studio_solid."
+  },
+  {
+    "id": "room_studio_solid",
+    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_overview.png",
+    "crop": [
+      958,
+      642,
+      1827,
+      1337
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "UE white 3D model of the same studio, same camera as the wireframe; crop scaled/offset from the bounding boxes (scale 0.9605) so the crossfade wire -> solid lands on the same room."
+  },
+  {
+    "id": "room_1br_wire",
+    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_hologram.png",
+    "crop": [
+      850,
+      621,
+      1908,
+      1468
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "UE wireframe of 1-bedroom F-113 (appendix: 1 ห้องนอน 34.0; UE 'Room34' = the sales '34 sq.m. room' = 1 Bedroom per report 14.8.1). Same UI cut-outs as the studio; bottom stops above the view buttons (y 1473)."
+  },
+  {
+    "id": "room_1br_solid",
+    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_overview.png",
+    "crop": [
+      858,
+      634,
+      1900,
+      1468
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "UE white 3D model of the same 1-bedroom, aligned to room_1br_wire (scale 0.9848)."
+  },
+  {
+    "id": "room_2br_wire",
+    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_hologram.png",
+    "crop": [
+      912,
+      621,
+      1896,
+      1408
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "UE wireframe of 2-bedroom C-309 (appendix: 2 ห้องนอน 51.5; UE 'TwoBed51'). NOT 09_C-309_OneBed51: that is a one-bedroom variant of the same footprint, matching the June-2026 '1BR 51 sq.m.' plan the report says is not a type that is sold."
+  },
+  {
+    "id": "room_2br_solid",
+    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_overview.png",
+    "crop": [
+      936,
+      638,
+      1886,
+      1398
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "UE white 3D model of the same 2-bedroom, aligned to room_2br_wire (scale 0.9653)."
+  },
+  {
+    "id": "mood_living",
+    "source": "web/6.gallery/ีunit/Living view a ps_0.jpg",
+    "crop": [
+      400,
+      1000,
+      3600,
+      5000
+    ],
+    "max_w": 720,
+    "format": "webp",
+    "why": "Website unit render from the owner's web pack (6.gallery/unit, 'Living view a'): sofa, coffee table, kitchen, TV. NOT the same picture as the approved slide intro-045 - the web set is a newer render (whiter finishes, different furniture) than slides intro-044..047; the owner chooses which set is the customer one. 4:5 portrait for the mood strip, always under the 'Interior mood' tag."
+  },
+  {
+    "id": "mood_dining",
+    "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
+    "crop": [
+      1500,
+      750,
+      4900,
+      5000
+    ],
+    "max_w": 720,
+    "format": "webp",
+    "why": "Website unit render ('Living view b'): dining table, chair, window, chandelier; the sofa stays small in the background so the studio can use it too (the studio package has a dining table and 2 chairs, no sofa - report 14.2.5). Newer render than slide intro-044 (same room idea, different finishes)."
+  },
+  {
+    "id": "mood_bedroom",
+    "source": "web/6.gallery/ีunit/Bedroom PS_0.jpg",
+    "crop": [
+      480,
+      750,
+      2280,
+      3000
+    ],
+    "max_w": 720,
+    "format": "webp",
+    "why": "Website unit render ('Bedroom'), newer than slide intro-046. Cropped right of the walk-in closet so a brand-labelled box on the shelf is out of frame. Not used for the studio (a studio has no separate bedroom)."
+  },
+  {
+    "id": "mood_bathroom",
+    "source": "web/6.gallery/ีunit/Bathroom PS_0.jpg",
+    "crop": [
+      750,
+      0,
+      4750,
+      5000
+    ],
+    "max_w": 720,
+    "format": "webp",
+    "why": "Website unit render ('Bathroom'), newer than slide intro-047: shower, wall-hung toilet, freestanding basin."
+  },
+  {
+    "id": "sh_curtain",
+    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_closed.png",
+    "crop": [
+      680,
+      280,
+      2120,
+      1320
+    ],
+    "max_w": 960,
+    "format": "webp",
+    "why": "UE interior of the 1-bedroom with the curtain drawn (no UI in this shot). Cropped above the stand-alone air purifier on the floor (y>=1330): the report says the package's purification is inside the air-con (13.8.2, 14.8.3), so a separate purifier tower would show something not offered."
+  },
+  {
+    "id": "sh_aircon",
+    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_open.png",
+    "crop": [
+      60,
+      560,
+      1300,
+      1420
+    ],
+    "max_w": 960,
+    "format": "webp",
+    "why": "UE interior of the 1-bedroom (no UI in this shot): the wall air-con with blue airflow streaks running into the room, curtain open. Chosen over the *_ac_on shots, whose close-up hides the airflow and whose frame is ringed by baked UI with demo values ('24 C / 70% / 75%'). Taken from the curtain-OPEN shot so it does not repeat the sh_curtain picture."
+  }
+]

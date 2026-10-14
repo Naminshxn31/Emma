@@ -172,7 +172,7 @@ class OpenAIProvider(VoiceProvider):
                 "item": {
                     "type": "function_call_output",
                     "call_id": call_id,
-                    "output": json.dumps(result, ensure_ascii=False),
+                    "output": json.dumps(tools.model_view(name, result), ensure_ascii=False),
                 },
             }))
             yield ProviderEvent(kind="tool_result", text=name, data=result)

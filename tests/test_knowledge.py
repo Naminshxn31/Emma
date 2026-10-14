@@ -220,7 +220,7 @@ def test_the_decks_own_concept_caveat_never_reaches_the_model(loaded, question):
 
 def test_a_specific_pool_location_returns_only_the_best_chunk(loaded):
     out = run(registry.dispatch(
-        "search_condo_info", {"query": "สระว่ายน้ำอยู่ตรงไหน"}
+        "search_condo_info", {"query": "Sky Pool อยู่ตรงไหน"}
     ))
 
     assert out["found"] is True
@@ -234,6 +234,9 @@ def test_a_specific_pool_location_returns_only_the_best_chunk(loaded):
     assert "Aqua Cinema" not in spoken_surface
     assert "ลากูน" not in spoken_surface
     assert "ตอบเฉพาะข้อมูลที่ตรงคำถาม" in out["instruction"]
+    # ...and a bare "pool" is the main pool, the Water Lagoon (owner 12 Oct)
+    out = run(registry.dispatch("search_condo_info", {"query": "สระว่ายน้ำอยู่ตรงไหน"}))
+    assert "ลากูน" in out["results"][0]["title"]
 
 
 def test_unapproved_marketing_copy_keeps_status_but_not_the_copy(loaded):
@@ -642,3 +645,16 @@ def test_answering_from_the_facts_never_licenses_extending_them(loaded):
     assert "ห้ามสรุปนโยบายหรือเงื่อนไขที่ไม่ได้เขียน" in money["instruction"]
     nothing = run(registry.dispatch("search_condo_info", {"query": "zzzz ไม่มีอยู่จริง qqqq"}))
     assert "ให้ตอบเฉพาะที่เขียนไว้ตรงๆ ห้ามขยายความ" in nothing["instruction"]
+
+
+
+def test_every_search_result_says_only_what_it_found(loaded):
+    """Owner 12 Oct: "พยายามให้ตอบตามข้อมูลจริง อย่าให้มันคิดเอง". The robot logs
+    showed descriptions added to true facts ("มีอุปกรณ์ครบครัน" for the gym,
+    "วิวทะเล" for a room); the rule rides on every result, quoting them."""
+    from app.tools import knowledge
+
+    out = run(registry.dispatch("search_condo_info", {"query": "ฟิตเนสอยู่ไหน"}))
+    assert out["found"] is True
+    assert knowledge.GROUNDED_ONLY in out["instruction"]
+    assert "'มีอุปกรณ์ครบครัน'" in knowledge.GROUNDED_ONLY and "'วิวทะเล'" in knowledge.GROUNDED_ONLY

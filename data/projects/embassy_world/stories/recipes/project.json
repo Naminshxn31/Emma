@@ -1,0 +1,173 @@
+[
+ {
+  "id": "prj_dev_logo",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_002.jpg",
+  "source_sha256": "d2e36014c0ecf55ffb0e0105488dc3752a70b087b6fc8fc84015a529125ddff6",
+  "crop": [
+   695,
+   35,
+   1226,
+   318
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Approved slide intro-002, the Empire Group lion-head logo and wordmark only: the slide's 20+ / 6,000+ / 16 are left out (the screen counts them up itself), and so is the unlabelled skyline of buildings (report 2.1: it must not be presented as the group's 16 projects). Cut to the awards crop's 1.87:1 so the frame swaps without a jump."
+ },
+ {
+  "id": "prj_dev_awards",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_003.jpg",
+  "source_sha256": "8e1319c3c2c563f861ba416ae2ba57c2b2be07cf03242b74997d03373c0395a6",
+  "crop": [
+   190,
+   198,
+   1730,
+   1020
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "Approved slide intro-003, the ten award plaques 2011-2025 with their year labels; the AWARDS title and the Embassy World logo at the top right are cut. None of the plaques names Embassy World (report 2.5) and her line says the group's work received them."
+ },
+ {
+  "id": "prj_life_lagoon",
+  "source": "web/6.gallery/exterior/CD03/Scene 36.png",
+  "source_sha256": "ac305625cd3672c9710fcf06e92c96f7b784fcb70302653696117e1b595565bb",
+  "crop": [
+   0,
+   64,
+   2560,
+   1664
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 36: the Water Lagoon with its islands, the jacuzzi island and sun loungers between the buildings, daylight. 16:10 for a features card (life first: the water)."
+ },
+ {
+  "id": "prj_life_park",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
+  "source_sha256": "bd9e370fbe6ec0293356bd500948b843eaef0062eef89e3ba5c533db9872bb15",
+  "crop": [
+   0,
+   230,
+   1232,
+   1000
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Approved slide intro-011 THE PARK: the park lake with palms and two of the buildings behind it. The chrome title, the Embassy World logo and the slide's concept badge at the bottom right are cut (owner: never the concept hedge)."
+ },
+ {
+  "id": "prj_life_fitness",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - Biogenesis 01.jpg",
+  "source_sha256": "db7726ae1284f81c4a7d592f6bc2aff43e60c272294d059cb55a2690c4988e4b",
+  "crop": [
+   454,
+   0,
+   2297,
+   1152
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Website facility render Biogenesis 01 (ground-floor fitness, glass wall onto the pool), 16:10 centre crop."
+ },
+ {
+  "id": "prj_life_kids",
+  "source": "web/4.facilities/G FLOOR/G FLOOR - JUNIOR WORLD 01.jpg",
+  "source_sha256": "a7121af6d0bfd3671a0ae5d34e6c754b6b0868667be4c489aa24111bd27d68d0",
+  "crop": [
+   296,
+   0,
+   2456,
+   1350
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Website facility render Junior World 01 (space-themed children's room); the strip of grass the website pasted under the render is cut."
+ },
+ {
+  "id": "prj_app",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_042.jpg",
+  "source_sha256": "e9fa42ae8c8cb522e6cfd6d2082ba6fa3cc984c9f5176a7c89ba5e589fdf2849",
+  "crop": [
+   190,
+   232,
+   1285,
+   916
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Approved slide intro-042 Embassy AI Application: the phone with WELCOME HOME and the four feature chips on its left. The title and the concept badge at the bottom right are cut. Not the Figma app screens (made-up data on them)."
+ },
+ {
+  "id": "prj_sec_lock",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_043.jpg",
+  "source_sha256": "65e01aea61797064fed99ddc244273afe0be05710cf1864d2fab9e5729e6d67b",
+  "crop": [
+   692,
+   880,
+   900,
+   1010
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Approved slide intro-043, the DIGITAL DOOR LOCK tile of the device strip: keypad and handle, above its printed caption. Small (208 px wide) -- the deck has no larger picture of the lock; it reads at card size. The VIDEO DOOR SYSTEM tile beside it (a ceiling dome camera) is not used: management said the camera is in the handle and the picture is wrong."
+ },
+ {
+  "id": "prj_sec_phone",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_043.jpg",
+  "source_sha256": "65e01aea61797064fed99ddc244273afe0be05710cf1864d2fab9e5729e6d67b",
+  "crop": [
+   1652,
+   852,
+   1908,
+   1012
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Approved slide intro-043, the MOBILE APPLICATION tile (a phone in a hand), above its printed caption: 'open or lock the door from your phone' without showing any app screen in detail."
+ },
+ {
+  "id": "prj_tech_ev",
+  "source": "web/3.project details/master plan/_Embassy World  Floor Plan/2.png",
+  "source_sha256": "3f13403a98762d044dffefdb68a1203ce20dde5b848646d897d03d8a22fefa9c",
+  "crop": [
+   230,
+   782,
+   990,
+   1257
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Website BASEMENT FLOOR PLAN, the parking lane printed WITH EV CHARGER only (16:10). Stays below y 715: the facility block above carries a name the owner removed and places rooms in the basement that the approved facts put elsewhere. Black lines -> light-blue lines on transparent for the dark card."
+ },
+ {
+  "id": "prj_tech_garden",
+  "source": "web/6.gallery/exterior/CD03/Scene 43.png",
+  "source_sha256": "782e441d030ac37cd0647baec5f061f30cf8d175c08533668c46a7b346372f83",
+  "crop": [
+   0,
+   104,
+   2560,
+   1704
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 43: a garden path between planted beds and the lagoon -- the planting the smart irrigation system waters. 16:10."
+ },
+ {
+  "id": "prj_tech_home",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_043.jpg",
+  "source_sha256": "65e01aea61797064fed99ddc244273afe0be05710cf1864d2fab9e5729e6d67b",
+  "crop": [
+   700,
+   0,
+   1800,
+   688
+  ],
+  "max_w": 800,
+  "format": "webp",
+  "why": "Approved slide intro-043 (THE FUTURE BEGINS INSIDE YOUR HOME): the living/dining render only, above the concept badge (y 700+) and the device strip; the slide's text column on the left is cut."
+ }
+]

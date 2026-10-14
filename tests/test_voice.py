@@ -3285,9 +3285,12 @@ def test_the_guests_first_sentence_sets_the_language_not_the_greeting():
     # 2026-10-11 (203-case run): the quote alone still let four first Thai
     # turns through in English, so the rule now also gives the Thai line to
     # say, and ends the refusal there (the "ชวนกลับ" questions after it were
-    # the run's most common filler).
+    # the run's most common filler). Owner 12 Oct overruled the ending: a
+    # refusal or a meaningless line gets ONE project question ("ลูกค้ากำลัง
+    # มองหาห้องไว้อยู่เองหรือไว้ลงทุนคะ"), never a bare "ค่ะ" -- the generic
+    # invitations stay banned.
     assert ('ลูกค้าพูดไทยต้องปฏิเสธเป็นไทย ถูก: "ขออภัยค่ะ ดิฉันดูแลเฉพาะโครงการ Test Condo ค่ะ" '
-            'ผิด: "I apologize, but I can only provide information about..." แล้วจบแค่นั้น') in text
+            'ผิด: "I apologize, but I can only provide information about..." แล้วชวนกลับเข้าโครงการด้วยคำถามหนึ่งข้อ') in text
     assert '"How can I help you today?"' in text
     assert "หลังจากนั้นคำต่างภาษาโผล่ประโยคเดียว" in text
     # Language-neutral on purpose: the first version said only "Thai", and

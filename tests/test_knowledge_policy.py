@@ -96,6 +96,24 @@ def test_the_concept_caveat_is_cut_from_project_text_not_price():
     assert sanitize_common_area_dimensions("ลากูนยาว 155 เมตร ป้ายท้ายหน้าระบุว่าเป็นแนวคิดเบื้องต้น") == "ลากูน"
 
 
+def test_what_the_owner_overruled_is_cut_from_project_text_too():
+    """Review 12 Oct: the approved slide catalog describes the deck's
+    INSPIRATION vignette as "ลานพักผ่อนบนดาดฟ้าตอนเย็น"; search served it and
+    "บนดาดฟ้ามีอะไร" became "บนดาดฟ้ามีสวนลอยฟ้า". The piece goes (with its
+    caption); the roof deck's approved height does not."""
+    from app.tools.retrieval import sanitize_common_area_dimensions, strip_overruled
+
+    vignette = ("คือ อุโมงค์นิทรรศการดิจิทัลกับเด็กๆ (DISCOVERY) ลานพักผ่อนบนดาดฟ้าตอนเย็น (INSPIRATION) "
+                "โต๊ะอาหารกลางคืนวิวเมือง (CONNECTION)")
+    out = sanitize_common_area_dimensions(vignette)
+    assert "ดาดฟ้า" not in out and "INSPIRATION" not in out
+    assert "(DISCOVERY)" in out and "(CONNECTION)" in out
+    assert strip_overruled("The rooftop garden opens at dusk. The lagoon is in the middle.") == \
+        "The lagoon is in the middle."
+    for kept in ("พื้นดาดฟ้าสูงประมาณ 23 เมตรจากระดับถนน", "Sky Pool on level 3"):
+        assert strip_overruled(kept) == kept
+
+
 #: Text only this test puts into the files, so the assertions never depend on
 #: what the owner's facts happen to say on the day it runs.
 MARK = "ข้อความทดสอบที่ห้ามถึงลูกค้า"

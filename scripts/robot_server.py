@@ -235,6 +235,39 @@ def answer_image_files(root: Path = ROOT) -> set[str]:
             if "/" not in item["path"] and (root / folder / item["path"]).is_file()}
 
 
+def _robot_env_on(root: Path, key: str) -> bool:
+    env = root / "data" / "robot-server" / "robot.env"
+    return env.is_file() and any(
+        re.fullmatch(r"\s*%s\s*=\s*(1|true|yes|on)\s*" % re.escape(key), line, re.IGNORECASE)
+        for line in env.read_text(encoding="utf-8").splitlines())
+
+
+def story_asset_files(root: Path = ROOT) -> set[str]:
+    """The robot face's story pictures (app/stories.py), once it tells stories.
+
+    Generated and gitignored (scripts/build_story_assets.py), so nothing
+    else ships them. Only while STORIES_ENABLED is on in robot.env -- with it
+    off nothing changes -- and only the pictures the catalog pins and this PC
+    has: a pinned file missing here is left out, and the robot then refuses
+    that story at its hash check instead of showing half of it. Same shape as
+    answer_image_files above.
+    """
+    if not _robot_env_on(root, "STORIES_ENABLED"):
+        return set()
+    out: set[str] = set()
+    for catalog_path in sorted((root / "data" / "projects").glob("*/stories/stories.json")):
+        try:
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        folder = catalog_path.parent / "assets"
+        for entry in (catalog.get("assets") or {}).values():
+            name = entry.get("file") if isinstance(entry, dict) else None
+            if isinstance(name, str) and "/" not in name and "\\" not in name and (folder / name).is_file():
+                out.add((folder / name).relative_to(root).as_posix())
+    return out
+
+
 def deploy_files(root: Path = ROOT) -> list[str]:
     files = set(tracked_files(root)) | {f for f in CODE_FILES if (root / f).is_file()}
     for pattern in EXTRA_GLOBS:
@@ -244,6 +277,7 @@ def deploy_files(root: Path = ROOT) -> list[str]:
                 if _deployable(rel):
                     files.add(rel)
     files |= answer_image_files(root)
+    files |= story_asset_files(root)
     return sorted(f for f in files if f not in FETCH_ON_ROBOT)
 
 

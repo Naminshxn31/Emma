@@ -1,0 +1,16 @@
+{
+ "_comment": "Units the sales system lists that the architect's drawings do not contain (project report 6 Oct; CLAUDE.md pending item: the sales team must delete them). Until they do, Emma never offers, counts or shows them -- live 12 Oct she recommended C-727 as a sea-view room. Remove a line once the sales system is fixed.",
+ "project_id": "embassy_world",
+ "units": [
+  "C-723",
+  "C-724",
+  "C-725",
+  "C-726",
+  "C-727",
+  "C-728",
+  "C-729",
+  "C-730",
+  "C-731",
+  "C-732"
+ ]
+}

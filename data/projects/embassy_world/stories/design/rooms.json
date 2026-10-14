@@ -1,0 +1,950 @@
+[
+ {
+  "id": "views_collections",
+  "template": "drill",
+  "questions_th": [
+   "ห้องเห็นทะเลไหม",
+   "มีห้องวิวทะเลไหม",
+   "ห้องไหนเห็นทะเล",
+   "วิวมีอะไรบ้าง",
+   "ห้องมีวิวอะไรบ้าง",
+   "อาคารแต่ละหลังมีวิวอะไร",
+   "Collection LAGOON SIGNATURE PARKSIDE BREEZE ต่างกันอย่างไร",
+   "ห้องไหนวิวสระ",
+   "ห้องไหนติดสวนสาธารณะ"
+  ],
+  "questions_en": [
+   "Can I see the sea from the room?",
+   "Are there sea-view rooms?",
+   "What views do the rooms have?",
+   "What's the difference between LAGOON, SIGNATURE, PARKSIDE and BREEZE?",
+   "Which rooms face the pool?",
+   "Which building has which view?"
+  ],
+  "lines": [
+   {
+    "th": "หาดจอมเทียนห่างจากโครงการเส้นตรงประมาณ 600 เมตรค่ะ ห้องชั้นสูงบางตำแหน่งมีโอกาสมองเห็นทะเล",
+    "en": "Jomtien Beach is about 600 metres from the project in a straight line, and from some upper-floor rooms, depending on position, you may be able to see the sea.",
+    "cue_th": [
+     "ทะเล",
+     "จอมเทียน"
+    ],
+    "cue_en": [
+     "beach",
+     "Jomtien"
+    ],
+    "cue_zh": [
+     "海",
+     "宗滴恩"
+    ]
+   },
+   {
+    "th": "ห้องของเราแบ่งตามวิวเป็นสี่กลุ่มค่ะ",
+    "en": "Our rooms come in four view collections.",
+    "cue_th": [
+     "สี่กลุ่ม"
+    ],
+    "cue_en": [
+     "four",
+     "collections"
+    ],
+    "cue_zh": [
+     "四个",
+     "四种",
+     "四类"
+    ]
+   },
+   {
+    "th": "LAGOON หันเข้าลากูนและสระกลางโครงการ มีในทุกอาคาร",
+    "en": "LAGOON faces the lagoon and pools in the middle, in every building.",
+    "cue_th": [
+     "LAGOON",
+     "ลากูน"
+    ],
+    "cue_en": [
+     "LAGOON"
+    ],
+    "cue_zh": [
+     "LAGOON",
+     "泻湖"
+    ]
+   },
+   {
+    "th": "PARKSIDE วิวสวนสาธารณะข้างโครงการ ส่วนใหญ่อยู่อาคาร C และ D",
+    "en": "PARKSIDE looks over the public park next door, mostly in buildings C and D.",
+    "cue_th": [
+     "PARKSIDE",
+     "สวนสาธารณะ",
+     "พาร์คไซด์"
+    ],
+    "cue_en": [
+     "PARKSIDE",
+     "park"
+    ],
+    "cue_zh": [
+     "PARKSIDE",
+     "公园"
+    ]
+   },
+   {
+    "th": "SIGNATURE ส่วนใหญ่อยู่อาคาร A, B และ F",
+    "en": "SIGNATURE is mostly in buildings A, B and F,",
+    "cue_th": [
+     "SIGNATURE",
+     "A, B และ F",
+     "ซิกเนเจอร์"
+    ],
+    "cue_en": [
+     "SIGNATURE"
+    ],
+    "cue_zh": [
+     "SIGNATURE"
+    ]
+   },
+   {
+    "th": "และ BREEZE อยู่ที่อาคาร E ทั้งหมดค่ะ",
+    "en": "and BREEZE is all in Building E.",
+    "cue_th": [
+     "BREEZE",
+     "อาคาร E",
+     "บรีซ"
+    ],
+    "cue_en": [
+     "BREEZE"
+    ],
+    "cue_zh": [
+     "BREEZE"
+    ]
+   },
+   {
+    "th": "ทีมขายช่วยเช็กวิวให้เป็นรายห้องได้ค่ะ",
+    "en": "Our sales team can check the view room by room.",
+    "cue_th": [
+     "รายห้อง"
+    ],
+    "cue_en": [
+     "room by room"
+    ],
+    "cue_zh": [
+     "逐间",
+     "每间"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "plan_ground_site",
+   "items": [
+    {
+     "label_en": "LAGOON",
+     "asset": "lagoon_scene58",
+     "at": [
+      46.5,
+      50.0
+     ],
+     "line": 2,
+     "tap": "story_views_collections_lagoon",
+     "sub_en": "429 rooms · lagoon & pool side · all 6 buildings"
+    },
+    {
+     "label_en": "PARKSIDE",
+     "asset": "rm_parkside",
+     "at": [
+      45.0,
+      89.0
+     ],
+     "line": 3,
+     "tap": "story_views_collections_park",
+     "sub_en": "183 rooms · public park side · mostly buildings C & D"
+    },
+    {
+     "label_en": "SIGNATURE",
+     "asset": "rm_signature",
+     "at": null,
+     "line": 4,
+     "sub_en": "367 rooms · mostly buildings A, B & F · 108 of our 117 studios"
+    },
+    {
+     "label_en": "BREEZE",
+     "asset": "rm_breeze",
+     "at": [
+      6.6,
+      44.0
+     ],
+     "line": 5,
+     "sub_en": "87 rooms · all in building E"
+    }
+   ],
+   "more_en": "Sea view varies by room · beach ≈ 600 m",
+   "tap_label_en": "Tap for details"
+  },
+  "taps": [
+   {
+    "id": "story_views_collections_lagoon",
+    "label_en": "The lagoon",
+    "label_th": "สระลากูน",
+    "next_story": "masterplan_lagoon",
+    "tool": null
+   },
+   {
+    "id": "story_views_collections_park",
+    "label_en": "Park & beach",
+    "label_th": "สวนสาธารณะและทะเล",
+    "next_story": "location_beach",
+    "tool": null
+   },
+   {
+    "id": "story_views_collections_types",
+    "label_en": "Room types",
+    "label_th": "แบบห้อง",
+    "next_story": "room_types",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:15_unit_stats.md#15.6 (LAGOON 429 · SIGNATURE 367 · PARKSIDE 183 · BREEZE 87; LAGOON in A 58 · B 65 · C 80 · D 80 · E 66 · F 80 = all six buildings; PARKSIDE C 88 · D 88 · E 7; SIGNATURE A 88 · B 135 · C 8 · E 24 · F 112; BREEZE E 87; SIGNATURE has 108 of the 117 studios)",
+   "report:15_unit_stats.md#15.9 (answer sentence: LAGOON คือกลุ่มวิวสระ ส่วน PARKSIDE คือกลุ่มวิวสวนสาธารณะ · วิวทะเล: ชั้นสูงอาจเห็นทะเลได้ขึ้นกับตำแหน่งห้อง ให้เจ้าหน้าที่ตรวจเป็นรายห้อง)",
+   "report:15_unit_stats.md#15.5.1 (ระบบขายไม่มีหมวดวิวทะเล · ชั้นสูงมีโอกาสเห็นทะเล ขึ้นกับตำแหน่งยูนิต · ห้ามรับประกัน · รหัส EMB/ORT/City East/Villas/Urban/Green ไม่มีคำอธิบายทางการ)",
+   "report:15_unit_stats.md#15.4 (E stack S10-S20 = the left row of building E: Villas on floors 2-8 → BREEZE)",
+   "report:19_faq.md#19.8 (Collection ต่างกันอย่างไร · อาคารแต่ละหลังมีวิวอะไร)",
+   "report:19_faq.md#19.4 (ห้องเห็นทะเลได้ไหม)",
+   "report:04_location.md (ห่างขอบทรายหาดจอมเทียนเส้นตรงประมาณ 0.6 กม. (600 เมตร))",
+   "facts:ทำเล (ห่างหาดจอมเทียนเส้นตรงประมาณ 0.6 กม. · อยู่ติดสวนสาธารณะซอยชัยพฤกษ์ 4)",
+   "slides:intro-011 (THE PARK — the PARKSIDE card picture)",
+   "web:3.project details/master plan/_Embassy World  Floor Plan/3.png (plan_ground_site, the site plan)",
+   "web:6.gallery/exterior/CD03/Scene 58.png (lagoon_scene58) · web:6.gallery/exterior/Entrance/Scene 61(2).png (rm_signature)",
+   "ue:BuildingExperience/Screenshots/E_02_realistic_overview.png (rm_breeze)"
+  ],
+  "notes_th": "ผังโครงการชั้นล่าง (plan_ground_site ตัวเดียวกับ masterplan_lagoon) อยู่บนจอ ประโยคแรก 'สี่กลุ่ม' = ผัง + แถบภาพย่อสี่ช่อง · LAGOON: วงบนผังที่ลากูนกลางโครงการ + การ์ดภาพมองลงลากูนจากระเบียง (Scene 58) · PARKSIDE: วงที่ขอบล่างของผังระหว่างอาคาร D กับ C (ฝั่งสวน ตามผัง key plan แถวล่าง = D, C) + ภาพสไลด์ THE PARK · SIGNATURE: ไม่มีวง (ห้องกระจายอยู่ A, B, F ชี้จุดเดียวจะผิด) + ภาพหน้าอาคาร A จากถนน (ห้องฝั่งนี้ของ A คือ SIGNATURE ตาม 15.4) · BREEZE: วงที่แถวซ้ายของอาคาร E (stack S10-S20 = Villas ชั้น 2-8) + ภาพโมเดล UE ของอาคาร E · ประโยคทะเลมาหลังสี่กลุ่ม (กฎเจ้าของ: บอกสิ่งที่เห็นจริงก่อน) และบอกระยะหาด 600 เมตรเป็นข้อเท็จจริงก่อน แล้ว 'ชั้นสูงบางตำแหน่งมีโอกาสมองเห็น' ตามที่รายงาน 15.5.1/19.4 อนุญาต ไม่รับประกัน และส่งให้ทีมขายเช็กเป็นรายห้อง · SIGNATURE/BREEZE ไม่บอกว่ามองเห็นอะไร เพราะรหัสวิว EMB/ORT/City East/Villas/Urban ไม่มีคำอธิบายทางการ (ห้ามเดา) บอกแค่ว่าอยู่อาคารไหน · ไม่มีจำนวนห้องขายแล้ว/ว่าง ไม่มีราคา (ตารางช่วงราคาใน 15.6 ไม่ใช้) · การ์ด LAGOON แตะไป masterplan_lagoon, PARKSIDE แตะไป location_beach (สวน + ระยะหาด) · คำถามแคบ 'เห็นทะเลไหม' ได้คำตอบที่ประโยคที่หก (ราว 15 วิ) — ถ้าเจ้าของอยากให้ตอบเร็วกว่านี้ ต้องทำเรื่องสั้นแยก · 13 ต.ค. (eval สด): ย้ายบรรทัดทะเลขึ้นก่อน — \"ห้องเห็นทะเลไหม\" เคยไป location_beach และคำตอบเรื่องทะเลอยู่บรรทัดที่หก (~15 วิ) ผังโครงการขึ้นพร้อมประโยคทะเล"
+ },
+ {
+  "id": "furniture",
+  "template": "stack",
+  "questions_th": [
+   "ห้องมีเฟอร์นิเจอร์ให้ไหม",
+   "ได้เฟอร์นิเจอร์อะไรบ้าง",
+   "Studio ได้กี่รายการ",
+   "หนึ่งห้องนอนได้เฟอร์นิเจอร์อะไรบ้าง",
+   "ห้องมีแอร์กี่เครื่อง",
+   "เฟอร์นิเจอร์ครบไหม"
+  ],
+  "questions_en": [
+   "What furniture is included?",
+   "Is the unit furnished?",
+   "How many furniture items come with a studio?",
+   "How many air-cons are in the room?"
+  ],
+  "lines": [
+   {
+    "th": "ทุกห้องมาพร้อมแพ็กเกจเฟอร์นิเจอร์ตามแบบห้องค่ะ",
+    "en": "Every room comes with a furniture package for its type.",
+    "cue_th": [
+     "แพ็กเกจ",
+     "เฟอร์นิเจอร์"
+    ],
+    "cue_en": [
+     "furniture",
+     "package"
+    ],
+    "cue_zh": [
+     "家具",
+     "套餐"
+    ]
+   },
+   {
+    "th": "สตูดิโอได้ 20 รายการ มีทีวี เตียง ตู้เสื้อผ้า ชุดครัว และแอร์ 1 เครื่อง",
+    "en": "A studio gets 20 items: TV, bed, wardrobe, kitchen set and one air-con.",
+    "cue_th": [
+     "สตูดิโอ"
+    ],
+    "cue_en": [
+     "studio"
+    ],
+    "cue_zh": [
+     "开间",
+     "单间",
+     "工作室"
+    ]
+   },
+   {
+    "th": "หนึ่งห้องนอนได้ 25 รายการ เพิ่มโซฟา ตู้ทีวี โต๊ะกาแฟ โต๊ะแต่งหน้า และแอร์ 2 เครื่อง",
+    "en": "A one-bedroom gets 25, adding a sofa, TV cabinet, coffee table, dressing table and two air-cons,",
+    "cue_th": [
+     "หนึ่งห้องนอน"
+    ],
+    "cue_en": [
+     "one-bedroom",
+     "one bedroom"
+    ],
+    "cue_zh": [
+     "一室",
+     "一房",
+     "一居"
+    ]
+   },
+   {
+    "th": "สองห้องนอนได้ 34 รายการ มีเตียงคิงไซซ์กับควีนไซซ์ ห้องน้ำสองชุด และแอร์ 3 เครื่องค่ะ",
+    "en": "and a two-bedroom gets 34, with a king-size and a queen-size bed, two bathroom sets and three air-cons.",
+    "cue_th": [
+     "สองห้องนอน"
+    ],
+    "cue_en": [
+     "two-bedroom",
+     "two bedroom"
+    ],
+    "cue_zh": [
+     "两室",
+     "两房",
+     "两居",
+     "二室"
+    ]
+   },
+   {
+    "th": "ส่วนเครื่องซักผ้า ไมโครเวฟ และผ้าม่าน ไม่อยู่ในแพ็กเกจนะคะ",
+    "en": "A washing machine, microwave and curtains aren't part of the package.",
+    "cue_th": [
+     "เครื่องซักผ้า",
+     "ไมโครเวฟ"
+    ],
+    "cue_en": [
+     "washing",
+     "microwave"
+    ],
+    "cue_zh": [
+     "洗衣机",
+     "微波炉"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "Studio",
+     "sub_en": "TV, bed, wardrobe, kitchen set, 1 air-con",
+     "asset": "plan_studio",
+     "asset_kind": "plan",
+     "value": {
+      "to": 20,
+      "unit_en": "items"
+     },
+     "line": 1,
+     "tap": "story_furniture_studio"
+    },
+    {
+     "label_en": "1 Bedroom",
+     "sub_en": "Adds sofa, TV cabinet, coffee table, dressing table, 2 air-cons",
+     "asset": "plan_1br",
+     "asset_kind": "plan",
+     "value": {
+      "to": 25,
+      "unit_en": "items"
+     },
+     "line": 2,
+     "tap": "story_furniture_1br"
+    },
+    {
+     "label_en": "2 Bedrooms",
+     "sub_en": "King + Queen beds, 4 chairs, 2 bathroom sets, 3 air-cons",
+     "asset": "plan_2br",
+     "asset_kind": "plan",
+     "value": {
+      "to": 34,
+      "unit_en": "items"
+     },
+     "line": 3,
+     "tap": "story_furniture_2br"
+    }
+   ],
+   "end_hint_en": "Not in the package: washing machine, microwave, curtains"
+  },
+  "taps": [
+   {
+    "id": "story_furniture_studio",
+    "label_en": "Studio",
+    "label_th": "ห้องสตูดิโอ",
+    "next_story": "unit_studio",
+    "tool": null
+   },
+   {
+    "id": "story_furniture_1br",
+    "label_en": "1 Bedroom",
+    "label_th": "ห้อง 1 ห้องนอน",
+    "next_story": "unit_one_bedroom",
+    "tool": null
+   },
+   {
+    "id": "story_furniture_2br",
+    "label_en": "2 Bedrooms",
+    "label_th": "ห้อง 2 ห้องนอน",
+    "next_story": "unit_two_bedroom",
+    "tool": null
+   },
+   {
+    "id": "story_furniture_smart_home",
+    "label_en": "Smart Home set",
+    "label_th": "ชุด Smart Home",
+    "next_story": "smart_home",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:14_units.md#14.1 line 26-27 (ห้องน้ำ/แอร์ 1/1 · 1/2 · 2/3 · แพ็กเกจ 20 · 25 · 34 ชิ้น)",
+   "report:14_units.md#14.2.4 (Studio 20 ชิ้น: ทีวี โต๊ะกินข้าว เก้าอี้ 2 เตียง ที่นอน หัวเตียง โต๊ะหัวเตียง ตู้เสื้อผ้า ตู้เย็น ตู้ครัวบน-ล่าง ซิงค์ เตา Hob เครื่องดูดควัน ชุดห้องน้ำ แอร์ 1 · ไม่มีโซฟา ตู้ทีวี โต๊ะกลาง)",
+   "report:14_units.md#14.3.4 (1-BR 25 ชิ้น: + ตู้ทีวี โซฟา โต๊ะกาแฟ โต๊ะแต่งหน้าพร้อมสตูล เตา 2 หัว แอร์ 2)",
+   "report:14_units.md#14.4.3 (2-BR 34 ชิ้น: เก้าอี้ 4 · เตียง King size 6 ฟุต + Queen size 5 ฟุต · ห้องน้ำ 2 ห้อง ชุดละ 4 รายการ · แอร์ 3)",
+   "report:14_units.md#14.1.3 (ไม่ปรากฏในรายการแพ็กเกจ: เครื่องซักผ้า ไมโครเวฟ ผ้าม่าน …)",
+   "report:19_faq.md#19.7 (ห้องมีเฟอร์นิเจอร์ให้ไหม · Studio/1-BR/2-BR ได้อะไรบ้าง · ห้องได้เครื่องซักผ้า ไมโครเวฟ ผ้าม่านไหม)",
+   "plans:sales/unit-plans/index.json A-316 'STUDIO 25.0 SQ.M.', F-113 '1 BEDROOM 34.0 SQ.M.', C-309 '2 BEDROOM 51.5 SQ.M.' (the three plan pictures, as in room_types)"
+  ],
+  "notes_th": "แม่แบบ stack แบบเดียวกับ room_types (ผังรายยูนิตจริงสามแบบ ภาพเดิมที่ปักแล้ว) แต่ตัวเลขที่นับขึ้นคือจำนวนรายการในแพ็กเกจ: 'แพ็กเกจเฟอร์นิเจอร์' = แถวว่างสามแถวรอ → 'สตูดิโอ' ผังสตูดิโอขึ้นใหญ่ 20 items → 'หนึ่งห้องนอน' 25 → 'สองห้องนอน' 34 → จบที่รายการสามแถว (แตะแล้วไปเรื่อง details ของแบบนั้น) + บรรทัดล่าง 'Not in the package' · ไม่พูดว่าเฟอร์นิเจอร์รวมในราคาหรือไม่ (เรื่องเงิน) พูดแค่ว่าห้องมาพร้อมอะไรตามที่รายงานเขียน · ไม่บอกขนาดเตียงสตูดิโอ/1 ห้องนอน (แบบไม่ระบุ — รายงาน 14.9 ห้ามเดา) บอกแค่ 'คิงไซซ์กับควีนไซซ์' ของ 2 ห้องนอน ไม่บอกเป็นเมตร (รายงาน: ยืนยันหน่วยกับฝ่ายขายก่อนอ้างเมตร) · ไม่พูดเวลาติดตั้ง (เงื่อนไขผูกกับการชำระเงินครบ = เรื่องเงิน) · ไม่ใช้ภาพห้องตกแต่ง/โมเดล UE เพราะภาพพวกนั้นมีของที่ไม่อยู่ในแพ็กเกจ (โคมระย้า ของแต่ง — 14.8.2) และรายงาน 14.1.3 ห้ามใช้โมเดลห้อง 3 มิติเป็นข้อมูลเฟอร์นิเจอร์ · ไม่ใช้ PDF 'FURNITURE PACKAGE 24-06-26' ใน .tmp (แบบเดือน มิ.ย. มีห้องรวม 66-69 ตร.ม. ที่รายงานบอกว่าไม่ได้ขาย) · ปุ่มที่สี่ไป smart_home เพราะม่านไม่อยู่ในแพ็กเกจ แต่มอเตอร์ม่านอยู่ในชุด Smart Home"
+ },
+ {
+  "id": "unit_details",
+  "template": "details",
+  "questions_th": [
+   "ระเบียงใหญ่แค่ไหน",
+   "เพดานสูงเท่าไร",
+   "หน้าต่างบานใหญ่ไหม",
+   "ครัวเปิดหรือปิด",
+   "ครัวเป็นแบบไหน",
+   "หน้าต่างกว้างเท่าไหร่",
+   "ห้องสูงแค่ไหน"
+  ],
+  "questions_en": [
+   "How big is the balcony?",
+   "How high are the ceilings?",
+   "How big are the windows?",
+   "Is the kitchen open or closed?"
+  ],
+  "lines": [
+   {
+    "th": "ยกตัวอย่างห้องหนึ่งห้องนอน ตามแบบสถาปนิกนะคะ",
+    "en": "Let's take our one-bedroom, as the architect drew it.",
+    "cue_th": [
+     "หนึ่งห้องนอน"
+    ],
+    "cue_en": [
+     "one-bedroom",
+     "one bedroom"
+    ],
+    "cue_zh": [
+     "一室",
+     "一房",
+     "一居"
+    ]
+   },
+   {
+    "th": "หน้าต่างและประตูบานเลื่อนสูงประมาณ 2.45 เมตร หน้าต่างห้องนอนกว้าง 2.60 เมตรค่ะ",
+    "en": "Windows and sliding doors are about 2.45 metres tall; the bedroom window is 2.60 metres wide.",
+    "cue_th": [
+     "หน้าต่าง",
+     "บานเลื่อน"
+    ],
+    "cue_en": [
+     "window"
+    ],
+    "cue_zh": [
+     "窗"
+    ]
+   },
+   {
+    "th": "ระเบียงประมาณ 2.5 คูณ 1 เมตร ราวกันตกสูง 1 เมตร",
+    "en": "The balcony is about 2.5 by 1 metre, with a railing 1 metre high,",
+    "cue_th": [
+     "ระเบียง"
+    ],
+    "cue_en": [
+     "balcony"
+    ],
+    "cue_zh": [
+     "阳台"
+    ]
+   },
+   {
+    "th": "ถ้าเป็นสองห้องนอน ระเบียงยาวได้ถึงประมาณ 3.8 เมตรค่ะ",
+    "en": "and in a two-bedroom it runs up to about 3.8 metres.",
+    "cue_th": [
+     "สองห้องนอน"
+    ],
+    "cue_en": [
+     "two-bedroom",
+     "two bedroom"
+    ],
+    "cue_zh": [
+     "两室",
+     "两房"
+    ]
+   },
+   {
+    "th": "ครัวเป็นแบบเปิด เชื่อมกับห้องนั่งเล่น มีเตาสองหัวและเครื่องดูดควันค่ะ",
+    "en": "The kitchen is open to the living area, with a two-burner hob and a hood.",
+    "cue_th": [
+     "ครัว"
+    ],
+    "cue_en": [
+     "kitchen"
+    ],
+    "cue_zh": [
+     "厨房"
+    ]
+   },
+   {
+    "th": "ส่วนความสูง จากพื้นถึงพื้นชั้นบนประมาณ 2.84 เมตร ความสูงฝ้าจริงทีมขายยืนยันให้ได้ค่ะ",
+    "en": "Floor to floor is about 2.84 metres; our sales team can confirm the finished ceiling height.",
+    "cue_th": [
+     "ความสูง",
+     "พื้นถึงพื้น"
+    ],
+    "cue_en": [
+     "floor to floor",
+     "ceiling"
+    ],
+    "cue_zh": [
+     "层高",
+     "天花板"
+    ]
+   }
+  ],
+  "params": {
+   "wire_asset": "plan_1br",
+   "value": {
+    "prefix_en": "≈",
+    "to": 2.45,
+    "dec": 2,
+    "unit_en": "m"
+   },
+   "meta_en": [
+    "Window & sliding-door height",
+    "Bedroom window ≈ 2.60 m wide",
+    "Balcony ≈ 2.5 × 1 m · railing 1 m",
+    "2‑bedroom balcony up to ≈ 3.8 m long",
+    "Floor to floor ≈ 2.84 m"
+   ],
+   "mood_assets": [
+    "rm_window",
+    "mood_living"
+   ],
+   "mood_tag_en": "Interior mood · design style",
+   "lines": [
+    0,
+    1,
+    4
+   ]
+  },
+  "taps": [
+   {
+    "id": "story_unit_details_1br",
+    "label_en": "1 Bedroom",
+    "label_th": "ห้อง 1 ห้องนอน",
+    "next_story": "unit_one_bedroom",
+    "tool": null
+   },
+   {
+    "id": "story_unit_details_furniture",
+    "label_en": "Furniture",
+    "label_th": "เฟอร์นิเจอร์ในห้อง",
+    "next_story": "furniture",
+    "tool": null
+   },
+   {
+    "id": "story_unit_details_types",
+    "label_en": "All room types",
+    "label_th": "แบบห้องทั้งหมด",
+    "next_story": "room_types",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:14_units.md#14.1 line 28-31 (หน้าต่างหลัก 1-BR 2.60 × 2.45 ม. · บานเลื่อนระเบียง 1.75 ม. · ราวกันตก 1.00 ม. · ระเบียง 1-BR ≈ 2.5–2.65 × 0.97–1.00 ม. · 2-BR ≈ 2.8–3.8 × 1.37–1.40 ม.)",
+   "report:14_units.md#14.1.3 (ครัวไม่มีผนังกั้นในแปลน = ครัวเปิดเชื่อมพื้นที่นั่งเล่น · 1-BR/2-BR เตา 2 หัวพร้อมเครื่องดูดควัน · ชั้นต่อชั้น 2.84 ม. · ช่องเปิดหน้าต่าง/ประตูเลื่อนสูง 2.45 ม. · ความสูงฝ้าจริงยังไม่ยืนยัน ห้ามตอบ 2.50)",
+   "report:14_units.md#14.3.5 (answer sentence: ระเบียงประมาณ 2.5 × 1 เมตร … หน้าต่างห้องนอนกว้าง 2.60 เมตร สูง 2.45 เมตร · เพดาน: ชั้นต่อชั้น 2.84 เมตร)",
+   "report:19_faq.md#19.7 (ครัวเปิดหรือปิด · หน้าต่างและประตูบานเลื่อนกว้างเท่าไร · ระเบียงใหญ่แค่ไหน · เพดานห้องสูงเท่าไร)",
+   "plans:sales/unit-plans/index.json F-113 '1 BEDROOM 34.0 SQ.M.' (plan_1br, the drawing on screen)",
+   "web:6.gallery/ีunit/Living vew b ps_0.jpg (rm_window) · web:6.gallery/ีunit/Living view a ps_0.jpg (mood_living, open kitchen)"
+  ],
+  "notes_th": "แม่แบบ details ใช้แค่ผัง: ผังรายยูนิตจริงของ 1 ห้องนอน F-113 (plan_1br เส้นฟ้าบนพื้นมืด ภาพเดียวกับ room_types) วาดขึ้นตอน 'หนึ่งห้องนอน' — ไม่มี solid_asset เพราะโมเดล UE ซ้อนกับผังไม่ตรงและมีเครื่องฟอกอากาศตั้งพื้นที่ไม่มีจริง · 'หน้าต่าง' = ตัวเลข ≈ 2.45 m นับขึ้น (ความสูงช่องหน้าต่าง/ประตูเลื่อน) พร้อมห้าบรรทัด: หน้าต่างห้องนอน 2.60 ม. · ระเบียง ≈ 2.5 × 1 ม. ราว 1 ม. · ระเบียง 2 ห้องนอนยาวถึง ≈ 3.8 ม. · ชั้นต่อชั้น ≈ 2.84 ม. · 'ครัว' = แถบภาพบรรยากาศสองภาพ (ประตูกระจกสูงออกระเบียง + ครัวเปิดหลังโซฟา) ติดป้าย Interior mood · ตัวเลขทุกตัวเป็นค่าวัดจากแบบ (🔎 ±2–3%) จึงพูดว่า 'ประมาณ' และขึ้น ≈ บนจอ · เพดาน: ตอบด้วยสิ่งที่มี (ชั้นต่อชั้น 2.84 ม.) แล้วให้ทีมขายยืนยันความสูงฝ้าจริง — ไม่พูด 2.50 ม. (ค่าตั้งต้นของสคริปต์ รายงานห้าม) ไม่พูดว่า 'ไม่มีข้อมูล' · ไม่พูดพื้นที่ระเบียงเป็น ตร.ม. (รายงาน 14.4.2: ตัวเลขไม่สอดคล้อง) · ไม่พูดว่ากระจกห้องนอนเปิดได้เต็มบาน/สูงจรดเพดาน (คำเซลล์ที่ขัดกับแปลน 14.3.3) · ไม่พูดเรื่องกันเสียง Double Glaze (ไม่มีสเปก) · ไม่พูดว่าพื้นที่ห้องรวมระเบียงหรือไม่ (ยังไม่ยืนยัน)"
+ },
+ {
+  "id": "lobby_where",
+  "template": "spotlight",
+  "questions_th": [
+   "ล็อบบี้เป็นอย่างไร",
+   "ล็อบบี้อยู่ตรงไหน",
+   "ล็อบบี้ใหญ่แค่ไหน",
+   "ทางเข้าโครงการเป็นแบบไหน"
+  ],
+  "questions_en": [
+   "What is the lobby like?",
+   "Where is the lobby?",
+   "How big is the lobby?"
+  ],
+  "lines": [
+   {
+    "th": "ล็อบบี้อยู่ชั้น G กลางอาคาร A ค่ะ หันหน้าสู่ลานรับส่ง",
+    "en": "The lobby is in the middle of Building A's ground floor, facing the drop-off court.",
+    "cue_th": [
+     "ล็อบบี้"
+    ],
+    "cue_en": [
+     "lobby"
+    ],
+    "cue_zh": [
+     "大堂"
+    ]
+   },
+   {
+    "th": "ตกแต่งโทนขาวเงิน มีเคาน์เตอร์ต้อนรับโลหะเงา และเพดานวงแหวนซ้อนชั้น",
+    "en": "It's finished in white and silver, with a liquid-metal reception counter and a ringed ceiling.",
+    "cue_th": [
+     "เคาน์เตอร์",
+     "ต้อนรับ",
+     "โทนขาวเงิน"
+    ],
+    "cue_en": [
+     "reception",
+     "counter",
+     "silver"
+    ],
+    "cue_zh": [
+     "前台",
+     "接待"
+    ]
+   },
+   {
+    "th": "ขนาด 130.5 ตารางเมตร และต่อเข้าทางเดิน Journey to the Future ไปยังส่วนกลางค่ะ",
+    "en": "It's 130.5 square metres and opens onto the Journey to the Future corridor, which leads to the facilities.",
+    "cue_th": [
+     "ตารางเมตร",
+     "Journey",
+     "เจอร์นีย์"
+    ],
+    "cue_en": [
+     "square met",
+     "Journey"
+    ],
+    "cue_zh": [
+     "平方米",
+     "Journey"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_g",
+   "zoom": {
+    "x": 49.3,
+    "y": 32.6,
+    "scale": 1.8
+   },
+   "spot": {
+    "x": 49.3,
+    "y": 32.6,
+    "label_en": "LOBBY",
+    "sub_en": "Ground floor · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "rm_lobby",
+    "title_en": "LOBBY",
+    "sub_en": "Ground floor · Building A",
+    "chips_en": [
+     {
+      "label_en": "Area",
+      "value_en": "130.5 sq.m."
+     },
+     "Liquid-metal reception counter",
+     "Ringed ceiling · marble & silver walls",
+     "Faces the drop-off court"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_lobby_where_journey",
+    "label_en": "Journey to the Future",
+    "label_th": "ทางเดิน Journey to the Future",
+    "next_story": "journey_future_where",
+    "tool": null
+   },
+   {
+    "id": "story_lobby_where_ground",
+    "label_en": "All of the ground floor",
+    "label_th": "ดูทั้งชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_lobby_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น (ชั้น G: Lobby … Journey to the Future)",
+   "report:09_facilities_ground.md#9.2 (กึ่งกลางอาคาร A ชั้น G ระหว่าง SHOP-4 กับ SHOP-3 ประตูคู่หันสู่ลาน Drop-off อีกด้านต่อกับทางเดิน Journey to the Future · 21.85 × 6.50 ม. 130.5 ตร.ม. · ภาพไฟนอล: เคาน์เตอร์โลหะเงา ผนังโลหะพลิ้ว เพดานวงแหวนซ้อนชั้น ผนังหินอ่อน)",
+   "report:09_facilities_ground.md#9.1.1",
+   "report:19_faq.md#19.12 (ล็อบบี้เป็นอย่างไร: โทนขาว–เงิน–ฟ้าเทา)",
+   "slides:intro-018 (the LOBBY label the ring sits on)",
+   "web:4.facilities/G FLOOR/G FLOOR - LOBBY 01.jpg (rm_lobby)"
+  ],
+  "notes_th": "เรื่องย่อยแบบ facility_spots: ผังชั้น G (fac_plan_g ตัวเดียวกับ facilities_ground) → ซูม 1.8× → วงชี้ที่ป้าย LOBBY ที่พิมพ์บนผัง (กลางป้าย 49.3%, 32.6% ของภาพหลังตัด) → ตัดไปภาพไฟนอล Lobby 01 + ชิปพื้นที่ 130.5 ตร.ม. (แผ่นแปลน facility ✅ ใช้เฉพาะขนาด) · บรรทัดสุดท้ายพาไปทางเดิน Journey to the Future (ปุ่มแรก) · ไม่พูดจำนวนที่นั่ง ความจุ รปภ. ห้องพัสดุ เจ้าหน้าที่ประจำ (ยังไม่มีในแบบ) ไม่พูด 'เหมือนล็อบบี้โรงแรม 5 ดาว' (คำเซลล์) ไม่ใช้ภาพ Lobby 03 (ชั้นลอยที่ผังไม่แสดง) · Lobby เป็นหนึ่งในสองที่ที่ facilities_ground ขึ้นแค่บรรทัด 'Also here' — เรื่องนี้ตอบคำถามแคบนั้น"
+ },
+ {
+  "id": "journey_future_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Journey to the Future คืออะไร",
+   "Journey to the Future อยู่ตรงไหน",
+   "ทางเดินที่เพดานเป็นแสงดาวคืออะไร",
+   "ทางเดินจากล็อบบี้ไปส่วนกลางเป็นแบบไหน"
+  ],
+  "questions_en": [
+   "What is the Journey to the Future?",
+   "Where is the Journey to the Future?"
+  ],
+  "lines": [
+   {
+    "th": "Journey to the Future คือทางเดินชั้น G อาคาร A ค่ะ เชื่อมจากล็อบบี้ไปยังห้องส่วนกลางทั้งแถว",
+    "en": "Journey to the Future is the ground-floor corridor of Building A, linking the lobby to the whole row of facilities.",
+    "cue_th": [
+     "Journey",
+     "ทางเดิน",
+     "เจอร์นีย์"
+    ],
+    "cue_en": [
+     "Journey",
+     "corridor"
+    ],
+    "cue_zh": [
+     "Journey",
+     "走廊"
+    ]
+   },
+   {
+    "th": "เพดานประดับแสงดาวระยิบ ผนังด้านหนึ่งเป็นกระจกโค้งโชว์สวนในร่มค่ะ",
+    "en": "It has a ceiling of twinkling stars, and one wall is curved glass with an indoor garden behind it.",
+    "cue_th": [
+     "แสงดาว",
+     "ดาว",
+     "สวนในร่ม"
+    ],
+    "cue_en": [
+     "stars",
+     "garden"
+    ],
+    "cue_zh": [
+     "星",
+     "花园"
+    ]
+   },
+   {
+    "th": "ส่วน Journey to Mars เป็นอีกที่หนึ่ง อยู่ในโซนสระชั้นใต้ดินค่ะ",
+    "en": "Journey to Mars is a different place, in the basement pool zone.",
+    "cue_th": [
+     "Mars",
+     "ชั้นใต้ดิน",
+     "มาร์ส"
+    ],
+    "cue_en": [
+     "Mars",
+     "basement"
+    ],
+    "cue_zh": [
+     "火星",
+     "Mars"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "fac_plan_g",
+   "zoom": {
+    "x": 50.4,
+    "y": 46.5,
+    "scale": 1.6
+   },
+   "spot": {
+    "x": 50.4,
+    "y": 46.5,
+    "label_en": "JOURNEY TO THE FUTURE",
+    "sub_en": "Corridor · Ground floor · Building A"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "rm_corridor",
+    "title_en": "JOURNEY TO THE FUTURE",
+    "sub_en": "Corridor · Ground floor",
+    "chips_en": [
+     {
+      "label_en": "Length",
+      "value_en": "53.475 m"
+     },
+     "Starry ceiling",
+     "Indoor garden behind curved glass",
+     "Junior World ↔ Bungee Gym & Yoga"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_journey_future_where_lobby",
+    "label_en": "Lobby",
+    "label_th": "ล็อบบี้",
+    "next_story": "lobby_where",
+    "tool": null
+   },
+   {
+    "id": "story_journey_future_where_mars",
+    "label_en": "Journey to Mars",
+    "label_th": "Journey to Mars ชั้นใต้ดิน",
+    "next_story": "journey_mars_where",
+    "tool": null
+   },
+   {
+    "id": "story_journey_future_where_ground",
+    "label_en": "All of the ground floor",
+    "label_th": "ดูทั้งชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "facts:จุดเด่น (ชั้น G: … Journey to the Future · ชั้นใต้ดิน: … Journey to Mars)",
+   "report:09_facilities_ground.md#9.8 (ทางเดินตลอดอาคาร A ระหว่างแถวร้านค้า/ล็อบบี้กับแถว facility ปลายซ้ายไป Junior World ปลายขวาไป Bungee Gym & Yoga · ยาว 53.475 ม. 107 ตร.ม. · เพดานแสงดาว กระจกโค้งโชว์สวนในร่ม ซุ้มโค้งโลหะ · ไม่ใช่ Journey to Mars ที่ชั้นใต้ดิน)",
+   "report:09_facilities_ground.md#9.1.1",
+   "report:19_faq.md#19.12 (Journey to the Future คืออะไร)",
+   "slides:intro-018 (the JOURNEY TO THE FUTURE label the ring sits on)",
+   "web:4.facilities/G FLOOR/G FLOOR - CORRIDOR.jpg (rm_corridor)"
+  ],
+  "notes_th": "ผังชั้น G → ซูม 1.6× → วงชี้ที่ป้าย JOURNEY TO THE FUTURE ที่พิมพ์บนผัง (กลางป้าย 50.4%, 46.5%) → ตัดไปภาพไฟนอล Corridor (ตัดแถบกลางของภาพแนวตั้งเป็น 16:10: เพดานดาว + สวนในกระจกโค้ง + ซุ้มโลหะ) + ชิปความยาว 53.475 ม. ตามแผ่นแปลน facility (✅ ใช้เฉพาะขนาด — เลขนี้ขึ้นจอเท่านั้น ไม่พูด เพราะทศนิยมสามตำแหน่งพูดแล้วฟังไม่เป็นธรรมชาติ) · บรรทัดสามแยกจาก Journey to Mars (สระธีมอวกาศชั้นใต้ดิน) ตามที่รายงาน 9.8 เตือนว่าคนสับสน และมีปุ่มไป journey_mars_where · ไม่พูดความกว้าง (≈ 2 ม. เป็นค่าคำนวณ ภาพดูกว้างกว่า — รายงานให้ระวัง) ไม่พูดว่าใครเข้าได้"
+ },
+ {
+  "id": "playground_where",
+  "template": "spotlight",
+  "questions_th": [
+   "Playground เป็นอย่างไร",
+   "มีสนามเด็กเล่นกลางแจ้งไหม",
+   "Playground อยู่ตรงไหน",
+   "ลานเด็กเล่นมีอะไรบ้าง"
+  ],
+  "questions_en": [
+   "What is the Playground like?",
+   "Is there an outdoor playground?",
+   "Where is the Playground?"
+  ],
+  "lines": [
+   {
+    "th": "Playground เป็นลานเล่นกลางแจ้งริมสระ ถัดจาก Junior World ค่ะ",
+    "en": "The Playground is an outdoor play area by the pool, next to Junior World.",
+    "cue_th": [
+     "Playground",
+     "ลานเล่น",
+     "เพลย์กราวด์"
+    ],
+    "cue_en": [
+     "Playground"
+    ],
+    "cue_zh": [
+     "游乐场",
+     "Playground"
+    ]
+   },
+   {
+    "th": "ธีมอวกาศ มียานอวกาศให้ปีนพร้อมสไลเดอร์ ชิงช้า และแทรมโพลีนค่ะ",
+    "en": "It's space-themed, with a spaceship to climb, slides, swings and trampolines,",
+    "cue_th": [
+     "อวกาศ",
+     "ยานอวกาศ"
+    ],
+    "cue_en": [
+     "space",
+     "spaceship"
+    ],
+    "cue_zh": [
+     "太空",
+     "飞船"
+    ]
+   },
+   {
+    "th": "มีบ่อน้ำตื้นพร้อมน้ำพุ และอยู่ติดสระเด็กค่ะ",
+    "en": "plus a splash pond with fountains, right by the Kid Pool.",
+    "cue_th": [
+     "น้ำพุ",
+     "บ่อน้ำ",
+     "สระเด็ก"
+    ],
+    "cue_en": [
+     "splash",
+     "fountain",
+     "Kid"
+    ],
+    "cue_zh": [
+     "喷泉",
+     "儿童池"
+    ]
+   }
+  ],
+  "params": {
+   "base_asset": "rm_playscape_aerial",
+   "zoom": {
+    "x": 42.4,
+    "y": 57.0,
+    "scale": 1.5
+   },
+   "spot": {
+    "x": 42.4,
+    "y": 57.0,
+    "label_en": "SPACE PLAYGROUND",
+    "sub_en": "Outdoor · by the pool"
+   },
+   "spot_line": 0,
+   "photo": {
+    "asset": "rm_playscape",
+    "title_en": "SPACE PLAYGROUND",
+    "sub_en": "Outdoor play area · next to Junior World",
+    "chips_en": [
+     {
+      "label_en": "Area",
+      "value_en": "137 sq.m."
+     },
+     "Spaceship climber & stainless slide",
+     "Swings · 2 trampolines",
+     "Splash pond · by the Kid Pool"
+    ],
+    "line": 1
+   }
+  },
+  "taps": [
+   {
+    "id": "story_playground_where_kids",
+    "label_en": "Junior World",
+    "label_th": "ห้องเด็ก Junior World",
+    "next_story": "kids_room_where",
+    "tool": null
+   },
+   {
+    "id": "story_playground_where_ground",
+    "label_en": "All of the ground floor",
+    "label_th": "ดูทั้งชั้น G",
+    "next_story": "facilities_ground",
+    "tool": null
+   },
+   {
+    "id": "story_playground_where_all",
+    "label_en": "All floors",
+    "label_th": "ดูทุกชั้น",
+    "next_story": "facilities_overview",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:09_facilities_ground.md#9.9 (Playground = Playscape · ลานกลางแจ้งริมลากูนด้านใต้ของ Junior World ติด Kid's Pool · 137 ตร.ม. · Space Playground โดมยานอวกาศ สไลเดอร์ท่อสแตนเลส สไลเดอร์ประติมากรรม ชิงช้า แทรมโพลีนฝังพื้น 2 จุด บ่อน้ำตื้นพร้อมน้ำพุ)",
+   "report:09_facilities_ground.md#9.1.1 (8 Playground · ลานกลางแจ้งริมลากูน ถัดจาก Junior World · 137 ตร.ม.)",
+   "report:12_landscape.md#12.10 (Playscape 137 ตร.ม. · Trampoline x2 · Shallow Pond · Kid's Pool)",
+   "report:19_faq.md#19.12 (Playground เป็นอย่างไร)",
+   "web:6.gallery/exterior/Playscape/Scene 55.png (rm_playscape_aerial) · Scene 64(2).png (rm_playscape)"
+  ],
+  "notes_th": "ภาพฐานไม่ใช่ผังชั้น G: fac_plan_g วาดแค่ตัวอาคาร ไม่มีป้าย Playground ให้ชี้ (ลานอยู่นอกอาคาร) และผังโครงการก็ไม่มีป้ายนี้ — วงบนที่ว่างจะเป็นการเดา จึงใช้ภาพมุมสูงของลาน Playscape จากชุดเว็บ (Scene 55) แล้ววงชี้ที่โดมยานอวกาศในภาพเอง (42.4%, 57.0%) ส่วน 'ตรงไหน' พูดเป็นคำ: ริมสระ ถัดจาก Junior World ตามรายงาน 9.9 · ตัดไปภาพระดับสายตา (Scene 64: ยาน สไลเดอร์ประติมากรรม ชิงช้าห่วง น้ำพุพื้น) + ชิป 137 ตร.ม. (ตารางภูมิสถาปัตย์ ✅) · องค์ประกอบทุกชิ้นตามรายงาน 9.9/12.10 พูดตรงๆ ไม่พูดว่าเป็นแบบแนวคิด (กฎเจ้าของ 10 ต.ค.) · ไม่พูดช่วงอายุ ความจุ วัสดุพื้น ความลึกน้ำ ความปลอดภัย (ยังไม่มีในแบบ) ไม่พูดเรื่องลดอุณหภูมิ 4–5 °C ของ Fog Canopy (คำผู้นำเสนอ) · คนในภาพเป็นจุดเล็ก ไม่ใช่ตัวหลักของภาพ"
+ }
+]

@@ -232,6 +232,13 @@ async def announce(
             turnlog.record("announce", source=source, sent=False,
                            reason="send failed", waited=round(waited, 1))
             return False
+        # An announcement is her speaking unasked: the silence follow-up
+        # (FOLLOW_UP_AFTER_S) is for her ANSWER, never for this turn. The
+        # follow-up itself and the respeak (her answer, said again) keep it.
+        if source not in ("follow_up", "respeak_silent_block"):
+            void = getattr(session, "_void_follow_up", None)
+            if callable(void):
+                void()
 
         # Start after the text is accepted, so a disconnected provider never
         # produces a silent gesture. Failure is deliberately non-fatal:
