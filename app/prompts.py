@@ -839,11 +839,13 @@ def _robot_face_block() -> str:
 #: กรณี" would otherwise forbid telling a fainting guest's friend to fetch
 #: staff (CLAUDE.md "ระวังคำสั่งที่ขัดกันเอง"). Robot face only: the sales
 #: room's desk prompt is byte-identical (snapshots) and over its budget.
-#: "ตอบแค่ ค่ะ" stays the order (14 Oct: the owner chose silence for staff
-#: talk, and "เงียบ ไม่ต้องพูดอะไรเลย" was tried live -- 3.8 then SPOKE its
-#: stage direction aloud, "Silently observe without responding.", 2 of 3).
-#: The model can say a bare "ค่ะ" reliably; making that silent is the
-#: server's job, not the prompt's.
+#: "ตอบแค่ ค่ะ" is what the model can do reliably for talk not meant for her;
+#: the robot then drops that bare "ค่ะ" before the speaker (SILENCE_BARE_ACK,
+#: providers/transcript_filter.BareAckGate) -- owner 15 Oct, after both other
+#: roads were measured live: "เงียบ ไม่ต้องพูดอะไรเลย" made 3.8 SPEAK its stage
+#: direction ("Silently observe without responding.", 2 of 3), and no order at
+#: all got "ขออภัยค่ะ ดิฉันดูแลเฉพาะโครงการ ... สนใจห้องแบบไหน" 10 s into staff
+#: talk (2 of 3) and "(ไม่มีการตอบสนอง)" read aloud (1 of 3).
 CONDO_FACE_CONTENT_BLOCK = (
     "\nบนหน้าหุ่นคุณได้ยินทั้งห้อง:\n"
     "- คนคุยกันเอง (เรื่องงาน เงิน เรื่องส่วนตัว เรียกกันว่าพี่หรือชื่อคน) หรือพนักงานพรีเซนต์ให้แขก "

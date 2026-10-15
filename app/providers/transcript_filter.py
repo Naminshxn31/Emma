@@ -162,3 +162,74 @@ class TranscriptFilter:
 
     def reset(self) -> None:
         self._buf = ""
+
+
+#: What a reply that is ONLY an acknowledgement reads as, once spaces and
+#: punctuation are gone.
+BARE_ACKS = ("ค่ะ", "คะ", "ค่า")
+_ACK_NOISE = re.compile(r"[\s.,!?…ๆ\-–—\"'()\[\]{}]+")
+#: A bare "ค่ะ" is about half a second of audio; past this much held audio
+#: the reply is something else whatever its transcript says (24 kHz s16le).
+ACK_MAX_HELD_BYTES = int(24000 * 2 * 1.2)
+
+
+def _ack_norm(text: str) -> str:
+    return _ACK_NOISE.sub("", text or "")
+
+
+class BareAckGate:
+    """Keep a reply that is only "ค่ะ" off the speaker and the screen.
+
+    Owner, 15 Oct: talk not meant for Emma (staff among themselves) must get
+    silence, not "ค่ะ" -- 24 of 142 robot turns 12-14 Oct were exactly that.
+    The prompt cannot ask for silence (3.8 then speaks its stage direction:
+    "Silently observe without responding."), but it reliably says a bare
+    "ค่ะ", so the server drops that turn.
+
+    A turn's first events are held until its transcript can no longer be a
+    bare acknowledgement -- usually the first transcript piece ("ที่จอดรถ...",
+    "Our parking..."), which in gemini-3.8 arrives with or before the first
+    audio, so an answer is not delayed. A reply that opens "ค่ะ ..." waits for
+    its next piece. At turn_complete a turn whose whole transcript is a bare
+    acknowledgement is dropped; anything else held is released in order.
+    Held audio past ACK_MAX_HELD_BYTES is released whatever the transcript.
+    """
+
+    def __init__(self, enabled: bool) -> None:
+        self.enabled = bool(enabled)
+        self.reset()
+
+    def reset(self) -> None:
+        self._held: list = []
+        self._text = ""
+        self._bytes = 0
+        self._passing = False
+
+    def _could_be_bare(self) -> bool:
+        n = _ack_norm(self._text)
+        return any(ack.startswith(n) for ack in BARE_ACKS)
+
+    def push(self, event) -> list:
+        """An output event (assistant_transcript or audio) -> what to send now."""
+        if not self.enabled or self._passing:
+            return [event]
+        self._held.append(event)
+        if event.kind == "assistant_transcript":
+            self._text += event.text or ""
+        elif event.kind == "audio":
+            self._bytes += len(event.audio or b"")
+        if self._could_be_bare() and self._bytes <= ACK_MAX_HELD_BYTES:
+            return []
+        out, self._held, self._passing = self._held, [], True
+        return out
+
+    def close(self) -> tuple[list, bool]:
+        """turn_complete: (events still owed, True if a bare acknowledgement
+        was dropped). The next turn starts deciding again."""
+        held, text = self._held, _ack_norm(self._text)
+        self.reset()
+        if not self.enabled or not held:
+            return [], False
+        if text in BARE_ACKS:
+            return [], True
+        return held, False

@@ -916,6 +916,13 @@ class Settings:
     # robot turns it on in robot.env. Evidence: `reply_stall` rows.
     reply_stall_s: float = float(os.getenv("REPLY_STALL_S", "0"))
     reply_stall_reconnect_s: float = float(os.getenv("REPLY_STALL_RECONNECT_S", "8"))
+    # A reply that is only "ค่ะ" is not played or shown (owner 15 Oct: talk not
+    # meant for Emma gets silence -- 24 of 142 robot turns 12-14 Oct were a bare
+    # "ค่ะ"; the prompt cannot ask for silence, 3.8 speaks the stage direction).
+    # The prompt keeps "ตอบแค่ ค่ะ" -- what the model does reliably -- and the
+    # provider drops that turn (transcript_filter.BareAckGate). Off by default:
+    # the sales room's PC unchanged; the robot turns it on in robot.env.
+    silence_bare_ack: bool = _get_bool("SILENCE_BARE_ACK", False)
     robot_body_enabled: bool = _get_bool("ROBOT_BODY_ENABLED", False)
     robot_body_ack_timeout_s: float = float(os.getenv("ROBOT_BODY_ACK_TIMEOUT_S", "2.5"))
     #: The heard-word guard (the `heard.py` precedent: "bit like" closed the

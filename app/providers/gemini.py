@@ -23,7 +23,7 @@ from app import heard
 from app.config import settings
 from app.providers.base import ProviderError, ProviderEvent, VoiceProvider
 from app.providers.thai_spacing import ThaiSpacing
-from app.providers.transcript_filter import TranscriptBudget, TranscriptFilter
+from app.providers.transcript_filter import BareAckGate, TranscriptBudget, TranscriptFilter
 
 logger = logging.getLogger("condo_voice.gemini")
 
@@ -547,6 +547,9 @@ class GeminiProvider(VoiceProvider):
         # Affective dialogue mixes emotion labels into the output transcript;
         # they're internal signals, not speech, so keep them off the screen.
         self._out_filter = TranscriptFilter()
+        #: SILENCE_BARE_ACK (robot): a reply that is only "ค่ะ" never reaches
+        #: the speaker or the screen (owner 15 Oct, transcript_filter.BareAckGate).
+        self._ack_gate = BareAckGate(settings.silence_bare_ack)
         #: Model reasoning once arrived as output transcript (2026-10-11):
         #: text with no audio behind it is cut here — see TranscriptBudget.
         self._out_budget = TranscriptBudget(self.output_sample_rate * 2)
@@ -1338,6 +1341,32 @@ class GeminiProvider(VoiceProvider):
         return _with_call_id(ProviderEvent(kind="tool_dropped", text=name,
                                            data={"call_id": call_id}), call_id)
 
+    def _ack(self, event: ProviderEvent) -> list:
+        gate = getattr(self, "_ack_gate", None)
+        return [event] if gate is None else gate.push(event)
+
+    def _ack_reset(self) -> None:
+        gate = getattr(self, "_ack_gate", None)
+        if gate is not None:
+            gate.reset()
+
+    def _ack_close(self) -> list:
+        """turn_complete: what the gate still owes the page, and a row when a
+        bare "ค่ะ" was dropped (how often she answered talk not meant for her)."""
+        gate = getattr(self, "_ack_gate", None)
+        if gate is None:
+            return []
+        owed, dropped = gate.close()
+        if dropped:
+            logger.info("a bare acknowledgement was not played (SILENCE_BARE_ACK)")
+            try:
+                from app import turnlog
+
+                turnlog.record("bare_ack_dropped")
+            except Exception:                              # pragma: no cover - belt
+                pass
+        return owed
+
     def _input_event(self, text: str) -> ProviderEvent:
         heard = getattr(self, "_stall_heard", "")
         if settings.reply_stall_s > 0 and text.strip() and len(heard) < 600:
@@ -1523,6 +1552,7 @@ class GeminiProvider(VoiceProvider):
                         self._out_filter.reset()
                         self._out_budget.reset()
                         self._out_spacing.reset()
+                        self._ack_reset()           # what it held was cut off anyway
                         yield ProviderEvent(kind="interrupted")
 
                     if getattr(content, "input_transcription", None):
@@ -1547,7 +1577,8 @@ class GeminiProvider(VoiceProvider):
                             clean = self._out_spacing.feed(self._out_filter.feed(text))
                             clean = self._out_budget.allow(clean)
                             if clean:
-                                yield ProviderEvent(kind="assistant_transcript", text=clean)
+                                for event in self._ack(ProviderEvent(kind="assistant_transcript", text=clean)):
+                                    yield event
 
                     model_turn = getattr(content, "model_turn", None)
                     if model_turn and model_turn.parts:
@@ -1556,7 +1587,8 @@ class GeminiProvider(VoiceProvider):
                             if blob is not None and blob.data:
                                 self._out_budget.add_audio(len(blob.data))
                                 self._replied_since_end = True
-                                yield ProviderEvent(kind="audio", audio=blob.data)
+                                for event in self._ack(ProviderEvent(kind="audio", audio=blob.data)):
+                                    yield event
 
                     if getattr(content, "turn_complete", False):
                         # Release any text the filters were holding back —
@@ -1565,7 +1597,10 @@ class GeminiProvider(VoiceProvider):
                         tail += self._out_spacing.flush()
                         tail = self._out_budget.allow(tail)
                         if tail:
-                            yield ProviderEvent(kind="assistant_transcript", text=tail)
+                            for event in self._ack(ProviderEvent(kind="assistant_transcript", text=tail)):
+                                yield event
+                        for event in self._ack_close():
+                            yield event
                         if self._out_budget.dropped:
                             logger.warning("output transcript ran %d chars ahead of its audio "
                                            "(model reasoning in the transcript?) — not shown",
