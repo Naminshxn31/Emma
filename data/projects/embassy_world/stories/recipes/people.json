@@ -1,0 +1,98 @@
+[
+  {
+    "id": "exec_ceo",
+    "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+    "source_sha256": "375c04d7a9f3c5db65f527a6163f0cb2ff21b51a7a18f3a82e03ea8a4c8b6648",
+    "page": 1,
+    "dpi": 150,
+    "crop": [
+      180,
+      165,
+      640,
+      453
+    ],
+    "max_w": 640,
+    "format": "webp",
+    "why": "CEO Miki Haim. Official portrait from the Embassy Life Sales Kit 2.0 (Empire Group level; report 2.10.1 names the four executives from it). Owner 15 Oct: names may be disclosed and the executives' question gets a picture. Crop = the portrait only, no page text."
+  },
+  {
+    "id": "exec_coo",
+    "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+    "source_sha256": "375c04d7a9f3c5db65f527a6163f0cb2ff21b51a7a18f3a82e03ea8a4c8b6648",
+    "page": 1,
+    "dpi": 150,
+    "crop": [
+      835,
+      490,
+      1255,
+      752
+    ],
+    "max_w": 640,
+    "format": "webp",
+    "why": "COO Pudthachad Sucharitakul. Official portrait from the Embassy Life Sales Kit 2.0 (Empire Group level; report 2.10.1 names the four executives from it). Owner 15 Oct: names may be disclosed and the executives' question gets a picture. Crop = the portrait only, no page text."
+  },
+  {
+    "id": "exec_gm",
+    "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+    "source_sha256": "375c04d7a9f3c5db65f527a6163f0cb2ff21b51a7a18f3a82e03ea8a4c8b6648",
+    "page": 2,
+    "dpi": 150,
+    "crop": [
+      203,
+      530,
+      603,
+      780
+    ],
+    "max_w": 640,
+    "format": "webp",
+    "why": "GM Moran S. Haim. Official portrait from the Embassy Life Sales Kit 2.0 (Empire Group level; report 2.10.1 names the four executives from it). Owner 15 Oct: names may be disclosed and the executives' question gets a picture. Crop = the portrait only, no page text."
+  },
+  {
+    "id": "exec_cfo",
+    "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+    "source_sha256": "375c04d7a9f3c5db65f527a6163f0cb2ff21b51a7a18f3a82e03ea8a4c8b6648",
+    "page": 2,
+    "dpi": 150,
+    "crop": [
+      830,
+      190,
+      1260,
+      459
+    ],
+    "max_w": 640,
+    "format": "webp",
+    "why": "CFO Dor Haim. Official portrait from the Embassy Life Sales Kit 2.0 (Empire Group level; report 2.10.1 names the four executives from it). Owner 15 Oct: names may be disclosed and the executives' question gets a picture. Crop = the portrait only, no page text."
+  },
+  {
+    "id": "dev_timeline_early",
+    "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+    "source_sha256": "375c04d7a9f3c5db65f527a6163f0cb2ff21b51a7a18f3a82e03ea8a4c8b6648",
+    "page": 3,
+    "dpi": 150,
+    "crop": [
+      390,
+      485,
+      1772,
+      1585
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "2006–2015. Empire Group's project timeline from the Embassy Life Sales Kit 2.0 (report 2.10.2 lists the 16 projects from it). Owner 15 Oct: questions the data answers must not slip -- '16 projects' went to the sales team on 12 Oct. Crop = the buildings with their names and dates, below the kit's number boxes (its 5,400 units disagrees with the deck's 6,000+)."
+  },
+  {
+    "id": "dev_timeline_late",
+    "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+    "source_sha256": "375c04d7a9f3c5db65f527a6163f0cb2ff21b51a7a18f3a82e03ea8a4c8b6648",
+    "page": 4,
+    "dpi": 150,
+    "crop": [
+      0,
+      485,
+      1390,
+      1590
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "why": "2013–2027. Empire Group's project timeline from the Embassy Life Sales Kit 2.0 (report 2.10.2 lists the 16 projects from it). Owner 15 Oct: questions the data answers must not slip -- '16 projects' went to the sales team on 12 Oct. Crop = the buildings with their names and dates, below the kit's number boxes (its 5,400 units disagrees with the deck's 6,000+)."
+  }
+]

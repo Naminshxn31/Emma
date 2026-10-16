@@ -55,9 +55,9 @@ function loadModel() {
   const src = between('// <nav-model>', '// </nav-model>');
   const ctx = vm.createContext({ TextEncoder, unescape, encodeURIComponent });
   vm.runInContext(src + `
-    this.__api = { navModel, relayCommand, bodyMessage, navGoMessage, allowedMessage, bodyCapsFrame,
+    this.__api = { navModel, relayCommand, bodyMessage, speechMessage, navGoMessage, allowedMessage, bodyCapsFrame,
       bodyStatusFrame, navStatusFrame, navCapsFrame, frameFits, holdController, joinDoors,
-      NAV_REASONS_TH, BODY_IDS, START_HOLD_MS, MAX_INBOUND_BYTES, ID_RE: ID_RE.source,
+      NAV_REASONS_TH, BODY_IDS, SPEECH_BODY_IDS, START_HOLD_MS, MAX_INBOUND_BYTES, ID_RE: ID_RE.source,
       COMMAND_ID_RE: COMMAND_ID_RE.source, BODY_STATUSES, NAV_STATES, BODY_STATUS_STATES,
       autoState, autoBanner, activityMessage, statusKey, NAV_ORIGINS, AUTO_PHASES, ACTIVITY_KINDS };`, ctx);
   return ctx.__api;
@@ -67,7 +67,8 @@ function runModel(cases) {
   const api = loadModel();
   return cases.map((c) => {
     if (c.fn === 'constants') {
-      return { NAV_REASONS_TH: api.NAV_REASONS_TH, BODY_IDS: api.BODY_IDS, START_HOLD_MS: api.START_HOLD_MS,
+      return { NAV_REASONS_TH: api.NAV_REASONS_TH, BODY_IDS: api.BODY_IDS, SPEECH_BODY_IDS: api.SPEECH_BODY_IDS,
+        START_HOLD_MS: api.START_HOLD_MS,
         MAX_INBOUND_BYTES: api.MAX_INBOUND_BYTES, ID_RE: api.ID_RE, COMMAND_ID_RE: api.COMMAND_ID_RE,
         BODY_STATUSES: api.BODY_STATUSES, NAV_STATES: api.NAV_STATES, BODY_STATUS_STATES: api.BODY_STATUS_STATES,
         NAV_ORIGINS: api.NAV_ORIGINS, AUTO_PHASES: api.AUTO_PHASES, ACTIVITY_KINDS: api.ACTIVITY_KINDS };

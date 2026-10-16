@@ -218,7 +218,13 @@ def test_the_203_case_review_fixes_are_in_the_condo_prompt():
     assert "ห้ามตอบว่าเป็นเรื่องนอกขอบเขต" in text
     # filler / unrelated chatter -> acknowledge + ONE project question (owner 12 Oct)
     assert 'ให้ตอบรับสั้นๆ แล้วชวนคุยเรื่องโครงการหนึ่งคำถาม (ข้อยกเว้นของ "ไม่ถามต่อ")' in text
-    assert "ห้ามถามซ้ำข้อที่ถามไปแล้ว ห้ามถามเรื่องงบหรือราคา" in text
+    assert "ห้ามถามซ้ำข้อที่ถามไปแล้ว ห้ามถามว่าซื้อไว้อยู่เองหรือลงทุน ห้ามถามเรื่องงบหรือราคา" in text
+    # owner 15 Oct: an unrelated question gets no content at all (robot log: an
+    # English word was translated, then "อยู่เองหรือลงทุน"), and the one question
+    # invites a recommendation from the project, never "live in or invest"
+    assert "คำถามที่ไม่เกี่ยวกับโครงการ (คำศัพท์ แปลภาษา ความรู้ทั่วไป โครงการอื่น) ห้ามตอบเนื้อหาแม้แต่คำเดียว" in text
+    assert '"อยากให้ดิฉันแนะนำส่วนไหนของโครงการเป็นพิเศษไหมคะ"' in text
+    assert "อยู่เองหรือไว้ลงทุนคะ" not in text
     assert 'ห้ามพูดว่าโครงการนี้ได้รางวัล' in text
     assert "กฎหมาย สิทธิ์ถือครอง หรือโควตาต่างชาติ ไม่มีในข้อมูล ให้ทีมขายยืนยัน" in text
     assert 'ห้ามพูดว่า "เรียนเชิญพนักงานขายมาดูแล"' in text

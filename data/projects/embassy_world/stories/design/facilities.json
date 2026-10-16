@@ -893,13 +893,15 @@
    "สกายพูลอยู่ชั้นไหน",
    "สระลอยฟ้าอยู่ตรงไหน",
    "Sky Pool อยู่ตึกไหน",
-   "สระพื้นกระจกอยู่ไหน"
+   "สระพื้นกระจกอยู่ไหน",
+   "Sky Pool ใหญ่แค่ไหน"
   ],
   "questions_en": [
    "Where is the Sky Pool?",
    "Which floor is the Sky Pool on?",
    "Which building has the Sky Pool?",
-   "Where's the pool with the glass floor?"
+   "Where's the pool with the glass floor?",
+   "How big is the Sky Pool?"
   ],
   "lines": [
    {
@@ -952,6 +954,22 @@
     "cue_zh": [
      "玻璃"
     ]
+   },
+   {
+    "th": "กว้างประมาณ 27 เมตร ผิวน้ำประมาณ 143 ตารางเมตรค่ะ",
+    "en": "It is about 27 metres wide, with about 143 square metres of water.",
+    "cue_th": [
+     "กว้าง",
+     "ตารางเมตร"
+    ],
+    "cue_en": [
+     "wide",
+     "square metres"
+    ],
+    "cue_zh": [
+     "米",
+     "平方米"
+    ]
    }
   ],
   "params": {
@@ -973,6 +991,10 @@
     "title_en": "SKY POOL",
     "sub_en": "Level 3 · Building A",
     "chips_en": [
+     {
+      "label_en": "Size",
+      "value_en": "≈ 27 m wide · ≈ 143 sq.m."
+     },
      "Above the fitness centre",
      "Glass-floor section",
      "Whirlpool seats",
@@ -1010,7 +1032,8 @@
    "report:11_facilities_3rd_floor.md#11.5.3",
    "report:11_facilities_3rd_floor.md#11.5.4",
    "report:09_facilities_ground.md#9.3",
-   "slides:intro-041"
+   "slides:intro-041",
+   "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
   ],
   "notes_th": "ภาพโฮโลแกรมอาคาร A จาก UE ของเจ้าของ (ด้านลากูน) → ซูมเข้าโดมกระจกกลางตึก → วงชี้ที่ขอบบนของโดม (ระดับชั้น 3) ป้าย SKY POOL · Level 3 · Building A → ตัดไปภาพ Sky Pool จริง (สไลด์ intro-041 ที่เห็นพื้นกระจกมองลงไปเห็นยิม) → ชิปเด้งทีละอัน จุดบนภาพ UE เป็นการอ่านจากรูปทรงโมเดล (นับแนวพื้นจากล่าง: G, 2, 3 — โดมสูงสองชั้นและหลังคาโดมอยู่ระดับพื้นชั้น 3) ไม่ใช่ป้ายที่พิมพ์ไว้ สอดคล้องกับรายงาน 9.3 'ด้านบน (ชั้น 3) คือ Sky Pool' และผังชั้น 3 ที่สระครึ่งวงกลมอยู่แนวเดียวกับ Biogenesis — ต้องให้เจ้าของยืนยันจุดนี้ ชั้น 3 ไม่ใช่ 'ชั้นสอง' (รายงาน 11.5.4) ไม่พูดขนาด/ระดับสระเพราะตัวเลขขัดกัน"
  },
@@ -1022,18 +1045,25 @@
    "ยิมอยู่ตรงไหน",
    "ห้องออกกำลังกายอยู่ชั้นไหน",
    "มีฟิตเนสไหม",
-   "Biogenesis คืออะไร อยู่ไหน"
+   "Biogenesis คืออะไร อยู่ไหน",
+   "ฟิตเนสใหญ่แค่ไหน",
+   "ฟิตเนสกี่ตารางเมตร",
+   "ฟิตเนสมีอุปกรณ์อะไรบ้าง",
+   "ในฟิตเนสมีเครื่องอะไรบ้าง",
+   "พื้นที่ฟิตเนสขนาดเท่าไหร่"
   ],
   "questions_en": [
    "Where is the gym?",
    "Where's the fitness centre?",
    "Is there a gym?",
-   "Which floor is the fitness on?"
+   "Which floor is the fitness on?",
+   "How big is the gym?",
+   "What equipment does the gym have?"
   ],
   "lines": [
    {
-    "th": "ฟิตเนส Biogenesis อยู่ชั้น G อาคาร A ค่ะ",
-    "en": "Our fitness centre, Biogenesis, is on the ground floor of Building A,",
+    "th": "ฟิตเนส Biogenesis อยู่ชั้น G อาคาร A พื้นที่ประมาณ 197 ตารางเมตรค่ะ",
+    "en": "Our fitness centre, Biogenesis, is on the ground floor of Building A, about 197 square metres,",
     "cue_th": [
      "Biogenesis",
      "ไบโอเจเนซิส",
@@ -1081,6 +1111,19 @@
      "Sky Pool",
      "上方",
      "上面"
+    ]
+   },
+   {
+    "th": "ข้างในมีลู่วิ่ง 8 เครื่อง เป็นลู่วิ่งสายพานโค้ง 4 เครื่อง พร้อมเครื่องเวทและดัมเบลค่ะ",
+    "en": "Inside there are eight treadmills, four of them curved, plus weight machines and dumbbells.",
+    "cue_th": [
+     "ลู่วิ่ง"
+    ],
+    "cue_en": [
+     "treadmill"
+    ],
+    "cue_zh": [
+     "跑步机"
     ]
    }
   ],
@@ -1139,7 +1182,8 @@
    "report:09_facilities_ground.md#9.3",
    "report:08_facilities_overview.md#8.10.2",
    "slides:intro-018",
-   "slides:intro-019"
+   "slides:intro-019",
+   "report:09_facilities_ground.md#9.3 (ภาพไฟนอล: ลู่วิ่ง 8 เครื่อง ทั่วไป 4 + สายพานโค้ง 4)"
   ],
   "notes_th": "ผังชั้น G → ซูมลงครึ่งวงกลมด้านล่าง → วงชี้ที่ Biogenesis (อ่านจากป้าย BIOGENESIS บนผัง วางกลางครึ่งวงกลม) → ตัดไปภาพไฟนอล Biogenesis 01 (กลางวัน เห็นลากูนผ่านกระจกและท้องสระกระจกเหนือหัว) → ชิป 197 ตร.ม. มาจากแผ่นแปลน facility ตามรายงาน 9.3 / 8.10.2 (✅ ใช้ได้เฉพาะขนาด ซึ่งคือสิ่งที่ใช้อยู่) ห้องเรียนสามห้องข้างๆ อยู่แถวเดียวกันตามรายงาน 9.1.1 กฎข้อ 6: ประโยคบอก 'ชั้น G อาคาร A' ชัดเจนว่าอยู่ในโครงการ ไม่ใช่ที่ห้องขาย"
  },
@@ -1150,12 +1194,15 @@
    "ห้องเด็กอยู่ไหน",
    "Junior World อยู่ตรงไหน",
    "Junior World คืออะไร",
-   "ห้องเด็กเป็นยังไง"
+   "ห้องเด็กเป็นยังไง",
+   "Junior World ใหญ่แค่ไหน",
+   "ห้องเด็กกี่ตารางเมตร"
   ],
   "questions_en": [
    "Where is the kids' room?",
    "Where is Junior World?",
-   "What is Junior World?"
+   "What is Junior World?",
+   "How big is Junior World?"
   ],
   "lines": [
    {
@@ -1203,6 +1250,20 @@
     "cue_zh": [
      "球池"
     ]
+   },
+   {
+    "th": "ห้องขนาด 12.825 × 5.85 เมตร ประมาณ 75 ตารางเมตรค่ะ",
+    "en": "The room is 12.825 by 5.85 metres, about 75 square metres.",
+    "cue_th": [
+     "ตารางเมตร",
+     "ขนาด"
+    ],
+    "cue_en": [
+     "square metres"
+    ],
+    "cue_zh": [
+     "平方米"
+    ]
    }
   ],
   "params": {
@@ -1224,6 +1285,10 @@
     "title_en": "JUNIOR WORLD",
     "sub_en": "Kids' room · Ground floor",
     "chips_en": [
+     {
+      "label_en": "Size",
+      "value_en": "12.825 × 5.85 m"
+     },
      "Space-station theme",
      "Ball pit",
      "Galactic Shot game wall"
@@ -1252,7 +1317,8 @@
    "report:09_facilities_ground.md#9.7",
    "report:08_facilities_overview.md#8.2",
    "slides:intro-018",
-   "slides:intro-024"
+   "slides:intro-024",
+   "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
   ],
   "notes_th": "ผังชั้น G → ซูมไปปลายซ้ายของแถวห้อง → วงชี้ที่ Junior World (อ่านจากป้าย JUNIOR WORLD บนผัง) → ตัดไปภาพไฟนอล Junior World 02 (บ่อบอล + ผนังเกม Galactic Shot) → ชิปสามอันตามรายงาน 9.7 / 8.2 ข้อ 6 ไม่พูดอายุ/ความจุ/ค่าใช้ (ยังไม่มีข้อมูล) ไม่พูดเรื่องเข้าใช้ฟรี (เป็นคำทีมขาย ยังไม่ยืนยัน) Playground กลางแจ้งกับ Kid Pool ไม่ใส่ เพราะตำแหน่งเทียบกับห้องนี้มาจากแบบภูมิสถาปัตย์ concept"
  }

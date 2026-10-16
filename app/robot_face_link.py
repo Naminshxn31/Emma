@@ -348,6 +348,10 @@ async def _send(session, kind: str, payload: dict):
     action = payload.get("action")
     if kind == "body" and action not in rc.BODY_ACTION_IDS:
         return _refusal("bad_request")
+    style = payload.get("style")
+    if style is not None and not (kind == "body" and style == "speech"
+                                  and action in rc.SPEECH_BODY_ACTIONS):
+        return _refusal("bad_request")
     if kind == "nav":
         if action not in NAV_ACTIONS:
             return _refusal("bad_request")
@@ -385,6 +389,8 @@ async def _send(session, kind: str, payload: dict):
     # Whitelisted fields only: the grammar is closed (§2b), and whatever a
     # caller adds to the payload must not ride along to the bridge.
     message = {"type": "%s_command" % kind, "command_id": command_id, "action": action}
+    if style == "speech":
+        message["style"] = "speech"
     if kind == "nav":
         if action == "go":
             message["place"] = payload["place"]

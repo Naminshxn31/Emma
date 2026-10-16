@@ -117,7 +117,8 @@ def test_flags_catch_telling_the_guest_there_is_no_information():
     the sales team naturally. A polite "ไม่ทราบว่า...คะ" question is fine."""
     base = {"user": "เลี้ยงสัตว์ได้ไหม", "complete": True, "audio_s": 4.0, "tools": []}
     for said in ("ขออภัยค่ะ ดิฉันไม่มีข้อมูลเรื่องนี้ค่ะ",
-                 "I don't have that information in my system."):
+                 "I don't have that information in my system.",
+                 "ข้อมูลความลึกของสระว่ายน้ำไม่มีระบุในระบบค่ะ"):       # robot log 15 Oct
         assert "t0:says_no_info" in harness.flags_for({"expect": {}}, [dict(base, said=said)], "")
     for said in ("เรื่องนี้ทีมขายของเราจะให้รายละเอียดได้ครบที่สุดค่ะ สอบถามที่โต๊ะทีมขายได้เลยนะคะ",
                  "ไม่ทราบว่าสนใจห้องแบบไหนคะ"):

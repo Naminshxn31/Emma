@@ -662,8 +662,15 @@ def _robot_moving() -> bool:
             return True
         state = robot_body.STATE
         at = state.get("at")
-        return (state.get("state") == "started" and isinstance(at, (int, float))
-                and time.time() - at < BODY_MOVING_MAX_S)
+        if not (state.get("state") == "started" and isinstance(at, (int, float))
+                and time.time() - at < BODY_MOVING_MAX_S):
+            return False
+        # Her explaining hand while she talks (speech_gestures) is not a
+        # robot somebody may need to stop by voice: counting it would open
+        # every door to room chatter after each answer and skip the follow-up.
+        from app import speech_gestures
+
+        return not speech_gestures.owns(state.get("last_action"), at)
     except Exception:
         return False
 

@@ -179,6 +179,10 @@ public final class MainActivity extends Activity
     private TextView navCheckText;
     private EditText faceTokenInput;
     private int poseTargetIndex = 0;
+    /** The next captured keyframe's length, from BodyGestures.STUDIO_FRAME_MS
+     *  (last = 3000 ms, what every frame used to be). */
+    private int frameMsIndex = BodyGestures.STUDIO_FRAME_MS.length - 1;
+    private TextView frameMsText;
     private static final long CORNER_HOLD_MS = 3000;   // deliberate 3s hold, not a stray long-press
     private boolean cornerHeld;
     private final Runnable cornerRevealRun = () -> {
@@ -439,6 +443,18 @@ public final class MainActivity extends Activity
         poseDraftText = text("", 15, 0xFFB8C7D9);
         poseDraftText.setGravity(Gravity.CENTER);
         root.addView(poseDraftText, matchWrap(0, 2, 0, 6));
+        LinearLayout frameMsRow = new LinearLayout(this);
+        frameMsRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button frameMsDown = button("◀", 0xFF31465E);
+        Button frameMsUp = button("▶", 0xFF31465E);
+        frameMsText = text("", 15, 0xFF80DFFF);
+        frameMsText.setGravity(Gravity.CENTER);
+        frameMsDown.setOnClickListener(v -> stepFrameMs(-1));
+        frameMsUp.setOnClickListener(v -> stepFrameMs(1));
+        frameMsRow.addView(frameMsDown, weightedWrap());
+        frameMsRow.addView(frameMsText, weightedWrap());
+        frameMsRow.addView(frameMsUp, weightedWrap());
+        root.addView(frameMsRow, matchWrap(0, 2, 0, 4));
         LinearLayout studioRow = new LinearLayout(this);
         studioRow.setOrientation(LinearLayout.HORIZONTAL);
         Button captureFrame = button("จำคีย์เฟรม", 0xFF73551A);
@@ -533,6 +549,10 @@ public final class MainActivity extends Activity
 
     @Override public String bodyGesture(String id) {
         return body.request(id);
+    }
+
+    @Override public String bodySpeech(String id) {
+        return body.requestSpeech(id);
     }
 
     @Override public String navPlaces() {
@@ -1322,9 +1342,15 @@ public final class MainActivity extends Activity
         });
     }
 
+    private void stepFrameMs(int delta) {
+        int n = BodyGestures.STUDIO_FRAME_MS.length;
+        frameMsIndex = Math.max(0, Math.min(n - 1, frameMsIndex + delta));
+        publishDraftStatus();
+    }
+
     private void captureDraftFrame() {
         try {
-            motionDraft.captureFrame();
+            motionDraft.captureFrame(BodyGestures.STUDIO_FRAME_MS[frameMsIndex]);
             persistDraft();
             publishDraftStatus();
             updateArmCommand("จำคีย์เฟรม " + motionDraft.frameCount() + " แล้ว", 0xFF5EE6A8);
@@ -1374,10 +1400,15 @@ public final class MainActivity extends Activity
     }
 
     private void publishDraftStatus() {
-        final String label = "ร่างท่า: " + motionDraft.frameCount() + " คีย์เฟรม · "
+        String lengths = motionDraft.frameLengths();
+        final String label = "ร่างท่า: " + motionDraft.frameCount() + " คีย์เฟรม"
+                + (lengths.isEmpty() ? "" : " (" + lengths + ")") + " · "
                 + motionDraft.targetCount() + " ช่องที่เคยสั่ง";
+        final String frameMs = String.format(java.util.Locale.US, "เวลาคีย์เฟรมถัดไป %.1f วิ",
+                BodyGestures.STUDIO_FRAME_MS[frameMsIndex] / 1000.0);
         ui.post(() -> {
             if (poseDraftText != null) poseDraftText.setText(label);
+            if (frameMsText != null) frameMsText.setText(frameMs);
         });
     }
 

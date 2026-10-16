@@ -1,6 +1,7 @@
 """M0.2 disclosure contract: authorization and construction state are separate."""
 from datetime import datetime, timedelta, timezone
 import json
+from pathlib import Path
 
 from app.config import ACTIVE_PROJECT_ID
 from app.knowledge_policy import (carries_claim, evaluate_claim, evaluate_live_inventory,
@@ -112,6 +113,38 @@ def test_what_the_owner_overruled_is_cut_from_project_text_too():
         "The lagoon is in the middle."
     for kept in ("พื้นดาดฟ้าสูงประมาณ 23 เมตรจากระดับถนน", "Sky Pool on level 3"):
         assert strip_overruled(kept) == kept
+
+
+def test_the_jellyfish_floor_and_utapao_40_60_are_cut_from_slide_text():
+    """Owner 15 Oct: "ลบ Glowing jellyfish-pattern floor ออก" (the design dropped
+    it) -- four approved slide summaries still describe it. And intro-008's
+    summary still gave U-Tapao "40–60 นาที", the figure the owner overruled."""
+    from app.tools.retrieval import sanitize_common_area_dimensions
+
+    th = "อุโมงค์ทรงโค้งธีมอวกาศใต้น้ำ มีแมงกะพรุนและปลาเรืองแสงบนพื้นน้ำ จางลง ขวาคือ 3RD FLOOR"
+    out = sanitize_common_area_dimensions(th)
+    assert "แมงกะพรุน" not in out and "อุโมงค์ทรงโค้งธีมอวกาศใต้น้ำ" in out and "3RD FLOOR" in out
+    en = "A space-themed tunnel. The water surface carries projected luminous jellyfish and fish. Lagoon beyond."
+    assert sanitize_common_area_dimensions(en) == "A space-themed tunnel. Lagoon beyond."
+    th8 = "ประมาณการจากแผนที่คือ อู่ตะเภาประมาณ 40–60 นาที สุวรรณภูมิประมาณ 1.5–2 ชั่วโมง"
+    assert sanitize_common_area_dimensions(th8) == "ประมาณการจากแผนที่คือ สุวรรณภูมิประมาณ 1.5–2 ชั่วโมง"
+    en8 = "map estimates are U-Tapao about 40–60 min, Suvarnabhumi about 1.5–2 hr."
+    assert sanitize_common_area_dimensions(en8) == "map estimates are Suvarnabhumi about 1.5–2 hr."
+
+
+def test_no_approved_slide_summary_reaches_her_with_an_overruled_thing():
+    """Every summary in the real catalog, through the one door they take."""
+    import re as _re
+
+    from app.tools.retrieval import sanitize_common_area_dimensions
+
+    idx = json.loads((Path(__file__).resolve().parent.parent / "data" / "projects" / "embassy_world"
+                      / "presentations" / "slides" / "index.json").read_text(encoding="utf-8"))
+    slides = next(v for v in idx.values() if isinstance(v, list))
+    banned = _re.compile(r"jelly\s*fish|แมงกะพรุน|40\s*[–-]\s*60\s*(นาที|min)|roof\s*-?\s*top", _re.IGNORECASE)
+    for slide in slides:
+        for key in ("summary_th", "summary_en"):
+            assert not banned.search(sanitize_common_area_dimensions(slide.get(key) or "")), (slide["id"], key)
 
 
 #: Text only this test puts into the files, so the assertions never depend on

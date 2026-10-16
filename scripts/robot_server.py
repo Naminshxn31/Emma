@@ -99,6 +99,14 @@ EXTRA_GLOBS = [
     "data/faces/models/auraface/scrfd_10g_bnkps.onnx", "data/faces/models/auraface/glintr100.onnx",
     "data/faces/models/auraface/LICENSE.md",
     "data/projects/*/sales/unit-plans/**/*",
+    # The report FAQ's embeddings (app/project_report.py), built on the PC.
+    # Never shipped before 15 Oct: every FAQ change (deny_terms) left the robot
+    # to embed 299 questions itself when the app opened -- and from 17:53 the
+    # robot hard-reset ~25 s into every app start, mid-embedding (bootloader
+    # reason "(none)", no Android shutdown), so the cache was never saved and
+    # the next start tried again. Same space on both sides (local MiniLM; the
+    # robot's ONNX measured equal), so the PC's file loads as is.
+    "data/projects/*/sales/faq_embeddings.npz",
     # slide text/index only: no robot tool shows slide images (slides is not
     # in the robot's TOOL_GROUPS), and the 183 JPEGs are 78 MB over adb
     "data/projects/*/presentations/**/*.json", "data/projects/*/presentations/**/*.npz",
@@ -496,7 +504,34 @@ def remote_manifest(robot: Robot) -> dict[str, str]:
         return {}
 
 
+def refresh_faq_cache() -> str:
+    """Make the report FAQ's embeddings current on this PC before they ship.
+
+    The robot no longer builds a stale index (EMBED_BUILD=false in robot.env
+    -- building it there hard-reset the robot, 15 Oct), so a stale cache
+    shipped from here = FAQ matched by words only on the robot. This builds
+    it here when the FAQ changed (a deny_terms edit is enough) and says so;
+    "" when there is nothing to do. Only in the robot's space (local MiniLM).
+    """
+    from app import project_report as pr
+    from app.tools.retrieval import choose_provider
+
+    m = pr.load_manifest()
+    if not m or not pr.approved(m):
+        return ""
+    if choose_provider() != "local":
+        return ("WARNING: EMBED_PROVIDER on this PC is not local -- the report FAQ cache was not "
+                "refreshed; the robot matches FAQ by words if it is stale")
+    index = pr._get_index(m)            # loads the cache, or builds and saves it
+    if index.get("faq") and index.get("faq_semantic") is None:
+        return "WARNING: the report FAQ cache could not be built on this PC (see the log above)"
+    return ""
+
+
 def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
+    note = refresh_faq_cache()
+    if note:
+        print(note)
     files = deploy_files()
     local = manifest(ROOT, files)
     # Diff against what is REALLY on the robot, not against our MANIFEST: the

@@ -213,7 +213,7 @@ def test_the_draft_counts_as_watched_only_from_the_playbacks_on_done():
     draft = code_only(read(DRAFT))
     assert "playedSinceEdit = false;" in method(draft, "int startPlayback()")
     assert "playedSinceEdit = editsAtStart == edits && !frames.isEmpty();" in method(draft, "void markPlayed(int editsAtStart)")
-    assert "edits++;" in method(draft, "ArmController.PoseFrame captureFrame()")
+    assert "edits++;" in method(draft, "ArmController.PoseFrame captureFrame(int durationMs)")
     assert "edits++;" in method(draft, "void clear()")
     assert "void markPlayed()" not in draft
 
@@ -222,7 +222,7 @@ def test_the_draft_counts_as_watched_only_from_the_playbacks_on_done():
 
 def test_head_known_is_false_from_the_start_of_a_head_sequence_until_its_on_done():
     body = code_only(read(BODY))
-    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames)")
+    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames, boolean speech)")
     reset = play.index("if (head) headKnown = false;")
     call = play.index("arm.playFrames(poseFrames,")
     known = play.index("if (head) headKnown = true;")

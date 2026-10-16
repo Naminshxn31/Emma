@@ -130,8 +130,20 @@ def strip_concept_caveat(text: str | None) -> str:
 #: "บนดาดฟ้ามีสวนลอยฟ้า...". "ดาดฟ้า" alone is not overruled -- the roof
 #: deck's height is an approved figure -- only a garden, terrace or jacuzzi
 #: ON it.
+#: 15 Oct (owner: "ลบ Glowing jellyfish-pattern floor ออก" -- the design
+#: dropped it): four approved slide summaries still describe jellyfish on the
+#: Journey to Mars / underground pool floor.
 OVERRULED = re.compile(
-    r"roof\s*-?\s*top|รูฟ\s*ท็อป|(?:สวน|ลาน|จากุซซี่)\S*ดาดฟ้า|thermal\s*galaxy",
+    r"roof\s*-?\s*top|รูฟ\s*ท็อป|(?:สวน|ลาน|จากุซซี่)\S*ดาดฟ้า|thermal\s*galaxy|jelly\s*-?\s*fish|แมงกะพรุน",
+    re.IGNORECASE,
+)
+
+#: The U-Tapao "40–60 minutes" map estimate the owner overruled (the approved
+#: figure is the deck's). The report's deny list cuts it there; the approved
+#: slide summary of intro-008 still says it -- cut the phrase, keep the rest.
+_UTAPAO_RANGE = re.compile(
+    r"(?:อู่ตะเภา|U-?Tapao)\S*?\s*(?:ประมาณ|about|approx\.?)?\s*40\s*[–-]\s*60\s*"
+    r"(?:นาที|min(?:utes|s)?\b)\.?,?\s*",
     re.IGNORECASE,
 )
 
@@ -173,6 +185,8 @@ def sanitize_common_area_dimensions(text: str | None) -> str:
     cut here too (`strip_concept_caveat`), and what the owner overruled
     (`strip_overruled`)."""
     value = strip_overruled(strip_concept_caveat(text))
+    if value and _UTAPAO_RANGE.search(value):
+        value = _UTAPAO_RANGE.sub("", value).strip()
     if not value or not _COMMON_AREA.search(value):
         return value
     value = _DIMENSION.sub("", value)
@@ -879,6 +893,12 @@ class SemanticIndex:
         #: same one; mixing two returns plausible numbers and wrong slides.
         self.provider = ""
 
+    @property
+    def _name(self) -> str:
+        """For log lines: which index (slides' embeddings.npz, the report's
+        faq_embeddings.npz). Tests build one without a path."""
+        return getattr(self.path, "name", None) or "embeddings"
+
     # -- persistence --
 
     def load(self, fingerprint: str) -> bool:
@@ -887,7 +907,10 @@ class SemanticIndex:
 
             with np.load(self.path, allow_pickle=False) as data:
                 if str(data["fingerprint"]) != fingerprint:
-                    logger.info("slide embeddings are stale — deck changed")
+                    # The file name, not "slide": the report FAQ uses this
+                    # class too, and on 15 Oct "slide embeddings are stale"
+                    # sent the robot's reset hunt after the slide index.
+                    logger.info("%s is stale — its texts changed", self._name)
                     return False
                 cached = str(data["provider"]) if "provider" in data else ""
                 wanted = choose_provider()
@@ -919,10 +942,17 @@ class SemanticIndex:
     # -- use --
 
     def build(self, texts: list[str], fingerprint: str) -> None:
+        from app.config import settings
+
+        if not settings.embed_build:
+            # Both callers catch this and search by words (EMBED_BUILD).
+            raise RuntimeError("%s is stale and EMBED_BUILD is off on this machine -- "
+                               "build it on the PC and deploy" % self._name)
         provider = choose_provider()
         if provider == "off":
             raise RuntimeError("no embedding provider available")
-        logger.info("embedding %d slides with %s", len(texts), embedding_signature(provider))
+        logger.info("embedding %d texts for %s with %s", len(texts), self._name,
+                    embedding_signature(provider))
         try:
             # Patient on purpose — this runs once and the result is cached to
             # disk. Waiting out a per-minute cap here is what stops every

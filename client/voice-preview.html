@@ -10,7 +10,7 @@
     document.documentElement.classList.add('app-shell');
   }
 </script>
-<link rel="stylesheet" href="/assets/emma-story.css?v=20261014-a">
+<link rel="stylesheet" href="/assets/emma-story.css?v=20261016-a">
 <style>
   :root {
     color-scheme: dark;
@@ -2613,7 +2613,7 @@
   <script src="/assets/echo-barge-gate.js?v=20260930-b"></script>
   <!-- The robot face's motion stories (present_story, app/stories.py):
        drawn with her voice, beat by beat; see docs/emma-story-engine.md -->
-  <script src="/assets/emma-story.js?v=20261014-b"></script>
+  <script src="/assets/emma-story.js?v=20261016-b"></script>
   <script>
   (function () {
     var Emma = window.EmmaVoicePreview;
@@ -3441,6 +3441,13 @@
         // first, so initialize the turn once instead of erasing transcript text
         // when the first audio chunk follows it.
         beginAssistantTurn();
+        // Owner 15 Oct: "ถามคำถามที่ไม่มี motion ก็ยังไม่ออกจากอันเก่า" -- the
+        // last answer's picture waited for turn_complete, which comes when
+        // the model stops GENERATING, seconds into her new answer. Her first
+        // sound of an answer that put nothing on screen is the moment it goes
+        // (a story or slide of this answer arrives before her voice and sets
+        // answerStaged; a follow-up keeps the picture it follows).
+        if (answerOwed && !answerStaged && document.body.classList.contains('emma-staging')) clearStage();
         sentMs += (msg.data.byteLength / 2 / outputRate) * 1000;
         playChunk(msg.data);
         return;
@@ -4150,7 +4157,15 @@
           }
           return u.href;
         },
-        onTap: function (id) { return sendQuickAsk(id); },
+        // keep = a tapped picture (emma-story.js onPictureTap): the story with
+        // the picture enlarged stays this answer's screen while she tells more
+        // (server side: session._quick_ask marks the same), so her first word
+        // does not clear it and an answer picture does not replace it
+        onTap: function (id, keep) {
+          var sent = sendQuickAsk(id);
+          if (sent && keep) { answerStaged = true; storyOwns = true; }
+          return sent;
+        },
         // numbers only (timing per beat, frame times): the server logs it as
         // `story_report` -- the voice-to-picture evidence from real use
         onReport: function (r) {
@@ -5862,6 +5877,9 @@
       'shake_head', 'raise_left_arm', 'raise_right_arm', 'greet_arm', 'wave', 'handshake',
       'hands_left', 'hands_right', 'rest', 'stop'];
     var BODY_STATUSES = ['verified', 'direction_known', 'operator_mapped', 'needs_mapping'];
+    // robot_contracts.SPEECH_BODY_ACTIONS: the recorded arm poses the server
+    // may play while she talks (owner 15 Oct), as `emma-body:<id>:speech`.
+    var SPEECH_BODY_IDS = ['raise_left_arm', 'raise_right_arm', 'wave', 'hands_left', 'hands_right'];
     var BODY_STATUS_STATES = ['started', 'done', 'stopped', 'failed'];
     var NAV_STATES = ['idle', 'preparing', 'starting', 'running', 'arrived', 'stopped', 'refused', 'failed'];
     var NAV_ACTIVE = ['preparing', 'starting', 'running'];
@@ -5941,6 +5959,9 @@
     function bodyMessage(action) {
       return has(BODY_IDS, action) && isId(action) ? 'emma-body:' + action : null;
     }
+    function speechMessage(action) {
+      return has(SPEECH_BODY_IDS, action) && isId(action) ? 'emma-body:' + action + ':speech' : null;
+    }
     function navGoMessage(place, origin) {
       return isId(place) && (origin === 'tap' || origin === 'voice') ? 'emma-nav:go:' + place + ':' + origin : null;
     }
@@ -5950,7 +5971,9 @@
     function allowedMessage(message) {
       if (typeof message !== 'string') return false;
       if (has(FIXED_MESSAGES, message)) return true;
-      var m = /^emma-body:(.+)$/.exec(message);
+      var m = /^emma-body:([^:]+):speech$/.exec(message);
+      if (m) return speechMessage(m[1]) === message;
+      m = /^emma-body:(.+)$/.exec(message);
       if (m) return bodyMessage(m[1]) === message;
       m = /^emma-nav:go:([^:]+):(tap|voice)$/.exec(message);
       return !!m && navGoMessage(m[1], m[2]) === message;
@@ -5970,7 +5993,7 @@
             accepted: false, reason: null, run_id: null };
       if (!onRobot) { ack.reason = 'not_robot_face'; return ack; }
       var message = null;
-      if (body) message = bodyMessage(evt.action);
+      if (body) message = evt.style === 'speech' ? speechMessage(evt.action) : bodyMessage(evt.action);
       else if (evt.action === 'stop') message = 'emma-nav:stop';
       // Always "voice" from the server: a server command is never a tap,
       // whatever its origin field says.
@@ -5996,7 +6019,7 @@
       var g = r.gestures && typeof r.gestures === 'object' ? r.gestures : {};
       BODY_IDS.forEach(function (id) { if (has(BODY_STATUSES, g[id])) gestures[id] = g[id]; });
       return { type: 'body_caps', enabled: r.enabled, allow_direction_known: r.allow_direction_known === true,
-        gestures: gestures };
+        gestures: gestures, speech: r.speech === true };
     }
     // `emma-body:status` holds the app's running state plus the LAST gesture's
     // outcome; a body_status goes only for a seq not sent yet (§5 P5 dedupe).

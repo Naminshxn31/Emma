@@ -314,8 +314,16 @@
     (data.template === 'stack' || data.template === 'drill' ? arr(p.items) : data.template === 'slabs' ? arr(p.floors) : [])
       .forEach(function (it) { if (it && it.tap) bound[it.tap] = true; });
     this.unbound = arr(data.taps).filter(function (t) { return t && !bound[t.id] && self.taps[t.id]; });
+    // Every picture the server listed can be tapped to see it large (owner,
+    // 15 Oct: "กดรูปบนจอ ... ขยายภาพนั้นและอธิบายเพิ่มเติม"): src -> its label
+    // and the "more" tap id the server will accept for it.
+    this.zoomMap = {};
+    arr(data.zoom).forEach(function (z) {
+      if (z && typeof z.src === 'string' && typeof z.tap === 'string') self.zoomMap[z.src] = z;
+    });
     this.root = el('div', 'es-root es-t-' + data.template);
     this.opts.mount.appendChild(this.root);
+    this.root.addEventListener('click', function (e) { self.onPictureTap(e); });
     this.W = this.root.clientWidth || root.innerWidth || 1080;
     this.H = this.root.clientHeight || root.innerHeight || 1920;
     // The overview's chips are laid out now (still invisible), so the lowest
@@ -452,8 +460,71 @@
     im.onerror = broken;
     if (src) im.src = this.opts.assetUrl ? this.opts.assetUrl(src) : src;
     im._ready = src && im.decode ? im.decode().catch(broken) : Promise.resolve();
+    if (src && this.zoomMap[src]) { im.classList.add('es-zoomable'); im._zoom = this.zoomMap[src]; }
     this.imgs.push(im);
     return im;
+  };
+  // A tap on a picture. The story's pictures are layered (a photo waits at
+  // opacity 0 over its plan until its line), so the picture tapped is the
+  // topmost one the guest can SEE under the finger, not the event's target.
+  // It opens large on the page at once; then Emma tells more: a row/slab/card
+  // that leads to a story sends its own tap (bindTap, already on its way), any
+  // other picture sends its "more" tap -- with `keep`, so this story and the
+  // enlarged picture stay this answer's screen.
+  Story.prototype.onPictureTap = function (e) {
+    if (this.dead) return;
+    if (this.zoomView && this.zoomView.contains(e.target)) { this.closeZoom(); return; }
+    var pick = null;
+    var under = document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [e.target];
+    for (var k = 0; k < under.length && !pick; k++) {
+      var n = under[k];
+      if (n && n._zoom && this.root.contains(n) && seen(n, this.root)) pick = n;
+    }
+    if (!pick) return;
+    this.showZoom(pick._zoom, pick.src, pick.naturalWidth, pick.naturalHeight);
+    var inBoundTap = pick.closest ? pick.closest('[data-tap]') : null;
+    if (!inBoundTap && this.opts.onTap) this.opts.onTap(pick._zoom.tap, true);
+  };
+  function seen(node, stop) {
+    for (var n = node; n && n !== stop; n = n.parentElement) {
+      var cs = root.getComputedStyle ? root.getComputedStyle(n) : null;
+      if (cs && (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.3)) return false;
+      if (n.classList && n.classList.contains('es-broken')) return false;
+    }
+    return true;
+  }
+  // The picture, large, over the story (still there underneath): its own
+  // label under it. Opacity and a scale only (the robot's frame budget, as
+  // every motion here); a tap anywhere on it closes it.
+  Story.prototype.showZoom = function (z, src, nw, nh) {
+    this.closeZoom();
+    var v = el('div', 'es-zoomview');
+    var fig = el('div', 'es-zv-fig');
+    var im = new Image();
+    im.alt = '';
+    im.className = 'es-zv-img es-contain';
+    im.src = src;
+    // Scaled UP to the room it has, its own shape kept: at its own pixel size
+    // a 640 px portrait stayed a third of the screen -- "enlarged" was not
+    // (16 Oct, the first recording of every picture tap).
+    var W = this.root.clientWidth || this.W, H = this.root.clientHeight || this.H;
+    if (nw > 0 && nh > 0) {
+      var s = Math.min(W * 0.94 / nw, H * 0.58 / nh);
+      im.style.width = Math.round(nw * s) + 'px';
+      im.style.height = Math.round(nh * s) + 'px';
+    }
+    fig.appendChild(im);
+    v.appendChild(fig);
+    if (z.label_en) v.appendChild(el('div', 'es-zv-label', tidy(z.label_en)));
+    v.appendChild(el('div', 'es-zv-hint', 'Tap to close'));
+    this.root.appendChild(v);
+    this.zoomView = v;
+    void v.offsetWidth;
+    v.classList.add('on');
+  };
+  Story.prototype.closeZoom = function () {
+    if (this.zoomView && this.zoomView.parentNode) this.zoomView.parentNode.removeChild(this.zoomView);
+    this.zoomView = null;
   };
   // Pictures inside `node` decoded (or 1.2 s passed): a beat never shows a
   // half-painted image, and never waits on one for long.

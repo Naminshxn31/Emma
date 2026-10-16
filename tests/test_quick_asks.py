@@ -453,3 +453,52 @@ def test_the_page_draws_her_choices_and_drops_them_when_answered():
     assert "answerOwed = true;" in send and "answerStaged = false;" in send
     # the example room says what it is
     assert "if (u.example_of)" in html
+
+
+# ---- the conversation's language for a tap (owner, 15 Oct 2026) ----------------
+
+def test_script_lang_reads_the_talk_not_the_names_in_it():
+    # a Thai reply is full of English names; an English one may end on "ค่ะ"
+    assert quick_asks.script_lang("ชั้น 3 อาคาร A มี Social Lounge, Co-working Lounge "
+                                  "ไว้นั่งทำงาน และ Sky Pool ค่ะ") == "th"
+    assert quick_asks.script_lang("Our project is developed by Empire Group ค่ะ") == "en"
+    assert quick_asks.script_lang("我可以为您介绍项目") == "zh"
+    assert quick_asks.script_lang("ok") is None and quick_asks.script_lang(None) is None
+
+
+def test_a_tap_in_an_english_talk_is_english_and_says_so():
+    text = quick_asks.text_for("condo", "units", "th", "en")
+    assert text.startswith('[The guest tapped "Unit types" on the screen and did not speak. '
+                           "This conversation is in English: answer in English, do not switch language.]")
+    assert text.endswith("What unit types are there, and how big are they?")
+    assert not re.search("[฀-๿]", text), "no Thai in an English talk's tap"
+    choice = quick_asks.text_for("condo", "type_1br", "th", "en")
+    assert "show_room_type(type=\"1br\")" in choice and not re.search("[฀-๿]", choice)
+    thai = quick_asks.text_for("condo", "units", "en", "th")
+    assert "ตอนนี้คุยกันเป็นภาษาไทย" in thai and thai.endswith("มีแบบห้องอะไรบ้าง ขนาดเท่าไหร่คะ")
+    # no talk known yet: the old text, byte for byte
+    assert quick_asks.text_for("condo", "units", "en", None) == quick_asks.text_for("condo", "units", "en")
+
+
+def test_a_story_tap_in_an_english_talk_is_english():
+    from app import stories
+
+    tap = {"id": "story_x_level3", "label_en": "Level 3", "label_th": "ชั้น 3", "next_story": "facilities_level3"}
+    text = stories.tap_text(tap, "en", "en")
+    assert text == ('[The guest tapped "Level 3" on the screen and did not speak. This conversation is in '
+                    'English: answer in English, do not switch language.] '
+                    'Call present_story(topic="facilities_level3") and tell it from the result.')
+    assert "ภาษาไทย" in stories.tap_text(tap, "en", "th")
+    assert stories.tap_text(tap, "en") == stories.tap_text(tap, "en", None)
+
+
+def test_the_session_taps_in_the_language_she_is_speaking(monkeypatch):
+    """Robot 15 Oct: an English answer, then a tap -- the reply came in Thai."""
+    sess = _session()
+    sess._said_since_guest = "Our facilities are spread over three floors."
+    asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "units", "lang": "th"}))
+    assert sess.provider.sent == [quick_asks.text_for("condo", "units", "th", "en")]
+    sess = _session()
+    sess._guest_text = "ห้องมีกี่แบบครับ อยากรู้รายละเอียด"
+    asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "units", "lang": "en"}))
+    assert sess.provider.sent == [quick_asks.text_for("condo", "units", "en", "th")]

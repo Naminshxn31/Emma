@@ -273,6 +273,60 @@ def _tap_next(story: dict, tap_id) -> str | None:
     return None
 
 
+def check_picture_taps(page, payload: dict, sdir: Path) -> dict:
+    """Owner 16 Oct: "กดรูปบนจอ ... ขยายภาพนั้นและอธิบายเพิ่มเติม". On the overview,
+    every picture the guest can SEE gets a real mouse click at its centre (the
+    browser's own hit test, as a finger): the large view must open, the page
+    must send the right id (a row's own story tap, else the picture's "more"
+    tap), a "more" tap must keep the story on screen through turn_complete
+    (the answer it asks for owns no new picture), and a tap on the large view
+    must close it. One screenshot of the first large view."""
+    zoom = {z["src"]: z for z in payload.get("zoom") or []}
+    targets = page.evaluate("""(srcs) => {
+        const out = [], seen = new Set();
+        const visible = (n) => { for (; n && !n.classList.contains('es-root'); n = n.parentElement) {
+            const cs = getComputedStyle(n);
+            if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.3) return false; }
+            return true; };
+        for (const im of document.querySelectorAll('.es-root img.es-zoomable')) {
+            const src = new URL(im.src).pathname;
+            if (!srcs.includes(src) || seen.has(src) || !visible(im)) continue;
+            const r = im.getBoundingClientRect();
+            if (r.width < 8 || r.height < 8) continue;
+            const x = r.left + r.width / 2, y = r.top + r.height / 2;
+            const top = document.elementsFromPoint(x, y).find((n) => n.classList && n.classList.contains('es-zoomable'));
+            if (top !== im) continue;                    // covered by another picture here
+            const bound = im.closest('[data-tap]');
+            seen.add(src);
+            out.push({src, x, y, bound: bound ? bound.getAttribute('data-tap') : null});
+        }
+        return out; }""", list(zoom))
+    results = []
+    for k, t in enumerate(targets):
+        page.evaluate("() => { window.__sent = []; }")
+        page.mouse.click(t["x"], t["y"])
+        page.wait_for_timeout(450)
+        opened = page.evaluate("() => !!document.querySelector('.es-root .es-zoomview.on')")
+        if k == 0:
+            page.screenshot(path=str(sdir / "zoom.png"))
+        sent = [json.loads(s) for s in page.evaluate("() => window.__sent || []") if s.startswith("{")]
+        asks = [s.get("id") for s in sent if s.get("type") == "quick_ask"]
+        want = t["bound"] or zoom[t["src"]]["tap"]
+        kept = None
+        if not t["bound"]:
+            page.evaluate("() => window.__emit({type: 'turn_complete'})")
+            page.wait_for_timeout(200)
+            kept = page.evaluate("() => !!document.querySelector('.es-root .es-zoomview.on')")
+        page.mouse.click(t["x"], t["y"])                  # on the large view: closes it
+        page.wait_for_timeout(250)
+        closed = page.evaluate("() => !document.querySelector('.es-root .es-zoomview')")
+        results.append({"src": t["src"], "label": zoom[t["src"]]["label_en"], "bound": t["bound"],
+                        "opened": opened, "sent": asks, "ok_id": asks == [want], "kept": kept, "closed": closed})
+    every = len(zoom)
+    good = [r for r in results if r["opened"] and r["ok_id"] and r["closed"] and r["kept"] is not False]
+    return {"pictures": every, "visible": len(results), "ok": len(good), "results": results}
+
+
 def run_story(browser, port: int, story: dict, payload: dict, out: Path, args) -> dict:
     sdir = out / story["id"]
     sdir.mkdir(parents=True, exist_ok=True)
@@ -384,6 +438,7 @@ def run_story(browser, port: int, story: dict, payload: dict, out: Path, args) -
             call = next((t.get("tool") for t in story.get("taps") or [] if t.get("id") == ok), None)
             if call:
                 tap_next = {"tap": ok, "tool": call.get("name"), "args": call.get("args")}
+    pictures = check_picture_taps(page, payload, sdir) if getattr(args, "tap_pictures", False) else None
     guest_text_on_screen = page.evaluate("() => document.body.innerText.indexOf('GUEST-WORDS-NEVER') >= 0")
     ctx.close()
     video = None
@@ -407,7 +462,7 @@ def run_story(browser, port: int, story: dict, payload: dict, out: Path, args) -
     return {"id": story["id"], "template": story["template"], "lines": len(lines),
             "audio_s": round(total_audio, 2), "sync": sync, "fps": fps, "tap": tap, "tap_next": tap_next,
             "ended": bool(state and state.get("ended")), "interrupted": interrupted,
-            "errors": errors, "guest_text_on_screen": guest_text_on_screen,
+            "errors": errors, "guest_text_on_screen": guest_text_on_screen, "pictures": pictures,
             "video": str(video) if video else None}
 
 
@@ -431,6 +486,9 @@ def main(argv=None) -> int:
                     help="the same answers WITHOUT the story (fps of the page around it)")
     ap.add_argument("--tap-through", action="store_true",
                     help="after the overview, tap a story tap and play the story it leads to (tap_next.png)")
+    ap.add_argument("--tap-pictures", action="store_true",
+                    help="after the overview, tap every picture the guest can see (a real click): it must open "
+                         "large, send its tap id, keep the screen for a 'more' answer, and close on a tap")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args(argv)
     try:
@@ -489,6 +547,12 @@ def main(argv=None) -> int:
                     row["fps"].get("fps"), row["fps"].get("beat_fps_min"), row["fps"].get("p95"),
                     row["fps"].get("long"), max(lt) if lt else "-",
                     None if row["tap"] is None else row["tap"]["ok"], len(row["errors"])))
+                pics = row.get("pictures")
+                if pics is not None:
+                    bad = [r["label"] or r["src"][-8:] for r in pics["results"]
+                           if not (r["opened"] and r["ok_id"] and r["closed"] and r["kept"] is not False)]
+                    print("%-26s pictures %d  visible %d  tap ok %d%s" % (
+                        "", pics["pictures"], pics["visible"], pics["ok"], ("  FAILED " + ", ".join(bad)) if bad else ""))
             browser.close()
     finally:
         server.close()

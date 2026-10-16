@@ -55,6 +55,46 @@ html.app-shell body.emma-story .mascot-wrap { width: min(30vw, 300px); }
 .vp-stage .es-root .es-cover { object-fit: cover; }
 .vp-stage .es-root .es-contain { object-fit: contain; }
 .es-root .es-tap { pointer-events: auto; cursor: pointer; }
+/* A tapped picture opens large over the story (owner 15 Oct: "กดรูป ... ขยายภาพ
+   นั้น"). Every story picture takes a tap; the large view sits above Emma's
+   corner (her head starts ~78% down) and fades/scales only -- no blur, no
+   backdrop-filter, nothing infinite (the robot's frame budget). */
+.es-root img.es-zoomable { pointer-events: auto; cursor: zoom-in; }
+.es-root .es-zoomview {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: auto;
+  cursor: zoom-out;
+  background: rgba(6, 7, 22, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.6vh;
+  padding-top: 12vh;
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.es-root .es-zoomview.on { opacity: 1; }
+/* the box is the picture's own shape (a wide plan must not float in a tall
+   box with its name far below it) */
+.es-root .es-zv-fig {
+  width: 94%;
+  display: flex;
+  justify-content: center;
+  transform: scale(.96);
+  transition: transform .28s ease;
+}
+.es-root .es-zoomview.on .es-zv-fig { transform: none; }
+.vp-stage .es-root .es-zv-img { width: auto; height: auto; max-width: 100%; max-height: 58vh; border-radius: 1.4vw; }
+.es-root .es-zv-label {
+  max-width: 86%;
+  text-align: center;
+  font-size: 4.2vw;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+.es-root .es-zv-hint { font-size: 2.5vw; opacity: .6; }
 /* a picture that failed to load: hidden, never the browser's broken icon */
 .es-root img.es-broken { visibility: hidden; }
 /* the end state on an interruption / reduced motion: no motion at all */

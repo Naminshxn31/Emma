@@ -32,7 +32,7 @@ from pathlib import Path
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app import display, heard, robot_contracts, robot_face_link, turnlog, voices
+from app import display, heard, robot_contracts, robot_face_link, speech_gestures, turnlog, voices
 from app.config import settings
 from app.prompts import build_instructions, greeting_for
 from app.providers import ProviderError, default_voice_for, get_provider
@@ -110,8 +110,10 @@ GOODBYE_TEXT = ("คนที่คุยอยู่เพิ่งเดิน
 #: "anything else?" -- and explicitly the "ไม่ถามต่อ" rule's exception.
 FOLLOW_UP_TEXT = ("ระบบแจ้ง: ลูกค้าเงียบไปหลังคำตอบล่าสุด ให้ถามต่อหนึ่งประโยคสั้นๆ "
                   "ที่ต่อจากเรื่องที่เพิ่งคุย ชวนไปขั้นถัดไปที่ทำได้จริงด้วยเครื่องมือที่มี "
-                  "หรือถามความต้องการของลูกค้า (นี่คือข้อยกเว้นของกฎไม่ถามต่อ) ใช้ภาษาเดียวกับลูกค้า "
+                  "หรือชวนให้เราแนะนำส่วนอื่นของโครงการ (นี่คือข้อยกเว้นของกฎไม่ถามต่อ) ใช้ภาษาเดียวกับลูกค้า "
                   "ห้ามทวนคำตอบเดิม ห้ามถามว่า 'มีอะไรให้ช่วยอีกไหมคะ' ห้ามเปิดเรื่องราคาเอง "
+                  # owner 15 Oct: "ทำไมชอบถามว่าลงทุนหรืออยู่เอง ควรจะถามเกี่ยวกับโครงการ"
+                  "ห้ามถามว่าซื้อไว้อยู่เองหรือลงทุน "
                   "และห้ามเอ่ยถึงข้อความแจ้งนี้")
 #: Her answer already ends on a question: the guest's silence is them
 #: thinking about it, not an opening for a second one.
@@ -485,6 +487,7 @@ class VoiceSession:
                 if task is not None and not task.done():
                     task.cancel()
                     await asyncio.gather(task, return_exceptions=True)
+            speech_gestures.on_closed(self)
             ears = getattr(self, "_call_ears", None)
             if ears is not None:
                 # What the in-call ear cost on THIS machine's event loop —
@@ -1397,6 +1400,9 @@ class VoiceSession:
                     # (`_she_is_audible`). Arithmetic only; with no array tap
                     # and engagement off nothing reads it.
                     self._note_playback(len(event.audio) / 2 / self.provider.output_sample_rate)
+                    # Her arms while she talks (SPEECH_GESTURES, robot face
+                    # only, off by default): paced from the clock just moved.
+                    speech_gestures.on_audio(self)
                     await self.ws.send_bytes(event.audio)
 
                 elif event.kind == "speech_started":
@@ -1424,6 +1430,7 @@ class VoiceSession:
                     # The page stops her audio on this message: so does the
                     # array's playback clock (its tail still runs).
                     self._play_until = min(getattr(self, "_play_until", 0.0), time.monotonic())
+                    speech_gestures.on_interrupted(self)
                     self._spoke_this_turn = False
                     self._said_this_turn = ""
                     # A barge-in mid-tour is a pause, not a skip: keep the deck
@@ -2314,7 +2321,12 @@ class VoiceSession:
             return
         from app import quick_asks
 
+        # The language the talk is in (owner 15 Oct: talking English, a tap
+        # was answered in Thai): her own latest words, else the guest's.
+        talk = (quick_asks.script_lang(getattr(self, "_said_since_guest", ""))
+                or quick_asks.script_lang(getattr(self, "_guest_text", "")))
         ask_id = event.get("id")
+        tap = None
         if isinstance(ask_id, str) and ask_id.startswith("story_"):
             # A tap on a story's own overview (app/stories.py): only an id of
             # the story this session put on screen last, and the words are the
@@ -2324,11 +2336,11 @@ class VoiceSession:
                 from app import stories
 
                 tap = stories.find_tap(getattr(self, "_story_topic", None), ask_id)
-                text = stories.tap_text(tap, event.get("lang")) if tap is not None else None
+                text = stories.tap_text(tap, event.get("lang"), talk) if tap is not None else None
             if text is None:
                 return
         else:
-            text = quick_asks.text_for(self.profile, ask_id, event.get("lang"))
+            text = quick_asks.text_for(self.profile, ask_id, event.get("lang"), talk)
             if text is None:
                 return
             choice_set = quick_asks.choice_set_of(ask_id)
@@ -2356,6 +2368,12 @@ class VoiceSession:
         lang = event.get("lang")
         turnlog.record("quick_ask", id=ask_id, lang=lang if lang in quick_asks.LANGS else None)
         self._guest_started_turn()        # a tapped question is a question
+        if tap is not None and tap.get("more"):
+            # A tapped picture (stories.tap_more_text): the page keeps the story
+            # with the picture enlarged as this answer's screen (onTap keep), so
+            # the story's taps live on and an answer picture does not replace it.
+            self._screen_staged = True
+            self._story_owns_answer = True
         await self.provider.send_text(text)
 
     async def _send_json(self, payload: dict) -> None:

@@ -142,6 +142,15 @@ def test_the_real_manifest_cuts_the_rooftop_in_thai_too():
                        / "sales" / "project_report_approval.json").read_text(encoding="utf-8"))
     terms = real["deny_terms"]
     assert {"สวนบนดาดฟ้า", "สวนดาดฟ้า", "จากุซซี่บนดาดฟ้า", "สวนบนหลังคา", "40–60"} <= set(terms)
+    # owner 15 Oct: the jellyfish floor of Journey to Mars was dropped from the design
+    assert {"แมงกะพรุน", "jellyfish"} <= set(terms)
+    assert project_report.clean("| ลายพื้น | ฉายภาพแมงกะพรุนเรืองแสงบนพื้นสระ |", terms) == ""
+    # owner 15 Oct: "เปิดเผยชื่อได้" -- the FAQ that told the bot never to name
+    # the executives would have argued with the executives story
+    for line in ("**ถาม:** ขอทราบชื่อพนักงานขาย ผู้บริหาร หรือข้อมูลลูกค้าท่านอื่นที่ซื้อไปแล้ว  ",
+                 "**ตอบ:** ขออภัย แชทบอทไม่เปิดเผยชื่อหรือข้อมูลส่วนบุคคลของพนักงาน ผู้บริหาร หรือลูกค้า"):
+        assert project_report.clean(line, terms) == "", line
+    assert project_report.clean("| Chief Executive Officer (CEO) | **Miki Haim** |", terms) != ""
     assert "ดาดฟ้า" not in terms
     assert project_report.clean("พื้นดาดฟ้าสูงประมาณ 23 เมตรจากระดับถนน", terms) != ""
     for line in ("ระเบียงหรือสวนดาดฟ้ามีต้นไม้ใหญ่และโซฟา", "ดาดฟ้า: \"ภายหลังจะทำสวน ตอนนี้ยังไม่มี\"",

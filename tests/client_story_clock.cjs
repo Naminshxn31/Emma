@@ -273,6 +273,12 @@ async function countsInRoundSteps(payload) {
     await sleep(40);
   }
   assert.ok(seen > 0, payload.template + ': no count was seen on its way up -- the check checked nothing');
+  // A count runs 1 s from its beat; the sampling above is ~1.2 s of timers, and
+  // on a loaded machine (the full suite beside other runs, 15-16 Oct) it ended
+  // on '1,000' of '1,066' -- the figure had not landed yet, not landed wrong.
+  // Up to 3 s more for it to land; it must still land exactly.
+  const pending = () => root._all([]).some((e) => e._final != null && e.textContent !== e._final);
+  for (let w = 0; w < 75 && pending(); w++) await sleep(40);
   for (const e of root._all([])) if (e._final != null) assert.equal(e.textContent, e._final, 'the exact figure lands');
   S.teardown();
 }

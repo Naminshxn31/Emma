@@ -83,6 +83,26 @@ final class BodyGestures {
      *  and group 99 have no measured length, so they report none. */
     static final int HANDSHAKE_EST_MS = 13000;
 
+    // ---- her arm while she talks (owner 15 Oct: "ขยับซ้ายขวาสลับกันตอนคุย") ----
+    /** A speech gesture's frames end with the arm still out; it waits this
+     *  long for her next beat, then group 99. The first build rested after
+     *  every gesture and ran 3 s frames: "ท่ายังช้าแล้วดูไม่เป็นธรรมชาติ". */
+    static final int SPEECH_REST_AFTER_MS = 1500;
+    /** Speech gestures run back to back (no COOLDOWN_MS between them) under
+     *  their own cap; voice gestures keep MAX_PER_MINUTE. */
+    static final int MAX_SPEECH_PER_MINUTE = 15;
+    /** The keyframe lengths the studio offers, all inside MIN..MAX_FRAME_MS.
+     *  The studio used to capture every frame at 3000 ms. */
+    static final int[] STUDIO_FRAME_MS = {800, 1000, 1200, 1500, 2000, 3000};
+
+    /** Which ids may run as a speech gesture: recorded arm poses only -- no
+     *  head (ch8 burned on 12 Sep; the head keeps its slow prefix), no
+     *  vendor group (groups end at their own pose), no rest, no stop. */
+    static boolean speechCapable(String id) {
+        return known(id) && !isHead(id) && !"handshake".equals(id) && !"greet_arm".equals(id)
+                && !"rest".equals(id) && !"stop".equals(id);
+    }
+
     /** One timed target set. Its own type (not ArmController.PoseFrame) so this
      *  file compiles without the vendor SDK. */
     static final class Frame {

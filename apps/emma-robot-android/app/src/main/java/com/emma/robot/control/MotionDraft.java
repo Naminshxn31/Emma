@@ -40,11 +40,22 @@ final class MotionDraft {
     }
 
     ArmController.PoseFrame captureFrame() {
+        return captureFrame(DEFAULT_FRAME_MS);
+    }
+
+    /** The studio's "เวลาคีย์เฟรม" (owner 15 Oct: 3 s frames made her
+     *  explaining hand slow). Only the voice-gesture range: a draft frame
+     *  outside it could never be saved as a pose anyway. */
+    ArmController.PoseFrame captureFrame(int durationMs) {
         if (commandedTargets.isEmpty()) {
             throw new IllegalStateException("ยังไม่มีค่าช่องที่ส่งจริงให้จำเป็นคีย์เฟรม");
         }
+        if (durationMs < BodyGestures.MIN_FRAME_MS || durationMs > BodyGestures.MAX_FRAME_MS) {
+            throw new IllegalArgumentException("เวลาคีย์เฟรมต้องอยู่ระหว่าง "
+                    + BodyGestures.MIN_FRAME_MS + "–" + BodyGestures.MAX_FRAME_MS + " ms");
+        }
         ArmController.PoseFrame frame = new ArmController.PoseFrame(
-                commandedTargets, DEFAULT_FRAME_MS);
+                commandedTargets, durationMs);
         frames.add(frame);
         playedSinceEdit = false;
         edits++;
@@ -57,6 +68,16 @@ final class MotionDraft {
 
     int frameCount() {
         return frames.size();
+    }
+
+    /** "1.0+0.8+0.8 วิ" for the draft line, or "" with no frames. */
+    String frameLengths() {
+        StringBuilder out = new StringBuilder();
+        for (ArmController.PoseFrame frame : frames) {
+            if (out.length() > 0) out.append('+');
+            out.append(String.format(java.util.Locale.US, "%.1f", frame.durationMs / 1000.0));
+        }
+        return out.length() == 0 ? "" : out + " วิ";
     }
 
     int targetCount() {

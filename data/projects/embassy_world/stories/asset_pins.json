@@ -191,6 +191,102 @@
   ],
   "alpha": false
  },
+ "dev_timeline_early": {
+  "file": "dev_timeline_early.webp",
+  "sha256": "6ce68a91bd36a3e5f7ad4a1229ce618268b309569f96244387e5c15967f4539b",
+  "bytes": 68106,
+  "w": 1080,
+  "h": 860,
+  "format": "webp",
+  "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+  "crop": [
+   390,
+   485,
+   1772,
+   1585
+  ],
+  "alpha": false
+ },
+ "dev_timeline_late": {
+  "file": "dev_timeline_late.webp",
+  "sha256": "1fd66365439332413650b495cc3b68abba3876013f6135e3db773fbde10542af",
+  "bytes": 59386,
+  "w": 1080,
+  "h": 859,
+  "format": "webp",
+  "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+  "crop": [
+   0,
+   485,
+   1390,
+   1590
+  ],
+  "alpha": false
+ },
+ "exec_ceo": {
+  "file": "exec_ceo.webp",
+  "sha256": "cb39e118e0ee7160b65b4acb59b2a1237d65ff0e837c200ef7edd3aab29139de",
+  "bytes": 15710,
+  "w": 460,
+  "h": 288,
+  "format": "webp",
+  "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+  "crop": [
+   180,
+   165,
+   640,
+   453
+  ],
+  "alpha": false
+ },
+ "exec_cfo": {
+  "file": "exec_cfo.webp",
+  "sha256": "58294df9ae91273cb049ef9ba7e039dba3899845612d1a644acb35cfee9fa05a",
+  "bytes": 16322,
+  "w": 430,
+  "h": 269,
+  "format": "webp",
+  "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+  "crop": [
+   830,
+   190,
+   1260,
+   459
+  ],
+  "alpha": false
+ },
+ "exec_coo": {
+  "file": "exec_coo.webp",
+  "sha256": "2d1e700d1ec3261d9d9b55d9ab83678fd7fb8a52df4bedc7227222301b5f0a63",
+  "bytes": 13582,
+  "w": 420,
+  "h": 262,
+  "format": "webp",
+  "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+  "crop": [
+   835,
+   490,
+   1255,
+   752
+  ],
+  "alpha": false
+ },
+ "exec_gm": {
+  "file": "exec_gm.webp",
+  "sha256": "1a15948370b30ac3f01bf6dd417aab6eece823683d084ce7e4c62fade2f4cf92",
+  "bytes": 14954,
+  "w": 400,
+  "h": 250,
+  "format": "webp",
+  "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+  "crop": [
+   203,
+   530,
+   603,
+   780
+  ],
+  "alpha": false
+ },
  "fac_3_common_sphere": {
   "file": "fac_3_common_sphere.webp",
   "sha256": "0ec85bbcc068befab1840f48d5fb8ab1a5bc1b3ad687ea3f0c2e2463d2ebfc61",

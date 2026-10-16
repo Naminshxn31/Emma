@@ -213,9 +213,12 @@ def test_no_transcript_or_user_text_ever_goes_to_a_prompt():
     for word in ("curUser", "transcript", "userLine", "evt.text", "replyNode", "data-emma-reply"):
         assert word not in code, word
     relay = code.split("function relayCommand(evt, ask, onRobot) {", 1)[1].split("\n    }\n", 1)[0]
-    # The relay reads the command's id, action and place -- nothing else.
+    # The relay reads the command's id, action and place -- nothing else --
+    # plus `style`, which only ever chooses between two fixed shapes
+    # (speechMessage / bodyMessage, owner 15 Oct): no value of it is asked.
     fields = set(re.findall(r"evt\.(\w+)", relay))
-    assert fields == {"type", "command_id", "action", "place"}
+    assert fields == {"type", "command_id", "action", "place", "style"}
+    assert "evt.style === 'speech' ? speechMessage(evt.action) : bodyMessage(evt.action)" in relay
     # The call script hands the bridge the server's command object only.
     html = _without_comments(_html())
     assert "window.EmmaRobotBridge.command(evt, robotSender(ws));" in html
@@ -585,3 +588,47 @@ def test_the_strings_p4s_test_asserts_are_untouched():
     # the arm greeting handling is unchanged
     assert ("if (evt.group === 6 && /EmmaRobot\\//.test(navigator.userAgent)) {\n"
             "            window.prompt('emma-arm:greet:6', '');") in page
+
+
+
+# ---- her arm while she talks (owner 15 Oct) ------------------------------------
+
+def test_speech_gestures_are_one_fixed_shape_of_the_closed_grammar():
+    [c] = _model({"fn": "constants"})
+    assert tuple(c["SPEECH_BODY_IDS"]) == rc.SPEECH_BODY_ACTIONS
+    cases = {
+        "emma-body:raise_left_arm:speech": True,
+        "emma-body:raise_right_arm:speech": True,
+        "emma-body:nod:speech": False,            # no head
+        "emma-body:handshake:speech": False,      # no vendor group
+        "emma-body:rest:speech": False,
+        "emma-body:stop:speech": False,
+        "emma-body:raise_left_arm:speech:x": False,
+        "emma-body:raise_left_arm:fast": False,
+        "emma-body:raise_left_arm": True,         # the voice gesture is unchanged
+    }
+    got = _model(*[{"fn": "allowedMessage", "args": [m]} for m in cases])
+    assert dict(zip(cases, got)) == cases
+
+
+def test_the_relay_asks_the_speech_shape_only_for_a_speech_command():
+    reply = {"accepted": True, "reason": None, "status": "operator_mapped", "est_ms": 3600}
+    speech = {"type": "body_command", "command_id": RUN, "action": "raise_right_arm", "style": "speech"}
+    plain = dict(speech)
+    del plain["style"]
+    head = dict(speech, action="nod")
+    a, b, c = _model(
+        {"fn": "relayCommand", "args": [speech, {"emma-body:raise_right_arm:speech": reply}, True]},
+        {"fn": "relayCommand", "args": [plain, {"emma-body:raise_right_arm": reply}, True]},
+        {"fn": "relayCommand", "args": [head, {}, True]})
+    assert a["asked"] == ["emma-body:raise_right_arm:speech"] and a["ack"]["accepted"] is True
+    assert b["asked"] == ["emma-body:raise_right_arm"] and b["ack"]["accepted"] is True
+    assert c["asked"] == [] and c["ack"]["reason"] == "bad_request"
+
+
+def test_body_caps_carries_whether_the_app_plays_speech_gestures():
+    on, off, odd = _model(
+        {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "speech": True}]},
+        {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}}]},
+        {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "speech": "yes"}]})
+    assert on["speech"] is True and off["speech"] is False and odd["speech"] is False

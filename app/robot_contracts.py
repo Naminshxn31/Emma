@@ -34,6 +34,11 @@ BODY_ACTIONS = (
 BODY_ACTION_IDS = tuple(a[0] for a in BODY_ACTIONS)
 BODY_LABELS = {a[0]: a[1] for a in BODY_ACTIONS}
 BODY_KINDS = {a[0]: a[2] for a in BODY_ACTIONS}
+#: Recorded arm poses the server may play while she talks (`style: "speech"`,
+#: app/speech_gestures.py; owner 15 Oct). The same set as the app's
+#: BodyGestures.speechCapable and the page's SPEECH_BODY_IDS: no head (ch8
+#: burned 12 Sep), no vendor group, no rest, no stop.
+SPEECH_BODY_ACTIONS = ("raise_left_arm", "raise_right_arm", "wave", "hands_left", "hands_right")
 
 # Heard guard (§2d): per action, the caption must contain one VERB token, and
 # for a sided action also the SIDE token — and, for the actions in

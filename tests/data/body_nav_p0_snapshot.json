@@ -1,8 +1,8 @@
 {
  "phrases": "e66b02637e8a49324df48e2cc89a2495d27ae817b3374d6bf4a2e3bbc0195662",
  "prompts": {
-  "condo/face=False": "00d6437523e1bcaec2abedfcf6a0d1e407759b6df483c1cdfaa12d7ff74a2cb1",
-  "condo/face=True": "7637bf2f804e2d1373d262323fb42e971e79e83362cfb0e2e85530c15b445a45",
+  "condo/face=False": "c20df48b08b09d8c370b50f7872e586b7f74534aaeea23b5db26678cc749ad71",
+  "condo/face=True": "97115e398496d5383820a3cb9fe12b8a89b215d88788f4bfa837db7cfac9d70f",
   "joke/face=False": "cf3899a32614a0b5edde5b2d9b35678c3dbf1d6cfb39f891254ef94cea491d35",
   "joke/face=True": "ce49ef8d3ddbea1569145584bf88586495a2fc123016f984b628389384cf8542"
  },

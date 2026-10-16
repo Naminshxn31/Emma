@@ -485,6 +485,42 @@ def test_an_old_cache_without_a_provider_still_loads(tmp_path, monkeypatch):
     assert index.provider == "gemini"
 
 
+def test_a_machine_with_embed_build_off_never_embeds_a_stale_index(tmp_path, monkeypatch):
+    """EMBED_BUILD=false (robot.env, 15 Oct): the report FAQ's cache was never
+    shipped, so every app start embedded 299 questions on the robot, and the
+    robot hard-reset ~25 s in, six times, before the cache was ever saved.
+    A stale index there now means words only -- for the FAQ and the slides
+    alike, both through SemanticIndex.build -- and nothing is embedded."""
+    import numpy as np
+
+    from app import project_report
+    from app.config import settings
+    from app.tools import retrieval
+
+    def no_batch(*a, **k):
+        raise AssertionError("embedded a whole index with EMBED_BUILD off")
+
+    monkeypatch.setattr(retrieval, "embed", no_batch)
+    monkeypatch.setattr(retrieval, "choose_provider", lambda: "local")
+    monkeypatch.setattr(settings, "embed_build", False)
+    path = tmp_path / "faq_embeddings.npz"
+    np.savez_compressed(path, vectors=np.zeros((2, 384), dtype="float32"),
+                        fingerprint="old-faq", provider="local")
+
+    index = retrieval.SemanticIndex(path)
+    assert index.load("new-faq") is False
+    with pytest.raises(RuntimeError, match="EMBED_BUILD"):
+        index.build(["a", "b", "c"], "new-faq")
+    assert str(np.load(path)["fingerprint"]) == "old-faq"     # nothing written either
+
+    # the FAQ's own caller falls back to words, it does not stop the report
+    monkeypatch.setattr(project_report, "manifest_path", lambda pid=None: tmp_path / "approval.json")
+    assert project_report._faq_semantic({"project_id": "x"}, [{"q": "a"}, {"q": "b"}]) is None
+
+    # and a current cache (the one deploy ships) still loads: only BUILD is off
+    assert index.load("old-faq") is True
+
+
 def test_a_query_is_embedded_in_the_same_space_as_the_index(monkeypatch):
     """Not a preference — the query path has to name the provider the vectors
     were built with, or the comparison is meaningless."""

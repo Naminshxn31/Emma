@@ -591,6 +591,13 @@ class Settings:
     #: key. Switching this rebuilds the index — vectors from two models are
     #: not comparable, see retrieval.embedding_signature.
     embed_provider: str = os.getenv("EMBED_PROVIDER", "auto")
+    #: Whether this machine may build a whole index (slides, report FAQ) when
+    #: its cache is stale. Off on the robot (robot.env): 15 Oct, every app
+    #: start there embedded the report's 299 FAQ questions and the robot
+    #: hard-reset ~25 s in, mid-batch, six times. Off = a stale index is
+    #: searched by words only, with one log line; queries still embed. The
+    #: PC builds, `robot_server.py deploy` ships the cache.
+    embed_build: bool = os.getenv("EMBED_BUILD", "true").strip().lower() not in {"false", "0", "no"}
     turn_log: bool = os.getenv("TURN_LOG", "true").strip().lower() not in {"false", "0", "no"}
     turn_log_dir: str = os.getenv("TURN_LOG_DIR", "data/logs")
     #: How long the raw transcripts are kept, in days. 0 keeps them forever.
@@ -929,6 +936,26 @@ class Settings:
     #: deck). A body tool call asks instead of moving unless a fresh caption
     #: of this session holds the action's verb.
     robot_body_require_heard: bool = _get_bool("ROBOT_BODY_REQUIRE_HEARD", True)
+    #: Arm gestures while Emma talks, right and left in turn (owner 15 Oct:
+    #: "ให้ขยับซ้ายขวาสลับกันตอนคุย"; app/speech_gestures.py). Only on the robot
+    #: face, only poses the robot reports playable (raise_right_arm /
+    #: raise_left_arm recorded in the app's studio), and the app's own gates
+    #: still decide. Off by default: the sales room PC never reaches it.
+    speech_gestures: bool = _get_bool("SPEECH_GESTURES", False)
+    #: After her voice starts, wait this long before the first gesture.
+    speech_gesture_first_s: float = float(os.getenv("SPEECH_GESTURE_FIRST_S", "0.8"))
+    #: Start a gesture only while at least this much of her voice is left
+    #: to play: a short reply gets none (a recorded pose + rest is ~5-8 s).
+    speech_gesture_min_left_s: float = float(os.getenv("SPEECH_GESTURE_MIN_LEFT_S", "4"))
+    #: At most one gesture start per this many seconds (the app caps 6/min).
+    #: Measured on the robot 15 Oct: a recorded pose (2 keyframes + rest)
+    #: runs ~8 s from start to done, then the app's 3 s cooldown.
+    speech_gesture_gap_s: float = float(os.getenv("SPEECH_GESTURE_GAP_S", "11.5"))
+    #: The same two knobs when the app plays speech gestures back to back
+    #: (body_caps "speech": true -- no rest and no cooldown between beats,
+    #: short keyframes; owner 15 Oct "ท่ายังช้าแล้วดูไม่เป็นธรรมชาติ").
+    speech_gesture_beat_gap_s: float = float(os.getenv("SPEECH_GESTURE_BEAT_GAP_S", "4.5"))
+    speech_gesture_beat_min_left_s: float = float(os.getenv("SPEECH_GESTURE_BEAT_MIN_LEFT_S", "3"))
     #: Voice nav on the robot face goes to the on-robot launcher, and the
     #: chassis planner refuses moves — one navigation system at a time.
     robot_nav_routes_enabled: bool = _get_bool("ROBOT_NAV_ROUTES_ENABLED", False)

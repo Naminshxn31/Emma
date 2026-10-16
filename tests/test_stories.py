@@ -364,6 +364,69 @@ def test_the_questions_that_missed_on_the_robot_match_their_story():
         assert stories.story_for_query(query, offered) is None, query
 
 
+def test_the_questions_the_robot_handed_to_sales_on_15_oct_reach_their_story():
+    """Owner 15 Oct: "เช็คข้อมูลกับคำถามทั้งหมด อย่าให้หลุด". The robot logs of
+    12-15 Oct, guests' words and the model's own queries, each answered "ทีม
+    ขายจะให้รายละเอียด" while a story held the number: a joining word ("ของ",
+    "นี้", "ที่นี่"), the project's own name, or a phrasing no story listed
+    pulled the match under its bar. 16 projects had no story at all."""
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    offered = {s["id"]: s for s in catalog["stories"]}
+    for query, topic in (
+            ("ความหนาของพื้นโครงการ", "floor_heights"),                    # the model's query, 15 Oct
+            ("พื้นของโครงการที่นี่หนากี่เซนติเมตร", "floor_heights"),
+            ("ระยะฝ้าของห้องพักสูงอยู่เท่าไหร่", "floor_heights"),
+            ("พื้นที่ของฟิตเนสขนาดเท่าไหร่", "fitness_where"),
+            ("ขนาดพื้นที่โซเชียลคลับขนาดเท่าไหร่", "social_lounge_where"),
+            ("ขอชื่อโครงการทั้ง 16 โครงการ", "developer_projects"),
+            ("ผลงานของผู้สร้างโครงการนี้มีอะไรบ้าง มีที่ไหนบ้าง", "developer_projects"),
+            ("โครงการ Embassy World ห่างจากเซ็นทรัลพัทยา กี่กิโลเมตร", "travel_malls"),   # 12 Oct
+            ("โครงการ Embassy World ห่างจาก Terminal 21 กี่กิโลเมตร", "travel_malls"),
+            ("ที่นี่มีที่จอดรถกี่คัน", "parking"),
+            ("สระว่ายน้ำลึกเท่าไหร่", "masterplan_lagoon"),
+            # what must not move: the name is the concept story's question
+            ("Embassy World คืออะไร", "project_concept"),
+            ("มีกี่อาคาร", "campus_buildings")):
+        assert stories.story_for_query(query, offered) == topic, query
+    # the lagoon's 1.30 m is not the Sky Pool's or the kid pool's
+    for query in ("Sky Pool ลึกเท่าไหร่", "สระเด็กลึกเท่าไหร่", "Aqua Cinema ลึกเท่าไหร่"):
+        assert stories.story_for_query(query, offered) != "masterplan_lagoon", query
+    # each of those stories carries the number it is asked for
+    say = {sid: " ".join(l["th"] for l in s["lines"]) for sid, s in offered.items()}
+    for sid, fact in (("floor_heights", "25 เซนติเมตร"), ("fitness_where", "197"), ("social_lounge_where", "74.3"),
+                      ("travel_malls", "9.9"), ("developer_projects", "Hyde Park"), ("developer_projects", "Embassy Life")):
+        assert fact in say[sid], (sid, fact)
+
+
+def test_a_question_with_a_number_gets_its_motion():
+    """Owner 15 Oct: "ทำพวก motion เรื่องคำถามต่างๆ ที่มีตัวเลขหรือรูปภาพด้วย".
+    The report FAQ's number questions that no story told: land, units per
+    building, Bangkok, and the sizes/counts the facility and room stories
+    left out. Each reaches the story that says the number."""
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    offered = {s["id"]: s for s in catalog["stories"]}
+    say = {sid: " ".join(l["th"] for l in s["lines"]) for sid, s in offered.items()}
+    for query, topic, fact in (
+            ("ที่ดินกี่ไร่", "site_area", "15,556"),
+            ("ที่ดินที่นี่ขนาดเท่าไหร่ครับ", "site_area", "9 ไร่"),          # robot log 15 Oct
+            ("แต่ละตึกมีกี่ห้อง", "units_by_building", "อาคาร E 184"),
+            ("ไปกรุงเทพกี่ชั่วโมง", "travel_bangkok", "104 นาที"),
+            ("How long to Bangkok?", "travel_bangkok", "ดอนเมือง"),
+            ("Junior World ใหญ่แค่ไหน", "kids_room_where", "12.825"),
+            ("Sky Pool ใหญ่แค่ไหน", "sky_pool_where", "143"),
+            ("สะพานข้ามสระมีกี่แห่ง", "masterplan_lagoon", "สะพานข้ามสระ 3 แห่ง"),
+            ("ห้องปั่นจักรยานมีจักรยานกี่คัน", "spinning_class_where", "3 คัน"),
+            ("พิลาทิสมี Reformer กี่เครื่อง", "pilates_where", "Reformer 4 เครื่อง"),
+            ("สตูดิโอมีแอร์กี่เครื่อง", "unit_studio", "แอร์ 1 เครื่อง"),
+            ("สองห้องนอนเตียงขนาดเท่าไหร่", "unit_two_bedroom", "6 ฟุต")):
+        assert stories.story_for_query(query, offered) == topic, query
+        assert fact in say[topic], (topic, fact)
+    # the airports and the buildings keep their own questions beside the new ones
+    for query, topic in (("How long to the airport?", "travel_airports"), ("มีกี่อาคาร", "campus_buildings"),
+                         ("How many units are there?", "unit_count"), ("มีตึกอะไรบ้าง", "campus_buildings")):
+        assert stories.story_for_query(query, offered) == topic, query
+
+
 def test_a_repeat_question_is_told_again_not_answered_from_memory():
     from app.prompts import STORIES_FACE_LINE
 
@@ -410,6 +473,38 @@ def test_a_story_does_not_fight_the_search_or_the_room_type_screen():
     assert "ไม่ต้องเรียก search_condo_info" in stories.INSTRUCTION
 
 
+def test_a_story_is_not_all_the_project_knows():
+    """Robot log 15 Oct 18:00: pools_all (no depth) answered "how deep", then
+    the Thai repeat got "ข้อมูลความลึกของสระว่ายน้ำไม่มีระบุในระบบค่ะ" with no
+    search -- "บรรทัดเหล่านี้คือคำตอบครบแล้ว" read as "nothing else exists".
+    The instruction now sends anything the lines do not say to the search,
+    quoting the reply she gave instead."""
+    assert "คำตอบครบแล้ว" not in stories.INSTRUCTION
+    assert "ให้เรียก search_condo_info ก่อนตอบ" in stories.INSTRUCTION
+    assert "ข้อมูลความลึกของสระว่ายน้ำไม่มีระบุในระบบค่ะ" in stories.INSTRUCTION
+
+
+def test_the_main_pools_depth_is_told_and_only_for_the_main_pool():
+    """Owner 15 Oct: "ความลึกสระว่ายน้ำไม่มีหรอ". The report's 1.30 m (the
+    developer's figure) is the outdoor main pool's; it says never to reuse it
+    for the Sky Pool or the basement pools. Read from the designs, so a draft
+    edit is checked before anybody approves it."""
+    design = ROOT / "data" / "projects" / "embassy_world" / "stories" / "design"
+    lines = {}
+    for path in design.glob("*.json"):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for story in (data["stories"] if isinstance(data, dict) else data):
+            for line in story.get("lines", []):
+                lines.setdefault(story["id"], []).append(line)
+    for sid in ("masterplan_lagoon", "pools_all"):
+        assert any("1.30" in l["th"] and "1.30" in l["en"] for l in lines[sid]), sid
+    for sid, story_lines in lines.items():
+        for line in story_lines:
+            if "1.30" in line["th"] or "1.30" in line["en"]:
+                assert re.search(r"สระหลัก|ลากูน|สระยาว", line["th"]), (sid, line["th"])
+                assert not re.search(r"Sky Pool|Aqua|Kid Pool|Private Pool", line["th"] + line["en"]), (sid, line)
+
+
 def test_no_page_payload_carries_a_price_notes_or_the_guests_questions(approved):
     catalog = _catalog(approved)
     for story in stories.available().values():
@@ -418,7 +513,9 @@ def test_no_page_payload_carries_a_price_notes_or_the_guests_questions(approved)
         assert not stories._MONEY.search(text), story["id"]
         for key in ("notes_th", "sources", "questions_th", "questions_en"):
             assert '"%s"' % key not in text, (story["id"], key)
-        assert set(payload) == {"id", "template", "beats", "params", "taps"}   # her lines: the model's
+        # her lines: the model's; zoom = the pictures a guest can tap (src, label, id)
+        assert set(payload) == {"id", "template", "beats", "params", "taps", "zoom"}
+        assert all(set(z) == {"src", "label_en", "tap"} for z in payload["zoom"])
 
 
 def test_a_tap_whose_tool_is_not_offered_is_not_drawn(approved, monkeypatch):
@@ -684,7 +781,9 @@ def test_a_story_tap_works_only_while_that_story_is_on_screen(approved):
         asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "story_fx_ground_back", "lang": "en"}))
         assert sess.provider.sent == []
         sess._note_screen("present_story", result, False)
-        assert sess._story_taps == {"story_fx_ground_back"}
+        # its button, and one "more" tap per picture (a tapped picture, 16 Oct)
+        assert sess._story_taps == {"story_fx_ground_back"} | {z["tap"] for z in result["story"]["zoom"]}
+        assert all(t.startswith("story_fx_ground_more_") for t in sess._story_taps - {"story_fx_ground_back"})
         asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "story_fx_ground_back", "lang": "en"}))
         assert len(sess.provider.sent) == 1
         text = sess.provider.sent[0]
@@ -695,6 +794,96 @@ def test_a_story_tap_works_only_while_that_story_is_on_screen(approved):
         for bad in ("story_fx_room_types_studio", "story_anything", "story_fx_ground_back x"):
             asyncio.run(sess._quick_ask({"type": "quick_ask", "id": bad}))
         assert len(sess.provider.sent) == 1
+
+
+def test_every_picture_of_every_story_can_be_tapped_large():
+    """Owner 16 Oct: "กดรูปบนจอ ... ขยายภาพนั้นและอธิบายเพิ่มเติม". Each picture of
+    the real catalog is listed once for the page with its own "more" tap id;
+    the assembly's hologram flipbook is not a picture to open."""
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    total = 0
+    for story in catalog["stories"]:
+        payload = stories.page_payload(story, catalog)
+        zoom = payload["zoom"]
+        assert len(zoom) == len(stories.zoom_targets(story)), story["id"]
+        assert len({z["src"] for z in zoom}) == len(zoom), story["id"]
+        for k, z in enumerate(zoom):
+            assert z["src"].startswith("/story-asset/") and z["tap"] == stories.more_tap_id(story["id"], k)
+        frames = set((story.get("params") or {}).get("frames") or [])
+        final = (story.get("params") or {}).get("final_asset")
+        assert not frames - {final} & {t["asset"] for t in stories.zoom_targets(story)}, story["id"]
+        result = {"story": payload}
+        assert {z["tap"] for z in zoom} <= stories.tap_ids(result)
+        total += len(zoom)
+    assert total >= 130
+    # a label is the picture's own: the room model is not "Interior mood"
+    studio = next(s for s in catalog["stories"] if s["id"] == "unit_studio")
+    labels = {t["asset"]: t["label_en"] for t in stories.zoom_targets(studio)}
+    assert labels[studio["params"]["solid_asset"]] == ""
+    assert all(labels[a] == studio["params"]["mood_tag_en"] for a in studio["params"]["mood_assets"])
+
+
+def test_a_tapped_picture_asks_emma_for_more_and_keeps_the_screen(approved, monkeypatch):
+    """The page sent a picture's id: the server's words go out (the report's
+    passages about it, the story she told quoted so it is not repeated, the
+    rules every report answer carries), and the story stays this answer's
+    screen -- its taps live on, an answer picture does not replace it."""
+    seen = []
+    monkeypatch.setattr(stories, "_more_facts", lambda story, label: seen.append(label) or ["ข้อเท็จจริงจากรายงาน 123"])
+    sess = _session()
+    with _as("condo", face=True):
+        result = stories.tool_result("fx_ground")
+        sess._note_screen("present_story", result, False)
+        more = result["story"]["zoom"][0]
+        asyncio.run(sess._quick_ask({"type": "quick_ask", "id": more["tap"], "lang": "en"}))
+        assert len(sess.provider.sent) == 1
+        text = sess.provider.sent[0]
+        assert text.startswith('[ลูกค้าแตะภาพ "') and "ภาพขยายอยู่บนจอแล้ว" in text
+        assert "ข้อมูล: ข้อเท็จจริงจากรายงาน 123" in text and "ไม่ต้องเรียกเครื่องมือ" in text
+        assert "ห้ามพูดราคา" in text and "ห้ามพูดว่า 'ไม่มีข้อมูล'" in text
+        assert seen == [more["label_en"]]
+        assert sess._screen_staged is True and sess._story_owns_answer is True
+        assert more["tap"] in sess._story_taps
+        # an answer picture in this answer does not take the screen or the taps
+        sess._note_screen("search_condo_info", {"ok": True, "slide": {"id": "intro-041"}}, True)
+        assert more["tap"] in sess._story_taps
+        # a picture number past the story's, another story's picture: nothing
+        sess._quick_ask_at = -1e9
+        for bad in (stories.more_tap_id("fx_ground", 99), stories.more_tap_id("fx_room_types", 0),
+                    "story_fx_ground_more_x"):
+            asyncio.run(sess._quick_ask({"type": "quick_ask", "id": bad}))
+        assert len(sess.provider.sent) == 1
+
+
+def test_a_tapped_picture_speaks_the_talk_and_without_facts_still_answers(approved, monkeypatch):
+    monkeypatch.setattr(stories, "_more_facts", lambda story, label: [])
+    with _as("condo", face=True):
+        result = stories.tool_result("fx_ground")
+        tap = stories.find_tap("fx_ground", result["story"]["zoom"][0]["tap"])
+    assert tap is not None and tap["more"] is True
+    english = stories.tap_text(tap, "th", "en")
+    assert english.startswith('[The guest tapped the picture "') and "answer in English" in english
+    assert "ข้อมูล:" not in english and "ถามว่าอยากดูส่วนไหนของโครงการต่อ" in english
+    assert "ไม่ต้องเรียกเครื่องมือ" in english
+
+
+def test_the_page_opens_the_picture_it_can_see_and_keeps_the_screen_for_more():
+    """The page side, read from source (a DOM test runs in record_stories
+    --tap-pictures, a real click on every visible picture): the picture is the
+    topmost VISIBLE one under the finger, a picture inside a row that leads to
+    a story sends nothing more (the row's tap is already on its way), the large
+    view moves by opacity/transform only, and a "more" tap keeps the story as
+    the answer's screen."""
+    engine = ENGINE.read_text(encoding="utf-8")
+    body = engine[engine.index("Story.prototype.onPictureTap"):engine.index("Story.prototype.showZoom")]
+    assert "elementsFromPoint" in body and "seen(n, this.root)" in body
+    assert "closest('[data-tap]')" in body and "this.opts.onTap(pick._zoom.tap, true)" in body
+    css = STYLE.read_text(encoding="utf-8")
+    view = css[css.index(".es-root .es-zoomview {"):css.index(".es-root .es-zv-hint")]
+    assert "backdrop-filter" not in view and "filter:" not in view and "infinite" not in view
+    page = PAGE.read_text(encoding="utf-8")
+    tap = page[page.index("onTap: function (id, keep)"):page.index("onReport:")]
+    assert "if (sent && keep) { answerStaged = true; storyOwns = true; }" in tap
 
 
 def test_a_tool_tap_names_the_catalogs_tool_and_arguments(approved):
@@ -864,7 +1053,8 @@ def test_the_page_loads_the_engine_and_draws_a_story_only_on_the_robot_face():
     assert "if ('slide' in evt && evt.slide && !storyOwns) showSlide(evt.slide);" in branch
     show = _between(html, "function showStory(story) {", "\n    }\n")
     assert "openStage();" in show and "storyOwns = true;" in show
-    assert "onTap: function (id) { return sendQuickAsk(id); }" in show
+    # a tap goes through the topic buttons' door; a tapped picture keeps the screen
+    assert "var sent = sendQuickAsk(id);" in show and "return sent;" in show
     # the token only on this server's own story pictures
     assert "u.origin === location.origin && u.pathname.indexOf('/story-asset/') === 0" in show
 

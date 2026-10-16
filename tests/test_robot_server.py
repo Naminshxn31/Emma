@@ -566,6 +566,21 @@ def test_the_robot_runs_local_embeddings_and_has_the_engine_to_do_it():
         assert embed_onnx.REVISION in rs.FETCH_ON_ROBOT[rel]
 
 
+def test_the_robot_never_builds_an_index_and_deploy_ships_the_faq_cache():
+    """15 Oct: the report FAQ's embeddings were not in EXTRA_GLOBS, so each FAQ
+    change left the robot to embed 299 questions at app start -- and it
+    hard-reset ~25 s in, six times. All three ends move together: the robot
+    does not build (EMBED_BUILD=false), deploy ships the PC's cache, and
+    deploy refreshes that cache on the PC before it diffs anything."""
+    values = dict(rs.parse_env((CONF / "robot.env").read_text(encoding="utf-8")))
+    assert values["EMBED_BUILD"] == "false"
+    assert "SEARCH_SEMANTIC" not in values          # the wrong first guess, undone
+    assert "data/projects/*/sales/faq_embeddings.npz" in rs.EXTRA_GLOBS
+    assert rs._deployable("data/projects/embassy_world/sales/faq_embeddings.npz")
+    body = inspect.getsource(rs.cmd_deploy)
+    assert body.index("refresh_faq_cache()") < body.index("deploy_files()")
+
+
 def test_models_the_robot_fetches_never_share_a_staging_name():
     """_MODEL_FETCH stages each download as STAGE/models/<basename> and copies
     it from there: two pins with one basename (two `model.onnx`s) would copy

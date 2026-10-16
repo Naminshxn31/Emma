@@ -28,6 +28,52 @@ LANGS = ("th", "en", "zh")
 
 _LANG_NAMES_TH = {"th": "ไทย", "en": "อังกฤษ", "zh": "จีน"}
 
+# ---- the conversation's language, for a tap (owner, 15 Oct 2026) -----------
+# Talking English, a tap on a story button got a Thai answer: the tap's user
+# turn was Thai text around a Thai label, and "answer in the language the
+# guest spoke last" lost to the language of the turn itself. When the server
+# knows what language the talk is in (her latest reply, else the guest's
+# words), the tap now says it outright -- and in that language.
+
+_TAP_PREAMBLE = {
+    "th": "[ลูกค้าแตะปุ่ม \"%s\" บนจอ ไม่ได้พูด — ตอนนี้คุยกันเป็นภาษาไทย ตอบเป็นภาษาไทย ห้ามเปลี่ยนภาษา] ",
+    "en": "[The guest tapped \"%s\" on the screen and did not speak. This conversation is in English: "
+          "answer in English, do not switch language.] ",
+    "zh": "[The guest tapped \"%s\" on the screen and did not speak. This conversation is in Chinese: "
+          "answer in Chinese, do not switch language.] ",
+}
+_TAP_CALL = {"th": "เรียก %s แล้วเล่าตามผลลัพธ์", "en": "Call %s and tell it from the result.",
+             "zh": "Call %s and tell it from the result."}
+
+
+def script_lang(text) -> str | None:
+    """th / en / zh by the letters of `text`, or None when it says too little.
+    Thai wins on a handful of Thai letters: a Thai reply is full of English
+    names (Water Lagoon, Sky Pool), while an English reply carries at most a
+    closing "ค่ะ"."""
+    if not isinstance(text, str):
+        return None
+    thai = sum(1 for c in text if "฀" <= c <= "๿")
+    cjk = sum(1 for c in text if "一" <= c <= "鿿")
+    latin = sum(1 for c in text if c.isascii() and c.isalpha())
+    if thai >= 8:
+        return "th"
+    if cjk >= 4:
+        return "zh"
+    if latin >= 8:
+        return "en"
+    return None
+
+
+def tap_preamble(label: dict, talk: str) -> str:
+    """The marked-as-a-tap opening in the conversation's own language."""
+    shown = label.get(talk) or label.get("en") or label.get("th") or ""
+    return _TAP_PREAMBLE[talk] % shown
+
+
+def tap_call(call: str, talk: str) -> str:
+    return _TAP_CALL[talk] % call
+
 #: The topics, per profile. `ask` is the guest's question in each language;
 #: the label is what the button says. Order = on-screen order.
 TOPICS: dict[str, tuple[dict, ...]] = {
@@ -99,14 +145,16 @@ def for_page(profile: str, brand: str = "") -> dict | None:
     }
 
 
-def text_for(profile: str, ask_id, lang=None) -> str | None:
+def text_for(profile: str, ask_id, lang=None, talk=None) -> str | None:
     """The user turn for a tap, or None for an id this profile does not have.
     `lang` is the page's language (its buttons, else the script of the
     guest's last utterance); the model still answers in the language the
-    guest is speaking, if any."""
+    guest is speaking, if any. `talk` is the conversation's language as the
+    server knows it (`script_lang`): when given, the tap says it outright."""
     if not isinstance(ask_id, str):
         return None
     code = _lang(lang)
+    talk = talk if talk in LANGS else None
     if ask_id.startswith("lang_"):
         target = ask_id[5:]
         if target not in LANGS or not TOPICS.get(profile):
@@ -115,11 +163,15 @@ def text_for(profile: str, ask_id, lang=None) -> str | None:
                 "ตอนนี้ตอบรับสั้นๆ ประโยคเดียวเป็นภาษา%s แล้วหยุด ห้ามถามต่อ"
                 % (_LANG_NAMES_TH[target], _LANG_NAMES_TH[target], _LANG_NAMES_TH[target]))
     for topic in TOPICS.get(profile) or ():
+        if topic["id"] == ask_id and talk:
+            return tap_preamble(topic["label"], talk) + topic["ask"][talk]
         if topic["id"] == ask_id:
             return ("[ลูกค้าแตะปุ่ม \"%s\" บนจอ ไม่ได้พูด — ตอบเป็นภาษาเดียวกับที่ลูกค้าพูดล่าสุด "
                     "ถ้ายังไม่ได้พูด ตอบเป็นภาษา%s] %s"
                     % (topic["label"]["th"], _LANG_NAMES_TH[code], topic["ask"][code]))
     item = _choice(ask_id)
+    if item is not None and TOPICS.get(profile) and talk:
+        return tap_preamble(item["label"], talk) + (item["ask"] if talk == "th" else item["ask_en"])
     if item is not None and TOPICS.get(profile):
         return ("[ลูกค้าแตะปุ่ม \"%s\" ใต้คำถามของคุณบนจอ ไม่ได้พูด — ตอบเป็นภาษาเดียวกับที่ลูกค้าพูดล่าสุด "
                 "ถ้ายังไม่ได้พูด ตอบเป็นภาษา%s] %s"
@@ -150,13 +202,19 @@ CHOICES: dict[str, dict] = {
         "items": (
             {"id": "type_studio", "label": {"th": "สตูดิโอ", "en": "Studio", "zh": "开间"},
              "ask": "ลูกค้าเลือกห้องแบบสตูดิโอ — เรียก show_room_type(type=\"studio\") "
-                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์"},
+                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์",
+             "ask_en": "The guest chose the studio -- call show_room_type(type=\"studio\") "
+                       "to show a sample room plan on the screen, then tell it from the result."},
             {"id": "type_1br", "label": {"th": "1 ห้องนอน", "en": "1 Bedroom", "zh": "一室"},
              "ask": "ลูกค้าเลือกห้องแบบ 1 ห้องนอน — เรียก show_room_type(type=\"1br\") "
-                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์"},
+                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์",
+             "ask_en": "The guest chose the one-bedroom -- call show_room_type(type=\"1br\") "
+                       "to show a sample room plan on the screen, then tell it from the result."},
             {"id": "type_2br", "label": {"th": "2 ห้องนอน", "en": "2 Bedrooms", "zh": "两室"},
              "ask": "ลูกค้าเลือกห้องแบบ 2 ห้องนอน — เรียก show_room_type(type=\"2br\") "
-                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์"},
+                    "เพื่อขึ้นผังห้องตัวอย่างบนจอ แล้วเล่าตามผลลัพธ์",
+             "ask_en": "The guest chose the two-bedroom -- call show_room_type(type=\"2br\") "
+                       "to show a sample room plan on the screen, then tell it from the result."},
         ),
     },
 }

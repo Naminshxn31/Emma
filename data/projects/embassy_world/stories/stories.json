@@ -4,11 +4,11 @@
  "schema": 1,
  "approval_status": "approved",
  "approved_by": "pete",
- "approved_at": "2026-10-14T09:46:05+07:00",
- "effective_at": "2026-10-14T09:46:05+07:00",
+ "approved_at": "2026-10-16T10:23:52+07:00",
+ "effective_at": "2026-10-16T10:23:52+07:00",
  "disclosure_scope": "customer",
  "content_state": "preliminary_concept",
- "approved_sha256": "332653e308fcd8227e8c27726b2581aadd3142390a36e0f0388c511e17bf9bad",
+ "approved_sha256": "1833fb845ad36dcd63805e381e25575eda354f104bd994834487613bca20afa5",
  "stories": [
   {
    "id": "campus_buildings",
@@ -19,13 +19,22 @@
     "มีตึกอะไรบ้าง",
     "โครงการใหญ่แค่ไหน",
     "ตึกหน้าตาเป็นยังไง",
-    "ขอดูภาพรวมโครงการ"
+    "ขอดูภาพรวมโครงการ",
+    "บอกรายละเอียดโครงการหน่อย",
+    "รายละเอียดโครงการ",
+    "โครงการนี้เป็นยังไง",
+    "สีของอาคารคืออะไร",
+    "ตึกสีอะไร",
+    "อาคารหน้าตาเป็นยังไง"
    ],
    "questions_en": [
     "How many buildings are there?",
     "How big is the project?",
     "What does the project look like?",
-    "Can I see the whole project?"
+    "Can I see the whole project?",
+    "Tell me about the project.",
+    "Can you give me an overview of the project?",
+    "What colour are the buildings?"
    ],
    "lines": [
     {
@@ -106,6 +115,22 @@
       "空中泳池",
       "Sky Pool",
       "三楼"
+     ]
+    },
+    {
+     "th": "ตัวอาคารโทนสีขาวครีม ใช้กระจกเยอะ และมีเส้นโค้งสีเข้มไหลลงด้านหน้าอาคารค่ะ",
+     "en": "The buildings are white and cream, with lots of glass and dark curved lines running down the front.",
+     "cue_th": [
+      "ขาวครีม",
+      "กระจก"
+     ],
+     "cue_en": [
+      "cream",
+      "glass"
+     ],
+     "cue_zh": [
+      "白色",
+      "玻璃"
      ]
     }
    ],
@@ -199,7 +224,8 @@
     "facts:โครงการ (คอนโดมิเนียม Low-rise 8 ชั้น 6 อาคาร (A–F) มีชั้นใต้ดินเชื่อมกันทั้งโครงการ)",
     "facts:จุดเด่น (ชั้น 3 อาคาร A: Social Lounge, Co-working Lounge, Common Sphere, Sky Pool · ภายนอก: Water Lagoon สระหลักกลางโครงการ)",
     "report:06_masterplan.md#6.7 line 297 (อาคาร A–F ใช้ระดับชั้นชุดเดียวกัน)",
-    "assets:ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2 (12 frames), HologramTransition/ViewportCapture_20260924_115211/cycle_01_outward_08 (realistic)"
+    "assets:ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2 (12 frames), HologramTransition/ViewportCapture_20260924_115211/cycle_01_outward_08 (realistic)",
+    "report:06_masterplan.md#ลักษณะภายนอก (ภาพมุมสูง: อาคารสีขาวครีม · เส้นโค้ง ribbon สีเข้ม · ผนังกระจก)"
    ],
    "notes_th": "เขียนใหม่ 13 ต.ค. (เจ้าของ: กด 'All buildings' จากเรื่องความสูงแล้ว 'ประโยคพูดก็ประโยคเดิม') — เดิมเรื่องนี้พูด 6 อาคาร A–F, Low-rise 8 ชั้น, หลังคา 23 ม. ซ้ำกับ building_height เกือบทุกคำ ตอนนี้พูดเฉพาะสิ่งที่เรื่องความสูงไม่ได้พูด: ลากูนกลางโครงการ ชั้นใต้ดินเชื่อมทุกอาคาร ส่วนกลางชั้น 3 + Sky Pool ที่อาคาร A (ทั้งหมดจาก facts ที่อนุมัติ) · ความสูงเหลือในเรื่อง building_height (ปุ่ม How tall?) · ลำดับบนจอ: (0) ฮอโลแกรมสร้างโครงการ + ตัวนับ 6 BUILDINGS + ชิป A–F · (1) ลากูน · (2) ภาพจริง crossfade · (3) จบ · ไม่มีเส้นวัดแล้ว (เดิมเป็นสัญลักษณ์บนตึกสูง ~85 px) · ป้าย BUILDING บนหลังคาภาพ UE ยังกลับด้าน — รอ re-render"
   },
@@ -211,7 +237,8 @@
     "ตึกสูงกี่ชั้น",
     "มีกี่ชั้น",
     "สูงกี่เมตร",
-    "เป็น low-rise ใช่ไหม"
+    "เป็น low-rise ใช่ไหม",
+    "ความสูงตึกกี่เมตร"
    ],
    "questions_en": [
     "How tall is the building?",
@@ -799,16 +826,22 @@
     "ใกล้ห้างไหม",
     "ไปเซ็นทรัลไกลไหม",
     "ไปเซ็นทรัลกี่นาที",
-    "ไป Terminal 21 กี่นาที"
+    "ไป Terminal 21 กี่นาที",
+    "ห้างห่างกี่กิโล",
+    "เซ็นทรัลห่างกี่กิโลเมตร",
+    "ห่างจากเซ็นทรัลพัทยากี่กิโลเมตร",
+    "ห่างจาก Terminal 21 กี่กิโลเมตร"
    ],
    "questions_en": [
     "How far is the shopping mall?",
-    "How long to Central Pattaya?"
+    "How long to Central Pattaya?",
+    "How many kilometres is it to Central Pattaya?",
+    "How far is Terminal 21?"
    ],
    "lines": [
     {
-     "th": "เซ็นทรัล พัทยา ขับรถประมาณ 12 ถึง 17 นาที",
-     "en": "Central Pattaya is about 12 to 17 minutes by car,",
+     "th": "เซ็นทรัล พัทยา ระยะทางถนนประมาณ 9.9 กิโลเมตร ขับรถประมาณ 12 ถึง 17 นาที",
+     "en": "Central Pattaya is about 9.9 kilometres by road, about 12 to 17 minutes by car,",
      "cue_th": [
       "เซ็นทรัล",
       "Central"
@@ -823,8 +856,8 @@
      ]
     },
     {
-     "th": "และเทอร์มินอล 21 ก็ใกล้เคียงกันค่ะ",
-     "en": "and Terminal 21 about the same.",
+     "th": "และเทอร์มินอล 21 ประมาณ 11.2 กิโลเมตร ใช้เวลาใกล้เคียงกันค่ะ",
+     "en": "and Terminal 21, about 11.2 kilometres, takes about the same.",
      "cue_th": [
       "เทอร์มินอล",
       "Terminal"
@@ -995,13 +1028,18 @@
     "สระลากูนยาวเท่าไหร่",
     "สระใหญ่แค่ไหน",
     "สระว่ายน้ำหลักอยู่ตรงไหน",
-    "Water Lagoon คืออะไร"
+    "Water Lagoon คืออะไร",
+    "สระลากูนลึกเท่าไหร่",
+    "สระหลักลึกกี่เมตร",
+    "สะพานข้ามสระมีกี่แห่ง"
    ],
    "questions_en": [
     "Can I see the site plan?",
     "How long is the lagoon?",
     "How big is the pool?",
-    "Where is the main pool?"
+    "Where is the main pool?",
+    "How deep is the lagoon?",
+    "How many bridges are there?"
    ],
    "lines": [
     {
@@ -1039,8 +1077,8 @@
      ]
     },
     {
-     "th": "สระยาวประมาณ 155 เมตร",
-     "en": "It is about 155 metres long,",
+     "th": "สระยาวประมาณ 155 เมตร ลึกประมาณ 1.30 เมตร",
+     "en": "It is about 155 metres long and 1.30 metres deep,",
      "cue_th": [
       "155 เมตร",
       "ร้อยห้าสิบห้า",
@@ -1075,8 +1113,8 @@
      ]
     },
     {
-     "th": "มีเกาะต้นไม้ สะพานข้ามสระ และจากุซซี่ค่ะ",
-     "en": "with planted islands, bridges and a jacuzzi.",
+     "th": "มีเกาะต้นไม้ สะพานข้ามสระ 3 แห่ง และจากุซซี่ค่ะ",
+     "en": "with planted islands, three bridges and a jacuzzi.",
      "cue_th": [
       "เกาะ",
       "สะพาน"
@@ -1114,6 +1152,10 @@
       {
        "label_en": "Length",
        "value_en": "≈ 155 m"
+      },
+      {
+       "label_en": "Depth",
+       "value_en": "≈ 1.30 m"
       },
       "≈ 1.5 football fields",
       "5 planted islands",
@@ -1155,7 +1197,9 @@
     "report:12_landscape.md line 139 (ผู้นำเสนอเทียบ 155 ม. = 1.5 สนามฟุตบอล 🔎 สอดคล้อง)",
     "report:12_landscape.md line 31, 193 (Island 3 = Jacuzzi + Water Curtain)",
     "slides:intro-015 (155M. Water Lagoon)",
-    "assets:web/3.project details/master plan/_Embassy World  Floor Plan/3.png · web/6.gallery/exterior/CD03/Scene 58.png"
+    "assets:web/3.project details/master plan/_Embassy World  Floor Plan/3.png · web/6.gallery/exterior/CD03/Scene 58.png",
+    "report:01_overview.md line 99, 150 · 19_faq.md (สระหลักลึกประมาณ 1.30 ม. ตามข้อมูลผู้พัฒนา; ไม่ใช้กับ Sky Pool/สระใต้ดิน)",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ลำดับบนจอ: (0) ผังชั้น G ของเว็บไซต์ทั้งผืน (ป้าย BUILDING A–F พิมพ์อยู่บนผังเอง) · (1) ไม่มีภาพใหม่ ผังค้าง (ป้ายอาคารบนผังทำหน้าที่แทน) · (2) ซูมเบาๆ 1.3 เท่า ที่ (48,50) ให้ยังเห็นลากูนทั้งเส้น วงชี้ที่ผิวน้ำกลางลากูน (56,52) ป้าย WATER LAGOON · ≈ 155 m · (3) ไม่มีภาพใหม่ (ฟุตบอลเป็นคำเปรียบ) · (4) ตัดไปภาพจริง Scene 58 (มุมสูงมองไล่ตามลากูน เห็นเกาะ สะพาน ศาลา) ชิปเด้งทีละข้อ · พิกัด: ลากูนบนผังที่ครอปกินตั้งแต่ x ≈ 11% (ปีกอาคาร E) ถึง ≈ 85% (อาคาร B) ตรงกับ 'จากปีกอาคาร E/D ถึงปลายติดอาคาร B' ในรายงาน · จุดวงชี้เลือกบนผิวน้ำสีฟ้าที่ไม่ทับสะพาน/เกาะ (อ่านจากภาพครอปที่มีกริด) · ถ้า engine ทำได้ ข้อเสนอ: เส้นวัดตามแนวลากูนจาก (11,52) ถึง (85,40) แทนวงชี้ ผังเว็บนี้มีเลขห้องและขนาดห้องพิมพ์อยู่ (ตรงกับช่วงใน facts ไม่มีราคา ไม่มีสถานะขาย) และมีป้าย SOUL SPACE ที่ไม่อยู่ในรายการ facility ของ facts — ให้เจ้าของดู · คำว่า 'ราวสนามฟุตบอลครึ่ง' เป็นคำเปรียบของผู้นำเสนอที่รายงานบันทึกไว้ ถ้าเจ้าของไม่อยากให้พูด ตัดบรรทัด 3 และชิปทิ้งได้ · แก้ตามรีวิว 12 ต.ค.: ชิปแรกเป็นแถวเด่น 'Length · ≈ 155 m' (ตัวเลขสีทอง) — ลูกค้าถามความยาว เดิมเป็นข้อความธรรมดาน้ำหนักเท่า 'Jacuzzi island'"
   },
@@ -1440,6 +1484,522 @@
     "assets:ue Wave2/Build_f2054 (หน้าต่างที่ติดไฟทั้งโครงการ = บ้านทุกหลัง)"
    ],
    "notes_th": "ลำดับบนจอ: (0) ฮอโลแกรมทั้งโครงการที่ไฟหน้าต่างติดทุกบาน (เฟรมเดียวกับตอนจบของ campus_buildings — cache ร่วม) ตัวเลข 1,066 นับขึ้น (ต้องมีจุลภาคพันตอนนับ) ป้าย 'Residences in 6 buildings' · (1)(2)(3) ส่วนย่อย Studio 117 → 1 Bedroom 801 → 2 Bedrooms 148 นับขึ้นทีละตัวตามเสียง · เปลี่ยนจากสเปก: ใส่ line ให้ parts เพื่อให้ตามเสียงทีละแบบ · ไม่พูด/ไม่ขึ้นสถานะขาย (ขายแล้ว/ว่าง) ไม่ขึ้นร้านค้า · ปุ่ม 'Room types' ต่อไปเรื่อง room_types ของทีม units"
+  },
+  {
+   "id": "floor_heights",
+   "template": "metric",
+   "questions_th": [
+    "พื้นหนาเท่าไหร่",
+    "พื้นหนากี่เซนติเมตร",
+    "ขนาดพื้น",
+    "ความหนาพื้นเท่าไหร่",
+    "ความสูงจากพื้นถึงพื้นเท่าไหร่",
+    "ความสูงแต่ละชั้นเท่าไหร่",
+    "เพดานสูงเท่าไหร่",
+    "ระยะฝ้าสูงเท่าไหร่",
+    "ระยะฝ้าห้องพักสูงเท่าไหร่"
+   ],
+   "questions_en": [
+    "How thick is the floor slab?",
+    "What is the floor-to-floor height?",
+    "How high are the ceilings?"
+   ],
+   "lines": [
+    {
+     "th": "ความสูงจากพื้นถึงพื้นของแต่ละชั้นประมาณ 2.84 เมตรค่ะ",
+     "en": "From one floor to the next is about 2.84 metres.",
+     "cue_th": [
+      "พื้นถึงพื้น",
+      "แต่ละชั้น"
+     ],
+     "cue_en": [
+      "floor",
+      "next"
+     ],
+     "cue_zh": [
+      "层高",
+      "每层"
+     ]
+    },
+    {
+     "th": "พื้นโครงสร้างหนาประมาณ 0.25 เมตร หรือ 25 เซนติเมตร",
+     "en": "The structural floor slab is about 25 centimetres thick,",
+     "cue_th": [
+      "โครงสร้าง",
+      "หนา"
+     ],
+     "cue_en": [
+      "slab",
+      "thick"
+     ],
+     "cue_zh": [
+      "楼板",
+      "厚"
+     ]
+    },
+    {
+     "th": "จากผิวพื้นถึงท้องพื้นชั้นบนประมาณ 2.59 เมตร ส่วนความสูงฝ้าสุดท้ายทีมขายจะยืนยันให้ค่ะ",
+     "en": "so from the floor surface to the slab above is about 2.59 metres; our sales team will confirm the finished ceiling height.",
+     "cue_th": [
+      "ท้องพื้น",
+      "ฝ้า"
+     ],
+     "cue_en": [
+      "above",
+      "ceiling"
+     ],
+     "cue_zh": [
+      "天花",
+      "吊顶"
+     ]
+    }
+   ],
+   "params": {
+    "bg_asset": "bld_c_real",
+    "value": {
+     "to": 2.84,
+     "dec": 2,
+     "prefix_en": "≈ ",
+     "unit_en": "m"
+    },
+    "label_en": "Floor to floor · every level",
+    "line": 0,
+    "parts": [
+     {
+      "label_en": "Structural slab",
+      "to": 0.25,
+      "dec": 2,
+      "prefix_en": "≈",
+      "unit_en": "m",
+      "line": 1
+     },
+     {
+      "label_en": "Floor to the slab above",
+      "to": 2.59,
+      "dec": 2,
+      "prefix_en": "≈",
+      "unit_en": "m",
+      "line": 2
+     }
+    ]
+   },
+   "taps": [
+    {
+     "id": "story_floor_heights_height",
+     "label_en": "Building height",
+     "label_th": "ความสูงอาคาร",
+     "next_story": "building_height",
+     "tool": null
+    },
+    {
+     "id": "story_floor_heights_rooms",
+     "label_en": "Room types",
+     "label_th": "แบบห้อง",
+     "next_story": "room_types",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:06_masterplan.md#ค่าสำคัญที่ใช้ตอบลูกค้า (ชั้นทั่วไป 2.84 · พื้นโครงสร้าง 0.25 · ผิวพื้นถึงท้องพื้น 2.59)"
+   ],
+   "notes_th": "เจ้าของ 15 ต.ค. (คำถามในภาพ: ขนาดพื้น) — ค่าตามโมเดลสถาปนิก 🔎 รายงานบท 6 · ความสูงฝ้าสำเร็จยังไม่สรุป ให้ทีมขายยืนยัน (ตามที่ตอบใน log 15 ต.ค.) · ภาพอาคาร C เดียวกับ building_height"
+  },
+  {
+   "id": "site_area",
+   "template": "metric",
+   "questions_th": [
+    "ที่ดินกี่ไร่",
+    "ที่ดินขนาดเท่าไหร่",
+    "ที่ดินกี่ตารางเมตร",
+    "ที่ดินรูปร่างเป็นยังไง",
+    "พื้นที่โครงการทั้งหมดเท่าไหร่"
+   ],
+   "questions_en": [
+    "How big is the land?",
+    "How many rai is the land?",
+    "What is the site area?"
+   ],
+   "lines": [
+    {
+     "th": "ที่ดินของโครงการประมาณ 15,556 ตารางเมตรค่ะ",
+     "en": "The land is about 15,556 square metres,",
+     "cue_th": [
+      "15,556",
+      "ที่ดิน"
+     ],
+     "cue_en": [
+      "15,556",
+      "land"
+     ],
+     "cue_zh": [
+      "15556",
+      "15,556",
+      "土地"
+     ]
+    },
+    {
+     "th": "หรือราว 9 ไร่ 2 งาน 89 ตารางวา",
+     "en": "about 9 rai 2 ngan 89 square wah,",
+     "cue_th": [
+      "ไร่"
+     ],
+     "cue_en": [
+      "rai"
+     ],
+     "cue_zh": [
+      "莱",
+      "rai"
+     ]
+    },
+    {
+     "th": "เป็นรูปหลายเหลี่ยม 9 มุม กว้างประมาณ 217 เมตร ลึกประมาณ 81 เมตร",
+     "en": "a nine-sided plot about 217 metres wide and 81 metres deep,",
+     "cue_th": [
+      "217",
+      "หลายเหลี่ยม"
+     ],
+     "cue_en": [
+      "217",
+      "nine-sided"
+     ],
+     "cue_zh": [
+      "217"
+     ]
+    },
+    {
+     "th": "ในนั้นเป็นพื้นที่สีเขียว 4,256 ตารางเมตร และสระว่ายน้ำรวม 2,157 ตารางเมตรค่ะ",
+     "en": "with 4,256 square metres of green space and 2,157 square metres of pools.",
+     "cue_th": [
+      "สีเขียว",
+      "4,256"
+     ],
+     "cue_en": [
+      "green",
+      "4,256"
+     ],
+     "cue_zh": [
+      "绿地",
+      "4256"
+     ]
+    }
+   ],
+   "params": {
+    "bg_asset": "plan_ground_site",
+    "value": {
+     "to": 15556,
+     "dec": 0,
+     "unit_en": "SQ.M."
+    },
+    "label_en": "Land · about 9 rai 2 ngan 89 sq.wah",
+    "parts": [
+     {
+      "label_en": "Green space",
+      "to": 4256,
+      "unit_en": "sq.m.",
+      "line": 3
+     },
+     {
+      "label_en": "Pools",
+      "to": 2157,
+      "unit_en": "sq.m.",
+      "line": 3
+     }
+    ],
+    "line": 0
+   },
+   "taps": [
+    {
+     "id": "story_site_area_plan",
+     "label_en": "Site plan",
+     "label_th": "ผังโครงการ",
+     "next_story": "masterplan_lagoon",
+     "tool": null
+    },
+    {
+     "id": "story_site_area_green",
+     "label_en": "Green & park",
+     "label_th": "สวนและพื้นที่สีเขียว",
+     "next_story": "park_green",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:19_faq.md (ที่ดินโครงการกี่ไร่ 15,556 ตร.ม. ≈ 9 ไร่ 2 งาน 89 ตร.ว. · ที่ดินรูปร่าง 9 มุม 217 × 81 ม. · พื้นที่ภายนอก สีเขียว 4,256 สระ 2,157)",
+    "report:06_masterplan.md"
+   ],
+   "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · log 15 ต.ค. \"ที่ดินที่นี่ขนาดเท่าไหร่ครับ\" ตอบจากการค้น ไม่มีภาพ · ที่ดินวัดจากแบบ ยังไม่ได้ยืนยันกับโฉนด (รายงาน) — พูด \"ประมาณ\" เสมอ"
+  },
+  {
+   "id": "units_by_building",
+   "template": "metric",
+   "questions_th": [
+    "แต่ละตึกมีกี่ห้อง",
+    "ตึก A มีกี่ห้อง",
+    "ตึกไหนห้องเยอะที่สุด"
+   ],
+   "questions_en": [
+    "Which building has the most units?"
+   ],
+   "lines": [
+    {
+     "th": "ทั้ง 1,066 ยูนิตอยู่ใน 6 อาคารค่ะ",
+     "en": "Our 1,066 residences are in six buildings:",
+     "cue_th": [
+      "1,066",
+      "6 อาคาร"
+     ],
+     "cue_en": [
+      "1,066",
+      "six buildings"
+     ],
+     "cue_zh": [
+      "1066",
+      "1,066",
+      "六栋"
+     ]
+    },
+    {
+     "th": "อาคาร A 146 ห้อง อาคาร B 200 ห้อง",
+     "en": "Building A has 146, Building B 200,",
+     "cue_th": [
+      "อาคาร A",
+      "146"
+     ],
+     "cue_en": [
+      "Building A",
+      "146"
+     ],
+     "cue_zh": [
+      "A栋",
+      "146"
+     ]
+    },
+    {
+     "th": "อาคาร C 176 ห้อง อาคาร D 168 ห้อง",
+     "en": "Building C 176, Building D 168,",
+     "cue_th": [
+      "อาคาร C",
+      "176"
+     ],
+     "cue_en": [
+      "Building C",
+      "176"
+     ],
+     "cue_zh": [
+      "C栋",
+      "176"
+     ]
+    },
+    {
+     "th": "อาคาร E 184 ห้อง และอาคาร F 192 ห้องค่ะ",
+     "en": "Building E 184 and Building F 192.",
+     "cue_th": [
+      "อาคาร E",
+      "184"
+     ],
+     "cue_en": [
+      "Building E",
+      "184"
+     ],
+     "cue_zh": [
+      "E栋",
+      "184"
+     ]
+    }
+   ],
+   "params": {
+    "bg_asset": "campus_holo_f2054",
+    "value": {
+     "to": 1066,
+     "dec": 0,
+     "unit_en": "UNITS"
+    },
+    "label_en": "Residences by building",
+    "parts": [
+     {
+      "label_en": "Building A",
+      "to": 146,
+      "line": 1
+     },
+     {
+      "label_en": "Building B",
+      "to": 200,
+      "line": 1
+     },
+     {
+      "label_en": "Building C",
+      "to": 176,
+      "line": 2
+     },
+     {
+      "label_en": "Building D",
+      "to": 168,
+      "line": 2
+     },
+     {
+      "label_en": "Building E",
+      "to": 184,
+      "line": 3
+     },
+     {
+      "label_en": "Building F",
+      "to": 192,
+      "line": 3
+     }
+    ],
+    "line": 0
+   },
+   "taps": [
+    {
+     "id": "story_units_by_building_types",
+     "label_en": "Room types",
+     "label_th": "แบบห้อง",
+     "next_story": "room_types",
+     "tool": null
+    },
+    {
+     "id": "story_units_by_building_buildings",
+     "label_en": "6 buildings",
+     "label_th": "6 อาคาร",
+     "next_story": "campus_buildings",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:19_faq.md (อาคารแต่ละหลังมีกี่ห้อง: A 146 · B 200 · C 176 · D 168 · E 184 · F 192)",
+    "facts:โครงการ (ห้องชุดทั้งหมด 1,066 ยูนิต)"
+   ],
+   "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · นับห้องพักอาศัย (อาคาร A มีร้านค้าอีก 6 ยูนิต ไม่นับรวม) · ไม่พูดจำนวนที่ขาย/ว่าง"
+  },
+  {
+   "id": "travel_bangkok",
+   "template": "journey",
+   "questions_th": [
+    "ไปกรุงเทพกี่ชั่วโมง",
+    "ไปกรุงเทพไกลไหม",
+    "จากกรุงเทพมาใช้เวลาเท่าไหร่",
+    "ไปดอนเมืองกี่ชั่วโมง"
+   ],
+   "questions_en": [
+    "How long to Bangkok?",
+    "How far is Bangkok?"
+   ],
+   "lines": [
+    {
+     "th": "ไปกรุงเทพแถวสยาม ขับรถประมาณ 104 นาทีตอนรถไม่ติดค่ะ",
+     "en": "Bangkok, around Siam, is about 104 minutes by car without traffic,",
+     "cue_th": [
+      "กรุงเทพ",
+      "สยาม"
+     ],
+     "cue_en": [
+      "Bangkok",
+      "Siam"
+     ],
+     "cue_zh": [
+      "曼谷"
+     ]
+    },
+    {
+     "th": "ถ้ารถติดประมาณ 1.9 ถึง 2.4 ชั่วโมง",
+     "en": "or about 1.9 to 2.4 hours in heavy traffic.",
+     "cue_th": [
+      "รถติด"
+     ],
+     "cue_en": [
+      "traffic"
+     ],
+     "cue_zh": [
+      "堵车"
+     ]
+    },
+    {
+     "th": "สนามบินสุวรรณภูมิประมาณชั่วโมงครึ่ง",
+     "en": "Suvarnabhumi Airport is about an hour and a half,",
+     "cue_th": [
+      "สุวรรณภูมิ"
+     ],
+     "cue_en": [
+      "Suvarnabhumi"
+     ],
+     "cue_zh": [
+      "素万那普",
+      "Suvarnabhumi"
+     ]
+    },
+    {
+     "th": "และดอนเมืองประมาณ 2 ชั่วโมงค่ะ",
+     "en": "and Don Mueang about 2 hours.",
+     "cue_th": [
+      "ดอนเมือง"
+     ],
+     "cue_en": [
+      "Don Mueang"
+     ],
+     "cue_zh": [
+      "廊曼",
+      "Don Mueang"
+     ]
+    }
+   ],
+   "params": {
+    "origin_en": "EMBASSY WORLD",
+    "origin_sub_en": "Jomtien, Pattaya · by car",
+    "bar_max": 150,
+    "rows": [
+     {
+      "icon": "road",
+      "label_en": "Bangkok (Siam)",
+      "sub_en": "Heavy traffic 1.9–2.4 hr",
+      "value_en": "≈ 104 min",
+      "bar": [
+       104,
+       144
+      ],
+      "line": 0
+     },
+     {
+      "icon": "plane",
+      "label_en": "Suvarnabhumi Airport",
+      "value_en": "≈ 1.5 hr",
+      "bar": [
+       90
+      ],
+      "line": 2
+     },
+     {
+      "icon": "plane",
+      "label_en": "Don Mueang Airport",
+      "value_en": "≈ 2 hr",
+      "bar": [
+       120
+      ],
+      "line": 3
+     }
+    ]
+   },
+   "taps": [
+    {
+     "id": "story_travel_bangkok_airports",
+     "label_en": "Airports",
+     "label_th": "สนามบิน",
+     "next_story": "travel_airports",
+     "tool": null
+    },
+    {
+     "id": "story_travel_bangkok_malls",
+     "label_en": "Malls",
+     "label_th": "ห้าง",
+     "next_story": "travel_malls",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:19_faq.md (ไปกรุงเทพฯ ย่านสยามสแควร์ 104 นาที รถไม่ติด · 1.9–2.4 ชม. รถหนาแน่น)",
+    "report:92_appendix_travel.md line 49 (เด็คหน้า 8: สุวรรณภูมิ 1.5 ชม. · ดอนเมือง 2 ชม.)",
+    "slides:intro-008"
+   ],
+   "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · ค่าประมาณจากแผนที่ ไม่ใช่วัดจริง · ห้ามพูดรถไฟความเร็วสูง 40–45 นาที (รายงาน: อย่าใช้)"
   },
   {
    "id": "facilities_overview",
@@ -2335,13 +2895,15 @@
     "สกายพูลอยู่ชั้นไหน",
     "สระลอยฟ้าอยู่ตรงไหน",
     "Sky Pool อยู่ตึกไหน",
-    "สระพื้นกระจกอยู่ไหน"
+    "สระพื้นกระจกอยู่ไหน",
+    "Sky Pool ใหญ่แค่ไหน"
    ],
    "questions_en": [
     "Where is the Sky Pool?",
     "Which floor is the Sky Pool on?",
     "Which building has the Sky Pool?",
-    "Where's the pool with the glass floor?"
+    "Where's the pool with the glass floor?",
+    "How big is the Sky Pool?"
    ],
    "lines": [
     {
@@ -2394,6 +2956,22 @@
      "cue_zh": [
       "玻璃"
      ]
+    },
+    {
+     "th": "กว้างประมาณ 27 เมตร ผิวน้ำประมาณ 143 ตารางเมตรค่ะ",
+     "en": "It is about 27 metres wide, with about 143 square metres of water.",
+     "cue_th": [
+      "กว้าง",
+      "ตารางเมตร"
+     ],
+     "cue_en": [
+      "wide",
+      "square metres"
+     ],
+     "cue_zh": [
+      "米",
+      "平方米"
+     ]
     }
    ],
    "params": {
@@ -2415,6 +2993,10 @@
      "title_en": "SKY POOL",
      "sub_en": "Level 3 · Building A",
      "chips_en": [
+      {
+       "label_en": "Size",
+       "value_en": "≈ 27 m wide · ≈ 143 sq.m."
+      },
       "Above the fitness centre",
       "Glass-floor section",
       "Whirlpool seats",
@@ -2452,7 +3034,8 @@
     "report:11_facilities_3rd_floor.md#11.5.3",
     "report:11_facilities_3rd_floor.md#11.5.4",
     "report:09_facilities_ground.md#9.3",
-    "slides:intro-041"
+    "slides:intro-041",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ภาพโฮโลแกรมอาคาร A จาก UE ของเจ้าของ (ด้านลากูน) → ซูมเข้าโดมกระจกกลางตึก → วงชี้ที่ขอบบนของโดม (ระดับชั้น 3) ป้าย SKY POOL · Level 3 · Building A → ตัดไปภาพ Sky Pool จริง (สไลด์ intro-041 ที่เห็นพื้นกระจกมองลงไปเห็นยิม) → ชิปเด้งทีละอัน จุดบนภาพ UE เป็นการอ่านจากรูปทรงโมเดล (นับแนวพื้นจากล่าง: G, 2, 3 — โดมสูงสองชั้นและหลังคาโดมอยู่ระดับพื้นชั้น 3) ไม่ใช่ป้ายที่พิมพ์ไว้ สอดคล้องกับรายงาน 9.3 'ด้านบน (ชั้น 3) คือ Sky Pool' และผังชั้น 3 ที่สระครึ่งวงกลมอยู่แนวเดียวกับ Biogenesis — ต้องให้เจ้าของยืนยันจุดนี้ ชั้น 3 ไม่ใช่ 'ชั้นสอง' (รายงาน 11.5.4) ไม่พูดขนาด/ระดับสระเพราะตัวเลขขัดกัน"
   },
@@ -2464,18 +3047,25 @@
     "ยิมอยู่ตรงไหน",
     "ห้องออกกำลังกายอยู่ชั้นไหน",
     "มีฟิตเนสไหม",
-    "Biogenesis คืออะไร อยู่ไหน"
+    "Biogenesis คืออะไร อยู่ไหน",
+    "ฟิตเนสใหญ่แค่ไหน",
+    "ฟิตเนสกี่ตารางเมตร",
+    "ฟิตเนสมีอุปกรณ์อะไรบ้าง",
+    "ในฟิตเนสมีเครื่องอะไรบ้าง",
+    "พื้นที่ฟิตเนสขนาดเท่าไหร่"
    ],
    "questions_en": [
     "Where is the gym?",
     "Where's the fitness centre?",
     "Is there a gym?",
-    "Which floor is the fitness on?"
+    "Which floor is the fitness on?",
+    "How big is the gym?",
+    "What equipment does the gym have?"
    ],
    "lines": [
     {
-     "th": "ฟิตเนส Biogenesis อยู่ชั้น G อาคาร A ค่ะ",
-     "en": "Our fitness centre, Biogenesis, is on the ground floor of Building A,",
+     "th": "ฟิตเนส Biogenesis อยู่ชั้น G อาคาร A พื้นที่ประมาณ 197 ตารางเมตรค่ะ",
+     "en": "Our fitness centre, Biogenesis, is on the ground floor of Building A, about 197 square metres,",
      "cue_th": [
       "Biogenesis",
       "ไบโอเจเนซิส",
@@ -2523,6 +3113,19 @@
       "Sky Pool",
       "上方",
       "上面"
+     ]
+    },
+    {
+     "th": "ข้างในมีลู่วิ่ง 8 เครื่อง เป็นลู่วิ่งสายพานโค้ง 4 เครื่อง พร้อมเครื่องเวทและดัมเบลค่ะ",
+     "en": "Inside there are eight treadmills, four of them curved, plus weight machines and dumbbells.",
+     "cue_th": [
+      "ลู่วิ่ง"
+     ],
+     "cue_en": [
+      "treadmill"
+     ],
+     "cue_zh": [
+      "跑步机"
      ]
     }
    ],
@@ -2581,7 +3184,8 @@
     "report:09_facilities_ground.md#9.3",
     "report:08_facilities_overview.md#8.10.2",
     "slides:intro-018",
-    "slides:intro-019"
+    "slides:intro-019",
+    "report:09_facilities_ground.md#9.3 (ภาพไฟนอล: ลู่วิ่ง 8 เครื่อง ทั่วไป 4 + สายพานโค้ง 4)"
    ],
    "notes_th": "ผังชั้น G → ซูมลงครึ่งวงกลมด้านล่าง → วงชี้ที่ Biogenesis (อ่านจากป้าย BIOGENESIS บนผัง วางกลางครึ่งวงกลม) → ตัดไปภาพไฟนอล Biogenesis 01 (กลางวัน เห็นลากูนผ่านกระจกและท้องสระกระจกเหนือหัว) → ชิป 197 ตร.ม. มาจากแผ่นแปลน facility ตามรายงาน 9.3 / 8.10.2 (✅ ใช้ได้เฉพาะขนาด ซึ่งคือสิ่งที่ใช้อยู่) ห้องเรียนสามห้องข้างๆ อยู่แถวเดียวกันตามรายงาน 9.1.1 กฎข้อ 6: ประโยคบอก 'ชั้น G อาคาร A' ชัดเจนว่าอยู่ในโครงการ ไม่ใช่ที่ห้องขาย"
   },
@@ -2592,12 +3196,15 @@
     "ห้องเด็กอยู่ไหน",
     "Junior World อยู่ตรงไหน",
     "Junior World คืออะไร",
-    "ห้องเด็กเป็นยังไง"
+    "ห้องเด็กเป็นยังไง",
+    "Junior World ใหญ่แค่ไหน",
+    "ห้องเด็กกี่ตารางเมตร"
    ],
    "questions_en": [
     "Where is the kids' room?",
     "Where is Junior World?",
-    "What is Junior World?"
+    "What is Junior World?",
+    "How big is Junior World?"
    ],
    "lines": [
     {
@@ -2645,6 +3252,20 @@
      "cue_zh": [
       "球池"
      ]
+    },
+    {
+     "th": "ห้องขนาด 12.825 × 5.85 เมตร ประมาณ 75 ตารางเมตรค่ะ",
+     "en": "The room is 12.825 by 5.85 metres, about 75 square metres.",
+     "cue_th": [
+      "ตารางเมตร",
+      "ขนาด"
+     ],
+     "cue_en": [
+      "square metres"
+     ],
+     "cue_zh": [
+      "平方米"
+     ]
     }
    ],
    "params": {
@@ -2666,6 +3287,10 @@
      "title_en": "JUNIOR WORLD",
      "sub_en": "Kids' room · Ground floor",
      "chips_en": [
+      {
+       "label_en": "Size",
+       "value_en": "12.825 × 5.85 m"
+      },
       "Space-station theme",
       "Ball pit",
       "Galactic Shot game wall"
@@ -2694,7 +3319,8 @@
     "report:09_facilities_ground.md#9.7",
     "report:08_facilities_overview.md#8.2",
     "slides:intro-018",
-    "slides:intro-024"
+    "slides:intro-024",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ผังชั้น G → ซูมไปปลายซ้ายของแถวห้อง → วงชี้ที่ Junior World (อ่านจากป้าย JUNIOR WORLD บนผัง) → ตัดไปภาพไฟนอล Junior World 02 (บ่อบอล + ผนังเกม Galactic Shot) → ชิปสามอันตามรายงาน 9.7 / 8.2 ข้อ 6 ไม่พูดอายุ/ความจุ/ค่าใช้ (ยังไม่มีข้อมูล) ไม่พูดเรื่องเข้าใช้ฟรี (เป็นคำทีมขาย ยังไม่ยืนยัน) Playground กลางแจ้งกับ Kid Pool ไม่ใส่ เพราะตำแหน่งเทียบกับห้องนี้มาจากแบบภูมิสถาปัตย์ concept"
   },
@@ -2706,13 +3332,15 @@
     "มีห้องปั่นจักรยานไหม",
     "Spinning Class คืออะไร",
     "Cycling Studio อยู่ชั้นไหน",
-    "ห้องปั่นจักรยานใหญ่แค่ไหน"
+    "ห้องปั่นจักรยานใหญ่แค่ไหน",
+    "ห้องปั่นจักรยานมีจักรยานกี่คัน"
    ],
    "questions_en": [
     "Is there a cycling studio?",
     "Where is the spinning room?",
     "What is the Spinning Class?",
-    "How big is the spinning room?"
+    "How big is the spinning room?",
+    "How many bikes are there?"
    ],
    "lines": [
     {
@@ -2734,8 +3362,8 @@
      ]
     },
     {
-     "th": "จักรยานแต่ละคันหันเข้าหาจอ LED โค้งที่แสดงวิวการปั่นค่ะ",
-     "en": "Each bike faces curved LED screens that show a riding view.",
+     "th": "มีจักรยาน 3 คัน แต่ละคันหันเข้าหาจอ LED โค้งที่แสดงวิวการปั่นค่ะ",
+     "en": "There are three bikes, each facing curved LED screens that show a riding view.",
      "cue_th": [
       "LED",
       "จอโค้ง",
@@ -2826,7 +3454,8 @@
     "report:09_facilities_ground.md#9.1.1",
     "report:09_facilities_ground.md#9.5",
     "slides:intro-018",
-    "slides:intro-021"
+    "slides:intro-021",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "คำถามแคบ (เจ้าของ 13 ต.ค.): ผังชั้น G (fac_plan_g ตัวเดียวกับ drill) → ซูม 1.8× ที่ห้อง → วงชี้ที่จุดเดียวกับการ์ด Spinning ใน facilities_ground (อ่านจากป้าย SPINNING CLASS ที่พิมพ์บนผัง ไม่ใช่การเดา) → ตัดไปภาพไฟนอล Cycling Studio (ภาพเดียวกับการ์ด) · 33.7 ตร.ม. ตามแผ่นแปลน facility รายงาน 9.4 / 9.1.1 (✅ ใช้ได้เฉพาะขนาด) · จอ LED โค้งตามภาพไฟนอล 9.4 · 'ถัดไปเป็น Pilates Studio' ตาม 9.5 ('ถัดจาก Spinning Class') · ไม่พูดจำนวนจักรยาน ความจุ ตารางคลาส ค่าบริการ · บอก 'ชั้น G อาคาร A' = อยู่ในโครงการ ไม่ใช่ห้องขาย"
   },
@@ -2838,12 +3467,14 @@
     "มีห้องพิลาทิสไหม",
     "Pilates Studio อยู่ชั้นไหน",
     "ห้องพิลาทิสใหญ่แค่ไหน",
-    "มีเตียง Reformer ไหม"
+    "มีเตียง Reformer ไหม",
+    "พิลาทิสมี Reformer กี่เครื่อง"
    ],
    "questions_en": [
     "Is there a Pilates studio?",
     "Where is the Pilates studio?",
-    "How big is the Pilates studio?"
+    "How big is the Pilates studio?",
+    "How many Reformers are there?"
    ],
    "lines": [
     {
@@ -2862,8 +3493,8 @@
      ]
     },
     {
-     "th": "มีเตียง Reformer กับแผงท้องฟ้ายามอาทิตย์ตกค่ะ",
-     "en": "with Reformer beds and sunset sky panels.",
+     "th": "มีเตียง Reformer 4 เครื่อง กับแผงท้องฟ้ายามอาทิตย์ตกค่ะ",
+     "en": "with four Reformer beds and sunset sky panels.",
      "cue_th": [
       "Reformer",
       "รีฟอร์มเมอร์",
@@ -2954,7 +3585,8 @@
     "report:09_facilities_ground.md#9.5",
     "report:09_facilities_ground.md#9.1.1",
     "slides:intro-018",
-    "slides:intro-022"
+    "slides:intro-022",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ผังชั้น G → ซูม 1.8× → วงชี้จุดเดียวกับการ์ด Pilates ใน facilities_ground (ป้าย PILATES STUDIO บนผัง) → ภาพไฟนอล Pilates Studio (ภาพเดียวกับการ์ด) · เตียง Reformer + แผงท้องฟ้ายามอาทิตย์ตก + ผนังกระจกเห็นยิม Biogenesis ตามภาพไฟนอล รายงาน 9.5 (ไม่พูดจำนวนเตียง) · 33.7 ตร.ม. ✅ แผ่นแปลน (ขนาดเท่านั้น) · ไม่พูดเรื่องครู/จองห้อง/Prime1/ค่าใช้ (คำทีมขาย ยังไม่ยืนยัน)"
   },
@@ -3220,11 +3852,13 @@
     "Journey to Mars คืออะไร",
     "Journey to Mars อยู่ไหน",
     "สระธีมอวกาศอยู่ตรงไหน",
-    "อุโมงค์ดาวอังคารคืออะไร"
+    "อุโมงค์ดาวอังคารคืออะไร",
+    "Journey to Mars ใหญ่แค่ไหน"
    ],
    "questions_en": [
     "What is Journey to Mars?",
-    "Where is Journey to Mars?"
+    "Where is Journey to Mars?",
+    "How big is Journey to Mars?"
    ],
    "lines": [
     {
@@ -3244,19 +3878,16 @@
      ]
     },
     {
-     "th": "เป็นทางน้ำธีมอวกาศ พื้นสระมีลายแมงกะพรุนเรืองแสงค่ะ",
-     "en": "It's a space-themed waterway with a glowing jellyfish pattern on the pool floor,",
+     "th": "เป็นทางน้ำธีมอวกาศค่ะ",
+     "en": "It's a space-themed waterway,",
      "cue_th": [
-      "อวกาศ",
-      "แมงกะพรุน"
+      "อวกาศ"
      ],
      "cue_en": [
-      "space",
-      "jellyfish"
+      "space"
      ],
      "cue_zh": [
-      "太空",
-      "水母"
+      "太空"
      ]
     },
     {
@@ -3273,6 +3904,20 @@
      "cue_zh": [
       "隧道",
       "银河"
+     ]
+    },
+    {
+     "th": "โถงยาวประมาณ 16 เมตร กว้างประมาณ 7.8 เมตรค่ะ",
+     "en": "The hall is about 16 metres long and 7.8 metres wide.",
+     "cue_th": [
+      "ยาว",
+      "เมตร"
+     ],
+     "cue_en": [
+      "metres"
+     ],
+     "cue_zh": [
+      "米"
      ]
     }
    ],
@@ -3295,7 +3940,10 @@
      "title_en": "JOURNEY TO MARS",
      "sub_en": "Space-themed waterway · Basement",
      "chips_en": [
-      "Glowing jellyfish-pattern floor",
+      {
+       "label_en": "Size",
+       "value_en": "≈ 16 × 7.8 m"
+      },
       "Galaxy tunnel",
       "Linked to the Aqua Cinema pool"
      ],
@@ -3330,9 +3978,10 @@
     "report:10_facilities_underground.md#10.3",
     "report:10_facilities_underground.md#10.1.3",
     "slides:intro-027",
-    "slides:intro-030"
+    "slides:intro-030",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
-   "notes_th": "ผังใต้ดิน → ซูม 1.8× ที่ปลายขวา → วงชี้จุดเดียวกับการ์ด Journey to Mars ใน drill (ป้าย JOURNEY TO MARS บนผัง) → ภาพเว็บแพ็ก 21 (ภาพเดียวกับการ์ด ป้ายสะกดผิดถูกครอปออกแล้ว) · ทางน้ำธีมอวกาศ ลายแมงกะพรุนเรืองแสงที่พื้นสระ อุโมงค์ลายกาแล็กซี ตามภาพแนวคิดรายงาน 10.3 (เล่าตามที่เห็น ไม่สัญญาเทคโนโลยีฉายภาพ — รายงาน 10.3 เตือนไว้) · ไม่พูดขนาดโถง (≈16 × 7.84 เป็นค่าคำนวณ 🔎) จากุซซี่ 2 อ่างไม่อยู่ในรายการทางการ ไม่พูด"
+   "notes_th": "ผังใต้ดิน → ซูม 1.8× ที่ปลายขวา → วงชี้จุดเดียวกับการ์ด Journey to Mars ใน drill (ป้าย JOURNEY TO MARS บนผัง) → ภาพเว็บแพ็ก 21 (ภาพเดียวกับการ์ด ป้ายสะกดผิดถูกครอปออกแล้ว) · ทางน้ำธีมอวกาศ อุโมงค์ลายกาแล็กซี ตามภาพแนวคิดรายงาน 10.3 (เล่าตามที่เห็น ไม่สัญญาเทคโนโลยีฉายภาพ — รายงาน 10.3 เตือนไว้) · ไม่พูดขนาดโถง (≈16 × 7.84 เป็นค่าคำนวณ 🔎) จากุซซี่ 2 อ่างไม่อยู่ในรายการทางการ ไม่พูด · 15 ต.ค. เจ้าของสั่งลบลายแมงกะพรุน (แบบเลิกใช้แล้ว) ทั้งบทพูดและป้าย"
   },
   {
    "id": "salt_sauna_where",
@@ -3440,11 +4089,13 @@
     "มี Ice Bath ไหม",
     "ห้องแช่น้ำแข็งอยู่ไหน",
     "Ice Bath อยู่ชั้นไหน",
-    "มีอ่างแช่น้ำเย็นไหม"
+    "มีอ่างแช่น้ำเย็นไหม",
+    "Ice Bath ใหญ่แค่ไหน"
    ],
    "questions_en": [
     "Is there an ice bath?",
-    "Where is the ice bath?"
+    "Where is the ice bath?",
+    "How big is the Ice Bath?"
    ],
    "lines": [
     {
@@ -3479,6 +4130,20 @@
       "圆形",
       "浴池"
      ]
+    },
+    {
+     "th": "ห้องขนาด 7.475 × 4.20 เมตรค่ะ",
+     "en": "The room is 7.475 by 4.20 metres.",
+     "cue_th": [
+      "ขนาด",
+      "เมตร"
+     ],
+     "cue_en": [
+      "metres"
+     ],
+     "cue_zh": [
+      "米"
+     ]
     }
    ],
    "params": {
@@ -3500,6 +4165,10 @@
      "title_en": "ICE BATH",
      "sub_en": "Basement · Building A",
      "chips_en": [
+      {
+       "label_en": "Size",
+       "value_en": "7.475 × 4.20 m"
+      },
       "Round plunge tubs",
       "Next to the salt sauna",
       "Basement wellness row"
@@ -3528,7 +4197,8 @@
     "report:10_facilities_underground.md#10.6",
     "report:10_facilities_underground.md#10.1.3",
     "slides:intro-027",
-    "slides:intro-034"
+    "slides:intro-034",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ผังใต้ดิน → ซูม 2× (ศูนย์ซูม y 65 ใต้แถวห้อง ดู salt_sauna_where) → วงชี้จุดเดียวกับการ์ด Ice Bath ใน drill (ป้าย ICE BATH บนผัง) → ภาพเว็บแพ็ก 33 (ภาพเดียวกับการ์ด) · 'ถัดจากซาวน่าเกลือ' ตามรายงาน 10.6 · ห้องโทนขาวฟ้า อ่างแช่ทรงกลม ตรงทั้งภาพแนวคิดในรายงาน 10.6 และภาพเว็บ (ไม่พูดจำนวนอ่าง) · ไม่พูดอุณหภูมิ เวลาแช่ ขนาด"
   },
@@ -3539,11 +4209,13 @@
     "Floating Swing Sauna คืออะไร",
     "ซาวน่าเตียงแขวนอยู่ไหน",
     "ซาวน่าชิงช้าคืออะไร",
-    "Floating Swing Sauna อยู่ไหน"
+    "Floating Swing Sauna อยู่ไหน",
+    "Floating Swing Sauna ใหญ่แค่ไหน"
    ],
    "questions_en": [
     "What is the Floating Swing Sauna?",
-    "Where is the swing sauna?"
+    "Where is the swing sauna?",
+    "How big is the Floating Swing Sauna?"
    ],
    "lines": [
     {
@@ -3580,6 +4252,20 @@
       "悬挂",
       "天花板"
      ]
+    },
+    {
+     "th": "ห้องขนาด 6.884 × 2.90 เมตร ประมาณ 20 ตารางเมตรค่ะ",
+     "en": "The room is 6.884 by 2.90 metres, about 20 square metres.",
+     "cue_th": [
+      "ขนาด",
+      "ตารางเมตร"
+     ],
+     "cue_en": [
+      "square metres"
+     ],
+     "cue_zh": [
+      "平方米"
+     ]
     }
    ],
    "params": {
@@ -3601,6 +4287,10 @@
      "title_en": "FLOATING SWING SAUNA",
      "sub_en": "Basement · Building A",
      "chips_en": [
+      {
+       "label_en": "Size",
+       "value_en": "6.884 × 2.90 m"
+      },
       "Loungers hung from the ceiling",
       "Next to the Ice Bath",
       "Basement wellness row"
@@ -3629,7 +4319,8 @@
     "report:10_facilities_underground.md#10.7",
     "report:10_facilities_underground.md#10.1.3",
     "slides:intro-027",
-    "slides:intro-032"
+    "slides:intro-032",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ผังใต้ดิน → ซูม 2× (ศูนย์ซูม y 65) → วงชี้จุดเดียวกับการ์ดใน drill (ป้าย FLOATING SWING SAUNA บนผัง) → ภาพเว็บแพ็ก 29 (ภาพเดียวกับการ์ด) · 'ถัดจาก Ice Bath' = ห้องที่ 3 จากซ้ายตามรายงาน 10.7 / ลำดับในตาราง 10.1.3 · เก้าอี้นอนแขวนจากเพดาน โยกเหมือนชิงช้า ตามรายงาน 10.7 (ภาพแนวคิด + คำผู้นำเสนอ 'swing sauna เหมือนตอนเด็ก') · ไม่พูดจำนวนเก้าอี้ อุณหภูมิ ความจุ"
   },
@@ -3639,11 +4330,13 @@
    "questions_th": [
     "Crystal Stone Sauna คืออะไร",
     "ซาวน่าหินคริสตัลอยู่ไหน",
-    "ซาวน่าคริสตัลเป็นยังไง"
+    "ซาวน่าคริสตัลเป็นยังไง",
+    "ซาวน่าคริสตัลใหญ่แค่ไหน"
    ],
    "questions_en": [
     "What is the Crystal Stone Sauna?",
-    "Where is the crystal sauna?"
+    "Where is the crystal sauna?",
+    "How big is the Crystal Stone Sauna?"
    ],
    "lines": [
     {
@@ -3675,6 +4368,20 @@
       "石床",
       "躺"
      ]
+    },
+    {
+     "th": "ห้องขนาด 7.80 × 2.90 เมตร ประมาณ 22.6 ตารางเมตรค่ะ",
+     "en": "The room is 7.80 by 2.90 metres, about 22.6 square metres.",
+     "cue_th": [
+      "ขนาด",
+      "ตารางเมตร"
+     ],
+     "cue_en": [
+      "square metres"
+     ],
+     "cue_zh": [
+      "平方米"
+     ]
     }
    ],
    "params": {
@@ -3696,6 +4403,10 @@
      "title_en": "CRYSTAL STONE SAUNA",
      "sub_en": "Basement · Building A",
      "chips_en": [
+      {
+       "label_en": "Size",
+       "value_en": "7.80 × 2.90 m"
+      },
       "Beds of crystal stones",
       "Basement wellness row"
      ],
@@ -3723,7 +4434,8 @@
     "report:10_facilities_underground.md#10.8",
     "report:10_facilities_underground.md#10.1.3",
     "slides:intro-027",
-    "slides:intro-033"
+    "slides:intro-033",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "มีภาพที่อนุมัติ (สไลด์ intro-033) จึงทำเรื่องนี้ แต่ใช้ภาพเว็บแพ็ก 37 ตัวเดียวกับการ์ดใน drill (fac_b_crystal_sauna — ป้าย สะกดผิดถูกครอปออก) · ผังใต้ดิน → ซูม 2× (ศูนย์ซูม y 65) → วงชี้จุดเดียวกับการ์ด (ป้าย CRYTAL STONE SAUNA บนผัง — ผังสะกดผิด บนจอเขียนถูก) · แท่นนอนปูหินคริสตัลตามรายงาน 10.8 (ตรงทั้งภาพแนวคิดและภาพเว็บ ไม่พูดจำนวนแท่น) · ห้ามคำอ้างพลังงาน/ล้างพิษ (10.10)"
   },
@@ -3734,11 +4446,13 @@
     "แคปซูลไฮโดรเทอราพีคืออะไร",
     "Hydrotherapy Capsule อยู่ไหน",
     "มีแคปซูลสปาไหม",
-    "แคปซูลบำบัดอยู่ตรงไหน"
+    "แคปซูลบำบัดอยู่ตรงไหน",
+    "แคปซูลไฮโดรเทอราพีมีกี่เครื่อง"
    ],
    "questions_en": [
     "What is the Hydrotherapy Capsule?",
-    "Is there a spa capsule?"
+    "Is there a spa capsule?",
+    "How many hydrotherapy capsules are there?"
    ],
    "lines": [
     {
@@ -3773,6 +4487,20 @@
       "太空",
       "白色"
      ]
+    },
+    {
+     "th": "ห้องขนาด 7.616 × 2.90 เมตรค่ะ",
+     "en": "The room is 7.616 by 2.90 metres.",
+     "cue_th": [
+      "ขนาด",
+      "เมตร"
+     ],
+     "cue_en": [
+      "metres"
+     ],
+     "cue_zh": [
+      "米"
+     ]
     }
    ],
    "params": {
@@ -3794,6 +4522,10 @@
      "title_en": "HYDROTHERAPY CAPSULE",
      "sub_en": "Basement · Building A",
      "chips_en": [
+      {
+       "label_en": "Size",
+       "value_en": "7.616 × 2.90 m"
+      },
       "Space-themed room",
       "Two white spa capsules",
       "End of the wellness row"
@@ -3822,7 +4554,8 @@
     "report:10_facilities_underground.md#10.9",
     "report:10_facilities_underground.md#10.1.3",
     "slides:intro-027",
-    "slides:intro-035"
+    "slides:intro-035",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ภาพคือสไลด์ที่อนุมัติ intro-035 (fac_b_hydro_capsule ตัวเดียวกับการ์ด) ไม่ใช่เว็บ 42.jpg (มียี่ห้อสปา) · ผังใต้ดิน → ซูม 2× (ศูนย์ซูม y 65) → วงชี้จุดเดียวกับการ์ดใน drill (ป้าย HYDRO THERAPY CAPSULE บนผัง) · 'ห้องสุดท้ายของแถวซาวน่า' = ห้องที่ 5 ขวาสุดตามรายงาน 10.9 · ห้องธีมอวกาศ + แคปซูลสีขาวสองเครื่อง ตามสรุปสไลด์ intro-035 และรายงาน 10.9 ('2 แคปซูล') · ไม่พูดฟังก์ชันไอน้ำ/เจ็ตน้ำ (ถอดเสียงเพี้ยน) และห้ามคำอ้างอินฟราเรด/ลดอายุ (10.10)"
   },
@@ -3833,11 +4566,15 @@
     "Social Lounge คืออะไร",
     "Social Lounge อยู่ไหน",
     "Social Club อยู่ชั้นไหน",
-    "Social Lounge ใหญ่แค่ไหน"
+    "Social Lounge ใหญ่แค่ไหน",
+    "Social Club ขนาดเท่าไหร่",
+    "โซเชียลคลับใหญ่แค่ไหน",
+    "พื้นที่โซเชียลคลับเท่าไหร่"
    ],
    "questions_en": [
     "What is the Social Lounge?",
-    "Where is the Social Lounge?"
+    "Where is the Social Lounge?",
+    "How big is the Social Club?"
    ],
    "lines": [
     {
@@ -3872,8 +4609,8 @@
      ]
     },
     {
-     "th": "ห้องขนาด 12.70 × 5.85 เมตร อยู่ติดโถงลิฟต์ค่ะ",
-     "en": "The room is 12.70 by 5.85 metres, next to the lift lobby.",
+     "th": "ห้องขนาด 12.70 × 5.85 เมตร ประมาณ 74.3 ตารางเมตร อยู่ติดโถงลิฟต์ค่ะ",
+     "en": "The room is 12.70 by 5.85 metres, about 74.3 square metres, next to the lift lobby.",
      "cue_th": [
       "เมตร",
       "ลิฟต์"
@@ -3910,6 +4647,10 @@
        "label_en": "Size",
        "value_en": "12.70 × 5.85 m"
       },
+      {
+       "label_en": "Area",
+       "value_en": "≈ 74.3 sq.m."
+      },
       "Dark-blue lounge",
       "Next to the lift lobby"
      ],
@@ -3937,7 +4678,8 @@
     "report:11_facilities_3rd_floor.md#11.2",
     "report:11_facilities_3rd_floor.md#11.1.2",
     "slides:intro-037",
-    "slides:intro-040"
+    "slides:intro-040",
+    "report:08_facilities_overview.md line 333 (Social Lounge 12.70 × 5.85 ม. ≈ 74.3 ตร.ม. กรอบ)"
    ],
    "notes_th": "ผังชั้น 3 อาคาร A (fac_plan_l3 ตัวเดียวกับ drill) → ซูม 1.8× → วงชี้จุดเดียวกับการ์ด Social Lounge ใน drill (ป้าย SOCIAL LOUNGE บนผัง) → ภาพเว็บชั้น 3 ไฟล์ 29 (ภาพเดียวกับการ์ด ครอปหุ่นยนต์บาร์เทนเดอร์ออกแล้ว — ภาพนี้ไม่มีป้ายชื่อ ดูคำถามข้อ 3 ใน facilities.notes.md) · โทนดำน้ำเงินตามรายงาน 11.2 · 12.70 × 5.85 ม. ✅ แผ่นแปลน (ขนาดเท่านั้น) · ติดโถงลิฟต์ตาม 11.2 · ไม่พูดบาร์/ซิการ์/เครื่องดื่ม/หุ่นยนต์ (รายงาน 11.2: ห้ามตอบเรื่องกฎ และหุ่นยนต์เป็นแผนอนาคต)"
   },
@@ -3954,7 +4696,8 @@
    "questions_en": [
     "Is there a co-working space?",
     "Where is the co-working lounge?",
-    "How big is the co-working lounge?"
+    "How big is the co-working lounge?",
+    "How big is the Co-working Lounge?"
    ],
    "lines": [
     {
@@ -3994,8 +4737,8 @@
      ]
     },
     {
-     "th": "ห้องขนาด 13.925 × 5.85 เมตรค่ะ",
-     "en": "The room is 13.925 by 5.85 metres.",
+     "th": "ห้องขนาด 13.925 × 5.85 เมตร ประมาณ 81.5 ตารางเมตรค่ะ",
+     "en": "The room is 13.925 by 5.85 metres, about 81.5 square metres.",
      "cue_th": [
       "เมตร"
      ],
@@ -4054,7 +4797,8 @@
     "report:11_facilities_3rd_floor.md#11.3",
     "report:11_facilities_3rd_floor.md#11.1.2",
     "slides:intro-037",
-    "slides:intro-038"
+    "slides:intro-038",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ผังชั้น 3 → ซูม 1.8× → วงชี้จุดเดียวกับการ์ด Co-working ใน drill (ป้าย CO-WORKING LOUNGE บนผัง) → ภาพเว็บชั้น 3 ไฟล์ 25 (ภาพเดียวกับการ์ด) · ถัดจาก Social Lounge ตาม 11.3 · โทนครีม บูธนั่ง โซฟา ตามภาพแนวคิด 11.3 · 13.925 × 5.85 ม. ✅ แผ่นแปลน (ตัวเลขตามรายงานเป๊ะ ไม่ปัด) · ไม่พูด 'ใช้ฟรี' / Wi-Fi / มุมวิดีโอคอล (คำทีมขาย ยังไม่มีเอกสารยืนยัน) · รับคำถาม 'มี co-working ไหม' / 'มีที่นั่งทำงานไหม' ที่ย้ายออกจาก facilities_level3"
   },
@@ -4069,7 +4813,8 @@
    ],
    "questions_en": [
     "What is the Common Sphere?",
-    "Is there a meeting room?"
+    "Is there a meeting room?",
+    "How big is the Common Sphere?"
    ],
    "lines": [
     {
@@ -4106,8 +4851,8 @@
      ]
     },
     {
-     "th": "ห้องขนาด 17.30 × 5.85 เมตรค่ะ",
-     "en": "The room is 17.30 by 5.85 metres.",
+     "th": "ห้องขนาด 17.30 × 5.85 เมตร ประมาณ 101 ตารางเมตรค่ะ",
+     "en": "The room is 17.30 by 5.85 metres, about 101 square metres.",
      "cue_th": [
       "เมตร"
      ],
@@ -4166,7 +4911,8 @@
     "report:11_facilities_3rd_floor.md#11.4",
     "report:11_facilities_3rd_floor.md#11.1.2",
     "slides:intro-037",
-    "slides:intro-039"
+    "slides:intro-039",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ผังชั้น 3 → ซูม 1.8× → วงชี้จุดเดียวกับการ์ด Common Sphere ใน drill (ป้าย COMMON SPHERE บนผัง) → ภาพเว็บชั้น 3 ไฟล์ 18 (ภาพเดียวกับการ์ด) · โถงโทนครีม โต๊ะวงรี ห้องประชุมผนังกระจกโค้ง ตามภาพแนวคิดรายงาน 11.4 (ไม่พูดจำนวนห้องประชุม/ที่นั่ง) · 17.30 × 5.85 ม. ✅ แผ่นแปลน · ผู้พัฒนายังไม่อธิบายการใช้งานทางการ จึงเล่าแค่ที่เห็น"
   },
@@ -4396,8 +5142,8 @@
      ]
     },
     {
-     "th": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ยาว 155 เมตร",
-     "en": "The main one is the Water Lagoon in the middle of the project, 155 metres long.",
+     "th": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ยาว 155 เมตร ลึกประมาณ 1.30 เมตร",
+     "en": "The main one is the Water Lagoon in the middle of the project, 155 metres long and about 1.30 metres deep.",
      "cue_th": [
       "Water Lagoon",
       "ลากูน",
@@ -4505,7 +5251,7 @@
     "items": [
      {
       "label_en": "Water Lagoon",
-      "sub_en": "Main pool · centre of the project",
+      "sub_en": "Main pool · ≈ 1.30 m deep",
       "asset": "liv_lagoon_night",
       "asset_kind": "photo",
       "value": {
@@ -4614,7 +5360,8 @@
     "slides:intro-015 (155M. Water Lagoon)",
     "slides:intro-041 (Sky Pool ชั้น 3)",
     "slides:intro-028 (Aqua Cinema)",
-    "assets:web/6.gallery/exterior/CD03/Scene 40.png · ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png · web/6.gallery/exterior/Playscape/Scene 55.png · fac_3_sky_pool / fac_b_aqua_cinema (ภาพของกลุ่ม facilities ใช้ร่วม)"
+    "assets:web/6.gallery/exterior/CD03/Scene 40.png · ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png · web/6.gallery/exterior/Playscape/Scene 55.png · fac_3_sky_pool / fac_b_aqua_cinema (ภาพของกลุ่ม facilities ใช้ร่วม)",
+    "report:01_overview.md line 99, 150 · 19_faq.md (สระหลักลึกประมาณ 1.30 ม. ตามข้อมูลผู้พัฒนา; ไม่ใช้กับ Sky Pool/สระใต้ดิน)"
    ],
    "notes_th": "ตอบ 'มีสระกี่สระ / มีสระอะไรบ้าง' ตามคำตอบ FAQ 19.15 ของรายงานเป๊ะ (สระหลัก 1 · Private Pool 3 · Kid Pool 1 · Sky Pool 1 · สระในร่มใต้ดินต่อ Journey to Mars) ไม่พูดยอดรวมเป็นตัวเลขเดียว เพราะรายงานนับเอง (🔎) และ Kid Pool ดูเป็นส่วนหนึ่งของแนวสระหลัก — เล่าทีละแบบแทน · จังหวะบนจอ: (0) แถวว่างห้าแถวรอ (บอก 'มีห้าแบบ' ก่อนภาพแรก) · (1) ภาพลากูนมุมสูงยามค่ำ Scene 40 (เห็นความยาวคดเคี้ยวของสระ) ตัวเลข 155 m นับขึ้น แล้วย่อเข้าแถว · (2) ภาพมุมบนของคอร์ทฝั่งตะวันตกจากโมเดล UE ของเจ้าของ (เห็นปีกอาคาร E/F/D ที่ Private Pool อยู่) + '3 pools' — ภาพนี้คือคอร์ทที่สระอยู่ ไม่ได้ชี้สระใดสระหนึ่ง ถ้าเจ้าของมีภาพเรนเดอร์ของ Private Pool เองให้เปลี่ยน · (3) ภาพมุมสูงลาน Playscape กับวงสระเด็ก Scene 55 (ครอปตัดคนเล็กๆ ที่ทางเดินและหน้าประตูออก) · (4) Sky Pool ภาพเดียวกับ sky_pool_where · (5) Aqua Cinema ภาพเดียวกับ aqua_cinema_where · (6) ไม่มีภาพใหม่ ประโยคพื้นที่รวม 2,157 ตร.ม. แล้วรายการขยายเต็มจอ พร้อม end_hint ตัวเลขเดียวกัน · แถวที่มีเรื่องของตัวเองแตะได้ (ลากูน→masterplan_lagoon, สระเด็ก→for_families, Sky Pool, Aqua Cinema) Journey to Mars กับ 'ทั้งหมด' เป็นชิปท้าย (taps 6 ≠ แถว 5 จงใจ ไม่ให้ระบบผูกปุ่มตามลำดับเข้าแถว Private Pool) · ไม่ใส่: ความลึก 1.30 ม. (ตามเจ้าของงาน ไม่มีในแบบ), ขนาด Sky Pool ≈143 ตร.ม. (วัดจากโมเดล), จากุซซี่ (ไม่ใช่สระ เรื่องนี้ยาวพอแล้ว), จากุซซี่บนชั้นบนสุด (เจ้าของตัดสินทับ) · ไม่พูดว่า Private Pool เป็นของห้องใด (รายงาน 12.1 ห้าม) · คำถาม 'สระใหญ่แค่ไหน / สระหลักยาวเท่าไหร่' ปล่อยให้ masterplan_lagoon (มีอยู่แล้ว) — ใส่ซ้ำสองเรื่องโมเดลจะเลือกไม่ถูก"
   },
@@ -4627,7 +5374,8 @@
     "สวนข้างโครงการเป็นยังไง",
     "พื้นที่สีเขียวเท่าไหร่",
     "มีต้นไม้อะไรบ้าง",
-    "ในโครงการมีสวนไหม"
+    "ในโครงการมีสวนไหม",
+    "พันธุ์ไม้มีอะไรบ้าง"
    ],
    "questions_en": [
     "Is it next to a park?",
@@ -4774,7 +5522,8 @@
     "report:91_appendix_plants.md#ข.2 (จิกน้ำ Indian oak · โมกมัน Water jasmine · มะฮอกกานี Big-leaf mahogany) และ English summary line 131",
     "report:19_faq.md line 658 (ต้นไม้ 34 ชื่อ) · line 234 (พื้นที่สีเขียว 4,256 ตร.ม.) · line 170 (ติดสวนสาธารณะ)",
     "slides:intro-011 (THE PARK)",
-    "assets:slides intro_011.jpg · web/6.gallery/exterior/CD03/Scene 43.png · Scene 38.png · Scene 37.png"
+    "assets:slides intro_011.jpg · web/6.gallery/exterior/CD03/Scene 43.png · Scene 38.png · Scene 37.png",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "การ์ดสี่ใบเด้งขึ้นตามคำ: (0) 'The Park next door' — ภาพ THE PARK จากสไลด์ intro-011 ที่อนุมัติแล้ว (ครอปซ้ายล่าง ตัดหัวข้อ THE PARK โลโก้ และป้ายมุมขวาล่างออก) ภาพนี้เป็นภาพประกอบของผู้พัฒนา ไม่ใช่ภาพถ่ายสวนจริง การ์ดจึงใช้คำว่า The Park ตามเด็ค แล้วบอกชื่อสวนจริงในบรรทัดเล็ก · (1) พื้นที่สีเขียว 4,256 ตร.ม. — Scene 43 ทางเดินกลางแปลงไม้พุ่มริมลากูน · (2) 34 ชนิด (ไม้ยืนต้น 11 · ไม้พุ่ม/คลุมดิน 23) — Scene 38 ต้นไม้ใหญ่ไม้ดอกขาว · (3) Stepped Garden — Scene 37 สนามหญ้าขั้นบันไดกับเตียงอาบแดด (Daybed 53 ชุดตามผัง) · footnote ขึ้นตอนจบ: สวนของเมืองพัทยา เปิดทุกวัน 05:00–21:00 เข้าฟรี · ชื่อต้นไม้: ไทยใช้ชื่อตามแบบ อังกฤษใช้ชื่อจาก English summary ของภาคผนวก ข (Indian oak, water jasmine, mahogany) · ไม่ใส่: ระยะ 40–100 ม. (อยู่ใน location_beach แล้ว และเป็นระยะจากหมุด) · คำว่า 'เดินเข้าสวนได้' / Direct Park Connection (facts: ทางเชื่อมยังไม่ยืนยัน — ห้ามสัญญา) จึงไม่ใส่คำถาม 'เดินเข้าสวนได้ไหม' ในเรื่องนี้ ปล่อยให้โมเดลตอบจาก facts · จำนวนต้นไม้ 62 ต้น (รายงานนับเอง ห้ามพูด) · ร้อยละที่เกินเกณฑ์พื้นที่สีเขียว (เกณฑ์ของสถาปนิก ห้ามอ้างข้อกฎหมาย) · ชื่อวิทยาศาสตร์ · ขนาดสวน 'กว่า 5 ไร่' (สองแหล่งไม่ตรงกัน)"
   },
@@ -5315,7 +6064,6 @@
    "questions_th": [
     "ใครเป็นผู้พัฒนาโครงการ",
     "Empire Group คือใคร",
-    "บริษัทนี้มีผลงานอะไรบ้าง",
     "ผู้พัฒนาได้รางวัลอะไรบ้าง",
     "บริษัททำมากี่ปีแล้ว",
     "ผู้พัฒนาน่าเชื่อถือไหม",
@@ -5325,7 +6073,6 @@
    "questions_en": [
     "Who is the developer?",
     "Who is Empire Group?",
-    "What has the developer built before?",
     "Has the developer won any awards?"
    ],
    "lines": [
@@ -5476,6 +6223,13 @@
    },
    "taps": [
     {
+     "id": "story_developer_projects",
+     "label_en": "16 projects",
+     "label_th": "ผลงาน 16 โครงการ",
+     "next_story": "developer_projects",
+     "tool": null
+    },
+    {
      "id": "story_developer_concept",
      "label_en": "The concept",
      "label_th": "แนวคิดโครงการ",
@@ -5513,13 +6267,16 @@
     "Embassy World คืออะไร",
     "อยู่ที่นี่แล้วชีวิตเป็นยังไง",
     "คอนเซ็ปต์ของโครงการ",
-    "ทำไมต้องเลือกที่นี่"
+    "ทำไมต้องเลือกที่นี่",
+    "ที่นี่แตกต่างจากที่อื่นยังไง",
+    "เล่าที่มาของโครงการ"
    ],
    "questions_en": [
     "What is the concept of the project?",
     "What makes this project special?",
     "How is it different from other condos?",
-    "Who is this project for?"
+    "Who is this project for?",
+    "What makes this project different from others?"
    ],
    "lines": [
     {
@@ -6028,6 +6785,285 @@
    "notes_th": "บนจอ (การ์ดห้าใบเด้งตามเสียง): (0) Eco System Quality — ภาพลากูน (CD03 Scene 36 ใบเดียวกับ project_concept) ใต้ภาพ 'Air & water quality dashboards · CO₂ sensors' · (1) EV charging — ผังใต้ดินเฉพาะแถวจอดที่พิมพ์ WITH EV CHARGER (เส้นฟ้าบนพื้นใส ครอปใต้ y 715 เสมอ: ข้างบนมีชื่อห้องที่เจ้าของตัด) · (2) Smart irrigation — ภาพทางเดินในสวน (CD03 Scene 43) + Weather & UV ในข้อความใต้ภาพ · (3) Embassy AI Application — สไลด์ intro-042 (ภาพเดียวกับ project_concept) · (4) Smart Home — ห้องนั่งเล่นจากสไลด์ intro-043 'An optional in-room package' แล้วปุ่ม Smart Home ไปเรื่อง smart_home (ไม่เล่าซ้ำ ม่าน/แอร์อยู่ที่นั่น) · ไม่พูด: ระบบพ่นละอองน้ำ/Fog (ไม่อยู่ในเด็ค ผู้นำเสนอว่ายังต้องเพิ่ม) Outdoor Air Quality System (ผูกกับ fog) หุ่นยนต์ Social Lounge (แนวคิดอนาคต) ฟิตเนส AI, Wi-Fi ฟรี, ตรวจช่องจอดว่างผ่านแอป, แอปฟรี/เฉพาะลูกบ้าน (คำพูดในคลิป ต้องยืนยันเป็นลายลักษณ์อักษร), Transportation Assistance (ห้ามยืนยันว่าเรียกรถได้ — ชื่อยังเห็นบนภาพแอปเพราะเป็นสไลด์ที่อนุมัติ แต่เธอไม่พูด), ช่องทางดูแดชบอร์ด (ห้ามระบุช่องทางแน่ชัด 13.12 ข้อ 10), จำนวนหัวชาร์จ EV, ค่าบริการใดๆ · ข้อให้เจ้าของตัดสิน: การ์ดแรกใช้ชื่อ 'Eco System Quality' (facility ข้อ 31) คู่กับแดชบอร์ดอากาศ/น้ำและเซ็นเซอร์ CO₂ — รายงาน 13.1/13.4 จัดไว้กลุ่มเดียวกันและบอกว่า 'น่าจะเป็นชื่อรวม' (🔎 ไม่ใช่ข้อยืนยัน) ถ้าไม่อยากผูกให้เปลี่ยนป้ายเป็น 'Air & water quality'"
   },
   {
+   "id": "executives",
+   "template": "features",
+   "questions_th": [
+    "ผู้บริหารโครงการชื่ออะไร",
+    "ใครเป็นผู้บริหาร",
+    "ผู้บริหารคือใคร",
+    "CEO ชื่ออะไร",
+    "ขอดูภาพผู้บริหาร",
+    "บอสชื่ออะไร",
+    "ผู้บริหาร Empire Group มีใครบ้าง",
+    "ผู้บริหารโครงการเราชื่ออะไร",
+    "โครงการเรามีบอสชื่ออะไร",
+    "ผู้บริหารชื่ออะไร"
+   ],
+   "questions_en": [
+    "Who are the executives?",
+    "Who is the CEO?",
+    "Who runs Empire Group?"
+   ],
+   "lines": [
+    {
+     "th": "ผู้บริหารของ Empire Group นำโดย CEO คุณ Miki Haim ค่ะ",
+     "en": "Empire Group is led by its CEO, Miki Haim,",
+     "cue_th": [
+      "Miki",
+      "มิกิ"
+     ],
+     "cue_en": [
+      "Miki"
+     ],
+     "cue_zh": [
+      "Miki",
+      "米基"
+     ]
+    },
+    {
+     "th": "Chief Operating Officer คือคุณพุทธชาด สุจริตกุล",
+     "en": "with Pudthachad Sucharitakul as Chief Operating Officer,",
+     "cue_th": [
+      "พุทธชาด",
+      "Pudthachad"
+     ],
+     "cue_en": [
+      "Pudthachad"
+     ],
+     "cue_zh": [
+      "Pudthachad"
+     ]
+    },
+    {
+     "th": "Chief Financial Officer คือคุณ Dor Haim",
+     "en": "Dor Haim as Chief Financial Officer,",
+     "cue_th": [
+      "Dor",
+      "ดอร์"
+     ],
+     "cue_en": [
+      "Dor"
+     ],
+     "cue_zh": [
+      "Dor"
+     ]
+    },
+    {
+     "th": "และ General Manager คือคุณ Moran S. Haim ค่ะ",
+     "en": "and Moran S. Haim as General Manager.",
+     "cue_th": [
+      "Moran",
+      "โมราน"
+     ],
+     "cue_en": [
+      "Moran"
+     ],
+     "cue_zh": [
+      "Moran"
+     ]
+    }
+   ],
+   "params": {
+    "items": [
+     {
+      "label_en": "Miki Haim",
+      "asset": "exec_ceo",
+      "note_en": "Chief Executive Officer",
+      "line": 0
+     },
+     {
+      "label_en": "Pudthachad Sucharitakul",
+      "asset": "exec_coo",
+      "note_en": "Chief Operating Officer",
+      "line": 1
+     },
+     {
+      "label_en": "Dor Haim",
+      "asset": "exec_cfo",
+      "note_en": "Chief Financial Officer",
+      "line": 2
+     },
+     {
+      "label_en": "Moran S. Haim",
+      "asset": "exec_gm",
+      "note_en": "General Manager",
+      "line": 3
+     }
+    ],
+    "footnote_en": "Empire Group leadership"
+   },
+   "taps": [
+    {
+     "id": "story_executives_developer",
+     "label_en": "About Empire Group",
+     "label_th": "เกี่ยวกับ Empire Group",
+     "next_story": "developer",
+     "tool": null
+    },
+    {
+     "id": "story_executives_concept",
+     "label_en": "Our concept",
+     "label_th": "แนวคิดโครงการ",
+     "next_story": "project_concept",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:02_developer.md#2.10.1 ทีมผู้บริหาร (CEO Miki Haim · COO Pudthachad Sucharitakul (พุทธชาด สุจริตกุล) · GM Moran S. Haim · CFO Dor Haim)",
+    "assets:saleskit/embassy_life_sales_kit_2.0.pdf p.1–2"
+   ],
+   "notes_th": "เจ้าของ 15 ต.ค.: \"เปิดเผยชื่อได้\" และ \"ขอ motion\" ให้คำถามภาพผู้บริหาร — สั่งทับ FAQ 19 ของรายงาน (\"แชทบอทไม่เปิดเผยชื่อ ... ผู้บริหาร\") และข้อห้ามภาพคนเฉพาะภาพผู้บริหารชุดนี้ · ข้อมูลระดับกลุ่มจาก Sales Kit Embassy Life 2.0 (รายงาน 2.10) · ชื่อพนักงานขาย/ลูกค้ายังไม่เปิดเผยเหมือนเดิม · ลำดับ CEO → COO → CFO → GM (เจ้าของ 16 ต.ค. ถามว่าให้ CFO มาก่อน GM ไหม — ตำแหน่ง C-level ก่อนผู้จัดการทั่วไปตามธรรมเนียม ลำดับเดิมมาจากหน้า Sales Kit ไม่ใช่ลำดับตำแหน่ง)"
+  },
+  {
+   "id": "developer_projects",
+   "template": "stack",
+   "questions_th": [
+    "บริษัทนี้มีผลงานอะไรบ้าง",
+    "ขอชื่อโครงการทั้ง 16 โครงการ",
+    "16 โครงการมีอะไรบ้าง",
+    "เคยสร้างโครงการอะไรมาบ้าง",
+    "ผู้สร้างโครงการมีผลงานที่ไหนบ้าง",
+    "โครงการเก่าของ Empire Group มีอะไรบ้าง",
+    "รายชื่อโครงการที่ผ่านมา",
+    "Empire Group เคยทำโครงการอะไรมาบ้าง"
+   ],
+   "questions_en": [
+    "What has the developer built before?",
+    "What are the 16 projects?",
+    "Which projects has Empire Group built?",
+    "Can you list the past projects?"
+   ],
+   "lines": [
+    {
+     "th": "ตั้งแต่ปี 2006 Empire Group พัฒนามาแล้ว 16 โครงการในพัทยาค่ะ",
+     "en": "Since 2006, Empire Group has developed 16 projects in Pattaya,",
+     "cue_th": [
+      "2006",
+      "16 โครงการ",
+      "สิบหก"
+     ],
+     "cue_en": [
+      "2006",
+      "16",
+      "sixteen"
+     ],
+     "cue_zh": [
+      "2006",
+      "16"
+     ]
+    },
+    {
+     "th": "เริ่มจาก Hyde Park I และ II, Sunset Boulevard I, Pattaya Heights และ Park Lane Jomtien",
+     "en": "starting with Hyde Park I and II, Sunset Boulevard I, Pattaya Heights and Park Lane Jomtien,",
+     "cue_th": [
+      "Hyde Park",
+      "ไฮด์ปาร์ค"
+     ],
+     "cue_en": [
+      "Hyde Park"
+     ],
+     "cue_zh": [
+      "Hyde Park"
+     ]
+    },
+    {
+     "th": "ตามด้วย Sunset Boulevard II, View, Paradise Park, Art on the Hill และ The Vision",
+     "en": "then Sunset Boulevard II, View, Paradise Park, Art on the Hill and The Vision,",
+     "cue_th": [
+      "Paradise Park",
+      "The Vision"
+     ],
+     "cue_en": [
+      "Paradise Park",
+      "Vision"
+     ],
+     "cue_zh": [
+      "Paradise Park",
+      "Vision"
+     ]
+    },
+    {
+     "th": "แล้วก็ Amazon Residence, City Center Residence, The Orient Resort & Spa และ The Empire Tower",
+     "en": "then Amazon Residence, City Center Residence, The Orient Resort & Spa and The Empire Tower,",
+     "cue_th": [
+      "Amazon",
+      "อเมซอน"
+     ],
+     "cue_en": [
+      "Amazon"
+     ],
+     "cue_zh": [
+      "Amazon"
+     ]
+    },
+    {
+     "th": "ล่าสุดคือ Embassy กับ Embassy Life และ Embassy World ของเราคือโครงการถัดไปค่ะ",
+     "en": "and most recently Embassy and Embassy Life, with our Embassy World as the next one.",
+     "cue_th": [
+      "Embassy Life",
+      "ล่าสุด"
+     ],
+     "cue_en": [
+      "Embassy Life",
+      "recently"
+     ],
+     "cue_zh": [
+      "Embassy Life"
+     ]
+    }
+   ],
+   "params": {
+    "items": [
+     {
+      "label_en": "Hyde Park → The Vision",
+      "sub_en": "2006 – 2015 · Pattaya",
+      "asset": "dev_timeline_early",
+      "asset_kind": "photo",
+      "value": {
+       "to": 10,
+       "unit_en": "projects"
+      },
+      "line": 1
+     },
+     {
+      "label_en": "Amazon → Embassy Life",
+      "sub_en": "2013 – 2027 · Pattaya",
+      "asset": "dev_timeline_late",
+      "asset_kind": "photo",
+      "value": {
+       "to": 6,
+       "unit_en": "projects"
+      },
+      "line": 3
+     }
+    ],
+    "end_hint_en": "16 projects since 2006 · Embassy World is next"
+   },
+   "taps": [
+    {
+     "id": "story_developer_projects_developer",
+     "label_en": "About Empire Group",
+     "label_th": "เกี่ยวกับ Empire Group",
+     "next_story": "developer",
+     "tool": null
+    },
+    {
+     "id": "story_developer_projects_executives",
+     "label_en": "Executives",
+     "label_th": "ผู้บริหาร",
+     "next_story": "executives",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:02_developer.md#2.10.2 ผลงานและไทม์ไลน์โครงการ (16 โครงการ 2006–2027 จาก Embassy Life Sales Kit)",
+    "report:19_faq.md (ขอดูรายชื่อโครงการเดิม ... — รายชื่อ 16 โครงการ)",
+    "report:02_developer.md#2.10.2 (Embassy World เป็นโครงการถัดไปของกลุ่ม)",
+    "assets:saleskit/embassy_life_sales_kit_2.0.pdf p.3–4"
+   ],
+   "notes_th": "เจ้าของ 15 ต.ค. \"เช็คข้อมูลกับคำถามทั้งหมด อย่าให้หลุด\" — log หุ่น 12 ต.ค. \"ขอชื่อโครงการทั้ง 16 โครงการ\" ถูกส่งทีมขาย ทั้งที่รายงานมีรายชื่อ (ไม่มีคำค้นแบบไหนดึงขึ้นมาได้) · ภาพครอปใต้กล่องตัวเลขของ Sales Kit (5,400 ยูนิตขัดกับเด็ค 6,000+) · \"Embassy\" (2023–2027) พูดตามชื่อในไทม์ไลน์ · ทุกโครงการอยู่พัทยาตามคำตอบแนะนำของรายงาน"
+  },
+  {
    "id": "views_collections",
    "template": "drill",
    "questions_th": [
@@ -6036,10 +7072,12 @@
     "ห้องไหนเห็นทะเล",
     "วิวมีอะไรบ้าง",
     "ห้องมีวิวอะไรบ้าง",
-    "อาคารแต่ละหลังมีวิวอะไร",
+    "แต่ละหลังมีวิวอะไร",
     "Collection LAGOON SIGNATURE PARKSIDE BREEZE ต่างกันอย่างไร",
     "ห้องไหนวิวสระ",
-    "ห้องไหนติดสวนสาธารณะ"
+    "ห้องไหนติดสวนสาธารณะ",
+    "ห้องไหนวิวดีที่สุด",
+    "วิวไหนดีที่สุด"
    ],
    "questions_en": [
     "Can I see the sea from the room?",
@@ -6047,7 +7085,8 @@
     "What views do the rooms have?",
     "What's the difference between LAGOON, SIGNATURE, PARKSIDE and BREEZE?",
     "Which rooms face the pool?",
-    "Which building has which view?"
+    "Which building has which view?",
+    "Which room has the best view?"
    ],
    "lines": [
     {
@@ -6252,7 +7291,6 @@
     "ได้เฟอร์นิเจอร์อะไรบ้าง",
     "Studio ได้กี่รายการ",
     "หนึ่งห้องนอนได้เฟอร์นิเจอร์อะไรบ้าง",
-    "ห้องมีแอร์กี่เครื่อง",
     "เฟอร์นิเจอร์ครบไหม"
    ],
    "questions_en": [
@@ -6421,7 +7459,8 @@
     "report:14_units.md#14.4.3 (2-BR 34 ชิ้น: เก้าอี้ 4 · เตียง King size 6 ฟุต + Queen size 5 ฟุต · ห้องน้ำ 2 ห้อง ชุดละ 4 รายการ · แอร์ 3)",
     "report:14_units.md#14.1.3 (ไม่ปรากฏในรายการแพ็กเกจ: เครื่องซักผ้า ไมโครเวฟ ผ้าม่าน …)",
     "report:19_faq.md#19.7 (ห้องมีเฟอร์นิเจอร์ให้ไหม · Studio/1-BR/2-BR ได้อะไรบ้าง · ห้องได้เครื่องซักผ้า ไมโครเวฟ ผ้าม่านไหม)",
-    "plans:sales/unit-plans/index.json A-316 'STUDIO 25.0 SQ.M.', F-113 '1 BEDROOM 34.0 SQ.M.', C-309 '2 BEDROOM 51.5 SQ.M.' (the three plan pictures, as in room_types)"
+    "plans:sales/unit-plans/index.json A-316 'STUDIO 25.0 SQ.M.', F-113 '1 BEDROOM 34.0 SQ.M.', C-309 '2 BEDROOM 51.5 SQ.M.' (the three plan pictures, as in room_types)",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "แม่แบบ stack แบบเดียวกับ room_types (ผังรายยูนิตจริงสามแบบ ภาพเดิมที่ปักแล้ว) แต่ตัวเลขที่นับขึ้นคือจำนวนรายการในแพ็กเกจ: 'แพ็กเกจเฟอร์นิเจอร์' = แถวว่างสามแถวรอ → 'สตูดิโอ' ผังสตูดิโอขึ้นใหญ่ 20 items → 'หนึ่งห้องนอน' 25 → 'สองห้องนอน' 34 → จบที่รายการสามแถว (แตะแล้วไปเรื่อง details ของแบบนั้น) + บรรทัดล่าง 'Not in the package' · ไม่พูดว่าเฟอร์นิเจอร์รวมในราคาหรือไม่ (เรื่องเงิน) พูดแค่ว่าห้องมาพร้อมอะไรตามที่รายงานเขียน · ไม่บอกขนาดเตียงสตูดิโอ/1 ห้องนอน (แบบไม่ระบุ — รายงาน 14.9 ห้ามเดา) บอกแค่ 'คิงไซซ์กับควีนไซซ์' ของ 2 ห้องนอน ไม่บอกเป็นเมตร (รายงาน: ยืนยันหน่วยกับฝ่ายขายก่อนอ้างเมตร) · ไม่พูดเวลาติดตั้ง (เงื่อนไขผูกกับการชำระเงินครบ = เรื่องเงิน) · ไม่ใช้ภาพห้องตกแต่ง/โมเดล UE เพราะภาพพวกนั้นมีของที่ไม่อยู่ในแพ็กเกจ (โคมระย้า ของแต่ง — 14.8.2) และรายงาน 14.1.3 ห้ามใช้โมเดลห้อง 3 มิติเป็นข้อมูลเฟอร์นิเจอร์ · ไม่ใช้ PDF 'FURNITURE PACKAGE 24-06-26' ใน .tmp (แบบเดือน มิ.ย. มีห้องรวม 66-69 ตร.ม. ที่รายงานบอกว่าไม่ได้ขาย) · ปุ่มที่สี่ไป smart_home เพราะม่านไม่อยู่ในแพ็กเกจ แต่มอเตอร์ม่านอยู่ในชุด Smart Home"
   },
@@ -6984,19 +8023,23 @@
     "มีแบบห้องอะไรบ้าง",
     "ห้องกี่ตารางเมตร",
     "มีกี่แบบห้อง",
-    "ห้องมีขนาดเท่าไหร่บ้าง"
+    "ห้องมีขนาดเท่าไหร่บ้าง",
+    "ห้องมีกี่รูปทรง",
+    "แปลนห้องมีกี่แบบ",
+    "ห้องมีกี่แบบ"
    ],
    "questions_en": [
     "What room types do you have?",
     "What sizes are the units?",
     "How big are the rooms?",
     "What kinds of units are there?",
-    "What layouts can I choose from?"
+    "What layouts can I choose from?",
+    "Which layouts are there?"
    ],
    "lines": [
     {
-     "th": "ที่นี่มีห้องให้เลือกสามแบบค่ะ",
-     "en": "We have three room types:",
+     "th": "เรามีห้อง 3 ประเภท รวม 7 รูปทรงแปลนค่ะ",
+     "en": "We have three room types in seven layouts:",
      "cue_th": [
       "สามแบบ",
       "3 แบบ"
@@ -7011,8 +8054,8 @@
      ]
     },
     {
-     "th": "สตูดิโอ 24 ถึง 29 ตารางเมตร",
-     "en": "a studio, 24 to 29 square metres,",
+     "th": "สตูดิโอ 4 รูปทรง ขนาด 24 ถึง 29 ตารางเมตร",
+     "en": "four studio layouts, 24 to 29 square metres,",
      "cue_th": [
       "สตูดิโอ"
      ],
@@ -7026,8 +8069,8 @@
      ]
     },
     {
-     "th": "หนึ่งห้องนอน 33 ถึง 35 ตารางเมตร",
-     "en": "a one-bedroom, 33 to 35,",
+     "th": "หนึ่งห้องนอน 2 รูปทรง ขนาด 33 ถึง 35 ตารางเมตร",
+     "en": "two one-bedroom layouts, 33 to 35,",
      "cue_th": [
       "หนึ่งห้องนอน",
       "1 ห้องนอน",
@@ -7046,8 +8089,8 @@
      ]
     },
     {
-     "th": "และสองห้องนอน 51.5 ถึง 52.5 ตารางเมตรค่ะ",
-     "en": "and a two-bedroom, 51.5 to 52.5 square metres.",
+     "th": "และสองห้องนอน 1 รูปทรง ขนาด 51.5 ถึง 52.5 ตารางเมตรค่ะ",
+     "en": "and one two-bedroom layout, 51.5 to 52.5 square metres.",
      "cue_th": [
       "สองห้องนอน",
       "2 ห้องนอน"
@@ -7070,7 +8113,7 @@
     "items": [
      {
       "label_en": "Studio",
-      "sub_en": "Open plan · 1 bathroom",
+      "sub_en": "4 layouts · open plan",
       "asset": "plan_studio",
       "asset_kind": "plan",
       "value": {
@@ -7082,7 +8125,7 @@
      },
      {
       "label_en": "1 Bedroom",
-      "sub_en": "1 bedroom · 1 bathroom",
+      "sub_en": "2 layouts · 1 bathroom",
       "asset": "plan_1br",
       "asset_kind": "plan",
       "value": {
@@ -7094,7 +8137,7 @@
      },
      {
       "label_en": "2 Bedrooms",
-      "sub_en": "2 bedrooms · 2 baths",
+      "sub_en": "1 layout · 2 bathrooms",
       "asset": "plan_2br",
       "asset_kind": "plan",
       "value": {
@@ -7137,9 +8180,11 @@
     "report:14_units.md#14.1 line 25 (Studio ห้องโล่งเดียว ไม่มีห้องนอนแยก · 1-BR 1 ห้องนอน + นั่งเล่น/ครัว · 2-BR 2 ห้องนอน + นั่งเล่น/ครัว)",
     "report:14_units.md#14.1 line 26 (ห้องน้ำ 1 / 1 / 2)",
     "plans:sales/unit-plans/index.json A-316 'STUDIO 25.0 SQ.M.', F-113 '1 BEDROOM 34.0 SQ.M.', C-309 '2 BEDROOM 51.5 SQ.M.' (label: pete ถูกต้องทั้งหมด)",
-    "sales:qa_script.json q05 answer_after (เล่าความต่างของการใช้งานก่อน ตัวเลขเป็นข้อมูลประกอบ ห้ามเหมาว่าแบบไหนไว้ลงทุนหรืออยู่เอง)"
+    "sales:qa_script.json q05 answer_after (เล่าความต่างของการใช้งานก่อน ตัวเลขเป็นข้อมูลประกอบ ห้ามเหมาว่าแบบไหนไว้ลงทุนหรืออยู่เอง)",
+    "report:14_units.md#14.2.2 (Studio มาตรฐาน · B-x25 · B-x07 คางหมู · E-107)",
+    "report:14_units.md#14.3.2/14.6 (1-BR มาตรฐาน · B-x13 แปลนเอียง)"
    ],
-   "notes_th": "เรื่องของเจ้าของข้อ 1: ผังแต่ละแบบขึ้นใหญ่ตอน Emma เอ่ยชื่อแบบ ตัวเลขช่วงขนาดนับขึ้น แล้วย่อลงไปเกาะเป็นแถว จบที่รายการสามแถวที่แตะได้ ผังเป็นผังรายยูนิตจริงจากระบบผังขาย (ห้องเดียวกับโมเดล UE ในเรื่อง details จึงตรงกัน) ไม่มีเลขห้องบนจอ บรรทัดแรกไม่มีภาพใหญ่ (แค่แถวว่างสามแถวรอ) ไม่มีประโยคถามปิดท้ายเพราะ prompt สั่งค่าเริ่มต้นไม่ถามต่อ ปล่อยให้ end_hint บนจอเชิญแตะแทน ไม่พูดเรื่องลงทุน/อยู่เองตาม qa_script q05"
+   "notes_th": "เรื่องของเจ้าของข้อ 1: ผังแต่ละแบบขึ้นใหญ่ตอน Emma เอ่ยชื่อแบบ ตัวเลขช่วงขนาดนับขึ้น แล้วย่อลงไปเกาะเป็นแถว จบที่รายการสามแถวที่แตะได้ ผังเป็นผังรายยูนิตจริงจากระบบผังขาย (ห้องเดียวกับโมเดล UE ในเรื่อง details จึงตรงกัน) ไม่มีเลขห้องบนจอ บรรทัดแรกไม่มีภาพใหญ่ (แค่แถวว่างสามแถวรอ) ไม่มีประโยคถามปิดท้ายเพราะ prompt สั่งค่าเริ่มต้นไม่ถามต่อ ปล่อยให้ end_hint บนจอเชิญแตะแทน ไม่พูดเรื่องลงทุน/อยู่เองตาม qa_script q05 · 15 ต.ค. เจ้าของ: นับตามรูปทรงแปลน 7 แบบ — สตูดิโอ 4 (มาตรฐาน 25, B-x25 26, B-x07 คางหมู 29, E-107 24) · 1 ห้องนอน 2 (มาตรฐาน 33–35, B-x13 แปลนเอียง 34) · 2 ห้องนอน 1 (51.5–52.5)"
   },
   {
    "id": "unit_studio",
@@ -7149,13 +8194,18 @@
     "สตูดิโอขนาดเท่าไหร่",
     "สตูดิโอกี่ตารางเมตร",
     "ห้องสตูดิโอข้างในเป็นแบบไหน",
-    "ห้องสตูดิโอมีห้องนอนแยกไหม"
+    "ห้องสตูดิโอมีห้องนอนแยกไหม",
+    "ห้องเล็กที่สุดกี่ตารางเมตร",
+    "ห้องที่เล็กที่สุดขนาดเท่าไหร่",
+    "สตูดิโอมีแอร์กี่เครื่อง",
+    "สตูดิโอมีห้องน้ำกี่ห้อง"
    ],
    "questions_en": [
     "What is the studio like?",
     "How big is the studio?",
     "What does the studio look like inside?",
-    "Does the studio have a separate bedroom?"
+    "Does the studio have a separate bedroom?",
+    "What is the smallest unit?"
    ],
    "lines": [
     {
@@ -7174,7 +8224,7 @@
      ]
     },
     {
-     "th": "เป็นห้องโล่ง ไม่มีห้องนอนแยก",
+     "th": "เป็นห้องโล่ง ไม่มีห้องนอนแยก มีห้องน้ำ 1 ห้อง แอร์ 1 เครื่อง",
      "en": "It's open plan, with no separate bedroom.",
      "cue_th": [
       "ห้องโล่ง",
@@ -7237,6 +8287,7 @@
     },
     "meta_en": [
      "Open plan · no separate bedroom",
+     "1 bathroom · 1 air-con",
      "1 bathroom",
      "117 units in the project",
      "3D model: one studio layout"
@@ -7280,7 +8331,8 @@
     "report:14_units.md#14.1 line 25 (ห้องโล่งเดียว ไม่มีห้องนอนแยก)",
     "report:14_units.md#14.1 line 26 (ห้องน้ำ 1)",
     "report:14_units.md#14.2.5 (Studio package has no sofa: mood images avoid the bedroom render and keep the sofa small)",
-    "ue:RoomExperience 03_A-316_Studio24 = appendix A-316 Studio 25.0 (design area 24.79) — evidence only, appendix not shown"
+    "ue:RoomExperience 03_A-316_Studio24 = appendix A-316 Studio 25.0 (design area 24.79) — evidence only, appendix not shown",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ลำดับ: โครงลวดฟ้าของห้องวาดขึ้น (คำ 'สตูดิโอ') → โมเดลขาวจางทับตรงตำแหน่งเดิม (คำ 'ห้องโล่ง') → ตัวเลข 24–29 นับขึ้นพร้อมข้อมูลประกอบ (คำ 'ตารางเมตร') → แถบภาพบรรยากาศสองภาพพร้อมป้าย Interior mood (คำ 'บรรยากาศ') โมเดล UE คือห้อง A-316 (Studio มาตรฐาน 25 ตร.ม.) ตัดแผง UI ที่มีเลขห้องและ 24.83 SQ.M. ออกแล้ว ภาพบรรยากาศใช้ห้องทานข้าวกับห้องน้ำ ไม่ใช้ภาพห้องนอนแยกเพราะสตูดิโอไม่มีห้องนอนแยก ปุ่ม 'ดูห้องสตูดิโอที่ยังว่าง' เรียก show_room_type(studio) ที่ลงหุ่นแล้ว (เซิร์ฟเวอร์เลือกห้องว่างจริง ราคาไม่ออกจอ) · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด"
   },
@@ -7292,7 +8344,8 @@
     "1 ห้องนอนกี่ตารางเมตร",
     "ห้อง 34 ตารางเมตรเป็นยังไง",
     "ห้องหนึ่งห้องนอนข้างในเป็นแบบไหน",
-    "ห้องนอนเดียวขนาดเท่าไหร่"
+    "ห้องนอนเดียวขนาดเท่าไหร่",
+    "หนึ่งห้องนอนมีห้องน้ำกี่ห้อง"
    ],
    "questions_en": [
     "What is the one-bedroom like?",
@@ -7322,7 +8375,7 @@
      ]
     },
     {
-     "th": "มีห้องนอนแยก กับมุมนั่งเล่นและครัว",
+     "th": "มีห้องนอนแยก กับมุมนั่งเล่นและครัว ห้องน้ำ 1 ห้อง แอร์ 2 เครื่อง",
      "en": "It has a separate bedroom, plus a living area and kitchen.",
      "cue_th": [
       "ห้องนอนแยก",
@@ -7385,6 +8438,7 @@
     },
     "meta_en": [
      "1 bedroom + living & kitchen",
+     "1 bathroom · 2 air-cons",
      "1 bathroom",
      "801 units · our most common type",
      "3D model: one 1‑bedroom layout"
@@ -7437,7 +8491,8 @@
     "report:14_units.md#14.1 line 25 (1 ห้องนอน + นั่งเล่น/ครัว)",
     "report:14_units.md#14.1 line 26 (ห้องน้ำ 1)",
     "report:14_units.md#14.8.1 (the '34 sq.m. room' the sales team names = 1-Bedroom; its interior is the designed one)",
-    "ue:RoomExperience 01_F-113_Room34 = appendix F-113 1 ห้องนอน 34.0 — evidence only, appendix not shown"
+    "ue:RoomExperience 01_F-113_Room34 = appendix F-113 1 ห้องนอน 34.0 — evidence only, appendix not shown",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ลำดับเหมือนสตูดิโอ: โครงลวด (คำ 'หนึ่งห้องนอน') → โมเดลขาว (คำ 'ห้องนอนแยก/นั่งเล่น') → 33–35 นับขึ้น + '801 units · our most common type' (คำ 'ตารางเมตร') → ภาพบรรยากาศสามภาพ นั่งเล่น ห้องนอน ห้องน้ำ (คำ 'บรรยากาศ') โมเดล UE คือ F-113 (34.0 ตร.ม. ขนาดที่พบมากสุด) ภาพบรรยากาศเป็นชุดเว็บ ซึ่งรายงาน 14.8.1 บอกว่าการออกแบบภายในนี้คือของแบบ 1 ห้องนอน ปุ่มเทียบนำไปเรื่อง unit_compare_1br_2br · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด"
   },
@@ -7449,13 +8504,16 @@
     "2 ห้องนอนกี่ตารางเมตร",
     "ห้องสองห้องนอนข้างในเป็นแบบไหน",
     "สองห้องนอนมีกี่ห้องน้ำ",
-    "ห้องใหญ่สุดขนาดเท่าไหร่"
+    "ห้องใหญ่สุดขนาดเท่าไหร่",
+    "สองห้องนอนมีแอร์กี่เครื่อง",
+    "สองห้องนอนเตียงขนาดเท่าไหร่"
    ],
    "questions_en": [
     "What is the two-bedroom like?",
     "How big is the 2 bedroom?",
     "How many bathrooms does the two-bedroom have?",
-    "What is your biggest unit?"
+    "What is your biggest unit?",
+    "What size are the beds?"
    ],
    "lines": [
     {
@@ -7479,8 +8537,8 @@
      ]
     },
     {
-     "th": "มีสองห้องนอน และสองห้องน้ำ",
-     "en": "It has two bedrooms and two bathrooms.",
+     "th": "มีสองห้องนอน เตียงคิงไซซ์ 6 ฟุตกับควีนไซซ์ 5 ฟุต สองห้องน้ำ และแอร์ 3 เครื่อง",
+     "en": "It has two bedrooms, a 6-foot king and a 5-foot queen bed, two bathrooms and three air-cons.",
      "cue_th": [
       "ห้องน้ำ"
      ],
@@ -7538,7 +8596,7 @@
     },
     "meta_en": [
      "2 bedrooms + living & kitchen",
-     "2 bathrooms",
+     "2 bathrooms · 3 air-cons",
      "148 units in the project",
      "3D model: one 2‑bedroom layout"
     ],
@@ -7589,7 +8647,8 @@
     "report:14_units.md#14.1 line 25 (2 ห้องนอน + นั่งเล่น/ครัว)",
     "report:14_units.md#14.1 line 26 (ห้องน้ำ 2)",
     "report:14_units.md#14.4.4 (\"มีห้องนอน 2 ห้อง ห้องน้ำ 2 ห้อง\" as the suggested answer)",
-    "ue:RoomExperience 08_C-309_TwoBed51 = appendix C-309 2 ห้องนอน 51.5 — evidence only, appendix not shown"
+    "ue:RoomExperience 08_C-309_TwoBed51 = appendix C-309 2 ห้องนอน 51.5 — evidence only, appendix not shown",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "ลำดับเหมือนสองเรื่องก่อน ประโยคที่สองบอกสองห้องนอนสองห้องน้ำ (จุดต่างที่ลูกค้าถามบ่อย) ตัวเลข 51.5–52.5 นับขึ้นแบบทศนิยมหนึ่งตำแหน่ง โมเดล UE คือ C-309 (51.5 ตร.ม. แบบย่อยเล็กสุดของ 2 ห้องนอน 8 ห้อง — โปรเจกต์ UE มีโมเดลครบชุดเฉพาะห้องนี้) ไม่ใช้ 09_C-309_OneBed51 เพราะเป็นแบบหนึ่งห้องนอนบนผังเดียวกัน ตรงกับแบบเก่ามิถุนายน '1BR 51' ที่รายงานบอกว่าไม่ได้ขายจริง ห้องใหญ่สุดของห้องชุดคือแบบนี้ (ร้านค้าไม่นับ) · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด"
   },
@@ -8042,6 +9101,102 @@
     368,
     3088,
     1451
+   ],
+   "alpha": false
+  },
+  "dev_timeline_early": {
+   "file": "dev_timeline_early.webp",
+   "sha256": "6ce68a91bd36a3e5f7ad4a1229ce618268b309569f96244387e5c15967f4539b",
+   "bytes": 68106,
+   "w": 1080,
+   "h": 860,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    390,
+    485,
+    1772,
+    1585
+   ],
+   "alpha": false
+  },
+  "dev_timeline_late": {
+   "file": "dev_timeline_late.webp",
+   "sha256": "1fd66365439332413650b495cc3b68abba3876013f6135e3db773fbde10542af",
+   "bytes": 59386,
+   "w": 1080,
+   "h": 859,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    0,
+    485,
+    1390,
+    1590
+   ],
+   "alpha": false
+  },
+  "exec_ceo": {
+   "file": "exec_ceo.webp",
+   "sha256": "cb39e118e0ee7160b65b4acb59b2a1237d65ff0e837c200ef7edd3aab29139de",
+   "bytes": 15710,
+   "w": 460,
+   "h": 288,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    180,
+    165,
+    640,
+    453
+   ],
+   "alpha": false
+  },
+  "exec_cfo": {
+   "file": "exec_cfo.webp",
+   "sha256": "58294df9ae91273cb049ef9ba7e039dba3899845612d1a644acb35cfee9fa05a",
+   "bytes": 16322,
+   "w": 430,
+   "h": 269,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    830,
+    190,
+    1260,
+    459
+   ],
+   "alpha": false
+  },
+  "exec_coo": {
+   "file": "exec_coo.webp",
+   "sha256": "2d1e700d1ec3261d9d9b55d9ab83678fd7fb8a52df4bedc7227222301b5f0a63",
+   "bytes": 13582,
+   "w": 420,
+   "h": 262,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    835,
+    490,
+    1255,
+    752
+   ],
+   "alpha": false
+  },
+  "exec_gm": {
+   "file": "exec_gm.webp",
+   "sha256": "1a15948370b30ac3f01bf6dd417aab6eece823683d084ce7e4c62fade2f4cf92",
+   "bytes": 14954,
+   "w": 400,
+   "h": 250,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    203,
+    530,
+    603,
+    780
    ],
    "alpha": false
   },
@@ -9146,5 +10301,5 @@
    "alpha": false
   }
  },
- "approval_note": "14 Oct: lagoon_islands story; spa questions on facilities_basement (owner: islands had no motion)"
+ "approval_note": "เจ้าของ 16 ต.ค. อนุมัติ: ลำดับผู้บริหาร CEO → COO → CFO → GM"
 }

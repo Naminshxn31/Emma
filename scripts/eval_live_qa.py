@@ -768,8 +768,10 @@ def _concept_caveat(said: str) -> bool:
 #: ... อย่าให้เหมือนว่าหุ่นไม่มีข้อมูลนี้" — a gap goes to the sales team in
 #: so many words, never "I don't have that". ("ไม่ทราบว่า...คะ" is a polite
 #: question, so only the flat forms count.)
+#: "ไม่มีระบุ/ไม่ได้ระบุ": robot log 15 Oct, "ข้อมูลความลึกของสระว่ายน้ำไม่มี
+#: ระบุในระบบค่ะ" (the report has 1.30 m) slipped past every word above.
 _SAYS_NO_INFO = re.compile(
-    r"(ไม่มีข้อมูล|ไม่มีในระบบ|ไม่ทราบค่ะ|ไม่ทราบข้อมูล|ดิฉันไม่ทราบ|ฉันไม่ทราบ"
+    r"(ไม่มีข้อมูล|ไม่มีในระบบ|ไม่มีระบุ|ไม่ได้ระบุ|ไม่ทราบค่ะ|ไม่ทราบข้อมูล|ดิฉันไม่ทราบ|ฉันไม่ทราบ"
     r"|I don'?t have (that |this |any |the |specific )?(information|info|details|data)"
     r"|not (in|available in) (my|our) system|I don'?t know)",
     re.IGNORECASE)
@@ -784,7 +786,13 @@ _SECTION_CHOICE = re.compile(r"(ส่วนไหน|ชั้นไหน|โ�
 #: Owner 12 Oct: after a meaningless line or an off-topic refusal she asks ONE
 #: discovery question about the project -- wanted, not filler. Generic
 #: invitations ("มีอะไรให้ช่วยไหมคะ") still match _FILLER and are still flagged.
-_DISCOVERY = re.compile(r"(ห้องแบบไหน|อยู่เองหรือ|ไว้ลงทุน|ชั้นไหน|for yourself or|which (room|unit) type)", re.IGNORECASE)
+#: Owner 15 Oct: the discovery question is "what may I recommend in the
+#: project", never "to live in or to invest" -- that one is flagged now.
+_DISCOVERY = re.compile(r"(ห้องแบบไหน|แนะนำส่วนไหน|ชั้นไหน|which (room|unit) type|"
+                        r"(like|want) me to (recommend|introduce|show))", re.IGNORECASE)
+#: The question the owner removed (15 Oct): a reply that asks it is a fault.
+LIVE_OR_INVEST = re.compile(r"(อยู่เองหรือ|ไว้ลงทุน|อยู่เอง.{0,12}ลงทุน|live in .{0,20}invest|for yourself or)",
+                            re.IGNORECASE)
 
 
 def _numbers(text: str) -> set[str]:
@@ -836,6 +844,8 @@ def flags_for(case: dict, turns: list[dict], allowed_text: str) -> list[str]:
             flags.append(f"t{i}:concept_caveat")
         if _SAYS_NO_INFO.search(said):
             flags.append(f"t{i}:says_no_info")
+        if LIVE_OR_INVEST.search(said):
+            flags.append(f"t{i}:asks_live_or_invest")
         if _bare_ack(said):
             flags.append(f"t{i}:bare_ack")
         if re.search(r"\d+\s*(นาที|minutes?\b|mins?\b)", said, re.IGNORECASE):

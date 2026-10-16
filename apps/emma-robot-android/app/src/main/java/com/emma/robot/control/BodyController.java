@@ -90,12 +90,17 @@ final class BodyController {
      *  during the NEXT gesture (a stop is the only thing that bumps it). */
     private final AtomicInteger attempts = new AtomicInteger();
     private final ArrayDeque<Long> starts = new ArrayDeque<>();
+    /** Starts of speech gestures, their own per-minute cap. */
+    private final ArrayDeque<Long> speechStarts = new ArrayDeque<>();
 
     private volatile long latchedUntil = 0L;
     private volatile long lastEnd = -BodyGestures.COOLDOWN_MS;
     /** Groups move joints nobody can read back; app start knows nothing either. */
     private volatile boolean headKnown = false;
-    private volatile String phase = "idle";          // idle | running | rest_return
+    /** idle | running | holding | rest_return. "holding" = a speech
+     *  gesture's frames ended with the arm out, waiting for her next beat
+     *  (SPEECH_REST_AFTER_MS) before group 99; busy is free in it. */
+    private volatile String phase = "idle";
     private volatile String active = null;
     private volatile boolean groupRunning = false;
     private volatile boolean groupAgfSeen = false;
@@ -187,6 +192,7 @@ final class BodyController {
                     .put("enabled", enabled())
                     .put("allow_direction_known", allowDirectionKnown())
                     .put("gestures", gestures)
+                    .put("speech", true)          // this build plays emma-body:<id>:speech
                     .toString();
         } catch (Exception e) {
             return "{\"enabled\":false,\"allow_direction_known\":false,\"gestures\":{}}";
@@ -208,7 +214,8 @@ final class BodyController {
 
     private String stateName(long now) {
         if (latched(now)) return "latched";
-        if ("running".equals(phase)) return "running";
+        // holding: the arm is still out -- reported as running, never idle
+        if ("running".equals(phase) || "holding".equals(phase)) return "running";
         if ("rest_return".equals(phase)) return "rest_return";
         if (now - lastEnd < BodyGestures.COOLDOWN_MS) return "cooldown";
         return "idle";
@@ -257,7 +264,36 @@ final class BodyController {
         }
         if (reason != null) return ack(false, id, reason, status, -1);
         if (!busy.compareAndSet(false, true)) return ack(false, id, "busy", status, -1);
-        int est = begin(id, now);
+        int est = begin(id, now, false);
+        return ack(true, id, null, status, est);
+    }
+
+    /** emma-body:<id>:speech -- her arm while she talks (owner 15 Oct), sent
+     *  by the server timed to her voice, never by a guest. Every gate of a
+     *  voice gesture holds (switch, operator screen, foreground, walking,
+     *  stop latch, mapping, busy, the clamps and allow-list) except the 3 s
+     *  cooldown, which made each gesture wait out the previous one's rest;
+     *  speech gestures have their own per-minute cap instead. Its frames end
+     *  in "holding", not in group 99: the next beat starts from where the arm
+     *  is, and the rest comes once, SPEECH_REST_AFTER_MS after the last. */
+    synchronized String requestSpeech(String id) {
+        if (!BodyGestures.speechCapable(id)) return ack(false, id, "bad_request", null, -1);
+        long now = SystemClock.elapsedRealtime();
+        String status = effectiveStatus(id);
+        List<BodyGestures.Frame> frames = framesFor(id);
+        String reason = BodyGestures.refusal(enabled(), host.operatorVisible(), host.foreground(),
+                host.navBlock(), latched(now), status, allowDirectionKnown(), busy.get(),
+                false, speechRateLimited(now));
+        if (reason == null && (frames == null || !BodyGestures.restAfter(frames)
+                || BodyGestures.checkFrames(frames, voiceChannels()) != null)) {
+            reason = "needs_mapping";
+        }
+        if (reason != null) return ack(false, id, reason, status, -1);
+        if (!busy.compareAndSet(false, true)) return ack(false, id, "busy", status, -1);
+        // her next beat: the pending rest of the previous one is void (the
+        // only timer a holding arm has; its frames' watchdog is spent)
+        if ("holding".equals(phase)) ui.removeCallbacksAndMessages(TIMERS);
+        int est = begin(id, now, true);
         return ack(true, id, null, status, est);
     }
 
@@ -272,7 +308,7 @@ final class BodyController {
         long now = SystemClock.elapsedRealtime();
         if (latched(now) || host.navBlock() != null) return;
         if (!busy.compareAndSet(false, true)) return;
-        begin("handshake", now);
+        begin("handshake", now, false);
     }
 
     private List<BodyGestures.Frame> framesFor(String id) {
@@ -286,10 +322,15 @@ final class BodyController {
         return starts.size() >= BodyGestures.MAX_PER_MINUTE;
     }
 
+    private boolean speechRateLimited(long now) {
+        while (!speechStarts.isEmpty() && now - speechStarts.peekFirst() >= 60000L) speechStarts.pollFirst();
+        return speechStarts.size() >= BodyGestures.MAX_SPEECH_PER_MINUTE;
+    }
+
     /** busy is already held. Returns the estimate in ms, or -1 for none. */
-    private int begin(String id, long now) {
+    private int begin(String id, long now, boolean speech) {
         attempts.incrementAndGet();
-        starts.addLast(now);
+        (speech ? speechStarts : starts).addLast(now);
         phase = "running";
         active = id;
         record(id, "started", null);
@@ -300,12 +341,12 @@ final class BodyController {
         else if (frames != null) est = BodyGestures.totalMs(frames)
                 + (headKnown || !BodyGestures.isHead(id) ? 0 : BodyGestures.HEAD_PREFIX_MS);
         host.changed();
-        io.execute(() -> play(id, gen, frames));
+        io.execute(() -> play(id, gen, frames, speech));
         return est;
     }
 
     /** On io. Everything queued before a stop re-checks before it moves. */
-    private void play(String id, int gen, List<BodyGestures.Frame> frames) {
+    private void play(String id, int gen, List<BodyGestures.Frame> frames, boolean speech) {
         if (stale(gen)) return;
         try {
             host.ensureArm();
@@ -386,7 +427,8 @@ final class BodyController {
                 arm.playFrames(poseFrames, () -> gen == generation.get() && !latched(), () -> {
                     if (gen != generation.get()) return;
                     if (head) headKnown = true;
-                    if (restAfter) later(gen, () -> restReturn(gen, "after frames"), BodyGestures.REST_AFTER_FRAMES_MS);
+                    if (speech) hold(gen, id);
+                    else if (restAfter) later(gen, () -> restReturn(gen, "after frames"), BodyGestures.REST_AFTER_FRAMES_MS);
                     else finish(gen, "done", null);
                 }, () -> {
                     Log.w(TAG, "gesture " + id + ": arm board lost mid-run");
@@ -398,6 +440,33 @@ final class BodyController {
             Log.e(TAG, "gesture " + id + " failed", e);
             finish(gen, "failed", "arm_unavailable");
         }
+    }
+
+    /** A speech gesture's frames are done: "done" for the server, the arm
+     *  stays out, busy is free for her next beat, and group 99 follows unless
+     *  one comes inside SPEECH_REST_AFTER_MS. */
+    private synchronized void hold(int gen, String id) {
+        if (gen != generation.get() || !"running".equals(phase)) return;
+        phase = "holding";
+        record(id, "done", null);
+        // active stays: the arm is still out for this id, and a stop while
+        // holding is reported as that gesture stopped (not an action-less row)
+        busy.set(false);
+        host.changed();
+        later(gen, () -> speechRest(gen), BodyGestures.SPEECH_REST_AFTER_MS);
+    }
+
+    /** No beat followed: the one rest of the whole reply. Takes the arm lock
+     *  like any gesture; a walk's rest or a voice gesture that started in the
+     *  meantime owns the arm instead (phase is no longer holding). */
+    private void speechRest(int gen) {
+        synchronized (this) {
+            if (gen != generation.get() || !"holding".equals(phase)) return;
+            if (!busy.compareAndSet(false, true)) return;
+            phase = "running";
+            active = "rest";
+        }
+        restReturn(gen, "after speech");
     }
 
     /** Stale = overtaken by a stop (generation), latched, or the robot is

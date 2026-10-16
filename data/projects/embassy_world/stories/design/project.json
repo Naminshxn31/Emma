@@ -5,7 +5,6 @@
   "questions_th": [
    "ใครเป็นผู้พัฒนาโครงการ",
    "Empire Group คือใคร",
-   "บริษัทนี้มีผลงานอะไรบ้าง",
    "ผู้พัฒนาได้รางวัลอะไรบ้าง",
    "บริษัททำมากี่ปีแล้ว",
    "ผู้พัฒนาน่าเชื่อถือไหม",
@@ -15,7 +14,6 @@
   "questions_en": [
    "Who is the developer?",
    "Who is Empire Group?",
-   "What has the developer built before?",
    "Has the developer won any awards?"
   ],
   "lines": [
@@ -166,6 +164,13 @@
   },
   "taps": [
    {
+    "id": "story_developer_projects",
+    "label_en": "16 projects",
+    "label_th": "ผลงาน 16 โครงการ",
+    "next_story": "developer_projects",
+    "tool": null
+   },
+   {
     "id": "story_developer_concept",
     "label_en": "The concept",
     "label_th": "แนวคิดโครงการ",
@@ -203,13 +208,16 @@
    "Embassy World คืออะไร",
    "อยู่ที่นี่แล้วชีวิตเป็นยังไง",
    "คอนเซ็ปต์ของโครงการ",
-   "ทำไมต้องเลือกที่นี่"
+   "ทำไมต้องเลือกที่นี่",
+   "ที่นี่แตกต่างจากที่อื่นยังไง",
+   "เล่าที่มาของโครงการ"
   ],
   "questions_en": [
    "What is the concept of the project?",
    "What makes this project special?",
    "How is it different from other condos?",
-   "Who is this project for?"
+   "Who is this project for?",
+   "What makes this project different from others?"
   ],
   "lines": [
    {
@@ -716,5 +724,284 @@
    "assets:web/6.gallery/exterior/CD03/Scene 43.png (ทางเดินในสวน)"
   ],
   "notes_th": "บนจอ (การ์ดห้าใบเด้งตามเสียง): (0) Eco System Quality — ภาพลากูน (CD03 Scene 36 ใบเดียวกับ project_concept) ใต้ภาพ 'Air & water quality dashboards · CO₂ sensors' · (1) EV charging — ผังใต้ดินเฉพาะแถวจอดที่พิมพ์ WITH EV CHARGER (เส้นฟ้าบนพื้นใส ครอปใต้ y 715 เสมอ: ข้างบนมีชื่อห้องที่เจ้าของตัด) · (2) Smart irrigation — ภาพทางเดินในสวน (CD03 Scene 43) + Weather & UV ในข้อความใต้ภาพ · (3) Embassy AI Application — สไลด์ intro-042 (ภาพเดียวกับ project_concept) · (4) Smart Home — ห้องนั่งเล่นจากสไลด์ intro-043 'An optional in-room package' แล้วปุ่ม Smart Home ไปเรื่อง smart_home (ไม่เล่าซ้ำ ม่าน/แอร์อยู่ที่นั่น) · ไม่พูด: ระบบพ่นละอองน้ำ/Fog (ไม่อยู่ในเด็ค ผู้นำเสนอว่ายังต้องเพิ่ม) Outdoor Air Quality System (ผูกกับ fog) หุ่นยนต์ Social Lounge (แนวคิดอนาคต) ฟิตเนส AI, Wi-Fi ฟรี, ตรวจช่องจอดว่างผ่านแอป, แอปฟรี/เฉพาะลูกบ้าน (คำพูดในคลิป ต้องยืนยันเป็นลายลักษณ์อักษร), Transportation Assistance (ห้ามยืนยันว่าเรียกรถได้ — ชื่อยังเห็นบนภาพแอปเพราะเป็นสไลด์ที่อนุมัติ แต่เธอไม่พูด), ช่องทางดูแดชบอร์ด (ห้ามระบุช่องทางแน่ชัด 13.12 ข้อ 10), จำนวนหัวชาร์จ EV, ค่าบริการใดๆ · ข้อให้เจ้าของตัดสิน: การ์ดแรกใช้ชื่อ 'Eco System Quality' (facility ข้อ 31) คู่กับแดชบอร์ดอากาศ/น้ำและเซ็นเซอร์ CO₂ — รายงาน 13.1/13.4 จัดไว้กลุ่มเดียวกันและบอกว่า 'น่าจะเป็นชื่อรวม' (🔎 ไม่ใช่ข้อยืนยัน) ถ้าไม่อยากผูกให้เปลี่ยนป้ายเป็น 'Air & water quality'"
+ },
+ {
+  "id": "executives",
+  "template": "features",
+  "questions_th": [
+   "ผู้บริหารโครงการชื่ออะไร",
+   "ใครเป็นผู้บริหาร",
+   "ผู้บริหารคือใคร",
+   "CEO ชื่ออะไร",
+   "ขอดูภาพผู้บริหาร",
+   "บอสชื่ออะไร",
+   "ผู้บริหาร Empire Group มีใครบ้าง",
+   "ผู้บริหารโครงการเราชื่ออะไร",
+   "โครงการเรามีบอสชื่ออะไร",
+   "ผู้บริหารชื่ออะไร"
+  ],
+  "questions_en": [
+   "Who are the executives?",
+   "Who is the CEO?",
+   "Who runs Empire Group?"
+  ],
+  "lines": [
+   {
+    "th": "ผู้บริหารของ Empire Group นำโดย CEO คุณ Miki Haim ค่ะ",
+    "en": "Empire Group is led by its CEO, Miki Haim,",
+    "cue_th": [
+     "Miki",
+     "มิกิ"
+    ],
+    "cue_en": [
+     "Miki"
+    ],
+    "cue_zh": [
+     "Miki",
+     "米基"
+    ]
+   },
+   {
+    "th": "Chief Operating Officer คือคุณพุทธชาด สุจริตกุล",
+    "en": "with Pudthachad Sucharitakul as Chief Operating Officer,",
+    "cue_th": [
+     "พุทธชาด",
+     "Pudthachad"
+    ],
+    "cue_en": [
+     "Pudthachad"
+    ],
+    "cue_zh": [
+     "Pudthachad"
+    ]
+   },
+   {
+    "th": "Chief Financial Officer คือคุณ Dor Haim",
+    "en": "Dor Haim as Chief Financial Officer,",
+    "cue_th": [
+     "Dor",
+     "ดอร์"
+    ],
+    "cue_en": [
+     "Dor"
+    ],
+    "cue_zh": [
+     "Dor"
+    ]
+   },
+   {
+    "th": "และ General Manager คือคุณ Moran S. Haim ค่ะ",
+    "en": "and Moran S. Haim as General Manager.",
+    "cue_th": [
+     "Moran",
+     "โมราน"
+    ],
+    "cue_en": [
+     "Moran"
+    ],
+    "cue_zh": [
+     "Moran"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "Miki Haim",
+     "asset": "exec_ceo",
+     "note_en": "Chief Executive Officer",
+     "line": 0
+    },
+    {
+     "label_en": "Pudthachad Sucharitakul",
+     "asset": "exec_coo",
+     "note_en": "Chief Operating Officer",
+     "line": 1
+    },
+    {
+     "label_en": "Dor Haim",
+     "asset": "exec_cfo",
+     "note_en": "Chief Financial Officer",
+     "line": 2
+    },
+    {
+     "label_en": "Moran S. Haim",
+     "asset": "exec_gm",
+     "note_en": "General Manager",
+     "line": 3
+    }
+   ],
+   "footnote_en": "Empire Group leadership"
+  },
+  "taps": [
+   {
+    "id": "story_executives_developer",
+    "label_en": "About Empire Group",
+    "label_th": "เกี่ยวกับ Empire Group",
+    "next_story": "developer",
+    "tool": null
+   },
+   {
+    "id": "story_executives_concept",
+    "label_en": "Our concept",
+    "label_th": "แนวคิดโครงการ",
+    "next_story": "project_concept",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:02_developer.md#2.10.1 ทีมผู้บริหาร (CEO Miki Haim · COO Pudthachad Sucharitakul (พุทธชาด สุจริตกุล) · GM Moran S. Haim · CFO Dor Haim)",
+   "assets:saleskit/embassy_life_sales_kit_2.0.pdf p.1–2"
+  ],
+  "notes_th": "เจ้าของ 15 ต.ค.: \"เปิดเผยชื่อได้\" และ \"ขอ motion\" ให้คำถามภาพผู้บริหาร — สั่งทับ FAQ 19 ของรายงาน (\"แชทบอทไม่เปิดเผยชื่อ ... ผู้บริหาร\") และข้อห้ามภาพคนเฉพาะภาพผู้บริหารชุดนี้ · ข้อมูลระดับกลุ่มจาก Sales Kit Embassy Life 2.0 (รายงาน 2.10) · ชื่อพนักงานขาย/ลูกค้ายังไม่เปิดเผยเหมือนเดิม · ลำดับ CEO → COO → CFO → GM (เจ้าของ 16 ต.ค. ถามว่าให้ CFO มาก่อน GM ไหม — ตำแหน่ง C-level ก่อนผู้จัดการทั่วไปตามธรรมเนียม ลำดับเดิมมาจากหน้า Sales Kit ไม่ใช่ลำดับตำแหน่ง)"
+ },
+ {
+  "id": "developer_projects",
+  "template": "stack",
+  "questions_th": [
+   "บริษัทนี้มีผลงานอะไรบ้าง",
+   "ขอชื่อโครงการทั้ง 16 โครงการ",
+   "16 โครงการมีอะไรบ้าง",
+   "เคยสร้างโครงการอะไรมาบ้าง",
+   "ผู้สร้างโครงการมีผลงานที่ไหนบ้าง",
+   "โครงการเก่าของ Empire Group มีอะไรบ้าง",
+   "รายชื่อโครงการที่ผ่านมา",
+   "Empire Group เคยทำโครงการอะไรมาบ้าง"
+  ],
+  "questions_en": [
+   "What has the developer built before?",
+   "What are the 16 projects?",
+   "Which projects has Empire Group built?",
+   "Can you list the past projects?"
+  ],
+  "lines": [
+   {
+    "th": "ตั้งแต่ปี 2006 Empire Group พัฒนามาแล้ว 16 โครงการในพัทยาค่ะ",
+    "en": "Since 2006, Empire Group has developed 16 projects in Pattaya,",
+    "cue_th": [
+     "2006",
+     "16 โครงการ",
+     "สิบหก"
+    ],
+    "cue_en": [
+     "2006",
+     "16",
+     "sixteen"
+    ],
+    "cue_zh": [
+     "2006",
+     "16"
+    ]
+   },
+   {
+    "th": "เริ่มจาก Hyde Park I และ II, Sunset Boulevard I, Pattaya Heights และ Park Lane Jomtien",
+    "en": "starting with Hyde Park I and II, Sunset Boulevard I, Pattaya Heights and Park Lane Jomtien,",
+    "cue_th": [
+     "Hyde Park",
+     "ไฮด์ปาร์ค"
+    ],
+    "cue_en": [
+     "Hyde Park"
+    ],
+    "cue_zh": [
+     "Hyde Park"
+    ]
+   },
+   {
+    "th": "ตามด้วย Sunset Boulevard II, View, Paradise Park, Art on the Hill และ The Vision",
+    "en": "then Sunset Boulevard II, View, Paradise Park, Art on the Hill and The Vision,",
+    "cue_th": [
+     "Paradise Park",
+     "The Vision"
+    ],
+    "cue_en": [
+     "Paradise Park",
+     "Vision"
+    ],
+    "cue_zh": [
+     "Paradise Park",
+     "Vision"
+    ]
+   },
+   {
+    "th": "แล้วก็ Amazon Residence, City Center Residence, The Orient Resort & Spa และ The Empire Tower",
+    "en": "then Amazon Residence, City Center Residence, The Orient Resort & Spa and The Empire Tower,",
+    "cue_th": [
+     "Amazon",
+     "อเมซอน"
+    ],
+    "cue_en": [
+     "Amazon"
+    ],
+    "cue_zh": [
+     "Amazon"
+    ]
+   },
+   {
+    "th": "ล่าสุดคือ Embassy กับ Embassy Life และ Embassy World ของเราคือโครงการถัดไปค่ะ",
+    "en": "and most recently Embassy and Embassy Life, with our Embassy World as the next one.",
+    "cue_th": [
+     "Embassy Life",
+     "ล่าสุด"
+    ],
+    "cue_en": [
+     "Embassy Life",
+     "recently"
+    ],
+    "cue_zh": [
+     "Embassy Life"
+    ]
+   }
+  ],
+  "params": {
+   "items": [
+    {
+     "label_en": "Hyde Park → The Vision",
+     "sub_en": "2006 – 2015 · Pattaya",
+     "asset": "dev_timeline_early",
+     "asset_kind": "photo",
+     "value": {
+      "to": 10,
+      "unit_en": "projects"
+     },
+     "line": 1
+    },
+    {
+     "label_en": "Amazon → Embassy Life",
+     "sub_en": "2013 – 2027 · Pattaya",
+     "asset": "dev_timeline_late",
+     "asset_kind": "photo",
+     "value": {
+      "to": 6,
+      "unit_en": "projects"
+     },
+     "line": 3
+    }
+   ],
+   "end_hint_en": "16 projects since 2006 · Embassy World is next"
+  },
+  "taps": [
+   {
+    "id": "story_developer_projects_developer",
+    "label_en": "About Empire Group",
+    "label_th": "เกี่ยวกับ Empire Group",
+    "next_story": "developer",
+    "tool": null
+   },
+   {
+    "id": "story_developer_projects_executives",
+    "label_en": "Executives",
+    "label_th": "ผู้บริหาร",
+    "next_story": "executives",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:02_developer.md#2.10.2 ผลงานและไทม์ไลน์โครงการ (16 โครงการ 2006–2027 จาก Embassy Life Sales Kit)",
+   "report:19_faq.md (ขอดูรายชื่อโครงการเดิม ... — รายชื่อ 16 โครงการ)",
+   "report:02_developer.md#2.10.2 (Embassy World เป็นโครงการถัดไปของกลุ่ม)",
+   "assets:saleskit/embassy_life_sales_kit_2.0.pdf p.3–4"
+  ],
+  "notes_th": "เจ้าของ 15 ต.ค. \"เช็คข้อมูลกับคำถามทั้งหมด อย่าให้หลุด\" — log หุ่น 12 ต.ค. \"ขอชื่อโครงการทั้ง 16 โครงการ\" ถูกส่งทีมขาย ทั้งที่รายงานมีรายชื่อ (ไม่มีคำค้นแบบไหนดึงขึ้นมาได้) · ภาพครอปใต้กล่องตัวเลขของ Sales Kit (5,400 ยูนิตขัดกับเด็ค 6,000+) · \"Embassy\" (2023–2027) พูดตามชื่อในไทม์ไลน์ · ทุกโครงการอยู่พัทยาตามคำตอบแนะนำของรายงาน"
  }
 ]

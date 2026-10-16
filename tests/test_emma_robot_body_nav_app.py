@@ -307,7 +307,15 @@ public final class Harness {
         for (String id : BodyGestures.IDS) {
             p("status." + id, BodyGestures.builtInStatus(id));
             p("mapped." + id, BodyGestures.effectiveStatus(id, true));
+            p("speech." + id, BodyGestures.speechCapable(id));
         }
+        StringBuilder fms = new StringBuilder();
+        for (int ms : BodyGestures.STUDIO_FRAME_MS) fms.append(fms.length() == 0 ? "" : ",").append(ms);
+        p("studio_frame_ms", fms);
+        p("min_frame_ms", BodyGestures.MIN_FRAME_MS);
+        p("max_frame_ms", BodyGestures.MAX_FRAME_MS);
+        p("speech_rest_after_ms", BodyGestures.SPEECH_REST_AFTER_MS);
+        p("max_speech_per_minute", BodyGestures.MAX_SPEECH_PER_MINUTE);
         Set<Integer> def = chans(BodyGestures.DEFAULT_VOICE_CHANNELS);
         for (String id : new String[]{"head_center", "head_down", "nod"}) {
             p("builtin." + id, ok(BodyGestures.checkFrames(BodyGestures.builtInFrames(id), def)));
@@ -503,7 +511,7 @@ def test_a_body_stop_latches_and_voids_on_the_calling_thread_then_stops_off_io()
 
 def test_gesture_tasks_re_check_the_latch_and_the_walk_before_moving():
     body = code_only(read(BODY))
-    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames)")
+    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames, boolean speech)")
     assert play.lstrip().startswith("if (stale(gen)) return;")
     assert play.index("host.ensureArm();") < play.index("if (stale(gen)) return;", 30)
     stale = method(body, "private boolean stale(int gen)")
@@ -783,7 +791,7 @@ def test_operator_screen_additions():
     # with "played since the last edit" from the draft itself
     assert "body.savePose(id, motionDraft.frames(), motionDraft.playedSinceEdit());" in code
     draft = code_only(read(DRAFT))
-    assert "playedSinceEdit = false;" in method(draft, "ArmController.PoseFrame captureFrame()")
+    assert "playedSinceEdit = false;" in method(draft, "ArmController.PoseFrame captureFrame(int durationMs)")
     assert "playedSinceEdit = false;" in method(draft, "void clear()")
     # review2 #22: only a playback that ran to the end counts (its onDone)
     play = method(code, "private void playDraftMotion()")
@@ -888,7 +896,7 @@ def test_a_stop_cannot_land_between_the_gate_check_and_the_arm_command():
     bump = void.index("generation.incrementAndGet();")
     assert gate_of(void, bump) is not None
     # the rest branch moves phase only inside the gate, after the check
-    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames)")
+    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames, boolean speech)")
     rest_phase = play.index('phase = "rest_return";')
     assert gate_of(play, rest_phase) is not None
     # a frame run also stops on the OWNER's generation, not only poseGeneration
@@ -920,7 +928,7 @@ def test_a_frame_gesture_whose_board_drops_off_still_ends():
         in loop
     assert "|| !armManager.isConnected()) return;" not in loop     # the silent exit is gone
     body = code_only(read(BODY))
-    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames)")
+    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames, boolean speech)")
     call = play[play.index("arm.playFrames(poseFrames,"):]
     call = call[:call.index("});\n") + 3]
     abort = call[call.rindex("}, () -> {"):]
@@ -1204,3 +1212,57 @@ def test_the_face_is_full_screen_and_staff_can_still_swipe_the_bars_in():
     focus = method(main, "public void onWindowFocusChanged(boolean hasFocus)")
     assert "if (hasFocus) hideSystemBars();" in focus
     assert 'stopBodyAndNav("not_foreground", "not_foreground", false);' in focus
+
+
+# ---- her arm while she talks (owner 15 Oct) ------------------------------------
+
+
+def test_compiled_speech_gestures_are_the_contracts_and_stay_inside_the_clamps(harness):
+    """Only recorded arm poses may run as speech gestures -- the same set in
+    the app, the page and the server (three copies of one rule drift)."""
+    speech = tuple(i for i in rc.BODY_ACTION_IDS if harness["speech." + i] == "true")
+    assert speech == rc.SPEECH_BODY_ACTIONS
+    for gid in ("head_down", "nod", "handshake", "greet_arm", "rest", "stop"):
+        assert harness["speech." + gid] == "false", gid
+    lengths = [int(x) for x in harness["studio_frame_ms"].split(",")]
+    assert lengths[-1] == 3000, "the studio's old frame length stays the default"
+    assert all(int(harness["min_frame_ms"]) <= ms <= int(harness["max_frame_ms"]) for ms in lengths)
+    assert 0 < int(harness["speech_rest_after_ms"]) <= 3000
+    assert int(harness["max_speech_per_minute"]) <= 20
+
+
+def test_a_speech_gesture_keeps_every_gate_but_the_cooldown_and_rests_once():
+    body = read(BODY)
+    req = method(body, "synchronized String requestSpeech(String id)")
+    assert "BodyGestures.speechCapable(id)" in req
+    # every voice-gesture gate, in the contract order, with no cooldown and its own cap
+    flat = " ".join(req.split())
+    assert ("BodyGestures.refusal(enabled(), host.operatorVisible(), host.foreground(), "
+            "host.navBlock(), latched(now), status, allowDirectionKnown(), busy.get(), "
+            "false, speechRateLimited(now));") in flat
+    assert "BodyGestures.checkFrames(frames, voiceChannels()) != null" in req
+    assert "!BodyGestures.restAfter(frames)" in req, "arm poses only"
+    assert "busy.compareAndSet(false, true)" in req
+    assert "begin(id, now, true)" in req
+    # frames end in "holding", not group 99; the rest comes once, after her last beat
+    play = method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames, boolean speech)")
+    assert "if (speech) hold(gen, id);" in play
+    hold = method(body, "private synchronized void hold(int gen, String id)")
+    assert 'phase = "holding";' in hold and "busy.set(false);" in hold
+    assert "later(gen, () -> speechRest(gen), BodyGestures.SPEECH_REST_AFTER_MS);" in hold
+    rest = method(body, "private void speechRest(int gen)")
+    assert '!"holding".equals(phase)' in rest and "busy.compareAndSet(false, true)" in rest
+    assert 'restReturn(gen, "after speech");' in rest
+    # a holding arm is never reported idle (SafetyBar, page)
+    assert 'if ("running".equals(phase) || "holding".equals(phase)) return "running";' in body
+    assert '.put("speech", true)' in body
+
+
+def test_the_bridge_takes_one_fixed_speech_shape():
+    face = read(FACE)
+    assert 'Pattern.compile("emma-body:([a-z][a-z0-9_]{1,31}):speech")' in face
+    assert "if (speech.matches()) return bridge.bodySpeech(speech.group(1));" in face
+    main = read(MAIN)
+    assert "return body.requestSpeech(id);" in main
+    # the studio's frame length: the draft line says what each frame lasts
+    assert "motionDraft.captureFrame(BodyGestures.STUDIO_FRAME_MS[frameMsIndex]);" in main

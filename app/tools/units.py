@@ -971,7 +971,11 @@ def show_plan(floor: int = 1, building: str | None = None) -> dict:
                             "ห้ามพูดว่าเปิดแล้วจนกว่าจะได้รับ render ACK; สถานะสด: "
                             f"ว่าง {counts['available']} จอง {counts['reserved']} "
                             f"ขายแล้ว {counts['sold']} ห้อง "
-                            "พูดจากตัวเลขนี้สั้นๆ ห้ามพูดราคา ห้ามบรรยายห้องรายห้องที่ไม่ได้ถูกถาม")}
+                            # 15 Oct log review: "มีแปลนให้ดูไหม" was answered with
+                            # "ตอนนี้มีห้องว่าง 95 ยูนิต" nobody asked for -- the
+                            # remaining-count rule of the room-type card (12 Oct)
+                            "พูดจำนวนห้องว่าง/จอง/ขายเฉพาะเมื่อลูกค้าถามเรื่องห้องว่างหรือยอดขาย "
+                            "ไม่งั้นบอกแค่ว่าเปิดผังชั้นนี้ให้ดู ห้ามพูดราคา ห้ามบรรยายห้องรายห้องที่ไม่ได้ถูกถาม")}
 
 
 def live_probe() -> tuple[bool, str]:

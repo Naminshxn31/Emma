@@ -2532,6 +2532,20 @@ def test_each_answer_owns_the_screen():
     assert "answerStaged = true;" in opener
 
 
+def test_an_answer_without_a_picture_clears_the_old_one_at_her_first_sound():
+    """Owner 15 Oct: "ถามคำถามที่ไม่มี motion ก็ยังไม่ออกจากอันเก่า" -- turn_complete
+    comes when generation ends, seconds into her new answer; the old story
+    stayed up over its start. The first audio chunk of an answer that staged
+    nothing clears it (a story/slide of this answer arrives before her voice)."""
+    html = PAGE.read_text(encoding="utf-8")
+    audio = html.split("if (msg.data instanceof ArrayBuffer) {", 1)[1].split("return;\n      }", 1)[0]
+    clear = "if (answerOwed && !answerStaged && document.body.classList.contains('emma-staging')) clearStage();"
+    assert clear in audio
+    assert audio.index(clear) < audio.index("playChunk(msg.data);")
+    # a barged-in old reply's late chunks are dropped before anything is cleared
+    assert audio.index("if (bargePendingUntil > performance.now()) return;") < audio.index(clear)
+
+
 def test_a_staged_card_puts_emma_in_the_corner_in_the_app_shell():
     """Owner's photo, 13 Oct: the room card (show_room_type) with Emma 610 px
     wide over its lower right. `html.app-shell .mascot-wrap` is as specific

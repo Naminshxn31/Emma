@@ -33,8 +33,8 @@
      ]
     },
     {
-     "th": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ยาว 155 เมตร",
-     "en": "The main one is the Water Lagoon in the middle of the project, 155 metres long.",
+     "th": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ยาว 155 เมตร ลึกประมาณ 1.30 เมตร",
+     "en": "The main one is the Water Lagoon in the middle of the project, 155 metres long and about 1.30 metres deep.",
      "cue_th": [
       "Water Lagoon",
       "ลากูน",
@@ -142,7 +142,7 @@
     "items": [
      {
       "label_en": "Water Lagoon",
-      "sub_en": "Main pool · centre of the project",
+      "sub_en": "Main pool · ≈ 1.30 m deep",
       "asset": "liv_lagoon_night",
       "asset_kind": "photo",
       "value": {
@@ -251,7 +251,8 @@
     "slides:intro-015 (155M. Water Lagoon)",
     "slides:intro-041 (Sky Pool ชั้น 3)",
     "slides:intro-028 (Aqua Cinema)",
-    "assets:web/6.gallery/exterior/CD03/Scene 40.png · ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png · web/6.gallery/exterior/Playscape/Scene 55.png · fac_3_sky_pool / fac_b_aqua_cinema (ภาพของกลุ่ม facilities ใช้ร่วม)"
+    "assets:web/6.gallery/exterior/CD03/Scene 40.png · ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png · web/6.gallery/exterior/Playscape/Scene 55.png · fac_3_sky_pool / fac_b_aqua_cinema (ภาพของกลุ่ม facilities ใช้ร่วม)",
+    "report:01_overview.md line 99, 150 · 19_faq.md (สระหลักลึกประมาณ 1.30 ม. ตามข้อมูลผู้พัฒนา; ไม่ใช้กับ Sky Pool/สระใต้ดิน)"
    ],
    "notes_th": "ตอบ 'มีสระกี่สระ / มีสระอะไรบ้าง' ตามคำตอบ FAQ 19.15 ของรายงานเป๊ะ (สระหลัก 1 · Private Pool 3 · Kid Pool 1 · Sky Pool 1 · สระในร่มใต้ดินต่อ Journey to Mars) ไม่พูดยอดรวมเป็นตัวเลขเดียว เพราะรายงานนับเอง (🔎) และ Kid Pool ดูเป็นส่วนหนึ่งของแนวสระหลัก — เล่าทีละแบบแทน · จังหวะบนจอ: (0) แถวว่างห้าแถวรอ (บอก 'มีห้าแบบ' ก่อนภาพแรก) · (1) ภาพลากูนมุมสูงยามค่ำ Scene 40 (เห็นความยาวคดเคี้ยวของสระ) ตัวเลข 155 m นับขึ้น แล้วย่อเข้าแถว · (2) ภาพมุมบนของคอร์ทฝั่งตะวันตกจากโมเดล UE ของเจ้าของ (เห็นปีกอาคาร E/F/D ที่ Private Pool อยู่) + '3 pools' — ภาพนี้คือคอร์ทที่สระอยู่ ไม่ได้ชี้สระใดสระหนึ่ง ถ้าเจ้าของมีภาพเรนเดอร์ของ Private Pool เองให้เปลี่ยน · (3) ภาพมุมสูงลาน Playscape กับวงสระเด็ก Scene 55 (ครอปตัดคนเล็กๆ ที่ทางเดินและหน้าประตูออก) · (4) Sky Pool ภาพเดียวกับ sky_pool_where · (5) Aqua Cinema ภาพเดียวกับ aqua_cinema_where · (6) ไม่มีภาพใหม่ ประโยคพื้นที่รวม 2,157 ตร.ม. แล้วรายการขยายเต็มจอ พร้อม end_hint ตัวเลขเดียวกัน · แถวที่มีเรื่องของตัวเองแตะได้ (ลากูน→masterplan_lagoon, สระเด็ก→for_families, Sky Pool, Aqua Cinema) Journey to Mars กับ 'ทั้งหมด' เป็นชิปท้าย (taps 6 ≠ แถว 5 จงใจ ไม่ให้ระบบผูกปุ่มตามลำดับเข้าแถว Private Pool) · ไม่ใส่: ความลึก 1.30 ม. (ตามเจ้าของงาน ไม่มีในแบบ), ขนาด Sky Pool ≈143 ตร.ม. (วัดจากโมเดล), จากุซซี่ (ไม่ใช่สระ เรื่องนี้ยาวพอแล้ว), จากุซซี่บนชั้นบนสุด (เจ้าของตัดสินทับ) · ไม่พูดว่า Private Pool เป็นของห้องใด (รายงาน 12.1 ห้าม) · คำถาม 'สระใหญ่แค่ไหน / สระหลักยาวเท่าไหร่' ปล่อยให้ masterplan_lagoon (มีอยู่แล้ว) — ใส่ซ้ำสองเรื่องโมเดลจะเลือกไม่ถูก"
   },
@@ -264,7 +265,8 @@
     "สวนข้างโครงการเป็นยังไง",
     "พื้นที่สีเขียวเท่าไหร่",
     "มีต้นไม้อะไรบ้าง",
-    "ในโครงการมีสวนไหม"
+    "ในโครงการมีสวนไหม",
+    "พันธุ์ไม้มีอะไรบ้าง"
    ],
    "questions_en": [
     "Is it next to a park?",
@@ -411,7 +413,8 @@
     "report:91_appendix_plants.md#ข.2 (จิกน้ำ Indian oak · โมกมัน Water jasmine · มะฮอกกานี Big-leaf mahogany) และ English summary line 131",
     "report:19_faq.md line 658 (ต้นไม้ 34 ชื่อ) · line 234 (พื้นที่สีเขียว 4,256 ตร.ม.) · line 170 (ติดสวนสาธารณะ)",
     "slides:intro-011 (THE PARK)",
-    "assets:slides intro_011.jpg · web/6.gallery/exterior/CD03/Scene 43.png · Scene 38.png · Scene 37.png"
+    "assets:slides intro_011.jpg · web/6.gallery/exterior/CD03/Scene 43.png · Scene 38.png · Scene 37.png",
+    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
    ],
    "notes_th": "การ์ดสี่ใบเด้งขึ้นตามคำ: (0) 'The Park next door' — ภาพ THE PARK จากสไลด์ intro-011 ที่อนุมัติแล้ว (ครอปซ้ายล่าง ตัดหัวข้อ THE PARK โลโก้ และป้ายมุมขวาล่างออก) ภาพนี้เป็นภาพประกอบของผู้พัฒนา ไม่ใช่ภาพถ่ายสวนจริง การ์ดจึงใช้คำว่า The Park ตามเด็ค แล้วบอกชื่อสวนจริงในบรรทัดเล็ก · (1) พื้นที่สีเขียว 4,256 ตร.ม. — Scene 43 ทางเดินกลางแปลงไม้พุ่มริมลากูน · (2) 34 ชนิด (ไม้ยืนต้น 11 · ไม้พุ่ม/คลุมดิน 23) — Scene 38 ต้นไม้ใหญ่ไม้ดอกขาว · (3) Stepped Garden — Scene 37 สนามหญ้าขั้นบันไดกับเตียงอาบแดด (Daybed 53 ชุดตามผัง) · footnote ขึ้นตอนจบ: สวนของเมืองพัทยา เปิดทุกวัน 05:00–21:00 เข้าฟรี · ชื่อต้นไม้: ไทยใช้ชื่อตามแบบ อังกฤษใช้ชื่อจาก English summary ของภาคผนวก ข (Indian oak, water jasmine, mahogany) · ไม่ใส่: ระยะ 40–100 ม. (อยู่ใน location_beach แล้ว และเป็นระยะจากหมุด) · คำว่า 'เดินเข้าสวนได้' / Direct Park Connection (facts: ทางเชื่อมยังไม่ยืนยัน — ห้ามสัญญา) จึงไม่ใส่คำถาม 'เดินเข้าสวนได้ไหม' ในเรื่องนี้ ปล่อยให้โมเดลตอบจาก facts · จำนวนต้นไม้ 62 ต้น (รายงานนับเอง ห้ามพูด) · ร้อยละที่เกินเกณฑ์พื้นที่สีเขียว (เกณฑ์ของสถาปนิก ห้ามอ้างข้อกฎหมาย) · ชื่อวิทยาศาสตร์ · ขนาดสวน 'กว่า 5 ไร่' (สองแหล่งไม่ตรงกัน)"
   },

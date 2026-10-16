@@ -8,13 +8,22 @@
    "มีตึกอะไรบ้าง",
    "โครงการใหญ่แค่ไหน",
    "ตึกหน้าตาเป็นยังไง",
-   "ขอดูภาพรวมโครงการ"
+   "ขอดูภาพรวมโครงการ",
+   "บอกรายละเอียดโครงการหน่อย",
+   "รายละเอียดโครงการ",
+   "โครงการนี้เป็นยังไง",
+   "สีของอาคารคืออะไร",
+   "ตึกสีอะไร",
+   "อาคารหน้าตาเป็นยังไง"
   ],
   "questions_en": [
    "How many buildings are there?",
    "How big is the project?",
    "What does the project look like?",
-   "Can I see the whole project?"
+   "Can I see the whole project?",
+   "Tell me about the project.",
+   "Can you give me an overview of the project?",
+   "What colour are the buildings?"
   ],
   "lines": [
    {
@@ -95,6 +104,22 @@
      "空中泳池",
      "Sky Pool",
      "三楼"
+    ]
+   },
+   {
+    "th": "ตัวอาคารโทนสีขาวครีม ใช้กระจกเยอะ และมีเส้นโค้งสีเข้มไหลลงด้านหน้าอาคารค่ะ",
+    "en": "The buildings are white and cream, with lots of glass and dark curved lines running down the front.",
+    "cue_th": [
+     "ขาวครีม",
+     "กระจก"
+    ],
+    "cue_en": [
+     "cream",
+     "glass"
+    ],
+    "cue_zh": [
+     "白色",
+     "玻璃"
     ]
    }
   ],
@@ -188,7 +213,8 @@
    "facts:โครงการ (คอนโดมิเนียม Low-rise 8 ชั้น 6 อาคาร (A–F) มีชั้นใต้ดินเชื่อมกันทั้งโครงการ)",
    "facts:จุดเด่น (ชั้น 3 อาคาร A: Social Lounge, Co-working Lounge, Common Sphere, Sky Pool · ภายนอก: Water Lagoon สระหลักกลางโครงการ)",
    "report:06_masterplan.md#6.7 line 297 (อาคาร A–F ใช้ระดับชั้นชุดเดียวกัน)",
-   "assets:ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2 (12 frames), HologramTransition/ViewportCapture_20260924_115211/cycle_01_outward_08 (realistic)"
+   "assets:ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Wave2 (12 frames), HologramTransition/ViewportCapture_20260924_115211/cycle_01_outward_08 (realistic)",
+   "report:06_masterplan.md#ลักษณะภายนอก (ภาพมุมสูง: อาคารสีขาวครีม · เส้นโค้ง ribbon สีเข้ม · ผนังกระจก)"
   ],
   "notes_th": "เขียนใหม่ 13 ต.ค. (เจ้าของ: กด 'All buildings' จากเรื่องความสูงแล้ว 'ประโยคพูดก็ประโยคเดิม') — เดิมเรื่องนี้พูด 6 อาคาร A–F, Low-rise 8 ชั้น, หลังคา 23 ม. ซ้ำกับ building_height เกือบทุกคำ ตอนนี้พูดเฉพาะสิ่งที่เรื่องความสูงไม่ได้พูด: ลากูนกลางโครงการ ชั้นใต้ดินเชื่อมทุกอาคาร ส่วนกลางชั้น 3 + Sky Pool ที่อาคาร A (ทั้งหมดจาก facts ที่อนุมัติ) · ความสูงเหลือในเรื่อง building_height (ปุ่ม How tall?) · ลำดับบนจอ: (0) ฮอโลแกรมสร้างโครงการ + ตัวนับ 6 BUILDINGS + ชิป A–F · (1) ลากูน · (2) ภาพจริง crossfade · (3) จบ · ไม่มีเส้นวัดแล้ว (เดิมเป็นสัญลักษณ์บนตึกสูง ~85 px) · ป้าย BUILDING บนหลังคาภาพ UE ยังกลับด้าน — รอ re-render"
  },
@@ -200,7 +226,8 @@
    "ตึกสูงกี่ชั้น",
    "มีกี่ชั้น",
    "สูงกี่เมตร",
-   "เป็น low-rise ใช่ไหม"
+   "เป็น low-rise ใช่ไหม",
+   "ความสูงตึกกี่เมตร"
   ],
   "questions_en": [
    "How tall is the building?",
@@ -788,16 +815,22 @@
    "ใกล้ห้างไหม",
    "ไปเซ็นทรัลไกลไหม",
    "ไปเซ็นทรัลกี่นาที",
-   "ไป Terminal 21 กี่นาที"
+   "ไป Terminal 21 กี่นาที",
+   "ห้างห่างกี่กิโล",
+   "เซ็นทรัลห่างกี่กิโลเมตร",
+   "ห่างจากเซ็นทรัลพัทยากี่กิโลเมตร",
+   "ห่างจาก Terminal 21 กี่กิโลเมตร"
   ],
   "questions_en": [
    "How far is the shopping mall?",
-   "How long to Central Pattaya?"
+   "How long to Central Pattaya?",
+   "How many kilometres is it to Central Pattaya?",
+   "How far is Terminal 21?"
   ],
   "lines": [
    {
-    "th": "เซ็นทรัล พัทยา ขับรถประมาณ 12 ถึง 17 นาที",
-    "en": "Central Pattaya is about 12 to 17 minutes by car,",
+    "th": "เซ็นทรัล พัทยา ระยะทางถนนประมาณ 9.9 กิโลเมตร ขับรถประมาณ 12 ถึง 17 นาที",
+    "en": "Central Pattaya is about 9.9 kilometres by road, about 12 to 17 minutes by car,",
     "cue_th": [
      "เซ็นทรัล",
      "Central"
@@ -812,8 +845,8 @@
     ]
    },
    {
-    "th": "และเทอร์มินอล 21 ก็ใกล้เคียงกันค่ะ",
-    "en": "and Terminal 21 about the same.",
+    "th": "และเทอร์มินอล 21 ประมาณ 11.2 กิโลเมตร ใช้เวลาใกล้เคียงกันค่ะ",
+    "en": "and Terminal 21, about 11.2 kilometres, takes about the same.",
     "cue_th": [
      "เทอร์มินอล",
      "Terminal"
@@ -984,13 +1017,18 @@
    "สระลากูนยาวเท่าไหร่",
    "สระใหญ่แค่ไหน",
    "สระว่ายน้ำหลักอยู่ตรงไหน",
-   "Water Lagoon คืออะไร"
+   "Water Lagoon คืออะไร",
+   "สระลากูนลึกเท่าไหร่",
+   "สระหลักลึกกี่เมตร",
+   "สะพานข้ามสระมีกี่แห่ง"
   ],
   "questions_en": [
    "Can I see the site plan?",
    "How long is the lagoon?",
    "How big is the pool?",
-   "Where is the main pool?"
+   "Where is the main pool?",
+   "How deep is the lagoon?",
+   "How many bridges are there?"
   ],
   "lines": [
    {
@@ -1028,8 +1066,8 @@
     ]
    },
    {
-    "th": "สระยาวประมาณ 155 เมตร",
-    "en": "It is about 155 metres long,",
+    "th": "สระยาวประมาณ 155 เมตร ลึกประมาณ 1.30 เมตร",
+    "en": "It is about 155 metres long and 1.30 metres deep,",
     "cue_th": [
      "155 เมตร",
      "ร้อยห้าสิบห้า",
@@ -1064,8 +1102,8 @@
     ]
    },
    {
-    "th": "มีเกาะต้นไม้ สะพานข้ามสระ และจากุซซี่ค่ะ",
-    "en": "with planted islands, bridges and a jacuzzi.",
+    "th": "มีเกาะต้นไม้ สะพานข้ามสระ 3 แห่ง และจากุซซี่ค่ะ",
+    "en": "with planted islands, three bridges and a jacuzzi.",
     "cue_th": [
      "เกาะ",
      "สะพาน"
@@ -1103,6 +1141,10 @@
      {
       "label_en": "Length",
       "value_en": "≈ 155 m"
+     },
+     {
+      "label_en": "Depth",
+      "value_en": "≈ 1.30 m"
      },
      "≈ 1.5 football fields",
      "5 planted islands",
@@ -1144,7 +1186,9 @@
    "report:12_landscape.md line 139 (ผู้นำเสนอเทียบ 155 ม. = 1.5 สนามฟุตบอล 🔎 สอดคล้อง)",
    "report:12_landscape.md line 31, 193 (Island 3 = Jacuzzi + Water Curtain)",
    "slides:intro-015 (155M. Water Lagoon)",
-   "assets:web/3.project details/master plan/_Embassy World  Floor Plan/3.png · web/6.gallery/exterior/CD03/Scene 58.png"
+   "assets:web/3.project details/master plan/_Embassy World  Floor Plan/3.png · web/6.gallery/exterior/CD03/Scene 58.png",
+   "report:01_overview.md line 99, 150 · 19_faq.md (สระหลักลึกประมาณ 1.30 ม. ตามข้อมูลผู้พัฒนา; ไม่ใช้กับ Sky Pool/สระใต้ดิน)",
+   "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
   ],
   "notes_th": "ลำดับบนจอ: (0) ผังชั้น G ของเว็บไซต์ทั้งผืน (ป้าย BUILDING A–F พิมพ์อยู่บนผังเอง) · (1) ไม่มีภาพใหม่ ผังค้าง (ป้ายอาคารบนผังทำหน้าที่แทน) · (2) ซูมเบาๆ 1.3 เท่า ที่ (48,50) ให้ยังเห็นลากูนทั้งเส้น วงชี้ที่ผิวน้ำกลางลากูน (56,52) ป้าย WATER LAGOON · ≈ 155 m · (3) ไม่มีภาพใหม่ (ฟุตบอลเป็นคำเปรียบ) · (4) ตัดไปภาพจริง Scene 58 (มุมสูงมองไล่ตามลากูน เห็นเกาะ สะพาน ศาลา) ชิปเด้งทีละข้อ · พิกัด: ลากูนบนผังที่ครอปกินตั้งแต่ x ≈ 11% (ปีกอาคาร E) ถึง ≈ 85% (อาคาร B) ตรงกับ 'จากปีกอาคาร E/D ถึงปลายติดอาคาร B' ในรายงาน · จุดวงชี้เลือกบนผิวน้ำสีฟ้าที่ไม่ทับสะพาน/เกาะ (อ่านจากภาพครอปที่มีกริด) · ถ้า engine ทำได้ ข้อเสนอ: เส้นวัดตามแนวลากูนจาก (11,52) ถึง (85,40) แทนวงชี้ ผังเว็บนี้มีเลขห้องและขนาดห้องพิมพ์อยู่ (ตรงกับช่วงใน facts ไม่มีราคา ไม่มีสถานะขาย) และมีป้าย SOUL SPACE ที่ไม่อยู่ในรายการ facility ของ facts — ให้เจ้าของดู · คำว่า 'ราวสนามฟุตบอลครึ่ง' เป็นคำเปรียบของผู้นำเสนอที่รายงานบันทึกไว้ ถ้าเจ้าของไม่อยากให้พูด ตัดบรรทัด 3 และชิปทิ้งได้ · แก้ตามรีวิว 12 ต.ค.: ชิปแรกเป็นแถวเด่น 'Length · ≈ 155 m' (ตัวเลขสีทอง) — ลูกค้าถามความยาว เดิมเป็นข้อความธรรมดาน้ำหนักเท่า 'Jacuzzi island'"
  },
@@ -1429,5 +1473,521 @@
    "assets:ue Wave2/Build_f2054 (หน้าต่างที่ติดไฟทั้งโครงการ = บ้านทุกหลัง)"
   ],
   "notes_th": "ลำดับบนจอ: (0) ฮอโลแกรมทั้งโครงการที่ไฟหน้าต่างติดทุกบาน (เฟรมเดียวกับตอนจบของ campus_buildings — cache ร่วม) ตัวเลข 1,066 นับขึ้น (ต้องมีจุลภาคพันตอนนับ) ป้าย 'Residences in 6 buildings' · (1)(2)(3) ส่วนย่อย Studio 117 → 1 Bedroom 801 → 2 Bedrooms 148 นับขึ้นทีละตัวตามเสียง · เปลี่ยนจากสเปก: ใส่ line ให้ parts เพื่อให้ตามเสียงทีละแบบ · ไม่พูด/ไม่ขึ้นสถานะขาย (ขายแล้ว/ว่าง) ไม่ขึ้นร้านค้า · ปุ่ม 'Room types' ต่อไปเรื่อง room_types ของทีม units"
+ },
+ {
+  "id": "floor_heights",
+  "template": "metric",
+  "questions_th": [
+   "พื้นหนาเท่าไหร่",
+   "พื้นหนากี่เซนติเมตร",
+   "ขนาดพื้น",
+   "ความหนาพื้นเท่าไหร่",
+   "ความสูงจากพื้นถึงพื้นเท่าไหร่",
+   "ความสูงแต่ละชั้นเท่าไหร่",
+   "เพดานสูงเท่าไหร่",
+   "ระยะฝ้าสูงเท่าไหร่",
+   "ระยะฝ้าห้องพักสูงเท่าไหร่"
+  ],
+  "questions_en": [
+   "How thick is the floor slab?",
+   "What is the floor-to-floor height?",
+   "How high are the ceilings?"
+  ],
+  "lines": [
+   {
+    "th": "ความสูงจากพื้นถึงพื้นของแต่ละชั้นประมาณ 2.84 เมตรค่ะ",
+    "en": "From one floor to the next is about 2.84 metres.",
+    "cue_th": [
+     "พื้นถึงพื้น",
+     "แต่ละชั้น"
+    ],
+    "cue_en": [
+     "floor",
+     "next"
+    ],
+    "cue_zh": [
+     "层高",
+     "每层"
+    ]
+   },
+   {
+    "th": "พื้นโครงสร้างหนาประมาณ 0.25 เมตร หรือ 25 เซนติเมตร",
+    "en": "The structural floor slab is about 25 centimetres thick,",
+    "cue_th": [
+     "โครงสร้าง",
+     "หนา"
+    ],
+    "cue_en": [
+     "slab",
+     "thick"
+    ],
+    "cue_zh": [
+     "楼板",
+     "厚"
+    ]
+   },
+   {
+    "th": "จากผิวพื้นถึงท้องพื้นชั้นบนประมาณ 2.59 เมตร ส่วนความสูงฝ้าสุดท้ายทีมขายจะยืนยันให้ค่ะ",
+    "en": "so from the floor surface to the slab above is about 2.59 metres; our sales team will confirm the finished ceiling height.",
+    "cue_th": [
+     "ท้องพื้น",
+     "ฝ้า"
+    ],
+    "cue_en": [
+     "above",
+     "ceiling"
+    ],
+    "cue_zh": [
+     "天花",
+     "吊顶"
+    ]
+   }
+  ],
+  "params": {
+   "bg_asset": "bld_c_real",
+   "value": {
+    "to": 2.84,
+    "dec": 2,
+    "prefix_en": "≈ ",
+    "unit_en": "m"
+   },
+   "label_en": "Floor to floor · every level",
+   "line": 0,
+   "parts": [
+    {
+     "label_en": "Structural slab",
+     "to": 0.25,
+     "dec": 2,
+     "prefix_en": "≈",
+     "unit_en": "m",
+     "line": 1
+    },
+    {
+     "label_en": "Floor to the slab above",
+     "to": 2.59,
+     "dec": 2,
+     "prefix_en": "≈",
+     "unit_en": "m",
+     "line": 2
+    }
+   ]
+  },
+  "taps": [
+   {
+    "id": "story_floor_heights_height",
+    "label_en": "Building height",
+    "label_th": "ความสูงอาคาร",
+    "next_story": "building_height",
+    "tool": null
+   },
+   {
+    "id": "story_floor_heights_rooms",
+    "label_en": "Room types",
+    "label_th": "แบบห้อง",
+    "next_story": "room_types",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:06_masterplan.md#ค่าสำคัญที่ใช้ตอบลูกค้า (ชั้นทั่วไป 2.84 · พื้นโครงสร้าง 0.25 · ผิวพื้นถึงท้องพื้น 2.59)"
+  ],
+  "notes_th": "เจ้าของ 15 ต.ค. (คำถามในภาพ: ขนาดพื้น) — ค่าตามโมเดลสถาปนิก 🔎 รายงานบท 6 · ความสูงฝ้าสำเร็จยังไม่สรุป ให้ทีมขายยืนยัน (ตามที่ตอบใน log 15 ต.ค.) · ภาพอาคาร C เดียวกับ building_height"
+ },
+ {
+  "id": "site_area",
+  "template": "metric",
+  "questions_th": [
+   "ที่ดินกี่ไร่",
+   "ที่ดินขนาดเท่าไหร่",
+   "ที่ดินกี่ตารางเมตร",
+   "ที่ดินรูปร่างเป็นยังไง",
+   "พื้นที่โครงการทั้งหมดเท่าไหร่"
+  ],
+  "questions_en": [
+   "How big is the land?",
+   "How many rai is the land?",
+   "What is the site area?"
+  ],
+  "lines": [
+   {
+    "th": "ที่ดินของโครงการประมาณ 15,556 ตารางเมตรค่ะ",
+    "en": "The land is about 15,556 square metres,",
+    "cue_th": [
+     "15,556",
+     "ที่ดิน"
+    ],
+    "cue_en": [
+     "15,556",
+     "land"
+    ],
+    "cue_zh": [
+     "15556",
+     "15,556",
+     "土地"
+    ]
+   },
+   {
+    "th": "หรือราว 9 ไร่ 2 งาน 89 ตารางวา",
+    "en": "about 9 rai 2 ngan 89 square wah,",
+    "cue_th": [
+     "ไร่"
+    ],
+    "cue_en": [
+     "rai"
+    ],
+    "cue_zh": [
+     "莱",
+     "rai"
+    ]
+   },
+   {
+    "th": "เป็นรูปหลายเหลี่ยม 9 มุม กว้างประมาณ 217 เมตร ลึกประมาณ 81 เมตร",
+    "en": "a nine-sided plot about 217 metres wide and 81 metres deep,",
+    "cue_th": [
+     "217",
+     "หลายเหลี่ยม"
+    ],
+    "cue_en": [
+     "217",
+     "nine-sided"
+    ],
+    "cue_zh": [
+     "217"
+    ]
+   },
+   {
+    "th": "ในนั้นเป็นพื้นที่สีเขียว 4,256 ตารางเมตร และสระว่ายน้ำรวม 2,157 ตารางเมตรค่ะ",
+    "en": "with 4,256 square metres of green space and 2,157 square metres of pools.",
+    "cue_th": [
+     "สีเขียว",
+     "4,256"
+    ],
+    "cue_en": [
+     "green",
+     "4,256"
+    ],
+    "cue_zh": [
+     "绿地",
+     "4256"
+    ]
+   }
+  ],
+  "params": {
+   "bg_asset": "plan_ground_site",
+   "value": {
+    "to": 15556,
+    "dec": 0,
+    "unit_en": "SQ.M."
+   },
+   "label_en": "Land · about 9 rai 2 ngan 89 sq.wah",
+   "parts": [
+    {
+     "label_en": "Green space",
+     "to": 4256,
+     "unit_en": "sq.m.",
+     "line": 3
+    },
+    {
+     "label_en": "Pools",
+     "to": 2157,
+     "unit_en": "sq.m.",
+     "line": 3
+    }
+   ],
+   "line": 0
+  },
+  "taps": [
+   {
+    "id": "story_site_area_plan",
+    "label_en": "Site plan",
+    "label_th": "ผังโครงการ",
+    "next_story": "masterplan_lagoon",
+    "tool": null
+   },
+   {
+    "id": "story_site_area_green",
+    "label_en": "Green & park",
+    "label_th": "สวนและพื้นที่สีเขียว",
+    "next_story": "park_green",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:19_faq.md (ที่ดินโครงการกี่ไร่ 15,556 ตร.ม. ≈ 9 ไร่ 2 งาน 89 ตร.ว. · ที่ดินรูปร่าง 9 มุม 217 × 81 ม. · พื้นที่ภายนอก สีเขียว 4,256 สระ 2,157)",
+   "report:06_masterplan.md"
+  ],
+  "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · log 15 ต.ค. \"ที่ดินที่นี่ขนาดเท่าไหร่ครับ\" ตอบจากการค้น ไม่มีภาพ · ที่ดินวัดจากแบบ ยังไม่ได้ยืนยันกับโฉนด (รายงาน) — พูด \"ประมาณ\" เสมอ"
+ },
+ {
+  "id": "units_by_building",
+  "template": "metric",
+  "questions_th": [
+   "แต่ละตึกมีกี่ห้อง",
+   "ตึก A มีกี่ห้อง",
+   "ตึกไหนห้องเยอะที่สุด"
+  ],
+  "questions_en": [
+   "Which building has the most units?"
+  ],
+  "lines": [
+   {
+    "th": "ทั้ง 1,066 ยูนิตอยู่ใน 6 อาคารค่ะ",
+    "en": "Our 1,066 residences are in six buildings:",
+    "cue_th": [
+     "1,066",
+     "6 อาคาร"
+    ],
+    "cue_en": [
+     "1,066",
+     "six buildings"
+    ],
+    "cue_zh": [
+     "1066",
+     "1,066",
+     "六栋"
+    ]
+   },
+   {
+    "th": "อาคาร A 146 ห้อง อาคาร B 200 ห้อง",
+    "en": "Building A has 146, Building B 200,",
+    "cue_th": [
+     "อาคาร A",
+     "146"
+    ],
+    "cue_en": [
+     "Building A",
+     "146"
+    ],
+    "cue_zh": [
+     "A栋",
+     "146"
+    ]
+   },
+   {
+    "th": "อาคาร C 176 ห้อง อาคาร D 168 ห้อง",
+    "en": "Building C 176, Building D 168,",
+    "cue_th": [
+     "อาคาร C",
+     "176"
+    ],
+    "cue_en": [
+     "Building C",
+     "176"
+    ],
+    "cue_zh": [
+     "C栋",
+     "176"
+    ]
+   },
+   {
+    "th": "อาคาร E 184 ห้อง และอาคาร F 192 ห้องค่ะ",
+    "en": "Building E 184 and Building F 192.",
+    "cue_th": [
+     "อาคาร E",
+     "184"
+    ],
+    "cue_en": [
+     "Building E",
+     "184"
+    ],
+    "cue_zh": [
+     "E栋",
+     "184"
+    ]
+   }
+  ],
+  "params": {
+   "bg_asset": "campus_holo_f2054",
+   "value": {
+    "to": 1066,
+    "dec": 0,
+    "unit_en": "UNITS"
+   },
+   "label_en": "Residences by building",
+   "parts": [
+    {
+     "label_en": "Building A",
+     "to": 146,
+     "line": 1
+    },
+    {
+     "label_en": "Building B",
+     "to": 200,
+     "line": 1
+    },
+    {
+     "label_en": "Building C",
+     "to": 176,
+     "line": 2
+    },
+    {
+     "label_en": "Building D",
+     "to": 168,
+     "line": 2
+    },
+    {
+     "label_en": "Building E",
+     "to": 184,
+     "line": 3
+    },
+    {
+     "label_en": "Building F",
+     "to": 192,
+     "line": 3
+    }
+   ],
+   "line": 0
+  },
+  "taps": [
+   {
+    "id": "story_units_by_building_types",
+    "label_en": "Room types",
+    "label_th": "แบบห้อง",
+    "next_story": "room_types",
+    "tool": null
+   },
+   {
+    "id": "story_units_by_building_buildings",
+    "label_en": "6 buildings",
+    "label_th": "6 อาคาร",
+    "next_story": "campus_buildings",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:19_faq.md (อาคารแต่ละหลังมีกี่ห้อง: A 146 · B 200 · C 176 · D 168 · E 184 · F 192)",
+   "facts:โครงการ (ห้องชุดทั้งหมด 1,066 ยูนิต)"
+  ],
+  "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · นับห้องพักอาศัย (อาคาร A มีร้านค้าอีก 6 ยูนิต ไม่นับรวม) · ไม่พูดจำนวนที่ขาย/ว่าง"
+ },
+ {
+  "id": "travel_bangkok",
+  "template": "journey",
+  "questions_th": [
+   "ไปกรุงเทพกี่ชั่วโมง",
+   "ไปกรุงเทพไกลไหม",
+   "จากกรุงเทพมาใช้เวลาเท่าไหร่",
+   "ไปดอนเมืองกี่ชั่วโมง"
+  ],
+  "questions_en": [
+   "How long to Bangkok?",
+   "How far is Bangkok?"
+  ],
+  "lines": [
+   {
+    "th": "ไปกรุงเทพแถวสยาม ขับรถประมาณ 104 นาทีตอนรถไม่ติดค่ะ",
+    "en": "Bangkok, around Siam, is about 104 minutes by car without traffic,",
+    "cue_th": [
+     "กรุงเทพ",
+     "สยาม"
+    ],
+    "cue_en": [
+     "Bangkok",
+     "Siam"
+    ],
+    "cue_zh": [
+     "曼谷"
+    ]
+   },
+   {
+    "th": "ถ้ารถติดประมาณ 1.9 ถึง 2.4 ชั่วโมง",
+    "en": "or about 1.9 to 2.4 hours in heavy traffic.",
+    "cue_th": [
+     "รถติด"
+    ],
+    "cue_en": [
+     "traffic"
+    ],
+    "cue_zh": [
+     "堵车"
+    ]
+   },
+   {
+    "th": "สนามบินสุวรรณภูมิประมาณชั่วโมงครึ่ง",
+    "en": "Suvarnabhumi Airport is about an hour and a half,",
+    "cue_th": [
+     "สุวรรณภูมิ"
+    ],
+    "cue_en": [
+     "Suvarnabhumi"
+    ],
+    "cue_zh": [
+     "素万那普",
+     "Suvarnabhumi"
+    ]
+   },
+   {
+    "th": "และดอนเมืองประมาณ 2 ชั่วโมงค่ะ",
+    "en": "and Don Mueang about 2 hours.",
+    "cue_th": [
+     "ดอนเมือง"
+    ],
+    "cue_en": [
+     "Don Mueang"
+    ],
+    "cue_zh": [
+     "廊曼",
+     "Don Mueang"
+    ]
+   }
+  ],
+  "params": {
+   "origin_en": "EMBASSY WORLD",
+   "origin_sub_en": "Jomtien, Pattaya · by car",
+   "bar_max": 150,
+   "rows": [
+    {
+     "icon": "road",
+     "label_en": "Bangkok (Siam)",
+     "sub_en": "Heavy traffic 1.9–2.4 hr",
+     "value_en": "≈ 104 min",
+     "bar": [
+      104,
+      144
+     ],
+     "line": 0
+    },
+    {
+     "icon": "plane",
+     "label_en": "Suvarnabhumi Airport",
+     "value_en": "≈ 1.5 hr",
+     "bar": [
+      90
+     ],
+     "line": 2
+    },
+    {
+     "icon": "plane",
+     "label_en": "Don Mueang Airport",
+     "value_en": "≈ 2 hr",
+     "bar": [
+      120
+     ],
+     "line": 3
+    }
+   ]
+  },
+  "taps": [
+   {
+    "id": "story_travel_bangkok_airports",
+    "label_en": "Airports",
+    "label_th": "สนามบิน",
+    "next_story": "travel_airports",
+    "tool": null
+   },
+   {
+    "id": "story_travel_bangkok_malls",
+    "label_en": "Malls",
+    "label_th": "ห้าง",
+    "next_story": "travel_malls",
+    "tool": null
+   }
+  ],
+  "sources": [
+   "report:19_faq.md (ไปกรุงเทพฯ ย่านสยามสแควร์ 104 นาที รถไม่ติด · 1.9–2.4 ชม. รถหนาแน่น)",
+   "report:92_appendix_travel.md line 49 (เด็คหน้า 8: สุวรรณภูมิ 1.5 ชม. · ดอนเมือง 2 ชม.)",
+   "slides:intro-008"
+  ],
+  "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · ค่าประมาณจากแผนที่ ไม่ใช่วัดจริง · ห้ามพูดรถไฟความเร็วสูง 40–45 นาที (รายงาน: อย่าใช้)"
  }
 ]

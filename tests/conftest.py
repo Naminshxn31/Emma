@@ -114,6 +114,9 @@ def _fresh_async_state():
     # fatal inside a test that drives `_ensure_page` for real — which
     # `test_a_fullscreen_failure_does_not_cost_us_the_window` does.
     _settings.embed_provider = "off"
+    # EMBED_BUILD=false belongs to the robot (robot.env); a PC .env that
+    # copied it would turn every index-building test red.
+    _settings.embed_build = True
     # Same family as tool_groups below: the gallery's .env scopes the library
     # to Embassy World (MYDOCS_INCLUDE), which would filter out every temp doc
     # a mydocs test drops in a tmp folder and turn the suite red on that one
@@ -281,6 +284,7 @@ def _fresh_async_state():
     # robot_nav_places_file is blank so no test reads the tracked floor plan
     # by accident; tests pass their fixture explicitly.
     _settings.robot_body_enabled = False
+    _settings.speech_gestures = False
     _settings.robot_nav_routes_enabled = False
     _settings.robot_nav_panel = "off"
     _settings.robot_nav_pin = ""
@@ -301,7 +305,7 @@ def _fresh_async_state():
     # only if something already imported them — the calc rule.
     import sys as _sys_modules
 
-    for _name in ("app.robot_body", "app.robot_nav"):
+    for _name in ("app.robot_body", "app.robot_nav", "app.speech_gestures"):
         _module = _sys_modules.modules.get(_name)
         if _module is not None and hasattr(_module, "reset_state"):
             _module.reset_state()

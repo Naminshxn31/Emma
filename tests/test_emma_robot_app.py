@@ -174,7 +174,7 @@ def test_face_handshake_requires_trusted_preview_and_foreground():
     # one lock on the arm (was greetingPending), and the verified group 6
     greet = code_only(method(BODY.read_text(encoding="utf-8"), "synchronized void greet()"))
     assert "busy.compareAndSet(false, true)" in greet
-    assert 'begin("handshake", now);' in greet
+    assert 'begin("handshake", now, false);' in greet
     assert "HANDSHAKE_GROUP = 6;" in GESTURES.read_text(encoding="utf-8")
     assert "arm.playGroup(\"handshake\".equals(id) ? BodyGestures.HANDSHAKE_GROUP" in BODY.read_text(
         encoding="utf-8")
@@ -197,7 +197,7 @@ def test_the_greeting_gesture_returns_the_arm_to_rest_and_a_stop_voids_it():
     # MainActivity only relays the framed event.
     assert "if (body != null) body.onArmFinished();" in code_only(method(text, "@Override public void onArmFinished()"))
     assert 'data.contains("AGF")' not in code_only(text)
-    play = code_only(method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames)"))
+    play = code_only(method(body, "private void play(String id, int gen, List<BodyGestures.Frame> frames, boolean speech)"))
     assert "later(gen, () -> restReturn(gen, \"no #AGF heard\"), BodyGestures.GROUP_FALLBACK_MS);" in play
     finished = code_only(method(body, "void onArmFinished()"))
     assert "later(gen, () -> restReturn(gen, \"#AGF\"), groupHoldMs);" in finished

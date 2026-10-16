@@ -84,6 +84,8 @@ final class EmmaFace {
         /** Always accepted: a stop is never blocked by focus or state. */
         String bodyStop();
         String bodyGesture(String id);
+        /** A speech gesture, timed by the server to her voice. */
+        String bodySpeech(String id);
         String navPlaces();
         String navStatus();
         String navGo(String placeId, String origin);
@@ -110,6 +112,10 @@ final class EmmaFace {
      *  `$` also matches before a final line terminator, and an id with a
      *  trailing newline is two shell lines by the time it reaches a shell. */
     private static final Pattern BODY_ACTION = Pattern.compile("emma-body:([a-z][a-z0-9_]{1,31})");
+    /** Her arm while she talks (owner 15 Oct): the same id shape, one fixed
+     *  suffix. An APK without it answers bad_request (BODY_ACTION needs the
+     *  whole message), so a newer page/server never moves an older app. */
+    private static final Pattern BODY_SPEECH = Pattern.compile("emma-body:([a-z][a-z0-9_]{1,31}):speech");
     private static final Pattern NAV_GO = Pattern.compile("emma-nav:go:([a-z][a-z0-9_]{1,31}):(tap|voice)");
     private static final String BAD_REQUEST = "{\"accepted\":false,\"reason\":\"bad_request\"}";
 
@@ -655,6 +661,8 @@ final class EmmaFace {
         }
         Matcher go = NAV_GO.matcher(message);
         if (go.matches()) return bridge.navGo(go.group(1), go.group(2));
+        Matcher speech = BODY_SPEECH.matcher(message);
+        if (speech.matches()) return bridge.bodySpeech(speech.group(1));
         Matcher body = BODY_ACTION.matcher(message);
         if (body.matches()) return bridge.bodyGesture(body.group(1));
         return BAD_REQUEST;
