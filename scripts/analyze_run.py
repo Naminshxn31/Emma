@@ -181,6 +181,27 @@ def summarize(events: list[dict], history: list[list[dict]] | None = None) -> di
             if secs > 0:
                 s.setdefault("slowed_ahead", []).append({"label": e.get("label"), "seconds": round(secs, 1),
                                                          "least_free_m": least})
+    # our lidar map, matched at every checkpoint for the log only (drive_route
+    # shadow_fix, 19 ต.ค.): how far from the walls on the axes they measured,
+    # what it says on the axes they did not, and what it costs
+    shadow = [e for e in events if e.get("kind") == "shadow_fix"]
+    if shadow:
+        ok = [e for e in shadow if not e.get("error")]
+        vs = defaultdict(list)
+        for e in ok:
+            for ax, v in (e.get("vs_walls") or {}).items():
+                vs[ax].append(abs(v))
+        s["shadow"] = {"n": len(shadow), "errors": len(shadow) - len(ok),
+                       "vs_walls_max": {ax: round(max(v) * (100 if ax.endswith("_m") else 1), 1)
+                                        for ax, v in vs.items()},
+                       "vs_walls_n": {ax: len(v) for ax, v in vs.items()},
+                       "only_map": sum(1 for e in ok for ax, key in ((0, "x_m"), (1, "y_m"))
+                                       if (e.get("pinned") or [False, False])[ax] and key not in (e.get("vs_walls") or {})),
+                       "seconds_max": max((e.get("seconds") or 0.0 for e in shadow), default=0.0),
+                       "score_min": min((e.get("score") or 0.0 for e in ok), default=None)}
+    seen = [f for e in events if e.get("kind") == "drive" for f in (e.get("seen") or [])]
+    if seen:
+        s["frames_on_the_move"] = len(seen)
     rolled = [f for e in events if e.get("kind") == "drive" for f in (e.get("rolling") or [])]
     if rolled:
         taken = [f for f in rolled if f.get("taken")]
@@ -291,6 +312,18 @@ def report(s: dict, name: str = "") -> str:
         ro = s["rolling"]
         out.append("walls on the move: %d taken, up to %.1f cm / %.1f deg" % (ro["taken"], ro["max_across_cm"],
                                                                           ro["max_turn_deg"]))
+    if s.get("shadow"):
+        sh = s["shadow"]
+        out.append("lidar map (log only): %d stops%s, vs walls max %s | axes only the map measured: %d | "
+                   "up to %.2f s a match%s" % (
+                       sh["n"], "" if not sh["errors"] else " (%d errors)" % sh["errors"],
+                       ", ".join("%s %.1f%s (n %d)" % (ax[0] if ax.endswith("_m") else "yaw", v,
+                                                        " cm" if ax.endswith("_m") else " deg", sh["vs_walls_n"][ax])
+                                 for ax, v in sorted(sh["vs_walls_max"].items())) or "-",
+                       sh["only_map"], sh["seconds_max"],
+                       "" if sh["score_min"] is None else ", lowest score %.2f" % sh["score_min"]))
+    if s.get("frames_on_the_move"):
+        out.append("lidar frames logged on the move: %d" % s["frames_on_the_move"])
     if s.get("slowed_ahead"):
         sl = s["slowed_ahead"]
         out.append("slowed for something ahead: %.1f s on %d lane(s): %s" % (

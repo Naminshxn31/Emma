@@ -247,7 +247,9 @@ const payloads = process.argv[2] ? JSON.parse(fs.readFileSync(process.argv[2], '
 
 const SHOWN = ['es-row', 'es-slab', 'es-fl', 'es-card', 'es-r', 'es-fig', 'es-chip', 'es-chipbtn', 'es-area',
                'es-jr-r', 'es-jr-v', 'es-jr-spine', 'es-nb-r', 'es-nb-pill', 'es-nb-tag', 'es-nb-park', 'es-nb-pin',
-               'es-thumb', 'es-strip'];
+               'es-thumb', 'es-strip',
+               // journey's rings view (the nearby stories, 21 Oct)
+               'es-ar-r', 'es-ar-m', 'es-ar-tag', 'es-ar-ring', 'es-ar-rl', 'es-ar-walk', 'es-ar-lead'];
 
 // A count on its way up shows round steps only, never a precise figure that
 // is not the fact ("124 m" on the way to 155 -- 13 Oct recordings). Once, on
@@ -357,7 +359,7 @@ async function oneStory(payload) {
   }
   // the drawn templates: every bar driven, every line drawn
   for (const e of root.querySelectorAll('.es-jr-run')) assert.ok(/translate3d\((?!0\.00%)/.test(e.style.transform || ''), payload.template + ': a bar not driven');
-  for (const cls of ['es-nb-road', 'es-nb-measure']) {
+  for (const cls of ['es-nb-road', 'es-nb-measure', 'es-ar-route']) {
     for (const e of root.querySelectorAll('.' + cls)) assert.ok(/scaleX\(1\)/.test(e.style.transform || ''), `${payload.template}: .${cls} not drawn`);
   }
   await sleep(60);
@@ -465,6 +467,42 @@ async function follows() {
       assert.ok(area.classList.contains('on') && !mood.classList.contains('on'));
       S._fireTo(3); await sleep(80);
       assert.ok(mood.classList.contains('on'), 'details: the mood on its line');
+    });
+  // journey, view "rings": a place drops onto its ring on its own line, its
+  // route drawn then; a walk waits for the line that says it; the place she
+  // names stands out and the overview has no highlight; two places the same
+  // minutes away stand apart on their ring; no compass (drive times have no
+  // direction)
+  await run({ id: 'r', template: 'journey', beats: beats(3), taps: [],
+              params: { view: 'rings', origin_en: 'HOME', origin_sub_en: 'by car', bar_max: 10,
+                        footnote_en: 'Drive time from the project · not a map',
+                        rows: [{ icon: 'shop', label_en: 'Shop', value_en: '≈ 4 min', bar: [4], line: 0,
+                                 walk: { value_en: '≈ 23 min', line: 1 } },
+                               { icon: 'school', label_en: 'School', short_en: 'Sch', value_en: '≈ 4 min', bar: [4], line: 2 }] } },
+    async (S, root) => {
+      S._fireTo(0); await sleep(1150);                  // the pin (0.65 s), then the place lands (+0.42 s)
+      const ms = byCls(root, 'es-ar-m'), routes = byCls(root, 'es-ar-route'), walk = byCls(root, 'es-ar-walk')[0];
+      assert.equal(ms.length, 2, 'rings: a mark per place');
+      assert.ok(ms[0].classList.contains('on') && /scaleX\(1\)/.test(routes[0].style.transform), 'rings: the first place on its line');
+      assert.ok(!ms[1].classList.contains('on') && /scaleX\(0\)/.test(routes[1].style.transform), 'rings: the next waits for its line');
+      assert.ok(ms[0].classList.contains('act'), 'rings: the place she names stands out');
+      await sleep(500);                                   // past the place's own walk timer (+0.9 s)
+      assert.ok(!walk.classList.contains('on'), 'rings: the walk waits for the line that says it');
+      S._fireTo(1); await sleep(300);
+      assert.ok(walk.classList.contains('on'), 'rings: the walk on its line');
+      S._fireTo(2); await sleep(500);
+      assert.ok(ms[1].classList.contains('on') && ms[1].classList.contains('act'), 'rings: the next place on its line');
+      assert.ok(!ms[0].classList.contains('act'), 'rings: one place stands out at a time');
+      const at = m => [parseFloat(m.style.left), parseFloat(m.style.top)];
+      const a = at(ms[0]), b = at(ms[1]);
+      assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) > 100, 'rings: the same minutes, apart on the ring: ' + a + ' / ' + b);
+      assert.equal(byCls(root, 'es-ar-tag')[1].textContent.indexOf('Sch'), 0, 'rings: the short name on the disc');
+      S.settle();
+      assert.ok([].concat(ms, byCls(root, 'es-ar-tag'), byCls(root, 'es-ar-r')).every(e => !e.classList.contains('act')),
+                'rings: no highlight at rest');
+      assert.ok(ms.every(m => !m.classList.contains('ping')), 'rings: no ripple left to replay after an interruption');
+      assert.equal(byCls(root, 'es-nb-n').length, 0, 'rings: no compass');
+      assert.ok(byCls(root, 'es-ar-note')[0].textContent.indexOf('not a map') >= 0, 'rings: says it is not a map');
     });
   // stack: an opening line that names no item shows the empty rows, unlabelled;
   // while she talks the list is drawn small (one transform), at rest full size

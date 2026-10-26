@@ -1383,6 +1383,34 @@ def show_quotation(room: str, ownership: str = "thai", currency: str | None = No
                             "ใบเสนอราคาเป็นของฝ่ายขาย พนักงานเป็นคนกรอกชื่อลูกค้าและกดพิมพ์เอง")}
 
 
+NO_WEB_MAP = "เครื่องนี้ไม่ได้เปิดจอเว็บ ให้บอกทำเลด้วยคำพูดตามข้อมูลโครงการ"
+#: Robot 20 Oct: "Can you show me the location of the project on Google Maps?"
+#: -> "I am sorry, but I am unable to display the map at the moment." The
+#: robot has no web window, but its face has the location story -- a map
+#: drawn in motion (owner 13 Oct: "ไม่ต้องใช้รูปภาพแต่ให้เป็น motion").
+NO_WEB_MAP_STORY = ("จอนี้เปิด Google Maps ไม่ได้ แต่มีแผนที่ทำเลเป็นเรื่องเล่าบนจอ: เรียก "
+                    "present_story(topic=\"%s\") ตอนนี้ แล้วพูดตามบรรทัด say ห้ามพูดว่า "
+                    "\"I am unable to display the map\" หรือ \"เปิดแผนที่ไม่ได้\"")
+
+
+def _no_web_map() -> str:
+    """Where the face tells stories, the story that answers "where is the
+    project" is the map; elsewhere, words."""
+    try:
+        from app import stories
+        from app.prompts import _tool_visible
+
+        if _tool_visible("present_story"):
+            offered = stories.available()
+            topic = (stories.story_for_query("Where is the project?", offered)
+                     or stories.story_for_query("โครงการอยู่ที่ไหน", offered))
+            if topic:
+                return NO_WEB_MAP_STORY % topic
+    except Exception:
+        logger.exception("no location story for the map -- answering in words")
+    return NO_WEB_MAP
+
+
 @tool(
     name="show_map",
     description=(
@@ -1440,8 +1468,7 @@ def show_map() -> dict:
                 "instruction": ("ยังไม่มีลิงก์แผนที่ที่ฝ่ายขายยืนยันในระบบ ให้บอกทำเลด้วยคำพูด "
                                 "ตามข้อมูลโครงการที่มี ห้ามเดาพิกัด ระยะทาง หรือเวลาเดินทาง")}
     if not webstage.enabled():
-        return {"ok": False, "error": "web stage off",
-                "instruction": "เครื่องนี้ไม่ได้เปิดจอเว็บ ให้บอกทำเลด้วยคำพูดตามข้อมูลโครงการ"}
+        return {"ok": False, "error": "web stage off", "instruction": _no_web_map()}
     webstage.request(link)
     turnlog.record("show_map")
     return {"ok": True, "screen": "web", "project_id": settings.project_id,

@@ -51,6 +51,7 @@ MAX_RESULTS = 4
 # would have sprouted `search_condo_info` just by using the web library.
 # retrieval is the one shared module with no @tool in it.
 from app.tools.retrieval import (  # noqa: E402
+    SPOKEN_NUMBERS,
     is_commercial as _is_commercial,
     sanitize_common_area_dimensions,
 )
@@ -154,11 +155,12 @@ def _slides_on_screen() -> bool:
 
 
 #: Rides on every answer drawn from the approved project report
-#: (app/project_report.py). Numbers as written -- the report rounds and
-#: qualifies them ("ประมาณ", "ตามแบบ") and those words are the honest part.
+#: (app/project_report.py). Numbers keep their qualifiers ("ประมาณ", "ตามแบบ")
+#: -- those words are the honest part -- and are SAID the owner's way
+#: (SPOKEN_NUMBERS, 21 Oct: one decimal, time over distance, few numbers).
 REPORT_INSTRUCTION = (
     "ข้อมูลจากรายงานโครงการที่เจ้าของอนุมัติแล้ว ใช้ตอบลูกค้าได้ ตอบเฉพาะที่ตรงคำถาม "
-    "พูดตัวเลขตามที่เขียนพร้อมคำกำกับ เช่น 'ประมาณ' 'ตามแบบ' ห้ามคำนวณหรือปัดเอง "
+    "พูดตัวเลขพร้อมคำกำกับ เช่น 'ประมาณ' 'ตามแบบ' " + SPOKEN_NUMBERS + " "
     "ถ้าขัดกับ 'ข้อมูลโครงการ' ใน system prompt ให้ใช้ข้อมูลโครงการ "
     "ส่วนที่เนื้อหาบอกว่ายังไม่สรุปหรือต้องให้บริษัทยืนยัน ให้บอกตัวเลขที่มีแล้วพูดว่า "
     "'ตัวเลขสุดท้ายทีมขายจะยืนยันให้ค่ะ' ห้ามพูดว่า 'ยังไม่มีข้อมูล' "
@@ -173,10 +175,20 @@ REPORT_INSTRUCTION = (
 #: ว่างที่เป็นวิวทะเล". Quoted, because a quoted wrong sentence is the form of
 #: instruction this model follows (CLAUDE.md); said on every search result,
 #: because a rule at the end of the prompt is the form it ignores.
+#: Robot 20 Oct (English call): the part a result did not hold came out as
+#: "...is not specified in our current details", "...not mentioned in our
+#: current information", "I don't have the exact start date" -- the owner's
+#: "อย่าให้เหมือนว่าหุ่นไม่มีข้อมูลนี้" (12 Oct) in English, which the Thai
+#: words of the rule never matched. Her own sentences, quoted.
 GROUNDED_ONLY = (
     "พูดได้เฉพาะสิ่งที่เขียนอยู่ในผลนี้หรือในข้อมูลโครงการ ห้ามเติมคำบรรยายที่ผลไม่ได้บอก "
     "เช่น ห้ามพูดว่า 'มีอุปกรณ์ครบครัน' 'ทันสมัย' 'วิวทะเล' ถ้าผลไม่ได้เขียนไว้ "
-    "ถ้าผลตอบได้แค่บางส่วน ให้ตอบส่วนที่มี แล้วบอกว่าส่วนที่เหลือทีมขายจะยืนยันให้")
+    "ถ้าผลตอบได้แค่บางส่วน ให้ตอบส่วนที่มี แล้วบอกว่าส่วนที่เหลือทีมขายจะยืนยันให้ "
+    "ห้ามพูดว่า 'not specified in our current details' 'not mentioned in our current information' "
+    "'I don't have the exact...' หรือ 'ไม่มีข้อมูล' ให้พูดแบบ 'ส่วนนี้ทีมขายจะยืนยันให้ค่ะ' "
+    "(พูดเป็นภาษาของบทสนทนา) "
+    "ห้ามยืนยันเกินที่ผลเขียน: ถามว่าเกลือมาจากหิมาลัยจริงไหม ผลบอกแค่ผนังก้อนเกลือ ห้ามตอบ "
+    "'Yes, it is real natural salt stone' ให้บอกสิ่งที่ผลเขียนแล้วให้ทีมขายยืนยันที่มา")
 
 
 def _report_hits(query: str) -> list[dict]:
@@ -189,6 +201,61 @@ def _report_hits(query: str) -> list[dict]:
     except Exception:
         logger.exception("project report search failed")
         return []
+
+
+#: The guest's own words beside the model's query. Robot 20 Oct: "Okay, how
+#: high is the ceiling of a one bedroom unit?" was searched as "unit details"
+#: and "Why is it called Biogenesis?" as "Biogenesis" -- the intent the
+#: description asks the model to keep, gone -- and both went to the sales
+#: team while the report's FAQ answers them ("เพดานห้องสูงเท่าไร", "Biogenesis
+#: ชื่อมีความหมายว่าอะไร"). The caption of the utterance this call answers
+#: (after the latest activity_start, at most this old) is matched against the
+#: FAQ only -- the strict, calibrated matcher, never the passage search.
+#: A tap on the robot face is activity too (session._quick_ask marks it,
+#: review 26 Oct): without that, a search the model made for a tapped topic
+#: within 30 s of the guest's last sentence got that sentence's FAQ answer
+#: put first.
+GUEST_WORDS_MAX_AGE_S = 30.0
+
+
+def _guest_words(query: str) -> str | None:
+    try:
+        from app import heard
+
+        caption = heard.caption_for(max_age_s=GUEST_WORDS_MAX_AGE_S)
+    except Exception:
+        logger.exception("could not read the guest's words -- the model's query alone")
+        return None
+    text = " ".join((caption.text if caption else "").split())
+    if not text or text.lower() == " ".join(query.split()).lower() or _is_commercial(text):
+        return None
+    return text
+
+
+def _guest_faq(query: str, report: list[dict]) -> list[dict]:
+    """The report's FAQ answer to what the guest said, when the model's own
+    query did not already bring it."""
+    guest = _guest_words(query)
+    if not guest:
+        return []
+    try:
+        from app import project_report
+
+        hits = project_report.faq(guest)
+    except Exception:
+        logger.exception("project report FAQ on the guest's words failed")
+        return []
+    # by the answer: the same FAQ answer comes back under its Thai question
+    # and under an English one ("ถาม: Empire Tower คืออะไร" / "How many units
+    # does Empire Tower have?") -- once is enough
+    def answer(hit: dict) -> str:
+        return str(hit.get("text") or "").split("\nตอบ: ", 1)[-1]
+
+    seen = {answer(h) for h in report}
+    extra = [h for h in hits if answer(h) not in seen]
+    if extra:
+        turnlog.record("lookup_guest_faq", query=query, files=[h.get("file") for h in extra])
+    return extra
 
 
 SEARCH_DESCRIPTION = (
@@ -270,6 +337,16 @@ def _story_redirect(query: str) -> dict | None:
         return None
     if topic is None:
         return None
+    if topic == stories.last_shown():
+        # The story is on screen and was just told; a search now is for what
+        # its lines did not say (robot 20 Oct: "Why biogenesis?" twice handed
+        # back to fitness_where -- the same lines three times). Search.
+        # "Just told" is a window (stories.SHOWN_WINDOW_S, review 26 Oct: it
+        # used to last the whole call, so a guest back on the topic minutes
+        # later never got the story again); this follow-up renews it.
+        stories.followed_up(topic)
+        turnlog.record("lookup", query=query, story=topic, reason="story already told -- searching")
+        return None
     story = offered[topic]
     asks = " / ".join(((story.get("questions_th") or [])[:3] + (story.get("questions_en") or [])[:1]))
     turnlog.record("lookup", query=query, showed=None, found=True, story=topic, reason="story topic")
@@ -321,6 +398,7 @@ def search_condo_info(query: str) -> dict:
         return redirect
 
     report = _report_hits(query)
+    report = _guest_faq(query, report) + report
 
     from app.tools import slides as slides_mod
 
@@ -417,6 +495,8 @@ def search_condo_info(query: str) -> dict:
         # (live 12 Oct: "สระยาวเท่าไหร่" found the Sky Pool caption and no
         # length). Both go back; the report's rule rides along.
         result["instruction"] += " · ผลที่มี source_id project_report: " + REPORT_INSTRUCTION
+    else:
+        result["instruction"] += " " + SPOKEN_NUMBERS     # the report's rule carries it
     # Once per distinct instruction: four hits of one concept deck used to
     # repeat the same sentence four times.
     for caution in dict.fromkeys(item["content_state_instruction"] for item in result["results"]

@@ -278,6 +278,15 @@
     var head = (v.prefix_en ? v.prefix_en + ' ' : '');
     return head + (num(v.from) != null ? fmt(v.from, dec) + '–' : '') + fmt(v.to, dec) + unit;
   }
+  // A value in a list row: the figure, its unit a size smaller (the unit
+  // set as large as the figure ran a long range off the row)
+  function rowValue(v) {
+    var node = el('em', 'es-v');
+    var unit = v && v.unit_en ? ' ' + v.unit_en : '';
+    node.appendChild(document.createTextNode(valueText(v ? { from: v.from, to: v.to, dec: v.dec, prefix_en: v.prefix_en } : null)));
+    if (unit) node.appendChild(el('small', null, unit));
+    return node;
+  }
   function reducedMotion() {
     try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); }
     catch (e) { return false; }
@@ -346,7 +355,10 @@
     // running. Frame times are sampled only while a report is wanted.
     if (this.opts.onReport) this.sampleFrames();
     if (reducedMotion()) { this.toEnd(true); return; }
-    this.tick = setInterval(function () { self.step(); }, 90);
+    // 60 ms, not 90: a due beat waited ~45 ms on average for the next look
+    // at the clock, on top of everything else that makes a picture late
+    // (owner 21 Oct: "คำพูดไปแล้วแต่ภาพยังไม่มา"); a poll is a few additions
+    this.tick = setInterval(function () { self.step(); }, 60);
   }
   Story.prototype.sampleFrames = function () {
     var self = this, last = 0;
@@ -389,28 +401,61 @@
   };
 
   Story.prototype.add = function (node) { this.root.appendChild(node); return node; };
-  // A wide picture and three rows leave the lower half of a portrait screen
-  // empty (the designers' 20 stories, 12 Oct: a 2.5:1 campus render filled a
-  // fifth of the height). Once laid out -- everything exists from the start,
-  // hidden by opacity only -- the content block moves down by part of the
-  // room left above the overview's taps, so it sits a little above centre.
-  // Positions only, set once before anything shows: no layout animation.
+  // The screen is a tall portrait (owner 21 Oct: "จอเรามันยาวสูง ... ไม่ให้มี
+  // พื้นที่โล่งเกินไป"). Each template first sizes its own content to the room
+  // it has -- bigger pictures, bigger type (`room()`). What is still left is
+  // shared out here, once, before anything shows: some of it between the
+  // blocks (the picture, the figure, the list -- at most 4.5vh a gap), the
+  // rest above them, so the whole sits a little above centre. It used to
+  // move everything down by 42% of the room left above the taps: a third of
+  // the screen stayed empty above the content and a third below it, and a
+  // full-width block could be pushed into Emma's corner (location_beach's
+  // cards ended at 82% of the height, 21 Oct recording). A block that
+  // reaches the right third ends above her head (contentBottom); one on the
+  // left may go down to the taps. Positions only: no layout animation.
   // Elements anchored to the bottom (taps, hint, footnote) stay where they are.
   Story.prototype.balance = function () {
-    var kids = this.root.children, movable = [], bottom = 0;
+    var kids = this.root.children, items = [], room = Infinity;
+    var head = this.contentBottom(), side = this.floorY - this.H * 0.015;
     for (var k = 0; k < kids.length; k++) {
       var c = kids[k];
-      if (c === this.tapRow || !c.style || !c.style.top) continue;
-      movable.push(c);
-      bottom = Math.max(bottom, (c.offsetTop || 0) + (c.offsetHeight || 0));
+      if (c === this.tapRow || !c.style || !c.style.top || !isFinite(parseFloat(c.style.top))) continue;
+      var t = c.offsetTop || 0, b = t + (c.offsetHeight || 0);
+      var right = (c.offsetLeft || 0) + (c.offsetWidth || 0);
+      items.push({ c: c, t: t, b: b });
+      room = Math.min(room, (right > this.W * 0.7 ? head : side) - b);
     }
-    var room = this.floorY - this.H * 0.03 - bottom;
-    if (!movable.length || !(room > this.H * 0.05)) return;
-    var dy = Math.round(room * 0.42);
-    movable.forEach(function (c) {
-      var t = parseFloat(c.style.top);
-      if (isFinite(t)) { c.style.top = Math.round(t + dy) + 'px'; if (c._top != null) c._top += dy; }
+    if (!items.length || !(room > this.H * 0.02)) return;
+    // blocks: what overlaps moves together (a photo over its plan)
+    items.sort(function (a, b) { return a.t - b.t; });
+    var blocks = [];
+    items.forEach(function (it) {
+      var last = blocks[blocks.length - 1];
+      if (last && it.t < last.b - 1) { last.items.push(it); last.b = Math.max(last.b, it.b); }
+      else blocks.push({ b: it.b, items: [it] });
     });
+    var gaps = blocks.length - 1;
+    var per = gaps ? Math.min(this.H * 0.045, room * 0.5 / gaps) : 0;
+    var lead = (room - per * gaps) * 0.4;
+    blocks.forEach(function (bl, j) {
+      var dy = Math.round(lead + per * j);
+      if (!dy) return;
+      bl.items.forEach(function (it) {
+        it.c.style.top = Math.round(parseFloat(it.c.style.top) + dy) + 'px';
+        if (it.c._top != null) it.c._top += dy;
+      });
+    });
+  };
+  // The height a template may fill under the caption band and above Emma's
+  // head: what each one sizes its picture and type from.
+  Story.prototype.room = function () {
+    return this.contentBottom() - this.H * TOP_VH / 100;
+  };
+  // A soft light that crosses a hero picture once as it lands (a transform
+  // of a gradient strip: no filter, plays once -- emma-story.css .es-sheen)
+  Story.prototype.sheen = function (box) {
+    box.appendChild(el('i', 'es-sheen'));
+    return box;
   };
   // The scale (<= 1) at which a block anchored at its top stays above
   // `limitY`. Lists that grow with the catalog (five pools, six nearby
@@ -654,8 +699,8 @@
   // below, and kept inside the picture. Placed by a % of the picture before,
   // on a wide picture it landed on the ring it named and on the plan's own
   // printed name (review 12 Oct). Measured once, before anything shows.
-  Story.prototype.placeLabel = function (label, box, x, y, prefer) {
-    var gap = Math.round(this.W * 0.055);
+  Story.prototype.placeLabel = function (label, box, x, y, prefer, gapPx) {
+    var gap = gapPx > 0 ? gapPx : Math.round(this.W * 0.055);
     var h = label.offsetHeight || Math.round(this.W * 0.1), w = label.offsetWidth || Math.round(this.W * 0.3);
     var py = y / 100 * box._h, roomUp = py - gap - h, roomDown = box._h - (py + gap + h);
     var up = prefer !== 'below' ? (roomUp >= 4 || roomUp >= roomDown) : !(roomDown >= 4 || roomDown >= roomUp);
@@ -709,7 +754,9 @@
     this.fire(this.n - 1);
     this.ended = true;
     var self = this;
-    this.later(this.n ? 700 : 0, function () {
+    // the last beats' own motion first, then the overview: 0.45 s (it was
+    // 0.7 -- the last line's picture is the one most often late already)
+    this.later(this.n ? 450 : 0, function () {
       try { self.tpl.rest(false); } catch (e) { if (root.console) console.warn('story rest', e); }
       self.showTaps();
       self.report(false);
@@ -813,8 +860,11 @@
     // two or three rows: bigger plans and type -- the end state is a list
     // a guest taps, and three small rows left the lower half of the screen bare
     var dock = S.add(el('div', 'es-dock' + (items.length <= 3 ? ' roomy' : '')));
-    dock.style.top = Math.round(S.H * 0.17) + 'px';
-    var SMALL = 0.56, LIST_TOP = S.H * 0.15, CARD_BOTTOM = S.H * 0.68;
+    var LIST_TOP = S.H * 0.15;
+    dock.style.top = Math.round(LIST_TOP) + 'px';
+    // the big card may come down to just above Emma's head (it stopped at
+    // 68% of the height: a third of the screen stood empty under every plan)
+    var SMALL = 0.56, CARD_BOTTOM = S.contentBottom() - S.H * 0.008;
     var rows = items.map(function (it) {
       var tapId = it.tap && S.taps[it.tap] ? it.tap : null;
       var row = el(tapId ? 'button' : 'div', 'es-row');
@@ -825,7 +875,7 @@
       if (it.sub_en) tx.appendChild(el('span', null, tidy(it.sub_en)));
       // the value under the label, not beside it: a long label and a range
       // ("2 BEDROOMS" / "51.5–52.5 sq.m.") never share one line
-      if (it.value) tx.appendChild(el('em', 'es-v', valueText(it.value)));
+      if (it.value) tx.appendChild(rowValue(it.value));
       row.appendChild(th);
       row.appendChild(tx);
       if (tapId) { row.appendChild(el('i', 'es-go', '›')); S.bindTap(row, tapId); }
@@ -834,6 +884,26 @@
     });
     var hint = p.end_hint_en ? S.add(el('p', 'es-hint es-fade', p.end_hint_en)) : null;
     if (hint) hint.style.bottom = Math.round(S.H - S.floorY + S.H * 0.01) + 'px';
+    // The list at rest fills the tall screen: each row's picture as large as
+    // its share of the height allows (two layouts, measured once before
+    // anything shows). Three room plans were 25vw thumbnails in a list that
+    // filled half the screen (21 Oct recording).
+    (function size() {
+      var n = rows.length;
+      if (!n) return;
+      var limit = S.contentBottom();
+      if (hint && hint.offsetTop) limit = Math.min(limit, hint.offsetTop - S.H * 0.012);
+      var gap = S.H * (n <= 3 ? 0.022 : 0.016), pad = S.W * 0.02;
+      var each = (limit - LIST_TOP - gap * (n - 1)) / n;
+      // 36vw at most: wider, a long size ("51.5–52.5 sq.m.") ran off the row
+      var tw = Math.max(S.W * 0.22, Math.min(S.W * (n <= 3 ? 0.36 : 0.3), (each - pad * 2) * 4 / 3));
+      dock.style.gap = Math.round(gap) + 'px';
+      rows.forEach(function (r) { var th = r.querySelector('.es-th'); if (th) th.style.width = Math.round(tw) + 'px'; });
+      // while she talks the list is small under her caption: one row about
+      // 8.5% of the height, whatever size the rows are at rest
+      var rh = rows[0].offsetHeight || 0;
+      if (rh > 0) SMALL = Math.max(0.36, Math.min(0.56, S.H * 0.085 / rh));
+    })();
     var cur = null, presented = false;
     // Her opening line names no item ("We have three room types"): the rows
     // wait as empty frames, so the screen answers "three" before the first
@@ -934,20 +1004,32 @@
     var floors = arr(p.floors), n = floors.length;
     var order = arr(p.order_bottom_up).slice();
     if (order.length !== n) order = floors.map(function (_, k) { return k; });
-    var areaTop = S.H * 0.185, areaH = Math.min(S.H * 0.62, S.floorY - S.H * 0.06 - areaTop);
-    var slot = Math.min(areaH / Math.max(n, 1), S.H * 0.23);
+    // The plates fill the tall screen: each one as large as its slot allows
+    // (a plate 16:9, turned like a floor seen from above, is ~0.54 of its
+    // width tall on screen), the stack from under her caption to just above
+    // Emma's head -- the labels on the right must clear her. At 54vw the
+    // three floors left ~100 px between plates and 300 below (21 Oct).
+    var areaTop = S.H * 0.16, areaBottom = Math.min(S.contentBottom(), S.floorY - S.H * 0.05);
+    var slot = Math.min((areaBottom - areaTop) / Math.max(n, 1), S.H * 0.26);
+    var pw = Math.max(S.W * 0.5, Math.min(S.W * 0.6, slot * 0.94 / 0.543));
+    var ph = pw * 9 / 16;
+    // centred on the room the stack actually takes
+    var used = slot * n, y0 = areaTop + Math.max(0, (areaBottom - areaTop - used) * 0.4);
     var slabs = [], labs = [];
     floors.forEach(function (f, k) {
       var rankTop = n - 1 - order.indexOf(k);
-      var y = areaTop + rankTop * slot;
+      var mid = y0 + rankTop * slot + slot / 2;
       var tapId = f.tap && S.taps[f.tap] ? f.tap : null;
       var slab = el(tapId ? 'button' : 'div', 'es-slab');
-      slab.style.top = Math.round(y) + 'px';
+      slab.style.width = Math.round(pw) + 'px';
+      slab.style.left = Math.round(S.W * 0.36 - pw / 2) + 'px';
+      slab.style.top = Math.round(mid - ph / 2) + 'px';
+      slab._mid = mid;
       slab.style.zIndex = String(10 + n - rankTop);
       if (f.asset) slab.appendChild(S.img(f.asset));
       slab.appendChild(el('i', 'es-glow'));
       var lab = el(tapId ? 'button' : 'div', 'es-fl');
-      lab.style.top = Math.round(y + slot * 0.18) + 'px';
+      lab._mid = mid;
       lab.style.zIndex = '30';
       lab.appendChild(el('i', 'es-flmark'));
       var tx = el('div');
@@ -964,6 +1046,9 @@
       slabs[k] = slab;
       labs[k] = lab;
     });
+    // each label centred on its plate (by its own height, read once for all)
+    var lh = labs.map(function (l) { return l.offsetHeight || S.H * 0.07; });
+    labs.forEach(function (l, k) { l.style.top = Math.round(l._mid - lh[k] / 2) + 'px'; });
     var hint = p.end_hint_en ? S.add(el('p', 'es-hint es-fade', p.end_hint_en)) : null;
     if (hint) hint.style.bottom = Math.round(S.H - S.floorY + S.H * 0.01) + 'px';
     function act(k) {
@@ -1131,7 +1216,46 @@
   // Where is it: the picture, a zoom, a ring on the spot, then the real photo
   // (the zoomed picture shrinks into its corner) and what makes it special.
   TEMPLATES.spotlight = function (S, p) {
-    var base = S.add(S.box(p.base_asset, 90, 42, TOP_VH, 'es-spbase'));
+    var ph = p.photo || {}, photo = null, chips = [], rows = null, phImg = null, heard = -1;
+    // The chips first, measured: the picture takes the rest of the height
+    // (it was 42% at most, with a third of the screen empty under the chips)
+    if (ph.asset) {
+      rows = S.add(el('div', 'es-rows'));
+      // a chip is a line of text, or {label_en, value_en}: the figure the
+      // guest asked about ("Length · ≈ 155 m"), drawn like a distance row
+      arr(ph.chips_en).forEach(function (c) {
+        var r = el('div', 'es-r es-left');
+        if (c && typeof c === 'object') {
+          r.classList.add('es-key');
+          r.appendChild(el('span', null, tidy(c.label_en)));
+          if (c.value_en) r.appendChild(el('b', null, tidy(c.value_en)));
+          // "≈ 155 m" sits beside "≈ 1.30 m"; "≈ 27 m wide · ≈ 143 sq.m."
+          // needs the whole row
+          if (String(c.value_en || '').length > 14) r.classList.add('wide');
+          if (num(c.line) != null) r._line = c.line;
+        } else {
+          r.appendChild(el('span', null, tidy(c)));
+        }
+        rows.appendChild(r);
+        chips.push(r);
+      });
+      // three or more plain chips sit in two columns (the figure keeps a
+      // whole row): five chips one per row took 600 px from the photo
+      var plain = chips.filter(function (r) { return !r.classList.contains('es-key'); }).length;
+      if (plain >= 3) rows.classList.add('grid');
+    }
+    var rowsH = rows ? rows.offsetHeight || 0 : 0;
+    var maxH = Math.max(30, Math.min(56, (S.room() - rowsH - S.H * 0.03) / S.H * 100));
+    // the plan and the photo share one width, so the plan insets into the
+    // photo's own corner: the narrower of the two sets it
+    var mw = 94;
+    [p.base_asset, ph.asset].forEach(function (ref) {
+      if (!ref || !(ref.w > 0 && ref.h > 0)) return;
+      var w = Math.min(S.W * 0.94, S.H * maxH / 100 * ref.w / ref.h);
+      mw = Math.min(mw, w / S.W * 100);
+    });
+    var base = S.box(p.base_asset, mw, maxH, TOP_VH, 'es-spbase');
+    S.root.insertBefore(base, rows);
     base.style.opacity = '0';
     var zoom = el('div', 'es-zoom');
     zoom.appendChild(S.img(p.base_asset));
@@ -1150,12 +1274,11 @@
     var label = el('div', 'es-label es-up', sp.label_en || '');
     if (sp.sub_en) label.appendChild(el('small', null, tidy(sp.sub_en)));
     if (sp.label_en) { base.appendChild(label); S.placeLabel(label, base, sx, sy); }
-    var ph = p.photo || {}, photo = null, chips = [], rows = null, phImg = null;
     if (ph.asset) {
       // the photo in a frame of its OWN shape, sharing the picture's top and
       // width (so the zoomed picture insets into its top-right corner): in the
       // picture's frame a 2.5:1 site plan cut a 4:3 photo to a strip
-      photo = S.box(ph.asset, 90, 42, TOP_VH, 'es-photo es-fade');
+      photo = S.box(ph.asset, mw, maxH, TOP_VH, 'es-photo es-fade');
       if (photo._w < base._w) {
         photo._left = base._left + base._w - photo._w;
         photo.style.left = photo._left + 'px';
@@ -1163,27 +1286,15 @@
       phImg = photo.appendChild(S.img(ph.asset, 'es-fill es-cover'));
       phImg._onBroken = function () { dropPhoto(); };
       photo.appendChild(el('i', 'es-shade'));
+      S.sheen(photo);
       var title = el('div', 'es-label', ph.title_en || '');
       if (ph.sub_en) title.appendChild(el('small', null, ph.sub_en));
       if (ph.title_en) photo.appendChild(title);
       S.root.insertBefore(photo, base);
-      rows = S.add(el('div', 'es-rows narrow'));
-      // the chips come with the photo, under it (the picture is inset by then)
+      // the chips come with the photo, under it (the picture is inset by
+      // then); full width when they end above Emma's head, as they now do
       rows.style.top = Math.round(photo._top + photo._h + S.H * 0.025) + 'px';
-      // a chip is a line of text, or {label_en, value_en}: the figure the
-      // guest asked about ("Length · ≈ 155 m"), drawn like a distance row
-      arr(ph.chips_en).forEach(function (c) {
-        var r = el('div', 'es-r es-left');
-        if (c && typeof c === 'object') {
-          r.classList.add('es-key');
-          r.appendChild(el('span', null, tidy(c.label_en)));
-          if (c.value_en) r.appendChild(el('b', null, tidy(c.value_en)));
-        } else {
-          r.appendChild(el('span', null, tidy(c)));
-        }
-        rows.appendChild(r);
-        chips.push(r);
-      });
+      if (photo._top + photo._h + S.H * 0.025 + rowsH > S.contentBottom()) rows.classList.add('narrow');
     }
     var spotLine = num(p.spot_line) != null ? p.spot_line : 0, photoLine = num(ph.line);
     var zoomed = false, photoOn = false, ringAt = 0, gone = false;
@@ -1192,16 +1303,26 @@
       if (spot) { spot.classList.remove('done'); spot.classList.add('on'); }
       label.classList.add('on');
     }
+    // the zoom lands in ~0.95 s (emma-story.css .es-zoom); the ring with it
+    var ZOOM_MS = 900;
     function zoomIn() {
       if (zoomed) return;
       zoomed = true;
       if (scale > 1) zoom.style.transform = 'scale(' + scale + ')';
-      ringAt = Date.now() + (scale > 1 ? 1150 : 200);
+      ringAt = Date.now() + (scale > 1 ? ZOOM_MS : 200);
       // not once the photo is up: the end state used to bring the label
       // back inside the shrunken corner picture, ~12 px tall (review 12 Oct)
-      S.later(scale > 1 ? 1150 : 200, function () { if (!photoOn || gone) ringOn(); });
+      S.later(scale > 1 ? ZOOM_MS : 200, function () { if (!photoOn || gone) ringOn(); });
     }
-    function chipsOn() { chips.forEach(function (c, k) { S.later(450 + k * 230, function () { c.classList.add('on'); }); }); }
+    // a figure chip with its own `line` waits for it: "≈ 27 m wide" up with
+    // the photo, two lines before she says it, was the picture leading
+    function chipsOn() {
+      var k = 0;
+      chips.forEach(function (c) {
+        if (c._line != null && c._line > heard) return;
+        S.later(350 + (k++) * 160, function () { c.classList.add('on'); });
+      });
+    }
     // The photo would not load: the zoomed picture keeps its ring and label,
     // and the chips sit under IT -- not a dark frame titled for a photo
     // that is not there.
@@ -1226,14 +1347,19 @@
     }
     return {
       beat: function (i) {
+        heard = Math.max(heard, i);
         if (i === 0) showBase();
-        if (i === spotLine) S.later(i === 0 ? 500 : 0, zoomIn);
+        if (i === spotLine) S.later(i === 0 ? 350 : 0, zoomIn);
+        if (photoOn) chips.forEach(function (c) { if (c._line === i) S.later(150, function () { c.classList.add('on'); }); });
         if (photoLine != null && i === photoLine) {
           if (!zoomed) zoomIn();
-          // the ring gets ~1.5 s on screen before the cut to the photo, even
+          // the ring gets ~1 s on screen before the cut to the photo, even
           // when the next line comes quickly ("Sky Pool is on level 3" is two
-          // seconds): the photo may trail her voice a little, never lead it
-          S.later(Math.max(i === spotLine ? 1800 : 0, ringAt + 1500 - Date.now()), showPhoto);
+          // seconds): the photo may trail her voice a little, never lead it.
+          // It was 1.5 s after a 1.15 s zoom (1.8 s on one line): when her
+          // photo line came quickly the photo trailed it by ~1 s (owner
+          // 21 Oct: "ภาพยังไม่มา หรือมาช้า")
+          S.later(Math.max(i === spotLine ? 1300 : 0, ringAt + 1000 - Date.now()), showPhoto);
         }
       },
       rest: function () {
@@ -1251,7 +1377,35 @@
   // in from the ground, the floors tick, a meter runs up, the numbers count.
   TEMPLATES.assembly = function (S, p) {
     var frames = arr(p.frames), fin = p.final_asset || null;
-    var box = S.add(S.box(fin || frames[frames.length - 1], 94, 40, TOP_VH, 'es-fade'));
+    // what goes under the picture first (counters, chips), measured: the
+    // render takes the rest of the height -- at 40% the six-building campus
+    // filled a fifth of the screen (21 Oct)
+    var counters = arr(p.counters), figs = [], ticks = [], meter = null, mlab = null;
+    var below = S.add(el('div', 'es-below'));
+    var figRow = below.appendChild(el('div', 'es-figs'));
+    var figEls = counters.map(function (c, k) {
+      var fig = el('div', 'es-fig es-up');
+      var nn = el('div', 'es-n');
+      if (c.prefix_en) nn.appendChild(document.createTextNode(c.prefix_en + ' '));
+      var val = el('span', null, '0');
+      nn.appendChild(val);
+      if (c.unit_en) nn.appendChild(el('small', null, c.unit_en));
+      fig.appendChild(nn);
+      if (c.label_en) fig.appendChild(el('div', 'es-u', c.label_en));
+      if (k % 2) fig.style.textAlign = 'right';        // two columns (.es-figs)
+      figRow.appendChild(fig);
+      return { fig: fig, val: val };
+    });
+    var chipRow = below.appendChild(el('div', 'es-chips'));
+    var chips = arr(p.chips).map(function (c) {
+      var ch = el('b', 'es-chip es-pop', c.label_en || '');
+      chipRow.appendChild(ch);
+      return ch;
+    });
+    var belowH = below.offsetHeight || 0;
+    var maxH = Math.max(30, Math.min(50, (S.room() - belowH - S.H * 0.035) / S.H * 100));
+    var box = S.box(fin || frames[frames.length - 1], 96, maxH, TOP_VH, 'es-fade');
+    S.root.insertBefore(box, below);
     box.style.background = '#03050f';
     var fwrap = el('div', 'es-frames es-fill');
     var fimgs = frames.map(function (f) { var im = S.img(f, 'es-frame es-fill es-cover'); fwrap.appendChild(im); return im; });
@@ -1271,24 +1425,14 @@
       rise.appendChild(rin);
       box.appendChild(rise);
     }
+    // the light crosses the real render as it comes up, not the hologram
+    if (rise) S.sheen(rise);
     var gy = num(p.ground_y), ry = num(p.roof_y), lines = gy != null && ry != null && gy > ry;
     var ground = null;
     if (gy != null) { ground = el('i', 'es-hline'); ground.style.top = gy + '%'; box.appendChild(ground); }
-    var counters = arr(p.counters), figs = [], ticks = [], meter = null, mlab = null;
-    var below = S.add(el('div', 'es-below'));
     below.style.top = Math.round(box._top + box._h + S.H * 0.03) + 'px';
-    var figRow = below.appendChild(el('div', 'es-figs'));
     counters.forEach(function (c, k) {
-      var fig = el('div', 'es-fig es-up');
-      var nn = el('div', 'es-n');
-      if (c.prefix_en) nn.appendChild(document.createTextNode(c.prefix_en + ' '));
-      var val = el('span', null, '0');
-      nn.appendChild(val);
-      if (c.unit_en) nn.appendChild(el('small', null, c.unit_en));
-      fig.appendChild(nn);
-      if (c.label_en) fig.appendChild(el('div', 'es-u', c.label_en));
-      if (k % 2) fig.style.textAlign = 'right';        // two columns (.es-figs)
-      figRow.appendChild(fig);
+      var fig = figEls[k].fig, val = figEls[k].val;
       var isFloors = c.ticks === true || (c.ticks !== false && /floor/i.test(c.unit_en || ''));
       var isMeter = c.meter === true || (c.meter !== false && /^(m|metres?|meters?)$/i.test(c.unit_en || ''));
       var own = [];
@@ -1316,12 +1460,6 @@
         box.appendChild(mlab);
       }
       figs.push({ c: c, fig: fig, val: val, ticks: own, meter: isMeter && meter && !meter._owner ? (meter._owner = true, meter) : null });
-    });
-    var chipRow = below.appendChild(el('div', 'es-chips'));
-    var chips = arr(p.chips).map(function (c) {
-      var ch = el('b', 'es-chip es-pop', c.label_en || '');
-      chipRow.appendChild(ch);
-      return ch;
     });
     var built = false, risen = false;
     function riseNow() {
@@ -1401,7 +1539,7 @@
   // up, then the mood pictures (labelled as mood, not this room).
   TEMPLATES.details = function (S, p) {
     var ref = p.solid_asset || p.wire_asset;
-    var box = S.add(S.box(ref, 90, 35, TOP_VH, 'es-fade'));
+    var box = S.add(S.box(ref, 94, 38, TOP_VH, 'es-fade'));
     box.style.background = '#070a1f';
     if (p.wire_asset) box.appendChild(S.img(p.wire_asset, 'es-fill es-contain'));
     var solid = p.solid_asset ? S.img(p.solid_asset, 'es-fill es-contain es-solid') : null;
@@ -1431,7 +1569,7 @@
     // not on the one before it). A later stage brings every earlier one.
     var stages = arr(p.lines).length ? arr(p.lines).slice(0, 4) : [0, 1, 2];
     var steps = [
-      function () { S.reveal(box, function () { S.later(150, function () { box.classList.add('drawn'); }); }); },
+      function () { S.reveal(box, function () { S.later(100, function () { box.classList.add('drawn'); }); }); },
       function () { if (solid) S.reveal(solid); },
       function () { area.classList.add('on'); if (v) S.later(300, v.go); },
       function () { if (tag) tag.classList.add('on'); if (mood) S.reveal(mood); }
@@ -1457,20 +1595,40 @@
   // How far: the map, the pin, a route drawn to it, then the places nearest
   // first as she says them.
   TEMPLATES.distance = function (S, p) {
-    var box = S.add(S.box(p.map_asset, 92, 42, TOP_VH, 'es-fade'));
+    // the rows first, measured: the map takes the rest of the height
+    var list = S.add(el('div', 'es-rows'));
+    var rows = arr(p.rows).map(function (r) {
+      var d = el('div', 'es-r es-left');
+      d.appendChild(el('span', null, tidy(r.label_en)));
+      if (r.value_en) d.appendChild(el('b', null, tidy(r.value_en)));
+      list.appendChild(d);
+      return d;
+    });
+    var listH = list.offsetHeight || 0;
+    var maxH = Math.max(30, Math.min(56, (S.room() - listH - S.H * 0.03) / S.H * 100));
+    var box = S.box(p.map_asset, 96, maxH, TOP_VH, 'es-fade');
+    S.root.insertBefore(box, list);
     box.appendChild(S.img(p.map_asset, 'es-fill es-cover'));
     var pin = p.pin || null, to = p.route_to || null, spot = null, plabel = null, route = null, rlabel = null;
     var pinUp = true;
-    function lab(text, x, y, prefer) {
+    function lab(text, x, y, prefer, gap) {
       var l = el('div', 'es-label es-up', text);
       box.appendChild(l);
-      l._up = S.placeLabel(l, box, x, y, prefer);
+      l._up = S.placeLabel(l, box, x, y, prefer, gap);
       return l;
     }
+    var marker = null;
     if (pin && num(pin.x) != null && num(pin.y) != null) {
       spot = S.spot(pin.x, pin.y);
       box.appendChild(spot);
-      if (pin.label_en) { plabel = lab(pin.label_en, pin.x, pin.y); pinUp = plabel._up; }
+      // a map pin stands on the point (drops in with the ring, .es-mpin)
+      marker = el('div', 'es-mpin');
+      marker.style.left = pin.x + '%';
+      marker.style.top = pin.y + '%';
+      marker.appendChild(pinGlyph());
+      box.appendChild(marker);
+      // clear of the pin standing over the point (~10vw tall), not only of the ring
+      if (pin.label_en) { plabel = lab(pin.label_en, pin.x, pin.y, null, Math.round(S.W * 0.115)); pinUp = plabel._up; }
     }
     if (spot && to && num(to.x) != null && num(to.y) != null) {
       var x1 = to.x / 100 * box._w, y1 = to.y / 100 * box._h, x2 = pin.x / 100 * box._w, y2 = pin.y / 100 * box._h;
@@ -1487,15 +1645,9 @@
       // (on the other side from the pin's own label, which it met head on)
       if (to.label_en) rlabel = lab(to.label_en, (to.x + pin.x) / 2, (to.y + pin.y) / 2, pinUp ? 'below' : 'above');
     }
-    var list = S.add(el('div', 'es-rows narrow'));
     list.style.top = Math.round(box._top + box._h + S.H * 0.025) + 'px';
-    var rows = arr(p.rows).map(function (r) {
-      var d = el('div', 'es-r es-left');
-      d.appendChild(el('span', null, tidy(r.label_en)));
-      if (r.value_en) d.appendChild(el('b', null, tidy(r.value_en)));
-      list.appendChild(d);
-      return d;
-    });
+    // full width when the rows end above Emma's head, else clear of her
+    if (box._top + box._h + S.H * 0.025 + listH > S.contentBottom()) list.classList.add('narrow');
     function drawRoute() { if (route) route.style.transform = 'rotate(' + route._ang + 'rad) scaleX(1)'; }
     // The route (and its label, often a distance) waits for the line that
     // says it -- "≈ 0.6 km" on the map while she is still saying "Jomtien"
@@ -1503,22 +1655,27 @@
     var routeLine = to && num(to.line) != null ? to.line : 0;
     function routeNow(delay) {
       S.later(delay, drawRoute);
-      S.later(delay + 800, function () { if (rlabel) rlabel.classList.add('on'); });
+      S.later(delay + 650, function () { if (rlabel) rlabel.classList.add('on'); });
     }
     return {
       beat: function (i) {
         if (i === 0) {
           S.reveal(box);
-          S.later(500, function () { if (spot) spot.classList.add('on'); if (plabel) plabel.classList.add('on'); });
+          S.later(400, function () {
+            if (marker) marker.classList.add('on');
+            if (spot) spot.classList.add('on');
+            if (plabel) plabel.classList.add('on');
+          });
         }
-        if (i === routeLine) routeNow(i === 0 ? 1000 : 0);
+        if (i === routeLine) routeNow(i === 0 ? 850 : 0);
         var j = 0;
         arr(p.rows).forEach(function (r, k) {
-          if (r.line === i) { var at = j++; S.later(at * 260, function () { rows[k].classList.add('on'); }); }
+          if (r.line === i) { var at = j++; S.later(at * 180, function () { rows[k].classList.add('on'); }); }
         });
       },
       rest: function () {
         box.classList.add('on');
+        if (marker) marker.classList.add('on');
         if (spot) spot.classList.add('on');
         if (plabel) plabel.classList.add('on');
         drawRoute();
@@ -1535,10 +1692,13 @@
   // shorter than ~30% of the screen -- keeps the number UNDER it: a 17vw
   // number over the bottom of a 470 px band hid what the band shows.
   TEMPLATES.metric = function (S, p) {
-    var box = S.add(S.box(p.bg_asset, 92, 38, TOP_VH, 'es-fade'));
+    // 96% of the width (a wide plan is width-bound: every point of width is
+    // height too), up to 46% of the height for a taller picture
+    var box = S.add(S.box(p.bg_asset, 96, 46, TOP_VH, 'es-fade'));
     var h = box._h, over = h >= S.H * 0.3;
     if (p.bg_asset) box.appendChild(S.img(p.bg_asset, 'es-fill es-contain'));
     if (over) box.appendChild(el('i', 'es-shade-all'));
+    S.sheen(box);
     var big = el('div', 'es-big-n es-up' + (over ? '' : ' under'));
     var v = p.value ? S.valueNode(p.value, 'es-n') : null;
     // The picture and its caption open with her voice; the number itself
@@ -1556,7 +1716,7 @@
     }
     var parts = arr(p.parts), max = 0;
     parts.forEach(function (q) { if (num(q.to) > max) max = q.to; });
-    var list = S.add(el('div', 'es-rows narrow'));
+    var list = S.add(el('div', 'es-rows'));
     list.style.top = Math.round(below + S.H * 0.025) + 'px';
     var rows = parts.map(function (q) {
       var r = el('div', 'es-r es-part es-left');
@@ -1572,6 +1732,8 @@
       list.appendChild(r);
       return { r: r, bar: bar, b: n, q: q };
     });
+    // full width when the parts end above Emma's head, else clear of her
+    if (parts.length && below + S.H * 0.025 + (list.offsetHeight || 0) > S.contentBottom()) list.classList.add('narrow');
     var line = num(p.line) != null ? p.line : 0, opened = false, counted = false;
     function showPart(x) {
       if (x.r.classList.contains('on')) return;
@@ -1582,7 +1744,7 @@
     function countNow() {
       if (counted) return;
       counted = true;
-      if (v) { v.node.classList.add('on'); S.later(250, v.go); }
+      if (v) { v.node.classList.add('on'); S.later(150, v.go); }
     }
     function open(then) {
       if (opened) { if (then) then(); return; }
@@ -1598,7 +1760,8 @@
           var at = num(x.q.line);
           if (at === i || (at == null && i === line)) {
             var k = j++;
-            S.later((at === line || at == null ? 1100 : 0) + k * 350, function () { showPart(x); });
+            // after the big figure has counted most of the way (it runs 1 s)
+            S.later((at === line || at == null ? 750 : 0) + k * 260, function () { showPart(x); });
           }
         });
       },
@@ -1614,12 +1777,12 @@
   // A set of features: each one pops in as she names it.
   TEMPLATES.features = function (S, p) {
     var items = arr(p.items).slice(0, 6);
-    var grid = S.add(el('div', 'es-feats'));
-    grid.style.top = Math.round(S.H * TOP_VH / 100) + 'px';
-    // one card: one column. Two side by side, not stacked: two full-width
-    // 16:10 cards ran 1,300 px down into Emma's corner and under the
-    // footnote on the robot's screen (smart_home, 13 Oct)
-    if (items.length <= 1) grid.style.gridTemplateColumns = '1fr';
+    // one or two: one column of wide cards; more: two columns
+    var n = items.length, cols = n <= 2 ? 1 : 2, rowsN = Math.max(1, Math.ceil(n / cols));
+    var grid = S.add(el('div', 'es-feats' + (cols === 1 ? ' wide' : '')));
+    var top = Math.round(S.H * TOP_VH / 100);
+    grid.style.top = top + 'px';
+    if (cols === 1) grid.style.gridTemplateColumns = '1fr';
     var cards = items.map(function (it) {
       var c = el('div', 'es-card es-feat es-pop');
       var ci = el('div', 'es-cimg');
@@ -1628,10 +1791,31 @@
       c.appendChild(el('span', null, it.label_en || ''));
       if (it.note_en) c.appendChild(el('small', null, tidy(it.note_en)));
       grid.appendChild(c);
+      c._ci = ci;
       return c;
     });
     var foot = p.footnote_en ? S.add(el('p', 'es-foot es-fade', p.footnote_en)) : null;
     if (foot) foot.style.bottom = Math.round(S.H - S.floorY + S.H * 0.01) + 'px';
+    // The pictures are as tall as the screen allows (two smart-home cards
+    // were 300 px pictures with half the screen empty under them, 21 Oct),
+    // computed from the room above Emma's head and the footnote -- so two
+    // wide cards one above the other no longer run into her corner and
+    // under the footnote, as fixed 16:10 ones did on the robot (13 Oct).
+    // A picture keeps between 2.4:1 and 1.5:1 (one column) or 2:1 and
+    // 1.25:1 (two columns) -- a cover crop; the floor is what lets five
+    // cards clear the footnote and her head (1.6:1 ran them into it).
+    (function size() {
+      if (!n) return;
+      var limit = S.contentBottom();
+      if (foot && foot.offsetTop) limit = Math.min(limit, foot.offsetTop - S.H * 0.015);
+      var gap = S.W * 0.022, colW = (S.W * 0.9 - gap * (cols - 1)) / cols;
+      var text = 0;
+      cards.forEach(function (c) { text = Math.max(text, (c.offsetHeight || 0) - (c._ci.offsetHeight || 0)); });
+      var each = (limit - top - gap * (rowsN - 1)) / rowsN - text;
+      var lo = colW / (cols === 1 ? 2.4 : 2), hi = colW / (cols === 1 ? 1.5 : 1.25);
+      var ih = Math.round(Math.max(lo, Math.min(hi, each)));
+      cards.forEach(function (c) { c._ci.style.aspectRatio = 'auto'; c._ci.style.height = ih + 'px'; });
+    })();
     // `footnote_line`: the line that says it ("an optional package, not
     // included in the room price") puts it up; without one, the overview does
     var footLine = num(p.footnote_line) != null ? p.footnote_line : null, any = false;
@@ -1639,7 +1823,7 @@
       beat: function (i) {
         var j = 0;
         items.forEach(function (it, k) {
-          if (it.line === i) { any = true; var at = j++; S.later(at * 200, function () { S.reveal(cards[k]); }); }
+          if (it.line === i) { any = true; var at = j++; S.later(at * 160, function () { S.reveal(cards[k]); }); }
         });
         // an opening line that names none of them: the empty frames wait
         if (!any) cards.forEach(function (c) { if (!c.classList.contains('on')) c.classList.add('ghost'); });
@@ -1671,7 +1855,17 @@
     // nearby_places (13 Oct): without them hospitals and schools fell back to
     // the house -- the very icon that marks the project
     hospital: 'M5 20V8.5h14V20M3.5 20h17M12 11v5M9.5 13.5h5M9 8.5V5h6v3.5',
-    school: 'M3 9.5 12 5l9 4.5-9 4.5zM7 11.6V16c1.5 1.4 3.2 2 5 2s3.5-.6 5-2v-4.4M21 9.5v5'
+    school: 'M3 9.5 12 5l9 4.5-9 4.5zM7 11.6V16c1.5 1.4 3.2 2 5 2s3.5-.6 5-2v-4.4M21 9.5v5',
+    // the nearby stories of 21 Oct: restaurants/cafés (a fork and a knife)
+    // and tourist attractions (a camera) -- not the mall's bag or the house
+    food: 'M6 3v5a2 2 0 0 0 4 0V3M8 3v18M17 21V3c-2.2 1.6-3.2 4.3-3.2 7.4 0 2.4 1.4 3.6 3.2 3.6',
+    sight: 'M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 16.5a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z',
+    // the rings view (21 Oct): a shop front with its awning (7-Eleven,
+    // FamilyMart, a supermarket, a market -- the bag stays the mall's), and
+    // the two ways to get there: by car (every drive time) and on foot
+    shop: 'M3.5 9.5 5 4.5h14l1.5 5M3.5 9.5a2.13 2.13 0 0 0 4.25 0 2.13 2.13 0 0 0 4.25 0 2.13 2.13 0 0 0 4.25 0 2.13 2.13 0 0 0 4.25 0M5 12v8h14v-8M10 20v-4.5h4V20',
+    car: 'M5 17v-4.6l1.8-4.6A2 2 0 0 1 8.7 6.5h6.6a2 2 0 0 1 1.9 1.3l1.8 4.6V17M5 12.4h14M4 17h16M7 17v2.2M17 17v2.2M7.6 14.6h1.2M15.2 14.6h1.2',
+    walk: 'M14.9 4.2a1.7 1.7 0 1 1-3.4 0 1.7 1.7 0 0 1 3.4 0zM12.6 7.6l-1.4 5.8-2.6 7.1M11.2 13.4l3 3 .8 4.4M12.3 8.4 9.4 11.6M12.3 8.4l3.5 3.4'
   };
   function icon(name) {
     var s = document.createElementNS(SVGNS, 'svg');
@@ -1691,10 +1885,15 @@
   // range ("12–17 min": free-flow to rush hour) is a solid bar to its low
   // end and a lighter one to its high end. No picture at all.
   TEMPLATES.journey = function (S, p) {
+    // the same rows drawn around the project instead of down a list
+    if (p.view === 'rings') return aroundRings(S, p);
     var rows = arr(p.rows), max = num(p.bar_max) || 0;
     rows.forEach(function (r) { arr(r.bar).forEach(function (v) { if (num(v) > max) max = v; }); });
-    // two places (a narrow question's story): bigger rows, the same scale
-    var wrap = S.add(el('div', 'es-jr' + (rows.length <= 2 ? ' roomy' : '')));
+    // fewer places, bigger rows (the same scale): two (a narrow question's
+    // story) were 300 px rows with a third of the screen empty above them
+    // and a third below (21 Oct); five or more, tighter rows -- shrunk as a
+    // whole to fit, they left a fifth of the width empty on the right
+    var wrap = S.add(el('div', 'es-jr' + (rows.length <= 2 ? ' xl' : rows.length <= 4 ? ' roomy' : ' dense')));
     wrap.style.top = Math.round(S.H * (TOP_VH + 1) / 100) + 'px';
     var spine = el('i', 'es-jr-spine');
     wrap.appendChild(spine);
@@ -1736,12 +1935,24 @@
       if (val) go.appendChild(val);
       body.appendChild(go);
       row.appendChild(body);
-      // the farther, the longer the drive (0.7-2.1 s), so the dot's speed
-      // reads the same on every row
-      row.style.setProperty('--d', (0.7 + 1.4 * hi).toFixed(2) + 's');
+      // the farther, the longer the drive (0.6-1.6 s), so the dot's speed
+      // reads the same on every row -- it was 0.7-2.1 s, and the airport's
+      // time came up a second after she had said it
+      row.style.setProperty('--d', (0.6 + 1.0 * hi).toFixed(2) + 's');
       wrap.appendChild(row);
       return { row: row, val: val, span: span, fill: fill, run: run, lo: lo, hi: hi, line: r.line };
     });
+    // what room is left goes between the rows first (up to 4.5vh more each)
+    (function spread() {
+      var h = wrap.offsetHeight || 0, n = items.length;
+      if (!h || !n) return;
+      var spare = S.room() - S.H * 0.01 - h;
+      if (!(spare > 0)) return;
+      var cs = root.getComputedStyle ? root.getComputedStyle(wrap) : null;
+      var gap = cs ? parseFloat(cs.rowGap || cs.gap) || 0 : 0;
+      var add = Math.min(S.H * 0.045, spare * 0.6 / n);
+      if (gap > 0 && add > 1) wrap.style.gap = Math.round(gap + add) + 'px';
+    })();
     function drive(x) {
       if (x.driven) return;
       x.driven = true;
@@ -1757,8 +1968,8 @@
       S.later(delay, function () {
         reach(x);
         x.row.classList.add('on');
-        S.later(280, function () { drive(x); });
-        if (x.val) S.later(280 + (0.7 + 1.4 * x.hi) * 1000 - 150, function () { x.val.classList.add('on'); });
+        S.later(200, function () { drive(x); });
+        if (x.val) S.later(200 + (0.6 + 1.0 * x.hi) * 1000 - 150, function () { x.val.classList.add('on'); });
       });
     }
     var opened = false;
@@ -1787,7 +1998,7 @@
         if (i === 0) open();
         var j = 0;
         items.forEach(function (x) {
-          if (x.line === i) show(x, (i === 0 ? 450 : 0) + 380 * j++);
+          if (x.line === i) show(x, (i === 0 ? 300 : 0) + 300 * j++);
         });
       },
       rest: function () {
@@ -1799,33 +2010,564 @@
     };
   };
 
+  // What is around the project (journey, `view: "rings"` -- the nearby
+  // stories of 21 Oct, 7-Eleven to the Big Buddha; owner: "ยังไม่ได้ทำ motion
+  // ที่มันโอเค", and of the drawn map before them, "Google Maps ... สวยกว่านี้").
+  // The same rows as the bars, drawn as a little map: the project's pin in a
+  // disc of city blocks, rings of drive time around it (every 5 minutes out to
+  // `bar_max`, labelled), and as she names a place a route draws out from the
+  // pin and the place drops onto its own ring -- its icon, its short name and
+  // time beside it. Under the disc the same places as a list, large enough to
+  // read standing at the robot, each row coming in with its place.
+  // DIRECTION IS NOT DATA: the approved figures are drive times with no
+  // bearing. The places are spread evenly round the pin in the order she
+  // names them (clockwise from the top; the top is kept for the rings'
+  // labels), there is no compass, and the design's footnote says so ("...
+  // not a map"). A place's distance from the pin is its minutes on the
+  // rings' scale (its `bar`, the first figure of a range); the figures on
+  // screen are the catalog's `value_en` -- a ring's minutes come from
+  // `bar_max`, never from her.
+  function ringStep(max) {
+    var steps = [1, 2, 5, 10, 15, 20, 30, 60];
+    for (var k = 0; k < steps.length; k++) if (max / steps[k] <= 4 + 1e-9) return steps[k];
+    return Math.ceil(max / 4);
+  }
+  // a category's own colour (CSS --k): the same mark on the disc and in the list
+  var KINDS = { hospital: 1, school: 1, food: 1, sight: 1, park: 1, beach: 1, plane: 1 };
+  function kindCls(name) { return KINDS[name] ? ' k-' + name : ''; }
+  function boxHit(a, b) {
+    var w = Math.min(a[2], b[2]) - Math.max(a[0], b[0]), h = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
+    return w > 0 && h > 0 ? w * h : 0;
+  }
+  function aroundRings(S, p) {
+    var rows = arr(p.rows).filter(function (r) { return r && typeof r === 'object'; });
+    var n = rows.length, W = S.W;
+    var mins = rows.map(function (r) { var v = num(arr(r.bar)[0]); return v != null && v >= 0 ? v : null; });
+    var max = num(p.bar_max) || 0;
+    mins.forEach(function (v) { if (v != null && v > max) max = v; });
+    if (!(max > 0)) max = 10;
+    var step = ringStep(max), size = n <= 2 ? 'xl' : n <= 4 ? 'roomy' : 'dense';
+    var top0 = Math.round(S.H * TOP_VH / 100), gap = Math.round(S.H * 0.016);
+    // the project's name over the disc, on one line with how the times were
+    // taken (by car: every figure on the disc is a drive)
+    var head = S.add(el('div', 'es-ar-o es-up ' + size));
+    head.appendChild(el('b', null, p.origin_en || ''));
+    if (p.origin_sub_en) {
+      var hs = el('span');
+      hs.appendChild(icon('car'));
+      hs.appendChild(document.createTextNode(tidy(p.origin_sub_en)));
+      head.appendChild(hs);
+    }
+    head.style.top = top0 + 'px';
+    // the list under the disc, built and measured first: the disc gets the
+    // rest of the height above Emma's head
+    var list = S.add(el('div', 'es-ar-list ' + size));
+    var legend = rows.map(function (r) {
+      var d = el('div', 'es-ar-r es-left' + kindCls(r.icon));
+      var ic = el('i', 'es-jr-node');
+      ic.appendChild(icon(r.icon));
+      d.appendChild(ic);
+      var body = el('div', 'es-ar-b');
+      body.appendChild(el('b', null, r.label_en || ''));
+      if (r.sub_en) body.appendChild(el('span', null, tidy(r.sub_en)));
+      // on foot: its own chip, which waits for the line that says it (a
+      // figure on screen before she says it -- the spotlight's rule, 21 Oct)
+      var walk = null;
+      if (r.walk && r.walk.value_en) {
+        walk = el('em', 'es-ar-walk es-pop');
+        walk.appendChild(icon('walk'));
+        walk.appendChild(document.createTextNode(tidy(r.walk.value_en))); // not a span: .es-ar-b span is the note's
+        body.appendChild(walk);
+      }
+      d.appendChild(body);
+      if (r.value_en) d.appendChild(timeText(r.value_en, 'es-ar-v'));
+      list.appendChild(d);
+      return { node: d, walk: walk };
+    });
+    // Five schools' full names wrapped to three lines a row and the list
+    // took 0.6 of the screen (first recording, 21 Oct): a long list first
+    // tightens (one more layout, measured), and only then gives way by
+    // scale; the disc keeps at least ~half the width.
+    var headH = head.offsetHeight || 0;
+    var spare = S.room() - headH - gap * 2;
+    var minH = Math.round(W * (size === 'dense' ? 0.52 : 0.56));
+    var listH = n ? list.offsetHeight || 0 : 0;
+    if (spare - listH < minH && size !== 'xl') {
+      list.classList.add('tight');
+      listH = list.offsetHeight || 0;
+    }
+    var Hb = Math.round(spare - listH);
+    if (Hb < minH) {
+      Hb = minH;
+      var k = (spare - Hb) / Math.max(1, listH);
+      if (k < 1) {
+        list.style.transformOrigin = '50% 0';
+        list.style.transform = 'scale(' + Math.max(0.6, k).toFixed(4) + ')';
+      }
+    }
+    Hb = Math.min(Hb, Math.round(W * 0.84));
+    var mapTop = top0 + headH + gap;
+    list.style.top = (mapTop + Hb + gap) + 'px';
+    var map = el('div', 'es-ar es-fade ' + size);
+    S.root.insertBefore(map, list);
+    map.style.top = mapTop + 'px';
+    map.style.height = Hb + 'px';
+    // the caption ("... not a map") on a line of its own under the disc:
+    // in a corner of the map it met the marks of the places nearest the rim
+    var note = p.footnote_en ? map.appendChild(el('div', 'es-ar-note es-fade', tidy(p.footnote_en))) : null;
+    var noteH = note ? Math.round(W * 0.036) : 0;   // its CSS (2.6vw, one line): no read, no layout
+    var Hd = Hb - noteH;                          // the disc's own height
+    var cx = W / 2, cy = Hd / 2;
+    var R = Math.max(W * 0.2, Math.min(Hd / 2 - W * 0.012, W * 0.34));
+    var rOut = R * 0.93;                         // the outer ring, inside the disc's rim
+    var M = Math.round(W * (size === 'xl' ? 0.104 : size === 'roomy' ? 0.092 : 0.082));
+    var pinW = W * 0.08, pinH = W * 0.1;         // .es-ar-pin .es-pinsvg
+    // the pin's own ground: no place inside it (the head of the pin stands
+    // over the middle, its point on it)
+    var r0 = Math.max(R * 0.34, pinH * 0.5 + M * 0.62);
+    function radius(v) { return r0 + (rOut - r0) * Math.max(0, Math.min(1, v / max)); }
+    function put(node, x, y, w, h) {
+      node.style.left = Math.round(x) + 'px'; node.style.top = Math.round(y) + 'px';
+      if (w != null) { node.style.width = Math.round(w) + 'px'; node.style.height = Math.round(h) + 'px'; }
+    }
+    var disc = el('div', 'es-ar-disc');
+    put(disc, cx - R, cy - R, 2 * R, 2 * R);
+    var blocks = discBlocks(R, r0 * 0.78);
+    if (blocks) disc.appendChild(blocks);
+    map.appendChild(disc);
+    // the rings: the scale of the disc, each a zone of its own (the inner
+    // ones drawn last, over the outer: nearer reads brighter)
+    var ringVals = [];
+    for (var rv = step; rv <= max + 1e-9; rv += step) ringVals.push(rv);
+    var rings = [];
+    ringVals.slice().reverse().forEach(function (v) {
+      var rr = radius(v), rg = el('i', 'es-ar-ring' + (v === ringVals[0] ? ' d0' : ''));
+      put(rg, cx - rr, cy - rr, 2 * rr, 2 * rr);
+      map.appendChild(rg);
+      rings.unshift(rg);                         // ripple order: inner first
+    });
+    // a label per ring -- every other ring when they lie closer than a
+    // label is tall (5/10/15/20 on a small disc: 10 and 20, the outer one
+    // always), the scale still reads from the even spacing
+    var every = (rOut - r0) * step / max < W * 0.05 ? 2 : 1;
+    var ringTags = ringVals.map(function (v, j) {
+      return (ringVals.length - 1 - j) % every ? null : map.appendChild(el('div', 'es-ar-rl es-fade', v + ' min'));
+    });
+    // the project: its ground ring, a shadow, the pin standing on the middle
+    var ground = S.spot(50, 50);
+    ground.classList.add('es-nb-ring');
+    put(ground, cx, cy);
+    map.appendChild(ground);
+    var shadow = el('i', 'es-nb-shadow es-fade');
+    put(shadow, cx, cy);
+    map.appendChild(shadow);
+    var pin = el('div', 'es-nb-pin es-ar-pin es-drop');
+    put(pin, cx, cy);
+    pin.appendChild(pinGlyph());
+    map.appendChild(pin);
+    // the places: evenly round the pin in the order she names them, the
+    // first at the top and on clockwise (started half a step round, five
+    // places put one at 6 o'clock whose label had nowhere to go but over the
+    // middle of the disc, across the routes), each at its minutes on the
+    // rings. Two the same time away sit on one ring at different angles; one
+    // that would touch the pin or an earlier place moves out along its own
+    // spoke, a few pixels at a time, never past the rim (deterministic).
+    var turn = 360 / Math.max(1, n);
+    var headC = [cx, cy - pinH * 0.61], headR = pinW * 0.44;
+    var places = rows.map(function (r, k) {
+      var deg = n === 1 ? -35 : n === 2 ? (k ? 160 : -20) : -90 + k * turn;   // the first at 12 o'clock
+      var th = deg * Math.PI / 180;
+      return { r: r, k: k, th: th, ux: Math.cos(th), uy: Math.sin(th), rr: radius(mins[k] != null ? mins[k] : max),
+               line: num(r.line) != null ? r.line : 0,
+               walkLine: r.walk && num(r.walk.line) != null ? r.walk.line : null,
+               row: legend[k].node, walk: legend[k].walk };
+    });
+    places.forEach(function (x, k) {
+      for (var guard = 0; guard < 80; guard++) {
+        x.mx = cx + x.rr * x.ux; x.my = cy + x.rr * x.uy;
+        var clash = Math.hypot(x.mx - headC[0], x.my - headC[1]) < headR + M / 2 + W * 0.006;
+        for (var j = 0; j < k && !clash; j++) {
+          clash = Math.hypot(x.mx - places[j].mx, x.my - places[j].my) < M + W * 0.01;
+        }
+        if (!clash || x.rr >= R - M / 2) break;
+        x.rr = Math.min(R - M / 2, x.rr + W * 0.004);
+      }
+    });
+    places.forEach(function (x) {
+      var r = x.r, kc = kindCls(r.icon);
+      var route = el('i', 'es-ar-route' + kc);
+      put(route, cx, cy);
+      route.style.width = Math.round(x.rr) + 'px';
+      route._ang = x.th.toFixed(4);
+      route.style.transform = 'rotate(' + route._ang + 'rad) scaleX(0)';
+      map.appendChild(route);
+      var m = el('div', 'es-ar-m es-drop' + kc);
+      put(m, x.mx, x.my);
+      var ping = el('b', 'es-ar-mping');
+      put(ping, -M / 2, -M / 2, M, M);
+      m.appendChild(ping);
+      var dot = el('i', 'es-jr-node es-ar-dot');
+      put(dot, -M / 2, -M / 2, M, M);
+      dot.appendChild(icon(r.icon));
+      m.appendChild(dot);
+      map.appendChild(m);
+      var tag = el('div', 'es-ar-tag es-pop' + kc);
+      tag.appendChild(el('b', null, r.short_en || r.label_en || ''));
+      if (r.value_en) tag.appendChild(timeText(r.value_en));
+      map.appendChild(tag);
+      x.route = route; x.m = m; x.tag = tag;
+    });
+    // Every label measured at once (one read between the writes -- a read
+    // per label forced a layout each, 217 ms as the map opened, 13 Oct),
+    // then placed, clear of the pin, every place's mark and every label
+    // placed before it, inside the map. Deterministic: the same story, the
+    // same screen.
+    var tagSize = places.map(function (x) { return [x.tag.offsetWidth || W * 0.25, x.tag.offsetHeight || W * 0.1]; });
+    var rlSize = ringTags.map(function (t) { return t ? [t.offsetWidth || W * 0.12, t.offsetHeight || W * 0.05] : null; });
+    var noteW = note ? note.offsetWidth || W * 0.5 : 0;
+    var pad = W * 0.008, edge = W * 0.012, half = M / 2 + 2;
+    var taken = [[cx - pinW / 2, cy - pinH, cx + pinW / 2, cy + W * 0.012]];
+    places.forEach(function (x) { taken.push([x.mx - half, x.my - half, x.mx + half, x.my + half]); });
+    // over a mark, the pin, a label: never while anywhere else is clear
+    // (a fixed price far above a route crossed); over a route: a little
+    function cost(box, routes, more) {
+      var c = 0, all = more ? taken.concat(more) : taken;
+      for (var t = 0; t < all.length; t++) { var a = boxHit(box, all[t]); if (a) c += W * 4 + a; }
+      if (routes) {
+        for (var q = 0; q < routePts.length; q++) {
+          var pt = routePts[q];
+          if (pt[0] > box[0] && pt[0] < box[2] && pt[1] > box[1] && pt[1] < box[3]) c += W * 0.04;
+        }
+      }
+      return c;
+    }
+    if (note) {
+      put(note, (W - noteW) / 2, Hb - noteH);
+      taken.push([(W - noteW) / 2, Hb - noteH, (W + noteW) / 2, Hb]);
+    }
+    // the routes: a label may lie over one (a map's labels do), at a cost,
+    // so it does only where every other side is taken
+    var routePts = [];
+    places.forEach(function (x) {
+      for (var d = M * 0.6; d < x.rr - M * 0.5; d += W * 0.012) routePts.push([cx + d * x.ux, cy + d * x.uy]);
+    });
+    // each place's label beside it: outward first, then every other side by
+    // how outward it points, then the same a step farther out, kept inside
+    // the map. Who chooses first matters (the first takes the clear side the
+    // next one needed): the order she names them, then outer places first
+    // (least room by the rim), then inner first -- the first clean layout
+    // wins, else the least crowded. Arithmetic only, no reads: cheap to
+    // try three times, and the same story always lays out the same.
+    var DIRS = [[1, 0], [-1, 0], [0, -1], [0, 1], [0.71, -0.71], [-0.71, -0.71], [0.71, 0.71], [-0.71, 0.71]];
+    function away(px, py, b) {               // a point's distance to a box
+      return Math.hypot(Math.max(b[0] - px, 0, px - b[2]), Math.max(b[1] - py, 0, py - b[3]));
+    }
+    function label(x, fixed) {
+      var k = x.k, w = tagSize[k][0], h = tagSize[k][1], reach0 = half + W * 0.012;
+      var dirs = [[x.ux, x.uy]].concat(DIRS.slice().sort(function (a, b) {
+        return (b[0] * x.ux + b[1] * x.uy) - (a[0] * x.ux + a[1] * x.uy);
+      }));
+      // beside the mark, a step farther, and slid along that side
+      var cands = [];
+      [1, 1.8].forEach(function (f) {
+        dirs.forEach(function (d) {
+          var side = Math.abs(d[1]) <= 0.25, end = Math.abs(d[0]) <= 0.25;
+          var slides = side ? [0, -0.45, 0.45] : end ? [0, -0.35, 0.35] : [0];
+          slides.forEach(function (sl) { cands.push([d[0], d[1], reach0 * f, side ? 0 : sl * w, side ? sl * h : 0]); });
+        });
+      });
+      var best = null, bestCost = Infinity;
+      for (var c = 0; c < cands.length; c++) {
+        var dx = cands[c][0], dy = cands[c][1], reach = cands[c][2];
+        var tx = x.mx + dx * reach + (dx > 0.25 ? w / 2 : dx < -0.25 ? -w / 2 : 0) + cands[c][3];
+        var ty = x.my + dy * reach + (dy > 0.25 ? h / 2 : dy < -0.25 ? -h / 2 : 0) + cands[c][4];
+        tx = Math.max(w / 2 + edge, Math.min(W - w / 2 - edge, tx));
+        // up into the gap under the header (the place at 12 o'clock)
+        ty = Math.max(h / 2 - gap * 0.8, Math.min(Hb - h / 2 - edge * 0.5, ty));
+        var c2 = cost([tx - w / 2 - pad, ty - h / 2 - pad, tx + w / 2 + pad, ty + h / 2 + pad], true, fixed);
+        // a label pushed far from its place by the edge reads as another's,
+        // and one as near another mark as its own names the wrong one (five
+        // cameras: "Sanctuary of Truth" sat between two of them, 21 Oct)
+        c2 += Math.max(0, Math.hypot(tx - x.mx, ty - x.my) - (reach0 + Math.max(w, h))) * 2;
+        var bb = [tx - w / 2, ty - h / 2, tx + w / 2, ty + h / 2], own = away(x.mx, x.my, bb);
+        for (var o = 0; o < places.length; o++) {
+          if (o !== k && away(places[o].mx, places[o].my, bb) < own + W * 0.03) { c2 += W * 1.2; break; }
+        }
+        if (c2 < bestCost) { bestCost = c2; best = [tx - w / 2, ty - h / 2, tx + w / 2, ty + h / 2]; }
+        if (!c2) break;
+      }
+      return { box: best, cost: bestCost };
+    }
+    var orders = [places.slice(),
+                  places.slice().sort(function (a, b) { return (b.rr - a.rr) || (a.k - b.k); }),
+                  places.slice().sort(function (a, b) { return (a.rr - b.rr) || (a.k - b.k); })];
+    var layout = null;
+    for (var oi = 0; oi < orders.length && !(layout && layout.cost === 0); oi++) {
+      var fixed = [], total = 0, boxes = [];
+      orders[oi].forEach(function (x) {
+        var got = label(x, fixed);
+        boxes[x.k] = got.box;
+        fixed.push(got.box);
+        total += got.cost;
+      });
+      if (!layout || total < layout.cost) layout = { cost: total, boxes: boxes };
+    }
+    places.forEach(function (x) {
+      var bx = layout.boxes[x.k];
+      put(x.tag, bx[0], bx[1]);
+      taken.push(bx);
+      // a label that could not sit right by its mark gets a short leader
+      var nx = Math.max(bx[0], Math.min(bx[2], x.mx)), ny = Math.max(bx[1], Math.min(bx[3], x.my));
+      var d = Math.hypot(nx - x.mx, ny - x.my);
+      if (d - M / 2 > W * 0.028) {
+        var ex = (nx - x.mx) / d, ey = (ny - x.my) / d, lead = el('i', 'es-ar-lead');
+        put(lead, x.mx + ex * M / 2, x.my + ey * M / 2);
+        lead.style.width = Math.round(d - M / 2) + 'px';
+        lead.style.transform = 'rotate(' + Math.atan2(ey, ex).toFixed(4) + 'rad)';
+        map.insertBefore(lead, x.m);
+        x.lead = lead;
+      }
+    });
+    // A ring's label sits on its ring at the top, or in the clear gap between
+    // two places nearest the top: the first recording put "5 min" under the
+    // nearest school's mark. Placed after the places' own labels (a name
+    // matters more than a scale mark) and outer ring first (it sets the
+    // scale); a label with no clear place on its ring is left out -- a ring
+    // unlabelled, never two labels on each other.
+    var angs = [-Math.PI / 2];
+    if (n >= 2) {
+      var sorted = places.map(function (x) { return (x.th % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI); })
+        .sort(function (a, b) { return a - b; });
+      sorted.forEach(function (a, k) {
+        var b = k + 1 < sorted.length ? sorted[k + 1] : sorted[0] + 2 * Math.PI;
+        angs.push((a + b) / 2);
+      });
+    }
+    angs = angs.concat([Math.PI / 2, 0, Math.PI]);
+    function fromTop(a) {
+      var d = Math.abs(((a + Math.PI / 2) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
+      return d;
+    }
+    var firstAng = angs.shift();
+    angs.sort(function (a, b) { return fromTop(a) - fromTop(b); });
+    angs.unshift(firstAng);
+    for (var ri = ringVals.length - 1; ri >= 0; ri--) {
+      if (!ringTags[ri]) continue;
+      var w = rlSize[ri][0], h = rlSize[ri][1], rr = radius(ringVals[ri]), at = null;
+      for (var ai = 0; ai < angs.length && !at; ai++) {
+        var lx = cx + rr * Math.cos(angs[ai]), ly = cy + rr * Math.sin(angs[ai]);
+        if (!cost([lx - w / 2 - pad, ly - h / 2 - pad, lx + w / 2 + pad, ly + h / 2 + pad])) at = [lx, ly];
+      }
+      if (!at) { map.removeChild(ringTags[ri]); ringTags[ri] = null; continue; }
+      put(ringTags[ri], at[0], at[1]);
+      taken.push([at[0] - w / 2, at[1] - h / 2, at[0] + w / 2, at[1] + h / 2]);
+    }
+    ringTags = ringTags.filter(function (t) { return !!t; });
+    function draw(x) {
+      x.route.style.transform = 'rotate(' + x.route._ang + 'rad) scaleX(1)';
+      x.route.classList.add('on');
+    }
+    // the place she is naming stands out (its mark, its label, its row);
+    // the overview has none -- not even from a landing still on its timer
+    // when the overview went up (the last line's places are staggered)
+    var rested = false;
+    function act(x, on) {
+      [x.m, x.tag, x.row].forEach(function (e) { e.classList.toggle('act', !!on && !rested); });
+    }
+    function land(x) {
+      places.forEach(function (o) { if (o.line !== x.line) act(o, false); });
+      x.m.classList.add('on');
+      x.row.classList.add('on');
+      act(x, true);
+      // one ripple as it lands -- a class of its own, taken off again: left
+      // on, the ripple replayed when an interruption's no-motion end state
+      // lifted (`animation: none` off = a new animation)
+      if (!S.instant && !rested) {
+        x.m.classList.add('ping');
+        S.later(1700, function () { x.m.classList.remove('ping'); });
+      }
+    }
+    function show(x, delay) {
+      S.later(delay, function () {
+        if (x.shown) return;
+        x.shown = true;
+        draw(x);
+        S.later(420, function () { land(x); });
+        S.later(640, function () { x.tag.classList.add('on'); if (x.lead) x.lead.classList.add('on'); });
+        if (x.walk && (x.walkLine == null || x.walkLine <= x.line)) S.later(900, function () { x.walk.classList.add('on'); });
+      });
+    }
+    var opened = false;
+    function open() {
+      if (opened) return;
+      opened = true;
+      head.classList.add('on');
+      S.reveal(map, function () {
+        rings.forEach(function (rg, j) { S.later(100 + 120 * j, function () { rg.classList.add('on'); }); });
+        ringTags.forEach(function (t, j) { S.later(520 + 120 * j, function () { t.classList.add('on'); }); });
+        S.later(250, function () { pin.classList.add('on'); shadow.classList.add('on'); });
+        S.later(800, function () { ground.classList.add('on'); });
+        if (note) S.later(700, function () { note.classList.add('on'); });
+      });
+    }
+    return {
+      beat: function (i) {
+        if (i === 0) open();
+        var j = 0;
+        places.forEach(function (x) { if (x.line === i) show(x, (i === 0 ? 650 : 0) + 380 * j++); });
+        // "...or about 23 minutes on foot": the walk on its own line
+        places.forEach(function (x) {
+          if (x.walk && x.walkLine === i && x.walkLine > x.line) S.later(250, function () { x.walk.classList.add('on'); });
+        });
+      },
+      rest: function (instant) {
+        rested = true;
+        open();
+        map.classList.add('on');
+        rings.forEach(function (rg) { rg.classList.add('on'); });
+        ringTags.forEach(function (t) { t.classList.add('on'); });
+        pin.classList.add('on'); shadow.classList.add('on'); ground.classList.add('on');
+        // the end state on an interruption: no ripple left to replay
+        if (instant) ground.classList.add('done');
+        if (note) note.classList.add('on');
+        places.forEach(function (x) {
+          x.shown = true;
+          draw(x);
+          x.m.classList.add('on'); x.tag.classList.add('on'); x.row.classList.add('on');
+          if (x.lead) x.lead.classList.add('on');
+          if (instant) x.m.classList.remove('ping');
+          if (x.walk) x.walk.classList.add('on');
+          act(x, false);
+        });
+      }
+    };
+  }
+  // "≈ 13 min": the figure, its unit a size smaller (as a list row's value)
+  function timeText(t, cls) {
+    var node = el('em', cls || null), s = tidy(t), m = /^(.*\d)\s+([A-Za-z.]+)$/.exec(s);
+    node.appendChild(document.createTextNode(m ? m[1] : s));
+    if (m) node.appendChild(el('small', null, ' ' + m[2]));
+    return node;
+  }
+  // City blocks inside the disc: a street map's texture, one SVG that never
+  // moves inside (it fades in with the disc). Generic -- a grid, a fixed
+  // pattern of split blocks -- so it says nothing about what stands where;
+  // only blocks wholly inside the rim, none on the pin's own ground.
+  function discBlocks(R, clear) {
+    var D = 2 * R, cell = Math.max(36, R * 0.25), lane = cell * 0.2, rx = cell * 0.09, lim = R * 0.95;
+    var cols = Math.ceil(D / cell) + 1, off = (cols * cell - D) / 2, count = 0;
+    var s = svgEl('svg', { viewBox: '0 0 ' + D.toFixed(1) + ' ' + D.toFixed(1), 'class': 'es-ar-blocks', 'aria-hidden': 'true' });
+    function inside(x, y) { return Math.hypot(x - R, y - R) <= lim; }
+    function rect(x0, y0, x1, y1) {
+      if (!(inside(x0, y0) && inside(x1, y0) && inside(x0, y1) && inside(x1, y1))) return;
+      if (Math.hypot((x0 + x1) / 2 - R, (y0 + y1) / 2 - R) < clear + cell * 0.35) return;
+      s.appendChild(svgEl('rect', { x: x0.toFixed(1), y: y0.toFixed(1), width: (x1 - x0).toFixed(1),
+                                    height: (y1 - y0).toFixed(1), rx: rx.toFixed(1), 'class': 'es-ar-block' }));
+      count++;
+    }
+    for (var i = 0; i < cols; i++) {
+      for (var j = 0; j < cols; j++) {
+        var x0 = i * cell - off + lane / 2, y0 = j * cell - off + lane / 2, x1 = x0 + cell - lane, y1 = y0 + cell - lane;
+        var cut = (i * 5 + j * 3) % 4;
+        if (cut === 0) {                         // two blocks side by side
+          var mx = (x0 + x1) / 2;
+          rect(x0, y0, mx - lane * 0.3, y1); rect(mx + lane * 0.3, y0, x1, y1);
+        } else if (cut === 2) {                  // two blocks one above the other
+          var my = (y0 + y1) / 2;
+          rect(x0, y0, x1, my - lane * 0.3); rect(x0, my + lane * 0.3, x1, y1);
+        } else {
+          rect(x0, y0, x1, y1);
+        }
+      }
+    }
+    return count ? s : null;
+  }
+
   // Where it is (location_beach): a schematic map drawn on the screen -- the
-  // sea slides in, the beach and the roads draw themselves, the project's
-  // marker lands; the park next door grows as she names it, and each
-  // distance is a dashed line that runs from the project to its place with
-  // the figure on it. Positions are % of the map (`x`, `y`; a road or a
+  // sea slides in, the beach and the streets draw themselves, the project's
+  // pin drops onto its spot; the park next door grows as she names it, and
+  // each distance is a dashed line that runs from the project to its place
+  // with the figure on it. Positions are % of the map (`x`, `y`; a road or a
   // measure from x1,y1 to x2,y2) and say "which side", not "how far": the
   // map says "not to scale" on itself, and the figures are the catalog's.
+  // Second pass (owner 21 Oct: "Google Maps อาจจะต้องทำให้สวยกว่านี้"): a
+  // street map's own texture -- generic city blocks between the streets, a
+  // shoreline with surf, an organic park with its lake and trees, roads with
+  // a casing and the main road in amber with a centre line, a teardrop pin --
+  // all drawn, no map picture ("ไม่ต้องใช้รูปภาพแต่ให้เป็น motion", 13 Oct).
+  // Every shape is still: what moves is whole layers, by transform/opacity.
   TEMPLATES.neighborhood = function (S, p) {
-    var W = Math.round(S.W * 0.92), H = Math.round(W * (num(p.aspect) || 0.86));
-    var map = S.add(el('div', 'es-nb es-fade'));
+    // the legend under the map first, measured: the map takes the rest of
+    // the height above Emma's head (it was 0.86 of its width whatever the
+    // room, and pushed down until its legend reached her corner)
+    var list = S.add(el('div', 'es-nb-rows'));
+    list.style.gridTemplateColumns = 'repeat(' + Math.max(1, arr(p.rows).length) + ', minmax(0, 1fr))';
+    var rows = arr(p.rows).map(function (r) {
+      var d = el('div', 'es-nb-r es-up');
+      var ic = el('i', 'es-jr-node');
+      ic.appendChild(icon(r.icon));
+      d.appendChild(ic);
+      if (r.value_en) d.appendChild(el('b', null, tidy(r.value_en)));
+      d.appendChild(el('span', null, r.label_en || ''));
+      if (r.sub_en) d.appendChild(el('small', null, tidy(r.sub_en)));
+      list.appendChild(d);
+      return { node: d, line: r.line };
+    });
+    var listH = rows.length ? list.offsetHeight || 0 : 0;
+    var top = Math.round(S.H * TOP_VH / 100);
+    var W = Math.round(S.W * 0.92);
+    // 0.72-1.2 of its width: a legend that grew a line (a "walk 15–24 min"
+    // under the beach, 21 Oct) must still end above her head, so the map
+    // gives way rather than the cards running under her
+    var fit = (S.room() - listH - (rows.length ? S.H * 0.022 : 0)) / W;
+    var H = Math.round(W * (num(p.aspect) || Math.max(0.72, Math.min(1.2, fit))));
+    var map = el('div', 'es-nb es-fade');
+    S.root.insertBefore(map, list);
     map._w = W; map._h = H;
     map.style.width = W + 'px';
     map.style.height = H + 'px';
     map.style.left = Math.round((S.W - W) / 2) + 'px';
-    map.style.top = Math.round(S.H * TOP_VH / 100) + 'px';
+    map.style.top = top + 'px';
+    list.style.top = Math.round(top + H + S.H * 0.022) + 'px';
     function pct(v) { return (num(v) != null ? Math.max(-5, Math.min(105, v)) : 0) + '%'; }
     function at(i, line) { return num(line) != null ? line === i : i === 0; }
+    var drawn = [];       // {node, line, delay}: everything that appears on a line
     var sea = p.sea && num(p.sea.to_x) != null ? el('i', 'es-nb-sea') : null;
-    if (sea) { sea.style.width = pct(p.sea.to_x); map.appendChild(sea); }
+    if (sea) {
+      sea.style.width = pct(p.sea.to_x);
+      sea.appendChild(shoreline(H));                  // the surf along the sand
+      map.appendChild(sea);
+    }
     var beach = p.beach && num(p.beach.to_x) != null ? el('i', 'es-nb-beach') : null;
+    var landX = 0;
     if (beach) {
       var from = sea ? p.sea.to_x : 0;
       beach.style.left = pct(from);
       beach.style.width = pct(p.beach.to_x - from);
       map.appendChild(beach);
+      landX = p.beach.to_x;
+    } else if (sea) {
+      landX = p.sea.to_x;
     }
-    var drawn = [];       // {node, line, delay}: everything that appears on a line
+    var roads = arr(p.roads).filter(function (r) {
+      return ![r.x1, r.y1, r.x2, r.y2].some(function (v) { return num(v) == null; });
+    });
+    var parks = arr(p.places).filter(function (pl) {
+      return pl.kind === 'park' && num(pl.x) != null && num(pl.y) != null && num(pl.w) != null && num(pl.h) != null;
+    });
+    var projects = arr(p.places).filter(function (pl) {
+      return pl.kind !== 'park' && num(pl.x) != null && num(pl.y) != null;
+    });
+    // the pin is ~13.75vw tall over its point
+    var PIN_H = S.W * 0.1375;
+    // ...and leave the footnote ("Schematic · not to scale") on open land
+    var keep = [];
+    if (p.footnote_en) {
+      var fx = num(p.footnote_x) != null ? p.footnote_x / 100 * W : S.W * 0.03;
+      keep.push([fx - S.W * 0.02, H - S.W * 0.085, fx + S.W * 0.46, H]);
+    }
+    var blk = cityBlocks(W, H, landX, roads, parks, projects, PIN_H, keep);
+    if (blk) { map.appendChild(blk); drawn.push({ node: blk, line: null, delay: 150 }); }
     function line(x1, y1, x2, y2, cls) {
       var ax = x1 / 100 * W, ay = y1 / 100 * H, bx = x2 / 100 * W, by = y2 / 100 * H;
       var d = el('i', cls);
@@ -1839,35 +2581,45 @@
     function draw(d) { if (d._ang != null) d.style.transform = 'rotate(' + d._ang + 'rad) scaleX(1)'; d.classList.add('on'); }
     // a label in the map, kept inside it -- measured all at once at the end
     // (`placeTags`): one read per label between writes forced a layout per
-    // label, a 217 ms frame as the map opened on the robot (13 Oct)
+    // label, a 217 ms frame as the map opened on the robot (13 Oct).
+    // `over`: y is the point the label stands OVER (its bottom edge `over`
+    // px above it, or under the point if there is no room above)
     var tags = [];
-    function tag(text, x, y, cls) {
+    function tag(text, x, y, cls, over) {
       var t = el('div', cls, tidy(text));
       map.appendChild(t);
-      tags.push({ t: t, x: x, y: y });
+      tags.push({ t: t, x: x, y: y, over: over });
       return t;
     }
+    // the compass owns the top-right corner: a label that would sit under it
+    // ("Sukhumvit Rd" placed 8% down, fixture recording 21 Oct) moves below it
+    var NORTH = p.compass !== false ? S.W * 0.13 : 0;
     function placeTags() {
       var sizes = tags.map(function (g) { return [g.t.offsetWidth || W * 0.3, g.t.offsetHeight || W * 0.08]; });
       tags.forEach(function (g, k) {
-        var w = sizes[k][0], h = sizes[k][1];
-        g.t.style.left = Math.round(Math.max(w / 2 + 8, Math.min(W - w / 2 - 8, g.x / 100 * W))) + 'px';
-        g.t.style.top = Math.round(Math.max(h / 2 + 8, Math.min(H - h / 2 - 8, g.y / 100 * H))) + 'px';
+        var w = sizes[k][0], h = sizes[k][1], cy = g.y / 100 * H;
+        if (g.over != null) {
+          var above = cy - g.over - S.W * 0.012 - h / 2;
+          cy = above - h / 2 >= 8 ? above : cy + S.W * 0.05 + h / 2;
+        }
+        var cx = Math.max(w / 2 + 8, Math.min(W - w / 2 - 8, g.x / 100 * W));
+        if (NORTH && cx + w / 2 > W - NORTH && cy - h / 2 < NORTH) cy = NORTH + h / 2 + 6;
+        g.t.style.left = Math.round(cx) + 'px';
+        g.t.style.top = Math.round(Math.max(h / 2 + 8, Math.min(H - h / 2 - 8, cy))) + 'px';
       });
     }
     // the streets of the scene draw one after another as it opens; a road
     // she names (`line`) draws as she says it, before its distance runs
     var streets = 0;
-    arr(p.roads).forEach(function (r) {
-      if ([r.x1, r.y1, r.x2, r.y2].some(function (v) { return num(v) == null; })) return;
+    roads.forEach(function (r) {
       var d = line(r.x1, r.y1, r.x2, r.y2, 'es-nb-road' + (r.label_en ? ' main' : ''));
       map.appendChild(d);
-      var delay = num(r.line) != null && r.line > 0 ? 0 : 250 + 120 * streets++;
+      var delay = num(r.line) != null && r.line > 0 ? 0 : 150 + 90 * streets++;
       drawn.push({ node: d, line: r.line, delay: delay, draw: true });
       if (r.label_en) {
         var lx = num(r.label_x) != null ? r.label_x : (r.x1 + r.x2) / 2;
         var ly = num(r.label_y) != null ? r.label_y : Math.min(r.y1, r.y2) + 8;
-        drawn.push({ node: tag(r.label_en, lx, ly, 'es-nb-tag es-pop'), line: r.line, delay: delay + 500 });
+        drawn.push({ node: tag(r.label_en, lx, ly, 'es-nb-tag road es-pop'), line: r.line, delay: delay + 400 });
       }
     });
     if (p.beach && p.beach.label_en && beach) {
@@ -1875,81 +2627,73 @@
       var bt = map.appendChild(el('div', 'es-nb-vtag es-fade', tidy(p.beach.label_en)));
       bt.style.left = ((sea ? p.sea.to_x : 0) + (p.beach.to_x - (sea ? p.sea.to_x : 0)) / 2) + '%';
       bt.style.top = pct(num(p.beach.label_y) != null ? p.beach.label_y : 62);
-      drawn.push({ node: bt, line: p.beach.line, delay: 900 });
+      drawn.push({ node: bt, line: p.beach.line, delay: 700 });
     }
     if (p.area_label_en) drawn.push({ node: tag(p.area_label_en, num(p.area_x) != null ? p.area_x : 70,
                                                num(p.area_y) != null ? p.area_y : 7, 'es-nb-area es-fade'),
-                                      line: null, delay: 600 });
+                                      line: null, delay: 500 });
     var marker = null;
-    arr(p.places).forEach(function (pl) {
-      if (num(pl.x) == null || num(pl.y) == null) return;
-      if (pl.kind === 'park' && num(pl.w) != null && num(pl.h) != null) {
-        var park = el('div', 'es-nb-park es-pop');
-        park.style.left = pct(pl.x); park.style.top = pct(pl.y);
-        park.style.width = pct(pl.w); park.style.height = pct(pl.h);
-        park.appendChild(el('i', 'es-nb-lake'));
-        map.appendChild(park);
-        drawn.push({ node: park, line: pl.line, delay: 0 });
-        if (pl.label_en) drawn.push({ node: tag(pl.label_en, pl.x + pl.w / 2, pl.y + pl.h + 6, 'es-nb-tag park es-up'),
-                                      line: pl.line, delay: 350 });
-        return;
-      }
-      // the project: a marker that lands, its name above it
-      var m = el('div', 'es-nb-pin es-pop');
+    parks.forEach(function (pl) {
+      var park = el('div', 'es-nb-park es-pop');
+      park.style.left = pct(pl.x); park.style.top = pct(pl.y);
+      park.style.width = pct(pl.w); park.style.height = pct(pl.h);
+      park.appendChild(parkGlyph());
+      map.appendChild(park);
+      drawn.push({ node: park, line: pl.line, delay: 0 });
+      if (pl.label_en) drawn.push({ node: tag(pl.label_en, pl.x + pl.w / 2, pl.y + pl.h + 6, 'es-nb-tag park es-up'),
+                                    line: pl.line, delay: 250 });
+    });
+    projects.forEach(function (pl) {
+      // the project: a pin that drops onto its spot, a ring on the ground
+      // under it, its name above it
+      var ring = S.spot(pl.x, pl.y);
+      ring.classList.add('es-nb-ring');
+      map.appendChild(ring);
+      var shadow = el('i', 'es-nb-shadow es-fade');
+      shadow.style.left = pct(pl.x); shadow.style.top = pct(pl.y);
+      map.appendChild(shadow);
+      var m = el('div', 'es-nb-pin es-drop');
       m.style.left = pct(pl.x); m.style.top = pct(pl.y);
-      var ring = S.spot(50, 50);
-      m.appendChild(ring);
-      var hm = el('i', 'es-jr-node es-jr-home');
-      hm.appendChild(icon('home'));
-      m.appendChild(hm);
+      m.appendChild(pinGlyph());
       map.appendChild(m);
       marker = { m: m, ring: ring };
-      drawn.push({ node: m, line: pl.line, delay: 650, then: function () { ring.classList.add('on'); } });
-      if (pl.label_en) drawn.push({ node: tag(pl.label_en, pl.x, pl.y - 9, 'es-nb-tag project es-up'),
-                                    line: pl.line, delay: 850 });
+      drawn.push({ node: shadow, line: pl.line, delay: 450 });
+      drawn.push({ node: m, line: pl.line, delay: 450, then: function () { ring.classList.add('on'); } });
+      if (pl.label_en) drawn.push({ node: tag(pl.label_en, pl.x, pl.y, 'es-nb-tag project es-up', PIN_H),
+                                    line: pl.line, delay: 650 });
     });
     arr(p.measures).forEach(function (ms) {
       if ([ms.x1, ms.y1, ms.x2, ms.y2].some(function (v) { return num(v) == null; })) return;
       var d = line(ms.x1, ms.y1, ms.x2, ms.y2, 'es-nb-measure');
       map.appendChild(d);
-      drawn.push({ node: d, line: ms.line, delay: 450, draw: true });
+      drawn.push({ node: d, line: ms.line, delay: 150, draw: true });
       var end = el('i', 'es-nb-end es-pop');
       end.style.left = pct(ms.x2); end.style.top = pct(ms.y2);
       map.appendChild(end);
-      drawn.push({ node: end, line: ms.line, delay: 1300 });
+      drawn.push({ node: end, line: ms.line, delay: 850 });
       if (ms.label_en) {
         var mx = num(ms.label_x) != null ? ms.label_x : (ms.x1 + ms.x2) / 2;
         var my = num(ms.label_y) != null ? ms.label_y : (ms.y1 + ms.y2) / 2 + 7;
-        drawn.push({ node: tag(ms.label_en, mx, my, 'es-nb-pill es-pop'), line: ms.line, delay: 1400 });
+        drawn.push({ node: tag(ms.label_en, mx, my, 'es-nb-pill es-pop'), line: ms.line, delay: 900 });
       }
     });
-    if (p.compass !== false) map.appendChild(el('div', 'es-nb-n', 'N'));
+    if (p.compass !== false) {
+      var n = el('div', 'es-nb-n');
+      n.appendChild(el('i', 'es-nb-needle'));
+      n.appendChild(el('b', null, 'N'));
+      map.appendChild(n);
+    }
     var note = p.footnote_en ? el('div', 'es-nb-note', p.footnote_en) : null;
     if (note) {
       if (num(p.footnote_x) != null) note.style.left = pct(p.footnote_x);
       map.appendChild(note);
     }
     placeTags();
-    // the legend under the map: what each figure is, nearest first
-    var list = S.add(el('div', 'es-nb-rows'));
-    list.style.gridTemplateColumns = 'repeat(' + Math.max(1, arr(p.rows).length) + ', minmax(0, 1fr))';
-    list.style.top = Math.round(S.H * TOP_VH / 100 + H + S.H * 0.022) + 'px';
-    var rows = arr(p.rows).map(function (r) {
-      var d = el('div', 'es-nb-r es-up');
-      var ic = el('i', 'es-jr-node');
-      ic.appendChild(icon(r.icon));
-      d.appendChild(ic);
-      if (r.value_en) d.appendChild(el('b', null, tidy(r.value_en)));
-      d.appendChild(el('span', null, r.label_en || ''));
-      if (r.sub_en) d.appendChild(el('small', null, tidy(r.sub_en)));
-      list.appendChild(d);
-      return { node: d, line: r.line };
-    });
     function put(x) {
       if (x.done) return;
       x.done = true;
       if (x.draw) draw(x.node); else x.node.classList.add('on');
-      if (x.then) S.later(400, x.then);
+      if (x.then) S.later(450, x.then);
     }
     var opened = false;
     function open() {
@@ -1957,15 +2701,15 @@
       opened = true;
       S.reveal(map, function () {
         if (sea) sea.classList.add('on');
-        S.later(300, function () { if (beach) beach.classList.add('on'); });
+        S.later(250, function () { if (beach) beach.classList.add('on'); });
       });
     }
     return {
       beat: function (i) {
         if (i === 0) open();
-        drawn.forEach(function (x) { if (at(i, x.line)) S.later(x.delay + (i === 0 ? 300 : 0), function () { put(x); }); });
+        drawn.forEach(function (x) { if (at(i, x.line)) S.later(x.delay + (i === 0 ? 200 : 0), function () { put(x); }); });
         var j = 0;
-        rows.forEach(function (x) { if (at(i, x.line)) S.later(500 + 200 * j++, function () { x.node.classList.add('on'); }); });
+        rows.forEach(function (x) { if (at(i, x.line)) S.later(350 + 160 * j++, function () { x.node.classList.add('on'); }); });
       },
       rest: function () {
         open();
@@ -1978,6 +2722,105 @@
       }
     };
   };
+
+  // The shoreline: a wavy edge of sea over the sand with a line of surf on
+  // it, on a 10 x 100 box stretched to the sea's edge (still; it slides in
+  // with the sea). About one wave per 4.4vw of height.
+  function shoreline(hpx) {
+    var n = Math.max(8, Math.round(hpx / (root.innerWidth || 1080) / 0.044));
+    var d = 'M0 0', k;
+    for (k = 0; k < n; k++) {
+      var y0 = k * 100 / n, y1 = (k + 1) * 100 / n;
+      d += 'Q9 ' + ((y0 + y1) / 2).toFixed(2) + ' 0 ' + y1.toFixed(2);
+    }
+    var s = svgEl('svg', { viewBox: '0 0 10 100', preserveAspectRatio: 'none', 'class': 'es-nb-shore', 'aria-hidden': 'true' });
+    s.appendChild(svgEl('path', { d: d + 'Z', 'class': 'es-shore-sea' }));
+    s.appendChild(svgEl('path', { d: d, 'class': 'es-shore-surf' }));
+    return s;
+  }
+  function svgEl(tag, attrs) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) e.setAttribute(k, String(attrs[k]));
+    return e;
+  }
+  // A map pin: a teardrop standing on its point, the project's house in its
+  // head. Drawn once; it moves as a whole (.es-drop / .es-mpin).
+  function pinGlyph() {
+    var s = svgEl('svg', { viewBox: '0 0 48 60', 'class': 'es-pinsvg', 'aria-hidden': 'true' });
+    s.appendChild(svgEl('path', { d: 'M24 59C24 59 4 37.6 4 22.6A20 20 0 0 1 44 22.6C44 37.6 24 59 24 59Z', 'class': 'es-pin-body' }));
+    s.appendChild(svgEl('circle', { cx: 24, cy: 22.6, r: 13.2, 'class': 'es-pin-face' }));
+    s.appendChild(svgEl('path', { d: ICONS.home, transform: 'translate(13.6 12.2) scale(.866)', 'class': 'es-pin-ico' }));
+    return s;
+  }
+  // A park seen from above: an organic lawn, a lake with its shore, a ring
+  // of trees, a footpath. On a 100-unit square stretched to the park's box
+  // (the parks in the catalog are about square, so circles stay round).
+  var PARK_TREES = [[15, 30], [22, 19], [36, 12], [53, 11], [70, 14], [84, 26], [90, 44], [88, 62],
+                    [80, 78], [64, 87], [45, 89], [27, 83], [15, 70], [11, 50]];
+  function parkGlyph() {
+    var s = svgEl('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none', 'class': 'es-nb-parksvg', 'aria-hidden': 'true' });
+    s.appendChild(svgEl('path', { 'class': 'es-park-land',
+      d: 'M14 16C27 4 58 1 78 8C95 15 99 38 96 58C93 81 76 97 51 96C27 95 7 85 4 61C2 42 4 27 14 16Z' }));
+    s.appendChild(svgEl('path', { 'class': 'es-park-path', d: 'M7 66C27 79 61 82 93 47' }));
+    s.appendChild(svgEl('path', { 'class': 'es-park-lake',
+      d: 'M31 37C39 25 62 24 70 35C78 46 72 62 58 66C44 70 27 65 25 53C24 46 27 41 31 37Z' }));
+    s.appendChild(svgEl('path', { 'class': 'es-park-glint', d: 'M38 36C45 31 56 31 62 35' }));
+    PARK_TREES.forEach(function (t) { s.appendChild(svgEl('circle', { cx: t[0], cy: t[1], r: 4.6, 'class': 'es-park-tree' })); });
+    return s;
+  }
+  // Generic city blocks between the streets: the texture of a street map,
+  // one SVG with no motion inside it (it fades in as a whole). Blocks, not
+  // buildings -- nothing here says what stands where: they fill the land
+  // between the catalog's own streets, a fixed pattern per cell, and leave
+  // the park and the project's spot open.
+  function cityBlocks(W, H, landX, roads, parks, projects, pinH, keep) {
+    var xs = [landX, 100], ys = [0, 100];
+    roads.forEach(function (r) {
+      if (Math.abs(r.x1 - r.x2) < 0.5 && r.x1 > landX + 1) xs.push(r.x1);
+      else if (Math.abs(r.y1 - r.y2) < 0.5) ys.push(r.y1);
+    });
+    function uniq(v) {
+      v.sort(function (a, b) { return a - b; });
+      return v.filter(function (x, k) { return k === 0 || x - v[k - 1] > 1.5; });
+    }
+    xs = uniq(xs); ys = uniq(ys);
+    if (xs.length < 2 || ys.length < 2) return null;
+    var avoid = parks.map(function (pl) {
+      return [(pl.x - 2) / 100 * W, (pl.y - 2) / 100 * H, (pl.x + pl.w + 2) / 100 * W, (pl.y + pl.h + 2) / 100 * H];
+    }).concat(projects.map(function (pl) {
+      var x = pl.x / 100 * W, y = pl.y / 100 * H;
+      return [x - pinH * 0.55, y - pinH * 1.1, x + pinH * 0.55, y + pinH * 0.35];
+    })).concat(arr(keep));
+    function hits(a, b, c, d) {
+      for (var k = 0; k < avoid.length; k++) {
+        var r = avoid[k];
+        if (a < r[2] && c > r[0] && b < r[3] && d > r[1]) return true;
+      }
+      return false;
+    }
+    var s = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', 'class': 'es-nb-blocks es-fade', 'aria-hidden': 'true' });
+    var m = W * 0.017, g = W * 0.013, rx = W * 0.009, count = 0;
+    for (var i = 0; i < xs.length - 1; i++) {
+      for (var j = 0; j < ys.length - 1; j++) {
+        var x0 = xs[i] / 100 * W + m, x1 = xs[i + 1] / 100 * W - m;
+        var y0 = ys[j] / 100 * H + m, y1 = ys[j + 1] / 100 * H - m;
+        if (x1 - x0 < W * 0.028 || y1 - y0 < W * 0.028) continue;
+        var wide = x1 - x0 >= y1 - y0, span = wide ? x1 - x0 : y1 - y0;
+        var parts = Math.max(1, Math.min(1 + ((i * 5 + j * 3) % 3), Math.floor(span / (W * 0.09))));
+        for (var k = 0; k < parts; k++) {
+          var a = k / parts, b = (k + 1) / parts;
+          var bx0 = x0, bx1 = x1, by0 = y0, by1 = y1;
+          if (wide) { bx0 = x0 + (x1 - x0) * a + (k ? g / 2 : 0); bx1 = x0 + (x1 - x0) * b - (k < parts - 1 ? g / 2 : 0); }
+          else { by0 = y0 + (y1 - y0) * a + (k ? g / 2 : 0); by1 = y0 + (y1 - y0) * b - (k < parts - 1 ? g / 2 : 0); }
+          if (hits(bx0, by0, bx1, by1)) continue;
+          s.appendChild(svgEl('rect', { x: bx0.toFixed(1), y: by0.toFixed(1), width: (bx1 - bx0).toFixed(1),
+                                        height: (by1 - by0).toFixed(1), rx: rx.toFixed(1), 'class': 'es-nb-block' }));
+          count++;
+        }
+      }
+    }
+    return count ? s : null;
+  }
 
   // ------------------------------------------------------------- public API
 

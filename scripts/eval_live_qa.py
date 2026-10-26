@@ -773,6 +773,9 @@ def _concept_caveat(said: str) -> bool:
 _SAYS_NO_INFO = re.compile(
     r"(ไม่มีข้อมูล|ไม่มีในระบบ|ไม่มีระบุ|ไม่ได้ระบุ|ไม่ทราบค่ะ|ไม่ทราบข้อมูล|ดิฉันไม่ทราบ|ฉันไม่ทราบ"
     r"|I don'?t have (that |this |any |the |specific )?(information|info|details|data)"
+    # robot 20 Oct, English: the gap said as a gap in our records
+    r"|I don'?t have the exact|not (specified|mentioned|listed) in (my|our|the) (current )?"
+    r"(details|information|data|records|documents)"
     r"|not (in|available in) (my|our) system|I don'?t know)",
     re.IGNORECASE)
 
@@ -870,6 +873,34 @@ def flags_for(case: dict, turns: list[dict], allowed_text: str) -> list[str]:
         flags += robot_flags(case, turns)
     if case.get("suite") == "content":
         flags += content_flags(case, turns)
+    elif case.get("turn_expect"):
+        flags += turn_expect_flags(case, turns)
+    return flags
+
+
+#: German words a reply in German cannot avoid, and an English one never has
+#: (robot log 19 Oct: an English guest's accent heard as "Bei der Kondom ist
+#: inklusive Karte?" got "Jedes Zimmer wird mit einem Möbelpaket geliefert").
+#: main_script() reads letters, and German is Latin like English.
+GERMAN = (r"\b(und|ist|wird|mit|uns|nur|etwa|vom|sehr|ich|wir|Sie|Ihnen|gerne|nicht|eine|einem|einen"
+          r"|Zimmer|Möbel\w*|Wohnung\w*|Strand\w*)\b|[äöüß]")
+
+
+def turn_expect_flags(case: dict, turns: list[dict]) -> list[str]:
+    """A scenario's per-turn language and wording checks (the content suite
+    has its own, wider set): `wrong_lang` by the script most of the reply is
+    in, `said_forbidden` / `said_missing` by the turn's regexes."""
+    flags: list[str] = []
+    for i, turn in enumerate(turns):
+        te = (case.get("turn_expect") or [])[i] if i < len(case.get("turn_expect") or []) else {}
+        said = (turn.get("said") or "").strip()
+        if said and te.get("lang") and main_script(said) != te["lang"]:
+            flags.append(f"t{i}:wrong_lang={main_script(said)}")
+        for pattern in te.get("said_none", []):
+            if re.search(pattern, said, re.IGNORECASE):
+                flags.append(f"t{i}:said_forbidden={pattern[:24]}")
+        if te.get("said_any") and not any(re.search(pt, said, re.IGNORECASE) for pt in te["said_any"]):
+            flags.append(f"t{i}:said_missing")
     return flags
 
 
@@ -1109,6 +1140,11 @@ class _EvalFace:
     ws = None
 
 
+class _EvalListener:
+    """Whose captions the heard store keeps in a case that is not the robot
+    suite (it claims no face; only the captions are needed)."""
+
+
 async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                    turn_timeout: float, screen: bool = True,
                    profile: str = "condo") -> dict:
@@ -1134,6 +1170,12 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
     else:
         _case_acks.set(None)
         registry.robot_face_session.set(object() if robot_face else None)
+    # Every case gets the guest's words the way the room does: a session the
+    # recogniser's captions belong to (search_condo_info reads them beside the
+    # model's query -- robot 20 Oct, "unit details" for a ceiling question).
+    listener = face if face is not None else _EvalListener()
+    if face is None:
+        heard.bind_session(listener)
     log: list = []
     _case_log.set(log)
 
@@ -1250,11 +1292,13 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                     record["greeting"] = close_turn(greet_turn, ok)
                 for n, text in enumerate(case["turns"]):
                     turn = new_turn(text)
-                    if face is not None:
-                        # What local VAD + the recogniser hand the heard guard
-                        # in the room: an activity_start, then this caption.
-                        heard.mark_activity(face)
-                        heard.record(text, face, utterance_id="eval-%d" % n)
+                    # What local VAD + the recogniser hand the heard guard
+                    # in the room: an activity_start, then this caption.
+                    heard.mark_activity(listener)
+                    heard.record(text, listener, utterance_id="eval-%d" % n)
+                    # what the recogniser would have handed the provider's
+                    # language tracker in the room (TALK_LANGUAGE_NOTE)
+                    getattr(provider, "note_guest", lambda _t: None)(text)
                     await provider.send_text(text)
                     ok = await wait_turn(turn)
                     turns.append(close_turn(turn, ok))
@@ -1269,7 +1313,7 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
         plan_display.unregister(sid)
         if face is not None:
             robot_face_link.session_closed(face)
-            heard.forget(face)
+        heard.forget(listener)
     record["screen"] = screen
     record["profile"] = profile
     record["usage"] = usage_peak
@@ -1305,9 +1349,14 @@ def split_serial(todo: list[dict]) -> tuple[list[dict], list[dict]]:
 #: tool groups beside the robot.env groups that answer project questions,
 #: and ANSWER_IMAGES on (robot.env) -- the picture a story must not fight.
 #: The robot/body groups stay out: they are stubbed anyway, and not what a
-#: story case measures. In this process only, never .env.
+#: story case measures. In this process only, never .env. TALK_LANGUAGE_NOTE
+#: is robot.env's too (19 Oct): every tool result says the talk's language.
 STORY_CASE_SETTINGS = {"stories_enabled": True, "answer_images": True,
-                       "tool_groups": "knowledge,mydocs,units,calc,stories"}
+                       "tool_groups": "knowledge,mydocs,units,calc,stories",
+                       "talk_language_note": True,
+                       # the robot has no web window (S31-map-story); and a PC
+                       # .env with WEB_STAGE=true would open a real browser here
+                       "web_stage": False}
 
 
 @contextlib.contextmanager

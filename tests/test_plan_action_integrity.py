@@ -92,6 +92,9 @@ def test_dispatch_waits_for_matching_render_ack_before_provider_success(monkeypa
     assert result["ok"] and result["action_state"] == "RENDERED"
     assert result["render_ack"]["sha256"] == DIGEST
     assert "image" not in result and "units" not in result
+    # robot 20 Oct: the counts reached the model and the rule beside them did
+    # not ("95 units available and 26 sold" to "I want to see the floor plan")
+    assert "counts" in result and plan_display.PLAN_COUNT_RULE in result["instruction"]
     assert commands[0]["url"] == f"/verified-plan/{DIGEST}"
     assert "https://sales.test" not in str(commands)
 

@@ -11,7 +11,14 @@
    "ห้องมีขนาดเท่าไหร่บ้าง",
    "ห้องมีกี่รูปทรง",
    "แปลนห้องมีกี่แบบ",
-   "ห้องมีกี่แบบ"
+   "ห้องมีกี่แบบ",
+   "ควรซื้อห้องแบบไหนดี",
+   "แนะนำห้องแบบไหนให้หน่อย",
+   "มีกี่แบบแปลน",
+   "มีแบบแปลนอะไรบ้าง",
+   "แบบห้องรวมคืออะไร",
+   "รวมสองห้องได้ไหม",
+   "แบบ 51 ทำเป็นหนึ่งห้องนอนได้ไหม"
   ],
   "questions_en": [
    "What room types do you have?",
@@ -19,28 +26,31 @@
    "How big are the rooms?",
    "What kinds of units are there?",
    "What layouts can I choose from?",
-   "Which layouts are there?"
+   "Which layouts are there?",
+   "What do you recommend me to buy?",
+   "What are the combined units?",
+   "Can I combine two rooms?",
+   "Can the 51 square metre layout be a one-bedroom?"
   ],
   "lines": [
    {
-    "th": "เรามีห้อง 3 ประเภท รวม 7 รูปทรงแปลนค่ะ",
-    "en": "We have three room types in seven layouts:",
+    "th": "ที่นี่มีแบบแปลน 8 แบบค่ะ แบบหลัก 5 แบบ แบบ 51 ตารางเมตรที่ทำเป็นหนึ่งห้องนอนอีกแบบ และห้องรวมอีก 2 แบบ",
+    "en": "We have eight layouts: five main ones, a one-bedroom version of the 51-square-metre unit, and two combined layouts.",
     "cue_th": [
-     "สามแบบ",
-     "3 แบบ"
+     "แบบแปลน",
+     "แบบหลัก"
     ],
     "cue_en": [
-     "three"
+     "eight"
     ],
     "cue_zh": [
-     "三种",
-     "三类",
-     "3种"
+     "八种",
+     "户型"
     ]
    },
    {
-    "th": "สตูดิโอ 4 รูปทรง ขนาด 24 ถึง 29 ตารางเมตร",
-    "en": "four studio layouts, 24 to 29 square metres,",
+    "th": "เริ่มจากสตูดิโอ 24 ตารางเมตร เป็นห้องโล่ง มีมุมนอนกับครัวอยู่ในห้องเดียว",
+    "en": "First, the 24-square-metre studio, one open room with the bed and the kitchen together;",
     "cue_th": [
      "สตูดิโอ"
     ],
@@ -54,18 +64,31 @@
     ]
    },
    {
-    "th": "หนึ่งห้องนอน 2 รูปทรง ขนาด 33 ถึง 35 ตารางเมตร",
-    "en": "two one-bedroom layouts, 33 to 35,",
+    "th": "สตูดิโอตรงหักมุมตึก ทรงคางหมู กว้างขึ้นเป็นประมาณ 29 ตารางเมตร",
+    "en": "the studio where the building turns, a trapezoid of about 29;",
     "cue_th": [
-     "หนึ่งห้องนอน",
-     "1 ห้องนอน",
-     "ห้องนอนเดียว"
+     "คางหมู",
+     "หักมุม"
     ],
     "cue_en": [
-     "one bedroom",
+     "trapezoid",
+     "where the building turns"
+    ],
+    "cue_zh": [
+     "梯形",
+     "转角"
+    ]
+   },
+   {
+    "th": "หนึ่งห้องนอน 33 ตารางเมตร มีห้องนอนแยกเป็นสัดส่วน กับมุมนั่งเล่นและครัว",
+    "en": "the one-bedroom of 33, with its own bedroom, a living area and kitchen;",
+    "cue_th": [
+     "หนึ่งห้องนอน",
+     "ห้องนอนแยก"
+    ],
+    "cue_en": [
      "one-bedroom",
-     "1 bedroom",
-     "1-bedroom"
+     "one bedroom"
     ],
     "cue_zh": [
      "一室",
@@ -74,17 +97,27 @@
     ]
    },
    {
-    "th": "และสองห้องนอน 1 รูปทรง ขนาด 51.5 ถึง 52.5 ตารางเมตรค่ะ",
-    "en": "and one two-bedroom layout, 51.5 to 52.5 square metres.",
+    "th": "และหนึ่งห้องนอนแปลนเอียงตรงหักมุมตึก ก็ 33 ตารางเมตรเหมือนกันค่ะ",
+    "en": "and the slanted one-bedroom where the building turns, also 33.",
     "cue_th": [
-     "สองห้องนอน",
-     "2 ห้องนอน"
+     "แปลนเอียง"
     ],
     "cue_en": [
-     "two bedroom",
-     "two-bedroom",
-     "2 bedroom",
-     "2-bedroom"
+     "slanted"
+    ],
+    "cue_zh": [
+     "倾斜",
+     "斜角"
+    ]
+   },
+   {
+    "th": "แบบ 51 ตารางเมตร ทำเป็นสองห้องนอน สองห้องน้ำ ทุกคนมีมุมส่วนตัวของตัวเอง",
+    "en": "The 51-square-metre layout comes as two bedrooms and two bathrooms, a room of your own for everyone,",
+    "cue_th": [
+     "สองห้องนอน"
+    ],
+    "cue_en": [
+     "two bedrooms"
     ],
     "cue_zh": [
      "两室",
@@ -92,45 +125,150 @@
      "两居",
      "二室"
     ]
+   },
+   {
+    "th": "หรือจะเลือกเป็นหนึ่งห้องนอนห้องใหญ่ ให้ห้องนั่งเล่นกว้างขึ้นก็ได้ค่ะ",
+    "en": "or as one large bedroom with a wider living room.",
+    "cue_th": [
+     "หนึ่งห้องนอน",
+     "ห้องนอนห้องใหญ่"
+    ],
+    "cue_en": [
+     "one large bedroom",
+     "large bedroom"
+    ],
+    "cue_zh": [
+     "大卧室",
+     "一室"
+    ]
+   },
+   {
+    "th": "ถ้าอยากได้พื้นที่มากขึ้น ก็มีแบบห้องรวม คือเอาสองสตูดิโอมารวมเป็นสองห้องนอน 48 ตารางเมตร",
+    "en": "For more space, two studios combine into a two-bedroom of 48,",
+    "cue_th": [
+     "ห้องรวม",
+     "สองสตูดิโอ"
+    ],
+    "cue_en": [
+     "two studios",
+     "combine"
+    ],
+    "cue_zh": [
+     "两间开间",
+     "合并",
+     "打通"
+    ]
+   },
+   {
+    "th": "หรือเอาหนึ่งห้องนอนสองห้องมารวมกัน เป็นสองห้องนอน 66 ตารางเมตรค่ะ",
+    "en": "and two one-bedrooms into a two-bedroom of 66.",
+    "cue_th": [
+     "หนึ่งห้องนอน"
+    ],
+    "cue_en": [
+     "one-bedrooms"
+    ],
+    "cue_zh": [
+     "两间一室",
+     "一室"
+    ]
    }
   ],
   "params": {
    "items": [
     {
      "label_en": "Studio",
-     "sub_en": "4 layouts · open plan",
-     "asset": "plan_studio",
+     "sub_en": "One open room",
+     "asset": "layout_studio_24",
      "asset_kind": "plan",
      "value": {
-      "from": 24,
+      "to": 24,
+      "unit_en": "sq.m."
+     },
+     "line": 1,
+     "tap": "story_room_types_studio"
+    },
+    {
+     "label_en": "Studio, trapezoid",
+     "sub_en": "Where the building turns",
+     "asset": "layout_studio_b107",
+     "asset_kind": "plan",
+     "value": {
+      "prefix_en": "≈",
       "to": 29,
       "unit_en": "sq.m."
      },
-     "line": 1
+     "line": 2,
+     "tap": "story_room_types_studio"
     },
     {
      "label_en": "1 Bedroom",
-     "sub_en": "2 layouts · 1 bathroom",
-     "asset": "plan_1br",
+     "sub_en": "Separate bedroom",
+     "asset": "layout_1br_33",
      "asset_kind": "plan",
      "value": {
-      "from": 33,
-      "to": 35,
+      "to": 33,
       "unit_en": "sq.m."
      },
-     "line": 2
+     "line": 3,
+     "tap": "story_room_types_1br"
+    },
+    {
+     "label_en": "1 Bedroom, slanted",
+     "sub_en": "Where the building turns",
+     "asset": "layout_1br_b113",
+     "asset_kind": "plan",
+     "value": {
+      "to": 33,
+      "unit_en": "sq.m."
+     },
+     "line": 4,
+     "tap": "story_room_types_1br"
     },
     {
      "label_en": "2 Bedrooms",
-     "sub_en": "1 layout · 2 bathrooms",
-     "asset": "plan_2br",
+     "sub_en": "The 51 sq.m. layout · 2 bathrooms",
+     "asset": "layout_51_2br",
      "asset_kind": "plan",
      "value": {
-      "from": 51.5,
-      "to": 52.5,
+      "to": 51,
       "unit_en": "sq.m."
      },
-     "line": 3
+     "line": 5,
+     "tap": "story_room_types_2br"
+    },
+    {
+     "label_en": "1 Bedroom, large",
+     "sub_en": "The same 51 sq.m. layout",
+     "asset": "layout_51_1br",
+     "asset_kind": "plan",
+     "value": {
+      "to": 51,
+      "unit_en": "sq.m."
+     },
+     "line": 6
+    },
+    {
+     "label_en": "Combined, 2 studios",
+     "sub_en": "Joined into 2 bedrooms",
+     "asset": "layout_combined_48",
+     "asset_kind": "plan",
+     "value": {
+      "to": 48,
+      "unit_en": "sq.m."
+     },
+     "line": 7
+    },
+    {
+     "label_en": "Combined, 2 one-bedrooms",
+     "sub_en": "Joined into 2 bedrooms",
+     "asset": "layout_combined_66",
+     "asset_kind": "plan",
+     "value": {
+      "to": 66,
+      "unit_en": "sq.m."
+     },
+     "line": 8
     }
    ],
    "end_hint_en": "Tap a room type to look inside"
@@ -159,17 +297,15 @@
    }
   ],
   "sources": [
+   "report:23_owner_review_2026-10-22.md#23.5 (owner 22 Oct: 8 layouts = 5 main + the 51 sq.m. unit as 1 or 2 bedrooms + 2 combined · Studio 24 · Studio B107 28.87 ≈ 29 · 1-BR 33 · 1-BR B113 33 · 51 as 2-BR with 2 bathrooms or 1-BR with 1 · 2-BR 48 from 2 studios · 2-BR 66 from 2 one-bedrooms)",
+   "web:5.room types/260615_EMB3_UNIT.pdf p.1-4 (the eight plan pictures)",
    "facts:แบบห้องและขนาด (Studio 24–29 · 1 ห้องนอน 33–35 · 2 ห้องนอน 51.5–52.5 ตร.ม.)",
-   "facts:โครงการ (three types: Studio · 1 ห้องนอน · 2 ห้องนอน)",
-   "report:14_units.md#14.1 line 20 (ขนาดที่แสดง 24.0–29.0 / 33.0–35.0 / 51.5–52.5)",
    "report:14_units.md#14.1 line 25 (Studio ห้องโล่งเดียว ไม่มีห้องนอนแยก · 1-BR 1 ห้องนอน + นั่งเล่น/ครัว · 2-BR 2 ห้องนอน + นั่งเล่น/ครัว)",
    "report:14_units.md#14.1 line 26 (ห้องน้ำ 1 / 1 / 2)",
-   "plans:sales/unit-plans/index.json A-316 'STUDIO 25.0 SQ.M.', F-113 '1 BEDROOM 34.0 SQ.M.', C-309 '2 BEDROOM 51.5 SQ.M.' (label: pete ถูกต้องทั้งหมด)",
-   "sales:qa_script.json q05 answer_after (เล่าความต่างของการใช้งานก่อน ตัวเลขเป็นข้อมูลประกอบ ห้ามเหมาว่าแบบไหนไว้ลงทุนหรืออยู่เอง)",
-   "report:14_units.md#14.2.2 (Studio มาตรฐาน · B-x25 · B-x07 คางหมู · E-107)",
-   "report:14_units.md#14.3.2/14.6 (1-BR มาตรฐาน · B-x13 แปลนเอียง)"
+   "report:14_units.md#14.6 (B-x07 Studio ผังเฉียงรูปคางหมูที่จุดหักมุมอาคาร B · B-x13 1-BR แปลนเอียงที่จุดหักมุมอาคาร B)",
+   "sales:qa_script.json q05 answer_after (เล่าความต่างของการใช้งานก่อน ตัวเลขเป็นข้อมูลประกอบ ห้ามเหมาว่าแบบไหนไว้ลงทุนหรืออยู่เอง)"
   ],
-  "notes_th": "เรื่องของเจ้าของข้อ 1: ผังแต่ละแบบขึ้นใหญ่ตอน Emma เอ่ยชื่อแบบ ตัวเลขช่วงขนาดนับขึ้น แล้วย่อลงไปเกาะเป็นแถว จบที่รายการสามแถวที่แตะได้ ผังเป็นผังรายยูนิตจริงจากระบบผังขาย (ห้องเดียวกับโมเดล UE ในเรื่อง details จึงตรงกัน) ไม่มีเลขห้องบนจอ บรรทัดแรกไม่มีภาพใหญ่ (แค่แถวว่างสามแถวรอ) ไม่มีประโยคถามปิดท้ายเพราะ prompt สั่งค่าเริ่มต้นไม่ถามต่อ ปล่อยให้ end_hint บนจอเชิญแตะแทน ไม่พูดเรื่องลงทุน/อยู่เองตาม qa_script q05 · 15 ต.ค. เจ้าของ: นับตามรูปทรงแปลน 7 แบบ — สตูดิโอ 4 (มาตรฐาน 25, B-x25 26, B-x07 คางหมู 29, E-107 24) · 1 ห้องนอน 2 (มาตรฐาน 33–35, B-x13 แปลนเอียง 34) · 2 ห้องนอน 1 (51.5–52.5)"
+  "notes_th": "22 ต.ค. เจ้าของ (หน้าตรวจ): '260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ' + โครงสร้างในความเห็นของ furniture 'มีทั้งหมด 8 แบบ แบบหลัก 5 แบบ แบบ 51 ตารางเมตรเลือกเป็น 1 หรือ 2 ห้องนอนได้ แบบคอมบาย 2 แบบ' → เรื่องนี้เล่าใหม่ทั้งเรื่อง: บรรทัดเปิดบอกโครงสร้าง (แถวว่างแปดแถวรอ) แล้วทีละแบบตามลำดับ สตูดิโอ 24 → สตูดิโอทรงคางหมู B107 ≈ 29 → หนึ่งห้องนอน 33 → หนึ่งห้องนอนแปลนเอียง B113 33 → แบบ 51 เป็นสองห้องนอน → แบบ 51 เป็นหนึ่งห้องนอนห้องใหญ่ → ห้องรวมจากสองสตูดิโอ 48 → ห้องรวมจากสองหนึ่งห้องนอน 66 · ภาพผังทั้ง 8 จาก PDF ของเจ้าของ (เส้นฟ้าบนพื้นใส มีเส้นบอกระยะและหัวชื่อแบบของแบบเอง) แทนผังรายยูนิต A-316/F-113/C-309 เดิม · 28.87 พูดและขึ้นจอเป็น '≈ 29' (ภาพ B107 ตัดบรรทัด 28.87 SQ.M. ออก ทศนิยมหนึ่งตำแหน่ง) · แถวห้าแบบหลักแตะได้ (ปุ่มเดิมสามปุ่ม id เดิม → unit_studio / unit_one_bedroom / unit_two_bedroom ซึ่งเรียก show_room_type ต่อ) แบบ 51 หนึ่งห้องนอนกับห้องรวม ไม่มีปุ่ม (เรื่องของแต่ละประเภทเล่าขนาดอื่น — แตะรูปได้ 'เล่าเพิ่ม' ตามกติกาข้อ 14) · ขนาดพูดตามแบบ (24/29/33/51/48/66) ซึ่งต่างจากขนาดที่แสดงของ Unit Sold (สตูดิโอส่วนใหญ่ 25, สองห้องนอน 51.5–52.5) — ถามเจ้าของไว้แล้ว · ขัดกับรายงาน 14.1.3 ที่ว่าแบบ 2BR 66 / 2BR 48 / 1BR 51 เป็นแบบเดือนมิ.ย. ที่ไม่ได้ขาย — ความเห็นเจ้าของ 22 ต.ค. ชนะ · ไม่พูดเรื่องลงทุน/อยู่เองตาม qa_script q05 · ไม่มีประโยคถามปิดท้าย · รีวิวภาษา 22 ต.ค.: บรรทัดเปิดเดิม 'แบบ 51 เลือกเป็นหนึ่งหรือสองห้องนอน' ฟังแล้วบวกได้ 7 (แบบ 51 สองห้องนอนอยู่ในห้าแบบหลักแล้ว) → นับให้ครบ 8 ตรงๆ: แบบหลัก 5 + แบบ 51 ที่ทำเป็นหนึ่งห้องนอนอีกแบบ + ห้องรวม 2 (ประโยคเดียวกับคำตอบ 'ห้องมีกี่แบบ' ในบทที่ 23.5) · บรรทัดห้องรวมสองบรรทัดเลิกซ้ำคำ 'ห้องรวม รวม' / 'ห้อง' สี่ครั้ง"
  },
  {
   "id": "unit_studio",
@@ -330,13 +466,15 @@
    "ห้อง 34 ตารางเมตรเป็นยังไง",
    "ห้องหนึ่งห้องนอนข้างในเป็นแบบไหน",
    "ห้องนอนเดียวขนาดเท่าไหร่",
-   "หนึ่งห้องนอนมีห้องน้ำกี่ห้อง"
+   "หนึ่งห้องนอนมีห้องน้ำกี่ห้อง",
+   "มีหนึ่งห้องนอนที่กว้างกว่านี้ไหม"
   ],
   "questions_en": [
    "What is the one-bedroom like?",
    "How big is the 1 bedroom?",
    "What does the one-bedroom look like inside?",
-   "What is the 34 square metre room?"
+   "What is the 34 square metre room?",
+   "Is there a bigger one-bedroom?"
   ],
   "lines": [
    {
@@ -411,6 +549,20 @@
      "室内",
      "装修"
     ]
+   },
+   {
+    "th": "ถ้าอยากได้หนึ่งห้องนอนที่กว้างกว่านี้ แบบ 51 ตารางเมตรก็ทำเป็นห้องนอนเดียวห้องใหญ่ได้ค่ะ",
+    "en": "If you'd like a roomier one-bedroom, the 51-square-metre layout can be a one-bedroom too.",
+    "cue_th": [
+     "กว้างกว่า"
+    ],
+    "cue_en": [
+     "roomier"
+    ],
+    "cue_zh": [
+     "更宽敞",
+     "更大"
+    ]
    }
   ],
   "params": {
@@ -477,9 +629,10 @@
    "report:14_units.md#14.1 line 26 (ห้องน้ำ 1)",
    "report:14_units.md#14.8.1 (the '34 sq.m. room' the sales team names = 1-Bedroom; its interior is the designed one)",
    "ue:RoomExperience 01_F-113_Room34 = appendix F-113 1 ห้องนอน 34.0 — evidence only, appendix not shown",
-   "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
+   "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)",
+   "report:23_owner_review_2026-10-22.md#23.5 (owner 22 Oct: the 51 sq.m. layout can be 1 bedroom or 2 bedrooms)"
   ],
-  "notes_th": "ลำดับเหมือนสตูดิโอ: โครงลวด (คำ 'หนึ่งห้องนอน') → โมเดลขาว (คำ 'ห้องนอนแยก/นั่งเล่น') → 33–35 นับขึ้น + '801 units · our most common type' (คำ 'ตารางเมตร') → ภาพบรรยากาศสามภาพ นั่งเล่น ห้องนอน ห้องน้ำ (คำ 'บรรยากาศ') โมเดล UE คือ F-113 (34.0 ตร.ม. ขนาดที่พบมากสุด) ภาพบรรยากาศเป็นชุดเว็บ ซึ่งรายงาน 14.8.1 บอกว่าการออกแบบภายในนี้คือของแบบ 1 ห้องนอน ปุ่มเทียบนำไปเรื่อง unit_compare_1br_2br · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด"
+  "notes_th": "ลำดับเหมือนสตูดิโอ: โครงลวด (คำ 'หนึ่งห้องนอน') → โมเดลขาว (คำ 'ห้องนอนแยก/นั่งเล่น') → 33–35 นับขึ้น + '801 units · our most common type' (คำ 'ตารางเมตร') → ภาพบรรยากาศสามภาพ นั่งเล่น ห้องนอน ห้องน้ำ (คำ 'บรรยากาศ') โมเดล UE คือ F-113 (34.0 ตร.ม. ขนาดที่พบมากสุด) ภาพบรรยากาศเป็นชุดเว็บ ซึ่งรายงาน 14.8.1 บอกว่าการออกแบบภายในนี้คือของแบบ 1 ห้องนอน ปุ่มเทียบนำไปเรื่อง unit_compare_1br_2br · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด · 22 ต.ค. (เจ้าของ: 'แบบ 51 ตารางเมตร สามารถเลือกเป็น 1 ห้องนอน หรือ 2 ห้องนอนได้'): เติมบรรทัดท้ายว่าหนึ่งห้องนอนที่กว้างกว่า คือแบบ 51 ที่เลือกเป็นหนึ่งห้องนอน — ไม่มีภาพใหม่ (แม่แบบ details ไม่มีจังหวะที่ห้า) บรรทัดเดิมไม่แตะ · รีวิวภาษา 22 ต.ค.: บรรทัดท้ายเลิกพูด 'หนึ่งห้องนอน' สองครั้ง → 'แบบ 51 ตารางเมตรก็ทำเป็นห้องนอนเดียวห้องใหญ่ได้ค่ะ'"
  },
  {
   "id": "unit_two_bedroom",
@@ -569,6 +722,20 @@
      "室内",
      "装修"
     ]
+   },
+   {
+    "th": "ถ้าอยากได้กว้างกว่านี้ ยังมีแบบห้องรวมเป็นสองห้องนอน 66 ตารางเมตรด้วยค่ะ",
+    "en": "And if you'd like more room, there's a combined two-bedroom of 66 square metres.",
+    "cue_th": [
+     "ห้องรวม"
+    ],
+    "cue_en": [
+     "combined"
+    ],
+    "cue_zh": [
+     "合并",
+     "打通"
+    ]
    }
   ],
   "params": {
@@ -633,9 +800,10 @@
    "report:14_units.md#14.1 line 26 (ห้องน้ำ 2)",
    "report:14_units.md#14.4.4 (\"มีห้องนอน 2 ห้อง ห้องน้ำ 2 ห้อง\" as the suggested answer)",
    "ue:RoomExperience 08_C-309_TwoBed51 = appendix C-309 2 ห้องนอน 51.5 — evidence only, appendix not shown",
-   "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
+   "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)",
+   "report:23_owner_review_2026-10-22.md#23.5 (owner 22 Oct: 2 combined layouts -- 2-BR 66 sq.m. from two 1-bedrooms, 2-BR 48 from two studios)"
   ],
-  "notes_th": "ลำดับเหมือนสองเรื่องก่อน ประโยคที่สองบอกสองห้องนอนสองห้องน้ำ (จุดต่างที่ลูกค้าถามบ่อย) ตัวเลข 51.5–52.5 นับขึ้นแบบทศนิยมหนึ่งตำแหน่ง โมเดล UE คือ C-309 (51.5 ตร.ม. แบบย่อยเล็กสุดของ 2 ห้องนอน 8 ห้อง — โปรเจกต์ UE มีโมเดลครบชุดเฉพาะห้องนี้) ไม่ใช้ 09_C-309_OneBed51 เพราะเป็นแบบหนึ่งห้องนอนบนผังเดียวกัน ตรงกับแบบเก่ามิถุนายน '1BR 51' ที่รายงานบอกว่าไม่ได้ขายจริง ห้องใหญ่สุดของห้องชุดคือแบบนี้ (ร้านค้าไม่นับ) · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด"
+  "notes_th": "ลำดับเหมือนสองเรื่องก่อน ประโยคที่สองบอกสองห้องนอนสองห้องน้ำ (จุดต่างที่ลูกค้าถามบ่อย) ตัวเลข 51.5–52.5 นับขึ้นแบบทศนิยมหนึ่งตำแหน่ง โมเดล UE คือ C-309 (51.5 ตร.ม. แบบย่อยเล็กสุดของ 2 ห้องนอน 8 ห้อง — โปรเจกต์ UE มีโมเดลครบชุดเฉพาะห้องนี้) ไม่ใช้ 09_C-309_OneBed51 เพราะเป็นแบบหนึ่งห้องนอนบนผังเดียวกัน ตรงกับแบบเก่ามิถุนายน '1BR 51' ที่รายงานบอกว่าไม่ได้ขายจริง · แก้ตามรีวิว 12 ต.ค.: หน่วย 'sq.m.' ตัวเล็กเหมือนเรื่อง room_types · ปุ่มสั้นลง (ปุ่มสามปุ่มยาว ทำให้ภาพบรรยากาศเหลือเป็นแถบบาง) · '2‑bedroom' ใช้ขีดที่ไม่ตัดบรรทัด · 22 ต.ค. (เจ้าของ: แบบห้องรวม 2 แบบจาก 260615_EMB3_UNIT.pdf): คำถาม 'ห้องใหญ่สุดขนาดเท่าไหร่' / 'What is your biggest unit?' เคยได้ 51.5–52.5 ซึ่งไม่ถูกแล้ว (ห้องรวมสองห้องนอน 66) → เติมบรรทัดท้ายเรื่องห้องรวม 66 ไม่ใช้คำว่า 'ใหญ่สุด' (Furniture PDF มิ.ย. มีห้องรวม 85 ตร.ม. อีกแบบ — เจ้าของนับห้องรวม 2 แบบ ถามไว้แล้ว) · โมเดล UE 09_C-309_OneBed51 (แบบ 51 เป็นหนึ่งห้องนอน) ตอนนี้ตรงกับแบบที่เจ้าของบอกว่าเลือกได้ — ยังไม่ได้ใช้"
  },
  {
   "id": "unit_compare_1br_2br",

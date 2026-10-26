@@ -2336,7 +2336,16 @@ class VoiceSession:
                 from app import stories
 
                 tap = stories.find_tap(getattr(self, "_story_topic", None), ask_id)
-                text = stories.tap_text(tap, event.get("lang"), talk) if tap is not None else None
+                # Off the event loop (review 26 Oct): a tapped picture's text
+                # (stories.tap_more_text) runs up to six report FAQ matches and
+                # three passage searches, each embedding its query -- 55 ms
+                # median, 185 ms worst over the 163 picture taps on the PC, and
+                # several times that on the robot's two ARM threads, with her
+                # audio to the page stalled meanwhile. Taps stay in order (this
+                # handler is awaited by the receive loop); to_thread copies the
+                # context, so the turn-log session and registry vars resolve.
+                text = (await asyncio.to_thread(stories.tap_text, tap, event.get("lang"), talk)
+                        if tap is not None else None)
             if text is None:
                 return
         else:
@@ -2368,6 +2377,14 @@ class VoiceSession:
         lang = event.get("lang")
         turnlog.record("quick_ask", id=ask_id, lang=lang if lang in quick_asks.LANGS else None)
         self._guest_started_turn()        # a tapped question is a question
+        # ...and new activity, as speech is (review 26 Oct): the guest's last
+        # spoken sentence is no longer the utterance the next tool call
+        # answers. knowledge._guest_words takes the latest caption after the
+        # latest activity_start (at most 30 s old) and put its FAQ answer
+        # FIRST in a search the model made for the tap. The motion guards
+        # read the same mark: a sentence from before a tap cannot authorise
+        # a move after it either.
+        heard.mark_activity(self)
         if tap is not None and tap.get("more"):
             # A tapped picture (stories.tap_more_text): the page keeps the story
             # with the picture enlarged as this answer's screen (onTap keep), so

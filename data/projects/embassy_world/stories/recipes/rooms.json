@@ -54,15 +54,16 @@
  {
   "id": "rm_parkside",
   "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
+  "source_sha256": "bd9e370fbe6ec0293356bd500948b843eaef0062eef89e3ba5c533db9872bb15",
   "crop": [
-   0,
-   215,
-   1330,
-   1055
+   1015,
+   205,
+   1920,
+   905
   ],
   "max_w": 1080,
   "format": "webp",
-  "why": "Approved slide intro-011 'THE PARK': the park lake and its planted banks with the low-rise buildings beside it. Card picture of PARKSIDE in views_collections (the collection of rooms on the park side, report 15.6). Cropped below the 'THE PARK' title (y<=190), right of the slide's concept box (x>=1345) and clear of the logo -- no text left in the picture."
+  "why": "Approved slide intro-011 'THE PARK': the park lake and its planted banks. Card picture of PARKSIDE in views_collections (the rooms on the park side, report 15.6). Owner 21 Oct 2026: every story picture a final render -- there is no final render of the park, so the picture stays the slide, but the crop now keeps only the lake, its planted banks and the path (x>=1015): the two blocks on the left of the slide are an early concept of the buildings (flat facades, not the final wavy balconies) and read as an old picture. Below the 'THE PARK' title (y>=205), above the concept badge (y<=905): no text left in the picture."
  },
  {
   "id": "rm_signature",

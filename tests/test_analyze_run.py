@@ -132,3 +132,27 @@ def test_a_crash_is_said_as_an_error_not_as_a_stop():
     assert s["errors"] == ["HTTPStatusError('500')"]
     assert any(n.startswith("ERROR (drive_route crashed") for n in s["notes"])
     assert "nothing stands out" not in ar.report(s, "t")
+
+
+def test_the_lidar_maps_stops_are_summed_up_beside_the_walls():
+    # drive_route logs `shadow_fix` at every checkpoint (19 ต.ค., log only): the
+    # summary says how far it was from the walls where they measured, how many
+    # axes only the map pinned (the dock's y), errors, and the slowest match
+    ar = _ar()
+    ev = [{"kind": "run_start", "t": 0.0},
+          {"kind": "shadow_fix", "label": "on the dock", "pinned": [True, True, True], "score": 0.96,
+           "vs_walls": {"x_m": 0.002, "yaw_deg": 0.7}, "seconds": 0.15, "t": 1.0},
+          {"kind": "shadow_fix", "label": "below D8", "pinned": [True, True, True], "score": 0.91,
+           "vs_walls": {"x_m": -0.031, "y_m": 0.012, "yaw_deg": -0.2}, "seconds": 0.21, "t": 2.0},
+          {"kind": "shadow_fix", "label": "junction", "error": "MemoryError: x", "seconds": 0.01, "t": 3.0},
+          {"kind": "drive", "label": "east", "seconds": 4.0, "seen": [{"along": 0.0}, {"along": 0.6}], "t": 4.0}]
+    s = ar.summarize(ev)
+    sh = s["shadow"]
+    assert sh["n"] == 3 and sh["errors"] == 1
+    assert sh["vs_walls_max"] == {"x_m": 3.1, "y_m": 1.2, "yaw_deg": 0.7}
+    assert sh["only_map"] == 1                       # the dock's y: no wall there measured it
+    assert sh["seconds_max"] == 0.21 and sh["score_min"] == 0.91
+    assert s["frames_on_the_move"] == 2
+    text = ar.report(s)
+    assert "lidar map (log only): 3 stops (1 errors)" in text and "x 3.1 cm (n 2)" in text
+    assert "lidar frames logged on the move: 2" in text

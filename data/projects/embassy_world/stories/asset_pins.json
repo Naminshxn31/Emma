@@ -321,33 +321,33 @@
  },
  "fac_3_sky_pool": {
   "file": "fac_3_sky_pool.webp",
-  "sha256": "ac1320f422c03402407eb025ddbf71365ea6d6d7ef92463f0b421b921f8020c6",
-  "bytes": 140476,
-  "w": 1080,
-  "h": 741,
+  "sha256": "13eae1f13fd7dd1c81b73790e036bce48a34db7e8969333c546c1d7f2fe1ac95",
+  "bytes": 48436,
+  "w": 1000,
+  "h": 667,
   "format": "webp",
-  "source": "../../data/projects/embassy_world/presentations/slides/intro_041.jpg",
+  "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/14.jpg",
   "crop": [
-   0,
-   160,
-   1340,
+   720,
+   413,
+   1720,
    1080
   ],
   "alpha": false
  },
  "fac_3_social": {
   "file": "fac_3_social.webp",
-  "sha256": "7707243f5d64da5ec386245f40a7cba9a60c97c58129307dcf977fd3074a33b9",
-  "bytes": 70206,
+  "sha256": "4b52d376c7fd51edfe9b2c177dfa2858908e2f62e03758ce9968f4bf13c381cd",
+  "bytes": 90306,
   "w": 1020,
   "h": 765,
   "format": "webp",
   "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/29.jpg",
   "crop": [
-   900,
-   300,
-   1920,
-   1065
+   480,
+   200,
+   1500,
+   965
   ],
   "alpha": false
  },
@@ -385,17 +385,17 @@
  },
  "fac_b_hydro_capsule": {
   "file": "fac_b_hydro_capsule.webp",
-  "sha256": "235cc65c518f1d7f74a0ff2cccffe43833b6f1e4352fe0cf4bfa25d2b63af753",
-  "bytes": 75224,
+  "sha256": "5552117fe5f0f7cc041b966c2d0cd56054b5a82e8e6d9923c544984df0a12d7e",
+  "bytes": 73688,
   "w": 1080,
-  "h": 495,
+  "h": 675,
   "format": "webp",
-  "source": "../../data/projects/embassy_world/presentations/slides/intro_035.jpg",
+  "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/42.jpg",
   "crop": [
-   150,
-   300,
-   1460,
-   900
+   240,
+   95,
+   1680,
+   995
   ],
   "alpha": false
  },
@@ -687,19 +687,147 @@
   ],
   "alpha": false
  },
+ "layout_1br_33": {
+  "file": "layout_1br_33.webp",
+  "sha256": "80596f2e314f35e9c6320b3842193cc699b0858d2fc65abe4af84c92f33b720b",
+  "bytes": 30150,
+  "w": 1018,
+  "h": 1276,
+  "format": "webp",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "crop": [
+   305,
+   624,
+   1323,
+   1900
+  ],
+  "alpha": true
+ },
+ "layout_1br_b113": {
+  "file": "layout_1br_b113.webp",
+  "sha256": "7c5dc16428d1a672f136e3ff4e4247795e8910d6d20138be7e04ccacabf4d67a",
+  "bytes": 146720,
+  "w": 1080,
+  "h": 1242,
+  "format": "webp",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "crop": [
+   1704,
+   645,
+   2795,
+   1900
+  ],
+  "alpha": true
+ },
+ "layout_51_1br": {
+  "file": "layout_51_1br.webp",
+  "sha256": "cf48aef6ef0a4fabd48e65bc7051071a7da389aa6cad0a49773ee4696cf31537",
+  "bytes": 104916,
+  "w": 1080,
+  "h": 1118,
+  "format": "webp",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "crop": [
+   368,
+   603,
+   1621,
+   1900
+  ],
+  "alpha": true
+ },
+ "layout_51_2br": {
+  "file": "layout_51_2br.webp",
+  "sha256": "9ec1e764277c986d3b91768c01de28978c9c8a98251c2f0695a3fa1b7a1fe2b8",
+  "bytes": 116112,
+  "w": 1080,
+  "h": 1075,
+  "format": "webp",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "crop": [
+   1705,
+   603,
+   3008,
+   1900
+  ],
+  "alpha": true
+ },
+ "layout_combined_48": {
+  "file": "layout_combined_48.webp",
+  "sha256": "cbb17d273aafeb4528f8dd06d61f5dd6275a29a400983c0e3bdbaaa14eecc9f1",
+  "bytes": 119800,
+  "w": 1080,
+  "h": 1083,
+  "format": "webp",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "crop": [
+   1461,
+   580,
+   2866,
+   1989
+  ],
+  "alpha": true
+ },
+ "layout_combined_66": {
+  "file": "layout_combined_66.webp",
+  "sha256": "8c932ab35d7b7f29f676a8fd2a73bd169b559d245db95f1bce51f3c87c31b332",
+  "bytes": 107882,
+  "w": 1080,
+  "h": 926,
+  "format": "webp",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "crop": [
+   1385,
+   580,
+   3028,
+   1989
+  ],
+  "alpha": true
+ },
+ "layout_studio_24": {
+  "file": "layout_studio_24.webp",
+  "sha256": "d820b17aecd009566678868607017e020338180ac5598a7bae89c6725c8a0e18",
+  "bytes": 25192,
+  "w": 866,
+  "h": 1276,
+  "format": "webp",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "crop": [
+   446,
+   624,
+   1312,
+   1900
+  ],
+  "alpha": true
+ },
+ "layout_studio_b107": {
+  "file": "layout_studio_b107.webp",
+  "sha256": "c28d0bfb189b4dbe116c04d476857b0b3c8152a5c473d5daabdf371a2e6e13c7",
+  "bytes": 114620,
+  "w": 1080,
+  "h": 876,
+  "format": "webp",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "crop": [
+   284,
+   730,
+   1557,
+   1762
+  ],
+  "alpha": true
+ },
  "liv_courtyard_top": {
   "file": "liv_courtyard_top.webp",
-  "sha256": "b5be3b6cf10c262766c3777f9fa4b624f724022f07c8d85df20edddb9c2b07f7",
-  "bytes": 56758,
-  "w": 920,
-  "h": 620,
+  "sha256": "e0e059eac7557d1f4aa3590cd8a429d71dffe09d420137679d3d7cf32c1bdbf8",
+  "bytes": 215534,
+  "w": 1080,
+  "h": 675,
   "format": "webp",
-  "source": "ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png",
+  "source": "web/6.gallery/exterior/CD03/Scene 58.png",
   "crop": [
-   230,
-   240,
-   1150,
-   860
+   0,
+   100,
+   1200,
+   850
   ],
   "alpha": false
  },
@@ -769,17 +897,17 @@
  },
  "liv_park": {
   "file": "liv_park.webp",
-  "sha256": "c3e8a060989c0466c54ba52b71cd0a64e54b295e584c28e557f149562025ffb3",
-  "bytes": 103404,
-  "w": 1080,
-  "h": 693,
+  "sha256": "55a7ac0987883d5cab2b35ff298692be5b871432a40d15efb68a0690bc9bcd97",
+  "bytes": 78294,
+  "w": 905,
+  "h": 700,
   "format": "webp",
   "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
   "crop": [
-   0,
-   220,
-   1340,
-   1080
+   1015,
+   205,
+   1920,
+   905
   ],
   "alpha": false
  },
@@ -1069,17 +1197,17 @@
  },
  "prj_life_park": {
   "file": "prj_life_park.webp",
-  "sha256": "be67f9b0baa3cdc15ad069cca25e02233be080cab8e63c397e88f468fa39e4bb",
-  "bytes": 66878,
+  "sha256": "b9b214979870a03b0bac33e6bb5c97513c35935a101c60a6775d944ad0fd7166",
+  "bytes": 67706,
   "w": 800,
-  "h": 500,
+  "h": 619,
   "format": "webp",
   "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
   "crop": [
-   0,
-   230,
-   1232,
-   1000
+   1015,
+   205,
+   1920,
+   905
   ],
   "alpha": false
  },
@@ -1149,17 +1277,17 @@
  },
  "prj_tech_home": {
   "file": "prj_tech_home.webp",
-  "sha256": "16a53d2b82d0153cf9e1bd1fcd37fbbe7ccb6e16450aae7aa723b7a012fcb8e0",
-  "bytes": 44160,
+  "sha256": "0412de14ff5da72c4b775ff10a104eea6b2da254dc2953b2b8c71aa5f8ef0aac",
+  "bytes": 38066,
   "w": 800,
   "h": 500,
   "format": "webp",
-  "source": "../../data/projects/embassy_world/presentations/slides/intro_043.jpg",
+  "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
   "crop": [
-   700,
-   0,
-   1800,
-   688
+   214,
+   1071,
+   5000,
+   4062
   ],
   "alpha": false
  },
@@ -1213,17 +1341,17 @@
  },
  "rm_parkside": {
   "file": "rm_parkside.webp",
-  "sha256": "abb07045c45a73457cffc8f15960b0c530cd90a0b005d4dc5f9e458002b460bd",
-  "bytes": 100664,
-  "w": 1080,
-  "h": 682,
+  "sha256": "55a7ac0987883d5cab2b35ff298692be5b871432a40d15efb68a0690bc9bcd97",
+  "bytes": 78294,
+  "w": 905,
+  "h": 700,
   "format": "webp",
   "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
   "crop": [
-   0,
-   215,
-   1330,
-   1055
+   1015,
+   205,
+   1920,
+   905
   ],
   "alpha": false
  },
@@ -1405,17 +1533,17 @@
  },
  "sh_curtain": {
   "file": "sh_curtain.webp",
-  "sha256": "3e37db1ac21d792a1afa7e7740383d21263e50fdb1f3c1f03df5edf10ad869ad",
-  "bytes": 16014,
+  "sha256": "f54e258a0824220589f71be0fdd8b4da513a608b3ba51462e4a7497b11f6b7f8",
+  "bytes": 19868,
   "w": 960,
   "h": 693,
   "format": "webp",
-  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_closed.png",
+  "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
   "crop": [
-   680,
-   280,
-   2120,
-   1320
+   460,
+   1450,
+   2260,
+   2750
   ],
   "alpha": false
  }

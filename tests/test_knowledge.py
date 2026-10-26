@@ -658,3 +658,20 @@ def test_every_search_result_says_only_what_it_found(loaded):
     assert out["found"] is True
     assert knowledge.GROUNDED_ONLY in out["instruction"]
     assert "'มีอุปกรณ์ครบครัน'" in knowledge.GROUNDED_ONLY and "'วิวทะเล'" in knowledge.GROUNDED_ONLY
+
+
+def test_every_result_says_numbers_the_owners_way(loaded):
+    """Owner 21 Oct: one decimal at most, as few numbers as answer the
+    question, the travel time instead of the distance when there is one.
+    Robot 20 Oct: "The room is 6.884 by 2.90 metres". On slide results, on
+    report results (once, inside the report's rule) and on tapped pictures."""
+    from app import stories
+    from app.tools import knowledge
+    from app.tools.retrieval import SPOKEN_NUMBERS
+
+    out = run(registry.dispatch("search_condo_info", {"query": "ฟิตเนสอยู่ไหน"}))
+    assert out["instruction"].count(SPOKEN_NUMBERS) == 1
+    assert SPOKEN_NUMBERS in knowledge.REPORT_INSTRUCTION
+    assert SPOKEN_NUMBERS in stories._MORE_FACT_RULES
+    assert "ห้ามคำนวณหรือปัดเอง" not in knowledge.REPORT_INSTRUCTION, "the old rule forbade the rounding"
+    assert "'ขับรถประมาณ 4 นาที'" in SPOKEN_NUMBERS and "'ประมาณ 7.6'" in SPOKEN_NUMBERS

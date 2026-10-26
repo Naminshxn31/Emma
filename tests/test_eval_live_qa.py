@@ -118,9 +118,15 @@ def test_flags_catch_telling_the_guest_there_is_no_information():
     base = {"user": "เลี้ยงสัตว์ได้ไหม", "complete": True, "audio_s": 4.0, "tools": []}
     for said in ("ขออภัยค่ะ ดิฉันไม่มีข้อมูลเรื่องนี้ค่ะ",
                  "I don't have that information in my system.",
-                 "ข้อมูลความลึกของสระว่ายน้ำไม่มีระบุในระบบค่ะ"):       # robot log 15 Oct
+                 "ข้อมูลความลึกของสระว่ายน้ำไม่มีระบุในระบบค่ะ",        # robot log 15 Oct
+                 # robot log 20 Oct, English
+                 "The water depth for the basement pool is not specified in our current details.",
+                 "Specific safety guidelines are not mentioned in our current information.",
+                 "I don't have the exact start date for construction.",
+                 "The exact number of units in Empire Tower is not specified in our documents."):
         assert "t0:says_no_info" in harness.flags_for({"expect": {}}, [dict(base, said=said)], "")
     for said in ("เรื่องนี้ทีมขายของเราจะให้รายละเอียดได้ครบที่สุดค่ะ สอบถามที่โต๊ะทีมขายได้เลยนะคะ",
+                 "Our sales team can confirm the water depth for you.",
                  "ไม่ทราบว่าสนใจห้องแบบไหนคะ"):
         assert "t0:says_no_info" not in harness.flags_for({"expect": {}}, [dict(base, said=said)], "")
 
@@ -174,11 +180,13 @@ def test_every_story_has_exactly_one_live_case():
         assert not case.get("held_out") and len(case["turns"]) == 1, case["id"]
     # Beside 27 (one per story) and 28 (held out) the only story cases are the
     # follow-ups from the robot log (cat 29, 14 Oct: the second question of a
-    # pair was answered from memory) -- more than one turn, so never a story's
-    # single live case.
+    # pair was answered from memory) and the language cases (cat 30, 19 Oct:
+    # an English talk switched to Thai and German on its own) and the robot
+    # log of 20 Oct (cat 31: follow-ups searched or refused, the map) -- more
+    # than one turn, so never a story's single live case.
     for case in story_cases:
         if not case["cat"].startswith(("27", "28")):
-            assert case["cat"].startswith("29") and len(case["turns"]) > 1, case["id"]
+            assert case["cat"].startswith(("29", "30", "31")) and len(case["turns"]) > 1, case["id"]
 
 
 def test_every_story_has_a_held_out_question_in_the_guests_words():

@@ -411,3 +411,17 @@ def test_a_run_the_face_app_started_counts_as_going():
         assert rp.run_going('{"state": "%s"}' % idle) is None
     assert rp.run_going("{broken") is not None        # cannot tell = do not start a second
     assert "emma_nav.py status" in rp.busy_command("/r")
+
+
+def test_deploy_carries_the_lidar_map_when_the_pc_has_built_one(tmp_path):
+    # drive_route matches it at every checkpoint (shadow_fix, log only); a robot
+    # without it logs no rows -- so a deploy from a PC without one must not fail
+    for rel in rp.CODE:
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_bytes(b"x")
+    assert not [f for f in rp.deploy_files([], tmp_path) if "maps" in f]
+    (tmp_path / "data/robot/maps").mkdir(parents=True)
+    (tmp_path / "data/robot/maps/floor2_lidar_field.npz").write_bytes(b"npz")
+    (tmp_path / "data/robot/maps/scratch_occupancy.npz").write_bytes(b"not a field")
+    assert [f for f in rp.deploy_files([], tmp_path) if "maps" in f] == ["data/robot/maps/floor2_lidar_field.npz"]
+    assert "app/scan_match.py" in rp.CODE

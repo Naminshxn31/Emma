@@ -135,7 +135,7 @@ def test_the_build_writes_a_draft_and_a_draft_offers_nothing(catalog_dir, monkey
 def test_an_edit_after_approval_is_a_draft_again(approved):
     assert set(stories.available()) == {
         "fx_room_types", "fx_facilities", "fx_ground", "fx_sky_pool", "fx_tower", "fx_studio",
-        "fx_nearby", "fx_units_total", "fx_smart_home", "fx_travel", "fx_where"}
+        "fx_nearby", "fx_units_total", "fx_smart_home", "fx_travel", "fx_where", "fx_around"}
     catalog = _catalog(approved)
     catalog["stories"][0]["lines"][1]["th"] = "สตูดิโอ ขนาด 30 ตารางเมตร"      # a number nobody approved
     _write(approved, catalog)
@@ -333,6 +333,103 @@ def test_a_search_for_a_story_topic_is_handed_to_the_story(approved):
         assert "story_topic" not in knowledge.search_condo_info("ห่างทะเลไหม")
 
 
+def test_a_search_after_the_story_was_told_searches(approved):
+    """Robot 20 Oct: after fitness_where, "Why biogenesis?" and "What is so
+    special about this gym?" were searched -- for what the lines did not say
+    -- and handed back to the same story: its lines three times running. The
+    story already up is never the answer to the search that follows it; a
+    call that has not seen it still gets the story."""
+    from app import stories, turnlog
+
+    _tool()
+    knowledge, _ = _search_tool()
+    with _as("condo", face=True):
+        token = turnlog.session_id.set("told")
+        try:
+            assert stories.tool_result("fx_nearby")["ok"]
+            assert stories.last_shown() == "fx_nearby"
+            assert "story_topic" not in knowledge.search_condo_info("ห่างทะเลไหม")
+        finally:
+            turnlog.session_id.reset(token)
+        token = turnlog.session_id.set("another call")
+        try:
+            assert knowledge.search_condo_info("ห่างทะเลไหม")["story_topic"] == "fx_nearby"
+        finally:
+            turnlog.session_id.reset(token)
+
+
+def test_the_story_just_told_is_just_told_for_a_while(approved, monkeypatch):
+    """Review 26 Oct: `last_shown` lasted the whole call -- only another story
+    replaced it -- so a guest back on the topic minutes later, after other
+    answers had taken the screen, got a plain search and no story (the 14 Oct
+    "the repeats got no picture" failure the hand-off exists for). The
+    follow-ups right after the story still search (20 Oct: 24 and 25 s after
+    it), several in a row; past the window the topic goes to its story again;
+    another story takes over at once."""
+    from app import turnlog
+
+    _tool()
+    knowledge, _ = _search_tool()
+    now = [1000.0]
+    monkeypatch.setattr(stories, "_clock", lambda: now[0])
+    window = stories.SHOWN_WINDOW_S
+    assert 60 <= window <= 120          # the longest story (26 s) and a few follow-ups on it
+    with _as("condo", face=True):
+        token = turnlog.session_id.set("told")
+        try:
+            assert stories.tool_result("fx_nearby")["ok"]
+            # each follow-up about it keeps it "just told" for another window
+            for step in (25, window - 5, window - 5):
+                now[0] += step
+                assert "story_topic" not in knowledge.search_condo_info("ห่างทะเลไหม"), step
+            # another answer in between does not keep it
+            knowledge.search_condo_info("ล็อบบี้ตกแต่งแบบไหน")
+            now[0] += window + 1
+            assert stories.last_shown() is None
+            assert knowledge.search_condo_info("ห่างทะเลไหม")["story_topic"] == "fx_nearby"
+            # told again: just told again
+            assert stories.tool_result("fx_nearby")["ok"]
+            now[0] += 10
+            assert "story_topic" not in knowledge.search_condo_info("ห่างทะเลไหม")
+            # another story takes over at once, inside the window too
+            assert stories.tool_result("fx_ground")["ok"]
+            assert stories.last_shown() == "fx_ground"
+            assert knowledge.search_condo_info("ห่างทะเลไหม")["story_topic"] == "fx_nearby"
+        finally:
+            turnlog.session_id.reset(token)
+
+
+def test_a_reset_forgets_the_story_each_call_told(approved):
+    """Review 26 Oct: conftest resets this module before every test, but the
+    story each call last told survived it -- and every test without a turn-log
+    session shares the key "", so a story an earlier test told decided
+    whether a later test's search was handed to its story."""
+    with _as("condo", face=True):
+        assert stories.tool_result("fx_nearby")["ok"]
+    assert stories.last_shown() == "fx_nearby"
+    stories.reset()
+    assert stories.last_shown() is None
+    # rows of calls long over make room; the call telling a story keeps its own
+    stories._SHOWN.update({"call %d" % i: ("fx_nearby", -1e9) for i in range(300)})
+    with _as("condo", face=True):
+        assert stories.tool_result("fx_ground")["ok"]
+    assert list(stories._SHOWN) == [""] and stories.last_shown() == "fx_ground"
+
+
+def test_the_map_on_a_face_without_a_web_window_is_the_location_story(approved, monkeypatch):
+    """Robot 20 Oct: "show me the location on Google Maps" -> "I am unable to
+    display the map". The robot has no web window; its face has the map."""
+    from app.tools import units, webstage
+
+    monkeypatch.setattr(webstage, "enabled", lambda: False)
+    _tool()
+    with _as("condo", face=True):
+        monkeypatch.setattr(stories, "story_for_query", lambda q, offered=None: "fx_nearby")
+        assert 'present_story(topic="fx_nearby")' in units._no_web_map()
+    with _as("condo", face=False):
+        assert units._no_web_map() == units.NO_WEB_MAP
+
+
 def test_the_search_declaration_names_the_story_first_only_where_it_is_offered(approved):
     import app.tools.registry as reg
 
@@ -356,8 +453,10 @@ def test_the_questions_that_missed_on_the_robot_match_their_story():
     catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
     offered = {s["id"]: s for s in catalog["stories"]}
     for query, topic in (("parking", "parking"), ("How many parking space are there?", "parking"),
-                         ("Is there EV charging?", "parking"), ("hospital nearby", "nearby_places"),
-                         ("school nearby", "nearby_places"), ("Is there a hospital nearby?", "nearby_places"),
+                         # owner 21 Oct: hospitals and schools have their own stories now
+                         # (narrow question = its own story); nearby_places is the overview
+                         ("Is there EV charging?", "parking"), ("hospital nearby", "nearby_hospitals"),
+                         ("school nearby", "nearby_schools"), ("Is there a hospital nearby?", "nearby_hospitals"),
                          ("how many units", "unit_count"), ("ที่จอดรถมีกี่คัน", "parking")):
         assert stories.story_for_query(query, offered) == topic, query
     for query in ("แนะนำโครงการหน่อย", "parking fee", "ค่าส่วนกลาง", "pet policy", "", None):
@@ -410,9 +509,11 @@ def test_a_question_with_a_number_gets_its_motion():
             ("ที่ดินกี่ไร่", "site_area", "15,556"),
             ("ที่ดินที่นี่ขนาดเท่าไหร่ครับ", "site_area", "9 ไร่"),          # robot log 15 Oct
             ("แต่ละตึกมีกี่ห้อง", "units_by_building", "อาคาร E 184"),
-            ("ไปกรุงเทพกี่ชั่วโมง", "travel_bangkok", "104 นาที"),
+            # owner 22 Oct: "เข้า กทม. ขับรถประมาณ 1 ชั่วโมง 30 นาที" (was the report's 104 minutes)
+            ("ไปกรุงเทพกี่ชั่วโมง", "travel_bangkok", "1 ชั่วโมงครึ่ง"),
             ("How long to Bangkok?", "travel_bangkok", "ดอนเมือง"),
-            ("Junior World ใหญ่แค่ไหน", "kids_room_where", "12.825"),
+            # owner 21 Oct: one decimal at most, the area -- not 12.825 x 5.85
+            ("Junior World ใหญ่แค่ไหน", "kids_room_where", "75 ตารางเมตร"),
             ("Sky Pool ใหญ่แค่ไหน", "sky_pool_where", "143"),
             ("สะพานข้ามสระมีกี่แห่ง", "masterplan_lagoon", "สะพานข้ามสระ 3 แห่ง"),
             ("ห้องปั่นจักรยานมีจักรยานกี่คัน", "spinning_class_where", "3 คัน"),
@@ -496,11 +597,13 @@ def test_the_main_pools_depth_is_told_and_only_for_the_main_pool():
         for story in (data["stories"] if isinstance(data, dict) else data):
             for line in story.get("lines", []):
                 lines.setdefault(story["id"], []).append(line)
+    # owner 21 Oct: numbers are said with one decimal at most -- "1.3", once "1.30"
+    depth = re.compile(r"(?<![\d.])1\.30?(?![\d.])")
     for sid in ("masterplan_lagoon", "pools_all"):
-        assert any("1.30" in l["th"] and "1.30" in l["en"] for l in lines[sid]), sid
+        assert any(depth.search(l["th"]) and depth.search(l["en"]) for l in lines[sid]), sid
     for sid, story_lines in lines.items():
         for line in story_lines:
-            if "1.30" in line["th"] or "1.30" in line["en"]:
+            if depth.search(line["th"]) or depth.search(line["en"]):
                 assert re.search(r"สระหลัก|ลากูน|สระยาว", line["th"]), (sid, line["th"])
                 assert not re.search(r"Sky Pool|Aqua|Kid Pool|Private Pool", line["th"] + line["en"]), (sid, line)
 
@@ -867,6 +970,325 @@ def test_a_tapped_picture_speaks_the_talk_and_without_facts_still_answers(approv
     assert "ไม่ต้องเรียกเครื่องมือ" in english
 
 
+def test_a_tapped_picture_is_worked_out_off_the_event_loop(approved, monkeypatch):
+    """Review 26 Oct: a picture's text runs up to six report FAQ matches and
+    three passage searches (55 ms median, 185 ms worst over 163 picture taps
+    on the PC, several times that on the robot) -- on the session's event
+    loop, where her audio to the page waits behind it. It runs in a worker
+    thread, and the call's turn-log session still resolves there."""
+    import threading
+
+    from app import turnlog
+
+    seen = {}
+
+    def facts(story, label):
+        seen.update(thread=threading.get_ident(), call=turnlog.session_id.get())
+        return ["ข้อเท็จจริงจากรายงาน 123"]
+
+    monkeypatch.setattr(stories, "_more_facts", facts)
+    sess = _session()
+
+    async def tap(tap_id):
+        seen["loop"] = threading.get_ident()
+        await sess._quick_ask({"type": "quick_ask", "id": tap_id, "lang": "en"})
+
+    with _as("condo", face=True):
+        token = turnlog.session_id.set("tapping")
+        try:
+            result = stories.tool_result("fx_ground")
+            sess._note_screen("present_story", result, False)
+            asyncio.run(tap(result["story"]["zoom"][0]["tap"]))
+        finally:
+            turnlog.session_id.reset(token)
+    assert len(sess.provider.sent) == 1 and "ข้อมูล: ข้อเท็จจริงจากรายงาน 123" in sess.provider.sent[0]
+    assert seen["thread"] != seen["loop"]
+    assert seen["call"] == "tapping"
+
+
+def test_a_tap_is_not_answered_with_the_guests_last_sentence(approved, monkeypatch):
+    """Review 26 Oct: search_condo_info puts the report's FAQ answer to the
+    guest's own words first (robot 20 Oct: the model searched "Biogenesis"
+    for "Why is it called Biogenesis?"). Those words are the latest caption
+    after the latest activity_start, at most 30 s old -- and a tap marked no
+    activity, so a search the model made for a tapped topic within 30 s of
+    the guest's last sentence got that sentence's answer first. A tap is new
+    activity now, as speech is."""
+    from app import heard, project_report
+    from app.tools import slides as slides_mod
+
+    knowledge, _ = _search_tool()
+    guest = {"source_id": "project_report", "file": "19_faq.md",
+             "text": "ถาม: ฟิตเนสมีลู่วิ่งกี่เครื่อง\nตอบ: คำตอบของคำถามที่ลูกค้าพูด"}
+    passage = {"source_id": "project_report", "file": "12_facilities.md", "text": "ข้อความเรื่องห้องพิลาทิส"}
+    asked = []
+    monkeypatch.setattr(project_report, "faq", lambda text: asked.append(text) or [dict(guest)])
+    monkeypatch.setattr(knowledge, "_report_hits", lambda query: [dict(passage)])
+    monkeypatch.setattr(slides_mod, "search_disclosed_slide_text", lambda query: [])
+    sess = _session()
+    heard.bind_session(sess)
+    try:
+        heard.mark_activity(sess)
+        heard.record("ฟิตเนสมีลู่วิ่งกี่เครื่อง", sess, utterance_id="1")
+        # a spoken question: the FAQ answer to the guest's own words, first
+        out = knowledge.search_condo_info("ฟิตเนส")
+        assert asked == ["ฟิตเนสมีลู่วิ่งกี่เครื่อง"]
+        assert [r["text"] for r in out["results"]] == [guest["text"], passage["text"]]
+        # the guest taps a button on the story; the model searches for the tap
+        with _as("condo", face=True):
+            result = stories.tool_result("fx_ground")
+            sess._note_screen("present_story", result, False)
+            asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "story_fx_ground_back", "lang": "en"}))
+        assert len(sess.provider.sent) == 1
+        asked.clear()
+        out = knowledge.search_condo_info("ห้องพิลาทิส")
+        assert asked == [] and [r["text"] for r in out["results"]] == [passage["text"]]
+    finally:
+        heard.forget(sess)
+        heard.bind_session(None)
+
+
+def _more_tap(topic, k=0):
+    with _as("condo", face=True):
+        result = stories.tool_result(topic)
+        return stories.find_tap(topic, result["story"]["zoom"][k]["tap"])
+
+
+def test_a_tapped_place_is_told_what_it_is_like_whats_inside_and_why_the_name(approved, monkeypatch):
+    """Owner 21 Oct: "โดยเฉพาะ facility ที่ต้องอธิบายว่าทำไมชื่อนี้ แล้วด้านในมีอะไร
+    บ้าง". A picture named for a place asks the report's own FAQ the three
+    things -- what it is like, what is inside, why the name -- and an answer
+    that only gives its size (what the story just told) is not one of them."""
+    from app import project_report
+
+    answers = {
+        "Sky Pool เป็นยังไง เป็นแบบไหน":
+            "ถาม: Sky Pool เป็นยังไง\nตอบ: สระโค้งที่ยื่นออกจากอาคาร พื้นสระบางส่วนเป็นกระจกใส มองลงไปเห็นยิมข้างล่าง",
+        "ใน Sky Pool มีอะไรบ้าง ทำอะไรได้บ้าง":
+            "ถาม: Sky Pool ใหญ่เท่าไร มีกี่ที่นั่ง\nตอบ: กว้างประมาณ 27 เมตร ยื่นออกจากแนวอาคารประมาณ 9 เมตร",
+        "What is in Sky Pool, and what can you do there?":
+            "ถาม: What can you do at the Sky Pool?\nตอบ: Swim above the gym and rest on the loungers on the stone deck.",
+        "ทำไมชื่อ Sky Pool ชื่อนี้หมายถึงอะไร":
+            "ถาม: ทำไมชื่อ Sky Pool\nตอบ: Sky แปลว่าท้องฟ้า เป็นสระที่ยกขึ้นไปอยู่สูงเหนือโถงยิม ต่างจากสระลากูน",
+    }
+    asked = []
+
+    def faq(query):
+        asked.append(query)
+        return [{"source_id": "project_report", "text": answers[query]}] if query in answers else []
+
+    monkeypatch.setattr(project_report, "faq", faq)
+    monkeypatch.setattr(project_report, "search", lambda q: pytest.fail("three answers need no passage search"))
+    tap = _more_tap("fx_sky_pool")
+    assert tap["label_en"] == "SKY POOL"
+    facts = stories._more_facts(tap["story"], tap["label_en"])
+    assert asked[0] == "Sky Pool เป็นยังไง เป็นแบบไหน"             # the name as written, not shouted
+    assert len(facts) == 3 and "กระจกใส" in facts[0] and "loungers" in facts[1] and "ท้องฟ้า" in facts[2]
+    assert not any("27 เมตร" in f for f in facts)
+    text = stories.tap_text(tap, "th", "en")
+    assert text.startswith('[The guest tapped the picture "SKY POOL"') and "answer in English" in text
+    assert "ชื่อนี้มาจากอะไร" in text and "ความหมายตรงตัวของคำในชื่อ" in text
+    assert "ห้ามแต่งเองว่าโครงการตั้งชื่อนี้เพราะอะไร" in text
+    assert "ห้ามพูดซ้ำขนาด ตำแหน่ง หรือชั้นที่เรื่องเพิ่งเล่า" in text and "Sky Pool อยู่ที่ชั้น 3" in text
+    assert "ไม่ต้องเรียกเครื่องมือ" in text and "ห้ามพูดราคา" in text and "27 เมตร" not in text
+
+
+def test_a_tapped_place_never_takes_another_rooms_answer_or_a_note(approved, monkeypatch):
+    """What the report search hands back for a place that the report does not
+    describe by name, measured 21 Oct on the real catalog: another room's
+    answer, the list naming every room, a chunk cut from its heading (another
+    room's render), a citation, a question cut from its answer, the report's
+    list of what it lacks. None of them is this place's fact; with nothing
+    left she says what the picture is, without its size again."""
+    from app import project_report
+
+    monkeypatch.setattr(project_report, "faq", lambda q: [
+        {"text": "ถาม: Biogenesis เป็นยังไง\nตอบ: ฟิตเนสโถงกระจกโค้งสูงสองชั้นที่ยื่นออกไปทางลากูนค่ะ"}])
+    monkeypatch.setattr(project_report, "search", lambda q: [
+        {"text": "**Q:** What facilities does the project have? **A:** Biogenesis, Spinning Class, Sky Pool, "
+                 "Junior World and more, on three floors of building A."},
+        {"text": "ภาพ concept แสดงอะไร: ห้องโทนมืดทองแดงแบบห้องนักบิน เสากลางรองรับจอโค้งขนาดใหญ่"},
+        {"text": "ที่มา: บทที่ 11; Deck หน้า 42–47; แบบ DWG ชั้น 3 (Sky Pool)\n### 11.4 Sky Pool"},
+        {"text": "ตัวอย่างคำตอบ ถาม: Sky Pool ลึกเท่าไร ใช้ได้กี่โมง"},
+        {"text": "ข้อมูลที่ยังไม่มี: ความลึกน้ำและเวลาเปิด-ปิดของ Sky Pool ยังไม่มีในเอกสารใด"},
+    ])
+    tap = _more_tap("fx_sky_pool")
+    assert stories._more_facts(tap["story"], tap["label_en"]) == []
+    text = stories.tap_text(tap, "th", "en")
+    assert "ข้อมูล:" not in text and "ห้องนักบิน" not in text and "Biogenesis" not in text
+    assert "ถามว่าอยากดูส่วนไหนของโครงการต่อ" in text
+    # she cannot see the picture: with nothing to tell, she must not say what
+    # is in it ("Green area" became "the Stepped Garden by the pool", 21 Oct)
+    assert "ห้ามบอกว่าในภาพมีอะไร" in text and "ห้ามเดาว่าภาพนี้คือที่ไหน" in text
+    assert "เล่าสั้นๆ หนึ่งถึงสองประโยคว่าในภาพนี้คืออะไร" not in text
+    assert 'พูดถึงภาพได้แค่ชื่อของภาพ ("SKY POOL")' in text and "ห้ามพูดซ้ำสิ่งที่เพิ่งเล่า" in text
+
+
+def test_half_a_shared_name_is_not_the_place_and_a_room_the_story_never_names_is_not_its_fact(approved,
+                                                                                              monkeypatch):
+    """"Smart Home" is half of "Smart Air": the word only Smart Air has must be
+    there ("JOURNEY TO MARS" took the corridor's "Journey to the Future คืออะไร",
+    21 Oct). And for a picture with no name of its own (the ground floor plan),
+    an answer about a room the story never mentions is that room's ("Why is it
+    called the Hydrotherapy Capsule?" was the ground floor's "more")."""
+    from app import project_report
+
+    smart_home = {"text": "ถาม: Smart Home เป็นยังไง\nตอบ: แผงควบคุมติดผนังสั่งไฟและม่านในห้องได้จากที่เดียว"}
+    smart_air = {"text": "ถาม: Smart Air เป็นยังไง\nตอบ: เครื่องฟอกอากาศที่วัดฝุ่นและปรับอากาศในห้องให้เอง"}
+    monkeypatch.setattr(project_report, "faq",
+                        lambda q: [smart_air] if "Smart Air" in q and "ทำไม" in q else [smart_home])
+    monkeypatch.setattr(project_report, "search", lambda q: [])
+    with _as("condo", face=True):
+        story = stories.tool_result("fx_smart_home")
+    air = stories.available()["fx_smart_home"]
+    assert story["ok"]
+    assert stories._more_facts(air, "Smart Air") == [
+        "ถาม: Smart Air เป็นยังไง ตอบ: เครื่องฟอกอากาศที่วัดฝุ่นและปรับอากาศในห้องให้เอง"]
+    # the ground floor plan: no label, the story's question is the search
+    monkeypatch.setattr(project_report, "search", lambda q: [
+        {"text": "ถาม: ทำไมชื่อ Sky Pool\nตอบ: Sky แปลว่าท้องฟ้า เป็นสระที่ยกขึ้นไปอยู่สูงเหนือโถงยิม"},
+        {"text": "ถาม: ชั้น G มีอะไรบ้าง\nตอบ: นอกจากห้องออกกำลังกาย มีล็อบบี้และทางเดิน Journey to the Future ค่ะ"},
+    ])
+    ground = stories.available()["fx_ground"]
+    assert stories.zoom_targets(ground)[0]["label_en"] == ""
+    facts = stories._more_facts(ground, "")
+    assert facts == ["ถาม: ชั้น G มีอะไรบ้าง ตอบ: นอกจากห้องออกกำลังกาย มีล็อบบี้และทางเดิน Journey to the Future ค่ะ"]
+    # a name inside another place's name is not that place (the view "Garden"
+    # took "What is the Stepped Garden like?", live 21 Oct): "Pool" is not the Sky Pool
+    monkeypatch.setattr(project_report, "faq", lambda q: [
+        {"text": "ถาม: Sky Pool เป็นยังไง\nตอบ: สระโค้งยื่นออกจากอาคาร มองลงไปเห็นยิมข้างล่างได้ค่ะ"}])
+    monkeypatch.setattr(project_report, "search", lambda q: [])
+    assert stories._more_facts(ground, "Pool") == []
+
+
+def test_a_picture_with_no_label_takes_the_reports_answer_to_the_storys_own_question(approved, monkeypatch):
+    """The building model, a floor plan, a room model: the report's own answer to
+    one of the story's questions, and only that -- searched by the question, the
+    building model got the high-speed rail ("ตึกสูง" ~ "ความเร็วสูง", 21 Oct)."""
+    from app import project_report
+
+    asked = []
+
+    def faq(query):
+        asked.append(query)
+        if query == "ชั้น G มีอะไรบ้าง":
+            return [{"text": "ถาม: ชั้น G มีอะไรบ้าง\nตอบ: นอกจากห้องออกกำลังกาย มีล็อบบี้และทางเดินไปยังห้องต่างๆ ค่ะ"}]
+        return []
+
+    monkeypatch.setattr(project_report, "faq", faq)
+    monkeypatch.setattr(project_report, "search", lambda q: pytest.fail("the story's own answer is enough"))
+    ground = stories.available()["fx_ground"]
+    assert stories._more_facts(ground, "") == [
+        "ถาม: ชั้น G มีอะไรบ้าง ตอบ: นอกจากห้องออกกำลังกาย มีล็อบบี้และทางเดินไปยังห้องต่างๆ ค่ะ"]
+    assert asked == ["ชั้น G มีอะไรบ้าง"]
+
+
+def test_a_fact_about_another_room_type_or_floor_is_not_this_pictures(approved, monkeypatch):
+    """Every unit story's "Interior mood" picture took the 1-Bedroom "34 sq m"
+    FAQ (live 21 Oct: on the 2-Bedroom she said "I don't have specific details
+    about that"); the ground floor plan took the third floor's list. A fact
+    naming a unit type or a floor the story never names -- and not the story's
+    own -- is not this picture's; one naming the story's own type stays."""
+    from app import project_report
+
+    one_bedroom = {"text": 'ถาม: ที่ทีมขายพูดถึง "ห้อง 34 ตร.ม." คือห้องแบบไหน\nตอบ: คือแบบ 1-Bedroom ซึ่งขนาดที่แสดง'
+                           "ส่วนใหญ่คือ 34 ตร.ม. เป็นแบบห้องเดียวที่ออกแบบภายในไฟนอลแล้ว"}
+    kitchen = {"text": "ถาม: ครัวเป็นแบบเปิดหรือปิด\nตอบ: ครัวเปิดเชื่อมกับพื้นที่นั่งเล่น Studio มีเตา Hob ส่วน "
+                       "1-Bedroom และ 2-Bedroom มีเตาสองหัวพร้อมเครื่องดูดควัน"}
+    third = {"text": "ถาม: ชั้น 3 มีอะไรบ้าง\nตอบ: ชั้น 3 ของอาคาร A มี Social Lounge, Co-working Lounge และ "
+                     "Common Sphere ค่ะ"}
+    # the studio's room model (no label): the report's answers to its questions
+    monkeypatch.setattr(project_report, "faq", lambda q: [one_bedroom, kitchen])
+    monkeypatch.setattr(project_report, "search", lambda q: [])
+    studio = stories.available()["fx_studio"]
+    assert stories.zoom_targets(studio)[0]["label_en"] == ""
+    facts = stories._more_facts(studio, "")
+    assert len(facts) == 1 and "เตา Hob" in facts[0]
+    # the ground floor plan: the third floor's list is not its fact
+    monkeypatch.setattr(project_report, "faq", lambda q: [third])
+    ground = stories.available()["fx_ground"]
+    assert not any("ชั้น 3" in f for f in stories._more_facts(ground, ""))
+    assert stories._kind_values("Pilates Studio และ Cycling Studio")["unit"] == set()
+
+
+def test_a_caption_takes_only_a_passage_on_its_storys_topic(approved, monkeypatch):
+    """A caption names no place, so its story's own questions are the topic: a
+    passage must share a word with them that few stories' questions use. Live
+    21 Oct, "Interior mood · design style" found the co-working lounge's
+    target-group table by the word "mood"."""
+    from app import project_report
+
+    dtv = {"text": "หัวข้อ สิ่งที่ผู้นำเสนอกล่าว กลุ่มเป้าหมาย ฟรีแลนซ์ต่างชาติที่เข้าไทยด้วยวีซ่า DTV mood board "
+                   "มุมสำหรับวิดีโอคอลและประชุมออนไลน์"}
+    studio_fact = {"text": "ถาม: ห้องสตูดิโอเป็นยังไง\nตอบ: สตูดิโอเป็นห้องโล่งไม่มีผนังกั้นห้องนอน ครัวอยู่ติดทางเข้า"}
+    monkeypatch.setattr(project_report, "faq", lambda q: [])
+    monkeypatch.setattr(project_report, "search", lambda q: [dtv])
+    studio = stories.available()["fx_studio"]
+    assert stories._more_facts(studio, "Interior mood · show-unit renders") == []
+    # on topic by its word "Studio" -- but it opens on another place the story
+    # never names: the Pilates Studio was the Studio unit's mood fact (21 Oct)
+    pilates = {"text": "ตอบ: มี Pilates Studio ที่ชั้น G อาคาร A ห้องมีขนาด 6.75 × 5.00 เมตร ตามภาพไฟนอลเป็นสตูดิโอ"
+                       "โทนส้มพีช"}
+    monkeypatch.setattr(project_report, "search", lambda q: [dtv, pilates, studio_fact])
+    assert stories._more_facts(studio, "Interior mood · show-unit renders") == [
+        "ถาม: ห้องสตูดิโอเป็นยังไง ตอบ: สตูดิโอเป็นห้องโล่งไม่มีผนังกั้นห้องนอน ครัวอยู่ติดทางเข้า"]
+
+
+def test_a_portrait_or_a_caption_gets_the_plain_ask_not_the_meaning_of_a_name(approved, monkeypatch):
+    """The place ask (what is inside, why the name) only when a fact's question
+    names the place: an executive's portrait whose fact is "ใครเป็นผู้บริหาร"
+    would otherwise be asked what the name Miki Haim means."""
+    monkeypatch.setattr(stories, "_more_facts", lambda story, label: [
+        "ถาม: ใครเป็นผู้บริหาร Empire Group ตอบ: คุณ Miki Haim เป็น CEO ของกลุ่มบริษัทค่ะ"])
+    tap = dict(_more_tap("fx_sky_pool"), label_en="Miki Haim")
+    text = stories.tap_text(tap, "th", "en")
+    assert "เล่ารายละเอียดเพิ่มเติมของสิ่งในภาพนี้" in text and "ชื่อนี้มาจากอะไร" not in text
+    assert "ความหมายตรงตัวของคำในชื่อ" not in text
+
+
+def test_the_draft_facility_chapter_answers_the_day_it_is_pinned_and_not_before(approved, tmp_path, monkeypatch):
+    """The facility-description chapter (draft 21 Oct) goes through the report's
+    own gate: unpinned -- here as on the owner's PC, "_draft_..." beside the
+    approved chapters -- it answers nothing; the day the owner approves and
+    pins it, the tapped picture's facts come from it with no code change."""
+    import hashlib
+
+    from app import project_report
+
+    folder = tmp_path / "report"
+    folder.mkdir()
+    (folder / "19_faq.md").write_text(
+        "**ถาม:** Sky Pool ใหญ่เท่าไร\n**ตอบ:** กว้างประมาณ 27 เมตร ผิวน้ำประมาณ 143 ตารางเมตร ตามแบบ\n",
+        encoding="utf-8")
+    chapter = ("## Sky Pool\n\n**ถาม:** Sky Pool เป็นยังไง เป็นแบบไหน\n**ตอบ:** สระโค้งที่ยื่นออกจากอาคาร "
+               "พื้นสระบางส่วนเป็นกระจกใส มองลงไปเห็นยิมข้างล่างได้\n\n"
+               "**ถาม:** ทำไมชื่อ Sky Pool\n**ตอบ:** Sky แปลว่าท้องฟ้า "
+               "เป็นสระที่อยู่สูงเหนือโถงยิม ต่างจากสระลากูนที่อยู่ระดับพื้นดิน\n")
+    (folder / "_draft_21_facility_descriptions.md").write_text(chapter, encoding="utf-8")
+    path = tmp_path / "approval.json"
+
+    def pin(*names):
+        path.write_text(json.dumps({
+            "source_id": "project_report", "project_id": "embassy_world", "approval_status": "approved",
+            "approved_by": "pete", "approved_at": "2026-10-12T09:00:00+07:00",
+            "effective_at": "2026-10-12T09:00:00+07:00", "disclosure_scope": "customer",
+            "content_state": "completed", "folder": str(folder), "deny_terms": [],
+            "files": {n: hashlib.sha256((folder / n).read_bytes()).hexdigest() for n in names}},
+            ensure_ascii=False), encoding="utf-8")
+        project_report.reset()
+
+    monkeypatch.setattr(project_report, "manifest_path", lambda project_id=None: path)
+    tap = _more_tap("fx_sky_pool")
+    pin("19_faq.md")
+    assert stories._more_facts(tap["story"], tap["label_en"]) == []    # only its size: not "more"
+    (folder / "21_facility_descriptions.md").write_text(chapter, encoding="utf-8")
+    pin("19_faq.md", "21_facility_descriptions.md")
+    facts = stories._more_facts(tap["story"], tap["label_en"])
+    assert any("กระจกใส" in f for f in facts) and any("ท้องฟ้า" in f for f in facts)
+    assert not any("27 เมตร" in f for f in facts)
+    project_report.reset()
+
+
 def test_the_page_opens_the_picture_it_can_see_and_keeps_the_screen_for_more():
     """The page side, read from source (a DOM test runs in record_stories
     --tap-pictures, a real click on every visible picture): the picture is the
@@ -1092,27 +1514,63 @@ def test_the_engine_stays_light_on_the_robot():
     for frames in re.findall(r"@keyframes[^{]+\{((?:[^{}]*\{[^}]*\})+)", body):
         for prop in re.findall(r"([a-z-]+)\s*:", frames):
             assert prop in ("transform", "opacity"), prop
+    # No blurred shadow at all, even a still one: it widens every layer that
+    # moves (21 Oct: p95 33 -> 17 ms when the room-type cards' shadows came
+    # off). Review 26 Oct: blurred text-shadows came back on the map labels,
+    # inside the sliding map, past a check that only banned "blur(". A shadow
+    # is offset-x offset-y [blur [spread]] colour; its third length is the blur.
+    colour = r"(?:rgba?|hsla?)\((?:[^()]|\([^()]*\))*\)|#[0-9a-fA-F]{3,8}\b"
+    number = r"-?(?:\d+\.?\d*|\.\d+)"
+
+    def blurred(value):
+        if value.strip() == "none":
+            return False
+        for shadow in re.split(r",(?![^(]*\))", value):
+            bare = re.sub(colour, " ", shadow)
+            if "(" in bare:                              # a var()/calc() blur cannot be judged
+                return True
+            lengths = [t for t in bare.split() if re.fullmatch(number + r"[a-z%]*", t)]
+            if len(lengths) >= 3 and float(re.match(number, lengths[2]).group()) != 0:
+                return True
+        return False
+
+    assert blurred("0 0 .5vw #161b47, 0 0 1vw #161b47") and blurred("0 1px 2px rgba(0, 0, 0, .4)")
+    assert blurred(".2vw 0 #10143a, 0 0 .6vw rgb(var(--es-teal))") and blurred("0 0 var(--b) #000")
+    assert not blurred(".2vw 0 #161b47, -.2vw 0 #161b47") and not blurred("none")
+    assert not blurred("0 0 0 2px rgba(255, 255, 255, .3)") and not blurred("inset 0 -.3vw 0 #000")
+    for prop, value in re.findall(r"(?<![\w-])(box-shadow|text-shadow)\s*:\s*([^;}]+)", body):
+        assert not blurred(value), (prop, value)
     # the script never animates anything but transform/opacity either
-    for banned in (".style.transition", ".style.animation", "boxShadow", ".style.filter", "backdropFilter"):
+    for banned in (".style.transition", ".style.animation", "boxShadow", ".style.filter", "backdropFilter",
+                   "textShadow", "box-shadow", "text-shadow"):
         assert banned not in js, banned
     assert "@keyframes" not in js
     # no ring behind or under Emma: rings only live on a picture (.es-spot in a box)
     assert ".mascot-wrap" not in body.replace("html.app-shell body.emma-story .mascot-wrap { width:", "")
 
 
+# The harness sleeps through every template's own timers (16.5 s for eleven
+# payloads, 21 Oct); with journey's rings view it ran past the suite's 20 s
+# cap. Its node call already allows 60 s.
+@pytest.mark.timeout(60)
 def test_the_clock_and_every_template_in_node(approved, tmp_path):
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is required to run the story clock and templates -- they are NOT being checked")
+    from scripts.story_fixture import VIEW_STORY
+
     catalog = _catalog(approved)
     payloads = [stories.page_payload(s, catalog) for s in stories.available().values()]
-    assert sorted(p["template"] for p in payloads) == sorted(stories.TEMPLATES)
+    # every template, and every template's other view (journey's rings), drawn
+    assert set(p["template"] for p in payloads) == set(stories.TEMPLATES)
+    views = {(p["template"], p["params"].get("view")) for p in payloads if p["params"].get("view")}
+    assert views == set(VIEW_STORY)
     path = tmp_path / "payloads.json"
     path.write_text(json.dumps(payloads, ensure_ascii=False), encoding="utf-8")
     result = subprocess.run([node, "tests/client_story_clock.cjs", str(path)], cwd=ROOT,
                             capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "%d templates PASS" % len(stories.TEMPLATES) in result.stdout
+    assert "%d templates PASS" % len(payloads) in result.stdout
 
 
 def test_the_harness_timeline_is_one_answer_in_order(approved):
@@ -1188,7 +1646,8 @@ def test_every_icon_a_design_names_is_drawn_by_the_engine():
     block = engine[engine.index("var ICONS = {"):]
     block = block[:block.index("};")]
     drawn = set(re.findall(r"^\s*([a-z_]+):\s*'", block, re.M))
-    assert {"home", "hospital", "school"} <= drawn
+    # food / sight: the nearby restaurants and attractions stories (21 Oct)
+    assert {"home", "hospital", "school", "food", "sight"} <= drawn
     named = set()
 
     def walk(value):
@@ -1206,6 +1665,52 @@ def test_every_icon_a_design_names_is_drawn_by_the_engine():
         walk(json.loads(path.read_text(encoding="utf-8")))
     assert named, "no design names an icon -- the walk found nothing to check"
     assert named <= drawn, sorted(named - drawn)
+    # the rings view draws its own two: by car (every time) and on foot
+    assert {"shop", "car", "walk"} <= drawn
+
+
+def _design_stories():
+    for path in sorted((stories.folder() / "design").glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and isinstance(data.get("stories"), list):
+            data = data["stories"]
+        yield from (data if isinstance(data, list) else [data])
+
+
+def test_the_nearby_rings_say_drive_time_and_never_a_direction():
+    """Owner 21 Oct: the nearby stories (7-Eleven, hospitals, schools,
+    restaurants, places to visit) had no motion that read as "what is around
+    us". They are drawn now as rings of drive time round the project's pin
+    (journey, `view: "rings"`). The approved figures are drive times with no
+    bearing, so a direction must never be implied: the engine spreads the
+    places evenly and draws no compass there, and every such story says on
+    screen that it is not a map. A place's minutes (`bar`) put it on the
+    scale; a walk's own line exists and comes no earlier than its place."""
+    engine = ENGINE.read_text(encoding="utf-8")
+    rings = engine[engine.index("  function aroundRings(S, p) {"):engine.index("  function discBlocks(")]
+    assert "'es-nb-n'" not in rings and "'N'" not in rings, "a compass on the drive-time rings"
+    assert "if (p.view === 'rings') return aroundRings(S, p);" in engine
+    told = {}
+    for story in _design_stories():
+        params = story.get("params") or {}
+        if params.get("view") != "rings":
+            continue
+        sid = story["id"]
+        told[sid] = story
+        assert story["template"] == "journey", sid
+        assert "not a map" in params.get("footnote_en", ""), sid
+        lines = len(story["lines"])
+        for row in params["rows"]:
+            assert isinstance(row.get("bar"), list) and row["bar"], (sid, row["label_en"])
+            assert 0 <= row["bar"][0] <= params["bar_max"], (sid, row["label_en"])
+            assert 0 <= row["line"] < lines, (sid, row["label_en"])
+            walk = row.get("walk")
+            if walk is not None:
+                assert walk.get("value_en"), (sid, row["label_en"])
+                if "line" in walk:
+                    assert row["line"] <= walk["line"] < lines, (sid, row["label_en"])
+    assert {"nearby_places", "nearby_7eleven", "nearby_hospitals", "nearby_schools", "nearby_restaurants",
+            "nearby_attractions"} <= set(told), sorted(told)
 
 
 def test_a_story_report_is_logged_as_numbers_and_the_id_only(monkeypatch):

@@ -1,0 +1,1569 @@
+{
+ "_comment": "English for the Thai questions of the approved project report's FAQ (19_faq.md). Each English question is tied to its Thai question by exact text and can only bring back THAT question's approved answer -- no answer text lives here. A Thai question edited in the report no longer matches and its English drops out (logged). Robot 20 Oct: English questions could not match the Thai FAQ by words (app/project_report.py).",
+ "source_id": "project_report",
+ "chapter": "19_faq.md",
+ "aliases": [
+  {
+   "th": "Embassy World คือโครงการอะไร อยู่ที่ไหน",
+   "en": [
+    "What is Embassy World, and where is it?"
+   ]
+  },
+  {
+   "th": "โครงการมีกี่อาคาร กี่ชั้น และกี่ยูนิต",
+   "en": [
+    "How many buildings, floors and units does the project have?"
+   ]
+  },
+  {
+   "th": "แนวคิดของโครงการคืออะไร",
+   "en": [
+    "What is the concept of the project?"
+   ]
+  },
+  {
+   "th": "จุดเด่นหลักของโครงการมีอะไรบ้าง",
+   "en": [
+    "What are the main highlights of the project?"
+   ]
+  },
+  {
+   "th": "โครงการนี้ต่างจากคอนโดทั่วไปอย่างไร",
+   "en": [
+    "How is this project different from other condos?"
+   ]
+  },
+  {
+   "th": "โครงการเหมาะกับใคร",
+   "en": [
+    "Who is the project suitable for?"
+   ]
+  },
+  {
+   "th": "โครงการใหญ่แค่ไหน",
+   "en": [
+    "How big is the project?"
+   ]
+  },
+  {
+   "th": "ภาพในเด็คและโบรชัวร์เหมือนของจริงไหม",
+   "en": [
+    "Do the pictures in the deck and brochure look like the real thing?"
+   ]
+  },
+  {
+   "th": "โครงการมีชื่ออื่นที่อาจเห็นในเอกสารไหม",
+   "en": [
+    "Does the project have other names I might see in documents?"
+   ]
+  },
+  {
+   "th": "โครงการมี facility ทั้งหมดกี่รายการ แบ่งอย่างไร",
+   "en": [
+    "How many facilities does the project have, and how are they grouped?"
+   ]
+  },
+  {
+   "th": "ข้อมูลที่แชทบอทใช้ล่าสุดวันไหน",
+   "en": [
+    "When was the chatbot's information last updated?"
+   ]
+  },
+  {
+   "th": "ใครเป็นผู้พัฒนาโครงการ Embassy World",
+   "en": [
+    "Who is the developer of Embassy World?"
+   ]
+  },
+  {
+   "th": "Empire Group มีประสบการณ์และผลงานแค่ไหน",
+   "en": [
+    "How much experience and how many past projects does Empire Group have?"
+   ]
+  },
+  {
+   "th": "ทีมขายพูดว่ามี 14 โครงการ แต่เด็คเขียน 16 โครงการ ใช้ตัวเลขไหน",
+   "en": [
+    "The sales team said 14 projects but the deck says 16. Which number is right?"
+   ]
+  },
+  {
+   "th": "Embassy World ได้รับรางวัลอะไรบ้าง",
+   "en": [
+    "What awards has Embassy World won?"
+   ]
+  },
+  {
+   "th": "Empire Tower คืออะไร",
+   "en": [
+    "What is Empire Tower?",
+    "Tell me about Empire Tower.",
+    "How many units does Empire Tower have?"
+   ]
+  },
+  {
+   "th": "จริงไหมที่ผู้พัฒนาขายหมดทุกโครงการและส่งมอบก่อนกำหนดเสมอ",
+   "en": [
+    "Is it true that the developer sold out every project and always delivers early?"
+   ]
+  },
+  {
+   "th": "บริษัทผู้ขายคือใคร ที่อยู่อะไร",
+   "en": [
+    "Which company is the seller, and what is its address?"
+   ]
+  },
+  {
+   "th": "ที่อยู่ 13/84 หมู่ 12 คือที่ตั้งโครงการหรือสำนักงานขายหรือไม่",
+   "en": [
+    "Is the address 13/84 Moo 12 the project site or the sales office?"
+   ]
+  },
+  {
+   "th": "ใครเป็นผู้ออกแบบโครงการ",
+   "en": [
+    "Who designed the project? Who is the architect?"
+   ]
+  },
+  {
+   "th": "Embassy One และ Embassy Life คืออะไร เกี่ยวกับ Embassy World อย่างไร",
+   "en": [
+    "What are Embassy One and Embassy Life, and how are they related to Embassy World?"
+   ]
+  },
+  {
+   "th": "Empire Group เป็นบริษัทเดียวกับ The Empire Dynasty, The Embassy Development และ The EMBS Life หรือไม่",
+   "en": [
+    "Is Empire Group the same company as The Empire Dynasty, The Embassy Development and The EMBS Life?"
+   ]
+  },
+  {
+   "th": "Empire Group เป็นบริษัทมหาชนหรือบริษัทครอบครัว",
+   "en": [
+    "Is Empire Group a public company or a family company?"
+   ]
+  },
+  {
+   "th": "ขอดูรายชื่อโครงการเดิม ปีก่อตั้ง หรือหลักฐานรางวัลได้ไหม",
+   "en": [
+    "Can I see the list of past projects, the founding year or proof of the awards?"
+   ]
+  },
+  {
+   "th": "ใครเป็นผู้บริหาร Empire Group",
+   "en": [
+    "Who are the executives of Empire Group?",
+    "Who is the CEO of Empire Group?"
+   ]
+  },
+  {
+   "th": "โครงการตั้งอยู่ตรงไหน",
+   "en": [
+    "Where is the project located?"
+   ]
+  },
+  {
+   "th": "ทางเข้าโครงการอยู่ด้านไหน",
+   "en": [
+    "Which side is the project entrance on?"
+   ]
+  },
+  {
+   "th": "ไปถนนสุขุมวิทใช้เวลานานไหม",
+   "en": [
+    "How long does it take to get to Sukhumvit Road?"
+   ]
+  },
+  {
+   "th": "ใกล้ห้างสรรพสินค้า ซูเปอร์มาร์เก็ต และร้านสะดวกซื้อแค่ไหน",
+   "en": [
+    "How close are shopping malls, supermarkets and convenience stores?",
+    "Where is the nearest 7-Eleven?"
+   ]
+  },
+  {
+   "th": "ใกล้โรงพยาบาลไหม",
+   "en": [
+    "Is there a hospital nearby?"
+   ]
+  },
+  {
+   "th": "ไปสนามบินสุวรรณภูมิและดอนเมืองใช้เวลาเท่าไร",
+   "en": [
+    "How long does it take to get to Suvarnabhumi and Don Mueang airports?"
+   ]
+  },
+  {
+   "th": "ย่านจอมเทียนเป็นอย่างไร เหมาะกับการอยู่อาศัยแบบไหน",
+   "en": [
+    "What is the Jomtien area like, and what kind of living is it good for?"
+   ]
+  },
+  {
+   "th": "จอมเทียนจะเป็นศูนย์กลางเมืองใหม่ ราคาจะขึ้นแน่หรือไม่",
+   "en": [
+    "Will Jomtien become the new city centre, and will prices definitely go up?"
+   ]
+  },
+  {
+   "th": "ย่านนี้มีคอนโดเยอะไหม มีความเสี่ยงอุปทานล้นหรือไม่",
+   "en": [
+    "Are there a lot of condos in this area? Is there a risk of oversupply?"
+   ]
+  },
+  {
+   "th": "ถนนจอมเทียนสายสองที่ใช้เข้าโครงการมีงานก่อสร้างไหม",
+   "en": [
+    "Is there construction on Jomtien Second Road, the road into the project?"
+   ]
+  },
+  {
+   "th": "โครงการติดสวนสาธารณะจริงไหม สวนชื่ออะไร",
+   "en": [
+    "Is the project really next to a public park? What is the park called?"
+   ]
+  },
+  {
+   "th": "เดินเข้าสวนจากโครงการได้โดยตรงไหม",
+   "en": [
+    "Can I walk into the park directly from the project?"
+   ]
+  },
+  {
+   "th": "ห้องไหนเป็นห้องฝั่งสวนสาธารณะ",
+   "en": [
+    "Which units are on the public park side?"
+   ]
+  },
+  {
+   "th": "โครงการติดทะเลหรือไม่",
+   "en": [
+    "Is the project on the beach?",
+    "Is it beachfront?"
+   ]
+  },
+  {
+   "th": "วิวสวนหรือวิวรอบโครงการจะเปลี่ยนในอนาคตไหม",
+   "en": [
+    "Will the garden view or the view around the project change in the future?"
+   ]
+  },
+  {
+   "th": "หาดจอมเทียนเป็นอย่างไร ปรับปรุงหรือยัง",
+   "en": [
+    "What is Jomtien Beach like? Has it been renovated?"
+   ]
+  },
+  {
+   "th": "ที่ว่า \"Lumpini Park of Pattaya\" หมายความว่าอะไร",
+   "en": [
+    "What does \"Lumpini Park of Pattaya\" mean?"
+   ]
+  },
+  {
+   "th": "ที่ดินโครงการกี่ไร่",
+   "en": [
+    "How many rai is the project land?"
+   ]
+  },
+  {
+   "th": "ที่ดินรูปร่างเป็นอย่างไร",
+   "en": [
+    "What shape is the land?"
+   ]
+  },
+  {
+   "th": "อาคารทั้ง 6 หลังวางอย่างไร",
+   "en": [
+    "How are the six buildings laid out?"
+   ]
+  },
+  {
+   "th": "อาคาร A ต่างจากอาคารอื่นอย่างไร",
+   "en": [
+    "How is Building A different from the other buildings?"
+   ]
+  },
+  {
+   "th": "อาคารแต่ละหลังมีกี่ห้อง ห้องต่อชั้นกี่ห้อง",
+   "en": [
+    "How many units does each building have, and how many units per floor?"
+   ]
+  },
+  {
+   "th": "อาคารสูงกี่เมตร",
+   "en": [
+    "How tall are the buildings in metres?"
+   ]
+  },
+  {
+   "th": "แต่ละชั้นสูงกี่เมตร เพดานสูงเท่าไร",
+   "en": [
+    "How high is each floor, and how high are the ceilings?"
+   ]
+  },
+  {
+   "th": "อาคารเป็นอาคารสูงตามกฎหมายหรือไม่",
+   "en": [
+    "Are the buildings high-rise buildings under the law?"
+   ]
+  },
+  {
+   "th": "พื้นที่อาคารและพื้นที่ขายทั้งหมดเท่าไร",
+   "en": [
+    "What is the total building area and the total sellable area?"
+   ]
+  },
+  {
+   "th": "ชั้นใต้ดินลึกแค่ไหน",
+   "en": [
+    "How deep is the basement?"
+   ]
+  },
+  {
+   "th": "ลิฟต์มีกี่ตัวต่ออาคาร",
+   "en": [
+    "How many lifts does each building have?",
+    "How many elevators are there?"
+   ]
+  },
+  {
+   "th": "พื้นที่สีเขียวของโครงการเท่าไร",
+   "en": [
+    "How much green area does the project have?"
+   ]
+  },
+  {
+   "th": "ทิศของอาคาร แดด และลมเป็นอย่างไร",
+   "en": [
+    "Which way do the buildings face, and what about the sun and the wind?"
+   ]
+  },
+  {
+   "th": "โครงการมีห้องกี่แบบ อย่างละกี่ห้อง ขนาดเท่าไร",
+   "en": [
+    "How many room types are there, how many of each, and how big are they?"
+   ]
+  },
+  {
+   "th": "Studio ขนาดเท่าไร มีกี่ห้อง อยู่อาคารไหน",
+   "en": [
+    "How big is the studio, how many are there, and which buildings are they in?"
+   ]
+  },
+  {
+   "th": "1-Bedroom ขนาดเท่าไร มีกี่ห้อง",
+   "en": [
+    "How big is the 1-bedroom, and how many are there?",
+    "How big is a one bedroom unit?"
+   ]
+  },
+  {
+   "th": "2-Bedroom ขนาดเท่าไร มีกี่ห้อง อยู่อาคารไหน",
+   "en": [
+    "How big is the 2-bedroom, how many are there, and which buildings are they in?",
+    "How big is a two bedroom unit?"
+   ]
+  },
+  {
+   "th": "ร้านค้าในโครงการมีกี่ยูนิต ขนาดเท่าไร ยังเหลือไหม",
+   "en": [
+    "How many shops are there in the project, how big are they, and are any left?"
+   ]
+  },
+  {
+   "th": "ห้องไหนเล็กที่สุดและใหญ่ที่สุดในโครงการ",
+   "en": [
+    "Which are the smallest and the largest units in the project?"
+   ]
+  },
+  {
+   "th": "ที่ทีมขายพูดถึง \"ห้อง 34 ตร.ม.\" คือห้องแบบไหน",
+   "en": [
+    "What is the \"34 sq m room\" the sales team talks about?"
+   ]
+  },
+  {
+   "th": "พื้นที่ห้องรวมระเบียงหรือไม่",
+   "en": [
+    "Does the unit area include the balcony?"
+   ]
+  },
+  {
+   "th": "มีห้องสำหรับผู้พิการหรือห้องที่มีสวนหรือเทอร์เรซส่วนตัวไหม",
+   "en": [
+    "Are there units for disabled people, or units with a private garden or terrace?"
+   ]
+  },
+  {
+   "th": "เลขห้อง เช่น B-513 อ่านอย่างไร",
+   "en": [
+    "How do I read a unit number such as B-513?"
+   ]
+  },
+  {
+   "th": "อาคารไหนมี Studio หรือ 2-Bedroom มากที่สุด",
+   "en": [
+    "Which building has the most studios or 2-bedroom units?"
+   ]
+  },
+  {
+   "th": "ห้องแต่ละประเภทมีกี่ห้องต่อชั้น",
+   "en": [
+    "How many units of each type are there per floor?"
+   ]
+  },
+  {
+   "th": "ชั้น 2 และ 3 ของอาคาร A มีห้องพักไหม ทีมขายบอกว่าเป็น facility",
+   "en": [
+    "Are there residential units on floors 2 and 3 of Building A? The sales team said those are facilities.",
+    "What is on the second floor? Are there facilities on the second floor?"
+   ]
+  },
+  {
+   "th": "ห้องมีเฟอร์นิเจอร์ให้ไหม ได้อะไรบ้าง",
+   "en": [
+    "Do the units come with furniture? What is included?"
+   ]
+  },
+  {
+   "th": "Studio ได้เฟอร์นิเจอร์ 20 รายการอะไรบ้าง",
+   "en": [
+    "What are the 20 furniture items in the studio?"
+   ]
+  },
+  {
+   "th": "1-Bedroom ได้เฟอร์นิเจอร์ 25 รายการอะไรบ้าง",
+   "en": [
+    "What are the 25 furniture items in the 1-bedroom?"
+   ]
+  },
+  {
+   "th": "2-Bedroom ได้เฟอร์นิเจอร์ 34 รายการอะไรบ้าง",
+   "en": [
+    "What are the 34 furniture items in the 2-bedroom?"
+   ]
+  },
+  {
+   "th": "เตียงใน Studio และ 1-Bedroom ขนาดเท่าไร",
+   "en": [
+    "What size are the beds in the studio and the 1-bedroom?"
+   ]
+  },
+  {
+   "th": "เตียงใน 2-Bedroom ขนาดเท่าไร",
+   "en": [
+    "What size are the beds in the 2-bedroom?"
+   ]
+  },
+  {
+   "th": "ทีวีขนาดเท่าไร มีกี่เครื่อง",
+   "en": [
+    "What size is the TV, and how many TVs are there?"
+   ]
+  },
+  {
+   "th": "ห้องได้เครื่องซักผ้า ไมโครเวฟ ผ้าม่าน หรือโคมไฟไหม",
+   "en": [
+    "Does the unit come with a washing machine, microwave, curtains or lamps?"
+   ]
+  },
+  {
+   "th": "เฟอร์นิเจอร์ติดตั้งเมื่อไร",
+   "en": [
+    "When is the furniture installed?"
+   ]
+  },
+  {
+   "th": "ห้องมีแอร์กี่เครื่อง ห้องน้ำกี่ห้อง มีอ่างอาบน้ำไหม",
+   "en": [
+    "How many air conditioners and bathrooms does a unit have? Is there a bathtub?"
+   ]
+  },
+  {
+   "th": "ครัวเป็นแบบเปิดหรือปิด ทำอาหารไทยได้ไหม",
+   "en": [
+    "Is the kitchen open or closed? Can I cook Thai food?"
+   ]
+  },
+  {
+   "th": "หน้าต่างและประตูบานเลื่อนออกระเบียงกว้างเท่าไร",
+   "en": [
+    "How wide are the windows and the sliding door to the balcony?"
+   ]
+  },
+  {
+   "th": "ระเบียงใหญ่แค่ไหน",
+   "en": [
+    "How big is the balcony?"
+   ]
+  },
+  {
+   "th": "เพดานห้องสูงเท่าไร",
+   "en": [
+    "How high is the ceiling in the room?",
+    "What is the ceiling height of the units?",
+    "How high is the ceiling of a unit, from floor to ceiling?"
+   ]
+  },
+  {
+   "th": "ห้องเงียบไหม กันเสียงและกันร้อนได้แค่ไหน",
+   "en": [
+    "Is the room quiet? How well does it keep out noise and heat?"
+   ]
+  },
+  {
+   "th": "กระจกห้องนอนเปิดได้เต็มบานเหมือนประตูระเบียงไหม",
+   "en": [
+    "Does the bedroom window open fully like the balcony door?"
+   ]
+  },
+  {
+   "th": "ห้องจริงจะเหมือนแปลนในเอกสารไหม",
+   "en": [
+    "Will the real unit look like the floor plan in the documents?"
+   ]
+  },
+  {
+   "th": "ห้องมุม (Corner) มีกี่ห้อง อยู่อาคารไหน",
+   "en": [
+    "How many corner units are there, and in which buildings?"
+   ]
+  },
+  {
+   "th": "ทำไมบางแหล่งบอกว่าห้องมุม 232 ห้อง แต่ที่แจ้งคือ 217 ห้อง",
+   "en": [
+    "Why do some sources say 232 corner units when the figure given is 217?"
+   ]
+  },
+  {
+   "th": "ห้องมุมยังเหลือกี่ห้อง",
+   "en": [
+    "How many corner units are still available?"
+   ]
+  },
+  {
+   "th": "ห้อง Pool Access มีสระส่วนตัวหรือเทอร์เรซลงสระโดยตรงไหม",
+   "en": [
+    "Do Pool Access units have a private pool or a terrace straight into the pool?"
+   ]
+  },
+  {
+   "th": "วิว \"สระ ABC\" และ \"สระ DEF\" คืออะไร",
+   "en": [
+    "What are the \"Pool ABC\" and \"Pool DEF\" views?"
+   ]
+  },
+  {
+   "th": "วิว EMB, ORT, ORT Far, Villas, City East, Urban และ Green คืออะไร",
+   "en": [
+    "What do the EMB, ORT, ORT Far, Villas, City East, Urban and Green views mean?",
+    "What does each view type mean?"
+   ]
+  },
+  {
+   "th": "Collection LAGOON, SIGNATURE, PARKSIDE, BREEZE ต่างกันอย่างไร",
+   "en": [
+    "What is the difference between the LAGOON, SIGNATURE, PARKSIDE and BREEZE collections?"
+   ]
+  },
+  {
+   "th": "อาคารแต่ละหลังมีวิวอะไรบ้าง",
+   "en": [
+    "What views does each building have?"
+   ]
+  },
+  {
+   "th": "โปรโมชันราคาสุทธิใช้กับผู้ซื้อชื่อชาวต่างชาติหรือนิติบุคคลได้ไหม",
+   "en": [
+    "Does the net-price promotion apply to foreign-name buyers or companies?"
+   ]
+  },
+  {
+   "th": "ต่อรองราคาหรือขอราคาพิเศษได้ไหม",
+   "en": [
+    "Can I negotiate the price or get a special price?"
+   ]
+  },
+  {
+   "th": "ราคาห้องรวมเฟอร์นิเจอร์ ค่าโอน และภาษีหรือไม่",
+   "en": [
+    "Does the price include the furniture, the transfer fee and taxes?"
+   ]
+  },
+  {
+   "th": "เงื่อนไขการชำระเงิน (ดาวน์และผ่อน) เป็นอย่างไร",
+   "en": [
+    "What are the payment terms (down payment and instalments)?"
+   ]
+  },
+  {
+   "th": "ผ่อนระหว่างก่อสร้างกี่งวด งวดละเท่าไร",
+   "en": [
+    "How many instalments are there during construction, and how much is each?"
+   ]
+  },
+  {
+   "th": "ค่าส่วนกลางรวมค่าใช้ facility ทั้งหมดไหม",
+   "en": [
+    "Does the common fee cover the use of all the facilities?"
+   ]
+  },
+  {
+   "th": "กู้ธนาคารได้ไหม มีธนาคารพาร์ทเนอร์ไหม",
+   "en": [
+    "Can I get a bank loan? Are there partner banks?"
+   ]
+  },
+  {
+   "th": "โควตาต่างชาติของโครงการเหลืออยู่เท่าไร",
+   "en": [
+    "How much of the project's foreign quota is left?",
+    "Is foreign ownership still available?"
+   ]
+  },
+  {
+   "th": "โอนเงินจากต่างประเทศ ต้องมีเอกสารหรือเสียภาษีอะไรบ้าง",
+   "en": [
+    "What documents or taxes are involved in transferring money from abroad?"
+   ]
+  },
+  {
+   "th": "มีวีซ่าสำหรับผู้ซื้อห้อง หรือวีซ่า DTV ใช้ได้ไหม",
+   "en": [
+    "Is there a visa for unit buyers? Can I use a DTV visa?"
+   ]
+  },
+  {
+   "th": "ปล่อยเช่าได้ไหม ผลตอบแทนค่าเช่าเท่าไร มีรับประกันไหม",
+   "en": [
+    "Can I rent the unit out? What is the rental return? Is it guaranteed?"
+   ]
+  },
+  {
+   "th": "ผู้เช่าหรือแขกใช้ facility ของโครงการได้ไหม",
+   "en": [
+    "Can tenants or guests use the project's facilities?"
+   ]
+  },
+  {
+   "th": "รับชำระเป็นสกุลเงินอื่นนอกจากบาทได้ไหม",
+   "en": [
+    "Can I pay in a currency other than baht?"
+   ]
+  },
+  {
+   "th": "ชั้น G (Entrance Floor) มี facility อะไรบ้าง",
+   "en": [
+    "What facilities are on the ground floor (entrance floor)?"
+   ]
+  },
+  {
+   "th": "ล็อบบี้เป็นอย่างไร มี รปภ. หรือห้องรับพัสดุไหม",
+   "en": [
+    "What is the lobby like? Is there security or a parcel room?"
+   ]
+  },
+  {
+   "th": "Biogenesis คืออะไร ชื่อมีความหมายว่าอะไร",
+   "en": [
+    "What is Biogenesis, and what does the name mean?",
+    "Why is the gym called Biogenesis?"
+   ]
+  },
+  {
+   "th": "เพดานยิมสูงเท่าไร จริงไหมที่เห็นท้องสระจากในยิม",
+   "en": [
+    "How high is the gym ceiling? Is it true you can see the bottom of the pool from the gym?"
+   ]
+  },
+  {
+   "th": "มีห้องปั่นจักรยาน (Spinning) ไหม",
+   "en": [
+    "Is there a spinning (cycling) room?"
+   ]
+  },
+  {
+   "th": "มี Pilates Studio ไหม ต้องจ้างครูหรือเปล่า",
+   "en": [
+    "Is there a Pilates studio? Do I need to hire a teacher?"
+   ]
+  },
+  {
+   "th": "Bungee Gym & Yoga คืออะไร",
+   "en": [
+    "What is Bungee Gym & Yoga?",
+    "What is a bungee gym?"
+   ]
+  },
+  {
+   "th": "มีที่เล่นสำหรับเด็กไหม ใช้ฟรีหรือเปล่า",
+   "en": [
+    "Is there a play area for children? Is it free?"
+   ]
+  },
+  {
+   "th": "Journey to the Future คืออะไร",
+   "en": [
+    "What is Journey to the Future?"
+   ]
+  },
+  {
+   "th": "Playground (ลานเล่นกลางแจ้ง) เป็นอย่างไร",
+   "en": [
+    "What is the playground (outdoor play area) like?"
+   ]
+  },
+  {
+   "th": "มีห้องน้ำ ห้องอาบน้ำ และล็อกเกอร์ไหม",
+   "en": [
+    "Are there toilets, showers and lockers?"
+   ]
+  },
+  {
+   "th": "รถเข้ามาส่งคนหน้าล็อบบี้ได้ไหม",
+   "en": [
+    "Can cars drop people off in front of the lobby?"
+   ]
+  },
+  {
+   "th": "facility ชั้น G ใช้ฟรีไหม เปิดกี่โมง เด็กใช้ได้ไหม",
+   "en": [
+    "Are the ground floor facilities free? What are the opening hours? Can children use them?"
+   ]
+  },
+  {
+   "th": "ภาพ facility ชั้น G เป็นของจริงหรือยัง",
+   "en": [
+    "Are the pictures of the ground floor facilities real yet?"
+   ]
+  },
+  {
+   "th": "ชั้นใต้ดินมี facility อะไรบ้างนอกจากที่จอดรถ",
+   "en": [
+    "What facilities are in the basement besides the car park?"
+   ]
+  },
+  {
+   "th": "Aqua Cinema คืออะไร ยาวเท่าไร",
+   "en": [
+    "What is Aqua Cinema, and how long is it?"
+   ]
+  },
+  {
+   "th": "มีซาวน่ากี่ห้อง ร้อนเท่าไร",
+   "en": [
+    "How many saunas are there, and how hot are they?"
+   ]
+  },
+  {
+   "th": "Floating Swing Sauna และ Crystal Stone Sauna แตกต่างกันอย่างไร",
+   "en": [
+    "What is the difference between the Floating Swing Sauna and the Crystal Stone Sauna?"
+   ]
+  },
+  {
+   "th": "Hydrotherapy Capsule คืออะไร มีกี่เครื่อง",
+   "en": [
+    "What is the Hydrotherapy Capsule, and how many are there?"
+   ]
+  },
+  {
+   "th": "ซาวน่า ห้องเกลือ และแคปซูลดีต่อสุขภาพไหม ล้างพิษหรือย้อนวัยได้ไหม",
+   "en": [
+    "Are the saunas, the salt room and the capsule good for your health? Can they detox or reverse ageing?"
+   ]
+  },
+  {
+   "th": "จากุซซี่ในชั้นใต้ดินมีไหม",
+   "en": [
+    "Is there a jacuzzi in the basement?"
+   ]
+  },
+  {
+   "th": "facility ใต้ดินใช้ฟรีไหม เปิดกี่โมง เด็กใช้ได้ไหม",
+   "en": [
+    "Are the basement facilities free? What are the opening hours? Can children use them?"
+   ]
+  },
+  {
+   "th": "ชั้น 3 มีอะไรบ้าง",
+   "en": [
+    "What is on the third floor?"
+   ]
+  },
+  {
+   "th": "Social Lounge สูบซิการ์หรือดื่มเครื่องดื่มแอลกอฮอล์ได้ไหม เด็กเข้าได้ไหม",
+   "en": [
+    "Can I smoke cigars or drink alcohol in the Social Lounge? Can children go in?"
+   ]
+  },
+  {
+   "th": "Sky Pool อยู่ชั้นไหน ใหญ่เท่าไร ลึกเท่าไร",
+   "en": [
+    "Which floor is the Sky Pool on, how big is it and how deep is it?"
+   ]
+  },
+  {
+   "th": "ทีมขายพูดว่า Sky Pool อยู่ \"ชั้นสอง\" ที่ถูกคือชั้นไหน",
+   "en": [
+    "The sales team said the Sky Pool is on the \"second floor\". Which floor is it really?"
+   ]
+  },
+  {
+   "th": "พื้นสระ Sky Pool เป็นกระจกมองเห็นยิมจริงไหม",
+   "en": [
+    "Is the Sky Pool floor really glass so you can see the gym?"
+   ]
+  },
+  {
+   "th": "facility ชั้น 3 ใช้ฟรีไหม เปิดกี่โมง เด็กใช้ได้ไหม",
+   "en": [
+    "Are the third floor facilities free? What are the opening hours? Can children use them?"
+   ]
+  },
+  {
+   "th": "สระหลักของโครงการยาวเท่าไร ลึกเท่าไร ใหญ่เท่าไร",
+   "en": [
+    "How long, how deep and how big is the main pool?"
+   ]
+  },
+  {
+   "th": "โครงการมีสระว่ายน้ำกี่สระ",
+   "en": [
+    "How many swimming pools does the project have?"
+   ]
+  },
+  {
+   "th": "Private Pool 3 สระคืออะไร ห้องไหนใช้ได้",
+   "en": [
+    "What are the three private pools, and which units can use them?"
+   ]
+  },
+  {
+   "th": "มีสระเด็ก จากุซซี่ และเกาะกลางสระไหม",
+   "en": [
+    "Is there a kids' pool, a jacuzzi and an island in the pool?"
+   ]
+  },
+  {
+   "th": "สะพานข้ามสระมีกี่แห่ง ทำจากอะไร",
+   "en": [
+    "How many bridges cross the pool, and what are they made of?"
+   ]
+  },
+  {
+   "th": "มีต้นไม้และพืชพรรณอะไรบ้าง",
+   "en": [
+    "What trees and plants are there?"
+   ]
+  },
+  {
+   "th": "พื้นที่สีเขียวของโครงการเท่าไร ผ่านเกณฑ์ไหม",
+   "en": [
+    "How much green area does the project have, and does it meet the standard?"
+   ]
+  },
+  {
+   "th": "มีเตียงอาบแดด ศาลา หรือสวนขั้นบันไดริมสระไหม",
+   "en": [
+    "Are there sun loungers, a pavilion or a stepped garden by the pool?"
+   ]
+  },
+  {
+   "th": "ระบบพ่นละอองน้ำ (fog/mist) ลดอุณหภูมิมีจริงไหม",
+   "en": [
+    "Is the cooling fog / mist system real?"
+   ]
+  },
+  {
+   "th": "\"Fog Canopy\" ที่เห็นในแบบภูมิสถาปัตย์คืออะไร อยู่ตรงไหน",
+   "en": [
+    "What is the \"Fog Canopy\" in the landscape drawings, and where is it?"
+   ]
+  },
+  {
+   "th": "พื้นผิวและวัสดุรอบสระเป็นอะไร มีไฟไหม",
+   "en": [
+    "What are the surfaces and materials around the pool? Is there lighting?"
+   ]
+  },
+  {
+   "th": "แบบภูมิสถาปัตย์มีป้าย \"Ocean Access\" แปลว่ามีทางลงทะเลตรงไหม",
+   "en": [
+    "The landscape drawings say \"Ocean Access\". Does that mean direct access to the sea?"
+   ]
+  },
+  {
+   "th": "ลากูนว่ายน้ำออกกำลังกายได้ไหม มีไลฟ์การ์ดหรือเปล่า เปิดกี่โมง",
+   "en": [
+    "Can I swim laps in the lagoon? Is there a lifeguard? What are the opening hours?"
+   ]
+  },
+  {
+   "th": "พื้นที่ภายนอกและภูมิสถาปัตย์ทั้งหมดมีอะไรบ้าง แต่ละส่วนกี่ตารางเมตร",
+   "en": [
+    "What outdoor and landscape areas are there, and how many square metres is each?"
+   ]
+  },
+  {
+   "th": "ลานทางเข้าและวงเวียนหน้าล็อบบี้มีน้ำพุหรือต้นไม้ไหม",
+   "en": [
+    "Is there a fountain or trees in the entrance court and the roundabout in front of the lobby?"
+   ]
+  },
+  {
+   "th": "เกาะในสระแต่ละเกาะมีอะไร บาร์บนเกาะคืออะไร",
+   "en": [
+    "What is on each island in the pool? What is the bar on the island?"
+   ]
+  },
+  {
+   "th": "ทางเดินน้ำตื้น (Shallow Pool / Path) และบ่อน้ำตื้นในลานเด็กเล่นคืออะไร",
+   "en": [
+    "What are the shallow water path and the shallow pond in the playground?"
+   ]
+  },
+  {
+   "th": "ภาพสระ สวน และลานเด็กเล่นที่เห็นเป็นแบบจริงหรือยัง ใครเป็นผู้ออกแบบ",
+   "en": [
+    "Are the pictures of the pool, the garden and the playground the real design yet? Who designed them?"
+   ]
+  },
+  {
+   "th": "โครงการมีที่จอดรถกี่คัน",
+   "en": [
+    "How many car parking spaces does the project have?"
+   ]
+  },
+  {
+   "th": "จอดรถฟรีไหม ได้กี่ช่องต่อห้อง เป็นช่องประจำหรือไม่",
+   "en": [
+    "Is parking free? How many spaces per unit? Are the spaces assigned?"
+   ]
+  },
+  {
+   "th": "มีที่จอดมอเตอร์ไซค์ไหม",
+   "en": [
+    "Is there motorbike parking?"
+   ]
+  },
+  {
+   "th": "มีที่ชาร์จรถไฟฟ้า (EV) ไหม มีกี่หัว คิดค่าบริการอย่างไร",
+   "en": [
+    "Is there EV charging? How many chargers, and how much does it cost?"
+   ]
+  },
+  {
+   "th": "ติดตั้งเครื่องชาร์จรถไฟฟ้าส่วนตัวที่ช่องจอดของตัวเองได้ไหม",
+   "en": [
+    "Can I install my own EV charger at my parking space?"
+   ]
+  },
+  {
+   "th": "ดูช่องจอดรถว่างผ่านแอปได้ไหม",
+   "en": [
+    "Can I check for free parking spaces in the app?"
+   ]
+  },
+  {
+   "th": "ที่จอดรถอยู่ที่ไหน ชั้นใต้ดินกี่ชั้น มีที่จอดบนพื้นดินไหม",
+   "en": [
+    "Where is the car park? How many basement levels? Is there parking above ground?"
+   ]
+  },
+  {
+   "th": "ทางเข้า–ออกที่จอดรถอยู่ตรงไหน ระบบเข้าออกเป็นอย่างไร",
+   "en": [
+    "Where is the car park entrance and exit, and how does the access system work?"
+   ]
+  },
+  {
+   "th": "รถ SUV หรือรถกระบะจอดได้ไหม",
+   "en": [
+    "Can an SUV or a pickup truck park there?"
+   ]
+  },
+  {
+   "th": "มีที่จอดรถแขก ที่จอดรถคนพิการ หรือที่ล้างรถไหม",
+   "en": [
+    "Is there visitor parking, disabled parking or a car wash area?"
+   ]
+  },
+  {
+   "th": "ที่จอดรถมีระบบรักษาความปลอดภัย กล้องวงจรปิด หรือระบบระบายอากาศไหม",
+   "en": [
+    "Does the car park have security, CCTV or ventilation?"
+   ]
+  },
+  {
+   "th": "Embassy World มีเทคโนโลยีอะไรบ้าง",
+   "en": [
+    "What technology does Embassy World have?"
+   ]
+  },
+  {
+   "th": "ระบบ \"Outdoor Air Quality System\" และ Smart Irrigation ในหน้า Future Nature คืออะไร มีในแบบภูมิสถาปัตย์ไหม",
+   "en": [
+    "What are the Outdoor Air Quality System and Smart Irrigation on the Future Nature page? Are they in the landscape drawings?"
+   ]
+  },
+  {
+   "th": "แอป Embassy AI Application ทำอะไรได้ มี AI ไหม",
+   "en": [
+    "What can the Embassy AI Application do? Does it have AI?"
+   ]
+  },
+  {
+   "th": "แอปต้องเสียค่าใช้จ่ายไหม ใครใช้ได้",
+   "en": [
+    "Does the app cost anything, and who can use it?"
+   ]
+  },
+  {
+   "th": "แอปจ่ายค่าส่วนกลาง ดูกล้องวงจรปิดส่วนกลาง หรือใช้เป็นคีย์การ์ดเข้าอาคารได้ไหม",
+   "en": [
+    "Can the app pay the common fee, show the common-area CCTV or work as a key card for the building?"
+   ]
+  },
+  {
+   "th": "Smart Home ในห้องคืออะไร มีอะไรบ้าง",
+   "en": [
+    "What is the smart home in the unit, and what does it include?"
+   ]
+  },
+  {
+   "th": "Smart Home ฟรีไหม รวมอยู่ในราคาห้องหรือเปล่า",
+   "en": [
+    "Is the smart home free? Is it included in the price of the unit?"
+   ]
+  },
+  {
+   "th": "ประตูห้องเป็นแบบไหน มีกล้องไหม ใช่ Video Door System หรือเปล่า",
+   "en": [
+    "What kind of door does the unit have? Does it have a camera? Is it a video door system?"
+   ]
+  },
+  {
+   "th": "ถ้าไม่ซื้อ Smart Package จะใช้แอปทำอะไรได้บ้าง",
+   "en": [
+    "Without the smart package, what can I do with the app?"
+   ]
+  },
+  {
+   "th": "ฟอกอากาศในห้องช่วยโรคภูมิแพ้หรือหอบหืดได้ไหม",
+   "en": [
+    "Does the air purifier in the unit help with allergies or asthma?"
+   ]
+  },
+  {
+   "th": "ดูคุณภาพอากาศ CO₂ หรือคุณภาพน้ำสระได้จากไหน",
+   "en": [
+    "Where can I see the air quality, CO2 or the pool water quality?"
+   ]
+  },
+  {
+   "th": "Eco System Quality Dashboard คืออะไร",
+   "en": [
+    "What is the Eco System Quality Dashboard?"
+   ]
+  },
+  {
+   "th": "สั่งงานด้วยเสียง หรือใช้กับ Google Home, Alexa, Apple Home ได้ไหม",
+   "en": [
+    "Can I use voice control, or Google Home, Alexa or Apple Home?"
+   ]
+  },
+  {
+   "th": "กล้องที่หน้าห้องบันทึกภาพไหม ข้อมูลความเป็นส่วนตัวเป็นอย่างไร",
+   "en": [
+    "Does the camera at the door record? How is privacy handled?"
+   ]
+  },
+  {
+   "th": "โครงการมี Wi-Fi ฟรีไหม",
+   "en": [
+    "Does the project have free Wi-Fi?"
+   ]
+  },
+  {
+   "th": "โครงการมีระบบรักษาความปลอดภัยอะไรบ้าง มี รปภ. และกล้องวงจรปิดไหม",
+   "en": [
+    "What security does the project have? Are there guards and CCTV?"
+   ]
+  },
+  {
+   "th": "มีรถรับส่ง หรือบริการเรียกรถผ่านแอปไหม",
+   "en": [
+    "Is there a shuttle, or a ride-hailing service through the app?"
+   ]
+  },
+  {
+   "th": "โครงการจะสร้างเสร็จเมื่อไร",
+   "en": [
+    "When will the project be completed?",
+    "When will construction be finished?"
+   ]
+  },
+  {
+   "th": "ทีมขายพูดว่ารอประมาณ 3 ปี หรือ Embassy Life เสร็จใน 2 ปี ใช้กับ Embassy World ได้ไหม",
+   "en": [
+    "The sales team said about 3 years, or that Embassy Life is finished in 2 years. Does that apply to Embassy World?"
+   ]
+  },
+  {
+   "th": "ตอนนี้ก่อสร้างไปถึงไหนแล้ว",
+   "en": [
+    "How far along is construction now?"
+   ]
+  },
+  {
+   "th": "จะส่งมอบก่อนกำหนดไหม มีค่าชดเชยถ้าส่งมอบล่าช้าหรือเปล่า",
+   "en": [
+    "Will it be handed over early? Is there compensation if the handover is late?"
+   ]
+  },
+  {
+   "th": "ส่งมอบพร้อมกันทั้ง 6 อาคาร หรือทยอยส่งมอบเป็นอาคาร",
+   "en": [
+    "Will all six buildings be handed over together, or one building at a time?"
+   ]
+  },
+  {
+   "th": "ดูห้องตัวอย่างได้เมื่อไร",
+   "en": [
+    "When can I see a show unit?"
+   ]
+  },
+  {
+   "th": "ห้องในภาพเด็คหน้า 50–53 (The Units) เหมือนห้องจริงที่จะส่งมอบไหม",
+   "en": [
+    "Do the units in the deck pictures on pages 50-53 (The Units) look like the real units that will be delivered?"
+   ]
+  },
+  {
+   "th": "สำนักงานขายหรือโชว์รูมอยู่ที่ไหน นัดชมโครงการได้ไหม",
+   "en": [
+    "Where is the sales office or showroom? Can I book a visit to the project?"
+   ]
+  },
+  {
+   "th": "ระหว่างก่อสร้างแบบจะเปลี่ยนไหม ถ้าแบบเปลี่ยนหลังซื้อทำอย่างไร",
+   "en": [
+    "Will the design change during construction? What happens if it changes after I buy?"
+   ]
+  },
+  {
+   "th": "ผู้รับเหมา วิศวกร และใบอนุญาตก่อสร้างของโครงการคือใคร",
+   "en": [
+    "Who are the contractor and the engineer, and what is the construction permit?",
+    "Who is the contractor of this project?"
+   ]
+  },
+  {
+   "th": "โครงการขายไปแล้วเท่าไร ยังเหลือกี่ห้อง",
+   "en": [
+    "How much of the project has been sold, and how many units are left?"
+   ]
+  },
+  {
+   "th": "ขายแล้วกี่ห้อง แยกตามประเภทห้อง",
+   "en": [
+    "How many units are sold, by unit type?"
+   ]
+  },
+  {
+   "th": "ขายแล้วกี่ห้อง แยกตามอาคาร",
+   "en": [
+    "How many units are sold, by building?"
+   ]
+  },
+  {
+   "th": "ชั้นไหนขายแล้วเยอะ ชั้นไหนยังว่าง",
+   "en": [
+    "Which floors have sold the most, and which floors are still available?"
+   ]
+  },
+  {
+   "th": "ห้องวิวไหนหรืออาคารไหนขายดีที่สุด",
+   "en": [
+    "Which view or which building sells best?"
+   ]
+  },
+  {
+   "th": "ห้องที่ผมสนใจขายแล้ว มีห้องใกล้เคียงไหม",
+   "en": [
+    "The unit I wanted is sold. Is there a similar one nearby?"
+   ]
+  },
+  {
+   "th": "ควรรีบซื้อไหม ห้องกำลังจะหมดหรือเปล่า",
+   "en": [
+    "Should I hurry to buy? Are the units about to sell out?"
+   ]
+  },
+  {
+   "th": "ร้านค้าในโครงการเหลือขายไหม",
+   "en": [
+    "Are there any shops in the project still for sale?"
+   ]
+  },
+  {
+   "th": "ห้องรหัส C-723 ถึง C-732 มีไหม",
+   "en": [
+    "Do units C-723 to C-732 exist?"
+   ]
+  },
+  {
+   "th": "ได้ยินตัวเลขยอดขายอื่น เช่น ขาย 326 จอง 7 ว่าง 739 ใช้ตัวเลขไหน",
+   "en": [
+    "I heard other sales figures, such as 326 sold, 7 reserved and 739 available. Which numbers are right?"
+   ]
+  },
+  {
+   "th": "สถานะ \"ขายแล้ว\" หมายถึงอะไร ชำระครบแล้วหรือแค่จอง",
+   "en": [
+    "What does \"sold\" mean? Fully paid or only reserved?"
+   ]
+  },
+  {
+   "th": "ห้องที่ขายแล้ว ขายให้ใคร ราคาเท่าไร",
+   "en": [
+    "Who bought the sold units, and at what price?"
+   ]
+  },
+  {
+   "th": "ปล่อยเช่าได้ผลตอบแทนปีละกี่เปอร์เซ็นต์ มีประกันรายได้ขั้นต่ำไหม",
+   "en": [
+    "What percentage rental return per year can I get? Is there a minimum income guarantee?"
+   ]
+  },
+  {
+   "th": "ห้องเป็นกรรมสิทธิ์แบบไหน (Freehold หรือเช่า) โฉนดห้องชุดเป็นอย่างไร",
+   "en": [
+    "What kind of ownership is it (freehold or leasehold)? What is the condo title deed like?"
+   ]
+  },
+  {
+   "th": "ผู้ซื้อต่างชาติถือครองได้กี่เปอร์เซ็นต์ โควตาเหลือเท่าไร",
+   "en": [
+    "What percentage can foreign buyers own, and how much quota is left?"
+   ]
+  },
+  {
+   "th": "ขอส่วนลด ราคาพิเศษ หรือส่วนลดเมื่อจ่ายเงินสดได้ไหม",
+   "en": [
+    "Can I get a discount, a special price or a cash discount?"
+   ]
+  },
+  {
+   "th": "ขอดูสัญญาจองหรือสัญญาจะซื้อจะขาย ใบอนุญาตก่อสร้าง หรือโฉนดที่ดินของโครงการ",
+   "en": [
+    "Can I see the reservation contract, the sale and purchase agreement, the construction permit or the project's land title deed?"
+   ]
+  },
+  {
+   "th": "ปล่อยเช่ารายวัน (เช่น Airbnb) หรือเลี้ยงสัตว์เลี้ยงได้ไหม มีกฎของนิติบุคคลอย่างไร",
+   "en": [
+    "Can I rent out daily (for example on Airbnb) or keep pets? What are the juristic person's rules?",
+    "Is the project pet friendly?"
+   ]
+  },
+  {
+   "th": "โครงการน้ำท่วมไหม แผ่นดินไหวหรือโครงสร้างปลอดภัยแค่ไหน",
+   "en": [
+    "Does the project flood? How safe is the structure against earthquakes?"
+   ]
+  },
+  {
+   "th": "การรับประกันงานก่อสร้าง งานซ่อม และประกันภัยของอาคารเป็นอย่างไร",
+   "en": [
+    "What are the warranty on construction, the repair service and the building insurance?"
+   ]
+  },
+  {
+   "th": "ขอยกเลิกจอง ขอเงินคืน หรือร้องเรียนเรื่องการบริการ",
+   "en": [
+    "I want to cancel my reservation, get a refund or complain about the service."
+   ]
+  },
+  {
+   "th": "ขอเปรียบเทียบกับโครงการคอนโดอื่นหรือถามว่าโครงการนี้คุ้มกว่าไหม",
+   "en": [
+    "Can you compare this project with other condos, or tell me if it is better value?"
+   ]
+  },
+  {
+   "th": "ขายต่อใบจองหรือโอนสิทธิ์ในสัญญาก่อนโอนกรรมสิทธิ์ได้ไหม ขายต่อหลังโอนต้องทำอย่างไร",
+   "en": [
+    "Can I resell my reservation or transfer the contract before the ownership transfer? How do I resell after the transfer?"
+   ]
+  },
+  {
+   "th": "ขนาดและความจุของ facility มาจากไหน เชื่อถือได้แค่ไหน",
+   "en": [
+    "Where do the facility sizes and capacities come from, and how reliable are they?"
+   ]
+  },
+  {
+   "th": "ขนาดรวม (กรอบ) กับพื้นที่ใช้สอยต่างกันอย่างไร ควรอ่านตัวเลขกว้าง × ยาวอย่างไร",
+   "en": [
+    "What is the difference between the overall size and the usable area? How should I read width x length?"
+   ]
+  },
+  {
+   "th": "ชั้น G มี facility อะไรบ้าง แต่ละจุดขนาดเท่าไร ความจุเท่าไร (สรุปรวม)",
+   "en": [
+    "What facilities are on the ground floor, how big is each one and how many people do they hold? (summary)"
+   ]
+  },
+  {
+   "th": "Lobby ของ Embassy World กว้างยาวเท่าไร มีที่นั่งกี่ที่",
+   "en": [
+    "How big is the Embassy World lobby, and how many seats does it have?"
+   ]
+  },
+  {
+   "th": "ยิม Biogenesis ใหญ่เท่าไร กว้างยาวเท่าไร",
+   "en": [
+    "How big is the Biogenesis gym? How wide and how long?"
+   ]
+  },
+  {
+   "th": "Biogenesis มีลู่วิ่งกี่เครื่อง",
+   "en": [
+    "How many treadmills does Biogenesis have?"
+   ]
+  },
+  {
+   "th": "Biogenesis มีอุปกรณ์ออกกำลังกายอะไรบ้าง",
+   "en": [
+    "What exercise equipment does Biogenesis have?"
+   ]
+  },
+  {
+   "th": "ยิม Biogenesis รองรับผู้ใช้ได้กี่คนพร้อมกัน",
+   "en": [
+    "How many people can use the Biogenesis gym at the same time?"
+   ]
+  },
+  {
+   "th": "ห้อง Spinning Class (Cycling Studio) ใหญ่เท่าไร มีจักรยานกี่คัน",
+   "en": [
+    "How big is the Spinning Class (Cycling Studio), and how many bikes does it have?"
+   ]
+  },
+  {
+   "th": "Pilates Studio ใหญ่เท่าไร มีเครื่อง Reformer กี่เครื่อง",
+   "en": [
+    "How big is the Pilates Studio, and how many Reformer machines does it have?"
+   ]
+  },
+  {
+   "th": "ทำไมจำนวนจักรยานและเตียง Pilates ในเด็ค ภาพ และคำของทีมขายไม่ตรงกัน ใช้ตัวเลขไหน",
+   "en": [
+    "Why don't the numbers of bikes and Pilates beds in the deck, the pictures and the sales team match? Which number should I use?"
+   ]
+  },
+  {
+   "th": "Bungee Gym & Yoga ใหญ่เท่าไร มีกี่สถานี",
+   "en": [
+    "How big is Bungee Gym & Yoga, and how many stations does it have?"
+   ]
+  },
+  {
+   "th": "Junior World ใหญ่เท่าไร มีที่นั่งกี่ที่",
+   "en": [
+    "How big is Junior World, and how many seats does it have?"
+   ]
+  },
+  {
+   "th": "บ่อบอลใน Junior World ใหญ่เท่าไร ลึกเท่าไร",
+   "en": [
+    "How big and how deep is the ball pit in Junior World?"
+   ]
+  },
+  {
+   "th": "Journey to the Future (ทางเดิน) ยาวและกว้างเท่าไร",
+   "en": [
+    "How long and how wide is the Journey to the Future corridor?"
+   ]
+  },
+  {
+   "th": "Playground (Playscape) ใหญ่เท่าไร",
+   "en": [
+    "How big is the playground (Playscape)?"
+   ]
+  },
+  {
+   "th": "ห้องน้ำชั้น G ระหว่าง Pilates กับ Bungee ใหญ่เท่าไร มีอะไรบ้าง",
+   "en": [
+    "How big is the ground floor toilet between Pilates and Bungee, and what does it have?"
+   ]
+  },
+  {
+   "th": "ห้องน้ำชั้น G ที่ปลายตะวันตกข้าง Junior World ใหญ่เท่าไร",
+   "en": [
+    "How big is the ground floor toilet at the west end next to Junior World?"
+   ]
+  },
+  {
+   "th": "ขนาดร้านค้า SHOP-1 ถึง SHOP-6 ที่เห็นบนแผ่นแปลนชั้น G ไม่ตรงกับตัวเลขอื่น ใช้ตัวเลขไหน",
+   "en": [
+    "The shop sizes for SHOP-1 to SHOP-6 on the ground floor plan don't match other figures. Which numbers are right?"
+   ]
+  },
+  {
+   "th": "ชั้นใต้ดินมี facility อะไรบ้าง แต่ละจุดขนาดเท่าไร จุกี่คน (สรุปรวม)",
+   "en": [
+    "What facilities are in the basement, how big is each one and how many people do they hold? (summary)"
+   ]
+  },
+  {
+   "th": "Aqua Cinema ใหญ่เท่าไร ยาวกี่เมตร ลึกเท่าไร",
+   "en": [
+    "How big, how long and how deep is Aqua Cinema?"
+   ]
+  },
+  {
+   "th": "ทีมขายพูดว่า Aqua Cinema ยาวเกือบ 45 เมตร จริงไหม",
+   "en": [
+    "The sales team said Aqua Cinema is almost 45 metres long. Is that true?"
+   ]
+  },
+  {
+   "th": "Journey to the Mars ใหญ่เท่าไร มีเก้าอี้นั่งไหม",
+   "en": [
+    "How big is Journey to Mars? Are there seats?"
+   ]
+  },
+  {
+   "th": "จากุซซี่ชั้นใต้ดินขนาดเท่าไร จุกี่คน",
+   "en": [
+    "How big is the basement jacuzzi, and how many people does it hold?"
+   ]
+  },
+  {
+   "th": "Himalayan Salt Sauna ใหญ่เท่าไร จุกี่คน",
+   "en": [
+    "How big is the Himalayan Salt Sauna, and how many people does it hold?"
+   ]
+  },
+  {
+   "th": "ทำไมแผ่นของ Himalayan Salt Sauna มีตัวเลขความกว้าง 10.36 เมตรและ 5.55 เมตร",
+   "en": [
+    "Why does the Himalayan Salt Sauna sheet show widths of 10.36 m and 5.55 m?"
+   ]
+  },
+  {
+   "th": "Ice Bath ใหญ่เท่าไร จุกี่คน มีกี่อ่าง",
+   "en": [
+    "How big is the Ice Bath, how many people does it hold and how many tubs does it have?"
+   ]
+  },
+  {
+   "th": "Floating Swing Sauna ใหญ่เท่าไร จุกี่คน",
+   "en": [
+    "How big is the Floating Swing Sauna, and how many people does it hold?"
+   ]
+  },
+  {
+   "th": "Crystal Stone Sauna ใหญ่เท่าไร จุกี่คน",
+   "en": [
+    "How big is the Crystal Stone Sauna, and how many people does it hold?"
+   ]
+  },
+  {
+   "th": "Hydro Therapy Capsule ใหญ่เท่าไร จุกี่คน",
+   "en": [
+    "How big is the Hydrotherapy Capsule room, and how many people does it hold?"
+   ]
+  },
+  {
+   "th": "ห้องซาวน่าและห้องบำบัดใต้ดินทั้ง 5 ห้องจุได้รวมกี่คน",
+   "en": [
+    "How many people do the five basement sauna and therapy rooms hold in total?"
+   ]
+  },
+  {
+   "th": "ห้อง Office & Control ห้อง MDB/Pump ห้องน้ำ และ EV Charger ในชั้นใต้ดินใหญ่เท่าไร",
+   "en": [
+    "How big are the Office & Control room, the MDB/Pump room, the toilets and the EV charger area in the basement?"
+   ]
+  },
+  {
+   "th": "ชั้น 3 มี facility อะไรบ้าง แต่ละจุดขนาดเท่าไร มีกี่ที่นั่ง (สรุปรวม)",
+   "en": [
+    "What facilities are on the third floor, how big is each one and how many seats? (summary)"
+   ]
+  },
+  {
+   "th": "Social Club (Social Lounge) ใหญ่เท่าไร มีที่นั่งกี่ที่",
+   "en": [
+    "How big is the Social Club (Social Lounge), and how many seats does it have?"
+   ]
+  },
+  {
+   "th": "Co-working Lounge ใหญ่เท่าไร มีที่นั่งกี่ที่",
+   "en": [
+    "How big is the Co-working Lounge, and how many seats does it have?"
+   ]
+  },
+  {
+   "th": "Common Sphere ใหญ่เท่าไร มีที่นั่งและห้องประชุมกี่ห้อง",
+   "en": [
+    "How big is the Common Sphere, and how many seats and meeting rooms does it have?"
+   ]
+  },
+  {
+   "th": "Sky Pool ใหญ่เท่าไร มีอะไรบ้าง",
+   "en": [
+    "How big is the Sky Pool, and what does it have?"
+   ]
+  },
+  {
+   "th": "ตัวเลข +4.63 และ +5.72 ของ Sky Pool คืออะไร ใช่ความลึกน้ำไหม",
+   "en": [
+    "What are the +4.63 and +5.72 figures of the Sky Pool? Are they the water depth?"
+   ]
+  },
+  {
+   "th": "ห้องน้ำชั้น 3 อยู่ตรงไหน ใหญ่เท่าไร",
+   "en": [
+    "Where is the third floor toilet, and how big is it?"
+   ]
+  },
+  {
+   "th": "facility ไหนมีที่นั่งกี่ที่ รวมทั้งโครงการกี่ที่นั่ง",
+   "en": [
+    "How many seats does each facility have, and how many in the whole project?"
+   ]
+  },
+  {
+   "th": "สระใต้ดิน Ice Bath และ Sky Pool ลึกเท่าไร",
+   "en": [
+    "How deep are the basement pool, the Ice Bath and the Sky Pool?",
+    "How deep is the pool in the basement?",
+    "How deep is the Sky Pool?"
+   ]
+  },
+  {
+   "th": "เพดานหรือความสูงฝ้าของ facility สูงเท่าไร",
+   "en": [
+    "How high are the ceilings of the facilities?"
+   ]
+  },
+  {
+   "th": "facility เปิดกี่โมง คิดค่าบริการไหม เด็กใช้ได้ไหม จำกัดจำนวนคนไหม",
+   "en": [
+    "What are the facility opening hours? Is there a fee? Can children use them? Is there a limit on people?"
+   ]
+  },
+  {
+   "th": "อุปกรณ์และจำนวนเครื่องใน facility จะเป็นไปตามผังนี้จริงไหม",
+   "en": [
+    "Will the equipment and number of machines in the facilities really follow this layout?"
+   ]
+  }
+ ]
+}

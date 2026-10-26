@@ -460,7 +460,7 @@
   ],
   "lines": [
    {
-    "th": "โครงการของเราอยู่ย่านจอมเทียน พัทยาค่ะ",
+    "th": "โครงการของเราอยู่ย่านจอมเทียน พัทยา",
     "en": "We're in Jomtien, Pattaya,",
     "cue_th": [
      "จอมเทียน"
@@ -475,12 +475,11 @@
     ]
    },
    {
-    "th": "อยู่ติดสวนสาธารณะหนองโพรง",
-    "en": "right next to Nong Phrong public park,",
+    "th": "และติดกับสวนสาธารณะหนองโพรง ได้พื้นที่สีเขียวเป็นเพื่อนบ้านเลยค่ะ",
+    "en": "right next to Nong Phrong public park, so green space is our next-door neighbour.",
     "cue_th": [
      "สวนสาธารณะ",
-     "หนองโพรง",
-     "สวน"
+     "หนองโพรง"
     ],
     "cue_en": [
      "park"
@@ -490,28 +489,21 @@
     ]
    },
    {
-    "th": "ห่างหาดจอมเทียนเส้นตรงประมาณ 600 เมตร",
-    "en": "about 600 metres from Jomtien Beach in a straight line,",
+    "th": "ขับรถไปหาดจอมเทียนแค่ประมาณ 4 นาที",
+    "en": "Jomtien Beach is only about 4 minutes by car,",
     "cue_th": [
-     "หาด",
-     "600 เมตร",
-     "หกร้อยเมตร"
+     "หาด"
     ],
     "cue_en": [
-     "beach",
-     "600 metres",
-     "600 meters",
-     "six hundred"
+     "beach"
     ],
     "cue_zh": [
-     "海滩",
-     "600米",
-     "六百米"
+     "海滩"
     ]
    },
    {
-    "th": "และถึงสุขุมวิทประมาณ 1.85 กิโลเมตรค่ะ",
-    "en": "and about 1.85 kilometres to Sukhumvit Road.",
+    "th": "และถนนสุขุมวิทก็ขับไปประมาณ 4 นาทีเหมือนกันค่ะ",
+    "en": "and Sukhumvit Road is about 4 minutes by car too.",
     "cue_th": [
      "สุขุมวิท"
     ],
@@ -601,7 +593,7 @@
      "y1": 40,
      "x2": 16,
      "y2": 40,
-     "label_en": "≈ 600 m",
+     "label_en": "≈ 4 min",
      "label_x": 12,
      "label_y": 53,
      "line": 2
@@ -611,7 +603,7 @@
      "y1": 40,
      "x2": 89,
      "y2": 40,
-     "label_en": "≈ 1.85 km",
+     "label_en": "≈ 4 min",
      "label_y": 46.5,
      "line": 3
     }
@@ -626,15 +618,16 @@
     {
      "icon": "beach",
      "label_en": "Jomtien Beach",
-     "sub_en": "straight line",
-     "value_en": "≈ 600 m",
+     "sub_en": "By car",
+     "value_en": "≈ 4 min",
      "line": 2
     },
     {
      "icon": "road",
      "label_en": "Sukhumvit Road",
-     "value_en": "≈ 1.85 km",
-     "line": 3
+     "value_en": "≈ 4 min",
+     "line": 3,
+     "sub_en": "By car"
     }
    ],
    "footnote_en": "Schematic · not to scale",
@@ -659,9 +652,10 @@
   "sources": [
    "facts:ทำเล (ย่านจอมเทียน เมืองพัทยา · ห่างหาดจอมเทียนเส้นตรงประมาณ 0.6 กม. · อยู่ติดสวนสาธารณะซอยชัยพฤกษ์ 4 (สวนหนองโพรง) · ถึงถนนสุขุมวิทประมาณ 1.85 กม.)",
    "report:04_location.md line 7, 22 (ขอบสวนห่างหมุด ≈ 40 ม. · ทางเชื่อมเข้าสวนยังไม่ยืนยัน)",
-   "report:92_appendix_travel.md#ค.3 (หาดจอมเทียนจุดทรายใกล้สุด เส้นตรง 0.60 กม.)"
+   "report:92_appendix_travel.md#ค.3 (หาดจอมเทียนจุดทรายใกล้สุด เส้นตรง 0.60 กม.)",
+   "report:04_location.md#4.8 (หาดจอมเทียนขอบทรายใกล้สุด: ขับ free-flow 4 นาที · ถนนสุขุมวิท 1.85 กม. ขับ 4 นาที) · 92_appendix_travel.md#ค.3 row 1, 53"
   ],
-  "notes_th": "ออกแบบใหม่ 13 ต.ค. (เจ้าของ: 'ไม่ค่อยสวย ให้ออกแบบให้มันสวยดูแล้วเข้าใจได้ง่าย') — เลิกใช้ภาพสไลด์ intro-010 วาดแผนที่ย่อเองด้วยรูปทรงล้วน (เทมเพลต neighborhood ไม่มีรูปภาพ): ทะเลซ้าย หาดทราย ถนนเส้นบาง โครงการกลาง สวนติดกันด้านล่าง สุขุมวิทขวา · ลำดับบนจอ: (0) ทะเลเลื่อนเข้า หาดลากลง ถนนวาดตัวเอง หมุดโครงการลง + ป้าย JOMTIEN · PATTAYA · (1) สวนหนองโพรงขยายขึ้นใต้โครงการ + การ์ด Next door · (2) เส้นประวิ่งจากโครงการไปหาด ป้าย ≈ 600 m + การ์ด · (3) ถนนสุขุมวิทวาดขึ้น แล้วเส้นประวิ่งไป ป้าย ≈ 1.85 km + การ์ด · ตำแหน่งบอก 'อยู่ฝั่งไหน' ไม่ใช่ระยะจริง (บนแผนที่เขียน 'Schematic · not to scale') แต่สัดส่วนหาด:สุขุมวิทใกล้เคียงจริง (20:53 ≈ 0.6:1.85) · ทิศทั่วไป: หาดจอมเทียนอยู่ตะวันตก สุขุมวิทอยู่ตะวันออก · สวนอยู่ใต้โครงการตามหมุดใน map.docx ที่ใช้อ้างอิงเดิม (ไม่ได้ใช้ภาพจาก Google Maps) · ไม่วาดชื่อถนนอื่น (ไม่มีในข้อมูลที่อนุมัติ) · ไม่พูดว่าเดินเข้าสวนจากโครงการได้ (ทางเชื่อมยังไม่ยืนยัน) · ตามกฎเจ้าของ (12 ต.ค.) คำตอบเรื่องทะเลขึ้นต้นด้วยระยะ ไม่พูด 'ไม่ติดทะเล'"
+  "notes_th": "ออกแบบใหม่ 13 ต.ค. (เจ้าของ: 'ไม่ค่อยสวย ให้ออกแบบให้มันสวยดูแล้วเข้าใจได้ง่าย') — เลิกใช้ภาพสไลด์ intro-010 วาดแผนที่ย่อเองด้วยรูปทรงล้วน (เทมเพลต neighborhood ไม่มีรูปภาพ): ทะเลซ้าย หาดทราย ถนนเส้นบาง โครงการกลาง สวนติดกันด้านล่าง สุขุมวิทขวา · ลำดับบนจอ: (0) ทะเลเลื่อนเข้า หาดลากลง ถนนวาดตัวเอง หมุดโครงการลง + ป้าย JOMTIEN · PATTAYA · (1) สวนหนองโพรงขยายขึ้นใต้โครงการ + การ์ด Next door · (2) เส้นประวิ่งจากโครงการไปหาด ป้าย ≈ 600 m + การ์ด · (3) ถนนสุขุมวิทวาดขึ้น แล้วเส้นประวิ่งไป ป้าย ≈ 1.85 km + การ์ด · ตำแหน่งบอก 'อยู่ฝั่งไหน' ไม่ใช่ระยะจริง (บนแผนที่เขียน 'Schematic · not to scale') แต่สัดส่วนหาด:สุขุมวิทใกล้เคียงจริง (20:53 ≈ 0.6:1.85) · ทิศทั่วไป: หาดจอมเทียนอยู่ตะวันตก สุขุมวิทอยู่ตะวันออก · สวนอยู่ใต้โครงการตามหมุดใน map.docx ที่ใช้อ้างอิงเดิม (ไม่ได้ใช้ภาพจาก Google Maps) · ไม่วาดชื่อถนนอื่น (ไม่มีในข้อมูลที่อนุมัติ) · ไม่พูดว่าเดินเข้าสวนจากโครงการได้ (ทางเชื่อมยังไม่ยืนยัน) · ตามกฎเจ้าของ (12 ต.ค.) คำตอบเรื่องทะเลขึ้นต้นด้วยระยะ ไม่พูด 'ไม่ติดทะเล' · 21 ต.ค. (เจ้าของ: 'พูดตัวเลขทศนิยม 1 ตำแหน่ง พูดให้เลขไม่เยอะ ระยะทางเปลี่ยนเป็นเวลา'): ระยะเส้นตรง 600 ม. และ 1.85 กม. ออกจากคำพูดและจอ เปลี่ยนเป็นเวลา: หาดขับรถ ≈ 4 นาที (free-flow) หรือเดิน 15–24 นาที (OSM 24 · ผ่านซอย 12 ≈ 15 ตามรายงาน — ห้ามพูด '5 นาที' ที่ไม่มีในข้อมูล) · สุขุมวิทขับ ≈ 4 นาที · เส้นประบนแผนที่ยังวิ่งไปหาด/สุขุมวิทเหมือนเดิม ป้ายเป็นเวลาแทนระยะ · บรรทัดเดินเพิ่มเป็นบรรทัดที่ 4 (สุขุมวิทเลื่อนเป็นบรรทัดที่ 5) · 22 ต.ค. (เจ้าของบนหน้าตรวจ: 'เดินไปประมาณ 15 ถึง 24 นาทีค่ะ เอาออก'): ตัดบรรทัดเดินเท้าทั้งบรรทัด และ 'walk 15–24 min' ใต้การ์ดหาด (การ์ดเหลือ 'By car') สุขุมวิทกลับเป็นบรรทัดที่ 4 (index 3) ทั้งถนน เส้นประ และการ์ด · บรรทัดสวนปรับให้ขายชีวิตโดยไม่อ้างทางเดินเข้าสวน ('มีพื้นที่สีเขียวอยู่ข้างโครงการ') · ไม่เพิ่มคำถามเรื่องเดินไปหาด (เรื่องนี้ไม่ตอบเวลาเดินแล้ว)"
  },
  {
   "id": "location_travel",
@@ -670,19 +664,23 @@
    "เดินทางสะดวกไหม",
    "ใกล้ห้างและสนามบินไหม",
    "เดินทางไปไหนได้บ้าง",
-   "ไปไหนสะดวกบ้าง"
+   "ไปไหนสะดวกบ้าง",
+   "มีรถไฟฟ้าไหม",
+   "มีโมโนเรลไหม",
+   "มีรถไฟความเร็วสูงไหม"
   ],
   "questions_en": [
    "Is it convenient to get around?",
-   "How far are the malls and airports?"
+   "How far are the malls and airports?",
+   "Is there a monorail?",
+   "Is there a high-speed train?"
   ],
   "lines": [
    {
-    "th": "เซ็นทรัล พัทยา ขับรถประมาณ 12 ถึง 17 นาที",
-    "en": "Central Pattaya is about 12 to 17 minutes by car,",
+    "th": "จากที่นี่ขับรถไปเซ็นทรัล พัทยา ประมาณ 12 นาที",
+    "en": "From here, Central Pattaya is about 12 minutes by car,",
     "cue_th": [
-     "เซ็นทรัล",
-     "Central"
+     "เซ็นทรัล"
     ],
     "cue_en": [
      "Central"
@@ -694,20 +692,17 @@
     ]
    },
    {
-    "th": "เทอร์มินอล 21 ก็ใกล้เคียงกันค่ะ",
+    "th": "เทอร์มินอล 21 ก็ใกล้เคียงกัน",
     "en": "Terminal 21 about the same,",
     "cue_th": [
-     "เทอร์มินอล",
-     "Terminal"
+     "เทอร์มินอล"
     ],
     "cue_en": [
-     "Terminal 21",
      "Terminal"
     ],
     "cue_zh": [
-     "Terminal 21",
-     "航站楼21",
-     "Terminal"
+     "Terminal",
+     "航站楼"
     ]
    },
    {
@@ -729,7 +724,7 @@
    },
    {
     "th": "และสุวรรณภูมิประมาณชั่วโมงครึ่งค่ะ",
-    "en": "and Suvarnabhumi about an hour and a half.",
+    "en": "and Suvarnabhumi Airport about an hour and a half.",
     "cue_th": [
      "สุวรรณภูมิ"
     ],
@@ -740,32 +735,60 @@
      "素万那普",
      "Suvarnabhumi"
     ]
+   },
+   {
+    "th": "ในอนาคตพัทยายังมีโครงการรถไฟฟ้าโมโนเรล ที่จะช่วยให้เดินทางในเมืองสะดวกยิ่งขึ้น",
+    "en": "Pattaya is also planning a monorail, to make getting around the city even easier,",
+    "cue_th": [
+     "โมโนเรล"
+    ],
+    "cue_en": [
+     "monorail"
+    ],
+    "cue_zh": [
+     "单轨"
+    ]
+   },
+   {
+    "th": "รวมถึงโครงการรถไฟความเร็วสูง EEC เชื่อม 3 สนามบิน เมื่อเปิดใช้แล้ว ไปสนามบินจะเร็วขึ้นมากค่ะ",
+    "en": "and the planned EEC high-speed rail linking three airports will make all three much quicker to reach once it opens.",
+    "cue_th": [
+     "ความเร็วสูง",
+     "EEC"
+    ],
+    "cue_en": [
+     "high-speed",
+     "EEC"
+    ],
+    "cue_zh": [
+     "高铁",
+     "高速铁路",
+     "EEC"
+    ]
    }
   ],
   "params": {
    "origin_en": "EMBASSY WORLD",
-   "origin_sub_en": "Jomtien, Pattaya · by car",
+   "origin_sub_en": "Jomtien, Pattaya · by car, no traffic",
    "bar_max": 90,
    "rows": [
     {
      "icon": "mall",
      "label_en": "Central Pattaya",
-     "sub_en": "9.9 km",
-     "value_en": "≈ 12–17 min",
+     "sub_en": "9.9 km by road",
+     "value_en": "≈ 12 min",
      "bar": [
-      12,
-      17
+      12
      ],
      "line": 0
     },
     {
      "icon": "mall",
      "label_en": "Terminal 21 Pattaya",
-     "sub_en": "11.2 km",
-     "value_en": "≈ 12–17 min",
+     "sub_en": "11.2 km by road",
+     "value_en": "≈ 12 min",
      "bar": [
-      12,
-      17
+      12
      ],
      "line": 1
     },
@@ -796,6 +819,13 @@
     "label_th": "หาดและสวน",
     "next_story": "location_beach",
     "tool": null
+   },
+   {
+    "id": "story_location_travel_bangkok",
+    "label_en": "Bangkok & motorway",
+    "label_th": "กรุงเทพและมอเตอร์เวย์",
+    "next_story": "travel_bangkok",
+    "tool": null
    }
   ],
   "sources": [
@@ -803,9 +833,11 @@
    "report:92_appendix_travel.md#ค.4.2 row 31 (Terminal 21 Pattaya ถนน 11.2 กม. · 12 นาที · 15–17 นาที)",
    "facts:ทำเล (สนามบินอู่ตะเภาประมาณ 30 นาที ตามเอกสารนำเสนอ) — ไม่ใช้ตัวเลข 40–60 นาทีในรายงาน (เจ้าของตัดสินทับ, deny_terms)",
    "report:92_appendix_travel.md#ค.4.5 row 64 (สุวรรณภูมิ 91 นาที ≈ 1.5 ชม. free-flow)",
-   "slides:intro-008 (สุวรรณภูมิ 1.5 HR · อู่ตะเภา 30 MIN)"
+   "slides:intro-008 (สุวรรณภูมิ 1.5 HR · อู่ตะเภา 30 MIN)",
+   "report:23_owner_review_2026-10-22.md#23.1 (เจ้าของ 22 ต.ค.: ในอนาคตมีโครงการรถไฟฟ้าโมโนเรลในพัทยา · รถไฟความเร็วสูงเชื่อม 3 สนามบิน EEC — ไม่มีเวลาเดินทาง ไม่มีปีเปิด)",
+   "report:05_growth.md#5.5.2 (รถไฟความเร็วสูงเชื่อม 3 สนามบิน: สถานะ ณ 5 ต.ค. 2026 — ห้ามพูดเวลาเดินทาง 40–45 นาที)"
   ],
-  "notes_th": "ออกแบบใหม่ 13 ต.ค. (เจ้าของ: 'ไม่ต้องใช้รูปภาพแต่ให้เป็น motion เหมือนมันขึ้นมาเอง') — เลิกใช้แผนที่ intro-009 เทมเพลต journey ไม่มีรูปภาพ: โครงการอยู่บนสุด เส้นลากลงผ่านแต่ละที่ แต่ละแถวเลื่อนเข้าตอนพูดชื่อ แล้วจุดวิ่งไปตามแถบ ยาวตามเวลาขับรถ สเกลเดียวกันทุกแถว (bar_max 90 นาที) ใกล้จึงดูใกล้ ไกลดูไกล · ช่วง 12–17 = แถบทึบถึง 12 (รถโล่ง) แถบจางถึง 17 (รถติด) ตามตารางรายงาน (OSRM ไม่ใช่วัดจริง) · 9.9/11.2 กม. อยู่บนจอแต่ไม่พูด · อู่ตะเภา 30 นาทีตาม facts (ไม่ใช้ 40–60 ของรายงาน — เจ้าของตัดสินทับ) · สุวรรณภูมิ ≈ 1.5 ชม. (รายงาน 91 นาที free-flow)"
+  "notes_th": "ออกแบบใหม่ 13 ต.ค. (เจ้าของ: 'ไม่ต้องใช้รูปภาพแต่ให้เป็น motion เหมือนมันขึ้นมาเอง') — เลิกใช้แผนที่ intro-009 เทมเพลต journey ไม่มีรูปภาพ: โครงการอยู่บนสุด เส้นลากลงผ่านแต่ละที่ แต่ละแถวเลื่อนเข้าตอนพูดชื่อ แล้วจุดวิ่งไปตามแถบ ยาวตามเวลาขับรถ สเกลเดียวกันทุกแถว (bar_max 90 นาที) ใกล้จึงดูใกล้ ไกลดูไกล · ช่วง 12–17 = แถบทึบถึง 12 (รถโล่ง) แถบจางถึง 17 (รถติด) ตามตารางรายงาน (OSRM ไม่ใช่วัดจริง) · 9.9/11.2 กม. อยู่บนจอแต่ไม่พูด · อู่ตะเภา 30 นาทีตาม facts (ไม่ใช้ 40–60 ของรายงาน — เจ้าของตัดสินทับ) · สุวรรณภูมิ ≈ 1.5 ชม. (รายงาน 91 นาที free-flow) · 21 ต.ค. (เจ้าของ: 'พูดตัวเลขทศนิยม 1 ตำแหน่ง พูดให้เลขไม่เยอะ ระยะทางเปลี่ยนเป็นเวลา'): ห้างพูดเวลารถไม่ติดตัวเดียว (12 นาที) ไม่พูดช่วง 12 ถึง 17 · แถบจางช่วงรถติดออก (จอไม่มีตัวเลขอธิบายแล้ว) หัวแถวบอก 'no traffic' แทน · 22 ต.ค. (เจ้าของบนหน้าตรวจ: 'เพิ่มเติมและในอนาคต จะมีโครงการรถไฟฟ้าโมโนเรล ... รวมถึงรถไฟความเร็วสูงเชื่อม 3 สถานี EEC ที่จะทำให้การเดินทางไป 3 สนามบินสะดวกและเร็วมาก ปรับคำให้ด้วยนะ'): เพิ่มบรรทัด 5 (โมโนเรลในพัทยา) และ 6 (รถไฟความเร็วสูงเชื่อม 3 สนามบิน EEC) พูดเป็น 'โครงการ' และ 'เมื่อเปิดใช้' ไม่มีปี ไม่มีเวลาเดินทาง (บทที่ 5 หัวข้อ 5.5.2 บันทึกว่าผู้รับสัมปทานขอเลิกสัญญา ก.ค. 2026 และรัฐเสนอปรับแผน — ความเห็นเจ้าของชนะ แต่คำพูดไม่สัญญาวันเปิด) · บนจอไม่มีแถวใหม่ (แถว journey ต้องมีเวลา โครงการรางไม่มีเวลา) · ปรับคำสี่บรรทัดเดิมให้ลื่นขึ้น ('จากที่นี่ขับรถไป...') ตัวเลขเดิมทั้งหมด · เพิ่มคำถามรถไฟฟ้า/โมโนเรล/รถไฟความเร็วสูง และปุ่ม 'Bangkok & motorway' ไปเรื่อง travel_bangkok"
  },
  {
   "id": "travel_malls",
@@ -829,8 +861,8 @@
   ],
   "lines": [
    {
-    "th": "เซ็นทรัล พัทยา ระยะทางถนนประมาณ 9.9 กิโลเมตร ขับรถประมาณ 12 ถึง 17 นาที",
-    "en": "Central Pattaya is about 9.9 kilometres by road, about 12 to 17 minutes by car,",
+    "th": "เซ็นทรัล พัทยา ขับรถประมาณ 12 นาที ระยะทางราว 9.9 กิโลเมตรค่ะ",
+    "en": "Central Pattaya is about 12 minutes by car, about 9.9 kilometres by road,",
     "cue_th": [
      "เซ็นทรัล",
      "Central"
@@ -845,8 +877,8 @@
     ]
    },
    {
-    "th": "และเทอร์มินอล 21 ประมาณ 11.2 กิโลเมตร ใช้เวลาใกล้เคียงกันค่ะ",
-    "en": "and Terminal 21, about 11.2 kilometres, takes about the same.",
+    "th": "ส่วนเทอร์มินอล 21 ใช้เวลาใกล้เคียงกันค่ะ",
+    "en": "and Terminal 21 takes about the same.",
     "cue_th": [
      "เทอร์มินอล",
      "Terminal"
@@ -864,28 +896,26 @@
   ],
   "params": {
    "origin_en": "EMBASSY WORLD",
-   "origin_sub_en": "Jomtien, Pattaya · by car",
+   "origin_sub_en": "Jomtien, Pattaya · by car, no traffic",
    "bar_max": 90,
    "rows": [
     {
      "icon": "mall",
      "label_en": "Central Pattaya",
-     "sub_en": "9.9 km",
-     "value_en": "≈ 12–17 min",
+     "sub_en": "9.9 km by road",
+     "value_en": "≈ 12 min",
      "bar": [
-      12,
-      17
+      12
      ],
      "line": 0
     },
     {
      "icon": "mall",
      "label_en": "Terminal 21 Pattaya",
-     "sub_en": "11.2 km",
-     "value_en": "≈ 12–17 min",
+     "sub_en": "11.2 km by road",
+     "value_en": "≈ 12 min",
      "bar": [
-      12,
-      17
+      12
      ],
      "line": 1
     }
@@ -911,7 +941,7 @@
    "report:92_appendix_travel.md#ค.4.2 row 28 (Central Pattaya ถนน 9.9 กม. · free-flow 12 นาที · รถติด 15–17 นาที)",
    "report:92_appendix_travel.md#ค.4.2 row 31 (Terminal 21 Pattaya ถนน 11.2 กม. · 12 นาที · 15–17 นาที)"
   ],
-  "notes_th": "เรื่องย่อยของ location_travel (เจ้าของ 13 ต.ค.: คำถามแคบแยกเรื่องย่อยต่อคำถาม) — ถามเรื่องห้างตอบแค่ห้าง สองแถว สเกลเดียวกับเรื่องหลัก (bar_max 90 นาที) แถบสั้น = ใกล้ · 12–17 = รถโล่งถึงรถติดตามตารางรายงาน"
+  "notes_th": "เรื่องย่อยของ location_travel (เจ้าของ 13 ต.ค.: คำถามแคบแยกเรื่องย่อยต่อคำถาม) — ถามเรื่องห้างตอบแค่ห้าง สองแถว สเกลเดียวกับเรื่องหลัก (bar_max 90 นาที) แถบสั้น = ใกล้ · 12–17 = รถโล่งถึงรถติดตามตารางรายงาน · 21 ต.ค. (เจ้าของ: 'พูดตัวเลขทศนิยม 1 ตำแหน่ง พูดให้เลขไม่เยอะ ระยะทางเปลี่ยนเป็นเวลา'): เวลาก่อน ระยะทีหลัง และเหลือระยะเดียว (เซ็นทรัล 9.9 กม. — คำถามของเรื่องนี้ถามกิโลด้วย และเทสต์ล็อกไว้) · Terminal 21 พูดแค่ 'ใกล้เคียงกัน' 11.2 กม. อยู่บนจอ · ไม่พูดช่วงรถติด"
  },
  {
   "id": "travel_airports",
@@ -1010,7 +1040,7 @@
  },
  {
   "id": "masterplan_lagoon",
-  "template": "spotlight",
+  "template": "drill",
   "questions_th": [
    "ขอดูผังโครงการ",
    "ผังโครงการเป็นยังไง",
@@ -1020,7 +1050,9 @@
    "Water Lagoon คืออะไร",
    "สระลากูนลึกเท่าไหร่",
    "สระหลักลึกกี่เมตร",
-   "สะพานข้ามสระมีกี่แห่ง"
+   "สะพานข้ามสระมีกี่แห่ง",
+   "ขอดูแปลนโครงการ",
+   "ในผังโครงการมีอะไรอยู่ตรงไหน"
   ],
   "questions_en": [
    "Can I see the site plan?",
@@ -1028,20 +1060,21 @@
    "How big is the pool?",
    "Where is the main pool?",
    "How deep is the lagoon?",
-   "How many bridges are there?"
+   "How many bridges are there?",
+   "Can I see the master plan?",
+   "What's on the site plan?"
   ],
   "lines": [
    {
-    "th": "นี่คือผังโครงการของเราค่ะ",
-    "en": "This is our site plan.",
+    "th": "นี่คือผังโครงการของเราค่ะ ทั้ง 6 อาคารล้อมสระลากูนไว้ตรงกลาง",
+    "en": "This is our site plan: six buildings wrapped around the lagoon in the middle.",
     "cue_th": [
      "ผังโครงการ",
      "ผัง"
     ],
     "cue_en": [
      "site plan",
-     "plan",
-     "layout"
+     "plan"
     ],
     "cue_zh": [
      "总平面",
@@ -1050,51 +1083,30 @@
     ]
    },
    {
-    "th": "6 อาคารล้อมสระลากูนไว้ตรงกลาง",
-    "en": "Six buildings wrap around the lagoon in the middle.",
+    "th": "สระหลักของเราคือ Water Lagoon ลึกประมาณ 1.3 เมตร ยาวราว 155 เมตร",
+    "en": "Our main pool, the Water Lagoon, is about 1.3 metres deep and 155 metres long,",
     "cue_th": [
-     "ลากูน",
-     "ล้อม"
+     "Water Lagoon",
+     "สระหลัก"
     ],
     "cue_en": [
-     "lagoon",
-     "around"
+     "Water Lagoon",
+     "main pool"
     ],
     "cue_zh": [
-     "泻湖",
-     "环绕"
+     "Water Lagoon",
+     "主泳池"
     ]
    },
    {
-    "th": "สระยาวประมาณ 155 เมตร ลึกประมาณ 1.30 เมตร",
-    "en": "It is about 155 metres long and 1.30 metres deep,",
-    "cue_th": [
-     "155 เมตร",
-     "ร้อยห้าสิบห้า",
-     "155",
-     "ยาว"
-    ],
-    "cue_en": [
-     "155",
-     "hundred and fifty-five",
-     "long"
-    ],
-    "cue_zh": [
-     "155米",
-     "一百五十五米",
-     "155"
-    ]
-   },
-   {
-    "th": "หรือราวหนึ่งสนามฟุตบอลครึ่ง",
-    "en": "about one and a half football fields,",
+    "th": "พอๆ กับสนามฟุตบอลหนึ่งสนามครึ่ง ว่ายกันได้เต็มที่เลยค่ะ",
+    "en": "that's one and a half football fields, room for a proper swim.",
     "cue_th": [
      "สนามฟุตบอล",
      "ฟุตบอล"
     ],
     "cue_en": [
-     "football",
-     "soccer"
+     "football"
     ],
     "cue_zh": [
      "足球场",
@@ -1102,8 +1114,8 @@
     ]
    },
    {
-    "th": "มีเกาะต้นไม้ สะพานข้ามสระ 3 แห่ง และจากุซซี่ค่ะ",
-    "en": "with planted islands, three bridges and a jacuzzi.",
+    "th": "กลางสระมีเกาะต้นไม้ จากุซซี่ และสะพานข้ามสระ 3 แห่ง แห่งหนึ่งเป็นสะพานกระจกด้วยค่ะ",
+    "en": "In the water there are planted islands, jacuzzis and three bridges, one of them glass.",
     "cue_th": [
      "เกาะ",
      "สะพาน"
@@ -1117,44 +1129,282 @@
      "岛",
      "桥"
     ]
+   },
+   {
+    "th": "อาคาร A เป็นอาคารหลัก ชั้น G มีล็อบบี้ต้อนรับ",
+    "en": "Building A is the main building, with the lobby on the ground floor,",
+    "cue_th": [
+     "ล็อบบี้",
+     "อาคาร A"
+    ],
+    "cue_en": [
+     "lobby",
+     "Building A"
+    ],
+    "cue_zh": [
+     "大堂",
+     "A栋"
+    ]
+   },
+   {
+    "th": "แล้วก็ฟิตเนส Biogenesis ผนังกระจกโค้งยื่นออกไปทางลากูน ออกกำลังกายไปก็ได้วิวสระไปด้วยค่ะ",
+    "en": "and Biogenesis, the curved glass gym reaching out to the water, so you work out with a pool view.",
+    "cue_th": [
+     "Biogenesis",
+     "ฟิตเนส"
+    ],
+    "cue_en": [
+     "Biogenesis",
+     "gym"
+    ],
+    "cue_zh": [
+     "Biogenesis",
+     "健身"
+    ]
+   },
+   {
+    "th": "ข้างกันเป็นห้องเด็ก Junior World ธีมอวกาศ",
+    "en": "Next to it is Junior World, the space-themed kids' room,",
+    "cue_th": [
+     "Junior World",
+     "ห้องเด็ก"
+    ],
+    "cue_en": [
+     "Junior World"
+    ],
+    "cue_zh": [
+     "Junior World",
+     "儿童"
+    ]
+   },
+   {
+    "th": "ออกไปด้านนอกก็เจอเพลย์กราวด์กับสระเด็ก เด็กๆ เล่นสนุกได้ทั้งบนบกและในน้ำเลยค่ะ",
+    "en": "which opens onto the playground and the kids' pool, for fun on land and in the water.",
+    "cue_th": [
+     "เพลย์กราวด์",
+     "สระเด็ก"
+    ],
+    "cue_en": [
+     "playground"
+    ],
+    "cue_zh": [
+     "游乐场",
+     "儿童池"
+    ]
+   },
+   {
+    "th": "รอบๆ เป็นสนามหญ้า สวนร่มรื่น และเตียงอาบแดดไว้พักผ่อนสบายๆ",
+    "en": "All around are lawns, shady gardens and sun loungers to relax on.",
+    "cue_th": [
+     "สนามหญ้า",
+     "เตียงอาบแดด"
+    ],
+    "cue_en": [
+     "lawns",
+     "gardens",
+     "sun loungers"
+    ],
+    "cue_zh": [
+     "草坪",
+     "花园"
+    ]
+   },
+   {
+    "th": "ชั้นใต้ดินมีสระในร่ม Aqua Cinema กับโซนซาวน่าหลายแบบให้ผ่อนคลาย",
+    "en": "Below ground there's the Aqua Cinema indoor pool and several saunas to unwind in,",
+    "cue_th": [
+     "ใต้ดิน",
+     "Aqua Cinema"
+    ],
+    "cue_en": [
+     "Aqua Cinema",
+     "below ground"
+    ],
+    "cue_zh": [
+     "地下",
+     "Aqua Cinema"
+    ]
+   },
+   {
+    "th": "และชั้น 3 ของอาคาร A ยังมี Sky Pool กับเลานจ์ไว้นั่งพบปะกันค่ะ",
+    "en": "and on level 3 of Building A, the Sky Pool and the lounges.",
+    "cue_th": [
+     "Sky Pool",
+     "เลานจ์"
+    ],
+    "cue_en": [
+     "Sky Pool"
+    ],
+    "cue_zh": [
+     "Sky Pool",
+     "空中泳池"
+    ]
    }
   ],
   "params": {
    "base_asset": "plan_ground_site",
-   "zoom": {
-    "x": 48,
-    "y": 50,
-    "scale": 1.3
-   },
-   "spot": {
-    "x": 56,
-    "y": 52,
-    "label_en": "WATER LAGOON",
-    "sub_en": "Main pool · ≈ 155 m long"
-   },
-   "spot_line": 2,
-   "photo": {
-    "asset": "lagoon_scene58",
-    "title_en": "WATER LAGOON",
-    "sub_en": "The main pool, between the buildings",
-    "chips_en": [
-     {
-      "label_en": "Length",
-      "value_en": "≈ 155 m"
-     },
-     {
-      "label_en": "Depth",
-      "value_en": "≈ 1.30 m"
-     },
-     "≈ 1.5 football fields",
-     "5 planted islands",
-     "3 bridges · 1 of glass",
-     "Jacuzzi island"
-    ],
-    "line": 4
-   }
+   "items": [
+    {
+     "label_en": "Water Lagoon",
+     "sub_en": "Main pool · ≈ 155 m long · ≈ 1.3 m deep",
+     "asset": "liv_trees",
+     "at": [
+      56.0,
+      52.0
+     ],
+     "line": 1,
+     "tap": "story_masterplan_lagoon_pools"
+    },
+    {
+     "label_en": "Islands & bridges",
+     "sub_en": "5 planted islands · 3 bridges, 1 glass · jacuzzis",
+     "asset": "lagoon_islands_aerial",
+     "at": [
+      28.1,
+      44.8
+     ],
+     "line": 3,
+     "tap": "story_masterplan_lagoon_islands"
+    },
+    {
+     "label_en": "Lobby",
+     "sub_en": "Building A · ground floor",
+     "asset": "rm_lobby",
+     "at": [
+      64.6,
+      24.8
+     ],
+     "line": 4,
+     "tap": "story_masterplan_lagoon_lobby"
+    },
+    {
+     "label_en": "Biogenesis",
+     "sub_en": "Fitness · curved glass wall to the lagoon",
+     "asset": "fac_g_biogenesis",
+     "at": [
+      64.9,
+      40.0
+     ],
+     "line": 5,
+     "tap": "story_masterplan_lagoon_fitness"
+    },
+    {
+     "label_en": "Junior World",
+     "sub_en": "Kids' room · space theme",
+     "asset": "fac_g_junior",
+     "at": [
+      53.2,
+      33.3
+     ],
+     "line": 6,
+     "tap": "story_masterplan_lagoon_kids"
+    },
+    {
+     "label_en": "Playground & kids' pool",
+     "sub_en": "Space playground by the water",
+     "asset": "rm_playscape_aerial",
+     "at": [
+      55.9,
+      41.3
+     ],
+     "line": 7,
+     "tap": "story_masterplan_lagoon_playground"
+    },
+    {
+     "label_en": "Lawns & gardens",
+     "sub_en": "Sun loungers · shady trees",
+     "asset": "liv_lawn",
+     "at": [
+      84.5,
+      31.5
+     ],
+     "line": 8,
+     "tap": "story_masterplan_lagoon_gardens"
+    },
+    {
+     "label_en": "Basement",
+     "sub_en": "Aqua Cinema · saunas · ice bath",
+     "asset": "fac_b_aqua_cinema",
+     "at": null,
+     "line": 9,
+     "tap": "story_masterplan_lagoon_basement"
+    },
+    {
+     "label_en": "Level 3 · Building A",
+     "sub_en": "Sky Pool · lounges",
+     "asset": "fac_3_sky_pool",
+     "at": null,
+     "line": 10,
+     "tap": "story_masterplan_lagoon_level3"
+    }
+   ],
+   "more_en": "Also on the ground floor: Spinning · Pilates · Bungee Gym & Yoga",
+   "tap_label_en": "Tap for details"
   },
   "taps": [
+   {
+    "id": "story_masterplan_lagoon_pools",
+    "label_en": "All pools",
+    "label_th": "สระทั้งหมด",
+    "next_story": "pools_all",
+    "tool": null
+   },
+   {
+    "id": "story_masterplan_lagoon_islands",
+    "label_en": "Lagoon islands",
+    "label_th": "เกาะกลางสระ",
+    "next_story": "lagoon_islands",
+    "tool": null
+   },
+   {
+    "id": "story_masterplan_lagoon_lobby",
+    "label_en": "Lobby",
+    "label_th": "ล็อบบี้",
+    "next_story": "lobby_where",
+    "tool": null
+   },
+   {
+    "id": "story_masterplan_lagoon_fitness",
+    "label_en": "Biogenesis",
+    "label_th": "ฟิตเนส Biogenesis",
+    "next_story": "fitness_where",
+    "tool": null
+   },
+   {
+    "id": "story_masterplan_lagoon_kids",
+    "label_en": "Junior World",
+    "label_th": "ห้องเด็ก Junior World",
+    "next_story": "kids_room_where",
+    "tool": null
+   },
+   {
+    "id": "story_masterplan_lagoon_playground",
+    "label_en": "Playground",
+    "label_th": "สนามเด็กเล่น",
+    "next_story": "playground_where",
+    "tool": null
+   },
+   {
+    "id": "story_masterplan_lagoon_gardens",
+    "label_en": "Green & park",
+    "label_th": "สวนและพื้นที่สีเขียว",
+    "next_story": "park_green",
+    "tool": null
+   },
+   {
+    "id": "story_masterplan_lagoon_basement",
+    "label_en": "Basement",
+    "label_th": "ชั้นใต้ดิน",
+    "next_story": "facilities_basement",
+    "tool": null
+   },
+   {
+    "id": "story_masterplan_lagoon_level3",
+    "label_en": "Level 3",
+    "label_th": "ชั้น 3",
+    "next_story": "facilities_level3",
+    "tool": null
+   },
    {
     "id": "story_masterplan_lagoon_facilities",
     "label_en": "Facilities",
@@ -1178,19 +1428,22 @@
    }
   ],
   "sources": [
-   "facts:จุดเด่น (ภายนอก: Water Lagoon สระหลักกลางโครงการ · Jacuzzi)",
+   "facts:จุดเด่น (ชั้น G: Lobby, Biogenesis, Junior World · ชั้นใต้ดิน: Aqua Cinema, ซาวน่า, Ice Bath · ชั้น 3 อาคาร A: Social Lounge, Co-working Lounge, Common Sphere, Sky Pool · ภายนอก: Water Lagoon สระหลักกลางโครงการ, Kid Pool, Jacuzzi, Stepped Garden)",
    "facts:โครงการ (6 อาคาร A–F)",
-   "report:06_masterplan.md#6.3 (อาคาร 6 หลังล้อมสระ/ลากูนกลาง)",
+   "report:06_masterplan.md#6.3 (อาคาร 6 หลังล้อมสระ/ลากูนกลาง · อาคาร A อาคารหลัก ล็อบบี้)",
    "report:06_masterplan.md#6.3.2 (Main Pool 155 m · สะพาน 3 แห่ง คอนกรีต 2 + กระจก 1 · เกาะ 5 เกาะ)",
+   "report:12_landscape.md#12.3 (อะไรอยู่ตรงไหนบนผัง: Biogenesis ส่วนโค้งกระจกยื่นสู่ลากูน · Playscape และ Kid Pool ใต้ Junior World ซ้ายของส่วนโค้ง · Lawn Terrace (Daybed) ติดอาคาร B · Main Pavilion ฝั่งซ้าย)",
+   "report:12_landscape.md#12.11 (Daybed 53 ชุด · สนามหญ้าขั้นบันได)",
    "report:12_landscape.md line 5, 101 (ชื่อทางการ 155 ม. · เส้นบอกขนาด 156.90 ม.)",
    "report:12_landscape.md line 139 (ผู้นำเสนอเทียบ 155 ม. = 1.5 สนามฟุตบอล 🔎 สอดคล้อง)",
    "report:12_landscape.md line 31, 193 (Island 3 = Jacuzzi + Water Curtain)",
+   "report:09_facilities_ground.md#9.7 (Junior World ธีมอวกาศ เปิดสู่ลาน Playscape)",
    "slides:intro-015 (155M. Water Lagoon)",
-   "assets:web/3.project details/master plan/_Embassy World  Floor Plan/3.png · web/6.gallery/exterior/CD03/Scene 58.png",
+   "assets:web/3.project details/master plan/_Embassy World  Floor Plan/3.png (ผังชั้น G — แผ่นที่สองหลังปกในชุดผังของเจ้าของ) · web/6.gallery/exterior/CD03/Scene 38.png, Scene 58.png, Scene 37.png · Playscape/Scene 55.png",
    "report:01_overview.md line 99, 150 · 19_faq.md (สระหลักลึกประมาณ 1.30 ม. ตามข้อมูลผู้พัฒนา; ไม่ใช้กับ Sky Pool/สระใต้ดิน)",
    "report:19_faq.md (เจ้าของ 15 ต.ค. ทำ motion คำถามที่มีตัวเลข — ขนาด/จำนวนตามคำตอบ FAQ ของรายงาน)"
   ],
-  "notes_th": "ลำดับบนจอ: (0) ผังชั้น G ของเว็บไซต์ทั้งผืน (ป้าย BUILDING A–F พิมพ์อยู่บนผังเอง) · (1) ไม่มีภาพใหม่ ผังค้าง (ป้ายอาคารบนผังทำหน้าที่แทน) · (2) ซูมเบาๆ 1.3 เท่า ที่ (48,50) ให้ยังเห็นลากูนทั้งเส้น วงชี้ที่ผิวน้ำกลางลากูน (56,52) ป้าย WATER LAGOON · ≈ 155 m · (3) ไม่มีภาพใหม่ (ฟุตบอลเป็นคำเปรียบ) · (4) ตัดไปภาพจริง Scene 58 (มุมสูงมองไล่ตามลากูน เห็นเกาะ สะพาน ศาลา) ชิปเด้งทีละข้อ · พิกัด: ลากูนบนผังที่ครอปกินตั้งแต่ x ≈ 11% (ปีกอาคาร E) ถึง ≈ 85% (อาคาร B) ตรงกับ 'จากปีกอาคาร E/D ถึงปลายติดอาคาร B' ในรายงาน · จุดวงชี้เลือกบนผิวน้ำสีฟ้าที่ไม่ทับสะพาน/เกาะ (อ่านจากภาพครอปที่มีกริด) · ถ้า engine ทำได้ ข้อเสนอ: เส้นวัดตามแนวลากูนจาก (11,52) ถึง (85,40) แทนวงชี้ ผังเว็บนี้มีเลขห้องและขนาดห้องพิมพ์อยู่ (ตรงกับช่วงใน facts ไม่มีราคา ไม่มีสถานะขาย) และมีป้าย SOUL SPACE ที่ไม่อยู่ในรายการ facility ของ facts — ให้เจ้าของดู · คำว่า 'ราวสนามฟุตบอลครึ่ง' เป็นคำเปรียบของผู้นำเสนอที่รายงานบันทึกไว้ ถ้าเจ้าของไม่อยากให้พูด ตัดบรรทัด 3 และชิปทิ้งได้ · แก้ตามรีวิว 12 ต.ค.: ชิปแรกเป็นแถวเด่น 'Length · ≈ 155 m' (ตัวเลขสีทอง) — ลูกค้าถามความยาว เดิมเป็นข้อความธรรมดาน้ำหนักเท่า 'Jacuzzi island'"
+  "notes_th": "22 ต.ค. ออกแบบใหม่ (เจ้าของบนหน้าตรวจ: 'ไม่ใช่ภาพนี้ต้องเป็นรูปภาพผังโครงการ แบบแปลนโครงการ เอารูปที่สองที่ส่งไปให้ดู และอธิบายพวกฟาซิลิตี้ในโครงการนะ') — เดิม spotlight จบที่ภาพจริง Scene 58 พร้อมชิป เจ้าของเห็นภาพจบแล้วบอกว่าคำตอบต้องเป็นผัง · ตอนนี้แม่แบบ drill: ผังชั้น G ของชุดผังเจ้าของ (3.png แผ่นที่สองหลังปก = plan_ground_site) อยู่บนสุดตลอดทั้งเรื่องและตอนจบ วงชี้ย้ายไปแต่ละที่ตามที่ Emma เอ่ย ใต้ผังเป็นการ์ดภาพใหญ่ทีละที่ (ภาพจริงเป็นของรอง ไม่ใช่คำตอบ) · ลำดับ: (0) ผัง 6 อาคารล้อมลากูน · (1) Water Lagoon (56,52) ยาว ≈155 ลึก ≈1.3 (สระหลักเท่านั้น — เทสต์) · (2) หนึ่งสนามฟุตบอลครึ่ง (ไม่มีการ์ดใหม่) · (3) เกาะ จากุซซี่ สะพาน 3 แห่ง กระจก 1 วงที่เกาะศาลาฝั่งซ้าย (28.1,44.8) · (4) อาคาร A ล็อบบี้ ที่ป้าย LOBBY (64.6,24.8) · (5) Biogenesis ส่วนโค้งกระจก (64.9,40) · (6) Junior World ที่ป้าย (53.2,33.3) · (7) ลาน Playscape + สระเด็ก ที่สระกลมใต้ Junior World ซ้ายของส่วนโค้ง (55.9,41.3) ตามรายงาน 12.3 · (8) สนามหญ้า/เตียงอาบแดด ที่ Lawn Terrace (Daybed) ติดอาคาร B (84.5,31.5) ตามรายงาน 12.3 · (9) ชั้นใต้ดิน และ (10) ชั้น 3 อาคาร A / Sky Pool ไม่มีวงชี้ (ไม่อยู่บนผังชั้น G) การ์ดพาไปเรื่องของชั้นนั้น · พิกัดอ่านจากภาพผังที่ครอปแล้วพร้อมกริด 5% (สคริปต์ scratchpad review22/scripts/arch_grid.py) · ห้องอื่นชั้น G (Spinning, Pilates, Bungee Gym & Yoga) อยู่ในบรรทัด more_en บนจอ ไม่พูด (เรื่องยาวแล้ว — ปุ่มชั้นต่างๆ พาไปต่อ) · ไม่พูด/ไม่ชี้ SOUL SPACE (ป้ายบนผังเว็บ ไม่อยู่ใน facts) · คำถามเดิมคงไว้ทั้งหมด เพิ่มเฉพาะคำถามที่ใช้คำว่าผัง/แปลน/plan (ไม่ใช้ 'สิ่งอำนวยความสะดวก'/'ส่วนกลาง'/'facilities' ไม่งั้นแย่งคำถามของ facilities_overview) · ก่อนหน้า: 12 ต.ค. ชิป Length เป็นแถวเด่น · 21 ต.ค. ลึก 1.30 → 1.3 คำ cue เลิกใช้ตัวเลข"
  },
  {
   "id": "parking",
@@ -1200,13 +1453,17 @@
    "มีที่จอดรถไหม",
    "จอดรถตรงไหน",
    "มีที่จอดมอเตอร์ไซค์ไหม",
-   "มีที่ชาร์จรถไฟฟ้าไหม"
+   "มีที่ชาร์จรถไฟฟ้าไหม",
+   "ตึกนี้มีที่จอดรถกี่ช่อง",
+   "มีที่จอดรถกี่ช่อง"
   ],
   "questions_en": [
    "How many parking spaces are there?",
    "Is there parking?",
    "Where do residents park?",
-   "Is there EV charging?"
+   "Is there EV charging?",
+   "How many car parks are in this building?",
+   "How many parking space are there?"
   ],
   "lines": [
    {
@@ -1325,7 +1582,7 @@
    "slides:intro-015 (Underground Parking)",
    "assets:drawn/parking_plan.svg (วาดใหม่ 13 ต.ค. ตามคำสั่งเจ้าของ ลอกจาก web/3.project details/master plan/_Embassy World  Floor Plan/2.png: วงแหวนจอดรถทั้งชั้น · ตัวอักษรอาคารจาก KEY PLAN ของแผ่นเดียวกัน · EV ที่เลนใต้อาคาร D ตรงที่แผ่นพิมพ์ WITH EV CHARGER)"
   ],
-  "notes_th": "ลำดับบนจอ: (0) ผังลานจอดใต้ดินที่วาดใหม่ (วงแหวนรอบลาน อาคาร A–F เลน EV สีเขียว) ค่อยๆ ขึ้น · (1) ไม่มีภาพใหม่ (ป้าย EV อยู่บนผังแล้ว) · (2) ตัวเลข ≈ 224 นับขึ้น หน่วย CAR SPACES ป้าย 'Underground · EV charging' · (3) ส่วนย่อย ≈ 108 Motorbike spaces นับขึ้น · เปลี่ยนจากสเปก: ใส่ line และ prefix_en ให้ parts (engine ไม่รองรับก็ขึ้นพร้อมตัวเลขหลัก) · ห้ามบอกว่าทุกห้องมีที่จอด / ฟรีหรือไม่ / จำนวนหัวชาร์จ (ยังไม่ยืนยัน ให้ส่งทีมขาย) · ข้อที่เจ้าของต้องตัดสิน: CLAUDE.md เคยจงใจไม่ใส่ที่จอด/EV ใน facts เพราะรายงานติด 'ควรให้บริษัทยืนยัน' แต่ 12 ต.ค. เจ้าของอนุมัติรายงานให้ตอบได้ ตัวเลข 224/108 เป็นการนับเส้นจากแบบ (±2–3) จึงพูด 'ประมาณ' และมี ≈ บนจอ — ขอคำยืนยันว่าขึ้นจอได้ · ผังที่วาดห้ามใส่ชื่อห้องในบล็อกใต้อาคาร A: แผ่นต้นฉบับมีป้ายชื่อห้องที่เจ้าของสั่งห้ามใช้ (อยู่ใน deny_terms) และวาง Bungee Gym/Journey to the Future ไว้ชั้นใต้ดินซึ่งขัดกับ facts · ไม่วาดทางลาด/ช่องมอเตอร์ไซค์/จำนวนหัวชาร์จ (แผ่นไม่ได้บอก) · เส้นช่องจอดเป็นลวดลาย ไม่ใช่จำนวน"
+  "notes_th": "ลำดับบนจอ: (0) ผังลานจอดใต้ดินที่วาดใหม่ (วงแหวนรอบลาน อาคาร A–F เลน EV สีเขียว) ค่อยๆ ขึ้น · (1) ไม่มีภาพใหม่ (ป้าย EV อยู่บนผังแล้ว) · (2) ตัวเลข ≈ 224 นับขึ้น หน่วย CAR SPACES ป้าย 'Underground · EV charging' · (3) ส่วนย่อย ≈ 108 Motorbike spaces นับขึ้น · เปลี่ยนจากสเปก: ใส่ line และ prefix_en ให้ parts (engine ไม่รองรับก็ขึ้นพร้อมตัวเลขหลัก) · ห้ามบอกว่าทุกห้องมีที่จอด / ฟรีหรือไม่ / จำนวนหัวชาร์จ (ยังไม่ยืนยัน ให้ส่งทีมขาย) · ข้อที่เจ้าของต้องตัดสิน: CLAUDE.md เคยจงใจไม่ใส่ที่จอด/EV ใน facts เพราะรายงานติด 'ควรให้บริษัทยืนยัน' แต่ 12 ต.ค. เจ้าของอนุมัติรายงานให้ตอบได้ ตัวเลข 224/108 เป็นการนับเส้นจากแบบ (±2–3) จึงพูด 'ประมาณ' และมี ≈ บนจอ — ขอคำยืนยันว่าขึ้นจอได้ · ผังที่วาดห้ามใส่ชื่อห้องในบล็อกใต้อาคาร A: แผ่นต้นฉบับมีป้ายชื่อห้องที่เจ้าของสั่งห้ามใช้ (อยู่ใน deny_terms) และวาง Bungee Gym/Journey to the Future ไว้ชั้นใต้ดินซึ่งขัดกับ facts · ไม่วาดทางลาด/ช่องมอเตอร์ไซค์/จำนวนหัวชาร์จ (แผ่นไม่ได้บอก) · เส้นช่องจอดเป็นลวดลาย ไม่ใช่จำนวน · 21 ต.ค. (เจ้าของ: 'พูดตัวเลขทศนิยม 1 ตำแหน่ง พูดให้เลขไม่เยอะ ระยะทางเปลี่ยนเป็นเวลา'): คำถามจริงจาก log หุ่น 20 ต.ค. (ตอบจากความจำ ไม่เรียกเรื่อง)"
  },
  {
   "id": "unit_count",
@@ -1486,17 +1743,19 @@
    "ความสูงแต่ละชั้นเท่าไหร่",
    "เพดานสูงเท่าไหร่",
    "ระยะฝ้าสูงเท่าไหร่",
-   "ระยะฝ้าห้องพักสูงเท่าไหร่"
+   "ระยะฝ้าห้องพักสูงเท่าไหร่",
+   "ห้องหนึ่งห้องนอนเพดานสูงเท่าไหร่"
   ],
   "questions_en": [
    "How thick is the floor slab?",
    "What is the floor-to-floor height?",
-   "How high are the ceilings?"
+   "How high are the ceilings?",
+   "How high is the ceiling of a one bedroom unit?"
   ],
   "lines": [
    {
-    "th": "ความสูงจากพื้นถึงพื้นของแต่ละชั้นประมาณ 2.84 เมตรค่ะ",
-    "en": "From one floor to the next is about 2.84 metres.",
+    "th": "ความสูงจากพื้นถึงพื้นของแต่ละชั้นประมาณ 2.8 เมตรค่ะ",
+    "en": "From one floor to the next is about 2.8 metres.",
     "cue_th": [
      "พื้นถึงพื้น",
      "แต่ละชั้น"
@@ -1511,7 +1770,7 @@
     ]
    },
    {
-    "th": "พื้นโครงสร้างหนาประมาณ 0.25 เมตร หรือ 25 เซนติเมตร",
+    "th": "พื้นโครงสร้างหนาประมาณ 25 เซนติเมตร",
     "en": "The structural floor slab is about 25 centimetres thick,",
     "cue_th": [
      "โครงสร้าง",
@@ -1527,8 +1786,8 @@
     ]
    },
    {
-    "th": "จากผิวพื้นถึงท้องพื้นชั้นบนประมาณ 2.59 เมตร ส่วนความสูงฝ้าสุดท้ายทีมขายจะยืนยันให้ค่ะ",
-    "en": "so from the floor surface to the slab above is about 2.59 metres; our sales team will confirm the finished ceiling height.",
+    "th": "จากผิวพื้นถึงท้องพื้นชั้นบนประมาณ 2.6 เมตร ส่วนความสูงฝ้าสุดท้ายทีมขายจะยืนยันให้ค่ะ",
+    "en": "so from the floor surface to the slab above is about 2.6 metres; our sales team will confirm the finished ceiling height.",
     "cue_th": [
      "ท้องพื้น",
      "ฝ้า"
@@ -1546,8 +1805,8 @@
   "params": {
    "bg_asset": "bld_c_real",
    "value": {
-    "to": 2.84,
-    "dec": 2,
+    "to": 2.8,
+    "dec": 1,
     "prefix_en": "≈ ",
     "unit_en": "m"
    },
@@ -1556,16 +1815,16 @@
    "parts": [
     {
      "label_en": "Structural slab",
-     "to": 0.25,
-     "dec": 2,
+     "to": 25,
+     "dec": 0,
      "prefix_en": "≈",
-     "unit_en": "m",
+     "unit_en": "cm",
      "line": 1
     },
     {
      "label_en": "Floor to the slab above",
-     "to": 2.59,
-     "dec": 2,
+     "to": 2.6,
+     "dec": 1,
      "prefix_en": "≈",
      "unit_en": "m",
      "line": 2
@@ -1589,9 +1848,10 @@
    }
   ],
   "sources": [
-   "report:06_masterplan.md#ค่าสำคัญที่ใช้ตอบลูกค้า (ชั้นทั่วไป 2.84 · พื้นโครงสร้าง 0.25 · ผิวพื้นถึงท้องพื้น 2.59)"
+   "report:06_masterplan.md#ค่าสำคัญที่ใช้ตอบลูกค้า (ชั้นทั่วไป 2.84 · พื้นโครงสร้าง 0.25 · ผิวพื้นถึงท้องพื้น 2.59)",
+   "report:19_faq.md (เพดานห้องสูงเท่าไร: พื้นถึงพื้น 2.84 ม. ความสูงฝ้าจริงยังไม่สรุป — พูดปัด 2.8)"
   ],
-  "notes_th": "เจ้าของ 15 ต.ค. (คำถามในภาพ: ขนาดพื้น) — ค่าตามโมเดลสถาปนิก 🔎 รายงานบท 6 · ความสูงฝ้าสำเร็จยังไม่สรุป ให้ทีมขายยืนยัน (ตามที่ตอบใน log 15 ต.ค.) · ภาพอาคาร C เดียวกับ building_height"
+  "notes_th": "เจ้าของ 15 ต.ค. (คำถามในภาพ: ขนาดพื้น) — ค่าตามโมเดลสถาปนิก 🔎 รายงานบท 6 · ความสูงฝ้าสำเร็จยังไม่สรุป ให้ทีมขายยืนยัน (ตามที่ตอบใน log 15 ต.ค.) · ภาพอาคาร C เดียวกับ building_height · 21 ต.ค. (เจ้าของ: 'พูดตัวเลขทศนิยม 1 ตำแหน่ง พูดให้เลขไม่เยอะ ระยะทางเปลี่ยนเป็นเวลา'): 2.84 → 2.8 · 0.25 ม. → 25 ซม. (ไม่พูดซ้ำสองหน่วย) · 2.59 → 2.6 · ตัวนับบนจอ dec 1 · คำถามจริงจาก log หุ่น 20 ต.ค. 'How high is the ceiling of a one bedroom unit?' (ค้นเป็น 'unit details' แล้วส่งทีมขาย)"
  },
  {
   "id": "site_area",
@@ -1600,35 +1860,33 @@
    "ที่ดินกี่ไร่",
    "ที่ดินขนาดเท่าไหร่",
    "ที่ดินกี่ตารางเมตร",
-   "ที่ดินรูปร่างเป็นยังไง",
-   "พื้นที่โครงการทั้งหมดเท่าไหร่"
+   "พื้นที่โครงการทั้งหมดเท่าไหร่",
+   "ที่ดินกว้างเท่าไหร่",
+   "ที่ดินกว้างที่สุดในพัทยาไหม"
   ],
   "questions_en": [
    "How big is the land?",
    "How many rai is the land?",
-   "What is the site area?"
+   "What is the site area?",
+   "How large is the plot?"
   ],
   "lines": [
    {
-    "th": "ที่ดินของโครงการประมาณ 15,556 ตารางเมตรค่ะ",
-    "en": "The land is about 15,556 square metres,",
+    "th": "ที่ดินของโครงการมีประมาณ 15,556 ตารางเมตร",
+    "en": "Our land is about 15,556 square metres,",
     "cue_th": [
-     "15,556",
      "ที่ดิน"
     ],
     "cue_en": [
-     "15,556",
      "land"
     ],
     "cue_zh": [
-     "15556",
-     "15,556",
      "土地"
     ]
    },
    {
-    "th": "หรือราว 9 ไร่ 2 งาน 89 ตารางวา",
-    "en": "about 9 rai 2 ngan 89 square wah,",
+    "th": "หรือราว 9 ไร่ 2 งานค่ะ",
+    "en": "or roughly 9 rai 2 ngan in Thai land units.",
     "cue_th": [
      "ไร่"
     ],
@@ -1641,34 +1899,35 @@
     ]
    },
    {
-    "th": "เป็นรูปหลายเหลี่ยม 9 มุม กว้างประมาณ 217 เมตร ลึกประมาณ 81 เมตร",
-    "en": "a nine-sided plot about 217 metres wide and 81 metres deep,",
+    "th": "เป็นโครงการโลว์ไรส์ที่มีที่ดินกว้างที่สุดในพัทยา",
+    "en": "It's the largest plot of any low-rise project in Pattaya,",
     "cue_th": [
-     "217",
-     "หลายเหลี่ยม"
+     "โลว์ไรส์",
+     "พัทยา"
     ],
     "cue_en": [
-     "217",
-     "nine-sided"
+     "low-rise",
+     "Pattaya"
     ],
     "cue_zh": [
-     "217"
+     "低层",
+     "芭提雅"
     ]
    },
    {
-    "th": "ในนั้นเป็นพื้นที่สีเขียว 4,256 ตารางเมตร และสระว่ายน้ำรวม 2,157 ตารางเมตรค่ะ",
-    "en": "with 4,256 square metres of green space and 2,157 square metres of pools.",
+    "th": "แถมสระว่ายน้ำของเรายังยาวที่สุดด้วย ราว 155 เมตรเลยค่ะ",
+    "en": "and our swimming pool is the longest too, about 155 metres.",
     "cue_th": [
-     "สีเขียว",
-     "4,256"
+     "สระว่ายน้ำ",
+     "ยาวที่สุด"
     ],
     "cue_en": [
-     "green",
-     "4,256"
+     "pool",
+     "longest"
     ],
     "cue_zh": [
-     "绿地",
-     "4256"
+     "泳池",
+     "最长"
     ]
    }
   ],
@@ -1679,18 +1938,13 @@
     "dec": 0,
     "unit_en": "SQ.M."
    },
-   "label_en": "Land · about 9 rai 2 ngan 89 sq.wah",
+   "label_en": "Land · about 9 rai 2 ngan",
    "parts": [
     {
-     "label_en": "Green space",
-     "to": 4256,
-     "unit_en": "sq.m.",
-     "line": 3
-    },
-    {
-     "label_en": "Pools",
-     "to": 2157,
-     "unit_en": "sq.m.",
+     "label_en": "Main pool length",
+     "prefix_en": "≈",
+     "to": 155,
+     "unit_en": "m",
      "line": 3
     }
    ],
@@ -1713,10 +1967,12 @@
    }
   ],
   "sources": [
-   "report:19_faq.md (ที่ดินโครงการกี่ไร่ 15,556 ตร.ม. ≈ 9 ไร่ 2 งาน 89 ตร.ว. · ที่ดินรูปร่าง 9 มุม 217 × 81 ม. · พื้นที่ภายนอก สีเขียว 4,256 สระ 2,157)",
-   "report:06_masterplan.md"
+   "report:19_faq.md (ที่ดินโครงการกี่ไร่ 15,556 ตร.ม. ≈ 9 ไร่ 2 งาน 89 ตร.ว.)",
+   "report:06_masterplan.md#6.2.1 (ที่ดิน ≈ 15,556 ตร.ม. ≈ 9-2-89 วัดจากแบบ)",
+   "report:06_masterplan.md#6.3.2 (Main Pool 155 m)",
+   "report:23_owner_review_2026-10-22.md#23.1 (เจ้าของ 22 ต.ค.: โครงการ Low-rise ที่มีที่ดินกว้างที่สุดในพัทยา และสระว่ายน้ำยาวที่สุด)"
   ],
-  "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · log 15 ต.ค. \"ที่ดินที่นี่ขนาดเท่าไหร่ครับ\" ตอบจากการค้น ไม่มีภาพ · ที่ดินวัดจากแบบ ยังไม่ได้ยืนยันกับโฉนด (รายงาน) — พูด \"ประมาณ\" เสมอ"
+  "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · log 15 ต.ค. \"ที่ดินที่นี่ขนาดเท่าไหร่ครับ\" ตอบจากการค้น ไม่มีภาพ · ที่ดินวัดจากแบบ ยังไม่ได้ยืนยันกับโฉนด (รายงาน) — พูด \"ประมาณ\" เสมอ · 21 ต.ค. (เจ้าของ: 'พูดตัวเลขทศนิยม 1 ตำแหน่ง พูดให้เลขไม่เยอะ ระยะทางเปลี่ยนเป็นเวลา'): ลดตัวเลข: 89 ตารางวา, 9 มุม, ลึก 81 ม. และสระ 2,157 ตร.ม. ออก (สระรวมอยู่ในเรื่อง pools_all) · คำ cue เลิกใช้ตัวเลข · 22 ต.ค. (เจ้าของบนหน้าตรวจ: 'เพิ่ม เป็นโครงการ low rise ที่มีที่ดินที่กว้างที่สุดในพัทยา และสระว่ายน้ำยาวที่สุด ลบ เป็นที่ดินหลายเหลี่ยม กว้างประมาณ 217 เมตร ในนั้นเป็นพื้นที่สีเขียว 4,256 ตารางเมตรค่ะ'): ตัดบรรทัดรูปร่าง/217 ม. และพื้นที่สีเขียว 4,256 พร้อมแถบ Green space บนจอ · เพิ่มบรรทัด 3 คำกล่าวของเจ้าของ (ขอบเขต 'โลว์ไรส์ ... ในพัทยา' ตามคำเจ้าของ ไม่ขยาย) และบรรทัด 4 สระยาวที่สุด + 155 ม. (ตัวเลขจากรายงาน 6.3.2 ใส่ไว้ให้คำอ้างมีตัวเลขรองรับ) แถบ Main pool length ≈ 155 m แทนแถบพื้นที่สีเขียว · คำอ้าง 'ที่สุด' พูดอย่างเดียว ไม่ขึ้นจอ (ภาพบนจอลูกค้าถ่ายได้) · ตัดคำถาม 'ที่ดินรูปร่างเป็นยังไง' (เรื่องไม่ตอบรูปร่างแล้ว) เพิ่มคำถามความกว้าง/ใหญ่ที่สุด"
  },
  {
   "id": "units_by_building",
@@ -1867,44 +2123,47 @@
    "ไปกรุงเทพกี่ชั่วโมง",
    "ไปกรุงเทพไกลไหม",
    "จากกรุงเทพมาใช้เวลาเท่าไหร่",
-   "ไปดอนเมืองกี่ชั่วโมง"
+   "ไปดอนเมืองกี่ชั่วโมง",
+   "ขึ้นมอเตอร์เวย์กี่นาที",
+   "ใกล้มอเตอร์เวย์ไหม",
+   "ใกล้ทางด่วนไหม"
   ],
   "questions_en": [
    "How long to Bangkok?",
-   "How far is Bangkok?"
+   "How far is Bangkok?",
+   "How far is the motorway?"
   ],
   "lines": [
    {
-    "th": "ไปกรุงเทพแถวสยาม ขับรถประมาณ 104 นาทีตอนรถไม่ติดค่ะ",
-    "en": "Bangkok, around Siam, is about 104 minutes by car without traffic,",
+    "th": "จากโครงการขับไปขึ้นมอเตอร์เวย์ได้ภายใน 15 นาที เดินทางสะดวกมากค่ะ",
+    "en": "From here you can be on the motorway within 15 minutes, so getting around is easy.",
     "cue_th": [
-     "กรุงเทพ",
-     "สยาม"
+     "มอเตอร์เวย์"
     ],
     "cue_en": [
-     "Bangkok",
-     "Siam"
+     "motorway"
+    ],
+    "cue_zh": [
+     "高速公路",
+     "高速"
+    ]
+   },
+   {
+    "th": "เข้ากรุงเทพขับรถประมาณ 1 ชั่วโมงครึ่ง",
+    "en": "Bangkok is about an hour and a half by car,",
+    "cue_th": [
+     "กรุงเทพ"
+    ],
+    "cue_en": [
+     "Bangkok"
     ],
     "cue_zh": [
      "曼谷"
     ]
    },
    {
-    "th": "ถ้ารถติดประมาณ 1.9 ถึง 2.4 ชั่วโมง",
-    "en": "or about 1.9 to 2.4 hours in heavy traffic.",
-    "cue_th": [
-     "รถติด"
-    ],
-    "cue_en": [
-     "traffic"
-    ],
-    "cue_zh": [
-     "堵车"
-    ]
-   },
-   {
-    "th": "สนามบินสุวรรณภูมิประมาณชั่วโมงครึ่ง",
-    "en": "Suvarnabhumi Airport is about an hour and a half,",
+    "th": "สนามบินสุวรรณภูมิก็ใช้เวลาใกล้เคียงกัน",
+    "en": "Suvarnabhumi Airport about the same,",
     "cue_th": [
      "สุวรรณภูมิ"
     ],
@@ -1917,8 +2176,8 @@
     ]
    },
    {
-    "th": "และดอนเมืองประมาณ 2 ชั่วโมงค่ะ",
-    "en": "and Don Mueang about 2 hours.",
+    "th": "ส่วนดอนเมืองประมาณ 2 ชั่วโมงค่ะ",
+    "en": "and Don Mueang Airport about two hours.",
     "cue_th": [
      "ดอนเมือง"
     ],
@@ -1934,18 +2193,26 @@
   "params": {
    "origin_en": "EMBASSY WORLD",
    "origin_sub_en": "Jomtien, Pattaya · by car",
-   "bar_max": 150,
+   "bar_max": 120,
    "rows": [
     {
      "icon": "road",
-     "label_en": "Bangkok (Siam)",
-     "sub_en": "Heavy traffic 1.9–2.4 hr",
-     "value_en": "≈ 104 min",
+     "label_en": "Motorway 7",
+     "sub_en": "On-ramp towards Bangkok",
+     "value_en": "≤ 15 min",
      "bar": [
-      104,
-      144
+      15
      ],
      "line": 0
+    },
+    {
+     "icon": "road",
+     "label_en": "Bangkok",
+     "value_en": "≈ 1.5 hr",
+     "bar": [
+      90
+     ],
+     "line": 1
     },
     {
      "icon": "plane",
@@ -1984,10 +2251,11 @@
    }
   ],
   "sources": [
-   "report:19_faq.md (ไปกรุงเทพฯ ย่านสยามสแควร์ 104 นาที รถไม่ติด · 1.9–2.4 ชม. รถหนาแน่น)",
+   "report:23_owner_review_2026-10-22.md#23.1 (เจ้าของ 22 ต.ค.: ขึ้นมอเตอร์เวย์ภายใน 15 นาที · เข้ากรุงเทพฯ ขับรถประมาณ 1 ชั่วโมง 30 นาที)",
+   "report:04_location.md#4.9.5 (มอเตอร์เวย์ 7 ทางขึ้นพัทยา 9.1 กม. ≈ 10 นาที รถไม่ติด — สอดคล้องกับ 'ภายใน 15 นาที')",
    "report:92_appendix_travel.md line 49 (เด็คหน้า 8: สุวรรณภูมิ 1.5 ชม. · ดอนเมือง 2 ชม.)",
    "slides:intro-008"
   ],
-  "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · ค่าประมาณจากแผนที่ ไม่ใช่วัดจริง · ห้ามพูดรถไฟความเร็วสูง 40–45 นาที (รายงาน: อย่าใช้)"
+  "notes_th": "เจ้าของ 15 ต.ค. \"ทำ motion คำถามที่มีตัวเลข\" · ค่าประมาณจากแผนที่ ไม่ใช่วัดจริง · ห้ามพูดรถไฟความเร็วสูง 40–45 นาที (รายงาน: อย่าใช้) · 21 ต.ค. (เจ้าของ: 'พูดตัวเลขทศนิยม 1 ตำแหน่ง พูดให้เลขไม่เยอะ ระยะทางเปลี่ยนเป็นเวลา'): บรรทัดช่วงรถติด 1.9–2.4 ชม. ออกจากคำพูด (อยู่บนจอใต้แถวกรุงเทพ) · 104 นาทีคงไว้ (จำนวนเต็ม และเทสต์ล็อก) · 22 ต.ค. (เจ้าของบนหน้าตรวจ: 'ลูกค้าสามารถเดินทางไปขึ้นทางด่วน มอเตอร์เวย์ ภายในเวลา 15 นาที สะดวกในการเดินทาง และเข้า กทม. ขับรถประมาณ 1 ชั่วโมง 30 นาที'): บรรทัดแรกใหม่ = มอเตอร์เวย์ภายใน 15 นาที (รายงาน 4.9.5 วัดได้ ≈ 10 นาทีรถไม่ติด สอดคล้อง) · กรุงเทพ 104 นาทีถึงสยาม → ประมาณ 1 ชั่วโมงครึ่ง ตามเจ้าของ (ขัดกับรายงานบท 4/19 ที่ 104 นาที — ความเห็นเจ้าของชนะ) แถบรถติด 1.9–2.4 ชม. ใต้แถวกรุงเทพออก (ขัดกับตัวเลขใหม่) bar_max 150 → 120 · สุวรรณภูมิ/ดอนเมืองคงเดิม (เด็คหน้า 8) สุวรรณภูมิพูด 'ใกล้เคียงกัน' ไม่ซ้ำ 'ชั่วโมงครึ่ง' · เทสต์ที่ล็อก '104 นาที' ต้องเปลี่ยนเป็น '1 ชั่วโมงครึ่ง' · เพิ่มคำถามมอเตอร์เวย์/ทางด่วน"
  }
 ]

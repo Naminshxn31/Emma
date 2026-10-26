@@ -79,9 +79,15 @@ WHEELS = {
 # against the imports, so a new module can't silently stay on the PC).
 CODE = ["app/__init__.py", "app/robot_lanes.py", "app/slamware_sdk.py",
         "scripts/drive_route.py", "scripts/analyze_run.py",
-        "app/robot_contracts.py", "app/robot_places.py", "scripts/emma_nav.py"]
+        "app/robot_contracts.py", "app/robot_places.py", "scripts/emma_nav.py",
+        "app/scan_match.py"]
 #: The places table the launcher reads (tracked; data/robot/ is not).
 PLACES_GLOB = "data/robot-places/*.json"
+#: Our lidar map, built on the PC (scripts/eval_scan_localization.py
+#: --save-field; numpy-only to load -- the robot has no scipy) and matched by
+#: drive_route at every checkpoint for the log only (SHADOW_FIELD). Pushed
+#: when the PC has one; a robot without it just logs no shadow_fix rows.
+MAPS_GLOB = "data/robot/maps/*_field.npz"
 
 LAUNCHER = """#!/system/bin/sh
 # Debian glibc + python-build-standalone on Android: start through glibc's own loader.
@@ -313,11 +319,12 @@ def nav_status_command(remote: str = REMOTE) -> str:
 
 def deploy_files(routes: list[str] | None = None, root: Path = ROOT) -> list[str]:
     """Everything a deploy pushes, relative to the repo (= to code/ on the
-    robot): the code, the places table, and the routes."""
+    robot): the code, the places table, the lidar map if built, and the routes."""
     places = sorted(str(q.relative_to(root)).replace("\\", "/") for q in root.glob(PLACES_GLOB))
+    maps = sorted(str(q.relative_to(root)).replace("\\", "/") for q in root.glob(MAPS_GLOB))
     rts = routes or [str(q.relative_to(root)).replace("\\", "/")
                      for q in sorted((root / "data" / "robot" / "routes").glob("*.json"))]
-    return CODE + places + list(rts)
+    return CODE + places + maps + list(rts)
 
 
 def manifest(files: dict[str, bytes], deployed_at: str) -> bytes:

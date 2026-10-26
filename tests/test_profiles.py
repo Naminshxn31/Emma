@@ -97,6 +97,53 @@ def test_emma_does_not_recite_the_condo_facts():
     assert "Preliminary Concept" not in text
 
 
+#: Sales-room text that must never reach the owner's assistant or the joke
+#: face: the project name, the receptionist's scope refusal, and the
+#: robot's own sales-talk slips of 19 Oct quoted in the language rule.
+_SALES_ONLY = ("Embassy World", "only provide information about", "Kondom",
+               "Möbelpaket", "Jedes Zimmer")
+
+
+@pytest.mark.parametrize("face", [False, True])
+@pytest.mark.parametrize("profile", ["emma", "joke"])
+def test_the_shared_language_rule_carries_no_sales_sentence(profile, face):
+    """CLAUDE.md: "กฎภาษาใช้ร่วมทุกโปรไฟล์ = ห้ามชื่อโครงการ/ประโยคขายในกฎนั้น".
+    The 19 Oct language fix quoted two condo slips in that shared rule -- the
+    refusal "I can only provide information about the project", and an
+    accented condo question ("Bei der Kondom ist inklusive Karte?") answered
+    with a furniture-package claim ("Jedes Zimmer wird mit einem Möbelpaket
+    geliefert") -- and the pre-commit review of 26 Oct found both in these
+    two prompts. The old check here looked only for "Embassy World". The
+    instruction itself must survive the move, in neutral words."""
+    text = build_instructions("Embassy World", languages="auto", robot_name="Emma",
+                              profile=profile, robot_face=face)
+    for phrase in _SALES_ONLY:
+        assert phrase not in text, "%s/face=%s carries %r" % (profile, face, phrase)
+    assert "ประโยคเดียวที่ฟังเหมือนภาษาใกล้กันจากสำเนียง" in text
+    assert "คุยอังกฤษอยู่แล้วได้ยินประโยคเดียวเป็นเยอรมัน ให้ตอบอังกฤษ" in text
+    assert "ผิด: 'I cannot speak Hebrew'; " in text
+
+
+@pytest.mark.parametrize("layout", ["v1", "v2"])
+def test_the_condo_language_rule_keeps_the_measured_quotes(layout, monkeypatch):
+    """The other half: the condo prompt keeps the 19 Oct slips word for word,
+    at the same places -- that wording is what the live language eval of 19
+    Oct measured (22/22 correct), so moving them out of the shared rule
+    must not weaken the sales room."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "prompt_layout", layout)
+    for face in (False, True):
+        text = build_instructions("Embassy World", languages="auto", robot_name="Emma",
+                                  robot_face=face)
+        assert "ผิด: 'I can only provide information about the project' 'I cannot speak Hebrew'; " in text
+        assert ("และประโยคเดียวที่ฟังเหมือนภาษาใกล้กันจากสำเนียง "
+                "คุยอังกฤษอยู่แล้วได้ยิน 'Bei der Kondom ist inklusive Karte?' ให้ตอบอังกฤษ "
+                "ผิด: 'Jedes Zimmer wird mit einem Möbelpaket geliefert' ได้ยิน 'ใช่' "
+                "ผิด: 'ค่ะ มีส่วนไหน...'; ") in text
+        assert "ได้ยินประโยคเดียวเป็นเยอรมัน" not in text
+
+
 def test_emma_knows_who_she_is_talking_to():
     text = build_instructions("X", robot_name="Emma", profile="emma")
     assert "เจ้าของ" in text
@@ -211,7 +258,8 @@ def test_the_203_case_review_fixes_are_in_the_condo_prompt():
     พนักงานขายมาดูแล" with no way to call anyone, find_units' rooms never
     named, and "ไม่ใช่ครับ ตึก C" opening floor 1 instead of the room."""
     text = build_instructions("X")
-    assert "ไม่ใช่นอกเรื่อง: ทำเลและการเดินทางจากโครงการ (สนามบิน หาด ห้าง โรงพยาบาล) และข้อเท็จจริงของโครงการ (ขนาด จำนวน ความสูง ที่จอดรถ วัสดุ ระบบ) ให้ค้นด้วย search_condo_info ก่อนเสมอ ห้ามส่งต่อทีมขายโดยไม่ค้น" in text
+    # robot 20 Oct: nearby restaurants and the developer's other projects ("Empire Tower") too
+    assert "ไม่ใช่นอกเรื่อง: ทำเลและการเดินทางจากโครงการ (สนามบิน หาด ห้าง โรงพยาบาล ร้านอาหารและที่เที่ยวใกล้โครงการ) ข้อเท็จจริงของโครงการ (ขนาด จำนวน ความสูง ที่จอดรถ วัสดุ ระบบ) และผู้พัฒนา ผู้บริหาร โครงการอื่นของผู้พัฒนา ให้ค้นด้วย search_condo_info ก่อนเสมอ ห้ามส่งต่อทีมขายโดยไม่ค้น" in text
     assert "ห้ามด้อยค่าหรือจัดอันดับที่อื่น" in text
     # owner 12 Oct: ask again AND offer the project's topics, never a bare "ค่ะ"
     assert "เสียงหรือคำที่ฟังไม่ออก ให้ขอให้พูดอีกครั้งพร้อมเสนอหัวข้อ" in text

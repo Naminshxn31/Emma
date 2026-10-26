@@ -33,8 +33,8 @@
      ]
     },
     {
-     "th": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ยาว 155 เมตร ลึกประมาณ 1.30 เมตร",
-     "en": "The main one is the Water Lagoon in the middle of the project, 155 metres long and about 1.30 metres deep.",
+     "th": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ลึกประมาณ 1.3 เมตร",
+     "en": "The main one is the Water Lagoon in the middle of the project, about 1.3 metres deep.",
      "cue_th": [
       "Water Lagoon",
       "ลากูน",
@@ -142,7 +142,7 @@
     "items": [
      {
       "label_en": "Water Lagoon",
-      "sub_en": "Main pool · ≈ 1.30 m deep",
+      "sub_en": "Main pool · ≈ 1.3 m deep",
       "asset": "liv_lagoon_night",
       "asset_kind": "photo",
       "value": {
@@ -153,8 +153,8 @@
       "tap": "story_pools_all_lagoon"
      },
      {
-      "label_en": "Private Pools",
-      "sub_en": "Beside the building wings",
+      "label_en": "Pools by the wings",
+      "sub_en": "Private Pools · beside the building wings",
       "asset": "liv_courtyard_top",
       "asset_kind": "photo",
       "value": {
@@ -254,7 +254,7 @@
     "assets:web/6.gallery/exterior/CD03/Scene 40.png · ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png · web/6.gallery/exterior/Playscape/Scene 55.png · fac_3_sky_pool / fac_b_aqua_cinema (ภาพของกลุ่ม facilities ใช้ร่วม)",
     "report:01_overview.md line 99, 150 · 19_faq.md (สระหลักลึกประมาณ 1.30 ม. ตามข้อมูลผู้พัฒนา; ไม่ใช้กับ Sky Pool/สระใต้ดิน)"
    ],
-   "notes_th": "ตอบ 'มีสระกี่สระ / มีสระอะไรบ้าง' ตามคำตอบ FAQ 19.15 ของรายงานเป๊ะ (สระหลัก 1 · Private Pool 3 · Kid Pool 1 · Sky Pool 1 · สระในร่มใต้ดินต่อ Journey to Mars) ไม่พูดยอดรวมเป็นตัวเลขเดียว เพราะรายงานนับเอง (🔎) และ Kid Pool ดูเป็นส่วนหนึ่งของแนวสระหลัก — เล่าทีละแบบแทน · จังหวะบนจอ: (0) แถวว่างห้าแถวรอ (บอก 'มีห้าแบบ' ก่อนภาพแรก) · (1) ภาพลากูนมุมสูงยามค่ำ Scene 40 (เห็นความยาวคดเคี้ยวของสระ) ตัวเลข 155 m นับขึ้น แล้วย่อเข้าแถว · (2) ภาพมุมบนของคอร์ทฝั่งตะวันตกจากโมเดล UE ของเจ้าของ (เห็นปีกอาคาร E/F/D ที่ Private Pool อยู่) + '3 pools' — ภาพนี้คือคอร์ทที่สระอยู่ ไม่ได้ชี้สระใดสระหนึ่ง ถ้าเจ้าของมีภาพเรนเดอร์ของ Private Pool เองให้เปลี่ยน · (3) ภาพมุมสูงลาน Playscape กับวงสระเด็ก Scene 55 (ครอปตัดคนเล็กๆ ที่ทางเดินและหน้าประตูออก) · (4) Sky Pool ภาพเดียวกับ sky_pool_where · (5) Aqua Cinema ภาพเดียวกับ aqua_cinema_where · (6) ไม่มีภาพใหม่ ประโยคพื้นที่รวม 2,157 ตร.ม. แล้วรายการขยายเต็มจอ พร้อม end_hint ตัวเลขเดียวกัน · แถวที่มีเรื่องของตัวเองแตะได้ (ลากูน→masterplan_lagoon, สระเด็ก→for_families, Sky Pool, Aqua Cinema) Journey to Mars กับ 'ทั้งหมด' เป็นชิปท้าย (taps 6 ≠ แถว 5 จงใจ ไม่ให้ระบบผูกปุ่มตามลำดับเข้าแถว Private Pool) · ไม่ใส่: ความลึก 1.30 ม. (ตามเจ้าของงาน ไม่มีในแบบ), ขนาด Sky Pool ≈143 ตร.ม. (วัดจากโมเดล), จากุซซี่ (ไม่ใช่สระ เรื่องนี้ยาวพอแล้ว), จากุซซี่บนชั้นบนสุด (เจ้าของตัดสินทับ) · ไม่พูดว่า Private Pool เป็นของห้องใด (รายงาน 12.1 ห้าม) · คำถาม 'สระใหญ่แค่ไหน / สระหลักยาวเท่าไหร่' ปล่อยให้ masterplan_lagoon (มีอยู่แล้ว) — ใส่ซ้ำสองเรื่องโมเดลจะเลือกไม่ถูก"
+   "notes_th": "ตอบ 'มีสระกี่สระ / มีสระอะไรบ้าง' ตามคำตอบ FAQ 19.15 ของรายงานเป๊ะ (สระหลัก 1 · Private Pool 3 · Kid Pool 1 · Sky Pool 1 · สระในร่มใต้ดินต่อ Journey to Mars) ไม่พูดยอดรวมเป็นตัวเลขเดียว เพราะรายงานนับเอง (🔎) และ Kid Pool ดูเป็นส่วนหนึ่งของแนวสระหลัก — เล่าทีละแบบแทน · จังหวะบนจอ: (0) แถวว่างห้าแถวรอ (บอก 'มีห้าแบบ' ก่อนภาพแรก) · (1) ภาพลากูนมุมสูงยามค่ำ Scene 40 (เห็นความยาวคดเคี้ยวของสระ) ตัวเลข 155 m นับขึ้น แล้วย่อเข้าแถว · (2) ภาพมุมบนของคอร์ทฝั่งตะวันตกจากโมเดล UE ของเจ้าของ (เห็นปีกอาคาร E/F/D ที่ Private Pool อยู่) + '3 pools' — ภาพนี้คือคอร์ทที่สระอยู่ ไม่ได้ชี้สระใดสระหนึ่ง ถ้าเจ้าของมีภาพเรนเดอร์ของ Private Pool เองให้เปลี่ยน · (3) ภาพมุมสูงลาน Playscape กับวงสระเด็ก Scene 55 (ครอปตัดคนเล็กๆ ที่ทางเดินและหน้าประตูออก) · (4) Sky Pool ภาพเดียวกับ sky_pool_where · (5) Aqua Cinema ภาพเดียวกับ aqua_cinema_where · (6) ไม่มีภาพใหม่ ประโยคพื้นที่รวม 2,157 ตร.ม. แล้วรายการขยายเต็มจอ พร้อม end_hint ตัวเลขเดียวกัน · แถวที่มีเรื่องของตัวเองแตะได้ (ลากูน→masterplan_lagoon, สระเด็ก→for_families, Sky Pool, Aqua Cinema) Journey to Mars กับ 'ทั้งหมด' เป็นชิปท้าย (taps 6 ≠ แถว 5 จงใจ ไม่ให้ระบบผูกปุ่มตามลำดับเข้าแถว Private Pool) · ไม่ใส่: ความลึก 1.30 ม. (ตามเจ้าของงาน ไม่มีในแบบ), ขนาด Sky Pool ≈143 ตร.ม. (วัดจากโมเดล), จากุซซี่ (ไม่ใช่สระ เรื่องนี้ยาวพอแล้ว), จากุซซี่บนชั้นบนสุด (เจ้าของตัดสินทับ) · ไม่พูดว่า Private Pool เป็นของห้องใด (รายงาน 12.1 ห้าม) · คำถาม 'สระใหญ่แค่ไหน / สระหลักยาวเท่าไหร่' ปล่อยให้ masterplan_lagoon (มีอยู่แล้ว) — ใส่ซ้ำสองเรื่องโมเดลจะเลือกไม่ถูก · 21 ต.ค. (เจ้าของ: 'พูดตัวเลขทศนิยม 1 ตำแหน่ง พูดให้เลขไม่เยอะ ระยะทางเปลี่ยนเป็นเวลา'): ลากูนไม่พูดความยาวแล้ว (155 ม. อยู่บนการ์ด) พูดแค่ความลึก 1.3 ม. ที่ลูกค้าถามต่อ · การ์ด Private Pool: ภาพ liv_courtyard_top เป็นครอปจาก Scene 58 (มุมสูงเห็นสระข้างปีกอาคาร) ยืนยันไม่ได้ว่าเป็น Private Pool — หัวการ์ดจึงเป็น 'Pools by the wings' (สิ่งที่ภาพแสดง) และชื่อ Private Pools อยู่ในบรรทัดรอง"
   },
   {
    "id": "park_green",
@@ -618,22 +618,34 @@
    "id": "nearby_places",
    "template": "journey",
    "questions_th": [
-    "ใกล้โรงพยาบาลไหม",
-    "มีโรงเรียนใกล้ไหม",
     "ใกล้ซูเปอร์มาร์เก็ตไหม",
     "มีตลาดใกล้ไหม",
-    "ไปโรงพยาบาลกี่นาที",
-    "มีโรงเรียนนานาชาติใกล้ไหม"
+    "มีซูเปอร์มาร์เก็ตอะไรใกล้บ้าง",
+    "มีที่ซื้อของใช้ใกล้ไหม"
    ],
    "questions_en": [
-    "Is there a hospital nearby?",
-    "Are there schools nearby?",
-    "Where can I buy groceries?"
+    "Where can I buy groceries?",
+    "Is there a supermarket nearby?",
+    "What places are nearby?"
    ],
    "lines": [
     {
-     "th": "ซูเปอร์มาร์เก็ตโลตัสขับรถประมาณ 6 ถึง 8 นาที",
-     "en": "Lotus's supermarket is about 6 to 8 minutes by car,",
+     "th": "ใกล้ๆ โครงการมีเซเว่นในปั๊ม PTT ห่างไปแค่ขับรถประมาณ 3 นาทีค่ะ",
+     "en": "Close by, there's a 7-Eleven at the PTT petrol station, only about a 3-minute drive away.",
+     "cue_th": [
+      "เซเว่น"
+     ],
+     "cue_en": [
+      "Eleven"
+     ],
+     "cue_zh": [
+      "便利店",
+      "Eleven"
+     ]
+    },
+    {
+     "th": "ซูเปอร์มาร์เก็ตโลตัสห่างประมาณ 6 นาที ตลาดโต้รุ่งจอมเทียนก็ใกล้พอๆ กัน",
+     "en": "Lotus's supermarket is about 6 minutes, with Jomtien Night Market about the same,",
      "cue_th": [
       "โลตัส",
       "ซูเปอร์มาร์เก็ต"
@@ -649,23 +661,8 @@
      ]
     },
     {
-     "th": "ตลาดโต้รุ่งจอมเทียนก็ใกล้เคียงกัน",
-     "en": "Jomtien Night Market about the same,",
-     "cue_th": [
-      "ตลาดโต้รุ่ง",
-      "ตลาด"
-     ],
-     "cue_en": [
-      "Night Market"
-     ],
-     "cue_zh": [
-      "夜市",
-      "市场"
-     ]
-    },
-    {
-     "th": "โรงพยาบาลจอมเทียนประมาณ 8 ถึง 11 นาที",
-     "en": "Jomtien Hospital about 8 to 11 minutes,",
+     "th": "โรงพยาบาลจอมเทียนประมาณ 8 นาที",
+     "en": "Jomtien Hospital about 8 minutes,",
      "cue_th": [
       "โรงพยาบาล"
      ],
@@ -677,10 +674,305 @@
      ]
     },
     {
-     "th": "โรงพยาบาลกรุงเทพพัทยาประมาณ 11 ถึง 16 นาที",
-     "en": "Bangkok Hospital Pattaya about 11 to 16,",
+     "th": "และโรงเรียนนานาชาติ German International School ก็ประมาณ 8 นาทีเหมือนกัน",
+     "en": "and German International School about 8 minutes too,",
      "cue_th": [
-      "กรุงเทพพัทยา",
+      "นานาชาติ",
+      "German"
+     ],
+     "cue_en": [
+      "German",
+      "International"
+     ],
+     "cue_zh": [
+      "国际学校",
+      "德国"
+     ]
+    },
+    {
+     "th": "ใช้ชีวิตประจำวันสะดวกมาก ไม่ต้องไปไหนไกลเลยค่ะ",
+     "en": "so everything for daily life is close at hand.",
+     "cue_th": [
+      "ชีวิตประจำวัน",
+      "สะดวก"
+     ],
+     "cue_en": [
+      "daily life"
+     ],
+     "cue_zh": [
+      "生活",
+      "方便"
+     ]
+    }
+   ],
+   "params": {
+    "view": "rings",
+    "origin_en": "EMBASSY WORLD",
+    "origin_sub_en": "by car, no traffic",
+    "bar_max": 10,
+    "footnote_en": "Drive time from the project · not a map",
+    "rows": [
+     {
+      "icon": "shop",
+      "label_en": "7-Eleven",
+      "sub_en": "In the PTT petrol station",
+      "value_en": "≈ 3 min",
+      "bar": [
+       3
+      ],
+      "line": 0
+     },
+     {
+      "icon": "shop",
+      "label_en": "Lotus's",
+      "sub_en": "Supermarket",
+      "value_en": "≈ 6 min",
+      "bar": [
+       6
+      ],
+      "line": 1
+     },
+     {
+      "icon": "shop",
+      "label_en": "Jomtien Night Market",
+      "short_en": "Night Market",
+      "value_en": "≈ 6 min",
+      "bar": [
+       6
+      ],
+      "line": 1
+     },
+     {
+      "icon": "hospital",
+      "label_en": "Jomtien Hospital",
+      "value_en": "≈ 8 min",
+      "bar": [
+       8
+      ],
+      "line": 2
+     },
+     {
+      "icon": "school",
+      "label_en": "German Int'l School",
+      "short_en": "German Int'l",
+      "sub_en": "Nearest international school",
+      "value_en": "≈ 8 min",
+      "bar": [
+       8
+      ],
+      "line": 3
+     }
+    ]
+   },
+   "taps": [
+    {
+     "id": "story_nearby_places_hospitals",
+     "label_en": "Hospitals",
+     "label_th": "โรงพยาบาล",
+     "next_story": "nearby_hospitals",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_places_schools",
+     "label_en": "Schools",
+     "label_th": "โรงเรียน",
+     "next_story": "nearby_schools",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_places_restaurants",
+     "label_en": "Restaurants",
+     "label_th": "ร้านอาหาร",
+     "next_story": "nearby_restaurants",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_places_sights",
+     "label_en": "Places to visit",
+     "label_th": "ที่เที่ยว",
+     "next_story": "nearby_attractions",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_places_malls",
+     "label_en": "Malls",
+     "label_th": "ห้าง",
+     "next_story": "travel_malls",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:23_owner_review_2026-10-22.md#23.2 (เซเว่นที่ใกล้ที่สุดอยู่ในปั๊มน้ำมัน PTT ห่างประมาณ 3 นาที — เจ้าของ 22 ต.ค.)",
+    "report:92_appendix_travel.md#ค.4.2 row 14 (Lotus's ถนนชัยพฤกษ์ 2: 2.9 กม. · 6 นาที) · row 15 (ตลาดโต้รุ่งจอมเทียน 3.2 กม. · 6 นาที)",
+    "report:92_appendix_travel.md#ค.4.3 row 33 (Jomtien Hospital 6.5 กม. · 8 นาที) · ค.4.4 row 43 (German International School 4.5 กม. · 8 นาที)",
+    "report:04_location.md#4.8 (วงรอบเวลา: Lotus's ชัยพฤกษ์ 2 6 · ตลาดโต้รุ่งจอมเทียน 6 · Jomtien Hospital 8 · German Intl School 8)",
+    "report:19_faq.md line 128, 131, 134 (ซูเปอร์มาร์เก็ต/ตลาด · โรงพยาบาล · โรงเรียน ตามแผนที่ ขับรถ)"
+   ],
+   "notes_th": "ออกแบบใหม่ 21 ต.ค. (เจ้าของ: 'จะมีเรื่องที่ต้องเพิ่มเช่น เซเว่นที่ใกล้ที่สุด โรงพยาบาลที่ไหนใกล้บ้าง คลินิค โรงเรียน' และ 'พูดให้เลขไม่เยอะ') — เรื่องนี้เป็นภาพรวม 'รอบโครงการมีอะไร' หนึ่งที่ต่อหมวด เวลาเดียว (รถไม่ติด, free-flow ของ OSRM ตามรายงาน) ไม่พูดช่วงรถติดและไม่พูดกิโลเมตร · คำถามแคบแยกเป็นเรื่องย่อยตามกติกาเจ้าของ 13 ต.ค.: เซเว่น = nearby_7eleven, โรงพยาบาล(+คลินิก) = nearby_hospitals, โรงเรียน = nearby_schools, ร้านอาหาร = nearby_restaurants, ที่เที่ยว = nearby_attractions (แตะได้จากเรื่องนี้) · คำถามโรงพยาบาล/โรงเรียนย้ายออกไปเรื่องของตัวเอง เรื่องนี้เหลือคำถามซูเปอร์มาร์เก็ต/ตลาด/รอบโครงการ · ไม่ใส่เวลาตอบสนองฉุกเฉิน (รายงาน ค.2 ข้อ 4) · ไอคอนร้านค้าใช้ mall (เครื่องยนต์ยังไม่มีไอคอนร้านสะดวกซื้อ/ตลาด) · **22 ต.ค. เจ้าของ: 'ขับรถไปประมาณ ปรับเป็น ห่างประมาณ 4 นาที'** → ใช้ 'ห่างประมาณ … นาที' แทน 'ขับรถไปประมาณ' (บรรทัดถัดไปย่อเป็น 'ประมาณ … นาที' ไม่ให้ซ้ำทุกบรรทัด) (บนจอยังเขียน by car, no traffic) · เซเว่นเปลี่ยนเป็นสาขาในปั๊ม PTT และใช้ 3 นาที ไม่ใช่ 4 — เจ้าของเขียน 3 นาทีให้เซเว่นเดียวกันใน nearby_7eleven ลูกค้าถามสองครั้งต้องได้ยินเลขเดียว (รอเจ้าของยืนยัน) · เพิ่มบรรทัดปิด 'ใช้ชีวิตประจำวันได้สะดวก' (ไม่มีตัวเลข) · German International School ยังเป็นโรงเรียนนานาชาติที่ใกล้ที่สุดตามภาคผนวก ค แต่ค้นเว็บ 22 ต.ค. ไม่พบเว็บไซต์ของโรงเรียน (มีแค่ใน OSM) และเรื่อง nearby_schools เปลี่ยนเป็นโรงเรียนนานาชาติชื่อดังแล้ว — รอเจ้าของตัดสินว่าจะคงไว้หรือเปลี่ยน · รีวิว 22 ต.ค.: บรรทัดเซเว่นเป็น 'ห่างไปแค่ขับรถประมาณ 3 นาที' / 'only about a 3-minute drive away' — คงคำ 'ห่าง' ของเจ้าของ แต่บอกว่าเป็นเวลาขับรถ (ลูกค้าที่ถามเรื่องเดินต้องไม่ได้ยิน 3 นาทีเป็นเวลาเดิน; บรรทัดถัดไปตามเป็นเวลาขับรถเดียวกัน) และ 'PTT petrol station' ให้ตรงกับ nearby_7eleven · บรรทัดปิดเป็น 'ใช้ชีวิตประจำวันสะดวกมาก ไม่ต้องไปไหนไกลเลยค่ะ' ('โดยไม่ต้อง' เป็นภาษาเขียน)"
+  },
+  {
+   "id": "nearby_7eleven",
+   "template": "journey",
+   "questions_th": [
+    "เซเว่นใกล้สุดอยู่ไหน",
+    "มีเซเว่นใกล้ไหม",
+    "มีร้านสะดวกซื้อใกล้ไหม",
+    "มีปั๊มน้ำมันใกล้ไหม",
+    "มีแฟมิลี่มาร์ทไหม",
+    "เซเว่นที่ใกล้ที่สุดอยู่ที่ไหน",
+    "มีเซเว่นแถวนี้ไหม",
+    "ปั๊มน้ำมันใกล้สุดอยู่ไหน"
+   ],
+   "questions_en": [
+    "Where is the nearest 7-Eleven?",
+    "Is there a 7-Eleven nearby?",
+    "Is there a convenience store nearby?",
+    "Is there a petrol station nearby?",
+    "Is there a gas station nearby?",
+    "Is there a Seven Eleven near here?"
+   ],
+   "lines": [
+    {
+     "th": "เซเว่นที่ใกล้ที่สุดอยู่ในปั๊มน้ำมัน PTT ขับรถไปแค่ประมาณ 3 นาที",
+     "en": "The nearest 7-Eleven is at the PTT petrol station, just a 3-minute drive from the project,",
+     "cue_th": [
+      "เซเว่น"
+     ],
+     "cue_en": [
+      "Eleven"
+     ],
+     "cue_zh": [
+      "便利店",
+      "Eleven"
+     ]
+    },
+    {
+     "th": "แวะเติมน้ำมันแล้วซื้อของใช้ได้ในที่เดียวเลยค่ะ",
+     "en": "so you can fill up and pick up your daily needs in one stop.",
+     "cue_th": [
+      "เติมน้ำมัน",
+      "ซื้อของ"
+     ],
+     "cue_en": [
+      "fill up",
+      "one stop"
+     ],
+     "cue_zh": [
+      "加油"
+     ]
+    },
+    {
+     "th": "ส่วน FamilyMart ก็ห่างประมาณ 4 นาทีค่ะ",
+     "en": "A FamilyMart is about 4 minutes away.",
+     "cue_th": [
+      "FamilyMart",
+      "แฟมิลี่มาร์ท"
+     ],
+     "cue_en": [
+      "FamilyMart"
+     ],
+     "cue_zh": [
+      "FamilyMart",
+      "全家"
+     ]
+    }
+   ],
+   "params": {
+    "view": "rings",
+    "origin_en": "EMBASSY WORLD",
+    "origin_sub_en": "by car, no traffic",
+    "bar_max": 10,
+    "footnote_en": "Drive time from the project · not a map",
+    "rows": [
+     {
+      "icon": "shop",
+      "label_en": "7-Eleven",
+      "sub_en": "In the PTT petrol station",
+      "value_en": "≈ 3 min",
+      "bar": [
+       3
+      ],
+      "line": 0
+     },
+     {
+      "icon": "shop",
+      "label_en": "FamilyMart",
+      "value_en": "≈ 4 min",
+      "bar": [
+       4
+      ],
+      "line": 2
+     }
+    ]
+   },
+   "taps": [
+    {
+     "id": "story_nearby_7eleven_around",
+     "label_en": "Around us",
+     "label_th": "รอบโครงการ",
+     "next_story": "nearby_places",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_7eleven_restaurants",
+     "label_en": "Restaurants",
+     "label_th": "ร้านอาหาร",
+     "next_story": "nearby_restaurants",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:23_owner_review_2026-10-22.md#23.2 (เซเว่นที่ใกล้ที่สุดอยู่ในปั๊มน้ำมัน PTT ห่างประมาณ 3 นาที — เจ้าของ ความเห็นบนหน้าตรวจ 22 ต.ค. แทนเวลาขับ 4 นาทีและเวลาเดิน 23 นาทีของภาคผนวก ค)",
+    "report:92_appendix_travel.md#ค.4.2 row 11 (FamilyMart ใกล้สุดตามระยะถนน 1.5 กม. · free-flow 4 นาที)"
+   ],
+   "notes_th": "เจ้าของ 21 ต.ค. 'เซเว่นที่ใกล้ที่สุด' — เรื่องสั้นสองแถว (แถวใหญ่ของ journey) · **22 ต.ค. เจ้าของ: 'เดินไปประมาณ 23 นาที เอาออก เปลี่ยนเป็น อยู่ในปั๊มน้ำมัน PTT และปรับเป็น 3 นาที'** → เซเว่นใกล้สุดคือสาขาในปั๊ม PTT ห่างประมาณ 3 นาที (ข้อมูลของเจ้าของ ชนะภาคผนวก ค ที่ให้ 7-Eleven จอมเทียนสาย 1 ขับ 4 นาที) · เอาบรรทัดเดินและชิปเดินออกทั้งสองแถว (FamilyMart เดิน 18 นาทีก็ออกด้วย ให้เรื่องไม่มีเวลาเดินเลย) · เพิ่มบรรทัด 'แวะเติมน้ำมันแล้วซื้อของใช้ได้ในที่เดียว' (ขายความสะดวก ไม่มีตัวเลข มาจากข้อเท็จจริงที่ว่าร้านอยู่ในปั๊ม) · บรรทัดเซเว่นพูด 'ขับรถไปแค่ประมาณ 3 นาที' (รีวิว 22 ต.ค.: 'ห่าง…3 นาที' ฟังเป็นเวลาเดิน ส่วนบรรทัดอังกฤษบอก drive อยู่แล้ว; เรื่องนี้เจ้าของสั่งแค่ 'ปรับเป็น 3 นาที' คำ 'ห่างประมาณ' เป็นคำสั่งของ nearby_places) และย้าย 'ค่ะ' ไปท้ายบรรทัดสอง (บรรทัดอังกฤษแรกจบด้วยจุลภาค) · บรรทัด FamilyMart ยังใช้ 'ห่างประมาณ' · คำถามปั๊มน้ำมันมาเรื่องนี้ (คำตอบคือปั๊ม PTT 3 นาที) · คำถามเดิน ('เดินถึงเซเว่นได้ไหม' / 'Can I walk to a 7-Eleven?') เอาออกจากรายการแล้ว (รีวิว 22 ต.ค.) — เรื่องไม่มีเวลาเดิน คำถามเดินจึงไปการค้นแทน ถ้าเจ้าของอยากให้ตอบเวลาเดิน ต้องมีตัวเลขเดินของสาขา PTT ก่อน (เจ้าของตัดสิน) · ไม่พูดเวลาเปิด (ไม่มีข้อมูล) ไม่พูดชื่อถนน"
+  },
+  {
+   "id": "nearby_hospitals",
+   "template": "journey",
+   "questions_th": [
+    "ใกล้โรงพยาบาลไหม",
+    "มีโรงพยาบาลใกล้ไหม",
+    "มีคลินิกใกล้ไหม",
+    "โรงพยาบาลที่ใกล้ที่สุดอยู่ไหน",
+    "คลินิกที่ใกล้ที่สุดอยู่ไหน",
+    "โรงพยาบาลไหนใกล้บ้าง",
+    "ไปโรงพยาบาลกี่นาที",
+    "มีคลินิกหรือโรงพยาบาลใกล้ไหม",
+    "มีโรงพยาบาลใกล้ๆไหม",
+    "แถวนี้มีคลินิกไหม",
+    "ไม่สบายไปหาหมอที่ไหนได้บ้าง"
+   ],
+   "questions_en": [
+    "Is there a hospital or clinic nearby?",
+    "Is there a hospital nearby?",
+    "Where is the nearest hospital?",
+    "Which hospitals are near here?",
+    "Where is the nearest clinic or hospital?",
+    "Is there a clinic nearby?",
+    "Where is the nearest clinic?",
+    "Where can I see a doctor nearby?"
+   ],
+   "lines": [
+    {
+     "th": "ถ้าต้องไปหาหมอ แนะนำโรงพยาบาลจอมเทียนค่ะ เป็นโรงพยาบาลที่ใกล้ที่สุด ห่างประมาณ 8 นาที",
+     "en": "If you need to see a doctor, we recommend Jomtien Hospital, the nearest hospital, about 8 minutes away.",
+     "cue_th": [
+      "จอมเทียน"
+     ],
+     "cue_en": [
+      "Jomtien"
+     ],
+     "cue_zh": [
+      "中天",
+      "宗甸",
+      "Jomtien"
+     ]
+    },
+    {
+     "th": "อยู่ในเครือเดียวกับโรงพยาบาลกรุงเทพพัทยา ที่ห่างประมาณ 11 นาทีค่ะ",
+     "en": "It's in the same group as Bangkok Hospital Pattaya, which is about 11 minutes away.",
+     "cue_th": [
       "กรุงเทพ"
      ],
      "cue_en": [
@@ -691,104 +983,260 @@
      ]
     },
     {
-     "th": "โรงเรียนเมืองพัทยา 7 ประมาณ 5 ถึง 7 นาที",
-     "en": "Pattaya City School 7, about 5 to 7 minutes,",
+     "th": "แล้วก็มีโรงพยาบาลเมืองพัทยา ห่างประมาณ 10 นาทีค่ะ",
+     "en": "There is also Pattaya City Hospital, about 10 minutes away.",
      "cue_th": [
-      "โรงเรียน"
+      "เมืองพัทยา"
      ],
      "cue_en": [
-      "school"
+      "City"
      ],
      "cue_zh": [
-      "学校"
-     ]
-    },
-    {
-     "th": "และโรงเรียนนานาชาติ German International School ประมาณ 8 ถึง 11 นาทีค่ะ",
-     "en": "and German International School about 8 to 11 minutes.",
-     "cue_th": [
-      "นานาชาติ",
-      "German",
-      "เยอรมัน"
-     ],
-     "cue_en": [
-      "German",
-      "International"
-     ],
-     "cue_zh": [
-      "国际学校",
-      "德国"
+      "芭提雅市",
+      "City"
      ]
     }
    ],
    "params": {
+    "view": "rings",
     "origin_en": "EMBASSY WORLD",
-    "origin_sub_en": "Jomtien, Pattaya · by car",
-    "bar_max": 20,
+    "origin_sub_en": "by car, no traffic",
+    "bar_max": 15,
+    "footnote_en": "Drive time from the project · not a map",
     "rows": [
      {
-      "icon": "mall",
-      "label_en": "Lotus's",
-      "sub_en": "Supermarket · 2.9 km",
-      "value_en": "≈ 6–8 min",
+      "icon": "hospital",
+      "label_en": "Jomtien Hospital",
+      "sub_en": "Bangkok Hospital Pattaya group",
+      "value_en": "≈ 8 min",
       "bar": [
-       6,
        8
       ],
       "line": 0
      },
      {
-      "icon": "mall",
-      "label_en": "Jomtien Night Market",
-      "sub_en": "3.2 km",
-      "value_en": "≈ 6–8 min",
+      "icon": "hospital",
+      "label_en": "Bangkok Hospital Pattaya",
+      "short_en": "Bangkok Hospital",
+      "value_en": "≈ 11 min",
       "bar": [
-       6,
-       8
+       11
       ],
       "line": 1
      },
      {
       "icon": "hospital",
-      "label_en": "Jomtien Hospital",
-      "sub_en": "6.5 km",
-      "value_en": "≈ 8–11 min",
+      "label_en": "Pattaya City Hospital",
+      "short_en": "City Hospital",
+      "value_en": "≈ 10 min",
       "bar": [
-       8,
-       11
+       10
+      ],
+      "line": 2
+     }
+    ]
+   },
+   "taps": [
+    {
+     "id": "story_nearby_hospitals_around",
+     "label_en": "Around us",
+     "label_th": "รอบโครงการ",
+     "next_story": "nearby_places",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_hospitals_schools",
+     "label_en": "Schools",
+     "label_th": "โรงเรียน",
+     "next_story": "nearby_schools",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:92_appendix_travel.md#ค.4.3 row 33 (Jomtien Hospital เครือ Bangkok Hospital Pattaya 6.5 กม. · free-flow 8 นาที) · row 34 (โรงพยาบาลเมืองพัทยา 8.1 กม. · 10 นาที) · row 37 (โรงพยาบาลกรุงเทพพัทยา 10.2 กม. · 11 นาที) · หมายเหตุ: ไม่ใช่เวลาตอบสนองกรณีฉุกเฉิน",
+    "report:04_location.md#4.9.3 · #4.13 FAQ ข้อโรงพยาบาล (Jomtien Hospital ≈ 8 นาที · รพ.เมืองพัทยา ≈ 10 · รพ.กรุงเทพพัทยา ≈ 11 · ประมาณการจากแผนที่ ไม่ใช่เวลาตอบสนองฉุกเฉิน)",
+    "report:23_owner_review_2026-10-22.md#23.2 (คำถามคลินิกให้ตอบด้วยโรงพยาบาลจอมเทียนและโรงพยาบาลกรุงเทพพัทยา ไม่เอ่ยชื่อคลินิก — เจ้าของ 22 ต.ค.)"
+   ],
+   "notes_th": "เจ้าของ 21 ต.ค. 'โรงพยาบาลที่ไหนใกล้บ้าง' — สามโรงพยาบาลที่ใกล้ที่สุดตามระยะถนน เวลารถไม่ติดตัวเดียว · ห้ามพูดเวลาตอบสนองฉุกเฉินหรือ 'รถพยาบาลมาถึงใน...' (รายงาน ค.2 ข้อ 4) — ทุกบรรทัดเป็นเวลาขับรถ · Pattaya Memorial (11 นาที) และ Pattaya International (12) ไม่ใส่ เพื่อให้เลขไม่เยอะ · **22 ต.ค. คลินิก: เจ้าของ 'ขอเป็นโรงพยาบาลจอมเทียน และโรงพยาบาลกรุงเทพพัทยา'** (แทนบรรทัด JMC Jomtien Medical Clinic ที่เสนอไว้) → คำถามคลินิกทุกแบบมาเรื่องนี้ บรรทัดแรกเปิดด้วย 'ถ้าต้องไปหาหมอ แนะนำโรงพยาบาลจอมเทียน' (ตอบได้ทั้งคำถามคลินิกและโรงพยาบาล ไม่อ้างว่าเป็นที่หาหมอที่ใกล้ที่สุด เพราะบท 22 ร่างมีคลินิก ≈ 6 นาที — อ้างแค่ 'โรงพยาบาลที่ใกล้ที่สุด' ซึ่งจริง) · เรียงใหม่: จอมเทียน → กรุงเทพพัทยา (เครือเดียวกัน ตามภาคผนวก ค.4.3) → เมืองพัทยา · คงโรงพยาบาลเมืองพัทยาไว้เป็นบรรทัดท้าย ('แล้วก็มี…' — รีวิว 22 ต.ค.: 'นอกจากนี้ยังมี' เป็นภาษาเขียน) เพราะเจ้าของไม่ได้ติเรื่องโรงพยาบาลและอ่านลื่น · ไม่เอ่ยชื่อคลินิกใดเลย บท _draft_22_nearby_clinics.md (เจ้าของ ok) ยังเป็นข้อมูลอ้างอิง ไม่ได้ใช้ในเรื่องเล่า · รีวิว 22 ต.ค.: บรรทัดอังกฤษสองเป็น 'It's in the same group as Bangkok Hospital Pattaya, which is about 11 minutes away.' (เดิมพูดชื่อ Bangkok Hospital Pattaya สองรอบ)"
+  },
+  {
+   "id": "nearby_schools",
+   "template": "journey",
+   "questions_th": [
+    "มีโรงเรียนใกล้ไหม",
+    "มีโรงเรียนนานาชาติใกล้ไหม",
+    "มีโรงเรียนอินเตอร์ใกล้ไหม",
+    "แถวนี้มีโรงเรียนอะไรบ้าง",
+    "โรงเรียนนานาชาติดังๆ มีที่ไหนบ้าง",
+    "Regents ไกลไหม",
+    "Rugby School ไกลไหม"
+   ],
+   "questions_en": [
+    "Are there schools nearby?",
+    "Is there an international school nearby?",
+    "Which international schools are near here?",
+    "Which schools are near here?",
+    "How far is Regents International School?",
+    "How far is Rugby School?"
+   ],
+   "lines": [
+    {
+     "th": "รอบพัทยามีโรงเรียนนานาชาติชื่อดังให้เลือกหลายแห่ง เดินทางจากที่นี่สะดวกค่ะ",
+     "en": "Several of Pattaya's best-known international schools are an easy drive from here.",
+     "cue_th": [
+      "นานาชาติ"
+     ],
+     "cue_en": [
+      "international"
+     ],
+     "cue_zh": [
+      "国际学校"
+     ]
+    },
+    {
+     "th": "อย่างโรงเรียนธาราพัฒนา ห่างประมาณ 13 นาที",
+     "en": "Tara Pattana is about 13 minutes away,",
+     "cue_th": [
+      "ธาราพัฒนา",
+      "Tara"
+     ],
+     "cue_en": [
+      "Tara"
+     ],
+     "cue_zh": [
+      "Tara"
+     ]
+    },
+    {
+     "th": "มูลตรีภักดีประมาณ 16 นาที",
+     "en": "Mooltripakdee about 16,",
+     "cue_th": [
+      "มูลตรีภักดี",
+      "Mooltripakdee"
+     ],
+     "cue_en": [
+      "Mooltripakdee"
+     ],
+     "cue_zh": [
+      "Mooltripakdee"
+     ]
+    },
+    {
+     "th": "รีเจ้นท์ประมาณ 18 นาที",
+     "en": "Regents about 18,",
+     "cue_th": [
+      "รีเจ้นท์",
+      "รีเจนท์",
+      "Regents"
+     ],
+     "cue_en": [
+      "Regents"
+     ],
+     "cue_zh": [
+      "Regents"
+     ]
+    },
+    {
+     "th": "รักบี้สคูลประมาณ 29 นาที",
+     "en": "Rugby School about 29,",
+     "cue_th": [
+      "รักบี้",
+      "Rugby"
+     ],
+     "cue_en": [
+      "Rugby"
+     ],
+     "cue_zh": [
+      "Rugby"
+     ]
+    },
+    {
+     "th": "และเซนต์แอนดรูว์ส กรีนวัลเลย์ ประมาณ 41 นาทีค่ะ",
+     "en": "and St Andrews Green Valley about 41 minutes.",
+     "cue_th": [
+      "แอนดรูว์",
+      "Andrews"
+     ],
+     "cue_en": [
+      "Andrews"
+     ],
+     "cue_zh": [
+      "Andrews"
+     ]
+    },
+    {
+     "th": "มูลตรีภักดี รีเจ้นท์ และรักบี้ เป็นโรงเรียนใหญ่ แต่ละที่มีนักเรียนกว่าพันคนเลยค่ะ",
+     "en": "Mooltripakdee, Regents and Rugby are the big ones, each with more than a thousand students.",
+     "cue_th": [
+      "นักเรียน"
+     ],
+     "cue_en": [
+      "students"
+     ],
+     "cue_zh": [
+      "学生"
+     ]
+    }
+   ],
+   "params": {
+    "view": "rings",
+    "origin_en": "EMBASSY WORLD",
+    "origin_sub_en": "by car, no traffic",
+    "bar_max": 45,
+    "footnote_en": "Drive time from the project · not a map",
+    "rows": [
+     {
+      "icon": "school",
+      "label_en": "Tara Pattana International School",
+      "short_en": "Tara Pattana",
+      "sub_en": "British curriculum",
+      "value_en": "≈ 13 min",
+      "bar": [
+       13
+      ],
+      "line": 1
+     },
+     {
+      "icon": "school",
+      "label_en": "Mooltripakdee International School",
+      "short_en": "Mooltripakdee",
+      "sub_en": "British, to A Level · 1,000+ students",
+      "value_en": "≈ 16 min",
+      "bar": [
+       16
       ],
       "line": 2
      },
      {
-      "icon": "hospital",
-      "label_en": "Bangkok Hospital Pattaya",
-      "sub_en": "10.2 km",
-      "value_en": "≈ 11–16 min",
+      "icon": "school",
+      "label_en": "Regents International School Pattaya",
+      "short_en": "Regents",
+      "sub_en": "British + IB · 1,100+ students",
+      "value_en": "≈ 18 min",
       "bar": [
-       11,
-       16
+       18
       ],
       "line": 3
      },
      {
       "icon": "school",
-      "label_en": "Pattaya City School 7",
-      "sub_en": "2.9 km",
-      "value_en": "≈ 5–7 min",
+      "label_en": "Rugby School Thailand",
+      "short_en": "Rugby",
+      "sub_en": "British, day & boarding · 1,000+ students",
+      "value_en": "≈ 29 min",
       "bar": [
-       5,
-       7
+       29
       ],
       "line": 4
      },
      {
       "icon": "school",
-      "label_en": "German Int'l School",
-      "sub_en": "4.5 km",
-      "value_en": "≈ 8–11 min",
+      "label_en": "St Andrews International School Green Valley",
+      "short_en": "St Andrews",
+      "sub_en": "British + IB · ≈ 450 students",
+      "value_en": "≈ 41 min",
       "bar": [
-       8,
-       11
+       41
       ],
       "line": 5
      }
@@ -796,35 +1244,339 @@
    },
    "taps": [
     {
-     "id": "story_nearby_places_malls",
-     "label_en": "Malls",
-     "label_th": "ห้าง",
-     "next_story": "travel_malls",
+     "id": "story_nearby_schools_around",
+     "label_en": "Around us",
+     "label_th": "รอบโครงการ",
+     "next_story": "nearby_places",
      "tool": null
     },
     {
-     "id": "story_nearby_places_airports",
-     "label_en": "Airports",
-     "label_th": "สนามบิน",
-     "next_story": "travel_airports",
-     "tool": null
-    },
-    {
-     "id": "story_nearby_places_beach",
-     "label_en": "Beach & park",
-     "label_th": "หาดและสวน",
-     "next_story": "location_beach",
+     "id": "story_nearby_schools_families",
+     "label_en": "For families",
+     "label_th": "สำหรับครอบครัว",
+     "next_story": "for_families",
      "tool": null
     }
    ],
    "sources": [
-    "report:04_location.md#4.9.2 (Lotus's ถนนชัยพฤกษ์ 2: ถนน 2.9 กม. · free-flow 6 นาที · รถติด 7–8 · ตลาดโต้รุ่งจอมเทียน 3.2 กม. · 6 · 7–8)",
-    "report:04_location.md#4.9.3 (Jomtien Hospital 6.5 กม. · 8 · 10–11 · โรงพยาบาลกรุงเทพพัทยา 10.2 กม. · 11 · 14–16)",
-    "report:04_location.md#4.9.4 (โรงเรียนเมืองพัทยา 7: 2.9 กม. · 5 · 6–7 · German International School 4.5 กม. · 8 · 10–11)",
-    "report:92_appendix_travel.md#ค.4.2 rows 14, 15 · ค.4.3 rows 33, 37 · ค.4.4 rows 42, 43 (ตัวเลขเดียวกัน · 'Pattaya City School 7 (public)')",
-    "report:19_faq.md line 128, 131, 134 (ซูเปอร์มาร์เก็ต/ตลาด · โรงพยาบาล · โรงเรียน ตามแผนที่ ขับรถ)"
+    "report:92_appendix_travel.md#ค.4.4 row 45 (Tara Pattana International School 8.8 กม. · free-flow 13 นาที) · row 48 (Regents International School Pattaya (พลง) 19.0 กม. · 18)",
+    "report:23_owner_review_2026-10-22.md#23.2 (โรงเรียนนานาชาติชื่อดังที่นักเรียนเยอะที่สุด 5 แห่ง — เจ้าของ 22 ต.ค. 'เลือกที่เป็นโรงเรียนดังๆ มา 5 ที่ ที่มีนักเรียนเยอะที่สุด เน้นโรงเรียนอินเตอร์' · เวลาขับ OSRM 22 ต.ค. วิธีเดียวกับภาคผนวก ค.1: Mooltripakdee 14.8 กม. · 16 นาที · Rugby School Thailand 25.6 กม. · 29 นาที · St Andrews Green Valley 31.1 กม. · 41 นาที · นักเรียนตามเว็บของโรงเรียนเอง: Regents กว่า 1,100 คน · Mooltripakdee กว่า 1,000 คน · Rugby 1,000+ คน · St Andrews ราว 450 คน · หลักสูตรตามเว็บของโรงเรียน: Tara Pattana / Mooltripakdee English National Curriculum · Regents IB + A Level/IGCSE · Rugby IGCSE/A Level ไปกลับและประจำ · St Andrews British + IB)"
    ],
-   "notes_th": "แม่แบบ journey ไม่มีรูป สเกลเดียวทุกแถว bar_max 20 นาที (ไม่ใช่ 90 ของเรื่องสนามบิน — ที่ใกล้ๆ ทุกแถวจะสั้นจนอ่านไม่ออก) · ช่วงเวลา = รถโล่ง (OSRM) ถึงช่วงรถติด (ประมาณการของรายงาน) แบบเดียวกับ travel_malls · กม. อยู่บนจอแต่ไม่พูด · เลือก: Lotus's ชัยพฤกษ์ 2 (โลตัสใหญ่ใกล้สุด; Lotus's Go Fresh ใกล้กว่าแต่เป็นมินิมาร์ท), ตลาดโต้รุ่งจอมเทียน, โรงพยาบาลจอมเทียน + โรงพยาบาลกรุงเทพพัทยา (FAQ 4 ของรายงาน), โรงเรียนเมืองพัทยา 7 (รัฐ) + German International School (นานาชาติใกล้สุด) · ไม่ซ้ำ travel_malls / travel_airports / location_travel (ห้าง สนามบิน หาด อยู่ในเรื่องเหล่านั้น — แตะไปได้) · ไม่ใส่: 'ไม่ใช่เวลาฉุกเฉิน' เป็นบรรทัดพูด (ทุกบรรทัดพูดว่า 'ประมาณ' และเป็นเวลาขับรถอยู่แล้ว) · เวลาเปิดตลาด · Tara Pattana / Regents (ไกลกว่า เรื่องจะยาวเกิน) · ค่าเทอม/หลักสูตร (รายงานให้ติดต่อโรงเรียนเอง) · ⚠️ ไอคอน: emma-story.js มีแค่ home/mall/plane/beach/park/road — แถวโรงพยาบาลและโรงเรียนตั้ง icon เป็น 'hospital' / 'school' ซึ่งตอนนี้หน้าเว็บถอยไปวาดรูปบ้าน (ICONS[name] || ICONS.home) เหมือนหมุดโครงการ ควรเพิ่ม path สองตัวใน ICONS ก่อนอนุมัติ (ไม่ได้แก้ไฟล์นั้นเพราะอยู่นอกงานกลุ่มนี้) · คำถามแคบ ('ใกล้โรงพยาบาลไหม') จะได้ยินเรื่องตลาดก่อนสองบรรทัด — ถ้าเจ้าของต้องการตามกติกา 13 ต.ค. แยกเป็นเรื่องย่อย nearby_hospitals / nearby_schools / nearby_shopping ได้จากแถวชุดเดียวกัน"
+   "notes_th": "เจ้าของ 21 ต.ค. 'โรงเรียน ไม่เอาสถาบันนะ' — เฉพาะโรงเรียน ไม่มีวิทยาลัย/มหาวิทยาลัย/สถาบัน · **22 ต.ค. เจ้าของ (ดูภาพเรื่องนี้บนหน้าตรวจ ซึ่งมี รร.เมืองพัทยา 7, German Int'l, Tara Pattana, Lovell, Regents): 'เลือกที่เป็นโรงเรียนดังๆ มา 5 ที่พอ ที่มีนักเรียนเยอะที่สุด เน้นโรงเรียนอินเตอร์'** → เปลี่ยนเป็นโรงเรียนนานาชาติ 5 แห่งที่นักเรียนเยอะที่สุดรอบพัทยา: Regents (กว่า 1,100), Mooltripakdee (กว่า 1,000), Rugby (1,000+), St Andrews Green Valley (ราว 450), Tara Pattana (≈ 300 ตามไดเรกทอรี ไม่มีตัวเลขของโรงเรียนเอง จึงไม่ขึ้นจอ) — ชุดเดียวกับห้าโรงเรียนที่ ischooladvisor 'Best International Schools in Pattaya 2026' เลือกเขียน · ตัดออก: รร.เมืองพัทยา 7 (รัฐ), German International School (เล็ก ค้นเว็บไม่พบเว็บไซต์ มีแค่ใน OSM), Lovell (เปิด 2023 รับไม่เกิน ~200 คน ถึง Year 4), ISE (~300 คน 44 นาที ไกลกว่า St Andrews และนักเรียนน้อยกว่า) · พูดเรียงจากใกล้ไปไกล (วงเวลาวางตามลำดับที่พูด) แล้วปิดด้วย 'สามแห่งเป็นโรงเรียนใหญ่ แต่ละที่มีนักเรียนกว่าพันคน' (ตัวเลขเดียวที่ไม่ใช่เวลา ไม่มีหลักในบท) · ไม่อ้างว่าที่ไหน 'ใกล้ที่สุด' (นานาชาติใกล้สุดในภาคผนวก ค คือ German 8 นาที) และเอาคำถาม 'โรงเรียนนานาชาติที่ใกล้ที่สุดอยู่ไหน' / 'Where is the nearest international school?' ออกจากรายการ (รีวิว 22 ต.ค.: เรื่องนี้ไม่ตอบที่ใกล้ที่สุด ส่วน nearby_places บนจอบอก German ใกล้สุด สองเรื่องจึงขัดกัน · ย้ายไป nearby_places แล้ว 'school nearby' หลุด จึงลบอย่างเดียว คำถามนี้ไปการค้นแทน · ถ้าเจ้าของอยากให้บอกที่ใกล้ที่สุด ต้องเพิ่มบรรทัด German ในเรื่องนี้) · ชื่อในบทไทยเป็นอักษรไทยตามชื่อไทยของโรงเรียน (ธาราพัฒนา มูลตรีภักดี รีเจ้นท์ รักบี้ เซนต์แอนดรูว์ส) ให้ออกเสียงไทยลื่น บนจอเป็นชื่ออังกฤษ · bar_max 45 (St Andrews 41 นาที) · ไม่พูดค่าเทอม/การรับนักเรียน · ตารางเต็มพร้อมพิกัดและที่มาอยู่ในบท 23.2 (ร่าง) · รีวิว 22 ต.ค.: บรรทัดเวลาพูด 'รักบี้สคูล' (คำว่า 'รักบี้' เดี่ยวๆ ไม่มีคำว่าโรงเรียน ฟังเป็นกีฬา)"
+  },
+  {
+   "id": "nearby_restaurants",
+   "template": "journey",
+   "questions_th": [
+    "ร้านอาหารใกล้สุดอยู่ไหน",
+    "มีร้านอาหารใกล้ไหม",
+    "แถวนี้มีร้านอาหารอะไรบ้าง",
+    "มีคาเฟ่ใกล้ไหม",
+    "มีร้านซีฟู้ดใกล้ๆไหม",
+    "เดินไปร้านอาหารได้ไหม"
+   ],
+   "questions_en": [
+    "Where is the nearest restaurant?",
+    "Are there restaurants nearby?",
+    "Is there a cafe near here?",
+    "Where can I eat around here?"
+   ],
+   "lines": [
+    {
+     "th": "ร้านอาหารที่ใกล้ที่สุดคือ Big Whale Seafood บุฟเฟต์ซีฟู้ดปิ้งย่าง ขับรถประมาณ 3 นาทีค่ะ",
+     "en": "The nearest restaurant is Big Whale Seafood, a seafood barbecue buffet, about 3 minutes by car,",
+     "cue_th": [
+      "Big Whale",
+      "บิ๊กเวล",
+      "บิ๊กวาฬ"
+     ],
+     "cue_en": [
+      "Big Whale",
+      "Whale"
+     ],
+     "cue_zh": [
+      "Big Whale",
+      "海鲜"
+     ]
+    },
+    {
+     "th": "ถ้าเดินไปประมาณ 11 นาที",
+     "en": "or about 11 minutes on foot.",
+     "cue_th": [
+      "เดิน"
+     ],
+     "cue_en": [
+      "foot",
+      "walk"
+     ],
+     "cue_zh": [
+      "步行",
+      "走路"
+     ]
+    },
+    {
+     "th": "ริมหาดจอมเทียนมีคาเฟ่และร้านอาหาร อย่าง Apple Bee Cafe กับ Toy Seafood ขับรถประมาณ 4 นาที",
+     "en": "On the Jomtien beach road there are cafes and restaurants like Apple Bee Cafe and Toy Seafood, about 4 minutes by car,",
+     "cue_th": [
+      "Apple Bee",
+      "แอปเปิ้ลบี",
+      "ริมหาด"
+     ],
+     "cue_en": [
+      "Apple Bee",
+      "beach road"
+     ],
+     "cue_zh": [
+      "Apple Bee",
+      "海滩"
+     ]
+    },
+    {
+     "th": "และร้านซีฟู้ดชื่อดังอย่างปูเป็น ซีฟู้ด ประมาณ 6 นาทีค่ะ",
+     "en": "and the well-known Pupen Seafood about 6 minutes.",
+     "cue_th": [
+      "ปูเป็น",
+      "Pupen"
+     ],
+     "cue_en": [
+      "Pupen"
+     ],
+     "cue_zh": [
+      "Pupen"
+     ]
+    }
+   ],
+   "params": {
+    "view": "rings",
+    "origin_en": "EMBASSY WORLD",
+    "origin_sub_en": "by car, no traffic",
+    "bar_max": 10,
+    "footnote_en": "Drive time from the project · not a map",
+    "rows": [
+     {
+      "icon": "food",
+      "label_en": "Big Whale Seafood BBQ Buffet",
+      "short_en": "Big Whale",
+      "sub_en": "Jomtien Second Road",
+      "value_en": "≈ 3 min",
+      "bar": [
+       3
+      ],
+      "walk": {
+       "value_en": "≈ 11 min",
+       "line": 1
+      },
+      "line": 0
+     },
+     {
+      "icon": "food",
+      "label_en": "Apple Bee Cafe",
+      "sub_en": "Jomtien Beach Road",
+      "value_en": "≈ 4 min",
+      "bar": [
+       4
+      ],
+      "line": 2
+     },
+     {
+      "icon": "food",
+      "label_en": "Toy Seafood",
+      "sub_en": "Beachfront · Jomtien Beach Road",
+      "value_en": "≈ 4 min",
+      "bar": [
+       4
+      ],
+      "line": 2
+     },
+     {
+      "icon": "food",
+      "label_en": "Pupen Seafood",
+      "sub_en": "Na Jomtien",
+      "value_en": "≈ 6 min",
+      "bar": [
+       6
+      ],
+      "line": 3
+     }
+    ]
+   },
+   "taps": [
+    {
+     "id": "story_nearby_restaurants_around",
+     "label_en": "Around us",
+     "label_th": "รอบโครงการ",
+     "next_story": "nearby_places",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_restaurants_sights",
+     "label_en": "Places to visit",
+     "label_th": "ที่เที่ยว",
+     "next_story": "nearby_attractions",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:92_appendix_travel.md#ค.4.7 row 85 (Big Whale Seafood BBQ Buffet (จอมเทียนสายสอง) 1.5 กม. · free-flow 3 นาที) · row 86 (Apple Bee Cafe (จอมเทียนสาย 1) 1.7 กม. · 4) · row 87 (Toy Seafood / Garage / Jet Cafe (ถนนจอมเทียนสาย 1 หน้าหาด) 2.0 กม. · 4) · row 92 (ปูเป็น ซีฟู้ด – ร้านซีฟู้ดดัง นาจอมเทียน 3.4 กม. · 6; Tripadvisor/Google)",
+    "report:92_appendix_travel.md#ค.5 (เดินตาม OSM: Big Whale Seafood 0.80 กม. 11 นาที)",
+    "report:04_location.md#4.9.7 (รายการมาจาก OSM ไม่ใช่การจัดอันดับความนิยม ยกเว้น Pupen Seafood ที่มาจากผลค้นหา · ร้านอาจปิด/เปลี่ยนเจ้าของ) · #4.11.1 (Big Whale Seafood ร้านอาหารที่เดินใกล้สุดในตาราง)"
+   ],
+   "notes_th": "ผู้ประสานงาน 21 ต.ค. (log หุ่น 20 ต.ค. 15:59 'Where is the nearest restaurant?' ส่งทีมขาย ทั้งที่ตารางในรายงานมี) — ร้านที่ใกล้ที่สุดก่อน พร้อมเวลาเดิน (ร้านเดียวที่เดินถึงใกล้สุดในตาราง ค.5) แล้วร้านริมหาด แล้วร้านซีฟู้ดดังหนึ่งร้าน · ไม่พูดว่า 'อร่อย/ดีที่สุด/ยอดนิยม' (รายงาน: รายการ OSM ไม่ใช่อันดับความนิยม) ยกเว้นปูเป็น 'ชื่อดัง' ตามที่รายงานอ้างผลค้นหา · Sandbar by the Sea (7 นาที) และคาเฟ่ริมบุณย์กัญจนาไม่ใส่ (เลขไม่เยอะ) · ⚠️ ไอคอน: เครื่องยนต์ยังไม่มีไอคอนร้านอาหาร ใช้ mall ไปก่อน — ถ้าเพิ่ม 'food' ใน ICONS ของ emma-story.js ค่อยเปลี่ยนสี่แถวนี้"
+  },
+  {
+   "id": "nearby_attractions",
+   "template": "journey",
+   "questions_th": [
+    "แถวนี้มีที่เที่ยวอะไรบ้าง",
+    "มีสถานที่ท่องเที่ยวใกล้ไหม",
+    "ใกล้โครงการมีที่น่าสนใจอะไรบ้าง",
+    "ไปสวนนงนุชไกลไหม",
+    "พระใหญ่ไกลไหม"
+   ],
+   "questions_en": [
+    "Is there any tourist attraction nearby?",
+    "What interesting places are around the project?",
+    "What is there to see around here?",
+    "How far is Nong Nooch?"
+   ],
+   "lines": [
+    {
+     "th": "ที่เที่ยวที่ใกล้ที่สุดคือ Underwater World พัทยา ขับรถประมาณ 6 นาทีค่ะ",
+     "en": "The closest attraction is Underwater World Pattaya, about 6 minutes by car,",
+     "cue_th": [
+      "Underwater",
+      "อันเดอร์วอเตอร์"
+     ],
+     "cue_en": [
+      "Underwater"
+     ],
+     "cue_zh": [
+      "海底世界",
+      "Underwater"
+     ]
+    },
+    {
+     "th": "ตลาดน้ำสี่ภาคก็ประมาณ 6 นาทีเหมือนกัน",
+     "en": "the Pattaya Floating Market about the same,",
+     "cue_th": [
+      "ตลาดน้ำ"
+     ],
+     "cue_en": [
+      "Floating"
+     ],
+     "cue_zh": [
+      "水上市场"
+     ]
+    },
+    {
+     "th": "พระใหญ่บนเขาพระตำหนักประมาณ 12 นาที",
+     "en": "the Big Buddha on Pratumnak Hill about 12 minutes,",
+     "cue_th": [
+      "พระใหญ่",
+      "เขาพระตำหนัก"
+     ],
+     "cue_en": [
+      "Buddha"
+     ],
+     "cue_zh": [
+      "大佛"
+     ]
+    },
+    {
+     "th": "ส่วนปราสาทสัจธรรมกับสวนนงนุชประมาณ 19 นาทีค่ะ",
+     "en": "and the Sanctuary of Truth and Nong Nooch Tropical Garden about 19 minutes.",
+     "cue_th": [
+      "สัจธรรม",
+      "ปราสาท"
+     ],
+     "cue_en": [
+      "Sanctuary"
+     ],
+     "cue_zh": [
+      "真理寺",
+      "真理圣殿"
+     ]
+    }
+   ],
+   "params": {
+    "view": "rings",
+    "origin_en": "EMBASSY WORLD",
+    "origin_sub_en": "by car, no traffic",
+    "bar_max": 20,
+    "footnote_en": "Drive time from the project · not a map",
+    "rows": [
+     {
+      "icon": "sight",
+      "label_en": "Underwater World Pattaya",
+      "short_en": "Underwater World",
+      "value_en": "≈ 6 min",
+      "bar": [
+       6
+      ],
+      "line": 0
+     },
+     {
+      "icon": "sight",
+      "label_en": "Pattaya Floating Market",
+      "short_en": "Floating Market",
+      "value_en": "≈ 6 min",
+      "bar": [
+       6
+      ],
+      "line": 1
+     },
+     {
+      "icon": "sight",
+      "label_en": "Big Buddha · Pratumnak Hill",
+      "short_en": "Big Buddha",
+      "value_en": "≈ 12 min",
+      "bar": [
+       12
+      ],
+      "line": 2
+     },
+     {
+      "icon": "sight",
+      "label_en": "Sanctuary of Truth",
+      "value_en": "≈ 19 min",
+      "bar": [
+       19
+      ],
+      "line": 3
+     },
+     {
+      "icon": "sight",
+      "label_en": "Nong Nooch Tropical Garden",
+      "short_en": "Nong Nooch",
+      "value_en": "≈ 19 min",
+      "bar": [
+       19
+      ],
+      "line": 3
+     }
+    ]
+   },
+   "taps": [
+    {
+     "id": "story_nearby_attractions_beach",
+     "label_en": "Beach & park",
+     "label_th": "หาดและสวน",
+     "next_story": "location_beach",
+     "tool": null
+    },
+    {
+     "id": "story_nearby_attractions_restaurants",
+     "label_en": "Restaurants",
+     "label_th": "ร้านอาหาร",
+     "next_story": "nearby_restaurants",
+     "tool": null
+    }
+   ],
+   "sources": [
+    "report:92_appendix_travel.md#ค.4.6 row 68 (Underwater World Pattaya 3.6 กม. · free-flow 6 นาที) · row 69 (ตลาดน้ำ 4 ภาค พัทยา 3.6 กม. · 6) · row 73 (พระใหญ่ วัดพระใหญ่ เขาพระตำหนัก 6.7 กม. · 12) · row 79 (ปราสาทสัจธรรม 14.8 กม. · 19) · row 80 (สวนนงนุช พัทยา 16.2 กม. · 19)",
+    "report:04_location.md#4.9.6 (Underwater World 6 · พระใหญ่ 12 · ปราสาทสัจธรรม 19 · สวนนงนุช 19 ตามพิกัดลานจอดรถ)"
+   ],
+   "notes_th": "ผู้ประสานงาน 21 ต.ค. (log หุ่น 20 ต.ค. 15:58, 16:19 'What interesting locations / tourist attractions are around?' ตอบสนามบินแล้วส่งทีมขาย) — ห้าที่ใกล้และเป็นที่รู้จักจากตาราง ค.4.6 เรียงตามเวลา · ไม่ใส่ Walking Street (อยู่ในหมวดชายหาด) ช้าง/เสือ (เลือกที่ไม่มีประเด็นสัตว์) · ไม่บรรยายสถานที่เกินชื่อ (รายงานไม่มีคำบรรยาย) · ⚠️ ไอคอน: เครื่องยนต์ไม่มีไอคอน 'ที่เที่ยว' ใช้ beach (ริมทะเล: Underwater World, ปราสาทสัจธรรม) park (เขา/สวน) mall (ตลาดน้ำ) ไปก่อน"
   },
   {
    "id": "lagoon_islands",

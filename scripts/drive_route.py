@@ -373,6 +373,27 @@ LANE_LOOKAHEAD_MIN_M = 0.6
 ROLL_ALONG_BIG_M = 0.25
 ROLL_ALONG_AGREE_M = 0.03
 ROLL_ALONG_AGE_S = 0.15
+#: Our own lidar map (app/scan_match.py; owner 19 ต.ค.: "เมื่อกี้เราเดินมาแบบนี้
+#: หุ่นก็น่าจะอยู่ประมาณนี้ แล้วก็ค่าตรงกับเลเซอร์"). Matched at every checkpoint
+#: from the wheels' guess, next to the walls' fix, and LOGGED ONLY
+#: (`shadow_fix`): nothing it says moves the robot or the pose written to the
+#: board. Offline it beat the walls' own reach (p90 2.1 / 6.0 cm, docked y the
+#: walls never measure); whether it holds on the robot is what these rows are
+#: for. 0.17 s a match on the robot's CPU (19 ต.ค.), done while it stands.
+#: Built on the PC: `scripts/eval_scan_localization.py --save-field`.
+#: RELATIVE to ROOT, joined in _main when the run starts, never here at import
+#: (pre-commit review 26 ต.ค. #8/#18): `default=str(ROOT / ...)` was fixed from
+#: the real ROOT, so every main()-driven test that patched ROOT still loaded
+#: this PC's gitignored map (a test's run log said shadow_map loaded=true) and
+#: took the "no map file" path on a clean checkout -- the suite read the
+#: machine. On the robot ROOT is the deployed tree either way: same file.
+SHADOW_FIELD = Path("data") / "robot" / "maps" / "floor2_lidar_field.npz"
+#: ...and the lidar frame on the move, every SCAN_LOG_EVERY_M along a velocity
+#: lane (`seen` in the drive record): until 19 ต.ค. only stopped checkpoints
+#: logged a frame, so nothing said how a 0.4 m/s frame matches. 2 cm thinned,
+#: millimetres -- ~7 KB a frame, ~10 a route.
+SCAN_LOG_EVERY_M = 0.6
+SCAN_LOG_VOXEL_M = 0.02
 #: A step sideways creeps a few cm: its front strip is the door pass's (the
 #: body + 1 cm a side), not a lane's (+ 5 cm) built for 0.3 m/s.
 STEP_STRIP_MARGIN_M = 0.01
@@ -870,6 +891,8 @@ class Runner:
         self.door_memory_path: Path | None = None   # --door-memory (DOOR_MEM_*)
         self.from_step = 1
         self.log_name = log_path.name
+        self.shadow = None                    # app.scan_match.Field (SHADOW_FIELD), log-only
+        self.shadow_why = "not loaded"
 
     def fast_pose(self) -> tuple[float, float, float]:
         """The pose over the SDK port when there is one: 8 ms there against
@@ -1109,6 +1132,7 @@ class Runner:
                  pose=fix.pose, dx=fix.dx, dy=fix.dy, dyaw=fix.dyaw, matches=fix.matches, doors=fix.doors, dropped=fix.dropped,
                  scan={"angle": [round(p["angle"], 4) for p in frames[0].get("laser_points", []) if p.get("valid")],
                        "distance": [round(p["distance"], 4) for p in frames[0].get("laser_points", []) if p.get("valid")]})
+        self.shadow_fix(step.label, guess, frames[0], fix)
         if not fix.accepted:
             raise Stop("checkpoint %r could not measure its walls: %s" % (step.label or "?", fix.reason))
         self.b.set_pose(fix.pose)
@@ -1120,6 +1144,49 @@ class Runner:
             if d is not None:
                 self.measured_at[axis] = (fix.pose[0], fix.pose[1])
         return fix
+
+    def shadow_fix(self, label: str, guess, frame: dict, fix: rl.Fix | None) -> dict | None:
+        """Our lidar map's answer at this stop (SHADOW_FIELD), from the same
+        wheels' guess and frame as the walls' fix -- logged as `shadow_fix`
+        beside it and NEVER used: the pose written to the board is the walls'
+        alone. Anything it raises is logged and swallowed; a log row is never
+        a reason to stop a route."""
+        fd = getattr(self, "shadow", None)
+        if fd is None:
+            return None
+        t0 = time.time()
+        try:
+            from app import scan_match as sm
+            pts = rl.scan_points(frame)
+            pts = pts[np.hypot(pts[:, 0], pts[:, 1]) < sm.MAX_RANGE] if len(pts) else pts
+            m = sm.search(fd, sm.voxel(pts), guess)
+            row = {"guess": [round(float(v), 4) for v in guess], "est": [round(float(v), 4) for v in m.pose],
+                   "score": round(m.score, 3), "sharp": [round(s, 3) for s in m.sharp], "pinned": list(m.pinned()),
+                   "applied": [round(float(v), 4) for v in m.apply()], "seconds": round(time.time() - t0, 3)}
+            if fix is not None and fix.accepted:
+                # against the walls, on the axes they measured
+                vs = {}
+                if fix.dx is not None:
+                    vs["x_m"] = round(float(m.pose[0] - fix.pose[0]), 4)
+                if fix.dy is not None:
+                    vs["y_m"] = round(float(m.pose[1] - fix.pose[1]), 4)
+                if fix.dyaw is not None:
+                    vs["yaw_deg"] = round(math.degrees(rl.wrap_pi(m.pose[2] - fix.pose[2])), 2)
+                row["vs_walls"] = vs
+            self.log(kind="shadow_fix", label=label, **row)
+            parts = [("%s %+.1f cm" % (k[0], v * 100)) if k.endswith("_m") else ("yaw %+.1f°" % v)
+                     for k, v in (row.get("vs_walls") or {}).items()]
+            self.say("  map (log only): (%.3f, %.3f, %.1f°) score %.2f%s, %.2f s"
+                     % (m.pose[0], m.pose[1], math.degrees(m.pose[2]), m.score,
+                        (" -- vs walls " + ", ".join(parts)) if parts else "", row["seconds"]))
+            return row
+        except Exception as e:                  # noqa: BLE001 -- see the docstring
+            try:
+                self.log(kind="shadow_fix", label=label, error=("%s: %s" % (type(e).__name__, e))[:200],
+                         seconds=round(time.time() - t0, 3))
+            except Exception:                   # noqa: BLE001
+                pass
+            return None
 
     def move(self, step: rl.Step) -> None:
         x0, y0, _ = self.b.pose()
@@ -1361,6 +1428,7 @@ class Runner:
         # a lane after a corner is short (0.7 m into D8): first fix sooner, closer together
         every = min(ROLL_FIX_EVERY_M, max(0.25, abs(length) / 3.0))
         corr, pending, next_fix, rolled = corr0, None, (0.1 if carry else ROLL_FIX_FIRST_M), []
+        seen, next_seen = [], 0.0           # frames on the move, for the log only (SCAN_LOG_*)
         big_seen = None                     # a fix beyond the caps, waiting for the next to agree
         along_seen = None                   # an along fix over ROLL_ALONG_MAX_M, likewise
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=1) if roll else None
@@ -1474,6 +1542,16 @@ class Runner:
                     sides = [g for g in (rl.side_clearance(pts_now, half_width=self.turn_width / 2, shaped=True)
                                          if fresh else (None, None)) if g is not None]
                     along = (x - x0) * ux + (y - y0) * uy
+                    if pts_now is not None and watcher.age() < ROLL_FIX_AGE_S and along >= next_seen:
+                        next_seen = along + SCAN_LOG_EVERY_M
+                        try:
+                            fr = getattr(watcher, "frame", None)
+                            pts_l, pose_l = fr() if fr is not None else (pts_now, None)
+                            seen.append(scan_record(
+                                pts_l, _apply_corr(corr, pose_l) if pose_l is not None else (x, y, yaw),
+                                along, 0.0 if pose_l is not None else watcher.age(), prev[0]))
+                        except Exception:       # noqa: BLE001 -- a frame for the log never stops a lane
+                            pass
                     if (roll and not arc and pending is None and pts_now is not None
                             and watcher.age() < ROLL_FIX_AGE_S and along >= next_fix):
                         next_fix = along + every
@@ -1676,7 +1754,7 @@ class Runner:
             x, y, yaw = _apply_corr(corr, self.fast_pose())
             self.log(kind="drive", mode="velocity", label=step.label, to=[tx, ty], end=[x, y, yaw],
                      worst_off_lane=round(worst, 3), seconds=round(time.time() - t0, 1), handed_over=then.label,
-                     corner=corner_note, rolling=rolled or None, trace=trace)
+                     corner=corner_note, rolling=rolled or None, trace=trace, seen=seen or None)
             self.say("  round the corner into %r at (%.2f, %.2f) on the move (%s), %.1f s"
                      % (then.label, x, y, corner_note, time.time() - t0))
             return {"prev": prev, "corr": corr}
@@ -1688,7 +1766,7 @@ class Runner:
         self.log(kind="drive", mode="velocity", label=step.label, to=[tx, ty], end=[x, y, yaw], miss=miss,
                  worst_off_lane=round(worst, 3), seconds=round(time.time() - t0, 1), stopped=reason,
                  held_short=None if held_short is None else round(held_short, 3), rolling=rolled or None,
-                 corner=corner_note, trace=trace)
+                 corner=corner_note, trace=trace, seen=seen or None)
         if rolled:
             taken = [r_ for r_ in rolled if r_["taken"]]
             along = [r_ for r_ in taken if r_.get("along_taken")]
@@ -3750,6 +3828,59 @@ def _n_comp(heading: float, lat_axis: str) -> float:
     return float(round(-math.sin(heading))) if lat_axis == "x" else float(round(math.cos(heading)))
 
 
+def scan_record(pts, pose, along: float, age: float, v: float) -> dict:
+    """One lidar frame on the move for the drive record (SCAN_LOG_*): the
+    robot-frame points thinned to one per SCAN_LOG_VOXEL_M square, in scan
+    order, as whole millimetres x0, y0, x1, y1, ...; `pose` = where the
+    controller had the robot when the frame was taken (odometry + the walls'
+    corrections so far), `age` = how old the frame was at that pose."""
+    p = np.asarray(pts, dtype=float).reshape(-1, 2)
+    if len(p):
+        k = np.floor(p / SCAN_LOG_VOXEL_M).astype(np.int64)
+        _, idx = np.unique(k[:, 0] * 1_000_003 + k[:, 1], return_index=True)
+        p = p[np.sort(idx)]
+    return {"along": round(float(along), 2), "pose": [round(float(q), 4) for q in pose],
+            "age": round(float(age), 3), "v": round(float(v), 3),
+            "xy_mm": np.round(p * 1000.0).astype(np.int64).ravel().tolist()}
+
+
+def load_shadow_field(route: rl.Route, path) -> tuple[object | None, str]:
+    """The lidar map for `Runner.shadow_fix`, or (None, why not). Refused when
+    a wall or door of this route is not where the map was built with it: the
+    map is a frame, and a frame moved under it (8 ต.ค.: mr_north and D11,
+    17 cm) would log every comparison that far off and call it the map's
+    error -- which is exactly how the first offline round misread itself."""
+    if path is None:
+        return None, "off (--no-shadow-map)"
+    p = Path(path)
+    if not p.exists():
+        return None, "no map file %s" % p
+    try:
+        from app import scan_match as sm
+        fd = sm.Field.load(p)
+    except Exception as e:                      # noqa: BLE001 -- a map that cannot load is no map
+        return None, "map not loaded: %s" % e
+    built_a, built_d = fd.meta.get("anchors") or {}, fd.meta.get("doors") or {}
+    if not built_a:
+        return None, "the map does not say which walls it was built on -- its frame is unknown"
+    def moved(b, axis: str, vals: tuple) -> bool:
+        return b[0] != axis or any(abs(float(u) - float(w)) > 0.001 for u, w in zip(b[1:], vals))
+
+    off = []
+    # a wall: where its face is (its lo/hi only say over what stretch it counts);
+    # a door: where its gap is too -- D11's moved with mr_north on 8 ต.ค.
+    for n, a in route.anchors.items():
+        if n in built_a and moved(built_a[n], a.axis, (a.at,)):
+            off.append("wall %s: route %s, map %s" % (n, a.at, built_a[n][1]))
+    for n, d in route.doors.items():
+        if n in built_d and moved(built_d[n], d.axis, (d.at, d.lo, d.hi)):
+            off.append("door %s: route %s..%s, map %s..%s" % (n, d.lo, d.hi, built_d[n][2], built_d[n][3]))
+    if off:
+        return None, "map built on other walls (%s)" % "; ".join(off[:3])
+    return fd, "%s: %s runs to %s, built %s" % (p.name, fd.meta.get("runs", "?"), fd.meta.get("last_run", "?"),
+                                               fd.meta.get("built_at", "?"))
+
+
 def route_frame_id(route: rl.Route) -> str:
     """The route's walls and doors, as numbers: a middle is remembered in the
     frame they set, and an edit to any of them may move that frame (8 ต.ค.:
@@ -3936,6 +4067,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--pid-file", default=None,
                     help="a run.pid that names this process: removed at the end if it still does "
                          "(scripts/robot_python.py run)")
+    # None = ROOT/SHADOW_FIELD, resolved in _main (not str(...) here: see SHADOW_FIELD)
+    ap.add_argument("--shadow-map", default=None,
+                    help="our lidar map (scripts/eval_scan_localization.py --save-field; default <repo>/"
+                         + SHADOW_FIELD.as_posix() + "): matched at every "
+                         "checkpoint and LOGGED only (shadow_fix); a missing file just means no rows")
+    ap.add_argument("--no-shadow-map", action="store_true", help="do not load or match the lidar map at all")
     args = ap.parse_args(argv)
 
     # Before anything else, and for EVERY run, not only --watch-parent (review
@@ -4058,6 +4195,12 @@ def _main(args: argparse.Namespace, watch: "ParentWatch | None") -> int:
     r.log(kind="run_start", route=route.name, steps=len(route.steps), from_step=args.from_step, vmax=round(vmax, 3),
           wmax=args.wmax, spin=round(r.limits.w_spin_fast or r.limits.w_spin, 3), speed_scale=args.speed_scale,
           arms_in=args.arms_in, door_width=r.door_width)
+    # the default map under ROOT as it is NOW, not as it was at import (SHADOW_FIELD)
+    shadow_map = (None if args.no_shadow_map
+                  else Path(args.shadow_map) if args.shadow_map is not None else ROOT / SHADOW_FIELD)
+    r.shadow, r.shadow_why = load_shadow_field(route, shadow_map)
+    print("lidar map (log only): %s" % r.shadow_why)
+    r.log(kind="shadow_map", loaded=r.shadow is not None, why=r.shadow_why)
     if args.dry_run:
         try:
             r.preflight(moving=False)
@@ -4073,6 +4216,8 @@ def _main(args: argparse.Namespace, watch: "ParentWatch | None") -> int:
             print("fix               :", fix.summary())
             for m in fix.matches:
                 print("  wall %-12s at %+.3f seen %+.3f (%.2f m)" % (m["anchor"], m["at"], m["seen"], m["length"]))
+            if r.shadow is not None:
+                r.shadow_fix(probe.label, guess, board.raw_scan(), fix)
             print("(dry run: pose NOT changed)")
             return 0
         except Stop as e:

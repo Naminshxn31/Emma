@@ -930,6 +930,11 @@ class Settings:
     # provider drops that turn (transcript_filter.BareAckGate). Off by default:
     # the sales room's PC unchanged; the robot turns it on in robot.env.
     silence_bare_ack: bool = _get_bool("SILENCE_BARE_ACK", False)
+    # Every tool result carries the conversation's language, kept by the server
+    # from what the guest said (app/talk_lang.py) -- robot log 19 Oct: an English
+    # talk went German on one accented line and Thai on a "yeah" heard as "ใช่".
+    # Off by default: the sales room's PC unchanged; the robot turns it on.
+    talk_language_note: bool = _get_bool("TALK_LANGUAGE_NOTE", False)
     robot_body_enabled: bool = _get_bool("ROBOT_BODY_ENABLED", False)
     robot_body_ack_timeout_s: float = float(os.getenv("ROBOT_BODY_ACK_TIMEOUT_S", "2.5"))
     #: The heard-word guard (the `heard.py` precedent: "bit like" closed the

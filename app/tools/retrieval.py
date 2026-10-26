@@ -90,36 +90,186 @@ _DIMENSION = re.compile(
 #: reads it, the same door the dimensions go through. The approved files are
 #: not edited; that is the owner's console. Price wording is left alone:
 #: "ราคาเปลี่ยนตามห้องที่เหลือ" is a fact a buyer needs, not the banned caveat.
+#: 21 Oct: the project report says it its own ways -- "ภาพเรนเดอร์ของชั้นนี้
+#: เป็นภาพแนวคิด ผู้นำเสนอยอมรับว่าส่วน co-working ยังไม่ได้ออกแบบ", "ภาพเรนเดอร์ที่
+#: อาจปรับเปลี่ยนได้", "Images are concept illustrations" -- and a tapped
+#: picture of level 3 came back as "the co-working space is still not
+#: designed". Narrow on purpose: "concept images" inside a fact's own
+#: parenthesis ("shown as a double-height hall in the concept images") is not
+#: the caveat, and an English sentence that matches goes whole.
+#: 22 Oct (review): "The preliminary-concept disclaimer sits bottom right."
+#: (intro-004.summary_en) slipped past "preliminary\s+concept" on its hyphen.
+#: 26 Oct (robot review): 114 served report lines still carried the report's
+#: own wording -- every picture caption "ภาพประกอบแนวคิด (Preliminary Concept)
+#: ไม่ใช่แบบสุดท้าย — ..." and a row telling the reader to "แจ้งลูกค้าทุกครั้งที่
+#: พูดถึงหน้าตา facility" -- the owner's rule the other way round.
+#: 26 Oct (pre-commit review): the report says it in still more ways, and
+#: the patterns above caught none of them -- built the way the robot serves
+#: it (clean() over every approved chapter, the FAQ pairs, the English
+#: aliases), 75 served report lines still carried it -- 15 of them FAQ
+#: answers, which 15 English phrasings bring back too. Live, "How many
+#: treadmills does Biogenesis have?" came back "...เป็นภาพเรนเดอร์ จึงควรบอก
+#: ลูกค้าว่ารายละเอียดจริงอาจ
+#: เปลี่ยนก่อนส่งมอบ" -- an approved answer telling Emma to say what the owner
+#: banned. The forms: plain "อาจเปลี่ยน" (no แปลง) / "อาจต่าง" / "จะต่างจากภาพ"
+#: after รายละเอียด/หน้าตา/ของ/จำนวน "จริง" (the real thing will differ),
+#: "...อาจเปลี่ยนก่อนส่งมอบ", "การจัดวาง...อาจเปลี่ยน", the landscape's
+#: "ชนิดไม้ วัสดุ และตำแหน่งอาจเปลี่ยน/อาจปรับ", "ยังพัฒนาต่อได้", "เป็นแบบแนวคิด",
+#: "เป็นภาพ concept", "ไม่ใช่ภาพสุดท้าย", "ภาพยังไม่ final", "ไม่ใช่ภาพจริง", the
+#: order to tell the customer every time ("บอก/แจ้งลูกค้า(ว่า)ทุกครั้ง/เสมอ",
+#: "แจ้งทุกครั้งที่พูดถึงหน้าตา", "แจ้งลูกค้าว่าเป็นภาพประกอบ", "บอกว่าภาพคือแนวคิด
+#: เสมอ") and the presenter's English inside Thai lines ("It will look a
+#: little bit different", "All this will be changed, still not designed",
+#: "This is not the real picture", the deck's whole "SUBJECT TO FURTHER
+#: DEVELOPMENT AND CHANGE WITHOUT PRIOR NOTICE"). Scoped so the facts that
+#: use the same verbs stay -- measured over every served line: "วิวสวน...
+#: อาจเปลี่ยนหากที่ดินรอบโครงการถูกพัฒนา" (a view fact), "ตลาด ดอกเบี้ย และ
+#: กฎหมายอาจเปลี่ยน" (investment caution), "ขนาดตามสัญญาอาจปรับตามรังวัดจริง"
+#: (contract size), clinic hours that "อาจเปลี่ยน", "ราคายังไม่ final" (price).
+#: Two lead-ins go with the caveat they introduce, never alone: "(ภาพ)เป็นภาพ
+#: เรนเดอร์" right before "รายละเอียดจริง.../จำนวน...อาจ", and "...ว่า(ส่วน)
+#: co-working" right before the presenter's not-designed quote -- left behind
+#: they read "the presenter admitted that the co-working part", which a
+#: model finishes itself.
 CONCEPT_CAVEAT = re.compile(
     r"แนวคิดเบื้องต้น|เป็นเพียงแนวคิด|ยังเป็นแนวคิด|เพื่อการนำเสนอเท่านั้น|อาจ(?:จะ)?มีการเปลี่ยนแปลง"
-    r"|อาจ(?:จะ)?เปลี่ยนแปลง|preliminary\s+concept|for\s+illustrative\s+purposes|subject\s+to\s+change"
-    r"|may\s+change",
+    r"|ภาพประกอบแนวคิด|ไม่ใช่(?:ของ|แบบ|ภาพ)สุดท้าย"
+    r"|อาจ(?:จะ)?เปลี่ยนแปลง|preliminary[\s-]+concept|for\s+illustrative\s+purposes(?:\s+only\.?)?"
+    r"|subject\s+to\s+(?:further\s+development\s+and\s+)?change(?:\s+without\s+prior\s+notice\.?)?"
+    r"|may\s+change"
+    r"|เป็นภาพแนวคิด|ยังไม่ได้ออกแบบ|อาจ(?:จะ)?ปรับเปลี่ยน"
+    r"|(?:images?|pictures?|renders?|renderings?)\s+(?:are|is)\s+(?:only\s+)?concept"
+    r"|(?:still\s+)?not\s+(?:yet\s+)?designed"
+    # the real thing will/may differ or change (26 Oct)
+    r"|(?:รายละเอียด|หน้าตา|ของ|จำนวน)จริง(?:จะ|อาจ)(?:จะ)?(?:แตก)?ต่าง"
+    r"|(?:รายละเอียด|หน้าตา|ของ|จำนวน)จริง(?:จะ|อาจ)(?:จะ)?(?:มีการ)?(?:ปรับ)?เปลี่ยน"
+    r"|(?:จะ|อาจ)(?:จะ)?(?:แตก)?ต่างจากภาพ"
+    # Narrowed after the fix round's own review (26 Oct): each of these was a
+    # bare "word ... อาจเปลี่ยน" and would have cut facts the owner adds later
+    # ("ตำแหน่งที่จอดรถอาจเปลี่ยนตามการจัดสรรของนิติบุคคล ห้องละ 1 คัน" lost its
+    # piece, "ทีมขายจะแจ้งลูกค้าทุกครั้งเมื่อมีโปรโมชั่นใหม่" went whole). They now
+    # name the report's own subjects: the pictured details, the planting plan.
+    r"|(?:รายละเอียด|หน้าตา|จำนวน|ภาพ)(?:จริง)?อาจ(?:จะ)?(?:มีการ)?เปลี่ยน\S*?ก่อนส่งมอบ"
+    r"|การจัดวาง\S*?อาจ(?:จะ)?(?:ปรับ|เปลี่ยน)"
+    r"|(?:ชนิดไม้\s+วัสดุ\s+และตำแหน่ง|ตำแหน่งและชนิด|ชนิดและตำแหน่งเป็นไปตามแบบแนวคิดและ|ชนิดไม้"
+    r"|ชนิดจริงและตำแหน่งปลูก)อาจ(?:จะ)?(?:ปรับ|เปลี่ยน)"
+    r"|แนวคิดที่ยังพัฒนาต่อได้|(?<!\S)ยังพัฒนาต่อได้(?!\S)|เป็นแบบแนวคิด|(?:เป็นภาพ|ภาพ(?:\s+facility)?\s*เป็น)\s*concept|ไม่ใช่ภาพจริง"
+    r"|concept,?\s+not\s+(?:yet\s+)?final"
+    r"|ภาพ\S*?\s?ยังไม่\s*(?:final\b|ไฟนอล)"
+    # "...and does not promise the building will match the picture" (03:211),
+    # "...not a promise the delivered room has everything pictured" (14:375)
+    r"|ไม่ยืนยันว่า\S*ตามภาพ|ไม่ใช่การรับประกันว่า\S*ตามภาพ\S*"
+    # the order to say it to every customer (26 Oct) -- only where what is to
+    # be said is the picture caveat: a table cell of its own, "...ว่า(เป็น)ภาพ",
+    # "...ที่พูดถึงหน้าตา", or the 18.6.4 heading
+    r"|(?:บอก|แจ้ง)ลูกค้า(?:ทุกครั้ง|เสมอ)(?=\s*(?:\||$|ว่า\s*[\"“]?(?:เป็น)?ภาพ|ที่(?:พูดถึง|บรรยาย)))"
+    r"|ภาพ\s*concept\s*ต้องแจ้งลูกค้าเสมอ|(?:บอก|แจ้ง)ทุกครั้งที่(?:พูดถึง|บรรยาย)หน้าตา"
+    r"|(?:บอก|แจ้ง)ลูกค้าว่าเป็นภาพ(?:ประกอบ|แนวคิด|เรนเดอร์)|บอกว่าภาพ\S*แนวคิด"
+    r"|(?:it|this|that)\s+(?:will|may|might|would)\s+look\s+a\s+little\s+(?:bit\s+)?different"
+    r"|all\s+this\s+will\s+be\s+changed"
+    r"|not\s+the\s+real\s+picture"
+    # the lead-ins, only right before the caveat they introduce (26 Oct)
+    r"|(?:ภาพ\s+facility\s+\S*?)?เป็นภาพเรนเดอร์\s+(?=\S*?(?:รายละเอียดจริง|จำนวน\S*?อาจ))"
+    r"|\(ภาพ(?:แนวคิด|เรนเดอร์)\s+(?=อาจ)"
+    # (anchored at a piece start: a bare leading \S* is retried at every
+    # character and made the whole report's cut six times slower)
+    r"|(?<!\S)\S*?(?:ต้อง|ควร)(?:พูด|บอก)ว่า(?=\s+[\"“]?(?:ภาพประกอบแนวคิด|เป็นภาพแนวคิด"
+    r"|\S*อาจ(?:จะ)?(?:มีการ)?(?:ปรับ)?เปลี่ยน))"
+    r"|(?<!\S)\S*?ว่า\S*(?:\s+co-working)?(?=\s+[\"“(]?(?:ยังไม่ได้ออกแบบ|all\s+this|(?:still\s+)?not\s+designed"
+    r"|it'?s\s+not\s+look|it\s+will\s+look))",
     re.IGNORECASE,
 )
 _PRICE_WORD = re.compile(r"ราคา|price|฿|baht", re.IGNORECASE)
+#: An ENGLISH quotation inside a Thai line -- the deck's printed disclaimer,
+#: the presenter's words ('"It will look a little bit different"', '"This is
+#: not the real picture. Everybody aware."') -- is an English sentence, and an
+#: English sentence that carries the caveat goes whole; cut by piece it left
+#: '"It will', 'This is', 'FINAL DESIGNS AND DETAILS ARE' behind (26 Oct). A
+#: THAI quotation is cut by piece like any Thai text: the report's suggested
+#: answers quote facts and the caveat together ('"ตามภาพไฟนอลมีจักรยาน 3 คัน
+#: รายละเอียดจริงอาจต่างได้)"', '"กลางโครงการมีสระหลักยาว 155 เมตร ... (ภาพแนวคิด
+#: ยังไม่ final)"') -- measured: going whole, those took the bike count and the
+#: lagoon's depth with them. The quote marks must sit like quote marks (an
+#: opening one before a word, a closing one after a word): a stray one must
+#: not pair with the next quote's opening and swallow the text between.
+_QUOTED = re.compile(r'(?<![^\s(\[|:/])"(?=\S)[^"\n]{1,240}?(?<=\S)"(?![^\s)\]|,.;:/])|“[^”\n]{1,240}”')
+_PAREN = re.compile(r"\s*\([^()\n]{1,120}\)")
+
+
+def _sentences(value: str) -> list[str]:
+    """Split at a full stop + space, never inside a quotation: the deck's
+    "...FOR ILLUSTRATIVE PURPOSES ONLY. SUBJECT TO FURTHER DEVELOPMENT..."
+    and "This is not the real picture. Everybody aware." are one quote each."""
+    quotes = [m.span() for m in _QUOTED.finditer(value)]
+    out, start = [], 0
+    for m in re.finditer(r"(?<=[.!?])\s+", value):
+        if any(a < m.start() < b for a, b in quotes):
+            continue
+        out.append(value[start:m.start()])
+        start = m.end()
+    out.append(value[start:])
+    return out
 
 
 def strip_concept_caveat(text: str | None) -> str:
     """Drop the clauses that carry the banned concept caveat.
 
     Thai separates clauses with spaces and English separates sentences
-    with full stops, so an English sentence that carries it goes whole and
-    a Thai text loses only the space-delimited pieces that do. A piece about
-    price stays (see CONCEPT_CAVEAT)."""
+    with full stops, so an English sentence that carries it goes whole (an
+    English parenthesis or quotation that carries it goes alone) and a Thai
+    text loses only the space-delimited pieces that do. A piece about price
+    stays (see CONCEPT_CAVEAT)."""
     value = str(text or "")
     if not value or not CONCEPT_CAVEAT.search(value):
         return value
     kept = []
-    for sentence in re.split(r"(?<=[.!?])\s+", value):
-        if not CONCEPT_CAVEAT.search(sentence) or _PRICE_WORD.search(sentence):
+    for sentence in _sentences(value):
+        thai = bool(_THAI.search(sentence))
+        # Thai has no full stops: a whole report line is one "sentence", and a
+        # price word anywhere in it used to keep the caveat beside it (19_faq:
+        # "เป็นภาพประกอบแนวคิด ... อาจเปลี่ยนแปลงได้ ..."). In Thai the price
+        # PIECE stays, the caveat pieces still go.
+        if not CONCEPT_CAVEAT.search(sentence) or (_PRICE_WORD.search(sentence) and not thai):
             kept.append(sentence)
             continue
-        if not _THAI.search(sentence):
+        if not thai:
+            # ...unless the caveat is only a parenthesis in it: "the third-floor
+            # Sky Pool is designed with a transparent floor (concept, not
+            # final)." keeps the floor and loses the parenthesis (26 Oct) --
+            # gone whole, the gym's 6 m ceiling in the same sentence went too.
+            trimmed = _PAREN.sub(lambda m: "" if CONCEPT_CAVEAT.search(m.group()) else m.group(), sentence)
+            if trimmed != sentence and not CONCEPT_CAVEAT.search(trimmed):
+                kept.append(trimmed.strip())
             continue
-        pieces = [p for p in sentence.split() if not CONCEPT_CAVEAT.search(p) or _PRICE_WORD.search(p)]
+        # A piece goes when the caveat touches it -- matched across pieces too:
+        # "(Preliminary Concept)" inside a Thai caption is two pieces, neither
+        # of which matched alone, so it was served (robot review 26 Oct).
+        spans = [m.span() for m in CONCEPT_CAVEAT.finditer(sentence)]
+        # An English quotation that carries it goes whole (see _QUOTED) --
+        # unless it is about price, which stays like an English price sentence.
+        spans += [q.span() for q in _QUOTED.finditer(sentence)
+                  if not _THAI.search(q.group()) and CONCEPT_CAVEAT.search(q.group())
+                  and not _PRICE_WORD.search(q.group())]
+        pieces, dropped = [], False
+        for p in re.finditer(r"\S+", sentence):
+            piece = p.group()
+            if _PRICE_WORD.search(piece) or not any(a < p.end() and p.start() < b for a, b in spans):
+                # "...เป็นภาพเรนเดอร์หรือภาพประกอบแนวคิด จึงไม่ใช่การรับประกัน และ..." (19_faq:1067):
+                # the conclusion of a caveat just cut is the caveat too. On its
+                # own ("ความเห็นของทีมขาย ไม่ใช่การรับประกัน") it is an
+                # investment caution and stays.
+                if dropped and _CAVEAT_CONCLUSION.fullmatch(piece):
+                    continue
+                pieces.append(piece)
+                dropped = False
+            else:
+                dropped = True
         if pieces:
             kept.append(" ".join(pieces))
     return " ".join(kept).strip()
+
+
+_CAVEAT_CONCLUSION = re.compile(r"(?:จึง|และ)?ไม่ใช่การรับประกัน[.,]?")
 
 
 #: What the owner overruled (12 Oct 2026, the project report's deny_terms):
@@ -133,8 +283,13 @@ def strip_concept_caveat(text: str | None) -> str:
 #: 15 Oct (owner: "ลบ Glowing jellyfish-pattern floor ออก" -- the design
 #: dropped it): four approved slide summaries still describe jellyfish on the
 #: Journey to Mars / underground pool floor.
+#: 22 Oct (owner: the Social Lounge has humanoid robots making and serving
+#: drinks): the approved Social Club slide (intro-040) still notes "Robots
+#: could be or could not be humanoid" / "ไม่เป็นรูปทรงมนุษย์" -- the report's
+#: lines saying it go by deny_terms, this cuts the slide's clause.
 OVERRULED = re.compile(
-    r"roof\s*-?\s*top|รูฟ\s*ท็อป|(?:สวน|ลาน|จากุซซี่)\S*ดาดฟ้า|thermal\s*galaxy|jelly\s*-?\s*fish|แมงกะพรุน",
+    r"roof\s*-?\s*top|รูฟ\s*ท็อป|(?:สวน|ลาน|จากุซซี่)\S*ดาดฟ้า|thermal\s*galaxy|jelly\s*-?\s*fish|แมงกะพรุน"
+    r"|could\s+be\s+or\s+could\s+not\s+be\s+humanoid|ไม่เป็นรูปทรงมนุษย์",
     re.IGNORECASE,
 )
 
@@ -1150,6 +1305,20 @@ def _asks_a_price_anyway(words: list[str], query: str = "") -> bool:
         return True
     measuring = [w for w in words if w in _MEASURE_EXACT or any(p in w for p in _MEASURE_PARTS)]
     return all(any(a in w for a in _PICKING_PARTS) for w in measuring)
+
+
+#: How a number from a result is SAID (owner 21 Oct: "การพูดตัวเลขให้เป็น
+#: ทศนิยม 1 ตน. แล้วก็พยายามพูดให้มันเลขไม่เยอะ ... ห่างจากทะเล 600 เมตร ก็อาจจะ
+#: เปลี่ยนเป็นใช้เวลา ... นาที"). Robot 20 Oct: "The room is 6.884 by 2.90
+#: metres", "7.616 by 2.90 metres". Rides on every search and report result
+#: (and the tapped-picture answers in app/stories.py); here because this is
+#: the shared module with no @tool in it. Time only when the result has it --
+#: the beach is 15-24 minutes on foot by the report, never a computed 5.
+SPOKEN_NUMBERS = (
+    "ตัวเลขที่พูด: ทศนิยมไม่เกินหนึ่งตำแหน่งพร้อมคำว่า 'ประมาณ' (7.616 เป็น 'ประมาณ 7.6') "
+    "ห้ามอ่านกว้างคูณยาว เช่น 'The room is 6.884 by 2.90 metres' ถ้าลูกค้าไม่ได้ถามขนาดด้านกว้างยาว "
+    "ระยะทางที่ผลมีเวลาเดินทาง ให้พูดเวลาแทนระยะ เช่น 'ขับรถประมาณ 4 นาที' "
+    "ใช้ตัวเลขให้น้อยที่สุดที่ตอบคำถามได้ ห้ามคำนวณตัวเลขใหม่")
 
 
 def is_commercial(query: str) -> bool:

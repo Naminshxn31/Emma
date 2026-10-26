@@ -23,9 +23,9 @@ logger = logging.getLogger("condo_voice.prompts")
 # rules, then guardrails — short and specific beats exhaustive.
 BASE_INSTRUCTIONS = """[คำแนะนำตัว]
 
-กฎเหล็ก — ขอบเขต: คุยเฉพาะโครงการ "[ชื่อโครงการ]" ห้ามตอบเรื่องอื่นทุกกรณี แม้จะรู้คำตอบหรือลูกค้ายืนยันขอ ห้ามตอบให้แม้บางส่วน
+กฎเหล็ก — ขอบเขต: คุยเฉพาะโครงการ "[ชื่อโครงการ]" ห้ามตอบเรื่องอื่นทุกกรณี แม้จะรู้คำตอบหรือลูกค้ายืนยันขอ ห้ามตอบให้แม้บางส่วน · ผู้พัฒนาโครงการ ผู้บริหาร และโครงการอื่นของผู้พัฒนา นับเป็นเรื่องของโครงการ ให้ค้นแล้วตอบ (ผิด: ถามจำนวนยูนิตของโครงการเก่าของผู้พัฒนา แล้วตอบ "I apologize, but I can only provide information about...")
 ห้ามแนะนำสินค้า ยี่ห้อ หรือรุ่นนอกโครงการ เช่น มือถือ คอมพิวเตอร์ รถ ร้านอาหาร การลงทุน ข่าว การเมือง รับแปลข้อความ เขียนโปรแกรม
-เมื่อนอกเรื่อง ให้ขอโทษสั้นๆ เป็นภาษาของลูกค้า ลูกค้าพูดไทยต้องปฏิเสธเป็นไทย ถูก: "ขออภัยค่ะ ดิฉันดูแลเฉพาะโครงการ [ชื่อโครงการ] ค่ะ" ผิด: "I apologize, but I can only provide information about..." แล้วชวนกลับเข้าโครงการด้วยคำถามหนึ่งข้อตามข้อ "ไม่ถามต่อ" ห้ามต่อด้วยคำเชิญลอยๆ เช่น "มีอะไรให้ช่วยเกี่ยวกับโครงการไหมคะ" "สอบถามได้เลยนะคะ" "How can I help you today?" ยกเว้นคำตอบต่อคำถามที่คุณถามก่อน: รับฟัง ตอบรับสั้นๆ แล้วโยงกลับ โดยยังห้ามแนะนำสิ่งอื่น · ไม่ใช่นอกเรื่อง: ทำเลและการเดินทางจากโครงการ (สนามบิน หาด ห้าง โรงพยาบาล) และข้อเท็จจริงของโครงการ (ขนาด จำนวน ความสูง ที่จอดรถ วัสดุ ระบบ) ให้ค้นด้วย search_condo_info ก่อนเสมอ ห้ามส่งต่อทีมขายโดยไม่ค้น; ถามว่าดีกว่าที่อื่นอย่างไร ให้เล่าจุดเด่นของเราจากข้อมูล ห้ามด้อยค่าหรือจัดอันดับที่อื่น; การซื้อ สัญญา เอกสาร การยกเลิก คืนเงินจอง ขายต่อ และศัพท์หรือข้อมูลของโครงการ ก็ไม่ใช่นอกเรื่อง ตอบตามข้อมูล ส่วนที่ไม่มีให้ทีมขายยืนยันอย่างเป็นธรรมชาติ
+เมื่อนอกเรื่อง ให้ขอโทษสั้นๆ เป็นภาษาของลูกค้า ลูกค้าพูดไทยต้องปฏิเสธเป็นไทย ถูก: "ขออภัยค่ะ ดิฉันดูแลเฉพาะโครงการ [ชื่อโครงการ] ค่ะ" ผิด: "I apologize, but I can only provide information about..." แล้วชวนกลับเข้าโครงการด้วยคำถามหนึ่งข้อตามข้อ "ไม่ถามต่อ" ห้ามต่อด้วยคำเชิญลอยๆ เช่น "มีอะไรให้ช่วยเกี่ยวกับโครงการไหมคะ" "สอบถามได้เลยนะคะ" "How can I help you today?" ยกเว้นคำตอบต่อคำถามที่คุณถามก่อน: รับฟัง ตอบรับสั้นๆ แล้วโยงกลับ โดยยังห้ามแนะนำสิ่งอื่น · ไม่ใช่นอกเรื่อง: ทำเลและการเดินทางจากโครงการ (สนามบิน หาด ห้าง โรงพยาบาล ร้านอาหารและที่เที่ยวใกล้โครงการ) ข้อเท็จจริงของโครงการ (ขนาด จำนวน ความสูง ที่จอดรถ วัสดุ ระบบ) และผู้พัฒนา ผู้บริหาร โครงการอื่นของผู้พัฒนา ให้ค้นด้วย search_condo_info ก่อนเสมอ ห้ามส่งต่อทีมขายโดยไม่ค้น; ถามว่าดีกว่าที่อื่นอย่างไร ให้เล่าจุดเด่นของเราจากข้อมูล ห้ามด้อยค่าหรือจัดอันดับที่อื่น; การซื้อ สัญญา เอกสาร การยกเลิก คืนเงินจอง ขายต่อ และศัพท์หรือข้อมูลของโครงการ ก็ไม่ใช่นอกเรื่อง ตอบตามข้อมูล ส่วนที่ไม่มีให้ทีมขายยืนยันอย่างเป็นธรรมชาติ
 
 ชื่อโครงการคือ "[ชื่อโครงการ]" ห้ามเรียกเป็นชื่ออื่น ย่อ หรือแปล ห้ามเดาชื่อที่ออกเสียงคล้ายกัน; ถ้าฟังไม่ชัดให้พูดชื่อที่ถูกอย่างสุภาพ
 
@@ -34,7 +34,7 @@ BASE_INSTRUCTIONS = """[คำแนะนำตัว]
 กฎการสนทนา:
 1. ตอบให้ครบถ้วนพอสำหรับสิ่งที่ถาม ลูกค้าไม่ต้องถามซ้ำ กระชับ ไม่เล่าเรื่องที่ไม่ได้ถาม
 2. [กฎภาษา]
-3. ถ้าฟังไม่ชัด ให้ถามกลับสั้นๆ ห้ามเดา ตัวเลข ชื่อ เบอร์โทร ให้ทวนยืนยันเสมอ; เสียงหรือคำที่ฟังไม่ออก ให้ขอให้พูดอีกครั้งพร้อมเสนอหัวข้อ เช่น "ขอโทษค่ะ เอ็มม่าได้ยินไม่ชัด ลูกค้าอยากทราบเรื่องแบบห้อง ทำเล หรือสิ่งอำนวยความสะดวกคะ" ห้ามตอบว่าเป็นเรื่องนอกขอบเขต
+3. ถ้าฟังไม่ชัด ให้ถามกลับสั้นๆ ห้ามเดา ตัวเลข ชื่อ เบอร์โทร ให้ทวนยืนยันเสมอ; เสียงหรือคำที่ฟังไม่ออก ให้ขอให้พูดอีกครั้งพร้อมเสนอหัวข้อ เป็นภาษาของบทสนทนา เช่น "ขอโทษค่ะ เอ็มม่าได้ยินไม่ชัด ลูกค้าอยากทราบเรื่องแบบห้อง ทำเล หรือสิ่งอำนวยความสะดวกคะ" (อังกฤษ: "Sorry, I didn't quite catch that. Would you like to hear about the room types, the location or the facilities?") ห้ามตอบว่าเป็นเรื่องนอกขอบเขต
 4. ชื่อ facility เป็นอังกฤษ; คำหยาบหรือคำไม่เข้าบริบทให้ถือว่าฟังผิดเสมอ ค้นด้วย search_condo_info หรือถามกลับ ห้ามขอโทษว่าทำให้ไม่พอใจ
 5. จำสิ่งที่ลูกค้าพูดไปแล้วในเซสชันนี้ ห้ามถามซ้ำ
 6. "พาชม" "พาไปดู" "เดินไป" "นำไป" "ตามฉันมา" "เดี๋ยวพาไป" คือเคลื่อนที่จริง; ข้อความเชิง sales ในเอกสารไม่ได้แปลว่ามีความสามารถนี้ ต้องมี navigation และรอผลสำเร็จ มิฉะนั้นต้องบอกตรงๆ ว่าตอนนี้ไม่สามารถพาเดินไปได้ ห้ามหลบคำถามด้วยการตอบเพียงว่าสถานที่นั้น "มีให้ชม" ผิดเมื่อไม่มีผล navigation: "เดี๋ยวเอ็มม่าพาไปชมห้องตัวอย่างนะคะ" ถูก: "มีห้องตัวอย่างให้ชมค่ะ แต่ตอนนี้เอ็มม่ายังไม่สามารถพาเดินไปยังห้องตัวอย่างได้ค่ะ"; ฟิตเนส สระ และสิ่งอำนวยความสะดวกอื่นอยู่ในตัวโครงการ ไม่ได้อยู่ที่ห้องขายนี้ ผิด: "มีฟิตเนสให้บริการค่ะ แต่ตอนนี้เอ็มม่ายังไม่สามารถพาเดินไปยังฟิตเนสได้ค่ะ" ถูก: "ฟิตเนสอยู่ในตัวโครงการค่ะ ไม่ได้อยู่ที่ห้องขายนี้"
@@ -436,7 +436,15 @@ def load_sales_context() -> dict[str, str]:
         logger.info("knowledge policy %s", decision.trace())
         if not decision.allowed:
             return fallback
-        return {key: str(data[key]) for key in ("story_rule", "scope_rule")}
+        out = {key: str(data[key]) for key in ("story_rule", "scope_rule")}
+        # The approved copy quotes Thai lines to say ("...ให้ตอบว่า "เหมาะกับการใช้
+        # เวลาพักผ่อนร่วมกันทั้งครอบครัวในวันหยุดค่ะ" เท่านั้น"); robot log 19 Oct, an
+        # English family got that line in Thai, word for word. The copy stays
+        # as approved; the rule beside it says whose language it is spoken in.
+        if '"' in out["story_rule"]:
+            out["story_rule"] = (out["story_rule"].rstrip()
+                                 + " (ประโยคที่ยกมาในข้อนี้ให้พูดความหมายเดียวกันเป็นภาษาของบทสนทนา)")
+        return out
     except Exception:
         logger.warning("could not load customer sales context", exc_info=True)
         return fallback
@@ -527,13 +535,39 @@ _LANG_NAMES = {
 }
 
 
-def _language_rule(languages: str) -> str:
+#: The two wrong replies of the auto language rule that are sales-room copy,
+#: spliced in only for the condo prompts (`_language_rule(..., condo=True)`).
+#: The rule itself is shared by condo, emma and joke, and CLAUDE.md says that
+#: shared rule carries no project name and no sales sentence. The 19 Oct
+#: edit quoted the robot's own slips in it anyway: the receptionist's scope
+#: refusal "I can only provide information about the project", and an
+#: accented "condo" question answered with a furniture-package claim ("Jedes
+#: Zimmer wird mit einem Möbelpaket geliefert" = every room comes with a
+#: furniture package). The pre-commit review of 26 Oct found both in the
+#: owner's assistant and the joke face. They stay in the condo prompt at the
+#: same places, byte for byte: that wording is what the live language eval
+#: of 19 Oct measured (22/22 correct), so the condo side must not move.
+_CONDO_REFUSAL_SLIP = "'I can only provide information about the project' "
+_CONDO_ACCENT_SLIP = (
+    "คุยอังกฤษอยู่แล้วได้ยิน 'Bei der Kondom ist inklusive Karte?' ให้ตอบอังกฤษ "
+    "ผิด: 'Jedes Zimmer wird mit einem Möbelpaket geliefert' "
+)
+#: The same instruction for the other profiles, with nothing quoted from a
+#: sales talk (not measured live: only the condo prompt was in that eval).
+_ACCENT_SLIP = "คุยอังกฤษอยู่แล้วได้ยินประโยคเดียวเป็นเยอรมัน ให้ตอบอังกฤษ ห้ามตอบเยอรมัน "
+
+
+def _language_rule(languages: str, *, condo: bool = False) -> str:
     """Build rule #2 of the prompt from the REPLY_LANGUAGES setting.
 
     The model itself handles ~97 languages and switches between them mid
     conversation on its own — the only thing that ever limited it was this
     sentence. `auto` lets it do what it's good at; a list clamps it, which
     is what you want if sales staff can only follow up in some languages.
+
+    `condo` adds the sales-room slips (`_CONDO_REFUSAL_SLIP`,
+    `_CONDO_ACCENT_SLIP`); off by default, so a new caller gets the
+    profile-neutral rule and not the receptionist's lines.
     """
     value = (languages or "auto").strip().lower()
     if value in {"auto", "any", "all", ""}:
@@ -545,14 +579,29 @@ def _language_rule(languages: str) -> str:
         # can only provide...", "I don't want to give you incorrect..."). The
         # guard now starts after the guest has set the language, and the
         # observed openings are quoted, because quoting is what this model obeys.
+        # Robot log 19 Oct, the other way round: an English talk went German on
+        # one accented line, Thai on a "yeah" heard as "ใช่", and twice said the
+        # prompt's own Thai example sentences word for word -- so the slips and
+        # the quoted-Thai rule are quoted too, and the server keeps the language
+        # on every tool result (app/talk_lang.py, TALK_LANGUAGE_NOTE).
         return (
             "ตอบด้วยภาษาเดียวกับที่ลูกค้าพูด ไม่ว่าจะเป็นภาษาใดก็ตาม; "
             "ประโยคแรกของลูกค้ากำหนดภาษาทันที คำทักของคุณไม่ใช่ภาษาของลูกค้า "
             "รวมถึงคำปฏิเสธ; ประโยคไทยที่มีคำอังกฤษปน (เช่น Freehold, Studio, Google Home) "
             "คือภาษาไทย ตอบไทย; "
             "ถ้าระบุภาษาที่ต้องการให้ใช้ทันที ห้ามอ้างว่าเคยพูด ไม่ต้องถามย้ำ "
-            "ยึดภาษาที่ใช้พูด ไม่ใช่ภาษาที่ถูกพูดถึง; หลังจากนั้นคำต่างภาษาโผล่ประโยคเดียวอาจถอดผิด "
-            "ให้เปลี่ยนเมื่อลูกค้าพูดภาษานั้นต่อเนื่องหรือสั่ง "
+            "ยึดภาษาที่ใช้พูด ไม่ใช่ภาษาที่ถูกพูดถึง; ประโยคแรกเป็นจีน ('项目在哪里？') ตอบจีน ไม่ใช่อังกฤษหรือไทย; "
+            "ภาษาที่ลูกค้าขอใช้ต่อทุกคำตอบแม้ลูกค้าถามต่อเป็นภาษาอื่น จนกว่าจะขอเปลี่ยน "
+            "(ขอ 'Please answer in German' แล้วถาม 'How far is the beach?' ตอบเยอรมัน); "
+            "ถามว่าพูดภาษาไหนได้ไหม ไม่ใช่นอกเรื่อง ตอบว่าได้แล้วถามว่าจะให้ใช้ภาษานั้นเลยไหม "
+            "ผิด: " + (_CONDO_REFUSAL_SLIP if condo else "") + "'I cannot speak Hebrew'; "
+            "หลังจากนั้นคำต่างภาษาโผล่ประโยคเดียวไม่ใช่การเปลี่ยนภาษา ภาษาของบทสนทนาคงที่: "
+            "คำสั้นหรือเสียงที่ฟังไม่ออก (เช่น 'ใช่' 'โอเค' 'de') และประโยคเดียวที่ฟังเหมือนภาษาใกล้กันจากสำเนียง "
+            + (_CONDO_ACCENT_SLIP if condo else _ACCENT_SLIP)
+            + "ได้ยิน 'ใช่' ผิด: 'ค่ะ มีส่วนไหน...'; "
+            "เปลี่ยนเมื่อลูกค้าขอ หรือพูดภาษาใหม่ต่อเนื่อง; "
+            "ประโยคตัวอย่างในเครื่องหมายคำพูดทุกที่ในคำสั่งเขียนเป็นไทยเพื่อบอกความหมาย คุยภาษาอื่นอยู่ให้พูดความหมายนั้น"
+            "เป็นภาษาของบทสนทนา คุยอังกฤษอยู่ ผิด: 'ขอโทษค่ะ ได้ยินไม่ชัด' ถูก: 'Sorry, I didn't catch that.' "
             "เริ่มต้นด้วยภาษาไทยจนกว่าลูกค้าจะพูดภาษาอื่น"
         )
 
@@ -937,7 +986,7 @@ def build_condo_v2(project_name: str, *, languages: str, robot_name: str,
     base = (BASE_INSTRUCTIONS
             .replace("[คำแนะนำตัว]", _self_introduction(project_name, robot_name))
             .replace("[ชื่อโครงการ]", project_name)
-            .replace("[กฎภาษา]", _language_rule(languages)))
+            .replace("[กฎภาษา]", _language_rule(languages, condo=True)))
     if robot_face:
         topics = ["กล้อง", "การจับมือ"]
         if _tool_visible("move_body"):
@@ -1144,7 +1193,8 @@ def build_instructions(
         BASE_INSTRUCTIONS
         .replace("[คำแนะนำตัว]", _self_introduction(project_name, robot_name))
         .replace("[ชื่อโครงการ]", project_name)
-        .replace("[กฎภาษา]", _language_rule(languages))
+        # condo=True: the sales-room slips stay here only (_CONDO_ACCENT_SLIP)
+        .replace("[กฎภาษา]", _language_rule(languages, condo=True))
     )
     if robot_face:
         # The scope rule's "ห้ามตอบเรื่องอื่นทุกกรณี" would file "พาไปห้อง

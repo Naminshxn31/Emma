@@ -15,17 +15,17 @@
  },
  {
   "id": "liv_courtyard_top",
-  "source": "ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png",
-  "source_sha256": "7237469b68e5b7e505b37507fcb4135e5e64f4b59c55f28467f0acea35b36893",
+  "source": "web/6.gallery/exterior/CD03/Scene 58.png",
+  "source_sha256": "d538efeb1a7bc05d1b890c50acc3144fdb9375eedc829cbc8d854b22beceb016",
   "crop": [
-   230,
-   240,
-   1150,
-   860
+   0,
+   100,
+   1200,
+   850
   ],
   "max_w": 1080,
   "format": "webp",
-  "why": "Owner's UE model, top view of the site (SiteEnvironment, UI collapsed). Crop = the west courtyard with the printed BUILDING E / F / D labels, where the landscape plan puts the labelled Private Pools (beside the E wing, under F; report 12.3). Drops the UE control buttons and the room walls of the viewer. The pools_all 'Private Pools' row: shows where they are, does not point at one pool."
+  "why": "Final render (web pack CD03 Scene 58, the aerial over the courtyard): a pool running along the foot of a building wing, with the lawn and its sun loungers beside it. Owner 21 Oct 2026: every story picture a final render; replaces the UE site-model top view (SiteEnvironment 01_collapsed). For the pools_all 'Private Pools - beside the building wings' row: the landscape plan labels the private pools beside the E wing and under F (report 12.5.1); no render is captioned 'Private Pool', so this shows a pool beside a wing without claiming which one. Crop stops left of the lagoon's egg pavilion (x<1200): the main lagoon stays out."
  },
  {
   "id": "liv_kid_pool",
@@ -60,14 +60,14 @@
   "source": "../../data/projects/embassy_world/presentations/slides/intro_011.jpg",
   "source_sha256": "bd9e370fbe6ec0293356bd500948b843eaef0062eef89e3ba5c533db9872bb15",
   "crop": [
-   0,
-   220,
-   1340,
-   1080
+   1015,
+   205,
+   1920,
+   905
   ],
   "max_w": 1080,
   "format": "webp",
-  "why": "Approved slide intro-011 'THE PARK' (deck p.11): dusk view across the park lake with the low-rise blocks behind. Crop keeps the lake and trees and drops the slide title, the logo and the bottom-right badge (owner forbids that wording on screen). The developer's illustration of the park next door, not a photo of it: the card says 'The Park' (the deck's word) and names the real park in its small line."
+  "why": "Approved slide intro-011 'THE PARK' (deck p.11): the developer's illustration of the park lake next door, not a photo of it -- the card says 'The Park' (the deck's word) and names the real park in its small line. Owner 21 Oct 2026: every story picture a final render -- there is no final render of the park, so the picture stays the slide, but the crop now keeps only the lake, its planted banks and the path (x>=1015): the two blocks on the left of the slide are an early concept of the buildings (flat facades, not the final wavy balconies) and read as an old picture. Below the 'THE PARK' title (y>=205), above the concept badge (y<=905): no text left in the picture."
  },
  {
   "id": "liv_garden",

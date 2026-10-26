@@ -120,7 +120,14 @@ def clean(text: str, deny_terms: list[str], state: dict | None = None) -> str:
     # Owner 12 Oct: never "ไม่มีข้อมูล" to a guest. The report says it about
     # what is not settled yet ("ยังไม่มีข้อมูลความสูงเพดานสำเร็จรูป") and the
     # model repeats the report's words -- same meaning, the guest-facing word.
-    return "\n".join(keep).strip().replace("ยังไม่มีข้อมูล", "ยังไม่สรุป")
+    # And the concept caveat the owner banned (10 Oct) is cut here as it is
+    # from facts, slides and search results: report passages never went
+    # through that door, and 22 of its 299 FAQ answers carry it (21 Oct --
+    # "the co-working space is still not designed" on a tapped picture).
+    from app.tools.retrieval import strip_concept_caveat
+
+    text = "\n".join(strip_concept_caveat(line) for line in keep)
+    return text.strip().replace("ยังไม่มีข้อมูล", "ยังไม่สรุป")
 
 
 def _sha256(path: Path) -> str:
@@ -151,22 +158,28 @@ def _build(manifest: dict) -> dict:
             if len(text) >= 40:
                 chunks.append({"file": name, "text": text})
         faq.extend(_faq_pairs(path.read_text(encoding="utf-8"), name, deny))
+    faq.extend(_faq_aliases(manifest, faq, deny))
     if skipped:
         logger.warning("project report: %d chapter(s) not served (missing or changed since "
                        "the approval): %s", len(skipped), ", ".join(skipped))
     bm25 = BM25([content_tokens(robust_tokens(c["text"])) for c in chunks])
     words = [set(content_tokens(tokenize(c["text"]))) for c in chunks]
     faq_words = [set(content_tokens(tokenize(_focus(f["q"])))) for f in faq]
+    # Word rarity over the report's OWN questions: the English (FAQ_ALIASES)
+    # are more questions to match, not a new calibration -- counted in, they
+    # made "developer" common and "Who is the developer?", the FAQ's own
+    # question word for word, fell under FAQ_MIN_INFORMATION (measured 20 Oct).
+    own = [ws for ws, f in zip(faq_words, faq) if not f.get("alias")]
     df: dict[str, int] = {}
-    for ws in faq_words:
+    for ws in own:
         for w in ws:
             df[w] = df.get(w, 0) + 1
-    faq_idf = {w: math.log((len(faq_words) + 1) / (n + 0.5)) for w, n in df.items()}
+    faq_idf = {w: math.log((len(own) + 1) / (n + 0.5)) for w, n in df.items()}
     logger.info("project report indexed: %d chunk(s) from %d chapter(s), %d FAQ question(s)",
                 len(chunks), len({c["file"] for c in chunks}), len(faq))
-    return {"key": json.dumps(manifest, sort_keys=True, ensure_ascii=False),
+    return {"key": _index_key(manifest),
             "chunks": chunks, "bm25": bm25, "words": words,
-            "faq": faq, "faq_words": faq_words, "faq_idf": faq_idf,
+            "faq": faq, "faq_words": faq_words, "faq_idf": faq_idf, "faq_own": len(own),
             "faq_semantic": _faq_semantic(manifest, faq)}
 
 
@@ -179,6 +192,59 @@ def _build(manifest: dict) -> dict:
 #: matched to the report's question -- by meaning (the same local model the
 #: slide search uses) and by its words -- and the report's own answer comes
 #: back, cleaned like every other passage.
+#: English for the FAQ's Thai questions (robot 20 Oct): an English guest
+#: question shares no WORD with a Thai FAQ question, so its coverage was 0
+#: and only meaning >= FAQ_SURE_SIMILARITY could match -- "how high is the
+#: ceiling" found "เพดานห้องสูงเท่าไร" at 0.845 and was dropped, while wrong
+#: pairs sat right beside it ("start construction" -> "จะสร้างเสร็จเมื่อไร"
+#: 0.839), so the bar could not come down. Each English question is tied to
+#: its Thai question by exact text and brings back THAT question's approved
+#: answer -- the file holds no answer text. A Thai question edited in the
+#: report no longer matches, and its English drops out (logged).
+FAQ_ALIASES = "project_report_faq_en.json"
+
+
+def _alias_path(manifest: dict) -> Path:
+    return manifest_path(manifest.get("project_id")).with_name(FAQ_ALIASES)
+
+
+def _index_key(manifest: dict) -> str:
+    """The manifest and the English questions: a change to either rebuilds."""
+    path = _alias_path(manifest)
+    try:
+        aliases = _sha256(path) if path.is_file() else ""
+    except OSError:
+        aliases = ""
+    return json.dumps(manifest, sort_keys=True, ensure_ascii=False) + "|" + aliases
+
+
+def _faq_aliases(manifest: dict, faq: list[dict], deny: list[str]) -> list[dict]:
+    path = _alias_path(manifest)
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        logger.warning("project report FAQ: %s unreadable -- Thai questions only", path.name)
+        return []
+    pairs = {(f["file"], f["q"]): f for f in faq}
+    chapter = data.get("chapter")
+    out, stale = [], 0
+    for item in data.get("aliases") or []:
+        pair = pairs.get((chapter, item.get("th"))) if isinstance(item, dict) else None
+        if pair is None:
+            stale += 1
+            continue
+        for en in item.get("en") or []:
+            if (isinstance(en, str) and en.strip()
+                    and not any(t and t.lower() in en.lower() for t in deny)):
+                out.append({"file": pair["file"], "q": en.strip(), "a": pair["a"], "alias": True})
+    if stale:
+        logger.warning("project report FAQ: %d English question(s) in %s name a Thai question the "
+                       "served report no longer has -- left out", stale, path.name)
+    return out
+
+
 _FAQ_Q = re.compile(r"^\*\*(?:ถาม|Q):\*\*\s*(.+?)\s*$")
 _FAQ_A = re.compile(r"^\*\*(?:ตอบ|A):\*\*\s*(.+?)\s*$")
 
@@ -227,7 +293,7 @@ def _faq_semantic(manifest: dict, faq: list[dict]):
 
 def _get_index(manifest: dict) -> dict:
     global _index
-    key = json.dumps(manifest, sort_keys=True, ensure_ascii=False)
+    key = _index_key(manifest)
     with _lock:
         if _index is None or _index["key"] != key:
             _index = _build(manifest)
@@ -251,7 +317,12 @@ _SYNONYMS = {"พืช": "พันธุ์ไม้ ต้นไม้", "ต
              # "สองห้องนอนมีกี่ห้องน้ำ" got the 1-Bedroom and Studio FAQ instead
              "สองห้องนอน": "2-Bedroom 2 ห้องนอน", "2 ห้องนอน": "2-Bedroom",
              "หนึ่งห้องนอน": "1-Bedroom 1 ห้องนอน", "1 ห้องนอน": "1-Bedroom", "ห้องนอนเดียว": "1-Bedroom",
-             "สตูดิโอ": "Studio", "two bedroom": "2-Bedroom", "one bedroom": "1-Bedroom"}
+             "สตูดิโอ": "Studio", "two bedroom": "2-Bedroom", "one bedroom": "1-Bedroom",
+             # the travel chapters head their tables in Thai (4.9.7 ร้านอาหารและคาเฟ่,
+             # หมวด ท่องเที่ยว); robot 20 Oct "nearest restaurant" got the convenience
+             # stores and the beach, "tourist attraction" the banks -- both to the sales team
+             "restaurant": "ร้านอาหาร", "cafe": "คาเฟ่", "tourist": "ท่องเที่ยว",
+             "attraction": "ท่องเที่ยว", "sightseeing": "ท่องเที่ยว"}
 
 
 def _focus(query: str) -> str:
@@ -362,6 +433,12 @@ FAQ_MIN_QUESTIONS_FOR_RARITY = 30
 #: Without an embedding model (words only): a stricter word bar.
 FAQ_WORDS_ONLY_COVERAGE = 0.75
 FAQ_MAX = 1
+_THAI_CHAR = re.compile(r"[\u0e00-\u0e7f]")
+#: Spoken fillers carry no question but counted as rare words the FAQ
+#: lacks: "Okay, how high is the ceiling..." lost a fifth of its word cover
+#: to "okay" (robot 20 Oct).
+_FAQ_FILLERS = frozenset({"okay", "ok", "so", "well", "um", "uh", "hmm", "let", "let's", "lets",
+                          "actually", "just"})
 
 
 def _faq_hits(index: dict, query: str, manifest: dict) -> list[dict]:
@@ -372,17 +449,18 @@ def _faq_hits(index: dict, query: str, manifest: dict) -> list[dict]:
     from app.tools.retrieval import content_tokens, tokenize
 
     idf = index.get("faq_idf") or {}
-    words = set(content_tokens(tokenize(_focus(query))))
+    words = set(content_tokens(tokenize(_focus(query)))) - _FAQ_FILLERS
     # A word the FAQ never uses still counts as information the FAQ lacks.
     # As a share of the rarest word's weight, so the bar does not move with
     # the number of questions (calibrated on 301).
-    rarest = math.log((len(faq) + 1) / 0.5)
-    weight = {w: idf.get(w, math.log(len(faq) + 1)) / rarest for w in words}
+    own = index.get("faq_own", len(faq))
+    rarest = math.log((own + 1) / 0.5)
+    weight = {w: idf.get(w, math.log(own + 1)) / rarest for w in words}
     information = sum(weight.values())
     # Word rarity means something only over many questions: with a handful,
     # every word is "rare" or "common" by accident (a 1-question FAQ weighed
     # "เพดาน" like "ห้อง"). Below that the meaning + coverage bars decide alone.
-    if len(faq) >= FAQ_MIN_QUESTIONS_FOR_RARITY and information < FAQ_MIN_INFORMATION:
+    if own >= FAQ_MIN_QUESTIONS_FOR_RARITY and information < FAQ_MIN_INFORMATION:
         return []
     covs = [sum(weight[w] for w in words if w in target) / information for target in index["faq_words"]]
     sims = None
@@ -392,20 +470,54 @@ def _faq_hits(index: dict, query: str, manifest: dict) -> list[dict]:
             sims = semantic.similarities(query)
         except Exception:
             logger.warning("project report FAQ: query embedding failed", exc_info=True)
-    ranked = sorted(range(len(faq)), key=lambda i: -(float(sims[i]) if sims is not None else covs[i]))
-    hits = []
-    for i in ranked[:1]:
+    # One question in several phrasings (FAQ_ALIASES) is judged as one: its
+    # best meaning and its best word cover, each from whichever phrasing has
+    # it. Judged phrasing by phrasing, the top one decided alone -- "Why is
+    # it called Biogenesis?" ranked the Thai original first (0.919, words
+    # 0.26) and failed, while its English phrasing (words 1.0) was never
+    # looked at. A question with no English is judged exactly as before.
+    # The English phrasings are for guests who do not ask in Thai: a Thai
+    # question is judged on the Thai ones alone, exactly as before -- with
+    # the English meaning in the mix "ภาพ facility ใต้ดินเป็นของจริงไหม" took
+    # the ground-floor answer (measured 20 Oct over 876 questions).
+    thai = bool(_THAI_CHAR.search(query or ""))
+    groups: dict[str, list[int]] = {}
+    for i, f in enumerate(faq):
+        if thai and f.get("alias"):
+            continue
+        groups.setdefault(f["a"], []).append(i)
+    scored = []
+    for members in groups.values():
         if sims is not None:
-            sim = float(sims[i])
-            ok = (sim >= FAQ_MIN_SIMILARITY and covs[i] >= FAQ_MIN_WEIGHTED_COVERAGE) or sim >= FAQ_SURE_SIMILARITY
+            top = max(members, key=lambda i: float(sims[i]))
+            sim, cov = float(sims[top]), max(covs[i] for i in members)
+            ok = (sim >= FAQ_MIN_SIMILARITY and cov >= FAQ_MIN_WEIGHTED_COVERAGE) or sim >= FAQ_SURE_SIMILARITY
+            scored.append((sim, top, ok))
         else:
-            ok = covs[i] >= FAQ_WORDS_ONLY_COVERAGE
+            top = max(members, key=lambda i: covs[i])
+            scored.append((covs[top], top, covs[top] >= FAQ_WORDS_ONLY_COVERAGE))
+    scored.sort(key=lambda t: -t[0])
+    hits = []
+    for _rank, i, ok in scored[:1]:
         if not ok:
             continue
         hits.append({"source_id": manifest.get("source_id"), "file": faq[i]["file"],
                      "text": "ถาม: %s\nตอบ: %s" % (faq[i]["q"], faq[i]["a"]), "a_text": faq[i]["a"][:120]})
         if len(hits) >= FAQ_MAX:
             break
+    return hits
+
+
+def faq(query: str) -> list[dict]:
+    """Only the report's own answer to `query` -- the strict FAQ matcher, no
+    passages (the guest's words beside the model's query, knowledge.py)."""
+    manifest = load_manifest()
+    if not approved(manifest):
+        return []
+    index = _get_index(manifest)
+    hits = _faq_hits(index, query, manifest)
+    for h in hits:
+        h.pop("a_text", None)
     return hits
 
 

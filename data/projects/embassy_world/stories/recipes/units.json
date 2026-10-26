@@ -167,16 +167,17 @@
   },
   {
     "id": "sh_curtain",
-    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_closed.png",
+    "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
+    "source_sha256": "f458e50a2c1e7dd5fe2fea66a7ab1d587f5ba243eedab44ff859380425cb8c98",
     "crop": [
-      680,
-      280,
-      2120,
-      1320
+      460,
+      1450,
+      2260,
+      2750
     ],
     "max_w": 960,
     "format": "webp",
-    "why": "UE interior of the 1-bedroom with the curtain drawn (no UI in this shot). Cropped above the stand-alone air purifier on the floor (y>=1330): the report says the package's purification is inside the air-con (13.8.2, 14.8.3), so a separate purifier tower would show something not offered."
+    "why": "Final render of a unit's living room (web pack 6.gallery/unit, Living view b): the window with its blue-gradient curtains drawn back on both sides and the sheer between them -- the curtain the Smart Home motor opens and closes. Owner 21 Oct 2026: every story picture a final render; replaces the UE white-model shot (RoomExperience curtain0_closed). Crop starts right of the wall TV (x>=460) and stops above the sofa cushions; no stand-alone air purifier in frame (report 13.8.2: purification is inside the air-con)."
   },
   {
     "id": "sh_aircon",
@@ -190,5 +191,157 @@
     "max_w": 960,
     "format": "webp",
     "why": "UE interior of the 1-bedroom (no UI in this shot): the wall air-con with blue airflow streaks running into the room, curtain open. Chosen over the *_ac_on shots, whose close-up hides the airflow and whose frame is ringed by baked UI with demo values ('24 C / 70% / 75%'). Taken from the curtain-OPEN shot so it does not repeat the sh_curtain picture."
+  },
+  {
+    "id": "layout_studio_24",
+    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+    "page": 1,
+    "dpi": 200,
+    "crop": [
+      446,
+      624,
+      1312,
+      1900
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Main layout 1 of 5: STUDIO 24 SQ.M. (page 1 left). Balcony on the drawing 2.45 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+  },
+  {
+    "id": "layout_studio_b107",
+    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+    "page": 4,
+    "dpi": 200,
+    "crop": [
+      284,
+      730,
+      1557,
+      1762
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Main layout 2 of 5: STUDIO B107, trapezoid where building B turns (page 4 left). The crop stops under 'STUDIO B107' and leaves out its '28.87 SQ.M.' line: two decimals on screen break the owner's one-decimal rule (21 Oct); the row says '≈ 29 sq.m.'. Balcony 2.55 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+  },
+  {
+    "id": "layout_1br_33",
+    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+    "page": 2,
+    "dpi": 200,
+    "crop": [
+      305,
+      624,
+      1323,
+      1900
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Main layout 3 of 5: 1 - BEDROOM 33 SQ.M. (page 2 left). Balcony 2.55 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+  },
+  {
+    "id": "layout_1br_b113",
+    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+    "page": 4,
+    "dpi": 200,
+    "crop": [
+      1704,
+      645,
+      2795,
+      1900
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Main layout 4 of 5: 1 - BEDROOM B113 33 SQ.M., slanted plan where building B turns (page 4 right). Balcony 2.55 (along the railing) x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+  },
+  {
+    "id": "layout_51_2br",
+    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+    "page": 3,
+    "dpi": 200,
+    "crop": [
+      1705,
+      603,
+      3008,
+      1900
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Main layout 5 of 5: the 51 sq.m. unit as 2 - BEDROOM 51 SQ.M. (page 3 right), two bathrooms. Balcony 2.85 x 1.40 m (the 0.80 m box beside it is walled, not counted). Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+  },
+  {
+    "id": "layout_51_1br",
+    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+    "page": 3,
+    "dpi": 200,
+    "crop": [
+      368,
+      603,
+      1621,
+      1900
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "The 51 sq.m. unit's other option: 1 - BEDROOM 51 SQ.M. (page 3 left) -- one large bedroom and a wider living room, one bathroom. Same balcony 2.85 x 1.40 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+  },
+  {
+    "id": "layout_combined_48",
+    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+    "page": 1,
+    "dpi": 200,
+    "crop": [
+      1461,
+      580,
+      2866,
+      1989
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Combined layout 1 of 2: 2 - BEDROOM 48 SQ.M. (STUDIO COMBINED) (page 1 right), two bathrooms. Balcony 5.07 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+  },
+  {
+    "id": "layout_combined_66",
+    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+    "page": 2,
+    "dpi": 200,
+    "crop": [
+      1385,
+      580,
+      3028,
+      1989
+    ],
+    "max_w": 1080,
+    "format": "webp",
+    "post": [
+      "lines_to_alpha:#bad6ff"
+    ],
+    "why": "Combined layout 2 of 2: 2 - BEDROOM 66 SQ.M. (1-BR COMBINED) (page 2 right), two bathrooms. Balcony 5.25 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
   }
 ]

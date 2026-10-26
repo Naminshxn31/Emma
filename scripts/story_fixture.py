@@ -27,6 +27,9 @@ TEMPLATE_STORY = {
     "distance": "fx_nearby", "metric": "fx_units_total", "features": "fx_smart_home",
     "journey": "fx_travel", "neighborhood": "fx_where",
 }
+#: A template's other drawing, chosen by a param, with a story of its own
+#: (the server knows templates by name only -- a view is the page's).
+VIEW_STORY = {("journey", "rings"): "fx_around"}
 
 
 def _line(th, en, cue_th=(), cue_en=(), cue_zh=()):
@@ -281,6 +284,38 @@ def stories() -> list[dict]:
             },
             "taps": [],
             "sources": ["facts:ทำเล", "report:92_appendix_travel.md#ค.4.2"],
+            "notes_th": "fixture",
+        },
+        {
+            # drawn, no picture: the same rows as rings of drive time round the
+            # project's pin (journey's view "rings" -- the nearby stories, 21 Oct)
+            "id": "fx_around", "template": "journey",
+            "questions_th": ["ใกล้เซเว่นไหม"], "questions_en": ["Is there a 7-Eleven close by?"],
+            "lines": [
+                _line("เซเว่นที่ใกล้ที่สุดขับรถประมาณ 4 นาทีค่ะ", "The nearest 7-Eleven is about 4 minutes by car,",
+                      ["เซเว่น"], ["eleven"]),
+                _line("หรือเดินประมาณ 23 นาที", "or about 23 minutes on foot,", ["เดิน"], ["foot"]),
+                _line("โรงพยาบาลจอมเทียนประมาณ 8 นาที", "Jomtien Hospital about 8 minutes,", ["โรงพยาบาล"],
+                      ["hospital"]),
+                _line("และโรงเรียนนานาชาติ German International School ก็ประมาณ 8 นาทีค่ะ",
+                      "and German International School about 8 minutes too.", ["german", "เยอรมัน"], ["german"]),
+            ],
+            "params": {
+                "view": "rings", "origin_en": "EMBASSY WORLD", "origin_sub_en": "by car, no traffic", "bar_max": 10,
+                "footnote_en": "Drive time from the project · not a map",
+                "rows": [
+                    {"icon": "shop", "label_en": "7-Eleven", "sub_en": "Nearest by road", "value_en": "≈ 4 min",
+                     "bar": [4], "walk": {"value_en": "≈ 23 min", "line": 1}, "line": 0},
+                    {"icon": "hospital", "label_en": "Jomtien Hospital", "value_en": "≈ 8 min", "bar": [8], "line": 2},
+                    {"icon": "school", "label_en": "German International School", "short_en": "German Int'l",
+                     "value_en": "≈ 8 min", "bar": [8], "line": 3},
+                ],
+            },
+            "taps": [
+                {"id": "story_fx_around_where", "label_en": "Where we are", "label_th": "ทำเล",
+                 "next_story": "fx_where", "tool": None},
+            ],
+            "sources": ["facts:ทำเล"],
             "notes_th": "fixture",
         },
         {

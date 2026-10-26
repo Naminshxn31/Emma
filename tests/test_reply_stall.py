@@ -296,3 +296,129 @@ def test_the_loops_reconnect_is_marked_so_a_cut_over_never_overlaps_it(monkeypat
     monkeypatch.setattr(provider, "_connect", connect)
     assert asyncio.run(provider._reconnect()) is True
     assert seen == [True] and provider._reconnecting is False
+
+
+# ---- a resume the server refuses: a fresh session in its place (robot 20 Oct)
+
+def _refusing_provider(monkeypatch, refuse_fresh=False):
+    """The loop's own road (`_reconnect`): the first connect -- with the
+    handle -- is refused the way the robot saw it on 20 Oct; the second, with
+    no handle, opens (unless `refuse_fresh`)."""
+    provider, _ = _provider(monkeypatch, [True, False])
+    opened, handles = [], []
+
+    async def connect():
+        handles.append(provider._resume_handle)
+        if provider._resume_handle or refuse_fresh:
+            raise RuntimeError("1008 None. BidiGenerateContent session not found or expired")
+        provider._session = _Session()
+        opened.append(provider._session)
+
+    monkeypatch.setattr(provider, "_connect", connect)
+    return provider, opened, handles
+
+
+def _pending(provider, monkeypatch, *exchanges):
+    """A conversation, then a question nobody has answered (the guard's own
+    timer far away, so only the fresh session asks)."""
+    monkeypatch.setattr(settings, "reply_stall_s", 30.0)
+
+    async def run():
+        for guest, emma in exchanges:
+            provider._input_event(guest)
+            provider._remember("emma", emma)
+        await provider.send_audio(LOUD)
+        provider._input_event("What is Journey to the Future?")
+        await provider.send_audio(QUIET)
+        ok = await provider._reconnect()
+        guard = provider._stall_guard
+        if guard is not None:
+            guard.cancel()
+        return ok
+
+    return asyncio.run(run())
+
+
+def test_a_refused_resume_opens_a_fresh_session_and_asks_with_a_recap(monkeypatch, rows):
+    provider, opened, handles = _refusing_provider(monkeypatch)
+    ok = _pending(provider, monkeypatch, ("Let's speak English from now on.", "Certainly!"),
+                  ("Why biogenesis?", "Our fitness centre, Biogenesis, is on the ground floor."))
+    assert ok is True, "the call goes on"
+    assert handles == ["handle", None], "the fresh one is opened without the dead handle"
+    assert provider._session is opened[0]
+    asked = _client_contents(opened[0])
+    assert len(asked) == 1 and asked[0]["turn_complete"] is True, "asked at once, not after the guard's timer"
+    text = asked[0]["turns"].parts[0].text
+    assert '"What is Journey to the Future?"' in text
+    assert 'Emma: "Our fitness centre, Biogenesis' in text, "the new model is told the conversation"
+    assert "ห้ามทักทาย" in text, "to the guest it is the same conversation"
+    fresh = [r for r in rows if r["event"] == "session_fresh"]
+    assert fresh and fresh[0]["pending"] is True and "not found or expired" in fresh[0]["reason"]
+    assert [r["stage"] for r in rows if r["event"] == "reply_stall"] == ["fresh"]
+
+
+def test_the_recap_rides_once(monkeypatch, rows):
+    provider, opened, _ = _refusing_provider(monkeypatch)
+    _pending(provider, monkeypatch, ("Hello", "Hi"))
+    assert "ห้ามทักทาย" not in provider._ask_text("again"), "consumed by the first ask"
+
+
+def test_a_fresh_session_with_nothing_pending_says_nothing(monkeypatch, rows):
+    provider, opened, _ = _refusing_provider(monkeypatch)
+    assert asyncio.run(provider._reconnect()) is True
+    assert _client_contents(opened[0]) == [], "no question waiting: the guest speaks next"
+    assert [r for r in rows if r["event"] == "session_fresh"][0]["pending"] is False
+
+
+def test_refused_twice_ends_the_call_as_before(monkeypatch, rows):
+    provider, opened, handles = _refusing_provider(monkeypatch, refuse_fresh=True)
+    assert asyncio.run(provider._reconnect()) is False
+    assert handles == ["handle", None] and opened == []
+
+
+# ---- a tool's result answered with silence (robot 20 Oct) ------------------
+
+def _asked_then_tool(provider, monkeypatch, *, reply_after_tool=None, wait=0.3):
+    """A question asked aloud, the model calls a tool (which counted as the
+    reply starting), the result goes back, then `reply_after_tool`."""
+    async def run():
+        await provider.send_audio(LOUD)
+        provider._input_event("What is a social lounge?")
+        await provider.send_audio(QUIET)
+        provider._reply_seen()                       # the tool_call arrives
+        provider._watch_after_tool()                 # its result went back
+        if reply_after_tool:
+            provider._reply_seen(reply_after_tool)
+        await asyncio.sleep(wait)
+
+    asyncio.run(run())
+
+
+def test_silence_after_a_tool_result_is_chased(monkeypatch, fast, rows):
+    """Robot 20 Oct 15:53: the story came up and no voice for 19 s, the guest
+    asked again. A bare turn_complete is not an answer here."""
+    provider, rejoined = _provider(monkeypatch, [True, False])
+    old = provider._session
+    _asked_then_tool(provider, monkeypatch, reply_after_tool="turn_complete")
+    assert _client_contents(old) == [{"turn_complete": True}], "the nudge"
+    nudge = [r for r in rows if r["event"] == "reply_stall"][0]
+    assert nudge["stage"] == "nudge" and nudge["after_tool"] is True
+
+
+def test_words_after_a_tool_result_end_the_watch(monkeypatch, fast, rows):
+    provider, rejoined = _provider(monkeypatch, [True, False])
+    old = provider._session
+    _asked_then_tool(provider, monkeypatch, reply_after_tool="reply")
+    assert _client_contents(old) == [] and rejoined == []
+    assert not [r for r in rows if r["event"] == "reply_stall"]
+
+
+def test_a_tool_after_emma_already_spoke_is_not_watched(monkeypatch, fast, rows):
+    """A tap or one of our own follow-ups: no guest question waiting on it."""
+    provider, rejoined = _provider(monkeypatch, [True, False])
+    old = provider._session
+    provider._replied_since_end = True
+    provider._stall_heard = "an old question"
+    provider._watch_after_tool()
+    asyncio.run(asyncio.sleep(0.2))
+    assert _client_contents(old) == [] and provider._stall_after_tool is False

@@ -229,29 +229,30 @@
   },
   {
     "id": "fac_b_hydro_capsule",
-    "source": "../../data/projects/embassy_world/presentations/slides/intro_035.jpg",
+    "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/42.jpg",
+    "source_sha256": "221111ce17fb944aca8802be3c9291559d3f97f8916a8951c74cd624944e3601",
     "crop": [
-      150,
-      300,
-      1460,
-      900
+      240,
+      95,
+      1680,
+      995
     ],
     "max_w": 1080,
     "format": "webp",
-    "why": "Approved slide intro-035 (Hydro Therapy Capsule). Used instead of web-pack 42.jpg because the capsules in 42.jpg carry a product brand name ('aquamassage SPA'), which would be an unapproved product claim. Crop removes the title pill, key plan, the logo watermark and the PRELIMINARY CONCEPT badge."
+    "why": "Final render (web pack, basement 42.jpg): the Hydro Therapy Capsule room, two white spa capsules under the lit ceiling grid. Owner 21 Oct 2026: every story picture a final render, so it replaces the approved slide intro-035 (an earlier concept of the same room). Crop drops the baked EMBASSY WORLD / title pill / JOMTIEN header (y<95) and the HYDRO THERAPY CAPSULE caption with the BEYOND MODELS credit along the bottom (y>995). Known: the capsule windows carry the supplier's name 'aquamessage SPA' (why intro-035 was used before) -- too large to paint out without smearing the glass; Emma never names a brand."
   },
   {
     "id": "fac_3_social",
     "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/29.jpg",
     "crop": [
-      900,
-      300,
-      1920,
-      1065
+      480,
+      200,
+      1500,
+      965
     ],
     "max_w": 1020,
     "format": "webp",
-    "why": "Web-pack level-3 render of the dark lounge bar with the Embassy World logo wall. It has no title pill; it is identified as Social Lounge (report 11.2: lounge / bar; DWG 'Bar & Cigar') because it is the only bar image in the level-3 folder and the others are pill-labelled HALL / COMMON SPHERE / CO-WORKING LOUNGE. Crop keeps the right side only: it leaves out the humanoid robot bartender (robots are not an approved claim) and the night high-rise window view."
+    "why": "Web-pack level-3 render of the dark-blue lounge bar. It has no title pill; it is identified as Social Lounge (report 11.2: lounge / bar; DWG 'Bar & Cigar') because it is the only bar image in the level-3 folder and the others are pill-labelled HALL / COMMON SPHERE / CO-WORKING LOUNGE. Owner 22 Oct: humanoid robots make and serve drinks in the Social Lounge, and the story now says so -- so the crop keeps the robot bartender behind the bar (until 22 Oct it was cut out, robots not being an approved claim). It still leaves out the left-hand windows with the night high-rise city view (a high-rise view misleads in a low-rise project), the robot's mirror image in the ceiling and the corner text. The logo wall on the right is left out so the robot stays large: the crop is 1020 x 765, the same size as before, no downscale."
   },
   {
     "id": "fac_3_coworking",
@@ -281,15 +282,16 @@
   },
   {
     "id": "fac_3_sky_pool",
-    "source": "../../data/projects/embassy_world/presentations/slides/intro_041.jpg",
+    "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/14.jpg",
+    "source_sha256": "08c0c41cfc8b7b114ea5ed00392095e65afe60980e90feecec0faddbb43b3053",
     "crop": [
-      0,
-      160,
-      1340,
+      720,
+      413,
+      1720,
       1080
     ],
     "max_w": 1080,
     "format": "webp",
-    "why": "Approved slide intro-041 (Sky Pool): aerial of the pool, whirlpool seats, loungers and the glass floor looking down into the gym. Used instead of web-pack 3rd-floor 14.jpg, which shows the pool high above the sea and the Pattaya skyline (misleading for a level-3 pool 600 m from the beach). Crop removes the SKY POOL pill, logo, key plan and the PRELIMINARY CONCEPT badge."
+    "why": "Final render (web pack, 3rd floor 14.jpg) of the Sky Pool: the glass-floor section with the fitness centre's treadmills showing through it, the whirlpool seat and the water jets. Owner 21 Oct 2026: every story picture a final render -- replaces the approved slide intro-041 (the earlier aerial concept). Crop: right of the guest sitting in the whirlpool (x 480-660 -- no people on the guest screen besides the executives), clear of the EMBASSY WORLD / JOMTIEN header, and low enough that the sea and the Pattaya skyline stay a thin band at the top: the render puts the pool high above the sea, the real one is on level 3 about 600 m from the beach, and a sea view is never promised (report 15.5.1)."
   }
 ]

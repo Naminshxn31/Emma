@@ -128,5 +128,23 @@ async def confirm_plan(prepared: dict) -> dict:
             "policy_trace": prepared.get("policy_trace", {}),
             "render_ack": {"command_id": command_id, "asset_id": command["asset_id"],
                            "sha256": sha256},
+            # The count rule rides here too: this instruction REPLACES the one
+            # units.show_plan wrote (15 Oct, "มีแปลนให้ดูไหม" -> "ห้องว่าง 95
+            # ยูนิต"), so the rule never reached the model and the counts did --
+            # robot 20 Oct, "I want to see the ground floor plan." -> "On this
+            # floor, there are currently 95 units available and 26 sold."
             "instruction": (f"จอยืนยันว่าแสดงผังชั้น {prepared['floor']} ที่ตรวจ hash แล้ว "
-                            "จึงบอกลูกค้าได้ว่าเปิดผังให้แล้ว ห้ามพูดราคา")}
+                            "จึงบอกลูกค้าได้ว่าเปิดผังให้แล้ว ห้ามพูดราคา "
+                            + PLAN_COUNT_RULE)}
+
+
+#: Said with every rendered plan: the counts are for a guest who asks.
+PLAN_COUNT_RULE = ("พูดจำนวนห้องว่าง/จอง/ขายเฉพาะเมื่อลูกค้าถามเรื่องห้องว่างหรือยอดขาย "
+                   "ไม่งั้นบอกแค่ว่าเปิดผังชั้นนี้ให้ดู ห้ามพูดว่า "
+                   "\"On this floor, there are currently 95 units available and 26 sold\" "
+                   "เมื่อลูกค้าขอดูผังเฉยๆ "
+                   # robot 20 Oct: "I can see a few parking spots next to building A." ->
+                   # "...are for drop-off or service purposes" -- the data names no such use
+                   "สิ่งบนผังที่ข้อมูลไม่ได้บอกว่าคืออะไร ห้ามเดาหน้าที่ของมัน "
+                   "(ผิด: \"Any spots you see near Building A are for drop-off or service purposes\") "
+                   "ให้ค้นด้วย search_condo_info ถ้าไม่พบให้ทีมขายยืนยัน")
