@@ -857,7 +857,8 @@ def test_the_capture_runs_only_with_the_face_in_front_and_the_server_asking():
     # link (the first would hold the server's one slot -> busy)
     resume = method(src, "void resume()")
     assert resume.index("if (running) {") < resume.index("return;") < resume.index("start();")
-    assert 'static final String USER_AGENT = "EmmaRobot/0.1 EmmaArray/1";' in src
+    # EmmaArrayMic/1 (ARRAY_MIC, 2 Nov): this build can hold the array alone
+    assert 'static final String USER_AGENT = "EmmaRobot/0.1 EmmaArray/1 EmmaArrayMic/1";' in src
     loop = method(src, "private void linkLoop(Run r)")
     assert "HttpsURLConnection.getDefaultHostnameVerifier()" in loop      # a raw SSLSocket checks no host
     assert "if (retry == 0) failures = 0;" in loop                         # backoff resets on ready only

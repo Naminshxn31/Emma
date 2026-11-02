@@ -29,6 +29,9 @@ class SessionMetrics:
         self.clock = clock
         self.current = None
         self.pending_end = None
+        #: Audio-less turns the pending end signal has already ridden through
+        #: (`finish`): 0 = the turn that speaks is the first after the guest.
+        self.pending_hops = 0
         self.recent = OrderedDict()
         self.responses = OrderedDict()
 
@@ -37,13 +40,23 @@ class SessionMetrics:
 
     def speech_end(self, source):
         self.pending_end = (self.clock(), source)
+        self.pending_hops = 0
+
+    def robot_turn(self):
+        """The server is starting a turn of its own (an announcement): its
+        reply is not the answer to the guest's last words, so an end signal
+        still waiting for audio stops here instead of timing it."""
+        self.pending_end = None
+        self.pending_hops = 0
 
     def ensure(self):
         if self.current is None:
             now = self.clock()
             self.current = {"id": uuid.uuid4().hex, "start": now,
-                            "end_signal": self.pending_end, "audio": None}
+                            "end_signal": self.pending_end, "audio": None,
+                            "hops": self.pending_hops if self.pending_end else 0}
             self.pending_end = None
+            self.pending_hops = 0
             self.recent[self.current["id"]] = set()
             while len(self.recent) > 32:
                 self.recent.popitem(last=False)
@@ -57,10 +70,11 @@ class SessionMetrics:
         now = self.clock()
         self.current["audio"] = now
         signal = self.current["end_signal"]
+        extra = {"tool_hops": self.current["hops"]} if signal and self.current.get("hops") else {}
         self.record("metric_first_audio", turn_id=turn_id,
                     reply_start_to_audio_ms=round((now-self.current["start"])*1000, 3),
                     end_signal_to_audio_ms=round((now-signal[0])*1000, 3) if signal else None,
-                    end_signal_source=signal[1] if signal else "unavailable")
+                    end_signal_source=signal[1] if signal else "unavailable", **extra)
         return turn_id
 
     def finish(self, reason="complete"):
@@ -69,6 +83,18 @@ class SessionMetrics:
         self.record("metric_turn_end", turn_id=self.current["id"], reason=reason,
                     elapsed_ms=round((self.clock()-self.current["start"])*1000, 3),
                     audio_observed=self.current["audio"] is not None)
+        # The guest's wait does not end with a turn that said nothing.
+        # gemini-3.8 completes a turn BEFORE its tool call (13/15, eval 8 Oct)
+        # and every tool result starts another, so the turn that finally
+        # speaks never had the end signal: on the robot 28 Oct every story
+        # and search answer -- the slow ones the staff noticed -- logged
+        # end_signal "unavailable". It rides on to the next turn instead,
+        # counted in `tool_hops`; new speech, an interruption or a turn of
+        # the server's own (`robot_turn`) drops it.
+        if (reason == "complete" and self.current["audio"] is None
+                and self.current["end_signal"] is not None and self.pending_end is None):
+            self.pending_end = self.current["end_signal"]
+            self.pending_hops = self.current.get("hops", 0) + 1
         self.current = None
 
     def usage(self, payload):

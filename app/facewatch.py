@@ -139,6 +139,41 @@ def _overlap(a, b) -> float:
     return inter / union if union > 0 else 0.0
 
 
+def _head_now() -> tuple[float, float]:
+    """Where the robot's head was last told to look, degrees (app/head_follow.py);
+    (0, 0) with HEAD_FOLLOW off -- the frame never moved."""
+    try:
+        from app import head_follow
+
+        return head_follow.offset_deg()
+    except Exception:  # noqa: BLE001 -- a probe, never a reason to greet twice
+        return 0.0, 0.0
+
+
+def _in_head_frame(bbox, head_then, frame) -> tuple | None:
+    """`bbox`, remembered with the head at `head_then`, moved to where that
+    same spot is in a frame taken with the head where it is now.
+
+    The same-spot dedupes compare a box from a greeting with a box seconds
+    later. With the camera on a head that turns toward the person
+    (HEAD_FOLLOW), the person ends up in the middle of the frame and their
+    own box no longer overlaps the one they were greeted in -- the 2 Sep
+    "blur greeted twice" bug, caused by the head instead of the blur. A
+    turn of d degrees slides the scene by ~focal * tan(d) pixels (+pan =
+    left: the scene moves right; +tilt = down: it moves up)."""
+    if not bbox or head_then is None:
+        return bbox
+    now = _head_now()
+    width = int(frame.shape[1]) if getattr(frame, "ndim", 0) >= 2 else 0
+    if not width or tuple(now) == tuple(head_then):
+        return bbox
+    focal = (width / 2.0) / math.tan(math.radians(ROBOT_CAMERA_HFOV_DEG / 2.0))
+    dx = focal * math.tan(math.radians(now[0] - head_then[0]))
+    dy = -focal * math.tan(math.radians(now[1] - head_then[1]))
+    x1, y1, x2, y2 = bbox
+    return (x1 + dx, y1 + dy, x2 + dx, y2 + dy)
+
+
 def _yaw(kps) -> float | None:
     """How far the head is turned, from SCRFD's five points; None without them."""
     if kps is None:
@@ -176,6 +211,15 @@ def bearing_deg(cx: float, frame_width: int, hfov_deg: float = ROBOT_CAMERA_HFOV
     half = frame_width / 2.0
     focal = half / math.tan(math.radians(hfov_deg / 2.0))
     return math.degrees(math.atan2(half - cx, focal))
+
+
+def elevation_deg(cy: float, frame_width: int, frame_height: int,
+                  hfov_deg: float = ROBOT_CAMERA_HFOV_DEG) -> float:
+    """Vertical angle of image row `cy` from the camera axis, + = above it
+    (square pixels: the focal length comes from the width's HFOV). Assumed
+    the way `bearing_deg` is -- an HFOV error scales both by one factor."""
+    focal = (frame_width / 2.0) / math.tan(math.radians(hfov_deg / 2.0))
+    return math.degrees(math.atan2(frame_height / 2.0 - cy, focal))
 
 
 def yaw_deg(kps) -> float | None:
@@ -619,7 +663,8 @@ class Watcher:
             # somebody walking in behind them lands in a different box.
             for entry in list(self._strangers):
                 recent = (now - entry.get("greeted_at", entry["at"])) < self.STRANGER_TO_NAME_S
-                if recent and _overlap(face.bbox, entry.get("bbox")) >= self.SAME_SPOT_IOU:
+                if recent and _overlap(face.bbox, _in_head_frame(entry.get("bbox"), entry.get("head"),
+                                                                 frame)) >= self.SAME_SPOT_IOU:
                     logger.info("face: %s confirmed %.0fs after an anonymous greeting in "
                                 "the same spot — same arrival, not greeting twice",
                                 name, now - entry.get("greeted_at", entry["at"]))
@@ -627,7 +672,7 @@ class Watcher:
                     self._note("%s ยืนจุดที่เพิ่งทักแบบไม่มีชื่อ — ไม่ทักซ้ำ" % name,
                                name=name)
                     return None
-            self._named = {"at": now, "bbox": tuple(face.bbox)}
+            self._named = {"at": now, "bbox": tuple(face.bbox), "head": _head_now()}
             self._note("ทัก %s (%.2f)" % (name, score), name=name,
                        score=round(float(score), 3), greeting=True)
             return Sighting(kind="known", name=name, score=float(score),
@@ -662,18 +707,19 @@ class Watcher:
         # and is still greeted.
         if (self._named is not None
                 and (now - self._named["at"]) < self.STRANGER_TO_NAME_S
-                and _overlap(face.bbox, self._named["bbox"]) >= self.SAME_SPOT_IOU):
+                and _overlap(face.bbox, _in_head_frame(self._named["bbox"], self._named.get("head"),
+                                                       frame)) >= self.SAME_SPOT_IOU):
             logger.info("face: a stranger confirmed %.0fs after a named greeting in "
                         "the same spot — their own blur, not greeting twice",
                         now - self._named["at"])
             self._strangers.append({"vec": np.array(face.vec, copy=True), "at": now,
-                                    "greeted_at": now, "bbox": tuple(face.bbox)})
+                                    "greeted_at": now, "bbox": tuple(face.bbox), "head": _head_now()})
             del self._strangers[:-16]
             self._note("ภาพเบลอของคนที่เพิ่งทักชื่อ — ไม่ทักซ้ำ")
             return None
 
         self._strangers.append({"vec": np.array(face.vec, copy=True), "at": now,
-                                "greeted_at": now, "bbox": tuple(face.bbox)})
+                                "greeted_at": now, "bbox": tuple(face.bbox), "head": _head_now()})
         # A remembered face costs 2KB; forgetting the oldest is cheaper
         # than comparing against a whole Saturday.
         del self._strangers[:-16]
@@ -1077,8 +1123,10 @@ class Watcher:
                             bearing_deg((x1 + x2) / 2.0, width) if width else 0.0,
                             int(x2 - x1)))
             latest = [(tid, tuple(face.bbox), face.kps, now) for tid, face, *_ in obs]
+            height = int(frame.shape[0]) if getattr(frame, "ndim", 0) >= 2 else 0
             with _latest_lock:
                 _latest[:] = latest
+                _latest_size[:] = [width, height]
             from app import focus
 
             if focus.enabled():          # off under MULTI_SESSION too
@@ -1149,6 +1197,9 @@ class _Tracks:
 _latest_lock = threading.Lock()
 #: The last published frame's faces: [(track, bbox, kps, t)].
 _latest: list[tuple] = []
+#: That frame's [width, height] -- where a box sits vertically, for the head's
+#: tilt (app/head_follow.py). [0, 0] until a frame has been published.
+_latest_size: list[int] = [0, 0]
 _asd_state = {"missing": False, "failed_at": 0.0}
 
 
@@ -1158,6 +1209,12 @@ def latest_tracks() -> list[tuple]:
     until a frame has been published (FOCUS_ENABLED or ASD_ENABLED)."""
     with _latest_lock:
         return list(_latest)
+
+
+def latest_frame_size() -> tuple[int, int]:
+    """(width, height) of the frame `latest_tracks` came from; (0, 0) = none yet."""
+    with _latest_lock:
+        return int(_latest_size[0]), int(_latest_size[1])
 
 
 def _active_speaker(frame, tracks: list[tuple], now: float) -> None:

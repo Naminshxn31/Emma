@@ -832,16 +832,16 @@ def test_semi_rows_carry_none_of_the_new_fields(on, rows):
 def test_attention_follows_whoever_speaks(on):
     t = T
     focus.observe_faces([face(1, t, -10.0, px=200), face(2, t, 25.0, px=120)], t)
-    assert focus.attention(t) == {"bearing": -10.0, "source": "face"}, "the nearest face"
+    assert focus.attention(t) == {"bearing": -10.0, "source": "face", "track": 1}, "the nearest face"
     focus.observe_mouth(2, t - 5, 0.9)
     focus.observe_mouth(2, t, 0.8)
-    assert focus.attention(t + 0.1) == {"bearing": 25.0, "source": "mouth"}
+    assert focus.attention(t + 0.1) == {"bearing": 25.0, "source": "mouth", "track": 2}
 
 
 def test_attention_turns_to_a_voice_outside_the_lens(on):
     focus.observe_faces([], T)
     focus.observe_doa(T, -40.0, 0.9)
-    assert focus.attention(T + 0.1) == {"bearing": -40.0, "source": "doa"}
+    assert focus.attention(T + 0.1) == {"bearing": -40.0, "source": "doa", "track": None}
 
 
 def test_attention_stays_on_the_last_speaker_then_returns_to_centre(on):
@@ -851,22 +851,118 @@ def test_attention_stays_on_the_last_speaker_then_returns_to_centre(on):
     focus.segment_closed(1, T, T + 2.0)
     t = T + 3.0
     focus.observe_faces([face(1, t, -10.0, px=200), face(2, t, 25.0, px=120)], t)
-    assert focus.attention(t) == {"bearing": 25.0, "source": "label"}
+    assert focus.attention(t) == {"bearing": 25.0, "source": "label", "track": 2}
     later = t + 5.0
     focus.observe_faces([], later)
-    assert focus.attention(later) == {"bearing": None, "source": None}
+    assert focus.attention(later) == {"bearing": None, "source": None, "track": None}
 
 
 def test_attention_in_full_mode_stays_with_the_main_person(on, monkeypatch):
     monkeypatch.setattr(settings, "focus_engage_mode", "full")
     _main_is_track_one()
     _companion_speaks(T + 7)
-    assert focus.attention(T + 7.1) == {"bearing": 0.0, "source": "main"}
+    assert focus.attention(T + 7.1) == {"bearing": 0.0, "source": "main", "track": 1}
 
 
 def test_attention_off_is_centre(rows):
     focus.observe_faces([face(t=T)], T)
-    assert focus.attention(T) == {"bearing": None, "source": None}
+    assert focus.attention(T) == {"bearing": None, "source": None, "track": None}
+
+
+# -- a group in front: one face at a time (FOCUS_GAZE_VISIT_S, owner 2 Nov) --
+
+def _group_of_three(t):
+    """Left (+30), nearest in the middle (0), right (-25)."""
+    focus.observe_faces([face(1, t, 30.0, px=120), face(2, t, 0.0, px=220),
+                         face(3, t, -25.0, px=150)], t)
+
+
+def test_without_the_switch_a_group_only_ever_sees_the_nearest(on):
+    """Today's rule, kept byte for byte while FOCUS_GAZE_VISIT_S is 0: the
+    nearest face, for as long as it is nearest -- the others are never
+    looked at (the gap the owner's "หันหน้าไปหาทีละคน" names)."""
+    for k in range(12):
+        t = T + k
+        _group_of_three(t)
+        assert focus.attention(t) == {"bearing": 0.0, "source": "face", "track": 2}
+
+
+def test_the_round_visits_each_face_in_turn_left_to_right(on, monkeypatch):
+    """Nearest first (the first visit is exactly the old cue), then the next
+    face to its right, wrapping to the leftmost: everybody in turn."""
+    monkeypatch.setattr(settings, "focus_gaze_visit_s", 3.0)
+    seen = []
+    for k in range(0, 40):
+        t = T + k * 0.5
+        _group_of_three(t)
+        cue = focus.attention(t)
+        assert cue["source"] == "visit"
+        seen.append(cue["track"])
+    order = [seen[0]] + [b for a, b in zip(seen, seen[1:]) if a != b]
+    assert order[:5] == [2, 3, 1, 2, 3], order
+    assert seen[:6] == [2] * 6, "one visit lasts FOCUS_GAZE_VISIT_S"
+
+
+def test_one_face_is_not_a_round(on, monkeypatch):
+    monkeypatch.setattr(settings, "focus_gaze_visit_s", 3.0)
+    for k in range(10):
+        t = T + k
+        focus.observe_faces([face(1, t, 12.0)], t)
+        assert focus.attention(t) == {"bearing": 12.0, "source": "face", "track": 1}
+
+
+def test_whoever_speaks_still_wins_at_once_and_the_round_goes_on_from_them(on, monkeypatch):
+    """A moving mouth beats the round immediately; after they stop they keep
+    her eyes for one visit (the label), then the round moves to the next face
+    to THEIR right -- not back to wherever it was."""
+    monkeypatch.setattr(settings, "focus_gaze_visit_s", 3.0)
+    _group_of_three(T)
+    assert focus.attention(T)["track"] == 2
+    focus.observe_mouth(1, T - 5, 0.9)                     # proven mouth
+    focus.observe_mouth(1, T + 1.0, 0.9)
+    t = T + 1.05
+    _group_of_three(t)
+    assert focus.attention(t) == {"bearing": 30.0, "source": "mouth", "track": 1}
+    focus.segment_closed(1, T + 0.5, T + 1.6)              # attributed to track 1
+    t = T + 2.0
+    _group_of_three(t)
+    assert focus.attention(t) == {"bearing": 30.0, "source": "label", "track": 1}
+    end = (T + 1.6) - settings.vad_silence_ms / 1000.0     # the segment's trimmed end
+    t = max(end, T + 1.05) + 3.0 + 0.5
+    _group_of_three(t)
+    cue = focus.attention(t)
+    assert cue == {"bearing": 0.0, "source": "visit", "track": 2}, "next to the speaker's right"
+
+
+def test_the_round_starts_again_from_the_nearest_after_a_pause(on, monkeypatch):
+    monkeypatch.setattr(settings, "focus_gaze_visit_s", 3.0)
+    for k in range(8):
+        _group_of_three(T + k)
+        focus.attention(T + k)
+    later = T + 120.0
+    _group_of_three(later)
+    assert focus.attention(later)["track"] == 2, "a new group starts with the nearest"
+
+
+def test_the_round_is_kept_in_the_room_while_the_head_turns(on, monkeypatch):
+    """With HEAD_FOLLOW the camera turns: every face's camera bearing shifts
+    by the head's pan, and the round must still pick the person to the right
+    of the last one -- in the room, not in the picture. The case that tells
+    the two apart: the person looked at left the frame, and a newcomer stands
+    to their LEFT in the room but right of centre in the turned picture."""
+    from app import head_follow
+
+    monkeypatch.setattr(settings, "focus_gaze_visit_s", 3.0)
+    pan = {"v": 0.0}
+    monkeypatch.setattr(head_follow, "offset_deg", lambda: (pan["v"], 0.0))
+    for k in range(6):                       # room: 1 at +30, 2 at 0, 3 at -25
+        _group_of_three(T + k * 0.5)
+        assert focus.attention(T + k * 0.5)["track"] == 2
+    pan["v"] = 20.0                          # the head turned 20 deg left
+    t = T + 4.5                              # track 2 gone (> FOCUS_HOLD_S)
+    focus.observe_faces([face(1, t, 10.0, px=120), face(4, t, -10.0, px=130),
+                         face(3, t, -45.0, px=150)], t)
+    assert focus.attention(t)["track"] == 3, "room -25 is right of room 0; room +10 is not"
 
 
 def test_the_cue_goes_to_the_robot_face_only_and_only_when_it_moved(on, monkeypatch):
@@ -891,6 +987,36 @@ def test_the_cue_goes_to_the_robot_face_only_and_only_when_it_moved(on, monkeypa
     assert sent == [{"type": "attention", "bearing": 10.0, "source": "face"},
                     {"type": "attention", "bearing": 14.0, "source": "face"},
                     {"type": "attention", "bearing": None, "source": None}]
+
+
+def test_the_mascot_on_the_chest_looks_where_the_turned_head_sees(on, monkeypatch):
+    """A face's bearing is in the HEAD camera's degrees; the mascot is on the
+    chest, which does not turn. With HEAD_FOLLOW the head turns toward the
+    person and their camera bearing shrinks to ~0 -- the mascot used to look
+    straight ahead while the head looked at them. HEAD_FOLLOW off (offset 0):
+    the cue is exactly what it was. The array's direction is not offset."""
+    from app import head_follow, robot_face_link
+
+    monkeypatch.setattr(robot_face_link, "is_robot_face", lambda s: True)
+    t = time.monotonic()
+    focus.observe_faces([face(1, t, 4.0)], t)
+    plain = _session()
+    plain.ws = _WS([])
+    asyncio.run(plain._send_attention(t))
+    assert plain.ws.out == [{"type": "attention", "bearing": 4.0, "source": "face"}]
+
+    monkeypatch.setattr(head_follow, "offset_deg", lambda: (20.0, 0.0))
+    turned = _session()
+    turned.ws = _WS([])
+    asyncio.run(turned._send_attention(t))
+    assert turned.ws.out == [{"type": "attention", "bearing": 24.0, "source": "face"}]
+
+    focus.observe_faces([], t + 5)
+    focus.observe_doa(t + 5, -40.0, 0.9)
+    voice = _session()
+    voice.ws = _WS([])
+    asyncio.run(voice._send_attention(t + 5.1))
+    assert voice.ws.out == [{"type": "attention", "bearing": -40.0, "source": "doa"}]
 
 
 def test_no_watcher_task_unless_a_switch_asks_for_one(on, monkeypatch):

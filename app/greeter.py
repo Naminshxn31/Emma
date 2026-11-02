@@ -307,6 +307,55 @@ class _GalleryFollower:
         logger.info("face gallery reloaded: %d vectors", len(gallery))
 
 
+#: The group greeting (FACE_GROUP_GREETING), owner 2 Nov 2026: "หากมีคนยืน
+#: ล้อมรอบเยอะ หุ่นยนต์ควรสามารถทักทายรวมๆ ได้ (เช่น "สวัสดีครับทุกท่าน มีอะไรให้
+#: ผมช่วยสอบถามได้เลยนะครับ")". Emma is a woman: ค่ะ/ดิฉัน, never ครับ/ผม. The
+#: owner's newest words ask for the open invitation ("มีอะไรให้ช่วย") that the
+#: one-person greetings avoid (GREETING, 14 Sep) -- here, for a group, it is
+#: his sentence, and it is quoted because a quoted line is what this model
+#: says (CLAUDE.md "อ้างคำ").
+GROUP_GREETING_TH = "สวัสดีค่ะทุกท่าน มีอะไรให้ดิฉันช่วย สอบถามได้เลยนะคะ"
+#: The same sentence where the opening is English: the robot in project mode,
+#: where the first greeting is English until a guest speaks (owner, confirmed
+#: 8 Oct -- prompts.GREETING). Only the English line is quoted on that road:
+#: a Thai sentence quoted in an English instruction is said word for word
+#: (CLAUDE.md, 19 Oct).
+GROUP_GREETING_EN = ("Hello everyone, I'm Emma. Welcome to Embassy World. "
+                     "If there is anything I can help with, please feel free to ask.")
+
+
+def _is_group(sighting) -> bool:
+    """FACE_GROUP_GREETING and two or more usable faces in the frame that
+    decided (`Sighting.faces_in_frame`: facewatch's company bar -- a poster or
+    somebody across the room is not company). 0 = not counted = not a group."""
+    if not settings.face_group_greeting:
+        return False
+    try:
+        return int(getattr(sighting, "faces_in_frame", 0) or 0) >= 2
+    except (TypeError, ValueError):
+        return False
+
+
+def _group_greeting() -> str:
+    """One greeting to everybody standing there, never a name.
+
+    No name even for somebody recognised: the model would be told one name
+    and address the whole group by it (the reason FACE_NAME_WHEN_ALONE
+    exists), and with this switch on that holds even where naming in company
+    was allowed. No head count spoken ("สวัสดีทั้งสามท่าน" is the camera
+    narrating). And nobody after it is assumed to be the one who spoke
+    before: there is no speaker identification (greeting_for's own rule).
+    """
+    rules = ("ห้ามเรียกชื่อใคร ห้ามนับหรือบอกจำนวนคน ห้ามพูดถึงกล้อง และห้ามบอกว่าจำไม่ได้หรือไม่รู้จัก "
+             "หลังจากนี้ใครถามก็ตอบคำถามนั้น ห้ามถือว่าคนที่พูดต่อไปคือคนเดียวกับคนที่พูดก่อน")
+    if settings.face_camera_source == "robot" and settings.assistant_profile == "condo":
+        return ("มีหลายคนยืนอยู่หน้าหุ่นพร้อมกัน ยังไม่รู้ว่าเป็นใคร — ทักทุกคนพร้อมกันประโยคเดียว "
+                "เป็นภาษาอังกฤษ (ยังไม่รู้ภาษาของลูกค้า): \"%s\" — %s "
+                "พอลูกค้าพูดแล้ว ตอบเป็นภาษาเดียวกับที่คนนั้นพูด" % (GROUP_GREETING_EN, rules))
+    return ("มีหลายคนยืนอยู่หน้าหุ่นพร้อมกัน ยังไม่รู้ว่าเป็นใคร — ทักทุกคนพร้อมกันประโยคเดียว "
+            "ว่า \"%s\" — %s" % (GROUP_GREETING_TH, rules))
+
+
 def greeting_for(sighting) -> str:
     """What to send to the model when somebody is standing there.
 
@@ -317,7 +366,12 @@ def greeting_for(sighting) -> str:
     unsettling to hear from a robot you have just walked up to, and telling
     a stranger that it does not know them, which is an accusation rather
     than a greeting.
+
+    A group in the frame (FACE_GROUP_GREETING, off by default) gets one
+    greeting for everybody before any of that is decided (`_group_greeting`).
     """
+    if _is_group(sighting):
+        return _group_greeting()
     if sighting.kind == "known":
         who = sighting.name
         role = sighting.group
@@ -438,6 +492,31 @@ def _handshake(sighting) -> tuple[bool, str]:
     return True, "named_alone"
 
 
+def _room_fields(sighting, greeting: bool = True) -> dict:
+    """How many people stood there when the greeting was decided -- numbers
+    only (docs/emma-multi-person-2026-11-02.md). Before 2 Nov a face_seen row
+    did not say, so "how often is it a group" could not be read from nine
+    days of robot logs. `faces` = usable faces in the deciding frame (0 = not
+    counted: left out); `lidar` = people the lidar sees round the base, only
+    while LIDAR_PEOPLE runs (its count is unverified -- logged beside the
+    camera's to be compared, never acted on); `group_greeting` when used
+    (`greeting=False`: a sighting that was not greeted at all)."""
+    out: dict = {}
+    faces = getattr(sighting, "faces_in_frame", 0)
+    if isinstance(faces, int) and faces > 0:
+        out["faces"] = faces
+    try:
+        from app import lidar_people
+
+        if lidar_people.enabled():
+            out["lidar"] = len(lidar_people.people())
+    except Exception:  # noqa: BLE001 -- a log field, never a reason to skip a greeting
+        pass
+    if greeting and _is_group(sighting):
+        out["group_greeting"] = True
+    return out
+
+
 async def _greet(sighting) -> None:
     extra = {}
     if sighting.meta.get("unnamed"):
@@ -445,6 +524,7 @@ async def _greet(sighting) -> None:
         # company, consent) is the whole story of that decision.
         extra = {"unnamed": sighting.meta["unnamed"]}
     extra.update(_track_fields(sighting))
+    extra.update(_room_fields(sighting))
     arm = True
     if settings.face_handshake_named_only:
         # Off, the gesture rides every camera greeting exactly as before
@@ -940,7 +1020,8 @@ async def run() -> None:
                                score=round(sighting.score, 3),
                                group=sighting.group or "",
                                greeted=False, why="live_session",
-                               **_track_fields(sighting))
+                               **_track_fields(sighting),
+                               **_room_fields(sighting, greeting=False))
                 debug_status["verdict"] = ("เห็น%s แต่กำลังคุยอยู่ — ไม่พูดแทรก"
                                            % (sighting.name or "คนแปลกหน้า"))
                 sighting = None

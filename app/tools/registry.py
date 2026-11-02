@@ -187,6 +187,8 @@ robot_face_session: ContextVar[object | None] = ContextVar("robot_face_session",
 #: memory or control of his computer.
 _JOKE_DENIED = {"knowledge", "mydocs", "documents", "slides", "units", "calc",
                 "memory", "computer", "websearch", "stories"}
+#: The walking tools, by name, that the event profile never sees.
+_EVENT_DENIED = {"go_to_place", "return_to_base"}
 
 
 def allowed(entry: Tool) -> bool:
@@ -214,15 +216,31 @@ def allowed(entry: Tool) -> bool:
     if entry.group == "stories" and (robot_face_session.get() is None
                                      or not settings.stories_enabled):
         return False
+    # The robot's face on a room's big screen: the robot face's own session
+    # (it is that page being copied), with the switch, the mirror listener
+    # and a configured screen (app/room_screens.offered).
+    if entry.group == "screens":
+        from app import room_screens
+
+        if robot_face_session.get() is None or not room_screens.offered():
+            return False
     profile = session_profile.get() or settings.assistant_profile
+    from app.prompts import SALES_PROFILES
+
     # The stories are the sales host's: the project's approved pictures.
-    if entry.group == "stories" and profile != "condo":
+    if entry.group == "stories" and profile not in SALES_PROFILES:
         return False
     # Optional personal/web/computer tools have no condo source-approval
     # contract. TOOL_GROUPS may not turn them into an alternate knowledge or
     # file/display path for a sales session.
-    if profile == "condo" and entry.group in {
+    if profile in SALES_PROFILES and entry.group in {
             "memory", "mydocs", "websearch", "computer"}:
+        return False
+    # At an event only staff walk the robot (app/event_host.py, owner 30 Oct
+    # "ให้ทีมงานกดเปลี่ยนซีน"): a guest's "พาไป..." must not reach the wheels.
+    # The stops stay -- stop_moving and move_body(stop) also stop the staff
+    # walk (app/event_walk.py).
+    if profile == "event" and entry.name in _EVENT_DENIED:
         return False
     # EmmaJoke answers anything EXCEPT the project. Stated in its prompt and
     # enforced here, because a prompt is a request and this is a fact.
@@ -434,11 +452,25 @@ def model_view(name: str, result: object) -> object:
     the tool's `screen_only` keys. Every tool without them gets the very same
     object back -- their function responses are byte-identical."""
     entry = _REGISTRY.get(name)
+    result = _with_event_scene(result)
     if entry is None or not entry.screen_only or not isinstance(result, dict):
         return result
     if not any(key in result for key in entry.screen_only):
         return result
     return {k: v for k, v in result.items() if k not in entry.screen_only}
+
+
+def _with_event_scene(result: object) -> object:
+    """An event session's tool results carry the scene staff chose
+    (app/event_host.py): an instruction beside a tool result reaches the model,
+    one at the end of the system prompt does not (CLAUDE.md). Every other
+    profile -- and an event with no scene picked -- gets the same object back."""
+    if not isinstance(result, dict) or session_profile.get() != "event":
+        return result
+    from app import event_host
+
+    note = event_host.scene_note()
+    return result if note is None else {**result, "event_scene": note}
 
 
 async def dispatch_all(calls: list[tuple[str, str, dict]]) -> list[tuple[str, str, dict]]:

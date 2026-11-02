@@ -689,129 +689,129 @@
  },
  "layout_1br_33": {
   "file": "layout_1br_33.webp",
-  "sha256": "80596f2e314f35e9c6320b3842193cc699b0858d2fc65abe4af84c92f33b720b",
-  "bytes": 30150,
-  "w": 1018,
-  "h": 1276,
+  "sha256": "d481f82ce652166f09c9dbf855d6cb9fbe7986978d434996e19172fc7a16cdf5",
+  "bytes": 14910,
+  "w": 634,
+  "h": 726,
   "format": "webp",
   "source": "web/5.room types/260615_EMB3_UNIT.pdf",
   "crop": [
-   305,
-   624,
-   1323,
-   1900
+   508,
+   774,
+   1142,
+   1500
   ],
   "alpha": true
  },
  "layout_1br_b113": {
   "file": "layout_1br_b113.webp",
-  "sha256": "7c5dc16428d1a672f136e3ff4e4247795e8910d6d20138be7e04ccacabf4d67a",
-  "bytes": 146720,
-  "w": 1080,
-  "h": 1242,
+  "sha256": "04f964751380bc4038d19e4e28875b7630f93de6c5063258ce6d361707ee3d5b",
+  "bytes": 26226,
+  "w": 736,
+  "h": 634,
   "format": "webp",
   "source": "web/5.room types/260615_EMB3_UNIT.pdf",
   "crop": [
-   1704,
-   645,
-   2795,
-   1900
+   1871,
+   866,
+   2607,
+   1500
   ],
   "alpha": true
  },
  "layout_51_1br": {
   "file": "layout_51_1br.webp",
-  "sha256": "cf48aef6ef0a4fabd48e65bc7051071a7da389aa6cad0a49773ee4696cf31537",
-  "bytes": 104916,
-  "w": 1080,
-  "h": 1118,
+  "sha256": "53e9f84bf67f1c96a33a11197bcacdbd1a88ab130765de9c8cd7b127a7ee3e31",
+  "bytes": 16180,
+  "w": 916,
+  "h": 747,
   "format": "webp",
   "source": "web/5.room types/260615_EMB3_UNIT.pdf",
   "crop": [
-   368,
-   603,
-   1621,
-   1900
+   535,
+   753,
+   1451,
+   1500
   ],
   "alpha": true
  },
  "layout_51_2br": {
   "file": "layout_51_2br.webp",
-  "sha256": "9ec1e764277c986d3b91768c01de28978c9c8a98251c2f0695a3fa1b7a1fe2b8",
-  "bytes": 116112,
-  "w": 1080,
-  "h": 1075,
+  "sha256": "6c30cf6fe4e677f172ed7881262868b7dc8d3de43981c748d639217992e81352",
+  "bytes": 20356,
+  "w": 916,
+  "h": 747,
   "format": "webp",
   "source": "web/5.room types/260615_EMB3_UNIT.pdf",
   "crop": [
-   1705,
-   603,
-   3008,
-   1900
+   1922,
+   753,
+   2838,
+   1500
   ],
   "alpha": true
  },
  "layout_combined_48": {
   "file": "layout_combined_48.webp",
-  "sha256": "cbb17d273aafeb4528f8dd06d61f5dd6275a29a400983c0e3bdbaaa14eecc9f1",
-  "bytes": 119800,
-  "w": 1080,
-  "h": 1083,
+  "sha256": "adcf53e1519fa8a723025634d1d3b25d8267d27705c6b758a68be251b0356ad4",
+  "bytes": 19658,
+  "w": 916,
+  "h": 706,
   "format": "webp",
   "source": "web/5.room types/260615_EMB3_UNIT.pdf",
   "crop": [
-   1461,
-   580,
-   2866,
-   1989
+   1677,
+   794,
+   2593,
+   1500
   ],
   "alpha": true
  },
  "layout_combined_66": {
   "file": "layout_combined_66.webp",
-  "sha256": "8c932ab35d7b7f29f676a8fd2a73bd169b559d245db95f1bce51f3c87c31b332",
-  "bytes": 107882,
+  "sha256": "4418323accf81ebcd91e501d36b705cf1fca09c352a526b3c9d79c647d488afa",
+  "bytes": 78100,
   "w": 1080,
-  "h": 926,
+  "h": 635,
   "format": "webp",
   "source": "web/5.room types/260615_EMB3_UNIT.pdf",
   "crop": [
-   1385,
-   580,
-   3028,
-   1989
+   1588,
+   774,
+   2822,
+   1500
   ],
   "alpha": true
  },
  "layout_studio_24": {
   "file": "layout_studio_24.webp",
-  "sha256": "d820b17aecd009566678868607017e020338180ac5598a7bae89c6725c8a0e18",
-  "bytes": 25192,
-  "w": 866,
-  "h": 1276,
+  "sha256": "b2d859d698edd5655f4b97d5b5ef6e7d8718f6a8188338f9da26fc8c9452a74c",
+  "bytes": 11504,
+  "w": 472,
+  "h": 706,
   "format": "webp",
   "source": "web/5.room types/260615_EMB3_UNIT.pdf",
   "crop": [
-   446,
-   624,
-   1312,
-   1900
+   662,
+   794,
+   1134,
+   1500
   ],
   "alpha": true
  },
  "layout_studio_b107": {
   "file": "layout_studio_b107.webp",
-  "sha256": "c28d0bfb189b4dbe116c04d476857b0b3c8152a5c473d5daabdf371a2e6e13c7",
-  "bytes": 114620,
-  "w": 1080,
-  "h": 876,
+  "sha256": "4d3fa4afd23259b8a30e534a704e007ef9980877ea7282e35bccab8500872575",
+  "bytes": 23282,
+  "w": 872,
+  "h": 557,
   "format": "webp",
   "source": "web/5.room types/260615_EMB3_UNIT.pdf",
   "crop": [
-   284,
-   730,
-   1557,
-   1762
+   530,
+   943,
+   1402,
+   1500
   ],
   "alpha": true
  },
@@ -957,6 +957,72 @@
    1240,
    940
   ],
+  "alpha": false
+ },
+ "map_location_beach": {
+  "file": "map_location_beach.webp",
+  "sha256": "4fc08ba4e0111e42ba6ac2749cf7c9aae27cb2550e671aa838209753afadbc43",
+  "bytes": 92184,
+  "w": 1080,
+  "h": 900,
+  "format": "webp",
+  "source": "maps/location_beach.png",
+  "crop": null,
+  "alpha": false
+ },
+ "map_nearby_7eleven": {
+  "file": "map_nearby_7eleven.webp",
+  "sha256": "8894963699af20ce5866100ea33ad61ae068a11e3aab0cf2d4b85290547e3581",
+  "bytes": 78744,
+  "w": 1080,
+  "h": 1080,
+  "format": "webp",
+  "source": "maps/nearby_7eleven.png",
+  "crop": null,
+  "alpha": false
+ },
+ "map_nearby_attractions": {
+  "file": "map_nearby_attractions.webp",
+  "sha256": "8dbf72629e4777548a4e4865998ec5f761e3ce902d3b2418a609276d072ee515",
+  "bytes": 28978,
+  "w": 1080,
+  "h": 800,
+  "format": "webp",
+  "source": "maps/nearby_attractions.png",
+  "crop": null,
+  "alpha": false
+ },
+ "map_nearby_hospitals": {
+  "file": "map_nearby_hospitals.webp",
+  "sha256": "8a6f843f86008fea7b85b84ca51c4a9deb61dfe5d0eff67074806471c56fb872",
+  "bytes": 56294,
+  "w": 1080,
+  "h": 939,
+  "format": "webp",
+  "source": "maps/nearby_hospitals.png",
+  "crop": null,
+  "alpha": false
+ },
+ "map_nearby_places": {
+  "file": "map_nearby_places.webp",
+  "sha256": "0d2bdd6c9f1e050ce2ceab9980b2da4d8b48e1e8220c8dc8d455b8c5943ee8ba",
+  "bytes": 93138,
+  "w": 1080,
+  "h": 800,
+  "format": "webp",
+  "source": "maps/nearby_places.png",
+  "crop": null,
+  "alpha": false
+ },
+ "map_nearby_restaurants": {
+  "file": "map_nearby_restaurants.webp",
+  "sha256": "8edd34cfec25315cfd80f7b8c4ba464e4de710e7cbfa5e46a7de85ed59a9d23e",
+  "bytes": 78176,
+  "w": 1080,
+  "h": 900,
+  "format": "webp",
+  "source": "maps/nearby_restaurants.png",
+  "crop": null,
   "alpha": false
  },
  "map_pattaya_zones": {

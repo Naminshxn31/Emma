@@ -1207,10 +1207,14 @@ def test_hold_menu_slot_one_opens_the_face_scan():
     assert "label: 'สแกนใบหน้า'" in first and "run: openFaceScan" in first
     assert "icon: SCAN_ICON" in first
     # Slot 2 is navigation since 2026-10-09 (design 2026-10-08 §3, P5; its own
-    # anchors are in tests/test_face_body_nav_page.py); the other four stay empty.
-    second, others = rest.split("},", 1)
+    # anchors are in tests/test_face_body_nav_page.py); slot 3 the big screen
+    # since 28 Oct (app/room_screens.py, tests/test_room_screens.py); the
+    # other three stay empty.
+    second, rest = rest.split("},", 1)
     assert "label: 'นำทาง'" in second and "run: openNav" in second and "when: navOffered" in second
-    assert others.split() == ["{},", "{},", "{},", "{}"]
+    third, others = rest.split("},", 1)
+    assert "label: 'จอใหญ่'" in third and "run: toggleScreen" in third and "when: screenOffered" in third
+    assert others.split() == ["{},", "{},", "{}"]
     # Wired to the overlay's own API, and null (an honest empty slot) if the
     # overlay script is missing -- never a button that silently does nothing.
     assert "var openFaceScan = window.EmmaFaceScan ? window.EmmaFaceScan.open : null;" in html
@@ -1375,7 +1379,11 @@ def test_the_robot_page_answers_the_cameras_bell_through_the_one_engine():
     assert "window.EmmaCall.answerSummons(reason);" in bell     # the bell's reason: face_* rings even when muted
     assert "new WebSocket(" in bell and bell.count("new WebSocket(") == 1
     engine = html.split("// ---- the robot's own camera, sent to the server (`?cam=1`) ----", 1)[0]
-    assert engine.count("new WebSocket(") == 1
+    # one dial of the call; the other socket is the room screen's watch
+    # (/mirror, app/face_mirror.py), which never dials /ws
+    assert engine.count("new WebSocket(") == 2 and engine.count("'/ws?voice='") == 1
+    watch = engine.split("function startMirror() {", 1)[1].split("function startMirrorAudio()", 1)[0]
+    assert watch.count("new WebSocket(") == 1 and "'/ws/mirror'" in watch and "'/ws?" not in watch
     # ...which flags the dial `summoned=1` once, so the server skips its own
     # opening line and the camera's greeting is the first thing said.
     assert "+ (summonedDial ? '&summoned=1' : ''));\n      summonedDial = false;" in engine
@@ -2475,11 +2483,39 @@ def test_a_soft_cue_marks_her_turn_ending_and_never_an_interruption():
     assert "function playListenCue()" in html
     assert "get('cue') === '0'" in html
     ended = html.index("if (!sources.length) {")
-    assert "if (inCall) playListenCue();" in html[ended:ended + 900]
+    # ...and never over a muted mic: the guest can't speak now (audit 27 Oct)
+    assert "if (inCall && !muted) playListenCue();" in html[ended:ended + 1200]
     stop = html.index("function stopPlayback()")
     stop_body = html[stop:html.index("function releaseCallHardware()")]
     assert "playListenCue" not in stop_body
     assert html.count("playListenCue();") == 1
+
+
+def test_a_muted_mic_stays_muted_on_the_pill_whatever_ends_her_turn():
+    """Audit 27 Oct: mute while she speaks, and when her voice ended the pill
+    said "Listening..." over the closed mic (the speak-now chime too, above).
+    Every way back to listening says "Muted" while muted: her voice ending,
+    an interruption, the "thinking" fallbacks and the mute button itself.
+    The two bare "Listening..." left answer the guest's own voice -- the
+    local barge-in and speech_started -- which comes up only in mic frames,
+    and handleMicAudio drops every frame while muted. The real page:
+    test_muted_her_answer_ends_on_the_muted_pill_without_the_cue."""
+    html = PAGE.read_text(encoding="utf-8")
+    ended = html[html.index("if (!sources.length) {"):]
+    ended = ended[:ended.index("\n      };\n")]
+    rest = "if (inCall) { show('listening'); if (muted) status('Muted'); } else paintReply();"
+    assert rest in ended
+    assert rest in html.split("case 'interrupted': {", 1)[1].split("break;", 1)[0]
+    assert "status(muted ? 'Muted' : 'Listening...')" in html.split("case 'heard_end':", 1)[1].split("break;", 1)[0]
+    bare = [line.strip() for line in html.splitlines() if "show('listening')" in line and "muted" not in line]
+    # the room screen's copy (/mirror) has no mic to mute: its call-started pose
+    assert "show('listening');" in html.split("case 'mirror_start':", 1)[1].split("break;", 1)[0]
+    bare.remove("show('listening');")
+    assert bare == ["show('listening'); status('Listening...');",
+                    "if (inCall) { show('listening'); status('Listening...'); } else paintReply();"], bare
+    assert bare[1] in html.split("case 'speech_started':", 1)[1].split("break;", 1)[0]
+    mic = html[html.index("function handleMicAudio(frame) {"):]
+    assert mic.index("if (muted || !ws") < mic.index("show('listening'); status('Listening...');")
 
 
 def test_the_mode_lamp_colours_are_the_owners_latest_pick():
@@ -2527,7 +2563,17 @@ def test_each_answer_owns_the_screen():
     started = html.split("case 'speech_started':", 1)[1].split("break;", 1)[0]
     assert "answerOwed = true;" in started and "answerStaged = false;" in started
     done = html.split("case 'turn_complete':", 1)[1].split("break;", 1)[0]
-    assert "if (answerOwed && !answerStaged && document.body.classList.contains('emma-staging')) clearStage();" in done
+    # ...only a turn that said something (audio or words): a dropped bare "ค่ะ"
+    # or gemini-3.8's empty pre-tool turn is no answer, and took the story
+    # down with nothing in its place (audit 27 Oct; the real page below:
+    # test_a_turn_that_said_nothing_keeps_the_screen)
+    clear = ("if (turnSaid && answerOwed && !answerStaged && (document.body.classList.contains('emma-staging') "
+             "|| document.body.classList.contains('mirror-story'))) "
+             "clearStage();")
+    assert clear in done
+    assert done.index("var turnSaid = assistantTurnStarted;") < done.index("resetAssistantTurn();") < done.index(clear)
+    begin = html[html.index("function beginAssistantTurn() {"):]
+    assert "assistantTurnStarted = true;" in begin[:begin.index("\n    }\n")]   # set by her audio and her words
     opener = html.split("function openStage() {", 1)[1].split("}", 1)[0]
     assert "answerStaged = true;" in opener
 
@@ -2539,7 +2585,8 @@ def test_an_answer_without_a_picture_clears_the_old_one_at_her_first_sound():
     nothing clears it (a story/slide of this answer arrives before her voice)."""
     html = PAGE.read_text(encoding="utf-8")
     audio = html.split("if (msg.data instanceof ArrayBuffer) {", 1)[1].split("return;\n      }", 1)[0]
-    clear = "if (answerOwed && !answerStaged && document.body.classList.contains('emma-staging')) clearStage();"
+    clear = ("if (answerOwed && !answerStaged && (document.body.classList.contains('emma-staging') "
+             "|| document.body.classList.contains('mirror-story'))) clearStage();")
     assert clear in audio
     assert audio.index(clear) < audio.index("playChunk(msg.data);")
     # a barged-in old reply's late chunks are dropped before anything is cleared
@@ -2596,3 +2643,500 @@ def test_her_choices_put_a_storys_chips_aside_and_the_pill_follows_the_story_awa
     end = html[html.index("function endStory() {"):]
     end = end[:end.index("\n    }\n")]
     assert "if (playing && lastStatusKey === 'Explaining — ask anytime') status('Speaking...');" in end
+
+
+# ---- her words as she says them: the robot face's motion captions (owner 27 Oct) ----
+#
+# "อันนี้มันยาวเกินไม่สวย อยากให้ทำเป็น motion ตัวหนังสือ" -- the reply was the
+# whole turn's text, painted the moment it came (seconds ahead of her voice),
+# growing to 5-7 lines of 16 px over the story; a guest asked her to say it
+# again. Now a window of lines (3 beside her, 2 in the band) whose words come
+# up with her PLAYED audio. The timing core is the story engine's clock and is
+# checked to the word in node (tests/client_captions.cjs, test_stories.py);
+# here: the wiring, and the real page in a real browser.
+
+def test_the_caption_hears_her_audio_and_text_and_draws_only_on_the_robot_face():
+    html = PAGE.read_text(encoding="utf-8")
+    paint = html[html.index("function paintReply() {"):]
+    paint = paint[:paint.index("\n    }\n")]
+    # the single gate is untouched; the caption only draws what it lets through
+    assert "var visible = !!(inCall && curBot);" in paint
+    assert "var up = (captions ? captions.paint(visible ? curBot : '') : false) && inCall;" in paint
+    assert "replySection.style.display = visible || up ? '' : 'none';" in paint   # a new answer taking over
+    # ...and what takes the line down at once: the guest speaking or tapping over her
+    for branch in ("case 'speech_started':", "case 'interrupted': {"):
+        block = html[html.index(branch):]
+        assert "captionHook('clear');" in block[:block.index("break;")], branch
+    tap = html[html.index("function sendQuickAsk(id) {"):]
+    assert "captionHook('clear');" in tap[:tap.index("ws.send(JSON.stringify({ type: 'quick_ask'")]
+    cap = html[html.index("var captions = (function () {"):]
+    cap = cap[:cap.index("\n    })();\n")]
+    assert "if (!appShell || !replySection" in cap                  # the desk /preview draws as before
+    assert "var now = heardClock(), wall = performance.now();" in cap and "var n = c.due(now, wall);" in cap  # her PLAYED audio
+    assert "innerHTML" not in cap and "setInterval" not in cap
+    assert "timer = setTimeout(sync, 100)" in cap and "if (core.pending())" in cap   # only while words wait
+    # the same stream the story hears, from the same places
+    at = html.index("function playChunk(arrayBuffer) {")
+    assert "captionHook('audio', at, buf.duration);" in html[at:html.index("src.onended", at)]
+    assert "captionHook('complete');" in html.split("case 'turn_complete':", 1)[1].split("break;", 1)[0]
+    begin = html[html.index("function beginAssistantTurn() {"):]
+    assert "captionHook('begin');" in begin[:begin.index("\n    }\n")]
+    append = html[html.index("function appendAssistantTranscript(text) {"):]
+    append = append[:append.index("\n    }\n")]
+    assert append.index("captionHook('text', text);") < append.index("paintReply();")
+    clear = html[html.index("function clearTranscript() {"):]
+    assert "captionHook('clear');" in clear[:clear.index("\n    }\n")]
+    # never the guest's words
+    assert "captionHook" not in html.split("case 'user_transcript':", 1)[1].split("break;", 1)[0]
+    # one clock for the story's beats and the caption's words
+    assert "clock: heardClock," in html
+    # light: opacity/transform only, a reduced-motion rule, no blur
+    css = html[html.index("/* Her words as she says them (owner 27 Oct"):html.index("/* the status pill: what she is doing")]
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    assert ".reply-cap" in css
+    for banned in ("infinite", "backdrop-filter", "blur(", "box-shadow", "will-change"):
+        assert banned not in css, banned
+    for decl in re.findall(r"transition\s*:\s*([^;}]+)", css):
+        assert decl.split()[0] in ("opacity", "transform", "none"), decl
+    reduced = html[html.index("@media (prefers-reduced-motion: reduce) {\n    html.app-shell .reply.fx-pop"):]
+    reduced = reduced[:reduced.index("\n  }\n")]
+    assert "html.app-shell .reply-cap-track { transition: none; }" in reduced
+
+
+def test_a_tap_the_server_drops_falls_back_to_listening():
+    """Review 27 Oct: a tap the server drops (its 1.2 s gap, a stale story id)
+    gets nothing back, and the page stood on "Thinking..." for good."""
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required -- the dropped tap's fallback to listening is NOT being checked")
+    result = subprocess.run([node, "tests/client_tap_fallback.cjs"], cwd=ROOT, capture_output=True,
+                            text=True, encoding="utf-8", timeout=20)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS" in result.stdout
+
+
+_CAPTION_STATE = """() => {
+  const box = document.querySelector('.reply-cap'), sec = document.querySelector('.reply');
+  const shown = box ? Array.from(box.querySelectorAll('.cw.on')) : [];
+  const cs = box ? getComputedStyle(box) : null, r = box ? box.getBoundingClientRect() : null;
+  // lines wholly inside the window (mid-slide, the line leaving and the one
+  // arriving are each partly in it)
+  const tops = new Set(shown.filter(w => { const b = w.getBoundingClientRect();
+    return b.top >= r.top - 2 && b.bottom <= r.bottom + 2; }).map(w => Math.round(w.getBoundingClientRect().top)));
+  return { has: !!box, shown: shown.map(w => w.textContent).join(''),
+           received: document.querySelector('.reply-text').textContent,
+           lines: tops.size, pitch: box ? parseFloat(cs.lineHeight) : 0, height: r ? r.height : 0,
+           font: box ? parseFloat(cs.fontSize) : 0, width: Math.round(sec.getBoundingClientRect().width),
+           below: shown.length ? shown[shown.length - 1].getBoundingClientRect().bottom - r.bottom : 0,
+           slid: !!box && getComputedStyle(box.querySelector('.reply-cap-track')).transform !== 'none',
+           hidden: sec.style.display === 'none' || getComputedStyle(sec).visibility === 'hidden',
+           elapsed: (performance.now() - (window.__t0 || 0)) / 1000 };
+}"""
+
+
+def _answer(text, cps, piece=18, start_ms=300):
+    """Her answer as Gemini sends it: each piece just before its own audio,
+    the audio 4x faster than it plays. Returns (events, when each character
+    of `text` has been said, in seconds after her first audio)."""
+    events, said, send, at = [], [], float(start_ms), 0.0
+    for k in range(0, len(text), piece):
+        p = text[k:k + piece]
+        dur = len(p) / cps
+        chunks = max(1, int(-(-dur // 0.1)))
+        events.append([round(send) - 1, "json", {"type": "assistant_transcript", "text": p}])
+        for _ in range(chunks):
+            events.append([round(send), "audio", {"ms": dur * 1000 / chunks, "amp": 0.09, "seed": len(events)}])
+            send += 100 / 4
+        said += [at + (j + 1) * dur / len(p) for j in range(len(p))]
+        at += dur
+    events.append([round(send + 200), "json", {"type": "turn_complete"}])
+    return sorted(events, key=lambda e: e[0]), said
+
+
+@pytest.fixture(scope="module")
+def _chromium_face():
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        pytest.skip("playwright is not installed -- the motion captions on the real page (the window of "
+                    "lines, in step with her voice) are NOT being checked")
+    from scripts import record_stories as harness
+
+    server = harness._Server({}, ROOT / "client")
+    pw = sync_playwright().start()
+    try:
+        browser = pw.chromium.launch(headless=True, args=[
+            "--autoplay-policy=no-user-gesture-required", "--use-fake-ui-for-media-stream",
+            "--use-fake-device-for-media-stream", "--disable-webgl", "--disable-3d-apis"])
+    except Exception as exc:                               # no Chromium downloaded for playwright
+        pw.stop()
+        server.close()
+        pytest.skip("headless Chromium is not installed (%s) -- the motion captions on the real page are "
+                    "NOT being checked" % str(exc).splitlines()[0])
+    yield browser, server.port, harness.FAKE_SOCKET
+    browser.close()
+    pw.stop()
+    server.close()
+
+
+def _in_a_call(chromium, app=True, cue=False, init=None):
+    browser, port, fake_socket = chromium
+    ctx = browser.new_context(viewport={"width": 1080, "height": 1920}, device_scale_factor=1,
+                              permissions=["microphone"])
+    ctx.add_init_script(fake_socket)
+    if init:
+        ctx.add_init_script(init)
+    page = ctx.new_page()
+    query = [p for p in ("app=1" if app else "", "" if cue else "cue=0") if p]   # the robot's URL has no cue=0
+    page.goto("http://127.0.0.1:%d/preview?%s" % (port, "&".join(query)))
+    page.wait_for_function("() => document.querySelector('.control.mic') && window.EmmaStory")
+    page.wait_for_timeout(1200)                            # /voices + /health
+    page.click(".control.mic")
+    page.wait_for_function("() => !!window.__callWS && window.__callWS.readyState === 1")
+    page.evaluate("""() => window.__emit({type: 'ready', provider: 'gemini', profile: 'condo', voice: 'Kore',
+        input_rate: 16000, output_rate: 24000, half_duplex: true, barge_in: false, hold_speech: false,
+        quick_asks: {brand: 'Embassy World', langs: [], hint: {}, items: []}})""")
+    page.wait_for_timeout(400)
+    return ctx, page
+
+
+_EN = ("We have facilities on three floors. The basement has the spa and the indoor pools. The ground "
+       "floor has the Biogenesis fitness by the pool, a Spinning Class studio, a Pilates Studio, Bungee Gym "
+       "and Yoga, and Junior World for the children. Which floor would you like to see?")
+_TH = ("ในโครงการของเรามีสิ่งอำนวยความสะดวกมากมายถึงสามชั้นค่ะ ชั้นใต้ดินเป็นสปาและสระว่ายน้ำในร่ม "
+       "ชั้น G มีฟิตเนส Biogenesis ริมสระ ห้องปั่นจักรยาน พิลาทิสสตูดิโอ บันจี้ยิมและโยคะ")
+
+
+def _said_up_to(text, said, shown):
+    """When she finished the last character on screen (`shown`, the words
+    without their spaces), and when she finished the next one."""
+    i, n = 0, 0
+    while n < len(shown) and i < len(text):
+        if not text[i].isspace():
+            n += 1
+        i += 1
+    return (said[i - 1] if i else 0.0), (said[i] if i < len(said) else float("inf"))
+
+
+@pytest.mark.timeout(120)
+def test_her_words_come_with_her_voice_in_a_window_of_lines(_chromium_face):
+    ctx, page = _in_a_call(_chromium_face)
+    try:
+        # beside Emma: the bubble, three lines at most
+        events, said = _answer(_EN, 15.0)
+        page.evaluate("(ev) => { window.__t0 = window.__play(ev); }", events)
+        rows, widths = [], set()
+        for _ in range(18):
+            page.wait_for_timeout(500)
+            s = page.evaluate(_CAPTION_STATE)
+            rows.append(s)
+            assert s["has"] and s["font"] >= 20
+            assert s["lines"] <= 3 and s["height"] <= 3 * s["pitch"] + 1, s
+            # her newest word is in the window (at most a line below it, mid-slide)
+            assert s["below"] <= s["pitch"] + 2, s
+            if s["shown"]:
+                widths.add(s["width"])
+                played = s["elapsed"] - 0.3
+                last, nxt = _said_up_to(_EN, said, s["shown"].replace(" ", ""))
+                # never ahead of her voice (but the lead, a tick, the page's own timers) ...
+                assert last <= played + 0.25 + 0.35, (round(played, 2), round(last, 2), s["shown"][-30:])
+                # ... nor far behind it
+                assert nxt >= played - 1.5, (round(played, 2), round(nxt, 2), s["shown"][-30:])
+        # the text came ~4x faster than she speaks: most of it waited for her voice
+        mid = rows[3]
+        assert len(mid["received"]) > 2 * len(mid["shown"]) > 0, (len(mid["received"]), len(mid["shown"]))
+        # it slid: far more than three lines said, three on screen
+        assert len(rows[-1]["shown"]) > 90 and max(r["lines"] for r in rows[-4:]) == 3 and rows[-1]["slid"]
+        # the bubble had its width before the first word: nothing moved sideways
+        assert len(widths) == 1, widths
+        # the guest speaks: the line goes
+        page.evaluate("() => { window.__stop(); window.__emit({type: 'speech_started'}); }")
+        page.wait_for_timeout(300)
+        assert page.evaluate(_CAPTION_STATE)["hidden"]
+        assert page.evaluate("() => document.querySelectorAll('.reply-cap .cw').length") == 0
+
+        # over a card on the stage: the band, two lines, bigger type
+        page.evaluate("""() => window.__emit({type: 'tool_result', name: 'show_unit', result: {screen: 'unit',
+            unit: {room: 'A-801', floor: 8, type: '1 Bedroom', sqm: 34, status: 'available', status_th: 'x'}}})""")
+        events, said = _answer(_TH, 12.5)
+        page.evaluate("(ev) => { window.__t0 = window.__play(ev); }", events)
+        band = []
+        for _ in range(20):
+            page.wait_for_timeout(500)
+            s = page.evaluate(_CAPTION_STATE)
+            band.append(s)
+            assert s["lines"] <= 2 and s["height"] <= 2 * s["pitch"] + 1, s
+            assert s["below"] <= s["pitch"] + 2, s
+        assert page.evaluate("() => document.body.classList.contains('emma-staging')")
+        assert band[-1]["font"] >= 26 and max(r["lines"] for r in band[-4:]) == 2
+        assert band[-1]["slid"]                            # more than two lines said by now
+        assert len(band[-1]["received"].replace(" ", "")) > len(band[-1]["shown"]) > 40
+    finally:
+        ctx.close()
+
+
+@pytest.mark.timeout(120)
+def test_the_desk_preview_still_paints_her_whole_line(_chromium_face):
+    """The motion captions are the robot face's (?app=1); the desk /preview
+    keeps its paragraph exactly as it was."""
+    ctx, page = _in_a_call(_chromium_face, app=False)
+    try:
+        page.evaluate("""() => { window.__emit({type: 'assistant_transcript', text: 'Hello, I am Emma.'});
+                                 window.__audio(300, 0.09, 0); }""")
+        page.wait_for_timeout(300)
+        assert page.evaluate("() => document.querySelector('.reply-cap')") is None
+        assert page.evaluate("() => document.querySelector('.reply-text').textContent") == "Hello, I am Emma."
+        assert page.evaluate("() => getComputedStyle(document.querySelector('.reply')).display") != "none"
+    finally:
+        ctx.close()
+
+
+@pytest.mark.timeout(120)
+@pytest.mark.parametrize("order", ["text_first", "audio_first"])
+def test_a_new_answer_takes_the_line_at_its_own_first_word(_chromium_face, order):
+    """Review 27 Oct: gemini-3.8 completes a turn before its tool call and
+    speaks again after it, so a new answer often begins while the last one's
+    voice is still queued. beginAssistantTurn empties curBot at once: the
+    last answer's words vanished with seconds of her voice still to come,
+    and the new answer -- timed from its chunk's arrival, not its start --
+    stood up whole ~7 s before she said it. Now the old words follow her old
+    voice to its end and the new answer takes the line at its first word."""
+    ctx, page = _in_a_call(_chromium_face)
+    try:
+        first = _EN[:150]
+        a_events, a_said = _answer(first, 15.0)                       # ~10 s of her voice, sent in ~3 s
+        b_text = "Here is the third floor plan for you. "
+        b_events, _ = _answer(b_text, 15.0, start_ms=4500)            # after her "tool call"
+        if order == "audio_first":
+            # her new answer's first sound before its text: beginAssistantTurn
+            # runs from the audio, and paintReply sees an empty curBot
+            b_events = sorted(([e[0] + 60] + e[1:] if e[1] == "json" else e for e in b_events),
+                              key=lambda e: e[0])
+        page.evaluate("(ev) => { window.__t0 = window.__play(ev); }", a_events + b_events)
+        a_end = 0.3 + a_said[-1]                                      # her first answer's voice ends here
+        b_word = a_end + len("Here") / 15.0                          # ...and she has said "Here" here
+        a_flat = first.replace(" ", "")
+        seen_b = False
+        for _ in range(int((b_word + 2.5) / 0.5)):
+            page.wait_for_timeout(500)
+            s = page.evaluate(_CAPTION_STATE)
+            shown = s["shown"].replace(" ", "")
+            if 5.0 < s["elapsed"] < a_end - 0.6:
+                # the new answer has begun (curBot holds it), her old voice still plays
+                assert s["received"].startswith("Here"), s["received"][:30]
+                assert not s["hidden"] and shown and a_flat.startswith(shown), (round(s["elapsed"], 2), s["shown"][-40:])
+            if s["elapsed"] < b_word - 0.6:
+                assert "Here" not in s["shown"], (round(s["elapsed"], 2), s["shown"][-40:])
+            if s["elapsed"] > b_word + 1.0:
+                assert shown.startswith("Here"), (round(s["elapsed"], 2), s["shown"][-40:])
+                seen_b = True
+        assert seen_b
+    finally:
+        ctx.close()
+
+
+# ---- the robot face's turn edges (audit 27 Oct) ----
+#
+# A turn that said nothing, a muted mic when her voice ends, an answer with
+# audio and no words, a story the engine cannot draw: each left the face
+# wrong (the picture gone, "Listening..." over a closed mic, a 10 Hz timer
+# for good, an empty stage nobody owned). The wiring here; the real page in
+# headless Chromium below.
+
+def test_a_finished_answer_with_no_words_stops_the_captions_look():
+    """The hand-over look (an old line still up, a new answer with nothing
+    due yet) re-armed every 100 ms for good when the new answer had audio
+    and no transcript: it never takes the line. Complete, nothing pending on
+    either side: it stops (its next text or turn starts a sync again)."""
+    html = PAGE.read_text(encoding="utf-8")
+    cap = html[html.index("var captions = (function () {"):]
+    cap = cap[:cap.index("\n    })();\n")]
+    hand = cap[cap.index("if (handingOver()) {"):]
+    hand = hand[:hand.index("fresh();")]
+    stop = "if (core.clock.complete && !core.pending() && !drawnFor.pending()) return;"
+    assert hand.index("draw(drawnFor, now, wall);") < hand.index(stop) < hand.index("timer = setTimeout(sync, 100);")
+    # what starts it again: her next answer's text/audio (paint) and turn_complete
+    assert "if (!timer) sync();" in cap and "complete: function () { if (core) { core.complete(); sync(); } }" in cap
+    engine = (ROOT / "client" / "assets" / "emma-story.js").read_text(encoding="utf-8")
+    assert "Caption.prototype.pending = function () {" in engine and "this.clock = new BeatClock([]);" in engine
+
+
+def test_a_story_the_engine_cannot_draw_takes_the_screen_back_in_the_wiring():
+    html = PAGE.read_text(encoding="utf-8")
+    show = html[html.index("function showStory(story) {"):]
+    show = show[:show.index("\n    }\n")]
+    assert "var drawn = window.EmmaStory.play(story, {" in show
+    assert show.rstrip().endswith("if (!drawn) { storyOwns = false; clearStage(); }")
+
+
+_STAGED = "() => document.body.classList.contains('emma-staging')"
+_UNIT_CARD = """() => window.__emit({type: 'tool_result', name: 'show_unit', result: {screen: 'unit',
+    unit: {room: 'A-801', floor: 8, type: '1 Bedroom', sqm: 34, status: 'available', status_th: 'x'}}})"""
+
+
+@pytest.mark.timeout(120)
+def test_a_turn_that_said_nothing_keeps_the_screen(_chromium_face):
+    """The guest speaks over the picture and the turn ends with nothing said:
+    the bare "ค่ะ" the server drops (SILENCE_BARE_ACK), gemini-3.8's empty
+    turn_complete before its tool call. That turn_complete cleared the stage
+    -- the picture the guest was looking at gone, nothing in its place. An
+    answer that did say something still takes it down at its turn_complete."""
+    ctx, page = _in_a_call(_chromium_face)
+    try:
+        page.evaluate(_UNIT_CARD)
+        page.wait_for_timeout(200)
+        assert page.evaluate(_STAGED)
+        page.evaluate("() => window.__emit({type: 'speech_started'})")
+        page.wait_for_timeout(200)
+        page.evaluate("() => window.__emit({type: 'turn_complete'})")       # no audio, no words
+        page.wait_for_timeout(300)
+        assert page.evaluate(_STAGED), "a turn that said nothing cleared the screen"
+        assert page.evaluate("() => document.querySelectorAll('.vp-stage .vp-card').length") == 1
+        # her answer in words, no picture of its own: it owns the screen
+        page.evaluate("() => window.__emit({type: 'speech_started'})")
+        page.wait_for_timeout(200)
+        page.evaluate("() => window.__emit({type: 'assistant_transcript', text: 'Our sales team will confirm it.'})")
+        page.wait_for_timeout(200)
+        page.evaluate("() => window.__emit({type: 'turn_complete'})")
+        page.wait_for_timeout(300)
+        assert not page.evaluate(_STAGED)
+    finally:
+        ctx.close()
+
+
+_CUES = """(() => {
+  // the speak-now cue is the page's only oscillator: two per cue
+  const AC = window.AudioContext || window.webkitAudioContext, make = AC.prototype.createOscillator;
+  window.__cues = 0;
+  AC.prototype.createOscillator = function () { window.__cues++; return make.apply(this, arguments); };
+})();"""
+_PILL = "() => document.querySelector('[data-emma-status]').textContent"
+_STATE_IS = "(s) => document.body.dataset.emmaState === s"
+
+
+@pytest.mark.timeout(120)
+def test_muted_her_answer_ends_on_the_muted_pill_without_the_cue(_chromium_face):
+    """Mute while she speaks: when her voice ended, the pill said
+    "Listening..." and the speak-now chime played, over a closed mic. Now
+    "Muted" and no chime; an interruption while muted rests on "Muted" too.
+    Unmuted, her answer still ends on "Listening..." with the chime."""
+    ctx, page = _in_a_call(_chromium_face, cue=True, init=_CUES)
+    try:
+        page.wait_for_function("() => document.querySelector('.control.mic .control-label').textContent === 'Listening'")
+        events, _ = _answer("We have facilities on three floors, from the spa to the Sky Pool. ", 15.0)
+        page.evaluate("(ev) => window.__play(ev)", events)
+        page.wait_for_timeout(1500)
+        page.click(".control.mic")                                         # muted while she speaks
+        page.wait_for_timeout(300)
+        assert page.evaluate(_PILL) == "Speaking..."
+        page.wait_for_function(_STATE_IS, arg="listening", timeout=15000)  # her voice has ended
+        page.wait_for_timeout(300)
+        assert page.evaluate(_PILL) == "Muted"
+        assert page.evaluate("() => window.__cues") == 0, "the speak-now chime over a muted mic"
+        # interrupted while muted
+        events, _ = _answer("The Sky Pool is on the roof of building A, with a view of the sea. ", 15.0)
+        page.evaluate("(ev) => window.__play(ev)", events)
+        page.wait_for_function(_STATE_IS, arg="speaking", timeout=5000)
+        page.wait_for_timeout(800)
+        page.evaluate("() => { window.__stop(); window.__emit({type: 'interrupted'}); }")
+        page.wait_for_timeout(300)
+        assert page.evaluate(_STATE_IS, "listening") and page.evaluate(_PILL) == "Muted"
+        # unmuted: the cue and "Listening..." as before
+        page.click(".control.mic")
+        page.wait_for_timeout(300)
+        assert page.evaluate(_PILL) == "Listening..."
+        events, _ = _answer("It is open every day. ", 15.0)
+        page.evaluate("(ev) => window.__play(ev)", events)
+        page.wait_for_function(_STATE_IS, arg="speaking", timeout=5000)
+        page.wait_for_function(_STATE_IS, arg="listening", timeout=10000)
+        page.wait_for_timeout(300)
+        assert page.evaluate(_PILL) == "Listening..."
+        assert page.evaluate("() => window.__cues") == 2
+    finally:
+        ctx.close()
+
+
+_LOOKS = """(() => {
+  // once an answer is done, the caption's look is the page's only 100 ms timer
+  const set = window.setTimeout;
+  window.__looks = 0;
+  window.setTimeout = function (fn, ms) { if (ms === 100) window.__looks++; return set.apply(this, arguments); };
+})();"""
+
+
+@pytest.mark.timeout(120)
+@pytest.mark.parametrize("words", [False, True], ids=["audio_no_words", "with_words"])
+def test_after_an_answer_the_captions_stop_looking(_chromium_face, words):
+    """An answer with words, then one with audio and no transcript at all:
+    the second never takes the line, and the caption's 10 Hz look re-armed
+    for good (97 looks in 10 s, audit 27 Oct) on a face that must stay light.
+    It stops once that answer is complete; the first answer's words stay up.
+    With words, the second answer takes the line and the look stops too."""
+    ctx, page = _in_a_call(_chromium_face, init=_LOOKS)
+    try:
+        first = "Sure, let me check the floor plan for you. "
+        events, said = _answer(first, 15.0)
+        page.evaluate("(ev) => window.__play(ev)", events)
+        page.wait_for_timeout(int((0.3 + said[-1]) * 1000) + 1300)
+        events, _ = _answer("Here is the plan. ", 15.0, start_ms=0)
+        if not words:
+            events = [e for e in events if not (e[1] == "json" and e[2]["type"] == "assistant_transcript")]
+        page.evaluate("(ev) => window.__play(ev)", events)
+        page.wait_for_timeout(3500)                                        # said and complete
+        looks = page.evaluate("() => window.__looks")
+        page.wait_for_timeout(5000)
+        assert page.evaluate("() => window.__looks") - looks == 0
+        shown = page.evaluate("() => Array.from(document.querySelectorAll('.reply-cap .cw.on'))"
+                              ".map(w => w.textContent).join(' ')")
+        assert shown == ("Here is the plan." if words else first.strip())
+    finally:
+        ctx.close()
+
+
+@pytest.mark.timeout(120)
+def test_a_story_the_engine_cannot_draw_gives_the_screen_back(_chromium_face):
+    """EmmaStory.play returns false when it draws nothing -- an unknown
+    template; a template that throws on a malformed payload (a null row,
+    audit 27 Oct). showStory opened the stage first and ignored it: an empty
+    stage under the close button nobody owned, and the story's claim on the
+    answer kept the answer's picture off."""
+    ctx, page = _in_a_call(_chromium_face)
+    try:
+        page.evaluate("() => window.__emit({type: 'speech_started'})")
+        page.evaluate("""() => window.__emit({type: 'tool_result', name: 'present_story', result: {ok: true,
+            screen: 'story', topic: 'x', story: {id: 'x', template: 'no_such_template', params: {}}}})""")
+        page.wait_for_timeout(300)
+        assert page.evaluate("""() => ({staged: document.body.classList.contains('emma-staging'),
+            story: document.body.classList.contains('emma-story'),
+            inner: (document.querySelector('.vp-stage-inner') || {}).childElementCount || 0})""") == {
+            "staged": False, "story": False, "inner": 0}
+        # the same answer's picture is not kept off by a story that never drew
+        page.evaluate("""() => window.__emit({type: 'tool_result', name: 'search_condo_info', result: {found: true},
+            slide: {url: '/slides/none.png', title_en: 'Sky Pool'}})""")
+        page.wait_for_timeout(200)
+        assert page.evaluate(_STAGED)
+        assert page.evaluate("() => document.querySelectorAll('.vp-stage-inner img').length") == 1
+    finally:
+        ctx.close()
+
+
+@pytest.mark.parametrize("script", ["client_audio_start.cjs", "client_voice_lifecycle.cjs"])
+def test_the_desk_pages_audio_start_and_lifecycle_checks_pass_in_node(script):
+    """These two ran only as CI steps, and went red when startMic() and
+    startWakeMode() began opening the mic through openPreferredMic() (and
+    reporting through micDenied()) without anybody noticing (audit 27 Oct).
+    Run here too, so a stale slice fails the suite on every machine."""
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required -- %s (the desk page's first greeting before the mic / its socket and "
+                    "wake-mic lifecycle) is NOT being checked" % script)
+    result = subprocess.run([node, "tests/" + script], cwd=ROOT, capture_output=True, text=True,
+                            encoding="utf-8", timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS" in result.stdout

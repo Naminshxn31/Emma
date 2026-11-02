@@ -24,7 +24,7 @@
         android:allowBackup="false"
         android:hardwareAccelerated="true"
         android:icon="@drawable/ic_controller"
-        android:label="Emma Robot"
+        android:label="@string/app_label"
         android:networkSecurityConfig="${networkSecurityConfig}"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"

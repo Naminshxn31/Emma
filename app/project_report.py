@@ -54,6 +54,17 @@ POOL = 40
 
 #: A line with money in it: room prices are the one thing that stays closed.
 _MONEY = re.compile(r"บาท|ล้าน|THB|฿|baht|million|ราคา\S*\s*\d|price", re.IGNORECASE)
+#: ...and a price said without a figure, and the sales board (audit 27 Oct:
+#: "ห้องฝั่งสวนสาธารณะอยู่ตึกไหน" was answered with which buildings cost more,
+#: "How many units are sold?" with the 30 Sep sold/available count -- the
+#: owner: room prices stay closed, and never the rooms left, 12 Oct). Its
+#: "ขายไปแล้วประมาณหนึ่งในสาม" came back in the live check of that fix: the
+#: "should I hurry" answer says it with ไป. "ขายหมด" stays: the shops sold out
+#: sits on the line that counts the 1,066 units, and the developer's sold-out
+#: projects are his record, not this board.
+_PRICE_TALK = re.compile(r"ราคา(?:สูง|ต่ำ|แพง|ถูก|ไม่แพง)|แพงกว่า|ถูกกว่า|more expensive|cheaper|"
+                         r"ขาย(?:ไป)?แล้ว|ขาย\s*\**\s*\d+\s*\**\s*ว่าง|ยังว่าง|ว่าง\s*\**\s*\d+\s*\**\s*(?:ห้อง|ยูนิต)|\d[\d,]*\**\s+(?:units?\s+)?sold|available out of",
+                         re.IGNORECASE)
 
 _lock = threading.Lock()
 _index: dict | None = None
@@ -84,6 +95,17 @@ def approved(manifest: dict | None) -> bool:
 
 
 _HEADING = re.compile(r"\s{0,3}(#{1,6})\s")
+#: The old two-bedroom balcony (owner 28 Oct: cut the "2.8–3.8 m" lines --
+#: 23.5, from his 22 Oct review, has the balcony read off the architect's
+#: plans; the robot said "3.8 m" on 15 and 27 Oct). deny_terms cut the lines
+#: that are only the balcony. Two lines carry it inside the two-bedroom
+#: answer (148 units, sizes, buildings): cut whole, "How big is a two
+#: bedroom unit?" lost its answer and the passage search handed back the
+#: one-bedroom one (measured 28 Oct) -- so there the clause goes, the rest
+#: stays. Runs before the deny check, so those two lines no longer match it.
+_OLD_BALCONY = re.compile(
+    r"\s*(?:และ)?ระเบียง(?:ยาว|กว้าง)ประมาณ\s*2\.8\s*[–-]\s*3\.8\s*เมตร"
+    r"(?:\s*กว้างประมาณ\s*1\.37\s*[–-]\s*1\.40\s*เมตร)?(?:\s*\(ตามบทที่ 14:[^)]*\))?")
 
 
 def clean(text: str, deny_terms: list[str], state: dict | None = None) -> str:
@@ -102,6 +124,7 @@ def clean(text: str, deny_terms: list[str], state: dict | None = None) -> str:
     state = state if state is not None else {}
     keep = []
     for line in text.splitlines():
+        line = _OLD_BALCONY.sub("", line)
         heading = _HEADING.match(line)
         level = len(heading.group(1)) if heading else 0
         denied = any(term and term.lower() in line.lower() for term in deny_terms)
@@ -114,7 +137,7 @@ def clean(text: str, deny_terms: list[str], state: dict | None = None) -> str:
             if level:
                 state["skip_level"] = level
             continue
-        if _MONEY.search(line):
+        if _MONEY.search(line) or _PRICE_TALK.search(line):
             continue
         keep.append(line)
     # Owner 12 Oct: never "ไม่มีข้อมูล" to a guest. The report says it about
@@ -439,6 +462,24 @@ _THAI_CHAR = re.compile(r"[\u0e00-\u0e7f]")
 #: to "okay" (robot 20 Oct).
 _FAQ_FILLERS = frozenset({"okay", "ok", "so", "well", "um", "uh", "hmm", "let", "let's", "lets",
                           "actually", "just"})
+#: The room types a question names. Two FAQ questions about different types
+#: sit a word apart ("How big is a one bedroom unit?" / "... two bedroom
+#: unit?") and their meaning scores alike -- 28 Oct: once the old balcony
+#: line took the two-bedroom answer out (deny_terms), the two-bedroom question
+#: matched the ONE-bedroom answer. A FAQ question naming types the guest's
+#: question does not name is not its answer; either side naming none, or one
+#: in common, the rest of the matcher decides as before.
+_UNIT_TYPES = (
+    ("studio", re.compile(r"studio|สตูดิโอ", re.IGNORECASE)),
+    ("1br", re.compile(r"\b(?:one|1)[\s-]*bed(?:room)?s?\b|\b1\s*br\b|1\s*ห้องนอน|หนึ่งห้องนอน|ห้องนอนเดียว",
+                       re.IGNORECASE)),
+    ("2br", re.compile(r"\b(?:two|2)[\s-]*bed(?:room)?s?\b|\b2\s*br\b|2\s*ห้องนอน|สองห้องนอน", re.IGNORECASE)),
+    ("3br", re.compile(r"\b(?:three|3)[\s-]*bed(?:room)?s?\b|3\s*ห้องนอน|สามห้องนอน", re.IGNORECASE)),
+)
+
+
+def _unit_types(text: str) -> frozenset:
+    return frozenset(name for name, pattern in _UNIT_TYPES if pattern.search(text or ""))
 
 
 def _faq_hits(index: dict, query: str, manifest: dict) -> list[dict]:
@@ -481,10 +522,15 @@ def _faq_hits(index: dict, query: str, manifest: dict) -> list[dict]:
     # the English meaning in the mix "ภาพ facility ใต้ดินเป็นของจริงไหม" took
     # the ground-floor answer (measured 20 Oct over 876 questions).
     thai = bool(_THAI_CHAR.search(query or ""))
+    asked_types = _unit_types(query)
     groups: dict[str, list[int]] = {}
     for i, f in enumerate(faq):
         if thai and f.get("alias"):
             continue
+        if asked_types:
+            named = _unit_types(f["q"])
+            if named and not (named & asked_types):
+                continue
         groups.setdefault(f["a"], []).append(i)
     scored = []
     for members in groups.values():

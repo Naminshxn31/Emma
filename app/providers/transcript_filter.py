@@ -36,6 +36,21 @@ _PARTIAL_MARKER_RE = re.compile(
 )
 
 
+#: Non-speech markup in the transcript of her speech: robot 27 Oct 17:21,
+#: after a story she "said" "<no speech>{pause}" (split "<no " / "speech>
+#: {pause}") over a moment of silent audio -- shown on the screen as her
+#: line. Eval outputs carried "</em>". Speech transcribed has no angle or
+#: curly brackets in any language this robot speaks; a tag is letters only.
+#: At most three words, the first right after the bracket: a stray "<" or "{"
+#: before a sentence ("The lobby <" + "is on the ground floor") is no tag,
+#: and was held to the turn's end and dropped with the words after it
+#: (review 27 Oct).
+_TAG_WORDS = r"[A-Za-z][A-Za-z_-]*(?: [A-Za-z_-]+){0,2}"
+_TAG_RE = re.compile(r"</?%s>|\{%s\}" % (_TAG_WORDS, _TAG_WORDS))
+#: The opening of a tag still arriving at the end of the buffer.
+_PARTIAL_TAG_RE = re.compile(r"(?:</?(?:%s ?)?|\{(?:%s ?)?)\Z" % (_TAG_WORDS, _TAG_WORDS))
+
+
 def _held_suffix_len(buf: str) -> int:
     """How many trailing chars could still become a marker, so must wait."""
     for marker in MARKERS:
@@ -115,7 +130,7 @@ class TranscriptFilter:
         self._buf = ""
 
     def feed(self, delta: str) -> str:
-        self._buf += delta
+        self._buf = _TAG_RE.sub("", self._buf + delta)
         out_parts: list[str] = []
 
         while True:
@@ -131,6 +146,13 @@ class TranscriptFilter:
         if partial:
             out_parts.append(self._buf[: partial.start()])
             self._buf = self._buf[partial.start():]
+            return "".join(out_parts)
+
+        # A tag whose closing bracket has not arrived yet: keep waiting.
+        tag = _PARTIAL_TAG_RE.search(self._buf)
+        if tag:
+            out_parts.append(self._buf[: tag.start()])
+            self._buf = self._buf[tag.start():]
             return "".join(out_parts)
 
         hold = _held_suffix_len(self._buf)
@@ -151,7 +173,8 @@ class TranscriptFilter:
 
     def flush(self) -> str:
         """End of turn: release anything held back, minus dangling markers."""
-        remaining = _PARTIAL_MARKER_RE.sub("", self._buf)
+        # a tag that never closed is markup too ("<no speech" at the turn's end)
+        remaining = _PARTIAL_TAG_RE.sub("", _PARTIAL_MARKER_RE.sub("", self._buf))
         if len(remaining) >= self._FRAGMENT_IS_MARKER_AT:
             for marker in MARKERS:
                 if marker.startswith(remaining):
@@ -233,3 +256,134 @@ class BareAckGate:
         if text in BARE_ACKS:
             return [], True
         return held, False
+
+
+# ---- a reply to noise (owner 29 Oct) -------------------------------------------
+#
+# "บางทีหุ่นพูดเองเหมือนจะได้ยินเสียงใกล้แล้วมาตีความเอง อะไรที่ฟังไม่ชัดก็ไม่ต้องตอบ
+# ให้คิดว่าเป็น noise แต่ถ้าเสียงดังอยู่ใกล้ แต่ฟังไม่ทันก็บอกหรือถามใหม่ ... ส่วนเสียงที่ไกล
+# หรือฟังไม่ชัดก็ข้ามไป". Prompt rule 3 asks her to have ANY sound she could not
+# make out said again, so a cough or a far word through the gate got a sentence.
+# Robot logs 9-27 Oct: 610 segments let through, 184 answered; 18 answers to a
+# segment the recogniser made 0-4 letters of. Those without a tool call and
+# quieter than a voice at the robot (open rms < 0.06) were noise answered --
+# "ดิฉันพร้อมให้ข้อมูล...", a Chinese refusal, "เช้า in English is morning"
+# for "อ่ะ"; the loud ones (0.08: a show_unit, a story) and the ones that
+# called a tool ("by?" -> hospitals) were questions whose caption came out
+# short. So the server decides, by what it knows and the model does not:
+# quiet + nothing heard + no tool = not played; loud and unclear still gets
+# rule 3's "please say it again".
+
+def _letters(text: str) -> int:
+    """Letters of a caption, Thai vowel and tone marks included (they are not
+    `isalpha`: "ครับ" is 4, the way the logs were measured)."""
+    return sum(1 for c in text or "" if c.isalpha() or "฀" <= c <= "๿")
+
+#: Letters of caption a guest's words make at the least ("ครับ" is 4).
+NOISE_MAX_LETTERS = 4
+#: ...but her name is never noise, however short and quiet ("Emma" is 4), nor
+#: a guest saying they missed what SHE said (replay 15 Oct: "What?" at 0.053;
+#: 28 Oct: "ห้ะ" at 0.047).
+_HER_NAME = re.compile(r"emma|เอ็มม่า|เอมม่า|เอ็มมา|อิมม่า|เอ็มอา"
+                       r"|\b(what|pardon|sorry|huh|again)\b|อะไร|ห้ะ|หะ|什么|что", re.IGNORECASE)
+#: The transcript of the guest's words lands before her first audio in 429 of
+#: 437 replies (robot logs 9-27 Oct); for the rest she waits this long for it.
+NOISE_HOLD_BYTES = int(24000 * 2 * 0.8)
+
+
+class NoiseReplyGate:
+    """Keep her answer to a quiet sound nobody could make out off the speaker
+    and the screen (module comment above). Off when `near_rms` is 0.
+
+    The guest's side since her last reply is one "heard" (a question in two
+    segments is one question): the loudest segment's opening rms, the
+    caption so far, and whether a tool was called for it. Her reply is
+    decided at its first event -- usually with the caption already in --
+    held at most NOISE_HOLD_BYTES of audio while the caption is still empty.
+    A reply to a server text or a tap (`text_turn`) is never judged."""
+
+    def __init__(self, near_rms: float) -> None:
+        self.near = float(near_rms or 0.0)
+        self._heard: dict | None = None
+        self.reset()
+
+    @property
+    def enabled(self) -> bool:
+        return self.near > 0.0
+
+    def reset(self) -> None:
+        """A turn's output state (a new turn, or one cut off)."""
+        self._held: list = []
+        self._bytes = 0
+        self._state: str | None = None        # None: undecided, "pass", "drop"
+        self._output = False
+
+    def segment(self, rms) -> None:
+        """A voice segment opened (VAD start) at this rms. Over her reply as
+        it streams, it starts a new "heard" (what she was saying is answered);
+        before her reply, it joins the one waiting -- a tap's or a tool's
+        reply stays theirs (replay 15 Oct: a tapped story's first words came
+        just after a 0.023 sound, which used to own the story)."""
+        rms = float(rms) if isinstance(rms, (int, float)) else None
+        if self._heard is None or self._output:
+            self._heard = {"rms": rms, "text": "", "tool": False, "server": False}
+        elif rms is not None:
+            prior = self._heard["rms"]
+            self._heard["rms"] = rms if prior is None else max(prior, rms)
+
+    def heard(self, text: str) -> None:
+        if self._heard is not None and text:
+            self._heard["text"] += text
+
+    def tool_call(self) -> None:
+        """She called a tool: her reply answers its result, never noise."""
+        if self._heard is None:
+            self._heard = {"rms": None, "text": "", "tool": True, "server": False}
+        else:
+            self._heard["tool"] = True
+
+    def text_turn(self) -> None:
+        """The server or a tap spoke last: her next reply answers that."""
+        self._heard = {"rms": None, "text": "", "tool": False, "server": True}
+
+    def _verdict(self, final: bool) -> str | None:
+        h = self._heard
+        if (not self.enabled or h is None or h["server"] or h["tool"] or h["rms"] is None
+                or h["rms"] >= self.near):
+            return "pass"
+        if _letters(h["text"]) > NOISE_MAX_LETTERS or _HER_NAME.search(h["text"]):
+            return "pass"           # words enough, or somebody calling her by name
+        if final or self._bytes >= NOISE_HOLD_BYTES:
+            return "drop"
+        return None
+
+    def push(self, event) -> list:
+        """An output event (assistant_transcript or audio) -> what to send now."""
+        self._output = True
+        if self._state == "pass":
+            return [event]
+        if self._state == "drop":
+            return []
+        self._held.append(event)
+        if event.kind == "audio":
+            self._bytes += len(event.audio or b"")
+        verdict = self._verdict(False)
+        if verdict is None:
+            return []
+        self._state = verdict
+        out, self._held = self._held, []
+        return out if verdict == "pass" else []
+
+    def close(self) -> tuple[list, dict | None]:
+        """turn_complete: (events still owed, the dropped reply's facts or
+        None). A turn that said something uses up what was heard; an empty
+        one (3.8 completes before its tool call) leaves it for the reply."""
+        state = self._state or (self._verdict(True) if self._output else "pass")
+        held, heard, output = self._held, self._heard, self._output
+        self.reset()
+        if output:
+            self._heard = None
+        if state == "drop" and output:
+            return [], {"rms": None if heard is None else heard["rms"],
+                        "letters": 0 if heard is None else _letters(heard["text"])}
+        return held, None

@@ -284,6 +284,12 @@ class Settings:
     #: name and address both of them by it; a greeting without a name is
     #: never wrong. Off = the nearest face is named regardless (old behaviour).
     face_name_when_alone: bool = _get_bool("FACE_NAME_WHEN_ALONE", True)
+    #: Two or more usable faces in the frame that decides the greeting (the
+    #: company bar above: a face at least 60% the size of the nearest) = ONE
+    #: greeting to everybody, never a name (owner 2 Nov 2026: "หากมีคนยืน
+    #: ล้อมรอบเยอะ หุ่นยนต์ควรสามารถทักทายรวมๆ ได้" -- docs/emma-multi-person-
+    #: 2026-11-02.md). Off = the greeting is chosen exactly as before.
+    face_group_greeting: bool = _get_bool("FACE_GROUP_GREETING", False)
     #: Require a consent record (data/faces/people.json) before naming
     #: anybody. Off by default because the staff portraits in staff.csv
     #: have no such record — the people in them never enrolled themselves
@@ -923,6 +929,29 @@ class Settings:
     # robot turns it on in robot.env. Evidence: `reply_stall` rows.
     reply_stall_s: float = float(os.getenv("REPLY_STALL_S", "0"))
     reply_stall_reconnect_s: float = float(os.getenv("REPLY_STALL_RECONNECT_S", "8"))
+    # --- A bad network: the dial's own ceiling (26 Oct 2026, robustness) -------
+    # Seconds the whole Gemini Live dial may take -- DNS, TCP, TLS, the upgrade
+    # AND the SDK's wait for the setup reply -- before it fails as a network
+    # fault (app/providers/gemini.py `_enter_within`). Every dial: the first,
+    # the model fallback, a resume, a fresh session, the stall cut-over. Before
+    # this the only ceilings were websockets' open_timeout (10 s, measured;
+    # robot_dns adds 2 s per blackholed resolver) and, after the upgrade,
+    # keepalive (~40 s, computed) -- a face saying "Connecting..." for most of
+    # a minute. Robot connects measured 9-20 Oct: p50 1 s, p99 7.4 s, slowest
+    # 10 s (first connect of the day p50 6 s), so a ceiling must sit above
+    # 10 s. 0 = off, the default: the sales room's PC dials exactly as before.
+    connect_timeout_s: float = float(os.getenv("CONNECT_TIMEOUT_S", "0"))
+    #: How much conversation each turn re-sends (Live API context window
+    #: compression). 0 = the API default: compress at 80% of the model's
+    #: context window -- on the robot 20 Oct a 23-minute call grew to 85,000
+    #: prompt tokens a turn against this key's free-tier 65,000 tokens per
+    #: MINUTE (AI Studio, 27 Oct: "Gemini 3.8 Live 65.37K / 65K"), and both
+    #: 1011 drops that day came at the two context peaks. Older turns are
+    #: dropped first; system instructions always stay (API reference). The
+    #: target is what is kept after compressing (0 = trigger/2). Tokens, both
+    #: (no "TOKEN" in the names: robot.env's secret check empties those).
+    live_context_compress_at: int = int(os.getenv("LIVE_CONTEXT_COMPRESS_AT", "0") or 0)
+    live_context_keep: int = int(os.getenv("LIVE_CONTEXT_KEEP", "0") or 0)
     # A reply that is only "ค่ะ" is not played or shown (owner 15 Oct: talk not
     # meant for Emma gets silence -- 24 of 142 robot turns 12-14 Oct were a bare
     # "ค่ะ"; the prompt cannot ask for silence, 3.8 speaks the stage direction).
@@ -930,6 +959,14 @@ class Settings:
     # provider drops that turn (transcript_filter.BareAckGate). Off by default:
     # the sales room's PC unchanged; the robot turns it on in robot.env.
     silence_bare_ack: bool = _get_bool("SILENCE_BARE_ACK", False)
+    # Her reply to a sound nobody could make out is not played or shown (owner
+    # 29 Oct: "อะไรที่ฟังไม่ชัดก็ไม่ต้องตอบ ให้คิดว่าเป็น noise แต่ถ้าเสียงดังอยู่ใกล้
+    # แต่ฟังไม่ทันก็บอกหรือถามใหม่"): the guest's side since her last reply opened
+    # quieter than this rms, made at most 4 letters of caption (not her name,
+    # not "what?"), and called no tool -> dropped (transcript_filter.NoiseReplyGate).
+    # Louder than this, prompt rule 3's "please say it again" stands. 0 = off
+    # (the sales room's PC unchanged); robot.env sets it.
+    noise_reply_near_rms: float = float(os.getenv("NOISE_REPLY_NEAR_RMS", "0") or 0)
     # Every tool result carries the conversation's language, kept by the server
     # from what the guest said (app/talk_lang.py) -- robot log 19 Oct: an English
     # talk went German on one accented line and Thai on a "yeah" heard as "ใช่".
@@ -1018,6 +1055,56 @@ class Settings:
     # check (localhost-only development). The roadmap gated LAN exposure on
     # exactly this, and the gallery/home machines crossed that line today.
     ws_token: str = os.getenv("WS_TOKEN", "")
+    # The room screen's copy of the robot face (owner 28 Oct: "ให้จอห้องนั้น
+    # โชว์ตัวหน้าเหมือนในจอหุ่นเลย", app/face_mirror.py): a SECOND listener,
+    # plain http on MIRROR_HOST:MIRROR_PORT, serving only the face page in
+    # view-only mode and its read-only socket. The robot's own server stays
+    # on 127.0.0.1 (robot_server.py). 0 = no listener (default: the sales room
+    # and every PC unchanged). Never starts without MIRROR_TOKEN.
+    mirror_port: int = int(os.getenv("MIRROR_PORT", "0") or 0)
+    mirror_host: str = os.getenv("MIRROR_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    mirror_token: str = _get_token("MIRROR_TOKEN")
+    # The robot puts that page up on a room's screen itself (app/room_screens.py,
+    # owner 28 Oct: "สั่งให้เปิดจอก็ให้หุ่นเชื่อมจอเลย" / near the screen = on):
+    # the `room_screen` tool (group `screens`, opt-in, robot face only) and the
+    # proximity watcher. Off = nothing reaches any room PC. The file is
+    # gitignored (each room PC's key); the robot's copy is pushed by
+    # `robot_server.py secrets`. Sound on the room screen stays off: the robot
+    # speaks in the same room and its microphone would hear itself.
+    room_screens_enabled: bool = _get_bool("ROOM_SCREENS_ENABLED", False)
+    room_screens_file: str = os.getenv("ROOM_SCREENS_FILE", "data/room-screens.json").strip()
+    room_screen_sound: bool = _get_bool("ROOM_SCREEN_SOUND", False)
+    # Emma as the host of an event (owner 30 Oct: "ให้ emma เป็น host งานคอยรับแขก
+    # ในวันงานอีเว้น ... เชิญลูกค้า แล้วพาไปยังจุดต่างๆ และคอยไปทักทายคนต่างๆที่โต๊ะ"
+    # -- 25-26 Nov, office floor 1; app/event_host.py). A separate robot app
+    # ("Emma Event") opens the face with event=1 = profile `event`; staff switch
+    # its scenes from a phone page on a THIRD listener, plain http on
+    # EVENT_CONTROL_HOST:EVENT_CONTROL_PORT, behind EVENT_CONTROL_KEY (its own
+    # key: the phone never holds WS_TOKEN). 0 = no listener (default: every
+    # machine unchanged). Never starts without the key.
+    event_file: str = os.getenv("EVENT_FILE", "data/events/floor1_event.json").strip()
+    event_control_port: int = int(os.getenv("EVENT_CONTROL_PORT", "0") or 0)
+    event_control_host: str = os.getenv("EVENT_CONTROL_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    event_control_key: str = _get_token("EVENT_CONTROL_KEY")
+    # Walking from the phone page (app/event_walk.py runs scripts/board_walk.py
+    # on the robot). A second key on purpose: the scenes (what Emma says) can
+    # be tried while the robot is off its spot -- 29 Oct: "อย่าเดินนะ ตอนนี้
+    # หุ่นไม่ได้อยู่ที่ตำแหน่ง". Off = a scene with a spot only says so.
+    event_walk_enabled: bool = _get_bool("EVENT_WALK_ENABLED", False)
+    # The staff page is the walk's dead man's switch: it polls every second,
+    # and a walk with no poll for this long is stopped (a phone locked, its
+    # Wi-Fi gone in the multimedia room -- CLAUDE.md "จุดอับ").
+    event_walk_heartbeat_s: float = float(os.getenv("EVENT_WALK_HEARTBEAT_S", "5") or 5)
+    # Pictures of every walk (app/walk_frames.py; owner 31 Oct: "ลองให้เดินแล้วดู
+    # ภาพประกอบด้วยจะได้ประเมินถูก"): while the robot walks, the head camera's
+    # newest frame + the board's pose and lidar every WALK_FRAMES_EVERY_S, to
+    # data/robot/walk-frames/<run>/ on the robot. People walk through these
+    # pictures: kept WALK_FRAMES_KEEP_DAYS, never committed (data/robot/ is
+    # gitignored), capped at WALK_FRAMES_MAX_MB. Off = nothing written.
+    walk_frames: bool = _get_bool("WALK_FRAMES", False)
+    walk_frames_every_s: float = float(os.getenv("WALK_FRAMES_EVERY_S", "1.0") or 1.0)
+    walk_frames_keep_days: int = int(os.getenv("WALK_FRAMES_KEEP_DAYS", "7") or 7)
+    walk_frames_max_mb: int = int(os.getenv("WALK_FRAMES_MAX_MB", "400") or 400)
 
 
     # --- Provider selection ---
@@ -1066,6 +1153,12 @@ class Settings:
     # pauses and hurts quality; longer just feels sluggish.
     vad_silence_ms: int = int(os.getenv("VAD_SILENCE_MS", "500"))
     vad_prefix_padding_ms: int = int(os.getenv("VAD_PREFIX_PADDING_MS", "300"))
+    # Local Silero only: extra head kept while the detector hears speech that
+    # the loudness floor or listening focus has not let through yet, so a
+    # sentence they admit mid-way arrives whole (app/vad_gate.py; robot log
+    # 28 Oct: in the media room a first sentence reached the model as its last word).
+    # 0 = the old pre-roll exactly (the sales-room PC); robot.env sets 1500.
+    vad_head_hold_ms: int = int(os.getenv("VAD_HEAD_HOLD_MS", "0"))
     # Local Silero only: reject clicks/bumps that resemble speech for one or
     # two frames. Pre-roll preserves the beginning while the detector waits.
     vad_min_speech_ms: int = int(os.getenv("VAD_MIN_SPEECH_MS", "250"))
@@ -1202,6 +1295,12 @@ class Settings:
     #: voice ended (greeting or answer) is the guest's reply -- turn-taking
     #: needs no camera. 0 = off. focus.her_turn_ended has the measurement.
     focus_reply_window_s: float = float(os.getenv("FOCUS_REPLY_WINDOW_S", "0"))
+    #: Fourth: while the robot stands at a room's big screen (room_screens.
+    #: at_screen -- owner 29 Oct "ผ่อน 'ต้องเห็นหน้า' ตอนหุ่นอยู่หน้าจอใหญ่"),
+    #: a voice this loud opens without a face, and the call is not hung up or
+    #: denied its follow-up for want of one (focus.at_big_screen). 0 = off =
+    #: today's rules everywhere (the sales-room PC); robot.env sets it.
+    focus_screen_rms: float = float(os.getenv("FOCUS_SCREEN_RMS", "0"))
     #: A camera-summoned call is deaf until its greeting is heard, or this
     #: long if no greeting comes (the face was lost before it was judged).
     #: 13 Oct robot logs: ears opened 9-10 s after the dial on call after
@@ -1249,6 +1348,56 @@ class Settings:
     #: Furhat's attention cue: the robot face's mascot turns its head toward
     #: whoever is speaking (focus.attention), over the call's own socket.
     focus_attention: bool = _get_bool("FOCUS_ATTENTION", False)
+    #: Two or more engaged faces and nobody's mouth or voice direction says who
+    #: speaks: the attention cue (the mascot's eyes, and the real head with
+    #: HEAD_FOLLOW) visits each face in turn, this many seconds each, left to
+    #: right -- owner 2 Nov 2026: "ใช้การสบตาหรือหันหน้าไปหาทีละคน". Whoever
+    #: speaks still wins at once. 0 = off: the nearest face, as before.
+    focus_gaze_visit_s: float = float(os.getenv("FOCUS_GAZE_VISIT_S", "0") or 0)
+    # The robot's REAL head follows the same cue (app/head_follow.py; owner
+    # 31 Oct: "เวลาคุยอยากให้หุ่นลองหมุนหัวเพื่อหันหน้าไปคุยกับคน ... ก้มหน้าหรือ
+    # ขึ้นลง เพื่อจับหน้าคน"). The server says where to look as a PERCENT of the
+    # app's own head span (ch7 turn / ch8 tilt, its pulses and hard clamps are
+    # the app's -- HeadLook.java); it never holds a pulse. Off by default, and
+    # the app's "สั่งท่าทางด้วยเสียง" switch must be on too.
+    head_follow: bool = _get_bool("HEAD_FOLLOW", False)
+    #: Degrees the head turns / tilts at 100% -- UNMEASURED (assumes ~10 us per
+    #: degree over the app's +-200 us). Read it on the bench: the face's bearing
+    #: shift after a look, divided into the percent sent (`head_look` rows).
+    head_pan_full_deg: float = float(os.getenv("HEAD_PAN_FULL_DEG", "20") or 20)
+    head_tilt_full_deg: float = float(os.getenv("HEAD_TILT_FULL_DEG", "20") or 20)
+    #: Measure those two (and their SIGN) on the robot itself before following
+    #: anybody: the first call with no data/robot/head_calibration.json sweeps
+    #: the head left/right/down and reads how far the head camera's picture
+    #: slid (app/head_follow.py). On by default -- a loop whose direction was
+    #: never seen turns AWAY from a guest (neither ch7's sign nor the camera's
+    #: mirroring has been checked on the robot). false = trust the two numbers above.
+    head_calibrate: bool = _get_bool("HEAD_CALIBRATE", True)
+    #: The lidar's people for the head (app/lidar_people.py; owner 31 Oct
+    #: "เช็คเรดาห์ เลเซอร์ และภาพประกอบกัน"): where somebody stands round the
+    #: base, for a voice with no face in view (turn toward them, not just look
+    #: down), and paired with the camera's faces to measure the camera in the
+    #: lidar's true degrees. Reads the board's scan only, and only while
+    #: HEAD_FOLLOW is on too; it steers the head only once its pairs agree.
+    lidar_people: bool = _get_bool("LIDAR_PEOPLE", False)
+    lidar_people_every_s: float = float(os.getenv("LIDAR_PEOPLE_EVERY_S", "0.5") or 0.5)
+    #: How far of that span the server may use, percent: the runtime range,
+    #: inside the app's hard one. Small to start (the bench widens it).
+    head_pan_max: int = int(os.getenv("HEAD_PAN_MAX", "60") or 60)
+    head_tilt_down_max: int = int(os.getenv("HEAD_TILT_DOWN_MAX", "40") or 40)
+    head_tilt_up_max: int = int(os.getenv("HEAD_TILT_UP_MAX", "20") or 20)
+    #: A voice AT the robot (rms >= HEAD_SEARCH_RMS) with no face in view: tilt
+    #: down this much (percent) to find a guest under the camera -- 12-13 Oct,
+    #: 983 of 983 "no face in front" had no face at all while people stood at
+    #: the chest screen. 0 = no search.
+    head_search_tilt: int = int(os.getenv("HEAD_SEARCH_TILT", "30") or 0)
+    head_search_rms: float = float(os.getenv("HEAD_SEARCH_RMS", "0.06") or 0.06)
+    #: That search turns toward the mic array's direction first ("ได้ยินเสียง
+    #: คนมาจากทางซ้าย ... ให้หุ่นหันทัก", owner 31 Oct) -- only with the app
+    #: owning the array (ARRAY_MIC) and a calibrated DOA (app/doa.py turns
+    #: its bearing into the head camera's frame: the array does not turn
+    #: with the head). Off: nobody has measured the array's accuracy yet.
+    head_follow_doa: bool = _get_bool("HEAD_FOLLOW_DOA", False)
     #: A brief goodbye when the person a camera-opened conversation was with
     #: walks away mid-conversation, then the call ends (the standing line
     #: rings a fresh one). Off: a person reading a brochure loses their face
@@ -1267,6 +1416,12 @@ class Settings:
     #: Direction of arrival from the robot's mic array (the face app reads
     #: the 8-channel Bothlent array natively and reports TDOA features).
     doa_enabled: bool = _get_bool("DOA_ENABLED", False)
+    #: The DOA bearings reach focus (rule 4 "the voice comes from where a face
+    #: is", the mascot's eyes, HEAD_FOLLOW_DOA). On = what DOA_ENABLED always
+    #: did. Off = the link, the calibration and ARRAY_MIC's audio run and
+    #: nothing decides with a direction: the robot test of the array as the
+    #: call's ears first, of its direction second (docs/emma-array-mic-2026-11-02.md).
+    doa_focus: bool = _get_bool("DOA_FOCUS", True)
     # ---- the array as the conversation's ears (app/array_audio.py) ----
     # Owner, 9 Oct 2026: "คุยได้แบบไม่ติดขัดแม้จะมีคนเยอะ". Every switch below
     # is OFF by default and needs DOA_ENABLED (the link it rides on, and the
@@ -1323,6 +1478,30 @@ class Settings:
     #: minutes after it was made. Room audio on disk: on only for the test.
     array_capture8: bool = _get_bool("ARRAY_CAPTURE8", False)
     array_capture8_keep_min: float = float(os.getenv("ARRAY_CAPTURE8_KEEP_MIN", "10"))
+    #: The app is the array's ONLY owner and the call's audio comes from it
+    #: (owner 2 Nov 2026: "ต้องแก้แอปให้ถือไมค์เองและทำเส้นเสียงใหม่";
+    #: docs/emma-array-mic-2026-11-02.md). The measured blocker of 10 Oct --
+    #: the Bothlent array gives Android ONE capture stream, app first = the
+    #: WebView's mic reads exact zeros -- is solved by never opening the page's
+    #: mic while the app holds the array: the page sends a SILENT source on its
+    #: own clock (half-duplex, echo guard, mute, summoned hold unchanged) and
+    #: the tap puts the array's audio in every frame. Needs DOA_ENABLED (the
+    #: link) and ARRAY_AUDIO (the stream) as well, and an APK that says
+    #: EmmaArrayMic/1; with an older APK the link is refused (doa_off) so it
+    #: never takes the array from the page. A dead stream hands the mic back
+    #: to the page for the rest of that app run (ARRAY_MIC_DEAF_S). Off.
+    array_mic: bool = _get_bool("ARRAY_MIC", False)
+    #: The call's frames find the array delivering nothing (no chunk, exact
+    #: zeros, the link down, the app not capturing) this long -> the page
+    #: takes the mic back (getUserMedia) and keeps it until the app restarts.
+    #: 2.0, not the stream's 120 ms staleness: a hand-back is for good, a
+    #: loop stall is not a dead array (array_report max_gap_ms says how long
+    #: the stalls really are on the robot -- tune from that, not from this).
+    array_mic_deaf_s: float = float(os.getenv("ARRAY_MIC_DEAF_S", "2.0"))
+    #: At a call's `ready`, wait at most this long for the array to be live
+    #: (an app that resumed a moment ago is still opening it). Not live by
+    #: then = the page takes the mic for the rest of the app run.
+    array_mic_start_wait_s: float = float(os.getenv("ARRAY_MIC_START_WAIT_S", "1.5"))
     #: Light speech enhancement (sherpa-onnx GTCRN, 16 kHz, streaming) on the
     #: call stream before the VAD. Off: measured (scripts/eval_enhance.py) it
     #: rescues Silero in fan/HVAC-type noise but not against other people's
@@ -1421,6 +1600,34 @@ class Settings:
     # after benchmarking the target robot's CPU/RAM.
     search_reranker_model: str = os.getenv("SEARCH_RERANKER_MODEL", "")
     search_reranker_candidates: int = int(os.getenv("SEARCH_RERANKER_CANDIDATES", "8"))
+
+    # --- Offline fallback (docs/emma-offline-mode.md, 26 Oct 2026) -------------
+    # Owner: "what should Emma do when the internet is bad? ... build an
+    # emergency backup." Off = nothing below is read: no probe runs, no model
+    # loads, no provider is swapped -- the sales-room PC and the robot without
+    # the switch behave byte-for-byte as before (snapshots + conftest pin).
+    #: Switch. On: app/net_health.py probes Google every NET_PROBE_S and the
+    #: session can open app/providers/offline.py instead of Gemini (approved
+    #: fixed lines + approved story lines, pre-rendered audio, local ASR).
+    offline_fallback: bool = _get_bool("OFFLINE_FALLBACK", False)
+    #: Seconds between background probes (DNS + TCP + TLS to the Live API
+    #: host, no API call, no quota). 0 = no background probe.
+    net_probe_s: float = float(os.getenv("NET_PROBE_S", "15"))
+    #: One probe's whole budget, DNS included. The robot's resolver gives each
+    #: server 2 s (scripts/robot_dns.py), so 3 s sees the first answer.
+    net_probe_timeout_s: float = float(os.getenv("NET_PROBE_TIMEOUT_S", "3"))
+    #: Where scripts/fetch_offline_models.py puts the two ASR models (gitignored).
+    offline_asr_dir: str = os.getenv("OFFLINE_ASR_DIR", "data/offline/asr")
+    #: Threads per ASR decode. The robot's four big cores are shared with the
+    #: greeter and the WebView 3D face (models research, 26 Oct): 1.
+    offline_asr_threads: int = int(os.getenv("OFFLINE_ASR_THREADS", "1"))
+    #: Pre-rendered clips + index.json (scripts/render_offline_voice.py; gitignored).
+    offline_voice_dir: str = os.getenv("OFFLINE_VOICE_DIR", "data/offline/voice")
+    #: The one TTS model every clip is rendered with (render script only: the
+    #: runtime reads the model from the index, so a clip is never played in
+    #: another model's voice). gemini-3.8-flash-tts: Thai supported, the
+    #: research's pick; the cache key carries model + GEMINI_VOICE + text.
+    offline_voice_model: str = os.getenv("OFFLINE_VOICE_MODEL", "gemini-3.8-flash-tts")
 
     def __post_init__(self) -> None:
         # Before the condo-only checks below, which return early for every

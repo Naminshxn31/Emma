@@ -123,6 +123,144 @@ def check_recipe(recipe: dict, sources: Path) -> Path:
     return path
 
 
+#: The architect's dimension layers in the unit drawings (260615_EMB3_UNIT.pdf).
+DIMENSION_LAYERS = ("DIMC", "DIMENSION")
+
+
+def _vector_points(drawing: dict) -> list:
+    import fitz
+
+    out = []
+    for item in drawing["items"]:
+        if item[0] == "re":
+            r = item[1]
+            out += [fitz.Point(r.x0, r.y0), fitz.Point(r.x1, r.y0), fitz.Point(r.x0, r.y1), fitz.Point(r.x1, r.y1)]
+        elif item[0] == "qu":
+            q = item[1]
+            out += [q.ul, q.ur, q.ll, q.lr]
+        else:
+            out += [p for p in item[1:] if isinstance(p, fitz.Point)]
+    return out
+
+
+def _without_dimensions(page, recipe: dict):
+    """A unit plan with no dimensions on it (owner 27 Oct, on the robot's room
+    types page: "รูปห้องไม่ต้องแสดง dimension ... ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น").
+
+    The plan is drawn again from the page's own vector paths into a new page:
+    the dimension layers left out, and what the architect drew on layer "0"
+    for them -- a thin line ending on a dimension tick (its dimension or
+    extension line) -- and anything mostly outside the walls (a slanted
+    wall's dimension lies inside the walls' box, so the box alone does not
+    catch it; the CAD wipeouts that cover the walls lie outside it). Text is
+    not drawn at all: the figures, and the title the row already says.
+    Returns (document, page) -- keep the document open while rendering."""
+    import fitz
+
+    s = 72.0 / int(recipe.get("dpi", 120))
+    area = fitz.Rect(*[v * s for v in recipe["crop"]])
+    # (padded: a straight line's rect has no area, and an empty Rect
+    # "intersects" nothing in PyMuPDF -- review 27 Oct: every horizontal or
+    # vertical one-segment path was gone, window glass and fixtures included)
+    def box(d):
+        return fitz.Rect(d["rect"]) + (-0.01, -0.01, 0.01, 0.01)
+
+    drawings = [d for d in page.get_drawings() if box(d).intersects(area)]
+    walls = [fitz.Rect(d["rect"]) for d in drawings if d.get("layer") == "WALL"]
+    if not walls:
+        raise RecipeError("%s: strip_dimensions found no WALL layer inside the crop" % recipe["id"])
+    wall = walls[0]
+    for w in walls[1:]:
+        wall |= w
+    zone = wall + (-4, -4, 4, 4)
+    ticks = [fitz.Rect(d["rect"]) + (-1.5, -1.5, 1.5, 1.5) for d in drawings
+             if d.get("layer") in DIMENSION_LAYERS]
+    def in_zone(d) -> bool:
+        rect = fitz.Rect(d["rect"])
+        if d.get("layer") in DIMENSION_LAYERS or not box(d).intersects(zone):
+            return False
+        if rect.get_area() > 0:
+            return (rect & zone).get_area() >= 0.6 * rect.get_area()
+        return zone.contains(rect.tl) and zone.contains(rect.br)
+
+    # The walls as segments (thick strokes: the cut walls, their outlines and
+    # the columns), for "is this point inside the room": a slanted wall's own
+    # reference lines run beside it, inside the walls' box (STUDIO B107).
+    segments = []
+    for d in drawings:
+        # (in the zone only: the page's frame is a thick stroke too, and every
+        # ray from anywhere meets it)
+        if (d.get("width") or 0) < 0.4 or not in_zone(d):
+            continue
+        for item in d["items"]:
+            if item[0] == "l":
+                segments.append((item[1], item[2]))
+            elif item[0] == "re":
+                r = item[1]
+                corners = [fitz.Point(r.x0, r.y0), fitz.Point(r.x1, r.y0), fitz.Point(r.x1, r.y1), fitz.Point(r.x0, r.y1)]
+                segments += [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+            elif item[0] == "qu":
+                q = item[1]
+                corners = [q.ul, q.ur, q.lr, q.ll]
+                segments += [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+
+    def enclosed(p) -> bool:
+        """Every axis ray from p meets a wall before leaving the plan."""
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            hit = False
+            for a, b in segments:
+                if dx:      # horizontal ray: does segment a-b cross y = p.y on that side?
+                    if (a.y - p.y) * (b.y - p.y) > 0 or a.y == b.y:
+                        continue
+                    x = a.x + (p.y - a.y) * (b.x - a.x) / (b.y - a.y)
+                    if (x - p.x) * dx > 0:
+                        hit = True
+                        break
+                else:
+                    if (a.x - p.x) * (b.x - p.x) > 0 or a.x == b.x:
+                        continue
+                    y = a.y + (p.x - a.x) * (b.y - a.y) / (b.x - a.x)
+                    if (y - p.y) * dy > 0:
+                        hit = True
+                        break
+            if not hit:
+                return False
+        return True
+    doc = fitz.open()
+    new = doc.new_page(width=page.rect.width, height=page.rect.height)
+    shape = new.new_shape()
+    for d in drawings:
+        if not in_zone(d):
+            continue
+        if ((d.get("width") or 0) < 0.4 and d.get("layer") == "0"
+                and any(t.contains(p) for p in _vector_points(d) for t in ticks)):
+            continue
+        if ((d.get("width") or 0) < 0.4 and d.get("layer") == "0" and len(d["items"]) == 1
+                and d["items"][0][0] == "l"):
+            a, b = d["items"][0][1], d["items"][0][2]
+            diagonal = min(abs(b.x - a.x), abs(b.y - a.y)) > 3 and abs(b - a) > 20
+            if diagonal and not enclosed(fitz.Point((a.x + b.x) / 2, (a.y + b.y) / 2)):
+                continue
+        for item in d["items"]:
+            kind = item[0]
+            if kind == "l":
+                shape.draw_line(item[1], item[2])
+            elif kind == "c":
+                shape.draw_bezier(item[1], item[2], item[3], item[4])
+            elif kind == "re":
+                shape.draw_rect(item[1])
+            elif kind == "qu":
+                shape.draw_quad(item[1])
+        cap = d.get("lineCap")
+        shape.finish(fill=d.get("fill"), color=d.get("color"), width=d.get("width") or 0,
+                     lineCap=max(cap) if isinstance(cap, (list, tuple)) else (cap or 0),
+                     lineJoin=d.get("lineJoin") or 0, closePath=d.get("closePath", False),
+                     even_odd=d.get("even_odd", False), fill_opacity=d.get("fill_opacity") or 1,
+                     stroke_opacity=d.get("stroke_opacity") or 1, dashes=d.get("dashes"))
+    shape.commit()
+    return doc, new
+
+
 def _open(path: Path, recipe: dict):
     from PIL import Image
 
@@ -134,7 +272,15 @@ def _open(path: Path, recipe: dict):
         with fitz.open(path) as doc:
             if not 1 <= page_no <= doc.page_count:
                 raise RecipeError("%s: page %d not in %s" % (recipe["id"], page_no, path.name))
-            pix = doc[page_no - 1].get_pixmap(dpi=dpi, alpha=False)
+            page = doc[page_no - 1]
+            if recipe.get("strip_dimensions"):
+                if not recipe.get("crop"):
+                    raise RecipeError("%s: strip_dimensions needs a crop (which plan of the page)" % recipe["id"])
+                drawn, page = _without_dimensions(page, recipe)
+                with drawn:
+                    pix = page.get_pixmap(dpi=dpi, alpha=False)
+            else:
+                pix = page.get_pixmap(dpi=dpi, alpha=False)
             return Image.open(io.BytesIO(pix.tobytes("png")))
     image = Image.open(path)
     image.load()
@@ -340,6 +486,55 @@ def load_designs(root: Path) -> list[dict]:
     return out
 
 
+def inline_maps(designs: list[dict], root: Path) -> dict[str, list[str]]:
+    """The real maps (template "map", owner 27 Oct): each story's overlay --
+    where the project, its places and their routes lie on the picture, as
+    scripts/render_story_maps.py projected them -- written into its params.
+    The overlay must have been computed on the very picture the recipe pins
+    (its PNG's sha256): a map re-rendered without its overlay, or the other
+    way round, puts every pin on the wrong street, silently. Returns the
+    problems per story id; a story with one is not offered."""
+    problems: dict[str, list[str]] = {}
+    try:
+        recipes = {r["id"]: r for r in load_recipes(root)}
+    except (RecipeError, OSError, ValueError) as exc:
+        recipes = {}
+        problems["*"] = ["recipes unreadable: %s" % exc]
+    for story in designs:
+        if not isinstance(story, dict) or story.get("template") != "map":
+            continue
+        sid = str(story.get("id"))
+        params = story.get("params") if isinstance(story.get("params"), dict) else {}
+        mine = problems.setdefault(sid, [])
+        name = params.get("overlay") or sid
+        try:
+            over = json.loads((root / "maps" / ("%s.json" % name)).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            mine.append("map overlay maps/%s.json missing -- run scripts/render_story_maps.py" % name)
+            continue
+        recipe = recipes.get(str(params.get("map_asset")))
+        if not recipe or recipe.get("source_sha256") != over.get("image_sha256"):
+            mine.append("map overlay %s was computed on another picture than %s pins -- render both again"
+                        % (name, params.get("map_asset")))
+            continue
+        params["aspect"] = round(over["w"] / over["h"], 4)
+        params["project"] = over["project"]
+        params["attribution_en"] = over["attribution_en"]
+        for row in params.get("rows") or []:
+            if not isinstance(row, dict) or not row.get("place"):
+                continue
+            for key in ("pin", "route", "walk_route"):
+                row.pop(key, None)
+            place = (over.get("places") or {}).get(row["place"])
+            if not place:
+                continue                     # stories.problems names the row
+            row["pin"] = {"x": place["x"], "y": place["y"]}
+            for key in ("route", "walk_route"):
+                if place.get(key):
+                    row[key] = place[key]
+    return problems
+
+
 def _numbers(text: str) -> set[str]:
     return {stories._plain(m.replace(",", "")) for m in stories._NUMBER.findall(text or "")}
 
@@ -435,6 +630,7 @@ def merge(root: Path, *, write: bool = True, project_id: str = ACTIVE_PROJECT_ID
         except (OSError, ValueError):
             pins = {}
     designs = load_designs(root)
+    map_problems = inline_maps(designs, root)
     used: set[str] = set()
     for story in designs:
         if isinstance(story, dict) and isinstance(story.get("params"), dict):
@@ -463,7 +659,8 @@ def merge(root: Path, *, write: bool = True, project_id: str = ACTIVE_PROJECT_ID
     ids = [s.get("id") for s in designs if isinstance(s, dict)]
     for story in designs:
         sid = story.get("id") if isinstance(story, dict) else None
-        entry = {"problems": stories.problems(story, assets), "unsourced": [], "bad_sources": []}
+        entry = {"problems": stories.problems(story, assets) + map_problems.get(str(sid), []),
+                 "unsourced": [], "bad_sources": []}
         if isinstance(story, dict):
             for ref in stories.asset_refs(story.get("params") or {}):
                 # pins rendered in memory (--check) have no file on disk to re-hash

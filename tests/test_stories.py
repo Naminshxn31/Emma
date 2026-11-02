@@ -20,6 +20,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -135,7 +136,7 @@ def test_the_build_writes_a_draft_and_a_draft_offers_nothing(catalog_dir, monkey
 def test_an_edit_after_approval_is_a_draft_again(approved):
     assert set(stories.available()) == {
         "fx_room_types", "fx_facilities", "fx_ground", "fx_sky_pool", "fx_tower", "fx_studio",
-        "fx_nearby", "fx_units_total", "fx_smart_home", "fx_travel", "fx_where", "fx_around"}
+        "fx_nearby", "fx_units_total", "fx_smart_home", "fx_travel", "fx_where", "fx_around", "fx_map"}
     catalog = _catalog(approved)
     catalog["stories"][0]["lines"][1]["th"] = "สตูดิโอ ขนาด 30 ตารางเมตร"      # a number nobody approved
     _write(approved, catalog)
@@ -582,7 +583,9 @@ def test_a_story_is_not_all_the_project_knows():
     quoting the reply she gave instead."""
     assert "คำตอบครบแล้ว" not in stories.INSTRUCTION
     assert "ให้เรียก search_condo_info ก่อนตอบ" in stories.INSTRUCTION
-    assert "ข้อมูลความลึกของสระว่ายน้ำไม่มีระบุในระบบค่ะ" in stories.INSTRUCTION
+    # quoted as a short fragment (audit 27 Oct): her whole sentence quoted is one she can say
+    assert "ไม่มีระบุในระบบ" in stories.INSTRUCTION
+    assert "ข้อมูลความลึกของสระว่ายน้ำไม่มีระบุในระบบค่ะ" not in stories.INSTRUCTION
 
 
 def test_the_main_pools_depth_is_told_and_only_for_the_main_pool():
@@ -738,12 +741,13 @@ def test_check_judges_a_fresh_checkout_against_the_pictures_it_just_rendered(_bu
     from scripts import build_story_assets as builder
 
     root = tmp_path / "stories"
-    for part in ("design", "recipes"):
+    # the tracked inputs: the designs, the recipes, the real maps' overlays
+    for part in ("design", "recipes", "maps"):
         shutil.copytree(_built / part, root / part)
     assert builder.main(["--root", str(root), "--sources", str(_built.parent / "src"), "--check"]) == 0
     out = capsys.readouterr().out
     assert "NOT OFFERED" not in out and "not pinned" not in out
-    assert sorted(p.name for p in root.iterdir()) == ["design", "recipes"]     # nothing written
+    assert sorted(p.name for p in root.iterdir()) == ["design", "maps", "recipes"]     # nothing written
 
 
 def test_the_build_is_deterministic_and_crops(tmp_path):
@@ -1304,7 +1308,8 @@ def test_the_page_opens_the_picture_it_can_see_and_keeps_the_screen_for_more():
     view = css[css.index(".es-root .es-zoomview {"):css.index(".es-root .es-zv-hint")]
     assert "backdrop-filter" not in view and "filter:" not in view and "infinite" not in view
     page = PAGE.read_text(encoding="utf-8")
-    tap = page[page.index("onTap: function (id, keep)"):page.index("onReport:")]
+    start = page.index("onTap: function (id, keep)")
+    tap = page[start:page.index("onReport:", start)]
     assert "if (sent && keep) { answerStaged = true; storyOwns = true; }" in tap
 
 
@@ -1481,6 +1486,55 @@ def test_the_page_loads_the_engine_and_draws_a_story_only_on_the_robot_face():
     assert "u.origin === location.origin && u.pathname.indexOf('/story-asset/') === 0" in show
 
 
+# The engine's cache tag and what it was set for (review 27 Oct). /assets is
+# plain StaticFiles (Last-Modified, no Cache-Control), so after a deploy the
+# robot's WebView may keep yesterday's engine -- no caption(), the old
+# pointer-events, the wrong-card tap back -- unless ?v= changes. Change
+# emma-story.js or .css and this test fails until both tags in
+# voice-preview.html are bumped and the pin set to the new content.
+ENGINE_TAG = ("20261029-a", "39c5a4636873902e")
+
+
+def test_the_engines_cache_tag_moves_with_the_engine():
+    import hashlib
+
+    digest = hashlib.sha256()
+    for path in (ENGINE, STYLE):                     # line endings as git stores them
+        digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
+    html = PAGE.read_text(encoding="utf-8")
+    tags = re.findall(r"/assets/emma-story\.(?:js|css)\?v=([\w-]+)", html)
+    assert len(tags) == 2 and set(tags) == {ENGINE_TAG[0]}, tags
+    assert digest.hexdigest()[:16] == ENGINE_TAG[1], (
+        "emma-story.js/.css changed: bump both ?v= tags in voice-preview.html and set "
+        "ENGINE_TAG = (<new tag>, %r)" % digest.hexdigest()[:16])
+
+
+def test_the_robots_stories_are_untouched_by_the_tvs_landscape_layout():
+    """Owner 29 Oct, of the room TV: "ทำเรื่องเล่าแบบแนวนอน" -- the same story
+    laid out across a landscape stage (Story.land). The robot's face must
+    stay what it was, to the pixel (measured: 63 stories, every beat and the
+    end state, before/after: 0 differing pixels). Two things carry that:"""
+    css = STYLE.read_text(encoding="utf-8")
+    bare = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    # 1. every size goes through the unit variables, which on the robot ARE
+    #    1vw / 1vh -- a bare vw on the TV would be its stage's own unit
+    assert ":root { --es-vw: 1vw; --es-vh: 1vh; }" in css
+    assert not re.search(r"\d(?:vw|vh)\b", bare.replace(":root { --es-vw: 1vw; --es-vh: 1vh; }", "")), \
+        "write calc(N * var(--es-vw)) / var(--es-vh), never N vw / N vh"
+    # 2. the landscape branches run only when the page asks for them, on a
+    #    stage wider than tall -- the robot's face never does
+    js = ENGINE.read_text(encoding="utf-8")
+    assert "this.land = this.opts.layout === 'land' && LAND[data.template] === 1 && this.W > this.H;" in js
+    assert "if (BALANCED[data.template] && !this.land) this.balance();" in js
+    page = PAGE.read_text(encoding="utf-8")
+    robot = page.split("var drawn = window.EmmaStory.play(story, {", 1)[1].split("});", 1)[0]
+    assert "layout" not in robot
+    # the landscape rules never match on the robot (no .es-land there)
+    land_css = css.split("/* ---- the room TV's landscape stage (Story.land", 1)[1].split("@media", 1)[0]
+    for rule in re.findall(r"^([^{}\n]+)\{", land_css, flags=re.M):
+        assert all(".es-land" in sel for sel in rule.split(",")), rule
+
+
 def test_the_story_follows_her_audio_and_never_hears_the_guest():
     html = PAGE.read_text(encoding="utf-8")
     assert "storyHook('audio', at, buf.duration);" in _between(html, "function playChunk(arrayBuffer) {", "src.onended")
@@ -1507,10 +1561,24 @@ def test_the_engine_stays_light_on_the_robot():
     body = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     for banned in ("backdrop-filter", "filter:", "blur(", "clip-path", "infinite", "will-change"):
         assert banned not in body, banned
-    for decl in re.findall(r"transition\s*:\s*([^;}]+)", body):
-        for part in re.split(r",(?![^(]*\))", decl):          # commas outside cubic-bezier(...)
-            prop = part.strip().split()[0]
-            assert prop in ("transform", "opacity", "none"), decl
+    # One exception, by selector: the real map's routes draw themselves once
+    # along the streets (stroke-dashoffset on a few short SVG paths, 0.7-1.6 s
+    # each). Measured 27 Oct, recorder at the robot's 1080x1920, CPU x4,
+    # software raster: the six map stories 48.5-53.7 fps, p95 33 ms, while the
+    # drive-time rings they replaced recorded 18.6-25.6 on the same harness.
+    paint_ok = re.compile(r"^\.es-mp-(?:case|route|wmask)\b")
+    checked = 0
+    for selector, block in re.findall(r"([^{}]+)\{([^{}]*)\}", body):
+        for decl in re.findall(r"transition\s*:\s*([^;}]+)", block):
+            checked += 1
+            for part in re.split(r",(?![^(]*\))", decl):          # commas outside cubic-bezier(...)
+                prop = part.strip().split()[0]
+                ok = ("transform", "opacity", "none")
+                if prop == "stroke-dashoffset":
+                    assert all(paint_ok.match(s.strip()) for s in selector.split(",")), (selector, decl)
+                    continue
+                assert prop in ok, decl
+    assert checked > 50                          # the rules were found, not skipped
     for frames in re.findall(r"@keyframes[^{]+\{((?:[^{}]*\{[^}]*\})+)", body):
         for prop in re.findall(r"([a-z-]+)\s*:", frames):
             assert prop in ("transform", "opacity"), prop
@@ -1522,7 +1590,13 @@ def test_the_engine_stays_light_on_the_robot():
     colour = r"(?:rgba?|hsla?)\((?:[^()]|\([^()]*\))*\)|#[0-9a-fA-F]{3,8}\b"
     number = r"-?(?:\d+\.?\d*|\.\d+)"
 
+    # a size in the engine's own unit (29 Oct: calc(N * var(--es-vw)), which
+    # on the robot IS N vw) reads as that length; any other var()/calc()
+    # still cannot be judged
+    unit = re.compile(r"calc\((" + number + r") \* var\(--es-(vw|vh)\)\)")
+
     def blurred(value):
+        value = unit.sub(lambda m: m.group(1) + m.group(2), value)
         if value.strip() == "none":
             return False
         for shadow in re.split(r",(?![^(]*\))", value):
@@ -1538,6 +1612,7 @@ def test_the_engine_stays_light_on_the_robot():
     assert blurred(".2vw 0 #10143a, 0 0 .6vw rgb(var(--es-teal))") and blurred("0 0 var(--b) #000")
     assert not blurred(".2vw 0 #161b47, -.2vw 0 #161b47") and not blurred("none")
     assert not blurred("0 0 0 2px rgba(255, 255, 255, .3)") and not blurred("inset 0 -.3vw 0 #000")
+    assert not blurred("calc(.2 * var(--es-vw)) 0 #161b47") and blurred("0 0 calc(.6 * var(--es-vw)) #000")
     for prop, value in re.findall(r"(?<![\w-])(box-shadow|text-shadow)\s*:\s*([^;}]+)", body):
         assert not blurred(value), (prop, value)
     # the script never animates anything but transform/opacity either
@@ -1709,8 +1784,74 @@ def test_the_nearby_rings_say_drive_time_and_never_a_direction():
                 assert walk.get("value_en"), (sid, row["label_en"])
                 if "line" in walk:
                     assert row["line"] <= walk["line"] < lines, (sid, row["label_en"])
-    assert {"nearby_places", "nearby_7eleven", "nearby_hospitals", "nearby_schools", "nearby_restaurants",
-            "nearby_attractions"} <= set(told), sorted(told)
+    # 27 Oct: the others are on the real map now (test below); the schools
+    # stay here -- three of the five have no checked coordinate
+    assert {"nearby_schools"} <= set(told), sorted(told)
+
+
+MAPS = ROOT / "data" / "projects" / "embassy_world" / "stories" / "maps"
+
+
+def test_the_nearby_stories_are_on_the_real_map_and_every_pin_was_checked():
+    """Owner 27 Oct: "พวกแมพเอาจากตรงนี้" (the sales gallery's map export) and
+    his choice, "แผนที่จริง + motion ตามเสียง". The location story and five
+    nearby stories draw on a picture of that map; every place on it has a
+    coordinate checked against the approved report (spec.json, by
+    render_story_maps.py), every pin and route is the projection computed on
+    that very picture (the overlay names the picture's sha256, and so does
+    the recipe), and no place without a checked coordinate gets a pin."""
+    spec = json.loads((MAPS / "spec.json").read_text(encoding="utf-8"))
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    by_id = {s["id"]: s for s in catalog["stories"]}
+    recipes = {r["id"]: r for r in json.loads(
+        (ROOT / "data/projects/embassy_world/stories/recipes/maps.json").read_text(encoding="utf-8"))}
+    wanted = {"location_beach", "nearby_7eleven", "nearby_places", "nearby_hospitals", "nearby_restaurants",
+              "nearby_attractions"}
+    assert set(spec["maps"]) == wanted
+    for sid in wanted:
+        story = by_id[sid]
+        params = story["params"]
+        assert story["template"] == "map", sid
+        assert not stories.problems(story, catalog["assets"]), (sid, stories.problems(story, catalog["assets"]))
+        over = json.loads((MAPS / ("%s.json" % sid)).read_text(encoding="utf-8"))
+        assert recipes[params["map_asset"]]["source_sha256"] == over["image_sha256"], sid
+        assert params["project"] == over["project"] and params["aspect"] == round(over["w"] / over["h"], 4)
+        assert "OpenStreetMap" in params["attribution_en"], sid          # ODbL: the credit on the picture
+        for row in params["rows"]:
+            key = row["place"]
+            assert key in spec["maps"][sid]["places"], (sid, key)
+            place = spec["places"][key]
+            # a pin = a coordinate with its source, checked where the report gives a figure
+            assert place.get("source"), key
+            assert place.get("straight_km") is not None or place.get("road_km") is not None \
+                or key in ("ptt_7eleven", "nong_phrong_park"), key
+            assert row["pin"] == {"x": over["places"][key]["x"], "y": over["places"][key]["y"]}, (sid, key)
+            if place.get("route") != "none":
+                assert row["route"][0] == [over["project"]["x"], over["project"]["y"]], (sid, key)
+                assert row["route"][-1] == [row["pin"]["x"], row["pin"]["y"]], (sid, key)
+        # no figure on the map that is not the row's own value
+        assert "not a map" not in json.dumps(params), sid
+    # the places the report gives no coordinate for are not in the spec at all
+    assert not {"regents", "mooltripakdee", "rugby"} & set(spec["places"])
+
+
+def test_the_map_render_checks_each_place_against_the_report():
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import render_story_maps as r
+
+    assert r.straight_ok(0.953, 0.95) and r.straight_ok(13.807, 13.8) and r.straight_ok(0.148, 0.15)
+    # the nearest FamilyMart by straight line is not the report's (nearest by road)
+    assert not r.straight_ok(0.57, 0.95)
+    # the owner's map's Sukhumvit point is not the report's junction (1.26 vs 1.4)
+    assert not r.straight_ok(1.256, 1.4)
+    assert r.road_ok(6.47, 6.5) and not r.road_ok(9.0, 6.5)
+    assert round(r.haversine_km(12.8848033, 100.8861799, 12.88142, 100.88185), 2) == 0.60
+    spec = json.loads((MAPS / "spec.json").read_text(encoding="utf-8"))
+    web = ROOT / ".tmp/story-sources/map/EmbassyWorldMap/web"
+    if not (web / "places.json").is_file():
+        pytest.skip("the owner's map export is not in .tmp/story-sources: the places are NOT being re-checked here")
+    places, problems = r.resolve_places(spec, web)
+    assert not problems and set(places) == set(spec["places"])
 
 
 def test_a_story_report_is_logged_as_numbers_and_the_id_only(monkeypatch):
@@ -1757,3 +1898,357 @@ def test_a_card_or_slab_that_is_not_shown_takes_no_tap_and_the_big_card_swallows
     css = STYLE.read_text(encoding="utf-8")
     assert ".es-root .es-fc:not(.on), .es-root .es-slab:not(.on) { pointer-events: none; }" in css
     assert ".es-root .es-big { pointer-events: auto; }" in css
+
+
+# ---- what a finger hits, in a real browser (review 27 Oct) ---------------------------
+#
+# The rule above is a CSS string; the review found three taps it did not
+# cover by hit-testing the real page: a hidden card's PICTURE still took the
+# tap (img.es-zoomable re-enables it), a drill thumbnail opened its picture
+# and sent a "more" tap, and chips / ghost rows took taps while invisible. The
+# node harness cannot see any of it -- its fake click does not bubble and it
+# has no layout. These run the REAL robot face page (client/voice-preview.html
+# at /preview?app=1) in headless Chromium with scripts/record_stories.py's
+# server and fake socket: no Gemini, nothing leaves the machine. The pictures
+# are drawn data: URLs, so no catalog or asset is needed.
+
+def _picture(colour, label):
+    import urllib.parse
+
+    svg = ("<svg xmlns='http://www.w3.org/2000/svg' width='480' height='360'>"
+           "<rect width='480' height='360' fill='%s'/><text x='240' y='215' font-size='110' "
+           "text-anchor='middle' fill='white' font-family='sans-serif'>%s</text></svg>" % (colour, label))
+    return {"src": "data:image/svg+xml," + urllib.parse.quote(svg), "w": 480, "h": 360}
+
+
+def _beats(*cues):
+    return [{"cues": [c], "w": {"th": 12, "en": 12}} for c in cues]
+
+
+_PICS = {k: _picture(c, k.upper()) for k, c in
+         (("plan", "#3b4f8f"), ("a", "#7a2f5f"), ("b", "#2f7a4f"), ("c", "#7a6a2f"))}
+# A floor with three places, each leading to a story of its own.
+DRILL = {
+    "id": "t_drill", "template": "drill", "beats": _beats("alpha", "bravo", "charlie"),
+    "params": {"base_asset": _PICS["plan"], "tap_label_en": "Tap for details", "items": [
+        {"label_en": "Alpha", "asset": _PICS["a"], "at": [25, 50], "line": 0, "tap": "story_t_a"},
+        {"label_en": "Bravo", "asset": _PICS["b"], "at": [50, 50], "line": 1, "tap": "story_t_b"},
+        {"label_en": "Charlie", "asset": _PICS["c"], "at": [75, 50], "line": 2, "tap": "story_t_c"}]},
+    "taps": [{"id": "story_t_%s" % k, "label_en": k, "label_th": k} for k in "abc"],
+    "zoom": [{"src": _PICS[k]["src"], "label_en": k, "tap": "story_t_more_%d" % n}
+             for n, k in enumerate(("plan", "a", "b", "c"))],
+}
+# A list: two rows with a story, one row without (its picture is its tap), a
+# chip on the overview; the opening line names no row (the rows wait as ghosts).
+STACK = {
+    "id": "t_stack", "template": "stack", "beats": _beats("three", "studio", "bedroom", "combined"),
+    "params": {"items": [
+        {"label_en": "STUDIO", "asset": _PICS["a"], "asset_kind": "plan", "line": 1, "tap": "story_t_studio"},
+        {"label_en": "1 BEDROOM", "asset": _PICS["b"], "asset_kind": "plan", "line": 2, "tap": "story_t_1br"},
+        {"label_en": "COMBINED", "sub_en": "Two studios", "asset": _PICS["c"], "asset_kind": "plan", "line": 3}]},
+    "taps": [{"id": "story_t_studio", "label_en": "Studio", "label_th": "s"},
+             {"id": "story_t_1br", "label_en": "1 Bedroom", "label_th": "1"},
+             {"id": "story_t_back", "label_en": "All rooms", "label_th": "b"}],
+    "zoom": [{"src": _PICS[k]["src"], "label_en": k, "tap": "story_t_more_%d" % n}
+             for n, k in enumerate(("a", "b", "c"))],
+}
+
+
+@pytest.fixture(scope="module")
+def _chromium():
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        pytest.skip("playwright is not installed -- what a finger hits on a story (hidden cards, thumbnails, "
+                    "invisible chips, ghost rows, a row without a story) is NOT being checked")
+    from scripts import record_stories as harness
+
+    server = harness._Server({}, ROOT / "client")          # data: pictures, no /story-asset
+    pw = sync_playwright().start()
+    try:
+        browser = pw.chromium.launch(headless=True, args=[
+            "--autoplay-policy=no-user-gesture-required", "--use-fake-ui-for-media-stream",
+            "--use-fake-device-for-media-stream", "--disable-webgl", "--disable-3d-apis"])
+    except Exception as exc:                               # no Chromium downloaded for playwright
+        pw.stop()
+        server.close()
+        pytest.skip("headless Chromium is not installed (%s) -- what a finger hits on a story is NOT "
+                    "being checked" % str(exc).splitlines()[0])
+    yield browser, server.port, harness.FAKE_SOCKET
+    browser.close()
+    pw.stop()
+    server.close()
+
+
+@pytest.fixture
+def face(_chromium):
+    """The robot face in a call: mic pressed, `ready` with tap-to-ask on."""
+    browser, port, fake_socket = _chromium
+    ctx = browser.new_context(viewport={"width": 1080, "height": 1920}, device_scale_factor=1,
+                              permissions=["microphone"])
+    ctx.add_init_script(fake_socket)
+    page = ctx.new_page()
+    page.goto("http://127.0.0.1:%d/preview?app=1&cue=0" % port)
+    page.wait_for_function("() => document.querySelector('.control.mic') && window.EmmaStory")
+    page.wait_for_timeout(1200)                            # /voices + /health
+    page.click(".control.mic")
+    page.wait_for_function("() => !!window.__callWS && window.__callWS.readyState === 1")
+    page.evaluate("""() => window.__emit({type: 'ready', provider: 'gemini', profile: 'condo', voice: 'Kore',
+        input_rate: 16000, output_rate: 24000, half_duplex: true, barge_in: false, hold_speech: false,
+        quick_asks: {brand: 'Embassy World', langs: [], hint: {}, items: []}})""")
+    page.wait_for_timeout(400)
+    yield page
+    ctx.close()
+
+
+def _story(page, payload, settle=True):
+    page.evaluate("(s) => window.__emit({type: 'tool_result', name: 'present_story', "
+                  "result: {ok: true, screen: 'story', story: s}})", payload)
+    page.wait_for_function("() => !!document.querySelector('.es-root')")
+    if settle:                                             # the guest cut in: the overview, now
+        page.evaluate("() => window.__emit({type: 'interrupted'})")
+        page.wait_for_timeout(1500)                        # its own motion has landed
+
+
+def _tap(page, selector, index=0, part=None):
+    """A real click (the browser's own hit test, as a finger) at the centre of
+    the element; what went over the socket as quick_ask ids since."""
+    page.evaluate("() => { window.__sent = []; }")
+    box = page.evaluate("""([sel, k, part]) => { let n = document.querySelectorAll(sel)[k];
+        if (part) n = n.querySelector(part); const r = n.getBoundingClientRect();
+        return [r.left + r.width / 2, r.top + r.height / 2]; }""", [selector, index, part])
+    page.mouse.click(box[0], box[1])
+    page.wait_for_timeout(350)
+    sent = [json.loads(s) for s in page.evaluate("() => window.__sent || []") if s.startswith("{")]
+    return [s["id"] for s in sent if s.get("type") == "quick_ask"]
+
+
+def _zoomed(page):
+    return page.evaluate("() => !!document.querySelector('.es-root .es-zoomview.on')")
+
+
+def _unzoom(page):
+    if _zoomed(page):
+        page.mouse.click(540, 300)                         # anywhere on the large view closes it
+        page.wait_for_timeout(250)
+    assert not _zoomed(page)
+
+
+@pytest.mark.timeout(120)
+def test_a_tap_on_the_drill_card_on_screen_is_that_cards_not_a_hidden_ones(face):
+    """Review 27 Oct (masterplan_lagoon -> "Level 3 · Building A"): after a
+    thumbnail pick, the cards after it wait invisible ABOVE the card on
+    screen, and their photos took the tap -- the last card's story went out."""
+    page = face
+    _story(page, DRILL)
+    assert page.evaluate("() => document.querySelectorAll('.es-fc')[2].classList.contains('on')")
+    page.evaluate("() => document.querySelectorAll('.es-thumb')[0].click()")   # the strip's own handler
+    page.wait_for_timeout(1300)                            # Alpha's card slides back in
+    on = page.evaluate("() => Array.from(document.querySelectorAll('.es-fc')).map(c => c.classList.contains('on'))")
+    assert on == [True, False, False]
+    assert _tap(page, ".es-fc", 0, ".es-fc-ph img") == ["story_t_a"]   # the photo
+    _unzoom(page)
+    assert _tap(page, ".es-fc", 0, ".es-fc-go") == ["story_t_a"]       # "Tap for details ›"
+    _unzoom(page)
+    assert _tap(page, ".es-fc", 0, ".es-fc-tx b") == ["story_t_a"]     # its name
+
+
+@pytest.mark.timeout(120)
+def test_a_drill_thumbnail_brings_its_card_up_and_sends_nothing(face):
+    """emma-story.js / docs/emma-story-engine.md: "แตะ = เอาห้องนั้นขึ้น (ในจอ
+    ไม่ส่งอะไร)". The root's picture listener also took the thumbnail's
+    picture: it opened large and its "more" tap went to the server."""
+    page = face
+    _story(page, DRILL)
+    assert _tap(page, ".es-thumb", 1) == []
+    assert not _zoomed(page)
+    page.wait_for_timeout(1000)
+    on = page.evaluate("() => Array.from(document.querySelectorAll('.es-fc')).map(c => c.classList.contains('on'))")
+    assert on == [False, True, False]
+
+
+@pytest.mark.timeout(120)
+def test_chips_and_ghost_rows_take_no_tap_until_they_are_shown(face):
+    """Before the overview the chips stood at opacity 0 and a ghost row (the
+    dashed frame of a room she has not named) is a button: both took taps."""
+    page = face
+    _story(page, STACK, settle=False)
+    # her first sound: line 0 names no row, so the rows wait as ghosts
+    page.evaluate("() => { window.__emit({type: 'assistant_transcript', text: 'We have three room types.'});"
+                  " window.__audio(400, 0.09, 0); }")
+    page.wait_for_function("() => document.querySelectorAll('.es-row.ghost').length === 3")
+    page.wait_for_timeout(200)
+    assert page.evaluate("() => getComputedStyle(document.querySelector('.es-chipbtn')).opacity") == "0"
+    assert _tap(page, ".es-chipbtn") == []
+    assert _tap(page, ".es-row", 0) == []
+    assert _tap(page, ".es-row", 1, ".es-th img") == []
+    assert not _zoomed(page)
+    # the same places once they are shown: each takes its own tap
+    page.evaluate("() => window.__emit({type: 'interrupted'})")
+    page.wait_for_timeout(1800)
+    assert _tap(page, ".es-chipbtn") == ["story_t_back"]
+    assert _tap(page, ".es-row", 0, ".es-tx b") == ["story_t_studio"]
+
+
+@pytest.mark.timeout(120)
+def test_a_list_row_without_a_story_is_its_picture(face):
+    """Owner 27 Oct, the room-types story ("Tap a room type to look inside"):
+    a row with no story of its own ("1 Bedroom, large", the combined units)
+    answered only on its small plan -- its words were dead. A tap anywhere on
+    it now does what the plan does: opens it large and asks her for more. A
+    row with a story keeps its own tap, its plan only enlarging."""
+    page = face
+    _story(page, STACK)
+    assert _tap(page, ".es-row", 2, ".es-tx b") == ["story_t_more_2"]     # the row's words
+    assert _zoomed(page)
+    _unzoom(page)
+    assert _tap(page, ".es-row", 2, ".es-tx span") == ["story_t_more_2"]  # its second line
+    _unzoom(page)
+    assert _tap(page, ".es-row", 2, ".es-th img") == ["story_t_more_2"]   # the plan, as before
+    _unzoom(page)
+    # a row with a story: its own tap, from its words or its plan
+    assert _tap(page, ".es-row", 1, ".es-tx b") == ["story_t_1br"]
+    _unzoom(page)
+    assert _tap(page, ".es-row", 1, ".es-th img") == ["story_t_1br"]
+    assert _zoomed(page)
+
+
+def test_the_caption_is_timed_by_the_storys_clock_word_by_word_in_node():
+    """Owner 27 Oct ("motion ตัวหนังสือ"): the page's reply line comes up word
+    by word with her PLAYED audio, on this engine's clock (EmmaStory.caption).
+    Her answers in Gemini's order, pieces cut mid-word: never ahead of her
+    voice but for the lead, never more than a fraction of a second behind,
+    no word split (Thai has no spaces), all of it once she has finished, and
+    the fallbacks (no audio clock, no audio, no turn_complete)."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required -- the caption's timing and word split are NOT being checked")
+    result = subprocess.run([node, "tests/client_captions.cjs"], cwd=ROOT, capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS" in result.stdout
+    engine = ENGINE.read_text(encoding="utf-8")
+    assert "caption: function () { return new Caption(); }" in engine
+
+
+
+def test_the_guests_own_words_name_the_story_the_models_keywords_missed():
+    """Replay of the 20 Oct robot log (27 Oct): the model searched keyword
+    lists ("nearest restaurant distance location") that name no story, while
+    the guest's own sentence names it -- and both answers became "not
+    specified". The search goes to the story when the guest's words name it
+    and the query shares a word with it; a search about something else stays
+    a search."""
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    offered = {s["id"]: s for s in catalog["stories"]}
+    for query, guest, topic in (
+            ("nearest restaurant distance location", "Where is the nearest restaurant?", "nearby_restaurants"),
+            ("nearby attractions interesting locations", "What interesting places are around the project?",
+             "nearby_attractions")):
+        assert stories.story_for_query(query, offered) is None, query
+        assert stories.story_for_guest(query, guest, offered) == topic, guest
+    assert stories.story_for_guest("Sky Pool water depth", "Where is the nearest restaurant?", offered) is None
+    assert stories.story_for_guest("restaurant", "", offered) is None
+    assert stories.story_for_guest("restaurant", None, offered) is None
+
+
+def test_a_search_goes_to_the_story_the_guest_asked_for(approved):
+    """The same inside search_condo_info: the caption of the utterance the call
+    answers (knowledge._guest_words) is tried when the model's query names no
+    story -- and only when the query still shares a word with that story."""
+    from app import heard
+
+    _tool()
+    knowledge, _ = _search_tool()
+    listener = object()
+    heard.bind_session(listener)
+    try:
+        with _as("condo", face=True):
+            # the model's keyword list alone names no story
+            assert "story_topic" not in knowledge.search_condo_info("nearby places list distance")
+            heard.mark_activity(listener)
+            heard.record("What is nearby?", listener, utterance_id="t1")
+            out = knowledge.search_condo_info("nearby places list distance")
+            assert out.get("story_topic") == "fx_nearby"
+            heard.mark_activity(listener)
+            heard.record("What is nearby?", listener, utterance_id="t2")
+            assert "story_topic" not in knowledge.search_condo_info("pool water depth")
+            # review 27 Oct: a shared FUNCTION word is no link ("what", "is")
+            heard.mark_activity(listener)
+            heard.record("What is nearby?", listener, utterance_id="t3")
+            assert "story_topic" not in knowledge.search_condo_info("what is the water depth of the pool")
+    finally:
+        heard.bind_session(None)
+
+
+def test_a_guests_opener_does_not_cost_the_story():
+    """Replay of 20 Oct (27 Oct): "Okay, and where is the nearest restaurant?"
+    named no story; without the opener it names nearby_restaurants."""
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    offered = {s["id"]: s for s in catalog["stories"]}
+    for query, topic in (("Okay, and where is the nearest restaurant?", "nearby_restaurants"),
+                         ("Okay, can you show me the ground floor?", "facilities_ground")):
+        assert stories.story_for_query(query, offered) == topic, query
+    # an opener alone is no question
+    for query in ("okay", "Okay, and", "yes yes", "โอเค"):
+        assert stories.story_for_query(query, offered) is None, query
+
+
+
+def test_a_shared_function_word_is_no_link_to_the_guests_story():
+    """Review 27 Oct: "what is the ceiling height" shared "is"/"the" with a
+    restaurant question still captioned and went to nearby_restaurants."""
+    catalog = json.loads((ROOT / "data/projects/embassy_world/stories/stories.json").read_text(encoding="utf-8"))
+    offered = {s["id"]: s for s in catalog["stories"]}
+    for query, guest in (("what is the ceiling height", "Where is the nearest restaurant?"),
+                         ("pet policy in the project", "Is there a hospital nearby?"),
+                         ("สระว่ายน้ำลึกเท่าไหร่ ชั้นไหน", "ใกล้โรงพยาบาลไหม")):
+        assert stories.story_for_guest(query, guest, offered) is None, query
+
+
+def test_a_place_story_carries_the_reports_answers_for_the_next_question(approved, monkeypatch):
+    """Replay of 20 Oct (27-28 Oct): after a place's story, "Why biogenesis?"
+    and "Is it really Himalayan salt stone?" were answered from memory or sent
+    to the sales team, with no search -- chapter 21 answers both. The story's
+    result carries them (`details`), looked up once by the place's name, cut by
+    the same door as every project text (no width x length of a common area)."""
+    calls = []
+
+    def more(story, label):
+        calls.append((story["id"], label))
+        return ["ถาม: Sky Pool เป็นยังไง ตอบ: สระโค้งยื่นออกจากอาคาร พื้นสระเป็นกระจกใส ขนาด 16.125 × 5.85 เมตร"]
+
+    monkeypatch.setattr(stories, "_more_facts", more)
+    out = stories.tool_result("fx_sky_pool")
+    assert out["details"] and "พื้นสระเป็นกระจกใส" in out["details"][0] and "16.125" not in out["details"][0]
+    assert stories.DETAILS in out["instruction"] and "ไม่ต้องพูดตอนนี้" in stories.DETAILS
+    assert stories.tool_result("fx_sky_pool")["details"] == out["details"]
+    assert calls == [("fx_sky_pool", "SKY POOL")]                           # looked up once
+    plain = stories.tool_result("fx_room_types")                            # no place of its own
+    assert "details" not in plain and stories.DETAILS not in plain["instruction"]
+    assert calls == [("fx_sky_pool", "SKY POOL")]
+
+
+def test_a_cold_details_lookup_never_holds_the_story(approved, monkeypatch):
+    """Cold, the lookup loads the search model (~13 s, measured 28 Oct): the
+    story goes out without details at once, the lookup finishes behind it,
+    and the next telling has them."""
+    import threading
+    import time
+
+    gate = threading.Event()
+
+    def slow(story, label):
+        gate.wait(5)
+        return ["ถาม: Sky Pool เป็นยังไง ตอบ: สระโค้งยื่นออกจากอาคาร พื้นสระเป็นกระจกใส มองเห็นยิมข้างล่าง"]
+
+    monkeypatch.setattr(stories, "_more_facts", slow)
+    monkeypatch.setattr(stories, "DETAILS_WAIT_S", 0.05)
+    started = time.monotonic()
+    first = stories.tool_result("fx_sky_pool")
+    assert time.monotonic() - started < 1.0 and "details" not in first and first["ok"]
+    gate.set()
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and not stories._DETAILS.get("fx_sky_pool"):
+        time.sleep(0.02)
+    assert stories.tool_result("fx_sky_pool")["details"]

@@ -537,6 +537,11 @@ async def greet(session=None) -> bool:
             raise PermissionError("groups_locked")
         if not 0 <= int(group) <= 255:
             raise ValueError("invalid greeting group")
+        if robot_face_link.server_walking():
+            # The event host walks past tables of faces, and the app cannot
+            # see a walk the server runs (robot_face_link._send): no hand out
+            # while the wheels turn.
+            raise PermissionError("event_walk")
         # The robot face uses the same Android SDK path as the operator's
         # confirmed handshake. A short adb write can be acknowledged by the
         # board without producing visible motion on this robot.

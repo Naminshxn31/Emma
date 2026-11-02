@@ -1,0 +1,56 @@
+[
+  {
+    "id": "map_location_beach",
+    "source": "maps/location_beach.png",
+    "source_sha256": "eed3c485327a66fe5bbb1c9020d945f5c4dfaf3fed0426673eb9847ec914e441",
+    "max_w": 1080,
+    "max_kb": 320,
+    "format": "webp",
+    "why": "The real map under location_beach (owner 27 Oct: \"พวกแมพเอาจากตรงนี้\"), rendered from the sales gallery's map export by scripts/render_story_maps.py: OSM roads and buildings, the project's 3D model, the map's own night palette, its shop icons hidden (the story's places are drawn over it). Its overlay is stories/maps/location_beach.json -- re-render both together."
+  },
+  {
+    "id": "map_nearby_7eleven",
+    "source": "maps/nearby_7eleven.png",
+    "source_sha256": "484f1e3d04e9e6ee8014946171f750ecae73b9c12272e9b7fbdda9a1031c9fc7",
+    "max_w": 1080,
+    "max_kb": 320,
+    "format": "webp",
+    "why": "The real map under nearby_7eleven (owner 27 Oct: \"พวกแมพเอาจากตรงนี้\"), rendered from the sales gallery's map export by scripts/render_story_maps.py: OSM roads and buildings, the project's 3D model, the map's own night palette, its shop icons hidden (the story's places are drawn over it). Its overlay is stories/maps/nearby_7eleven.json -- re-render both together."
+  },
+  {
+    "id": "map_nearby_attractions",
+    "source": "maps/nearby_attractions.png",
+    "source_sha256": "cfaee755d8bf1cc07449a6c9213e5a2c501faa564a1b531a14de9072bfffa55f",
+    "max_w": 1080,
+    "max_kb": 320,
+    "format": "webp",
+    "why": "The real map under nearby_attractions (owner 27 Oct: \"พวกแมพเอาจากตรงนี้\"), rendered from the sales gallery's map export by scripts/render_story_maps.py: OSM roads and buildings, the project's 3D model, the map's own night palette, its shop icons hidden (the story's places are drawn over it). Its overlay is stories/maps/nearby_attractions.json -- re-render both together."
+  },
+  {
+    "id": "map_nearby_hospitals",
+    "source": "maps/nearby_hospitals.png",
+    "source_sha256": "248adcb83dd5762ec3ea547795d9f339516e6de34f56cae2cfb1f5480df49efa",
+    "max_w": 1080,
+    "max_kb": 320,
+    "format": "webp",
+    "why": "The real map under nearby_hospitals (owner 27 Oct: \"พวกแมพเอาจากตรงนี้\"), rendered from the sales gallery's map export by scripts/render_story_maps.py: OSM roads and buildings, the project's 3D model, the map's own night palette, its shop icons hidden (the story's places are drawn over it). Its overlay is stories/maps/nearby_hospitals.json -- re-render both together."
+  },
+  {
+    "id": "map_nearby_places",
+    "source": "maps/nearby_places.png",
+    "source_sha256": "c5fda8758dc67209eef2e34a4016d82fd6cef7903f8fe51ac48e5b82c6311c8f",
+    "max_w": 1080,
+    "max_kb": 320,
+    "format": "webp",
+    "why": "The real map under nearby_places (owner 27 Oct: \"พวกแมพเอาจากตรงนี้\"), rendered from the sales gallery's map export by scripts/render_story_maps.py: OSM roads and buildings, the project's 3D model, the map's own night palette, its shop icons hidden (the story's places are drawn over it). Its overlay is stories/maps/nearby_places.json -- re-render both together."
+  },
+  {
+    "id": "map_nearby_restaurants",
+    "source": "maps/nearby_restaurants.png",
+    "source_sha256": "93dd1c70cf826edc76b4100a2722ed82658f4aa366541ceac62bf184a5432704",
+    "max_w": 1080,
+    "max_kb": 320,
+    "format": "webp",
+    "why": "The real map under nearby_restaurants (owner 27 Oct: \"พวกแมพเอาจากตรงนี้\"), rendered from the sales gallery's map export by scripts/render_story_maps.py: OSM roads and buildings, the project's 3D model, the map's own night palette, its shop icons hidden (the story's places are drawn over it). Its overlay is stories/maps/nearby_restaurants.json -- re-render both together."
+  }
+]

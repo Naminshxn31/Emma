@@ -1,0 +1,199 @@
+{
+ "why": "Owner 27 Oct: \"พวกแมพเอาจากตรงนี้\" (EmbassyWorld_Map_Standalone_2026-10-27.zip, the accepted 26 Oct map of the sales gallery) and chose \"แผนที่จริง + motion ตามเสียง\": the location and nearby stories draw on the real map instead of the schematic disc. scripts/render_story_maps.py renders each base from that map (its own OSM data, palette and the project's 3D model; wider tiles from OpenFreeMap) and projects every pin and route onto it; the robot face draws the motion over the picture. Every place below is checked against the approved report before it is drawn: its straight-line km from the report's own start pin (Haversine, the report's method) and the drive route's km against the report's road km. A place with no checked coordinate gets no pin -- the schools' story stays the drive-time rings (Regents, Mooltripakdee and Rugby have none: report 92 says so for Rugby; OSM/Nominatim found none of the three on 27 Oct).",
+ "origin": {
+  "lng": 100.8861799,
+  "lat": 12.8848033,
+  "source": "report:92_appendix_travel.md (หมุด Google Maps \"Embassy World Pattaya\" -- the start of every route and distance in the report)"
+ },
+ "palette": "night",
+ "attribution_en": "© OpenStreetMap contributors · OpenFreeMap",
+ "places": {
+  "ptt_7eleven": {
+   "place_id": "user-ptt-seveneleven-nearest",
+   "source": "owner's map places.json (the owner's own annotation 22 Oct, ±35 m; report 23_owner_review 23.2: nearest 7-Eleven in the PTT station)"
+  },
+  "familymart": {
+   "place_id": "tile-4726955592-3553",
+   "straight_km": 0.95,
+   "road_km": 1.5,
+   "source": "report 92 ค.4.2 #11 (FamilyMart nearest by road) · OSM via the owner's map"
+  },
+  "lotus": {
+   "place_id": "tile-3809579582-3944",
+   "straight_km": 2.2,
+   "road_km": 2.9,
+   "source": "report 92 ค.4.2 #14 (Lotus's Chaiyapruek 2) · OSM via the owner's map"
+  },
+  "night_market": {
+   "place_id": "tile-3075463852-1247",
+   "straight_km": 1.5,
+   "road_km": 3.2,
+   "source": "report 92 ค.4.2 #15 (Jomtien Night Market) · OSM via the owner's map"
+  },
+  "jomtien_hospital": {
+   "place_id": "jomtien-hospital",
+   "straight_km": 3.3,
+   "road_km": 6.5,
+   "source": "report 92 ค.4.3 #33 · the owner's map"
+  },
+  "bangkok_hospital": {
+   "place_id": "bangkok-hospital-pattaya",
+   "straight_km": 8.0,
+   "road_km": 10.2,
+   "source": "report 92 ค.4.3 #37 · the owner's map"
+  },
+  "pattaya_city_hospital": {
+   "lng": 100.884674,
+   "lat": 12.927311,
+   "straight_km": 4.7,
+   "road_km": 8.1,
+   "source": "report 92 ค.4.3 #34 · OSM way/1211753054 (Nominatim, 27 Oct)"
+  },
+  "big_whale": {
+   "place_id": "tile-141615177011-3599",
+   "straight_km": 0.15,
+   "road_km": 1.5,
+   "walk_km": 0.8,
+   "source": "report 92 ค.4.7 #85, ค.5 #85 (walk 0.80 km) · OSM via the owner's map"
+  },
+  "apple_bee": {
+   "place_id": "tile-63396602851-3647",
+   "straight_km": 0.63,
+   "road_km": 1.7,
+   "source": "report 92 ค.4.7 #86 · OSM via the owner's map"
+  },
+  "toy_seafood": {
+   "place_id": "tile-64019571951-1294",
+   "straight_km": 0.6,
+   "road_km": 2.0,
+   "source": "report 92 ค.4.7 #87 · OSM via the owner's map"
+  },
+  "pupen": {
+   "lng": 100.895537,
+   "lat": 12.861424,
+   "straight_km": 2.8,
+   "road_km": 3.4,
+   "source": "report 92 ค.4.7 #92 · OSM way/1203417427 (Nominatim, 27 Oct)"
+  },
+  "underwater_world": {
+   "place_id": "tile-2090622712-3521",
+   "straight_km": 1.7,
+   "road_km": 3.6,
+   "source": "report 92 ค.4.6 #68 · OSM via the owner's map"
+  },
+  "floating_market": {
+   "place_id": "tile-9625351352-3949",
+   "straight_km": 2.9,
+   "road_km": 3.6,
+   "source": "report 92 ค.4.6 #69 · OSM via the owner's map"
+  },
+  "big_buddha": {
+   "lng": 100.868687,
+   "lat": 12.914072,
+   "straight_km": 3.8,
+   "road_km": 6.7,
+   "source": "report 92 ค.4.6 #73 · OSM way/322626265 Wat Phra Yai (Nominatim, 27 Oct)"
+  },
+  "sanctuary": {
+   "lng": 100.88915,
+   "lat": 12.972777,
+   "straight_km": 9.8,
+   "road_km": 14.8,
+   "source": "report 92 ค.4.6 #79 · OSM way/223698118 (Nominatim, 27 Oct)"
+  },
+  "nong_nooch": {
+   "place_id": "nong-nooch",
+   "straight_km": 13.8,
+   "road_km": 16.2,
+   "source": "report 92 ค.4.6 #80 · the owner's map"
+  },
+  "jomtien_beach": {
+   "place_id": "jomtien-beach",
+   "straight_km": 0.6,
+   "road_km": 1.9,
+   "source": "report 92 ค.3 #1 (nearest sand) · the owner's map"
+  },
+  "sukhumvit": {
+   "place_id": "sukhumvit-road",
+   "road_km": 1.85,
+   "source": "facts:ทำเล (ถึงถนนสุขุมวิทประมาณ 1.85 กม.) · the owner's map's Sukhumvit Road point (its straight line is not the report's junction, so only the road km is checked)"
+  },
+  "nong_phrong_park": {
+   "place_id": "nong-phrong-park",
+   "route": "none",
+   "source": "facts:ทำเล (ติดสวนสาธารณะหนองโพรง) · report 04 line 7 (park edge ≈ 40 m) · the owner's map"
+  },
+  "tara_pattana": {
+   "place_id": "tile-2591781982-3865",
+   "straight_km": 4.8,
+   "road_km": 8.8,
+   "source": "report 92 ค.4.4 #45 · 23_owner_review 23.2.3 (the owner's first school) · OSM via the owner's map"
+  }
+ },
+ "maps": {
+  "location_beach": {
+   "aspect": 1.2,
+   "pitch": 45,
+   "bearing": 0,
+   "places": [
+    "nong_phrong_park",
+    "jomtien_beach",
+    "sukhumvit"
+   ]
+  },
+  "nearby_7eleven": {
+   "aspect": 1.0,
+   "pitch": 0,
+   "bearing": 0,
+   "places": [
+    "ptt_7eleven",
+    "familymart"
+   ]
+  },
+  "nearby_places": {
+   "aspect": 1.35,
+   "pitch": 0,
+   "bearing": 0,
+   "places": [
+    "ptt_7eleven",
+    "lotus",
+    "night_market",
+    "jomtien_hospital",
+    "tara_pattana"
+   ]
+  },
+  "nearby_hospitals": {
+   "aspect": 1.15,
+   "pitch": 0,
+   "bearing": 0,
+   "places": [
+    "jomtien_hospital",
+    "bangkok_hospital",
+    "pattaya_city_hospital"
+   ]
+  },
+  "nearby_restaurants": {
+   "aspect": 1.2,
+   "pitch": 0,
+   "bearing": 0,
+   "places": [
+    "big_whale",
+    "apple_bee",
+    "toy_seafood",
+    "pupen"
+   ]
+  },
+  "nearby_attractions": {
+   "aspect": 1.35,
+   "pitch": 0,
+   "bearing": 0,
+   "places": [
+    "underwater_world",
+    "floating_market",
+    "big_buddha",
+    "sanctuary",
+    "nong_nooch"
+   ]
+  }
+ }
+}

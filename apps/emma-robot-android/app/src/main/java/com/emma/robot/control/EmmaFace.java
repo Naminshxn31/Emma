@@ -1,6 +1,7 @@
 package com.emma.robot.control;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
@@ -86,6 +87,8 @@ final class EmmaFace {
         String bodyGesture(String id);
         /** A speech gesture, timed by the server to her voice. */
         String bodySpeech(String id);
+        /** The head toward a person: percent of the app's head span (HeadLook). */
+        String bodyLook(int pan, int tilt);
         String navPlaces();
         String navStatus();
         String navGo(String placeId, String origin);
@@ -103,6 +106,19 @@ final class EmmaFace {
         String navActivity(String kind);
         /** The robot's face_token for the page's face_hello. */
         String faceToken();
+        /** ARRAY_MIC (docs/emma-array-mic-2026-11-02.md): is the app's capture
+         *  of the mic array still running -- the page opens its own mic only
+         *  after it has ENDED (one capture stream on this array). */
+        String micState();
+        /** ARRAY_MIC: let go of the array for the rest of this app run (the
+         *  page takes its mic). Idempotent; answers like micState. */
+        String micRelease();
+        /** ARRAY_MIC: let go of the array for the page's CALL -- `kind` is one of
+         *  this class's literals: "start" (not live at the call's ready) or
+         *  "deaf" (it went quiet mid-call; counted per app run). */
+        String micHold(String kind);
+        /** ARRAY_MIC: the page's call mic is stopped, or a page just loaded. */
+        String micFree();
         /** The page died with its renderer (review #14): whatever it asked to
          *  move has nobody answering for it now. */
         void pageLost();
@@ -116,6 +132,11 @@ final class EmmaFace {
      *  suffix. An APK without it answers bad_request (BODY_ACTION needs the
      *  whole message), so a newer page/server never moves an older app. */
     private static final Pattern BODY_SPEECH = Pattern.compile("emma-body:([a-z][a-z0-9_]{1,31}):speech");
+    /** The head toward a person (owner 31 Oct): two whole numbers, each up to
+     *  three digits with an optional minus -- PERCENT of the app's own head
+     *  span, range-checked again by BodyController/HeadLook. An older APK
+     *  answers bad_request (no pattern of its own matches it). */
+    private static final Pattern BODY_LOOK = Pattern.compile("emma-body:look:(-?[0-9]{1,3}):(-?[0-9]{1,3})");
     private static final Pattern NAV_GO = Pattern.compile("emma-nav:go:([a-z][a-z0-9_]{1,31}):(tap|voice)");
     private static final String BAD_REQUEST = "{\"accepted\":false,\"reason\":\"bad_request\"}";
 
@@ -333,6 +354,15 @@ final class EmmaFace {
         return (activity.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
+    /** The "Emma Event" build (build.gradle -PemmaApp=event): told apart by its
+     *  own package, like debug by its flag -- no BuildConfig needed. */
+    static boolean isEventApp(Context context) {
+        return EVENT_PACKAGE.equals(context.getPackageName());
+    }
+
+    static final String EVENT_PACKAGE = "com.emma.robot.event";
+    static final String ROBOT_PACKAGE = "com.emma.robot.control";
+
     private FrameLayout buildUi() {
         FrameLayout container = new FrameLayout(activity);
         container.setBackgroundColor(Color.rgb(5, 11, 18));
@@ -463,7 +493,10 @@ final class EmmaFace {
         // APK answers an unknown prompt with `return false`, and the WebView
         // then shows its own prompt dialog ("emma-face:token") in front of a
         // customer on every call until the APK is reinstalled.
-        settings.setUserAgentString(settings.getUserAgentString() + " EmmaRobot/0.1 EmmaBridge/1");
+        // EmmaArrayMic/1 (ARRAY_MIC, 2 Nov 2026): this APK can hold the mic
+        // array alone and answers emma-face:mic / emma-face:mic:release -- a
+        // page goes without its own mic only for an app that says so.
+        settings.setUserAgentString(settings.getUserAgentString() + " EmmaRobot/0.1 EmmaBridge/1 EmmaArrayMic/1");
         WebView.setWebContentsDebuggingEnabled(debugBuild());
 
         webView.setWebViewClient(new WebViewClient() {
@@ -656,6 +689,16 @@ final class EmmaFace {
                 return bridge.navActivity("speech");
             case "emma-face:token":
                 return bridge.faceToken();
+            case "emma-face:mic":
+                return bridge.micState();
+            case "emma-face:mic:release":
+                return bridge.micRelease();
+            case "emma-face:mic:hold":
+                return bridge.micHold("start");
+            case "emma-face:mic:hold:deaf":
+                return bridge.micHold("deaf");
+            case "emma-face:mic:free":
+                return bridge.micFree();
             default:
                 break;
         }
@@ -663,6 +706,8 @@ final class EmmaFace {
         if (go.matches()) return bridge.navGo(go.group(1), go.group(2));
         Matcher speech = BODY_SPEECH.matcher(message);
         if (speech.matches()) return bridge.bodySpeech(speech.group(1));
+        Matcher look = BODY_LOOK.matcher(message);
+        if (look.matches()) return bridge.bodyLook(Integer.parseInt(look.group(1)), Integer.parseInt(look.group(2)));
         Matcher body = BODY_ACTION.matcher(message);
         if (body.matches()) return bridge.bodyGesture(body.group(1));
         return BAD_REQUEST;
@@ -993,6 +1038,9 @@ final class EmmaFace {
         // configured server URL wins -- cam=0 there turns the stream off
         // without a new APK.
         if (base.getQueryParameter("cam") == null) page.appendQueryParameter("cam", "1");
+        // "Emma Event" (owner 30 Oct, build.gradle -PemmaApp=event): the same
+        // face, every call the event host (app/event_host.py on the server).
+        if (isEventApp(activity)) page.appendQueryParameter("event", "1");
         if (token != null && !token.isEmpty()) page.appendQueryParameter("token", token);
         progress.setVisibility(View.VISIBLE);
         errorText.setVisibility(View.GONE);

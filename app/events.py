@@ -113,6 +113,17 @@ async def _wait_for_idle(idle: asyncio.Event, source: str) -> None:
             return
 
 
+def with_held_language(text: str, provider) -> str:
+    """`text` with the language the guest picked on the robot face's menu
+    (app/talk_lang.py `pin`), when one is held. Every line the server writes
+    rides through here: those texts say "the guest's language", and the
+    guest's latest words may be a colleague's Thai in an English talk (review
+    29 Oct). Unheld talks get their text untouched."""
+    talk = getattr(provider, "_talk", None)
+    held = talk.held_note() if talk is not None and hasattr(talk, "held_note") else None
+    return text + " — " + held if held else text
+
+
 async def announce(
     text: str,
     *,
@@ -223,6 +234,7 @@ async def announce(
 
         if idle is not None:
             idle.clear()                  # the model owes a turn for this text
+        text = with_held_language(text, session.provider)
         try:
             await session.provider.send_text(text)
         except Exception:
@@ -232,6 +244,12 @@ async def announce(
             turnlog.record("announce", source=source, sent=False,
                            reason="send failed", waited=round(waited, 1))
             return False
+        # Her reply to this text is not the answer to the guest's last words:
+        # a guest end signal still riding through audio-less turns (a bare
+        # "ค่ะ" the server dropped) must not time it (app/metrics.py).
+        observer = getattr(session, "metrics", None)
+        if observer is not None and hasattr(observer, "robot_turn"):
+            observer.robot_turn()
         # An announcement is her speaking unasked: the silence follow-up
         # (FOLLOW_UP_AFTER_S) is for her ANSWER, never for this turn. The
         # follow-up itself and the respeak (her answer, said again) keep it.

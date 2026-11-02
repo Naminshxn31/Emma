@@ -604,6 +604,329 @@ def shutdown() -> dict:
             "instruction": "สั่งปิดเครื่องแล้ว เปิดกลับจากที่นี่ไม่ได้ (ต้อง Wake-on-LAN หรือกดเปิดที่เครื่อง)"}
 
 
+# ==================== Emma's face on this room's screen ====================
+# Owner 28 Oct 2026: "จอห้องนั้นต้องเปิดเว็บทิ้งไว้หรอ ไม่เอาๆ เอาแบบหุ่นไปอยู่ใกล้
+# จอห้องนั้น หรือสั่งให้เปิดจอก็ให้หุ่นเชื่อมจอเลย". The screen keeps nothing open:
+# the robot's server asks for its own face page here when it comes near (or a
+# guest asks) and takes it down again (app/room_screens.py on the robot).
+#
+# A kiosk window of the browser already on the PC, in a profile of its OWN:
+# with the everyday profile Chrome hands the URL to the browser that is
+# already running and exits -- --kiosk is ignored and a tab opens in the
+# middle of somebody's work. The window is found again by that profile path
+# in its command line, never by a remembered pid: the agent can restart
+# between open and close, and a pid can be reused by anything.
+
+EMMA_SCREEN_PROFILE = LOG_DIR / "emma-screen"
+_EMMA_BROWSERS = (
+    r"%ProgramFiles%\Google\Chrome\Application\chrome.exe",
+    r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe",
+    r"%LocalAppData%\Google\Chrome\Application\chrome.exe",
+    r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe",
+    r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe",
+)
+#: Autoplay because nobody is at the keyboard to tap it (the page is muted
+#: unless its URL asks for sound -- the robot speaks in the same room, and
+#: its microphone would hear itself from this speaker). The crash-bubble pair:
+#: a window closed by force otherwise asks "restore pages?" on the next open.
+_EMMA_FLAGS = ("--kiosk", "--no-first-run", "--no-default-browser-check",
+               "--autoplay-policy=no-user-gesture-required",
+               "--hide-crash-restore-bubble", "--disable-session-crashed-bubble",
+               "--noerrdialogs", "--disable-features=Translate",
+               "--overscroll-history-navigation=0", "--disable-pinch",
+               # Less of Chrome's own traffic. Not none: measured 28 Oct, the
+               # kiosk still opened connections to Google with these and eight
+               # more "quiet" flags -- Chrome's own services, nothing from the
+               # page (it loads only from the robot).
+               "--disable-background-networking", "--disable-component-update")
+
+
+def _emma_browser() -> str:
+    """Chrome, else Edge (every Windows 10/11 has Edge). ROOM_AGENT_BROWSER
+    names one explicitly."""
+    chosen = os.getenv("ROOM_AGENT_BROWSER", "").strip()
+    for raw in ((chosen,) if chosen else _EMMA_BROWSERS):
+        path = os.path.expandvars(raw)
+        if path and "%" not in path and Path(path).is_file():
+            return path
+    return ""
+
+
+def _emma_page(url: str) -> bool:
+    """Only the robot's face page: http(s), a host, the path /mirror, no
+    credentials, no fragment. This is not open_in_browser with a kiosk flag
+    -- a full-screen window nobody can close from the keyboard is the wrong
+    shape for "any web page"."""
+    from urllib.parse import urlparse
+
+    try:
+        p = urlparse((url or "").strip())
+        p.port                                   # raises on a malformed port
+    except ValueError:
+        return False
+    return (p.scheme in ("http", "https") and bool(p.hostname) and p.path == "/mirror"
+            and p.username is None and p.password is None and not p.fragment)
+
+
+def _emma_windows(close: bool) -> int:
+    """How many browser processes run in the Emma profile; with close=True
+    they are closed -- politely first (a clean exit leaves no restore bubble),
+    by force after 3 s. -EncodedCommand: no quoting of the profile path."""
+    import base64
+    import subprocess
+
+    profile = str(EMMA_SCREEN_PROFILE).replace("'", "''")
+    script = (
+        "$d = '%s'; "
+        "$p = @(Get-CimInstance Win32_Process -Filter \"Name='chrome.exe' OR Name='msedge.exe'\" | "
+        "Where-Object { $_.CommandLine -and $_.CommandLine.Contains($d) }); "
+        "if (%s) { "
+        "foreach ($x in $p) { if ($x.CommandLine -notlike '*--type=*') { "
+        "try { (Get-Process -Id $x.ProcessId -ErrorAction Stop).CloseMainWindow() | Out-Null } catch {} } }; "
+        "for ($i = 0; $i -lt 30; $i++) { "
+        "if (-not @($p | Where-Object { Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }).Count) { break }; "
+        "Start-Sleep -Milliseconds 100 }; "
+        "foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue } }; "
+        "$p.Count" % (profile, "$true" if close else "$false"))
+    out = subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand",
+         base64.b64encode(script.encode("utf-16-le")).decode("ascii")],
+        capture_output=True, timeout=30, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    try:
+        return int((out.stdout or b"").decode("ascii", "replace").strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return 0
+
+
+def _prepare_profile() -> None:
+    """The profile's own settings, written before every open (a fresh profile
+    reads a seeded file): the record of a clean last exit -- what Chrome
+    reads to offer "restore pages?" -- and translation off. The first open on
+    a real desktop (28 Oct) put Google Translate's bubble over the kiosk:
+    the PC's Chrome is English and Emma's page is Thai."""
+    prefs = EMMA_SCREEN_PROFILE / "Default" / "Preferences"
+    try:
+        data = json.loads(prefs.read_text(encoding="utf-8")) if prefs.is_file() else {}
+        if not isinstance(data, dict):
+            data = {}
+        profile = data.setdefault("profile", {})
+        profile["exit_type"] = "Normal"
+        profile["exited_cleanly"] = True
+        data.setdefault("translate", {})["enabled"] = False
+        prefs.parent.mkdir(parents=True, exist_ok=True)
+        prefs.write_text(json.dumps(data), encoding="utf-8")
+    except (OSError, ValueError, AttributeError):
+        logger.warning("could not prepare the Emma screen profile")
+
+
+#: The display stays awake while Emma is on it: a 3D page is not video, so
+#: Chrome holds no wake lock, and a sales-room PC that blanks after ten idle
+#: minutes would put her face out mid-conversation. Execution state belongs to
+#: a thread, so one thread holds it until the window is closed.
+_awake = {"stop": None}
+
+
+def _keep_display_on(on: bool) -> None:
+    import threading
+
+    stop = _awake["stop"]
+    if stop is not None:
+        stop.set()
+        _awake["stop"] = None
+    if not on or not WINDOWS:
+        return
+    import ctypes
+
+    event = threading.Event()
+
+    def hold() -> None:
+        ES_CONTINUOUS, ES_SYSTEM_REQUIRED, ES_DISPLAY_REQUIRED = 0x80000000, 0x1, 0x2
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)
+        event.wait()
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+
+    _awake["stop"] = event
+    threading.Thread(target=hold, name="emma-screen-awake", daemon=True).start()
+
+
+def displays() -> list[dict]:
+    """This PC's monitors (owner 28 Oct: "มันจะมี 2 จอ ให้ขึ้นจอใหญ่ได้ไหม" -- the
+    multimedia room's PC drives a ~22" MSI monitor and a second screen that
+    reports no size). Device name, primary, the rectangle in physical pixels,
+    and the size the screen itself reports (EDID, mm; 0 = it does not say).
+    `hmon` is kept for the agent only; /health shows the rest."""
+    if not WINDOWS:
+        return []
+    import ctypes
+    from ctypes import wintypes
+
+    user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
+
+    class MONITORINFOEXW(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT), ("rcWork", wintypes.RECT),
+                    ("dwFlags", wintypes.DWORD), ("szDevice", wintypes.WCHAR * 32)]
+
+    found: list[dict] = []
+    proc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HMONITOR, wintypes.HDC,
+                              ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+
+    def each(hmon, _hdc, _rect, _lp):
+        info = MONITORINFOEXW()
+        info.cbSize = ctypes.sizeof(info)
+        if user32.GetMonitorInfoW(hmon, ctypes.byref(info)):
+            r = info.rcMonitor
+            mm = (0, 0)
+            dc = gdi32.CreateDCW("DISPLAY", info.szDevice, None, None)
+            if dc:
+                mm = (gdi32.GetDeviceCaps(dc, 4), gdi32.GetDeviceCaps(dc, 6))   # HORZSIZE, VERTSIZE
+                gdi32.DeleteDC(dc)
+            found.append({"device": info.szDevice.replace("\\\\.\\", ""), "primary": bool(info.dwFlags & 1),
+                          "x": r.left, "y": r.top, "width": r.right - r.left, "height": r.bottom - r.top,
+                          "mm": list(mm), "hmon": hmon})
+        return True
+
+    # Physical pixels on every monitor, whatever this process's DPI setting:
+    # a scaled screen otherwise reports a virtual rectangle (2048 wide at -1920).
+    old = user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))
+    try:
+        user32.EnumDisplayMonitors(None, None, proc(each), 0)
+    finally:
+        if old:
+            user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(old))
+    return found
+
+
+def _safe_displays() -> list[dict]:
+    try:
+        return displays()
+    except Exception:                    # a health check must answer whatever the GPU says
+        logger.exception("could not list the displays")
+        return []
+
+
+def _pick_display(which: str) -> dict | None:
+    """'' / primary = the primary; secondary = the other one of two;
+    DISPLAYn (or n) = that one. None = no such screen (the open says so)."""
+    found = displays()
+    want = (which or "").strip().upper().replace("\\\\.\\", "")
+    if not found:
+        return None
+    if want in ("", "PRIMARY"):
+        return next((d for d in found if d["primary"]), found[0])
+    if want == "SECONDARY":
+        others = [d for d in found if not d["primary"]]
+        return others[0] if len(others) == 1 else None
+    if want.isdigit():
+        want = "DISPLAY" + want
+    return next((d for d in found if d["device"].upper() == want), None)
+
+
+def _bring_to_front(pid: int, wait_s: float = 12.0, display: dict | None = None) -> bool:
+    """The kiosk window over whatever the room PC is showing.
+
+    The agent is a background process (a logon task), and Windows does not let
+    a background process put a NEW window in front of the one in use: on the
+    multimedia room's PC (28 Oct) Emma came up behind an open PowerShell
+    window -- behind a presentation she would never be seen. Topmost needs no
+    foreground right, so the window goes topmost (until it is closed); focus
+    is asked for but not forced -- no synthetic key press on somebody's PC.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                    ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+    found: list = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(hwnd, _):
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(hwnd) and user32.GetWindowTextLengthW(hwnd) > 0:
+            found.append(hwnd)
+        return True
+
+    user32.MonitorFromWindow.restype = wintypes.HMONITOR
+    deadline = time.monotonic() + wait_s
+    while time.monotonic() < deadline:
+        found.clear()
+        user32.EnumWindows(each, 0)
+        if found:
+            HWND_TOPMOST, SWP_NOSIZE, SWP_NOMOVE, SWP_SHOWWINDOW = -1, 0x1, 0x2, 0x40
+            hwnd = found[0]
+            if display is not None and user32.MonitorFromWindow(hwnd, 2) != display["hmon"]:
+                # Chrome reads --window-position in its own units; when the
+                # window still lands on the other screen, move it there whole
+                # (physical pixels, so this thread speaks them too).
+                old = user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))
+                try:
+                    user32.SetWindowPos(hwnd, HWND_TOPMOST, display["x"], display["y"], display["width"],
+                                        display["height"], SWP_SHOWWINDOW)
+                finally:
+                    if old:
+                        user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(old))
+            else:
+                user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW)
+            user32.SetForegroundWindow(hwnd)
+            return True
+        time.sleep(0.25)
+    logger.warning("the Emma screen window did not appear within %.0fs", wait_s)
+    return False
+
+
+def emma_screen_open(url: str, display: str = "") -> dict:
+    """Put the robot's face page up full screen (replacing one already up),
+    on `display` (the robot's table says which: '' = the primary)."""
+    if not WINDOWS:
+        return _unsupported("emma_screen_open")
+    if not _emma_page(url):
+        return {"ok": False, "error": "not the robot face page",
+                "instruction": "เปิดได้เฉพาะหน้าจอของหุ่น ให้บอกตรงๆ ห้ามบอกว่าเปิดแล้ว"}
+    browser = _emma_browser()
+    if not browser:
+        return {"ok": False, "error": "no Chrome or Edge on this machine",
+                "instruction": "เครื่องในห้องนี้ไม่มีเบราว์เซอร์ที่ใช้ได้ ให้บอกตรงๆ ห้ามบอกว่าเปิดแล้ว"}
+    screen = _pick_display(display)
+    if screen is None:
+        return {"ok": False, "error": "no such display", "displays": [d["device"] for d in displays()],
+                "instruction": "เครื่องในห้องนั้นไม่มีจอตามที่ตั้งไว้ ให้บอกตรงๆ ห้ามบอกว่าเปิดแล้ว"}
+    import subprocess
+
+    _emma_windows(close=True)        # one window, never a second on top of the first
+    EMMA_SCREEN_PROFILE.mkdir(parents=True, exist_ok=True)
+    _prepare_profile()
+    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    try:
+        where = "--window-position=%d,%d" % (screen["x"] + screen["width"] // 4, screen["y"] + screen["height"] // 4)
+        proc = subprocess.Popen([browser, "--user-data-dir=%s" % EMMA_SCREEN_PROFILE, *_EMMA_FLAGS, where, url.strip()],
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, close_fds=True, creationflags=flags)
+    except OSError as exc:
+        return {"ok": False, "error": "could not start the browser", "detail": str(exc),
+                "instruction": "เปิดหน้าจอไม่สำเร็จ ให้บอกตรงๆ ห้ามบอกว่าเปิดแล้ว"}
+    import threading
+
+    # Off the reply: the window takes a second or two to appear.
+    threading.Thread(target=_bring_to_front, args=(proc.pid,), kwargs={"display": screen},
+                     name="emma-screen-front", daemon=True).start()
+    try:
+        monitor("on")                # a display asleep would show nothing
+    except Exception:                # best effort: the window is up either way
+        logger.exception("could not wake the display")
+    _keep_display_on(True)
+    return {"ok": True, "opened": "emma_screen", "browser": Path(browser).stem, "display": screen["device"]}
+
+
+def emma_screen_close() -> dict:
+    """Take the robot's face page down. Nothing up is not an error."""
+    if not WINDOWS:
+        return _unsupported("emma_screen_close")
+    closed = _emma_windows(close=True)
+    _keep_display_on(False)
+    return {"ok": True, "closed": "emma_screen" if closed else "nothing_open"}
+
+
 CAPABILITIES: dict[str, Capability] = {
     "list_windows": Capability(list_windows, risk="read", what="รายชื่อหน้าต่างที่เปิดอยู่"),
     "screenshot": Capability(screenshot, risk="read", what="เก็บภาพหน้าจอไว้ในเครื่องนั้น"),
@@ -615,6 +938,9 @@ CAPABILITIES: dict[str, Capability] = {
     "open_in_browser": Capability(_computer("open_in_browser"), args=("url",),
                                   what="เปิดหน้าเว็บ (เฉพาะ http/https)"),
     "close_web_page": Capability(_computer("close_web_page"), what="ปิดหน้าเว็บที่เปิดไว้"),
+    "emma_screen_open": Capability(emma_screen_open, args=("url",), optional=("display",),
+                                   what="ขึ้นหน้าจอของหุ่นเต็มจอ (เฉพาะหน้า /mirror ของหุ่น)"),
+    "emma_screen_close": Capability(emma_screen_close, what="เอาหน้าจอของหุ่นลง"),
     "media_control": Capability(_computer("media_control"), args=("action",), optional=("times",),
                                 what="ปุ่มมีเดีย เล่น/หยุด/เสียง"),
     "press_key": Capability(press_key, args=("key",), what="กดปุ่มในรายการ เช่น เลื่อนสไลด์"),
@@ -719,6 +1045,9 @@ def create_app() -> FastAPI:
             # The LAN MAC, so the console can fill rooms.json's "mac" for
             # Wake-on-LAN while this PC is on (it can't be read once it's off).
             "mac_hint": _mac_hint(),
+            # Which screens this PC drives, so the robot's table can name the
+            # big one ("display": "DISPLAY2") without anyone at this PC.
+            "displays": [{k: v for k, v in d.items() if k != "hmon"} for d in _safe_displays()],
         }
 
     @app.post("/do")
@@ -745,8 +1074,8 @@ def create_app() -> FastAPI:
         ok = bool(result.get("ok"))
         # Only fields the action itself resolved from its own lists are copied
         # into the log — never the raw text that was asked for.
-        detail = str(result.get("opened") or result.get("pressed") or result.get("focused")
-                     or result.get("error") or "")
+        detail = str(result.get("opened") or result.get("closed") or result.get("pressed")
+                     or result.get("focused") or result.get("error") or "")
         _record(action or "(none)", ok, detail, client)
         return JSONResponse(content=result)
 

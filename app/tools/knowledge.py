@@ -17,6 +17,7 @@ approved source; a description inferred from an image is not approval.
 from __future__ import annotations
 
 import logging
+import re
 
 from app.tools.registry import tool
 from app import turnlog
@@ -52,6 +53,7 @@ MAX_RESULTS = 4
 # retrieval is the one shared module with no @tool in it.
 from app.tools.retrieval import (  # noqa: E402
     SPOKEN_NUMBERS,
+    asks_only_a_date,
     is_commercial as _is_commercial,
     sanitize_common_area_dimensions,
 )
@@ -180,15 +182,31 @@ REPORT_INSTRUCTION = (
 #: current information", "I don't have the exact start date" -- the owner's
 #: "อย่าให้เหมือนว่าหุ่นไม่มีข้อมูลนี้" (12 Oct) in English, which the Thai
 #: words of the rule never matched. Her own sentences, quoted.
+#: Replay of that log on 27 Oct: the two quotes held only those two
+#: wordings -- 16 of 115 answers said the same thing another way ("is not
+#: specified in our project details", "not available in our current
+#: records", "Our current project details do not specify"). Quoting three of
+#: those sentences WHOLE then backfired: the next replay said the EV one word
+#: for word, twice ("The exact number of EV chargers is not specified in our
+#: project details."). A/B on 10 real no-data questions x 3 (27 Oct): whole
+#: wrong sentences 3/30 said "no information", this wording 0/30 -- the
+#: hand-off is ONE sentence that starts with the sales team, never a sentence
+#: about what our details/records hold, and the bans are fragments too short
+#: to copy as an answer. Then the hand-off example itself became the answer in
+#: long calls (run 5: "Our sales team will be able to confirm that for you."
+#: 20 times; run 6, with a "[topic]" gap: "...confirm the exact details for
+#: you." 13 bare hand-offs, after searches that had found the executives) --
+#: so no hand-off sentence at all, whole or templated: the partial-answer
+#: rule of before, plus the short bans.
 GROUNDED_ONLY = (
     "พูดได้เฉพาะสิ่งที่เขียนอยู่ในผลนี้หรือในข้อมูลโครงการ ห้ามเติมคำบรรยายที่ผลไม่ได้บอก "
     "เช่น ห้ามพูดว่า 'มีอุปกรณ์ครบครัน' 'ทันสมัย' 'วิวทะเล' ถ้าผลไม่ได้เขียนไว้ "
-    "ถ้าผลตอบได้แค่บางส่วน ให้ตอบส่วนที่มี แล้วบอกว่าส่วนที่เหลือทีมขายจะยืนยันให้ "
-    "ห้ามพูดว่า 'not specified in our current details' 'not mentioned in our current information' "
-    "'I don't have the exact...' หรือ 'ไม่มีข้อมูล' ให้พูดแบบ 'ส่วนนี้ทีมขายจะยืนยันให้ค่ะ' "
-    "(พูดเป็นภาษาของบทสนทนา) "
+    "ตอบสิ่งที่ผลนี้บอกก่อนเสมอ ถ้าผลตอบได้แค่บางส่วน ให้ตอบส่วนที่มี แล้วบอกว่าส่วนที่เหลือทีมขายจะยืนยันให้ "
+    "(พูดเป็นภาษาของบทสนทนา) ห้ามพูดถึงว่าข้อมูล เอกสาร บันทึก หรือระบบของเรามีหรือไม่มีอะไร ทุกภาษา "
+    "ห้ามคำว่า 'not specified' 'not available in our' 'our details' 'our records' 'I don't have' "
+    "'ไม่มีข้อมูล' 'ไม่ได้ระบุ' "
     "ห้ามยืนยันเกินที่ผลเขียน: ถามว่าเกลือมาจากหิมาลัยจริงไหม ผลบอกแค่ผนังก้อนเกลือ ห้ามตอบ "
-    "'Yes, it is real natural salt stone' ให้บอกสิ่งที่ผลเขียนแล้วให้ทีมขายยืนยันที่มา")
+    "'it is real natural salt' ให้บอกสิ่งที่ผลเขียนแล้วให้ทีมขายยืนยันที่มา")
 
 
 def _report_hits(query: str) -> list[dict]:
@@ -218,7 +236,7 @@ def _report_hits(query: str) -> list[dict]:
 GUEST_WORDS_MAX_AGE_S = 30.0
 
 
-def _guest_words(query: str) -> str | None:
+def _guest_words(query: str, *, dates_ok: bool = False) -> str | None:
     try:
         from app import heard
 
@@ -227,9 +245,40 @@ def _guest_words(query: str) -> str | None:
         logger.exception("could not read the guest's words -- the model's query alone")
         return None
     text = " ".join((caption.text if caption else "").split())
-    if not text or text.lower() == " ".join(query.split()).lower() or _is_commercial(text):
+    if not text or text.lower() == " ".join(query.split()).lower():
+        return None
+    if _is_commercial(text) and not (dates_ok and asks_only_a_date(text)):
         return None
     return text
+
+
+#: The FAQ answers the completion-date route may give: questions about WHEN the
+#: project is done. Review 27 Oct: the route took whatever the FAQ matched, and
+#: "เงื่อนไขการชำระเงินตอนสร้างเสร็จเป็นอย่างไร" (a payment term COMMERCIAL_TERMS
+#: has no word for) came back with the payment split.
+_DATE_QUESTION = re.compile(r"เสร็จเมื่อไ|เสร็จปีไหน|complet|finish", re.IGNORECASE)
+
+
+def _report_faq(query: str) -> list[dict]:
+    """The approved FAQ's completion-date answer to `query` or to the guest's
+    own words (the model's "completion date" matches no FAQ question, the
+    guest's "โครงการจะสร้างเสร็จเมื่อไหร่คะ" does), or []."""
+    try:
+        from app import project_report
+
+        hits = project_report.faq(query)
+        if not hits:
+            guest = _guest_words(query, dates_ok=True)
+            hits = project_report.faq(guest) if guest else []
+    except Exception:
+        logger.exception("project report FAQ failed")
+        return []
+
+    def question(hit: dict) -> str:
+        return str(hit.get("text") or "").split("\n", 1)[0]
+
+    return [h for h in hits if _DATE_QUESTION.search(question(h))
+            and not (_is_commercial(question(h)) and not asks_only_a_date(question(h)))]
 
 
 def _guest_faq(query: str, report: list[dict]) -> list[dict]:
@@ -266,6 +315,12 @@ SEARCH_DESCRIPTION = (
     "ฟิตเนสใหญ่แค่ไหน มีอุปกรณ์อะไร ห่างห้าง/โรงพยาบาลกี่กิโล พันธุ์ไม้ วัสดุ ระบบ ผลงานผู้พัฒนา "
     "(มีในรายงานโครงการที่ค้นได้) ห้ามตอบจากความรู้ทั่วไป ห้ามเติมรายการที่ไม่มีในผลค้น "
     "และห้ามตอบว่า 'ทีมขายจะให้รายละเอียดได้ครบที่สุด' ก่อนค้นในเทิร์นนั้น "
+    # NOT an English hand-off sentence here (replay 27 Oct, run 5): quoted as
+    # "forbidden before a search", "Our sales team will be able to confirm
+    # that for you." became the WHOLE answer 20 times in 115 turns -- twelve
+    # in a row in one call, after searches that had found the CEO and the
+    # COO. A whole sentence in an instruction is a sentence she can say.
+    "ส่งต่อทีมขายได้หลังค้นไม่พบเท่านั้น ทุกภาษา "
     "ส่ง intent ของคำถามให้ครบ โดยเฉพาะคำว่าอยู่ตรงไหนหรืออยู่ชั้นไหน "
     "ห้ามย่อเหลือเพียงชื่อสถานที่จน intent ตำแหน่งหาย "
     "ห้ามเดาเอง ถ้าไม่พบข้อมูลห้ามพูดว่าไม่มีข้อมูลหรือไม่ทราบ ให้ส่งต่อทีมขายอย่างเป็นธรรมชาติ"
@@ -329,9 +384,17 @@ def _story_redirect(query: str) -> dict | None:
         return None
     from app import stories
 
+    via = "query"
     try:
         offered = stories.available()
         topic = stories.story_for_query(query, offered)
+        if topic is None:
+            # The guest's own sentence, when the model's keyword list names no
+            # story (stories.story_for_guest: the 20 Oct replay's restaurant
+            # and attractions questions went to the sales team this way).
+            guest = _guest_words(query)
+            topic = stories.story_for_guest(query, guest, offered) if guest else None
+            via = "guest"
     except Exception:
         logger.exception("story match failed -- searching as usual")
         return None
@@ -349,9 +412,28 @@ def _story_redirect(query: str) -> dict | None:
         return None
     story = offered[topic]
     asks = " / ".join(((story.get("questions_th") or [])[:3] + (story.get("questions_en") or [])[:1]))
-    turnlog.record("lookup", query=query, showed=None, found=True, story=topic, reason="story topic")
+    turnlog.record("lookup", query=query, showed=None, found=True, story=topic,
+                   reason="story topic" if via == "query" else "story topic (guest's words)")
     return {"ok": True, "found": True, "results": [], "story_topic": topic,
             "instruction": STORY_REDIRECT % (topic, asks)}
+
+
+#: The executives' names as the recogniser spells them, to the report's
+#: spelling. Robot 20 Oct: "What can you tell me about Mickey Hayim?" -- the
+#: search "Mickey Hayim" found nothing (the report writes "Miki Haim"; "Miki
+#: Haim" finds the executives' FAQ), and the CEO went to the sales team, in
+#: both replays (27 and 28 Oct). "Putchachat Sucharitakul" was found by its
+#: surname and needs nothing.
+_NAME_SPELLINGS = (
+    (re.compile(r"\bmi(?:ck|k|kk)e?y\b", re.IGNORECASE), "Miki"),
+    (re.compile(r"\b(?:hay+im|haiim|chaim)\b", re.IGNORECASE), "Haim"),
+)
+
+
+def _spell_names(query: str) -> str:
+    for pattern, spelling in _NAME_SPELLINGS:
+        query = pattern.sub(spelling, query)
+    return query
 
 
 @tool(
@@ -368,6 +450,18 @@ def search_condo_info(query: str) -> dict:
     slides = load_slides()
     if not slides:
         return {"ok": False, "error": "no project information available"}
+    query = _spell_names(query)
+
+    if _is_commercial(query) and asks_only_a_date(query):
+        # When the project is finished: the approved FAQ's answer, carrying
+        # its own "confirm in the contract" (retrieval._DATE_TERMS). The FAQ
+        # only -- the strict matcher, never a passage or a slide.
+        dated = _report_faq(query)
+        if dated:
+            turnlog.record("lookup", query=query, showed=None, found=True,
+                           report=[h["file"] for h in dated], reason="project report (date)")
+            return {"ok": True, "found": True, "results": dated,
+                    "instruction": REPORT_INSTRUCTION + " " + GROUNDED_ONLY}
 
     if _is_commercial(query):
         logger.info("lookup %r: commercial question, not answerable from slides", query)

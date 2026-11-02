@@ -8,7 +8,9 @@ __all__ = ["ProviderError", "ProviderEvent", "VoiceProvider", "get_provider", "d
 
 
 def default_voice_for(provider: str) -> str:
-    return settings.gemini_voice if provider == "gemini" else settings.openai_voice
+    # offline plays clips rendered in GEMINI_VOICE (app/offline/voice.py)
+    offline = provider == "offline" and settings.offline_fallback
+    return settings.gemini_voice if provider == "gemini" or offline else settings.openai_voice
 
 
 def get_provider(provider: str, voice: str, instructions: str, greeting: str | None = None,
@@ -28,4 +30,14 @@ def get_provider(provider: str, voice: str, instructions: str, greeting: str | N
         from app.providers.openai_realtime import OpenAIProvider
 
         return OpenAIProvider(voice, instructions, greeting=greeting, use_tools=use_tools)
+    if provider == "offline" and settings.offline_fallback:
+        # OFFLINE_FALLBACK (docs/emma-offline-mode.md): approved lines and
+        # stories, local ASR, no network and no key. Chosen by the session
+        # when app/net_health.py says the link is down. With the switch off
+        # the name does not exist (a `?provider=offline` URL gets the same
+        # "unknown provider" as before the switch was written).
+        from app.providers.offline import OfflineProvider
+
+        return OfflineProvider(voice, instructions, greeting=greeting,
+                               use_tools=use_tools, vad_floor=vad_floor)
     raise ProviderError(f"Unknown VOICE_PROVIDER '{provider}'. Use 'gemini' or 'openai'.")

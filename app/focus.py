@@ -111,6 +111,9 @@ NEAR_VOICE = "near voice"
 #: Rule 2 waived: the segment opened within FOCUS_REPLY_WINDOW_S of her voice
 #: ending -- the guest answering what she just said (`her_turn_ended`).
 REPLY = "reply to her"
+#: Rule 2 waived: the robot stands at a room's big screen (room_screens.
+#: at_screen) and the voice is clear (FOCUS_SCREEN_RMS) -- see `at_big_screen`.
+AT_SCREEN = "at the big screen"
 
 # ---- tunables (constants, not settings: tune from focus_* rows first) ----
 #: Rule 3's window: mouth samples this recent count for "is anybody in front
@@ -190,6 +193,10 @@ _doa: deque = deque(maxlen=MAX_DOA)                 # (t, bearing | None, confid
 #: and "no open segment" read as "nobody talking" let the goodbye be said —
 #: and the call hung up — over a question (review 10 Oct).
 _voice_at: list = [None]
+#: The rms of that voice's trigger chunk (None when the gate gave none): the
+#: head's look-down search (app/head_follow.py) moves only for a voice AT the
+#: robot, never for the room's chatter.
+_voice_rms: list = [None]
 #: When the robot last invited somebody in (FOCUS_INVITE). Room state, on
 #: purpose: the standing line rings a fresh line seconds after the last one
 #: ends, so a per-line rate limit reset with every ring (review 10 Oct).
@@ -613,6 +620,8 @@ def may_open(t: float, rms: float | None = None) -> tuple[bool, str]:
     if not enabled():
         return True, OFF                                    # rule 1
     with _lock:
+        if _voice_at[0] is None or t >= _voice_at[0]:
+            _voice_rms[0] = rms
         _voice_at[0] = t if _voice_at[0] is None else max(_voice_at[0], t)
         allow, reason, inputs = _decide(t, rms)
         # Renewed only by a segment the rules themselves let through (a face
@@ -648,6 +657,31 @@ def may_open(t: float, rms: float | None = None) -> tuple[bool, str]:
 BODY_MOVING_MAX_S = 30.0
 
 
+def at_big_screen() -> str | None:
+    """The room screen the robot stands at, when the face rule is waived
+    there (FOCUS_SCREEN_RMS > 0), else None.
+
+    Owner 29 Oct, after the media-room test: "ผ่อน 'ต้องเห็นหน้า' ตอนหุ่นอยู่
+    หน้าจอใหญ่ ... ผ่อนเลย ฟังจากเสียงที่ได้ยินชัดเอา". With its face on the
+    TV, people watch the TV, not the head camera: the robot log of 28 Oct had
+    a usable face in 1 of 297 listening decisions all day (34 of 155 opens on
+    20 Oct), the testers' first sentences at a normal voice (0.031, 0.044)
+    were refused "no face in front", and the call hung up "no face" 30 s
+    after every answer. There the face rule gives way to the voice: rule 2
+    admits a clear one (`_decide`), and the session's face-based idle and
+    follow-up vetoes stand down. Never raises: no screen table, no pose, any
+    error = None, the rules as they were."""
+    level = float(getattr(settings, "focus_screen_rms", 0) or 0)
+    if level <= 0:
+        return None
+    try:
+        from app import room_screens
+
+        return room_screens.at_screen()
+    except Exception:
+        return None
+
+
 def _robot_moving() -> bool:
     """Walking (the face link's nav state, most cautious face) or a gesture
     under way. Review 12 Oct: rules 2-3 dropped a guest's "หยุด" spoken from
@@ -656,9 +690,11 @@ def _robot_moving() -> bool:
     heard it. While the robot moves, hearing a stop beats ignoring a
     bystander. Never raises: focus must not fail on the motion bookkeeping."""
     try:
-        from app import robot_body, robot_face_link
+        from app import event_walk, robot_body, robot_face_link
 
         if robot_face_link.nav_activity() in ("active", "stale"):
+            return True
+        if event_walk.walking():                         # the event host's staff walk
             return True
         state = robot_body.STATE
         at = state.get("at")
@@ -720,7 +756,7 @@ def her_turn_ended(voice_end: float, epoch: int | None = None) -> None:
         since, _reply["since"] = _reply["since"], set()
         if since and since <= {REPLY}:
             _reply["chain"] += 1
-        elif since & {OK, NEAR_VOICE, CONVERSING}:
+        elif since & {OK, NEAR_VOICE, CONVERSING, AT_SCREEN}:
             _reply["chain"] = 0
         if _reply["chain"] >= MAX_REPLY_CHAIN:
             _reply["until"] = float("-inf")
@@ -775,6 +811,18 @@ def _decide(t: float, rms: float | None = None) -> tuple[bool, str, dict]:
             if near > 0 and rms is not None and rms >= near:
                 inputs["near"] = True
                 return True, NEAR_VOICE, inputs
+            # At a room's big screen nobody faces the head camera (they watch
+            # the TV): a clear voice is enough there. "Clear" = this frame at
+            # FOCUS_SCREEN_RMS or more on top of what every voice already
+            # passed (Silero's sustained speech, the call's loudness floor).
+            # The gate asks on every frame of the sentence and VAD_HEAD_HOLD_MS
+            # keeps its head, so a sentence that becomes clear mid-way comes
+            # in whole. Calibrated on the 28 Oct log: see robot.env.
+            screen = at_big_screen()
+            if screen is not None:
+                inputs["at_screen"] = True
+                if rms is not None and rms >= float(settings.focus_screen_rms):
+                    return True, AT_SCREEN, inputs
             return False, (NO_CAMERA if not camera else NO_FACE), inputs
 
     # Full engagement (FOCUS_ENGAGE_MODE=full): the person the conversation
@@ -1075,8 +1123,9 @@ def context_note(label: SpeakerLabel | None) -> str | None:
 
 def attention(t: float | None = None) -> dict:
     """Where the robot's face should look (FOCUS_ATTENTION): {"bearing": deg
-    or None, "source": why}. None = back to centre: nobody engaged and nobody
-    speaking.
+    or None, "source": why, "track": the face track it is, or None}. None =
+    back to centre: nobody engaged and nobody speaking. `track` lets the
+    physical head (app/head_follow.py) find that face's box for its tilt.
 
     Furhat's rule — attention follows whoever speaks — in the order of what
     this arbiter is surest of: a face in front whose mouth moves; else the
@@ -1085,10 +1134,15 @@ def attention(t: float | None = None) -> dict:
     engaged face (eye contact with somebody waiting). In full engagement mode
     the main person wins outright while they are in front: Pepper's
     FullyEngaged robot does not glance at every other voice.
+
+    FOCUS_GAZE_VISIT_S (owner 2 Nov 2026, a group in front): with two or more
+    engaged faces the last two steps become a round -- the last speaker for
+    one visit after they stopped, then each face in turn (`_visit`), source
+    "visit". A moving mouth or a direction still wins at once.
     """
     t = time.monotonic() if t is None else t
     if not enabled():
-        return {"bearing": None, "source": None}
+        return {"bearing": None, "source": None, "track": None}
     with _lock:
         out, released = _attend(t)
     if released is not None:
@@ -1104,26 +1158,105 @@ def _attend(t: float) -> tuple[dict, int | None]:
         if lead is not None:
             mine = [f for k, f in engaged.items() if _track_person.get(k) is lead]
             face = max(mine, key=lambda f: f.width_px)
-            return {"bearing": face.bearing_deg, "source": "main"}, released
+            return {"bearing": face.bearing_deg, "source": "main", "track": face.track}, released
     moving = []
     for track in _proven(engaged):
         value = _mouth_max([track], t - MOUTH_WINDOW_S, t + 0.1)
         if value is not None and value >= MOUTH_MOVING:
             moving.append((value, track))
+    dwell = _visiting(engaged)
     if moving:
-        return {"bearing": engaged[max(moving)[1]].bearing_deg, "source": "mouth"}, released
+        track = max(moving)[1]
+        if dwell:
+            _gaze_on(engaged[track], t, t)          # the round goes on from the speaker
+        return {"bearing": engaged[track].bearing_deg, "source": "mouth", "track": track}, released
     doa = _doa_bearing(t - DOA_WINDOW_S, t + 0.1)
     if doa is not None:
-        return {"bearing": doa, "source": "doa"}, released
+        return {"bearing": doa, "source": "doa", "track": None}, released
     for info in reversed(_segments.values()):
         track = info.get("track")
         if track is not None and track in engaged:
-            return {"bearing": engaged[track].bearing_deg, "source": "label"}, released
+            if not dwell:
+                return {"bearing": engaged[track].bearing_deg, "source": "label", "track": track}, released
+            # Visiting (FOCUS_GAZE_VISIT_S): the last speaker keeps her eyes
+            # for one visit after they stopped, then the round goes on from
+            # them -- without the limit the label wins for as long as they
+            # stay in view and the others are never looked at.
+            if t - float(info.get("t1", t)) <= dwell:
+                _gaze_on(engaged[track], float(info.get("t1", t)), t)
+                return {"bearing": engaged[track].bearing_deg, "source": "label", "track": track}, released
         break                                   # only the latest segment
+    if dwell:
+        return _visit(t, engaged, dwell), released
     if engaged:
         face = max(engaged.values(), key=lambda f: f.width_px)
-        return {"bearing": face.bearing_deg, "source": "face"}, released
-    return {"bearing": None, "source": None}, released
+        return {"bearing": face.bearing_deg, "source": "face", "track": face.track}, released
+    return {"bearing": None, "source": None, "track": None}, released
+
+
+# ---- visiting each face in turn (FOCUS_GAZE_VISIT_S) --------------------
+#
+# Owner, 2 Nov 2026: "หากมีคนยืนล้อมรอบเยอะ ... ใช้การสบตาหรือหันหน้าไปหาทีละคน"
+# (docs/emma-multi-person-2026-11-02.md). With two or more engaged faces and
+# nothing saying who speaks, the cue used to rest on the nearest face for as
+# long as it stayed nearest: the others in the group were never looked at.
+
+#: Room state (the people standing there survive a new session): which face
+#: the round is on, since when, where it stood in the ROOM (camera bearing +
+#: the head's pan -- with HEAD_FOLLOW the camera turns, and a bearing kept in
+#: camera degrees would point somewhere else after the next look), and when
+#: the round last ran. Guarded by _lock (`_attend` runs under it).
+_gaze: dict = {"track": None, "since": float("-inf"), "room": None, "at": float("-inf")}
+
+
+def _visiting(engaged: dict) -> float:
+    """FOCUS_GAZE_VISIT_S when it applies to this moment, else 0.0: the
+    switch is on and at least two faces are engaged. One face, or the switch
+    off, is today's rule exactly."""
+    dwell = float(settings.focus_gaze_visit_s or 0.0)
+    return dwell if dwell > 0 and len(engaged) >= 2 else 0.0
+
+
+def _head_pan() -> float:
+    """Degrees the robot's head is turned (+ = left); 0.0 with HEAD_FOLLOW off
+    (head_follow.offset_deg says so itself), and 0.0 if it cannot be read --
+    the round's order then works in camera degrees, which is right for a head
+    that does not turn."""
+    try:
+        from app import head_follow
+
+        return float(head_follow.offset_deg()[0])
+    except Exception:  # noqa: BLE001 -- a probe, never a reason to lose the cue
+        return 0.0
+
+
+def _gaze_on(face: FaceObs, since: float, t: float) -> None:
+    _gaze.update(track=face.track, since=since, room=face.bearing_deg + _head_pan(), at=t)
+
+
+def _visit(t: float, engaged: dict, dwell: float) -> dict:
+    """The face the round is on: the same one for `dwell` seconds, then the
+    next to its right (the robot's right = smaller bearing), wrapping to the
+    leftmost. It starts with the nearest face -- for the first visit the cue
+    is exactly what it was without the switch -- and starts again from the
+    nearest after a pause longer than one visit (a new group, not the next
+    person of the old one)."""
+    cur = _gaze["track"]
+    if t - _gaze["at"] > max(dwell, float(settings.focus_hold_s)):
+        cur, _gaze["room"] = None, None
+    if cur in engaged and t - _gaze["since"] < dwell:
+        face = engaged[cur]
+        _gaze_on(face, _gaze["since"], t)          # follow them as they move
+    else:
+        order = sorted(engaged.values(), key=lambda f: (-f.bearing_deg, f.track))
+        if _gaze["room"] is None:
+            face = max(order, key=lambda f: f.width_px)
+        else:
+            last = _gaze["room"] - _head_pan()     # where the last one stood, in this frame
+            right = [f for f in order if f.track != cur and f.bearing_deg < last]
+            face = right[0] if right else next(f for f in order if f.track != cur)
+        _gaze_on(face, t, t)
+    return {"bearing": face.bearing_deg, "source": "visit", "track": face.track}
 
 
 def calling_out_of_view(t: float, n: int) -> float | None:
@@ -1159,6 +1292,12 @@ def last_voice_at() -> float | None:
     the voices focus refused, not only the segments it let through."""
     with _lock:
         return _voice_at[0]
+
+
+def last_voice() -> tuple[float | None, float | None]:
+    """(monotonic time, rms) of the last voice at the door, opened or denied."""
+    with _lock:
+        return _voice_at[0], _voice_rms[0]
 
 
 def claim_invite(t: float, every_s: float) -> bool:
@@ -1242,7 +1381,9 @@ def _forget_everything() -> None:
         _moved.clear()
         _doa.clear()
         _voice_at[0] = None
+        _voice_rms[0] = None
         _invited["t"] = None
+        _gaze.update(track=None, since=float("-inf"), room=None, at=float("-inf"))
         _last_frame_t = None
         _last_engaged_t = None
         _session_t[0] = float("-inf")

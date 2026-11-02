@@ -675,3 +675,124 @@ def test_every_result_says_numbers_the_owners_way(loaded):
     assert SPOKEN_NUMBERS in stories._MORE_FACT_RULES
     assert "ห้ามคำนวณหรือปัดเอง" not in knowledge.REPORT_INSTRUCTION, "the old rule forbade the rounding"
     assert "'ขับรถประมาณ 4 นาที'" in SPOKEN_NUMBERS and "'ประมาณ 7.6'" in SPOKEN_NUMBERS
+
+
+
+# ---- replay of the 20 Oct robot log (27 Oct) -----------------------------------
+
+def test_a_completion_date_question_is_commercial_only_for_its_date():
+    """The gate refused "expected completion date" while the owner-approved
+    FAQ carries the date (with its own "confirm in the contract"). Only a
+    question commercial BECAUSE of its date words may take the FAQ; a price
+    word anywhere keeps it a price question."""
+    from app.tools.retrieval import asks_only_a_date, is_commercial
+
+    for q in ("expected completion date", "When is the handover?", "สร้างเสร็จเมื่อไหร่"):
+        assert is_commercial(q) and asks_only_a_date(q), q
+    for q in ("completion price", "ราคาตอนสร้างเสร็จเท่าไหร่", "how much at handover",
+              "When will the project be completed?", "ฟิตเนสอยู่ชั้นไหน"):
+        assert not asks_only_a_date(q), q
+
+
+def test_a_date_question_gets_the_approved_faq_answer(loaded, monkeypatch):
+    from app import project_report
+    from app.tools import knowledge
+
+    asked = []
+
+    def faq(query):
+        asked.append(query)
+        return [{"source_id": "project_report", "file": "19_faq.md",
+                 "text": "ถาม: โครงการจะสร้างเสร็จเมื่อไร\nตอบ: ตามระบบขาย ... ยืนยันในสัญญา"}]
+
+    monkeypatch.setattr(project_report, "faq", faq)
+    out = run(registry.dispatch("search_condo_info", {"query": "expected completion date"}))
+    assert out["found"] is True and out["results"][0]["file"] == "19_faq.md"
+    assert out["instruction"].startswith(knowledge.REPORT_INSTRUCTION)
+    # a price question never asks the FAQ, date words or not
+    asked.clear()
+    out = run(registry.dispatch("search_condo_info", {"query": "completion price"}))
+    assert out["found"] is False and asked == []
+    # no FAQ answer: the old refusal, handed to the sales team
+    monkeypatch.setattr(project_report, "faq", lambda query: [])
+    out = run(registry.dispatch("search_condo_info", {"query": "expected completion date"}))
+    assert out["found"] is False and "ส่งต่อทีมขาย" in out["instruction"]
+
+
+def test_no_ready_made_hand_off_sentence_rides_on_the_model():
+    """Replay of 20 Oct, run 5 (27 Oct): "Our sales team will be able to
+    confirm that for you." -- quoted in the search description as forbidden
+    before a search -- became the WHOLE answer 20 times, twelve in a row in one
+    call. A whole hand-off sentence in an instruction is a sentence she says;
+    the rule names what to confirm instead."""
+    from app import stories
+    from app.tools import knowledge
+
+    for text in (knowledge.SEARCH_DESCRIPTION, knowledge.GROUNDED_ONLY, stories._MORE_RULES):
+        assert "will be able to confirm that for you" not in text
+        assert "Our sales team will confirm that for you." not in text
+        assert "confirm the exact" not in text and "Our sales team will" not in text
+    assert "ตอบสิ่งที่ผลนี้บอกก่อนเสมอ" in knowledge.GROUNDED_ONLY
+
+
+
+def test_the_date_route_takes_only_a_completion_answer(loaded, monkeypatch):
+    """Review 27 Oct: "เงื่อนไขการชำระเงินตอนสร้างเสร็จเป็นอย่างไร" passed the date
+    test (no COMMERCIAL_TERMS word for a payment term) and the route took the
+    payment split the FAQ matched. Only the FAQ's WHEN-is-it-done answers."""
+    from app import project_report
+
+    monkeypatch.setattr(project_report, "faq", lambda query: [
+        {"source_id": "project_report", "file": "19_faq.md",
+         "text": "ถาม: เงื่อนไขการชำระเงินเป็นอย่างไร\nตอบ: ..."}])
+    out = run(registry.dispatch("search_condo_info",
+                                {"query": "เงื่อนไขการชำระเงินตอนสร้างเสร็จเป็นอย่างไร"}))
+    assert out["found"] is False, "a payment answer must not ride the date route"
+
+
+def test_the_date_route_falls_back_to_the_guests_words(loaded, monkeypatch):
+    """The model's "completion date" matches no FAQ question; the guest's
+    "โครงการจะสร้างเสร็จเมื่อไหร่คะ" does (a date-only commercial caption)."""
+    from app import heard, project_report
+
+    def faq(query):
+        if "เมื่อไหร่คะ" in query:
+            return [{"source_id": "project_report", "file": "19_faq.md",
+                     "text": "ถาม: โครงการจะสร้างเสร็จเมื่อไร\nตอบ: ตามระบบขาย ..."}]
+        return []
+
+    monkeypatch.setattr(project_report, "faq", faq)
+    listener = object()
+    heard.bind_session(listener)
+    try:
+        heard.mark_activity(listener)
+        heard.record("โครงการจะสร้างเสร็จเมื่อไหร่คะ", listener, utterance_id="d1")
+        out = run(registry.dispatch("search_condo_info", {"query": "completion date"}))
+        assert out["found"] is True and out["results"][0]["file"] == "19_faq.md"
+    finally:
+        heard.bind_session(None)
+
+
+def test_the_ceos_name_as_the_recogniser_spells_it_is_searched_as_the_report_writes_it():
+    """Robot 20 Oct: the search "Mickey Hayim" found nothing; "Miki Haim"
+    finds the executives (both replays sent the CEO to the sales team)."""
+    import inspect
+
+    from app.tools import knowledge
+    from app.tools.knowledge import _spell_names
+
+    assert _spell_names("What can you tell me about Mickey Hayim?") == "What can you tell me about Miki Haim?"
+    assert _spell_names("micky chaim") == "Miki Haim"
+    for untouched in ("Can I see the mike?", "Is the milk included?", "Miki Haim", "haiku"):
+        assert _spell_names(untouched) == untouched
+    assert "query = _spell_names(query)" in inspect.getsource(knowledge.search_condo_info)
+
+
+def test_a_width_by_length_of_a_common_area_goes_whole():
+    """28 Oct: "ขนาด 16.125 × 5.85 เมตร" (Bungee Gym) was cut to "ขนาด 16.125 ×"
+    -- the first number stayed. A unit's balcony is not a common area."""
+    from app.tools.retrieval import sanitize_common_area_dimensions as cut
+
+    assert cut("ห้องติดกระจกเห็นลากูน ขนาด 16.125 × 5.85 เมตร") == "ห้องติดกระจกเห็นลากูน"
+    assert cut("the lagoon is 16 x 5 m") == "the lagoon is"
+    assert cut("Studio 24 ตร.ม. ระเบียง 2.5 × 1 เมตร") == "Studio 24 ตร.ม. ระเบียง 2.5 × 1 เมตร"

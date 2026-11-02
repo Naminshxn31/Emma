@@ -25,8 +25,13 @@ from __future__ import annotations
 import re
 
 LANGS = ("th", "en", "zh")
+#: The language menu (owner 29 Oct: "ไทย อังกฤษ จีน จะเพิ่มรัสเซีย"): LANGS
+#: are the languages the topics and hints are written in; a language on the
+#: menu needs no topic text of its own -- picking it pins the conversation
+#: (app/talk_lang.py `pin`) and every later tap says it by name.
+PICK_LANGS = ("th", "en", "zh", "ru")
 
-_LANG_NAMES_TH = {"th": "ไทย", "en": "อังกฤษ", "zh": "จีน"}
+_LANG_NAMES_TH = {"th": "ไทย", "en": "อังกฤษ", "zh": "จีน", "ru": "รัสเซีย"}
 
 # ---- the conversation's language, for a tap (owner, 15 Oct 2026) -----------
 # Talking English, a tap on a story button got a Thai answer: the tap's user
@@ -45,19 +50,57 @@ _TAP_PREAMBLE = {
 _TAP_CALL = {"th": "เรียก %s แล้วเล่าตามผลลัพธ์", "en": "Call %s and tell it from the result.",
              "zh": "Call %s and tell it from the result."}
 
+# ---- any other language the server can tell (audit 27 Oct) -------------------
+# The tap's language came from `script_lang`, which reads every Latin script
+# as English and kanji as Chinese: in a German talk a tap said "This
+# conversation is in English: answer in English, do not switch language", in
+# a Japanese one "in Chinese" -- the tap itself switched her. session._quick_ask
+# now asks the provider's TalkLanguage first (app/talk_lang.py, from what the
+# GUEST said), and a language with no wording of its own here gets this one
+# preamble naming it -- a bracketed stage direction like the others, never a
+# sentence in that language for her to repeat.
+
+#: English names for the codes app/talk_lang.py tells (its NAMES are Thai).
+#: Every one of them (review 29 Oct, tests/test_talk_lang_vietnamese.py): talk_lang
+#: learnt "vi" on 28 Oct and this table did not, so a tap in a Vietnamese talk
+#: fell back to the Thai "answer in the language spoken last" turn -- the one
+#: a Thai tap text beats (owner 15 Oct, the reason `talk` exists).
+_LANG_NAMES_EN = {"th": "Thai", "en": "English", "zh": "Chinese", "ja": "Japanese", "ko": "Korean",
+                  "ru": "Russian", "he": "Hebrew", "ar": "Arabic", "hi": "Hindi", "de": "German",
+                  "fr": "French", "es": "Spanish", "it": "Italian", "vi": "Vietnamese"}
+_TAP_PREAMBLE_NAMED = ("[The guest tapped \"%s\" on the screen and did not speak. This conversation is in %s: "
+                       "answer in %s, do not switch language.] ")
+
+
+def tap_talk(code) -> str | None:
+    """`code` when a tap can say the conversation is in it (th/en/zh, or any
+    other language app/talk_lang.py tells), else None -- the caller then uses
+    the old "answer in the language the guest spoke last" wording."""
+    return code if isinstance(code, str) and code in _LANG_NAMES_EN else None
+
+
+def talk_name_en(code) -> str | None:
+    """The language's English name for a bracketed instruction ("German"),
+    or None for a code `tap_talk` does not take."""
+    return _LANG_NAMES_EN.get(code) if tap_talk(code) else None
+
 
 def script_lang(text) -> str | None:
     """th / en / zh by the letters of `text`, or None when it says too little.
     Thai wins on a handful of Thai letters: a Thai reply is full of English
     names (Water Lagoon, Sky Pool), while an English reply carries at most a
-    closing "ค่ะ"."""
+    closing "ค่ะ". Kana is Japanese, which this cannot name: None, not the
+    "zh" its kanji used to read as (audit 27 Oct)."""
     if not isinstance(text, str):
         return None
     thai = sum(1 for c in text if "฀" <= c <= "๿")
+    kana = sum(1 for c in text if "぀" <= c <= "ヿ")
     cjk = sum(1 for c in text if "一" <= c <= "鿿")
     latin = sum(1 for c in text if c.isascii() and c.isalpha())
     if thai >= 8:
         return "th"
+    if kana:
+        return None
     if cjk >= 4:
         return "zh"
     if latin >= 8:
@@ -66,13 +109,17 @@ def script_lang(text) -> str | None:
 
 
 def tap_preamble(label: dict, talk: str) -> str:
-    """The marked-as-a-tap opening in the conversation's own language."""
+    """The marked-as-a-tap opening in the conversation's own language (any
+    code `tap_talk` takes; one outside LANGS gets the English label)."""
     shown = label.get(talk) or label.get("en") or label.get("th") or ""
-    return _TAP_PREAMBLE[talk] % shown
+    if talk in _TAP_PREAMBLE:
+        return _TAP_PREAMBLE[talk] % shown
+    name = _LANG_NAMES_EN[talk]
+    return _TAP_PREAMBLE_NAMED % (shown, name, name)
 
 
 def tap_call(call: str, talk: str) -> str:
-    return _TAP_CALL[talk] % call
+    return _TAP_CALL.get(talk, _TAP_CALL["en"]) % call
 
 #: The topics, per profile. `ask` is the guest's question in each language;
 #: the label is what the button says. Order = on-screen order.
@@ -110,13 +157,19 @@ TOPICS: dict[str, tuple[dict, ...]] = {
                  "zh": "现在还有哪些房源可售？"}},
     ),
 }
+#: The event host is the sales host at an event (app/event_host.py): the same
+#: taps, the same language menu.
+TOPICS["event"] = TOPICS["condo"]
 
-#: The language buttons. Tapping one is the guest saying which language,
-#: which rule #2 already obeys at once ("ถ้าระบุภาษาที่ต้องการให้ใช้ทันที").
+#: The language menu. Picking one is the guest saying which language -- and,
+#: since 29 Oct, the only language she answers in for the rest of the call
+#: (app/talk_lang.py `pin`). `label` in the language itself, `sub` its
+#: English name for whoever reads neither script.
 LANGUAGE_BUTTONS = (
-    {"id": "th", "label": "ไทย"},
-    {"id": "en", "label": "English"},
-    {"id": "zh", "label": "中文"},
+    {"id": "th", "label": "ไทย", "sub": "Thai"},
+    {"id": "en", "label": "English", "sub": ""},
+    {"id": "zh", "label": "中文", "sub": "Chinese"},
+    {"id": "ru", "label": "Русский", "sub": "Russian"},
 )
 
 HINT = {
@@ -145,26 +198,53 @@ def for_page(profile: str, brand: str = "") -> dict | None:
     }
 
 
-def text_for(profile: str, ask_id, lang=None, talk=None) -> str | None:
+def picked_language(ask_id) -> str | None:
+    """The language a `lang_xx` id picks from the menu, or None."""
+    if isinstance(ask_id, str) and ask_id.startswith("lang_") and ask_id[5:] in PICK_LANGS:
+        return ask_id[5:]
+    return None
+
+
+def text_for(profile: str, ask_id, lang=None, talk=None, cut: bool = False) -> str | None:
     """The user turn for a tap, or None for an id this profile does not have.
     `lang` is the page's language (its buttons, else the script of the
     guest's last utterance); the model still answers in the language the
     guest is speaking, if any. `talk` is the conversation's language as the
-    server knows it (`script_lang`): when given, the tap says it outright."""
+    server knows it (the provider's TalkLanguage, else `script_lang`): when
+    given, the tap says it outright -- a language with no ask of its own here
+    gets the English one under a preamble that names it."""
     if not isinstance(ask_id, str):
         return None
     code = _lang(lang)
-    talk = talk if talk in LANGS else None
+    talk = tap_talk(talk)
     if ask_id.startswith("lang_"):
-        target = ask_id[5:]
-        if target not in LANGS or not TOPICS.get(profile):
+        target = picked_language(ask_id)
+        if target is None or not TOPICS.get(profile):
             return None
-        return ("[ลูกค้าแตะปุ่มเลือกภาษาบนจอ ไม่ได้พูด] ลูกค้าเลือกภาษา%s — ตั้งแต่นี้ตอบเป็นภาษา%s "
-                "ตอนนี้ตอบรับสั้นๆ ประโยคเดียวเป็นภาษา%s แล้วหยุด ห้ามถามต่อ"
-                % (_LANG_NAMES_TH[target], _LANG_NAMES_TH[target], _LANG_NAMES_TH[target]))
+        # `cut`: the pick stopped her mid-answer (the page says so -- review 29
+        # Oct: the answer was lost, and "one short sentence, then stop" never
+        # gave it back). Somebody who switched language mid-answer did not
+        # follow it: it is said again, whole, in the new language.
+        if target == "th":
+            now = ("ลูกค้าเลือกขณะที่คุณกำลังตอบ จึงยังไม่ได้ฟังคำตอบล่าสุดจนจบ ตอนนี้ตอบคำตอบล่าสุดนั้นใหม่ทั้งหมดเป็นภาษาไทย"
+                   if cut else "ตอนนี้ตอบรับสั้นๆ ประโยคเดียวเป็นภาษาไทย แล้วหยุด ห้ามถามต่อ")
+            return ("[ลูกค้าแตะปุ่มเลือกภาษาบนจอ ไม่ได้พูด] ลูกค้าเลือกภาษาไทย — ตั้งแต่นี้ตอบเป็นภาษาไทยเท่านั้น"
+                    " แม้ได้ยินภาษาอื่น จนกว่าลูกค้าจะเลือกใหม่หรือขอเปลี่ยนภาษาตรงๆ " + now)
+        # Any other pick in English, naming the language: a Thai turn is what
+        # a tap's answer comes back in (owner 15 Oct), and this one turn sets
+        # the language of every answer after it. A stage direction, never a
+        # sentence in that language for her to repeat.
+        name = _LANG_NAMES_EN[target]
+        now = ("They chose it while you were answering and did not hear the rest: now give your last "
+               "answer again, whole, in %s." % name if cut else
+               "Now say one short sentence in %s that you will speak %s, then stop; do not ask anything."
+               % (name, name))
+        return ("[The guest chose %s on the screen's language menu and did not speak.] From now on answer "
+                "only in %s, even when you hear another language, until the guest chooses again or plainly "
+                "asks for another language. " % (name, name)) + now
     for topic in TOPICS.get(profile) or ():
         if topic["id"] == ask_id and talk:
-            return tap_preamble(topic["label"], talk) + topic["ask"][talk]
+            return tap_preamble(topic["label"], talk) + topic["ask"].get(talk, topic["ask"]["en"])
         if topic["id"] == ask_id:
             return ("[ลูกค้าแตะปุ่ม \"%s\" บนจอ ไม่ได้พูด — ตอบเป็นภาษาเดียวกับที่ลูกค้าพูดล่าสุด "
                     "ถ้ายังไม่ได้พูด ตอบเป็นภาษา%s] %s"
@@ -222,12 +302,14 @@ CHOICES: dict[str, dict] = {
 #: The room types as she says them. Thai is matched as whole phrases built on
 #: ห้องนอน / สตูดิโอ, never a short word that can sit inside another one (the
 #: ราคา-inside-อาคาร trap); "Pilates Studio" is a facility, not a room type.
+#: Russian since the language menu offered it (29 Oct): her Russian question
+#: about the types drew no buttons (review 29 Oct).
 _ROOM_TYPE_WORDS = (
-    re.compile(r"สตูดิโอ|(?<!pilates )\bstudios?\b|开间|单间", re.IGNORECASE),
-    re.compile(r"(หนึ่ง|1)\s*ห้องนอน|ห้องนอนเดียว|\b(one|1)[\s-]*bed(room)?s?\b|一室|一房|一居",
-               re.IGNORECASE),
-    re.compile(r"(สอง|2)\s*ห้องนอน|\b(two|2)[\s-]*bed(room)?s?\b|两室|两房|两居|二室|二房",
-               re.IGNORECASE),
+    re.compile(r"สตูดิโอ|(?<!pilates )\bstudios?\b|开间|单间|студи[яюиейё]", re.IGNORECASE),
+    re.compile(r"(หนึ่ง|1)\s*ห้องนอน|ห้องนอนเดียว|\b(one|1)[\s-]*bed(room)?s?\b|一室|一房|一居"
+               r"|(одн(ой|а|у|им)|1)[\s-]*спальн|однокомнатн", re.IGNORECASE),
+    re.compile(r"(สอง|2)\s*ห้องนอน|\b(two|2)[\s-]*bed(room)?s?\b|两室|两房|两居|二室|二房"
+               r"|(дв(умя|е|ух)|2)[\s-]*спальн|двухкомнатн", re.IGNORECASE),
 )
 
 
@@ -275,8 +357,8 @@ def choices_asked(said: str) -> str | None:
 
 
 #: A question that asks for one of the room types just listed.
-_WHICH_TYPE = re.compile(r"แบบไหน|ห้องไหน|\bwhich\s+(one|type|unit|room)s?\b|哪种|哪一种|哪个户型",
-                         re.IGNORECASE)
+_WHICH_TYPE = re.compile(r"แบบไหน|ห้องไหน|\bwhich\s+(one|type|unit|room)s?\b|哪种|哪一种|哪个户型"
+                         r"|как(ой|ая|ую|ие)\s+(тип|вариант|квартир)", re.IGNORECASE)
 
 
 def _types_named(text: str) -> int:

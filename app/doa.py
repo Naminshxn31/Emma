@@ -121,8 +121,11 @@ BEAT_S = 15.0
 SILENT_S = 60.0
 #: With ROBOT_FACE_TOKEN set, the app's doa_hello must arrive this fast.
 HELLO_TIMEOUT_S = 5.0
+#: "released" (ARRAY_MIC): the app handed the array back to the page and
+#: keeps it closed for the rest of its run; "held": for the page's call only
+#: (app/array_audio.py, MicOwner.java).
 STATES = frozenset({"starting", "capturing", "no_permission", "no_array", "capture_refused",
-                    "conflict", "stopped", "idle"})
+                    "conflict", "stopped", "idle", "released", "held"})
 SOURCES = frozenset({"VOICE_RECOGNITION", "UNPROCESSED", "MIC"})
 
 # ---- the estimator ----
@@ -154,20 +157,22 @@ SUMMARY_EVERY_S = 30.0
 STATS_LOG_EVERY_S = 10.0
 
 
-def ready_frame() -> dict:
+def ready_frame(agent: str = "") -> dict:
     """The first thing the app hears. It resets its backoff on THIS frame
     only -- never on onopen: the token gate accepts-then-closes too.
 
     `array` / `capture8` appear only with ARRAY_AUDIO / ARRAY_CAPTURE8 on
     (app/array_audio.py): with both off the frame is exactly what it was,
-    and an app only ever beamforms or uploads raw audio when told to here."""
+    and an app only ever beamforms or uploads raw audio when told to here.
+    `array_mic` (ARRAY_MIC) only for an app whose `agent` says it can hold
+    the array alone."""
     frame = {"type": "doa_ready", "rate": RATE, "frame": FRAME, "channels": list(CHANNELS),
              "max_lag": MAX_LAG, "gate_rms": GATE_RMS, "max_fps": MAX_FPS,
              "band": list(BAND_HZ), "stats_s": STATS_S}
     if settings.array_audio or settings.array_capture8:
         from app import array_audio
 
-        frame.update(array_audio.ready_fields())
+        frame.update(array_audio.ready_fields(agent))
     return frame
 
 
@@ -653,6 +658,32 @@ def _calibration_for(fingerprint: dict) -> Calibration:
     return cal
 
 
+#: A face's bearing taken this soon after the head was told to move is in a
+#: frame nobody knows (the servo is still turning, the picture is ~0.4 s
+#: old): not a calibration pair.
+HEAD_SETTLE_S = 1.5
+
+
+def _head_pan(t: float) -> tuple[float, bool]:
+    """(degrees the head is turned, + = the robot's left; settled at `t`).
+
+    The array is on the body and does not turn with the head; the camera is
+    on the head and does. A face's bearing is in the camera's frame, so the
+    robot's bearing of that face is face + pan -- what a pair must learn --
+    and the bearing this module hands focus (compared with faces) is the
+    robot's minus pan. HEAD_FOLLOW off: (0, True), every number unchanged."""
+    if not settings.head_follow:
+        return 0.0, True
+    try:
+        from app import head_follow
+
+        pan = float(head_follow.offset_deg()[0])
+        moved = head_follow.moved_at()
+    except Exception:
+        return 0.0, False
+    return pan, moved is None or t - moved >= HEAD_SETTLE_S
+
+
 def _robot_speaking(t: float, now: float) -> bool:
     try:
         from app import display
@@ -694,6 +725,13 @@ def estimate(cal: Calibration | None, t: float, lags, strength, *, speaking: boo
         _STATE.truth_try_t = t
         truth = _truth_at(t)
         if truth is not None:
+            pan, settled = _head_pan(t)
+            if not settled:
+                info["pair"] = "head_moving"
+                truth = None
+            else:
+                truth += pan           # the camera's bearing -> the robot's (the array's frame)
+        if truth is not None:
             _STATE.pair_last_t = t
             was_ready = cal.ready
             verdict = cal.add(fitted, truth, weight=mean_strength ** 2)
@@ -717,6 +755,8 @@ def estimate(cal: Calibration | None, t: float, lags, strength, *, speaking: boo
 
 
 def _observe(t: float, bearing: float | None, conf: float) -> None:
+    if not settings.doa_focus:
+        return                  # DOA_FOCUS off: focus never hears of a direction
     focus = _focus()
     if focus is None:
         return
@@ -836,6 +876,11 @@ class _Link:
         self.summary_at = time.monotonic()
         self.stats_log_at = 0.0
         self.drop_log_at = -1e9
+        #: ARRAY_MIC (app/array_audio.py): this app holds the array alone,
+        #: the server asked it to let go, and how to tell it (serve_link).
+        self.sole = False
+        self.released = False
+        self.send_text = None
 
     def handle(self, event: dict) -> None:
         """One parsed message from the app. Never raises."""
@@ -870,7 +915,11 @@ class _Link:
         t = self.clock.convert(t_app, now)
         cal = _calibration_for({"rate": RATE, "channels": list(CHANNELS), "device": self.device})
         bearing, conf, info = estimate(cal, t, lags, strength, speaking=_robot_speaking(t, now))
-        _observe(t, bearing, conf)
+        # The calibration's bearings are the ROBOT's (head at centre); focus
+        # compares them with faces in the head camera, which turns with the
+        # head. 0 with HEAD_FOLLOW off: unchanged.
+        pan, _settled = _head_pan(t)
+        _observe(t, None if bearing is None else bearing - pan, conf)
         self.counts["frames"] += 1
         if bearing is None:
             self.counts["unknown"] += 1
@@ -975,7 +1024,33 @@ async def serve_link(websocket) -> None:
         await websocket.send_text(json.dumps({"type": "doa_off"}))
         await websocket.close()
         return
+    sole = False
+    from app import array_audio
+
+    if array_audio.MARKER in agent and not array_audio.sole_enabled():
+        # A build that CAN hold the array alone is only ever asked to as its
+        # only owner: a capture beside the page's mic is the measured blocker
+        # (10 Oct), and this makes the rollback one step either way -- ARRAY_MIC
+        # off (or DOA_ENABLED off) and the app never opens the array.
+        _once("sole_only", "this robot app captures the array only as its only owner (ARRAY_MIC) — "
+                           "ARRAY_MIC is off: doa_off, the page keeps its mic")
+        await websocket.send_text(json.dumps({"type": "doa_off"}))
+        await websocket.close()
+        return
+    if settings.array_mic:
+        if array_audio.sole_enabled():
+            if array_audio.MARKER not in agent:
+                # An APK from before ARRAY_MIC captures beside the page's mic
+                # -- the measured blocker (app first = the page's mic reads
+                # zeros, Emma deaf). It gets "off", as if DOA were off.
+                _once("old_apk", "ARRAY_MIC is on and this robot app cannot hold the array alone "
+                                 "(no %s in %s) — doa_off, the page keeps its mic", array_audio.MARKER, agent[:120])
+                await websocket.send_text(json.dumps({"type": "doa_off"}))
+                await websocket.close()
+                return
+            sole = True
     link = _Link(agent)
+    link.sole = sole
     with _LOCK:
         busy = _STATE.link is not None
         if not busy:
@@ -992,8 +1067,9 @@ async def serve_link(websocket) -> None:
             logger.warning("robot-doa link without the right face token — refused")
             await _refuse(websocket, "bad_face_token")
             return
-        ready = ready_frame()
+        ready = ready_frame(agent)
         array_on = "array" in ready or "capture8" in ready
+        link.send_text = websocket.send_text
         await websocket.send_text(json.dumps(ready))
         logger.info("robot-doa link open (%s)", link.agent)
         _record("doa_link", state="open")

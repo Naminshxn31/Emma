@@ -1,0 +1,80 @@
+{
+  "source_id": "offline_lines",
+  "project_id": "embassy_world",
+  "schema": 1,
+  "notes_th": "ประโยคตายตัวที่ Emma พูดได้ตอนอินเทอร์เน็ตใช้ไม่ได้ (OFFLINE_FALLBACK, docs/emma-offline-mode.md) ทุกบรรทัดเป็นร่างจนกว่าเจ้าของจะอนุมัติด้วย python scripts/approve_offline_lines.py --by ชื่อ — ร่างไม่ถูกพูดและไม่ขึ้นจอ แก้ข้อความหลังอนุมัติ = กลับเป็นร่างเอง (approved_sha256 ไม่ตรง) ห้ามมีตัวเลข ห้ามข้อมูลโครงการ ห้ามพูดว่าไม่มีข้อมูล/ไม่ทราบ ห้ามถามอยู่เองหรือลงทุน",
+  "lines": [
+    {
+      "id": "offline_greeting",
+      "kind": "greeting",
+      "th": "สวัสดีค่ะ ดิฉันเอ็มม่า ยินดีต้อนรับสู่ Embassy World ค่ะ อยากให้ดิฉันเล่าเรื่องสิ่งอำนวยความสะดวก หรือทำเลของโครงการก่อนดีคะ",
+      "en": "Hello, I'm Emma. Welcome to Embassy World. Would you like me to show you our facilities first, or tell you about the location?",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null
+    },
+    {
+      "id": "not_heard",
+      "kind": "repeat",
+      "th": "ขออภัยค่ะ ดิฉันฟังไม่ชัด รบกวนพูดอีกครั้งได้ไหมคะ",
+      "en": "Sorry, I didn't quite catch that. Could you say it again, please?",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null
+    },
+    {
+      "id": "menu",
+      "kind": "menu",
+      "th": "ตอนนี้ดิฉันเล่าภาพรวมของสิ่งอำนวยความสะดวก ทำเล แบบห้อง และผู้พัฒนาโครงการให้ฟังได้ค่ะ ถ้ามีภาพขึ้นบนจอ แตะที่ภาพเพื่อดูใกล้ๆ ได้ค่ะ ส่วนรายละเอียดอื่นๆ ทีมขายของเราที่ห้องขายจะดูแลให้ได้ครบค่ะ",
+      "en": "Right now I can give you an overview of our facilities, the location, the room types and the developer. If pictures come up on the screen, tap one to see it closer. For any other details, our sales team here in the gallery will be glad to help.",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null
+    },
+    {
+      "id": "handoff_commercial",
+      "kind": "handoff",
+      "th": "เรื่องนี้ ทีมขายของเราที่ห้องขายจะแจ้งข้อมูลล่าสุดให้ได้ครบถ้วนค่ะ",
+      "en": "Our sales team here in the gallery will give you the latest details on that.",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null
+    },
+    {
+      "id": "handoff_other",
+      "kind": "handoff",
+      "th": "เรื่องนี้ ทีมขายของเราที่ห้องขายจะให้รายละเอียดได้ครบค่ะ",
+      "en": "Our sales team here in the gallery can give you the full details on that.",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null
+    },
+    {
+      "id": "off_topic",
+      "kind": "redirect",
+      "th": "ขออภัยค่ะ ดิฉันดูแลเฉพาะเรื่องของโครงการ Embassy World ค่ะ อยากให้ดิฉันแนะนำส่วนไหนของโครงการเป็นพิเศษไหมคะ",
+      "en": "Sorry, I can only help with Embassy World. Which part of the project would you like me to tell you about?",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null
+    },
+    {
+      "id": "invite",
+      "kind": "invite",
+      "th": "อยากให้ดิฉันแนะนำส่วนไหนของโครงการเป็นพิเศษไหมคะ",
+      "en": "Which part of the project would you like me to tell you about?",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null
+    },
+    {
+      "id": "ack",
+      "kind": "ack",
+      "th": "ยินดีค่ะ แวะมาถามดิฉันได้ตลอดเลยนะคะ",
+      "en": "My pleasure. Feel free to ask me anytime.",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null
+    }
+  ]
+}

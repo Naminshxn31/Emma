@@ -270,7 +270,7 @@ def test_the_203_case_review_fixes_are_in_the_condo_prompt():
     # owner 15 Oct: an unrelated question gets no content at all (robot log: an
     # English word was translated, then "อยู่เองหรือลงทุน"), and the one question
     # invites a recommendation from the project, never "live in or invest"
-    assert "คำถามที่ไม่เกี่ยวกับโครงการ (คำศัพท์ แปลภาษา ความรู้ทั่วไป โครงการอื่น) ห้ามตอบเนื้อหาแม้แต่คำเดียว" in text
+    assert "คำถามที่ไม่เกี่ยวกับโครงการ (คำศัพท์ แปลภาษา ความรู้ทั่วไป วันที่หรือเวลาตอนนี้ โครงการอื่น) ห้ามตอบเนื้อหาแม้แต่คำเดียว" in text
     assert '"อยากให้ดิฉันแนะนำส่วนไหนของโครงการเป็นพิเศษไหมคะ"' in text
     assert "อยู่เองหรือไว้ลงทุนคะ" not in text
     assert 'ห้ามพูดว่าโครงการนี้ได้รางวัล' in text
@@ -949,3 +949,15 @@ def test_approved_starting_prices_may_be_said_unit_prices_still_go_to_sales():
     assert "ห้ามถามหรือเปิดเรื่องราคาเอง" in line
     assert '"ราคาขอให้ทีมขายยืนยันนะคะ ดิฉันไม่อยากให้ข้อมูลที่คลาดเคลื่อน" แล้วหยุด' in line
     assert not any(ch.isdigit() for ch in line)
+
+
+
+def test_a_starting_price_always_says_whose_name_it_is_for():
+    """Replay of 20 Oct (27 Oct): "One-bedroom units start at 2.79 million baht"
+    to an English-speaking guest -- the Thai-name price, unlabelled; the facts
+    give the foreign-name price beside it. The rule quotes the wrong form,
+    without a number (the block carries none)."""
+    from app import prompts
+
+    assert "บอกทุกครั้งว่าเป็นราคาชื่อคนไทยหรือชื่อต่างชาติ" in prompts.SALES_HOST_BLOCK
+    assert "One-bedroom units start at ... million baht" in prompts.SALES_HOST_BLOCK

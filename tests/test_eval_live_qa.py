@@ -123,10 +123,20 @@ def test_flags_catch_telling_the_guest_there_is_no_information():
                  "The water depth for the basement pool is not specified in our current details.",
                  "Specific safety guidelines are not mentioned in our current information.",
                  "I don't have the exact start date for construction.",
-                 "The exact number of units in Empire Tower is not specified in our documents."):
+                 "The exact number of units in Empire Tower is not specified in our documents.",
+                 # replay of 20 Oct on 27 Oct: the same gap in other words
+                 "The exact number of EV chargers is not specified in our project details yet.",
+                 "I'm sorry, but that information is not available in our current records.",
+                 "Our current project details do not specify the exact use of those spots.",
+                 "I don't have the specific completion date in my current information.",
+                 "I don't have that specific date available here.",
+                 "Specific details about the nearest restaurant are not specified in our current "
+                 "project information."):
         assert "t0:says_no_info" in harness.flags_for({"expect": {}}, [dict(base, said=said)], "")
     for said in ("เรื่องนี้ทีมขายของเราจะให้รายละเอียดได้ครบที่สุดค่ะ สอบถามที่โต๊ะทีมขายได้เลยนะคะ",
                  "Our sales team can confirm the water depth for you.",
+                 "Our sales team will confirm the exact number of EV chargers for you.",
+                 "I have the floor plan of the second floor here for you.",
                  "ไม่ทราบว่าสนใจห้องแบบไหนคะ"):
         assert "t0:says_no_info" not in harness.flags_for({"expect": {}}, [dict(base, said=said)], "")
 
@@ -182,11 +192,12 @@ def test_every_story_has_exactly_one_live_case():
     # follow-ups from the robot log (cat 29, 14 Oct: the second question of a
     # pair was answered from memory) and the language cases (cat 30, 19 Oct:
     # an English talk switched to Thai and German on its own) and the robot
-    # log of 20 Oct (cat 31: follow-ups searched or refused, the map) -- more
-    # than one turn, so never a story's single live case.
+    # log of 20 Oct (cat 31: follow-ups searched or refused, the map) and the
+    # language menu (cat 32, 29 Oct: a pick, then questions in other
+    # languages) -- more than one turn, so never a story's single live case.
     for case in story_cases:
         if not case["cat"].startswith(("27", "28")):
-            assert case["cat"].startswith(("29", "30", "31")) and len(case["turns"]) > 1, case["id"]
+            assert case["cat"].startswith(("29", "30", "31", "32")) and len(case["turns"]) > 1, case["id"]
 
 
 def test_every_story_has_a_held_out_question_in_the_guests_words():
@@ -207,3 +218,62 @@ def test_every_story_has_a_held_out_question_in_the_guests_words():
         story = by_id[case["expect"]["args"]["present_story"]["topic"]]
         listed = {norm(q) for q in story.get("questions_th", []) + story.get("questions_en", [])}
         assert norm(case["turns"][0]) not in listed, case["id"]
+
+
+def test_a_text_turn_arms_the_reply_watchdog_like_heard_speech(monkeypatch):
+    """Replay of 20 Oct (27 Oct): the robot chases a transcribed question the
+    model leaves silent (REPLY_STALL_S); a text turn never armed the guard, so
+    the harness scored silences the robot would have nudged. Story cases carry
+    robot.env's watchdog, and every turn arms it the way an activity_end does."""
+    from app.config import settings
+
+    assert harness.STORY_CASE_SETTINGS["reply_stall_s"] > 0
+
+    class _P:
+        _stall_heard = ""
+        _replied_since_end = True
+        armed = 0
+
+        def _stall_restart(self):
+            self._stall_heard = ""
+
+        def _arm_stall_guard(self):
+            self.armed += 1
+
+    provider = _P()
+    monkeypatch.setattr(settings, "reply_stall_s", 8.0)
+    harness._watch_like_heard(provider, "Where is the nearest restaurant?")
+    assert provider.armed == 1 and provider._stall_heard == "Where is the nearest restaurant?"
+    assert provider._replied_since_end is False
+    monkeypatch.setattr(settings, "reply_stall_s", 0)
+    harness._watch_like_heard(provider, "again")
+    assert provider.armed == 1, "off with the setting off"
+
+
+
+def test_a_silent_turn_is_waited_on_while_the_watchdog_chases_it(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "reply_stall_s", 8.0)
+    monkeypatch.setattr(settings, "reply_stall_reconnect_s", 8.0)
+    assert harness._stall_patience() == 22.0
+    monkeypatch.setattr(settings, "reply_stall_s", 0)
+    assert harness._stall_patience() == 0.0
+
+
+
+def test_wait_turn_waits_only_while_the_watchdog_chases_a_wordless_turn(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "reply_stall_s", 8.0)
+    monkeypatch.setattr(settings, "reply_stall_reconnect_s", 8.0)
+
+    class _P:
+        _stall_wait = 1.0
+
+    silent, spoke = {"audio_bytes": 0}, {"audio_bytes": 4800}
+    assert harness._watchdog_still_chasing(silent, _P(), 3.0, 2.5)
+    assert not harness._watchdog_still_chasing(spoke, _P(), 3.0, 2.5), "she answered"
+    assert not harness._watchdog_still_chasing(silent, _P(), 30.0, 2.5), "past its patience"
+    _P._stall_wait = None
+    assert not harness._watchdog_still_chasing(silent, _P(), 3.0, 2.5), "nothing chasing"

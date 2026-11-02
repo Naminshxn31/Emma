@@ -371,6 +371,14 @@ async def _send(session, kind: str, payload: dict):
         return _refusal("not_robot_face")
     if not is_robot_face(session):
         return _refusal("not_robot_face")
+    if kind == "body" and not stop and server_walking():
+        # The event host's walk is the server's own board_walk: the app's
+        # nav poll (run.pid of emma_nav / drive_route) never sees it, so the
+        # app's own "navigating" gate is OPEN -- her speech gestures, a voice
+        # "ยกแขน", swung the arm between the tables (found 31 Oct, round 2, before
+        # the first event walk). Refused here with the app's own word.
+        _record("face_link_refused", command=kind, action=action, why="event_walk")
+        return _refusal("navigating")
     ws = getattr(session, "ws", None)
     if ws is None:
         return _refusal("disconnected")
@@ -411,6 +419,56 @@ async def _send(session, kind: str, payload: dict):
         _LAST_SENT[slot] = (session, _SEQ)
     _record("%s_command" % kind, action=action, place=payload.get("place"))
     return pending
+
+
+def server_walking() -> bool:
+    """A walk this server runs itself (the event host's board_walk), which
+    the app cannot see. Never raises: a probe that fails is "not walking"
+    here, because the app's own gate still holds for every walk IT runs."""
+    try:
+        from app import event_walk
+
+        return bool(event_walk.walking())
+    except Exception:  # noqa: BLE001
+        return False
+
+
+async def look(session, pan: int, tilt: int, *, seq: int | None = None) -> bool:
+    """The robot's real head toward a direction (app/head_follow.py): `pan`
+    and `tilt` are PERCENT of the app's own head span (-100..100; + = the
+    robot's left / down). The app maps them to ch7/ch8 inside its own hard
+    clamps (HeadLook.java) -- no pulse leaves here, the rule above.
+
+    Fire and forget, on purpose: no pending slot (a look must never make a
+    speech gesture or a stop wait), and no stop on a timeout -- a look that
+    lands late only turns the head, and the app's gates (its switch, the
+    stop latch, a walk, the operator screen, a vendor group on the arm)
+    refuse it there. The app's answer comes back as `head_look_ack` with
+    `seq` (session.py hands it to the call's HeadFollow), for what the head
+    IS doing, never as a wait. Only to a call's robot face whose body_caps
+    says `look` (an older APK answers the prompt with bad_request, never a
+    dialog, but it is not asked at all). Never on the status link: it only
+    carries a stop."""
+    for value in (pan, tilt):
+        if isinstance(value, bool) or not isinstance(value, int) or not -100 <= value <= 100:
+            return False
+    if seq is not None and (isinstance(seq, bool) or not isinstance(seq, int) or not 0 < seq < 2 ** 31):
+        return False
+    if is_status_link(session) or not is_robot_face(session):
+        return False
+    if (caps(session, "body") or {}).get("look") is not True:
+        return False
+    ws = getattr(session, "ws", None)
+    if ws is None:
+        return False
+    frame = {"type": "head_look", "pan": pan, "tilt": tilt}
+    if seq is not None:
+        frame["seq"] = seq
+    try:
+        await ws.send_text(json.dumps(frame))
+    except Exception:  # noqa: BLE001 -- a look lost is a look not made
+        return False
+    return True
 
 
 def _release(pending: _Pending) -> None:

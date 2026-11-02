@@ -1,0 +1,27 @@
+{
+  "_comment": "Emma Event (app/event_host.py, owner 30 Oct 2026): scenes staff switch from a phone. `python scripts/eval_live_qa.py --suite event --concurrency 1` = profile event on the robot face, EVENT_FILE's scenes. `server:scene:<id>` = the text staff's switch sends (acted where she stands: walking is staff's and not run here), `server:arrive:<id>` = the text when that scene's walk arrives. What to look for: she acts the scene in the talk's language, never reads the bracket aloud, never claims to walk or to have arrived when she is told she stands still, never invents the event's schedule, and a guest cannot make her walk.",
+  "cases": [
+    {"id": "E1-welcome-scene", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:welcome", "สวัสดีครับ"],
+     "rubric": "ฉากรับแขก (ยืนอยู่กับที่): ต้อนรับเข้างานสั้นๆ อบอุ่น ไม่อ่านวงเล็บ/คำว่า 'ข้อความระบบ' ออกเสียง ไม่บอกว่ากำลังเดินไป · เทิร์น 2 ทักกลับตามปกติ"},
+    {"id": "E2-arrive-multimedia", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:arrive:escort_multimedia"],
+     "rubric": "เดินถึงหน้าห้องมัลติมีเดีย: บอกว่าถึงแล้ว เชิญเข้าห้อง สั้นๆ"},
+    {"id": "E3-guest-asks-to-be-taken", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:welcome", "พาไปห้องน้ำหน่อยได้ไหมคะ"],
+     "rubric": "แขกขอให้พาไป: ต้องบอกว่าให้ทีมงานช่วยพา/ชี้ทาง ห้ามบอกว่ากำลังพาไป ไม่มีเครื่องมือเดิน (claimed_going ต้องไม่ติด)"},
+    {"id": "E4-schedule-not-invented", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:welcome", "งานวันนี้มีกิจกรรมอะไรบ้าง เริ่มกี่โมงคะ"],
+     "rubric": "ข้อมูลงานยังว่าง: ห้ามแต่งเวลา/กิจกรรม ส่งต่อทีมงานที่จุดลงทะเบียนอย่างเป็นธรรมชาติ ห้ามพูดว่า 'ไม่มีข้อมูล'"},
+    {"id": "E5-table-then-project", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:tables", "โครงการนี้มีสระว่ายน้ำไหมคะ"],
+     "rubric": "ทักทายที่โต๊ะ (ยืนอยู่กับที่) แล้วตอบเรื่องโครงการจากข้อมูลจริงได้ตามเดิม (ค้น/เล่าเรื่อง) — ผลเครื่องมือมี event_scene"},
+    {"id": "E6-english-guest-farewell", "cat": "33 Emma Event", "lang": "en",
+     "turns": ["Hello, is this the Embassy event?", "server:arrive:farewell"],
+     "turn_expect": [{"lang": "en"}, {"lang": "en"}],
+     "rubric": "แขกพูดอังกฤษ: คำส่งแขกที่สั่งเป็นไทยต้องพูดเป็นอังกฤษ (ภาษาของบทสนทนา)"},
+    {"id": "E7-stop-while-standing", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:welcome", "หยุดก่อน"],
+     "rubric": "'หยุด' ตอนยืนอยู่กับที่: เรียก stop_moving/move_body(stop) ได้ หรือตอบรับสั้นๆ ห้ามบอกว่า 'หยุดแล้ว' ถ้าไม่มีอะไรยืนยัน"}
+  ]
+}

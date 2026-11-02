@@ -109,6 +109,97 @@ def test_a_known_face_on_the_robot_is_asked_about_the_project_not_live_or_invest
         "และห้ามถือว่าคนที่พูดคือต้า — ไม่มีระบบจำเสียง อาจเป็นคนอื่นที่ยืนอยู่ด้วย")
 
 
+# -- a group in front (FACE_GROUP_GREETING, owner 2 Nov 2026) ---------------
+
+def _group(kind="stranger", name=None, faces=3):
+    s = _sighting(kind=kind, name=name, group="" if name is None else "staff")
+    s.faces_in_frame = faces
+    return s
+
+
+def test_a_group_changes_nothing_while_the_switch_is_off(monkeypatch):
+    """Off is the code default and the sales room's / robot's setting until
+    robot.env says otherwise: two or three faces in the frame get exactly the
+    greeting they got before, byte for byte, on every road."""
+    for source, profile in (("local", "condo"), ("robot", "condo"), ("robot", "joke")):
+        monkeypatch.setattr(settings, "face_camera_source", source)
+        monkeypatch.setattr(settings, "assistant_profile", profile)
+        for kind, name in (("stranger", None), ("known", "ต้า")):
+            alone = _sighting(kind=kind, name=name, group="" if name is None else "staff")
+            assert greeter.greeting_for(_group(kind, name)) == greeter.greeting_for(alone)
+            assert "group_greeting" not in greeter._room_fields(_group(kind, name))
+
+
+def test_a_group_gets_one_greeting_in_her_voice_and_no_name(monkeypatch):
+    """The owner's sentence ("สวัสดีครับทุกท่าน มีอะไรให้ผมช่วยสอบถามได้เลยนะ
+    ครับ") in Emma's voice -- she is a woman: ค่ะ/ดิฉัน, never ครับ/ผม -- and
+    nobody's name, not even a recognised one's: one name told to the model is
+    the whole group addressed by it."""
+    monkeypatch.setattr(settings, "face_group_greeting", True)
+    monkeypatch.setattr(settings, "face_camera_source", "local")
+    for kind, name in (("stranger", None), ("known", "ต้า")):
+        text = greeter.greeting_for(_group(kind, name))
+        assert greeter.GROUP_GREETING_TH in text
+        assert "สวัสดีค่ะทุกท่าน" in text and "ดิฉัน" in text
+        assert "ครับ" not in text and "ผม" not in text
+        assert "ต้า" not in text
+        assert "ห้ามเรียกชื่อใคร" in text and "ห้ามพูดถึงกล้อง" in text
+        assert "ห้ามนับหรือบอกจำนวนคน" in text
+        assert "ห้ามถือว่าคนที่พูดต่อไปคือคนเดียวกับคนที่พูดก่อน" in text
+
+
+def test_the_robot_greets_a_group_in_english_like_its_one_person_opening(monkeypatch):
+    """The robot in project mode opens in English until a guest speaks
+    (owner, 8 Oct; prompts.GREETING): the group line follows that rule, and
+    only the English sentence is quoted -- a Thai sentence quoted on that
+    road is said word for word."""
+    monkeypatch.setattr(settings, "face_group_greeting", True)
+    monkeypatch.setattr(settings, "face_camera_source", "robot")
+    monkeypatch.setattr(settings, "assistant_profile", "condo")
+    text = greeter.greeting_for(_group())
+    assert greeter.GROUP_GREETING_EN in text and "Hello everyone" in text
+    assert greeter.GROUP_GREETING_TH not in text
+    assert "ภาษาเดียวกับที่คนนั้นพูด" in text
+    from app.prompts import GREETING
+
+    assert GREETING not in text, "one sentence for everybody, not the one-person opening"
+
+
+def test_one_usable_face_is_not_a_group(monkeypatch):
+    """`faces_in_frame` is facewatch's company bar (a face >= 60% of the
+    nearest); 1 is alone, and 0 is "not counted" -- neither is a group."""
+    monkeypatch.setattr(settings, "face_group_greeting", True)
+    for faces in (0, 1):
+        for kind, name in (("stranger", None), ("known", "ต้า")):
+            s = _group(kind, name, faces=faces)
+            alone = _sighting(kind=kind, name=name, group="" if name is None else "staff")
+            assert greeter.greeting_for(s) == greeter.greeting_for(alone)
+    assert "ต้า" in greeter.greeting_for(_group("known", "ต้า", faces=1))
+
+
+def test_the_turn_log_counts_the_faces_at_every_greeting(monkeypatch):
+    """Nine days of robot logs could not say how often a greeting met a group:
+    face_seen carried no count. Numbers only, and `group_greeting` only when
+    the group line was really sent."""
+    rows = []
+    monkeypatch.setattr(greeter.turnlog, "record", lambda event, **f: rows.append({"event": event, **f}))
+
+    async def fake_announce(text, **kwargs):
+        return True
+
+    from app import events
+
+    monkeypatch.setattr(events, "announce", fake_announce)
+    asyncio.run(greeter._greet(_group(faces=2)))
+    assert rows[-1]["faces"] == 2 and "group_greeting" not in rows[-1]
+    monkeypatch.setattr(settings, "face_group_greeting", True)
+    asyncio.run(greeter._greet(_group(faces=2)))
+    assert rows[-1]["faces"] == 2 and rows[-1]["group_greeting"] is True
+    asyncio.run(greeter._greet(_sighting()))                 # not counted
+    assert "faces" not in rows[-1] and "group_greeting" not in rows[-1]
+    assert "group_greeting" not in greeter._room_fields(_group(faces=2), greeting=False)
+
+
 # -- the switch -------------------------------------------------------------
 
 def test_nothing_watches_unless_the_machine_was_told_to(monkeypatch):

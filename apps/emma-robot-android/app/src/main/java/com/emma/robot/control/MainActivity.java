@@ -555,6 +555,10 @@ public final class MainActivity extends Activity
         return body.requestSpeech(id);
     }
 
+    @Override public String bodyLook(int pan, int tilt) {
+        return body.look(pan, tilt);
+    }
+
     @Override public String navPlaces() {
         return nav.places();
     }
@@ -619,6 +623,26 @@ public final class MainActivity extends Activity
         } catch (Exception e) {
             return "{\"token\":\"\"}";
         }
+    }
+
+    /** ARRAY_MIC: the page asks before it opens its own mic (ArrayListener). */
+    @Override public String micState() {
+        return array == null ? ArrayListener.NO_ARRAY_STATE : array.micState();
+    }
+
+    /** ARRAY_MIC: the page takes its mic; the array stays closed until the app restarts. */
+    @Override public String micRelease() {
+        return array == null ? ArrayListener.NO_ARRAY_STATE : array.micRelease("page");
+    }
+
+    /** ARRAY_MIC: the page takes its mic for one call. */
+    @Override public String micHold(String kind) {
+        return array == null ? ArrayListener.NO_ARRAY_STATE : array.micHold(kind);
+    }
+
+    /** ARRAY_MIC: the page's call mic is stopped (or a page loaded): the app may capture again. */
+    @Override public String micFree() {
+        return array == null ? ArrayListener.NO_ARRAY_STATE : array.micFree();
     }
 
     // ---- operator screen: voice body + navigation --------------------------------
@@ -1065,6 +1089,16 @@ public final class MainActivity extends Activity
             throw new IllegalStateException("ปิด Aobo ไม่สำเร็จ (exit " + result.exit + ")");
         }
         Log.i(TAG, "vendor app force-stopped before exclusive SDK connection");
+        // "Emma Robot" and "Emma Event" are one app built twice (build.gradle):
+        // a backgrounded sibling still holds the arm's serial port (closed only
+        // in onDestroy) and the SDK link. Not fatal -- it may not be installed,
+        // and a sibling that never ran holds nothing.
+        RootShell.Result sibling = RootShell.run("am force-stop " + siblingPackage(), RootShell.TIMEOUT_MS);
+        if (sibling.exit != 0) Log.w(TAG, "could not stop " + siblingPackage() + " (exit " + sibling.exit + ")");
+    }
+
+    private String siblingPackage() {
+        return EmmaFace.isEventApp(this) ? EmmaFace.ROBOT_PACKAGE : EmmaFace.EVENT_PACKAGE;
     }
 
     private void publishBaseStatus(String model, JSONObject power) {

@@ -145,6 +145,10 @@ data/room-deploy-log/
 # One shared secret per sales-room PC. A token in the history is a token that has
 # to be changed on every machine it was ever used on.
 data/rooms.json
+# The room screens the robot opens itself, with each room PC's agent key
+# (app/room_screens.py); the robot's copy is pushed by robot_server.py secrets.
+data/room-screens.json
+room-screens.json
 
 # What the room agent writes on the machine it runs on (app/room_agent.py):
 # full-desktop screenshots and a per-day action log. The screenshots are
@@ -174,3 +178,14 @@ tools/android/scrcpy/
 
 # The project report FAQ question embeddings (app/project_report.py), rebuilt on demand
 data/projects/*/sales/faq_embeddings.npz
+
+# Offline mode (docs/emma-offline-mode.md): the two speech recognizers
+# (scripts/fetch_offline_models.py restores them, ~310 MB) and Emma's
+# pre-rendered clips (scripts/render_offline_voice.py, a paid render) --
+# models and rendered audio are rebuilt, not history.
+data/offline/asr/
+data/offline/voice/
+# The event host (app/event_host.py): spots measured at the robot by the staff
+# page, and the route file each walk writes -- the robot's own, never history.
+data/events/*.spots.json
+data/events/.run/

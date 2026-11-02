@@ -543,3 +543,81 @@ def test_the_owners_humanoid_robots_are_not_contradicted_by_the_social_club_slid
     assert OVERRULED.search("Robots could be or could not be humanoid.")
     assert OVERRULED.search("หุ่นยนต์อาจไม่เป็นรูปทรงมนุษย์")
     assert not OVERRULED.search("a humanoid robot serves drinks in the Social Lounge")
+
+
+def test_a_price_said_without_a_figure_and_the_sales_board_are_cut():
+    """Audit 27 Oct: ordinary questions ("ห้องฝั่งสวนสาธารณะอยู่ตึกไหน",
+    "How many units are sold?") were answered from the approved FAQ with
+    which buildings cost more and the 30 Sep sold/available count -- no
+    figure of money, so the money filter let them through. Owner: room prices
+    stay closed (12 Oct), and never the rooms left."""
+    for line in ("ตามทีมขาย C และ D ติดสวนราคาสูงกว่า A และ F",
+                 "ฝั่งแดดไม่ลง ขายคนไทยราคาไม่แพง",
+                 "ห้องมุมแพงกว่าห้องธรรมดาเท่าไร",
+                 "สถานะขาย ณ 30/09/2026: ขายแล้ว **347 ยูนิต (32.6%)** ว่าง **719 ยูนิต**",
+                 "Garden มี 18 ห้อง ว่าง 15 ห้อง",
+                 # the live check of the fix (27 Oct): "should I hurry" said it with ไป
+                 "ณ 30 กันยายน 2026 ขายไปแล้วประมาณหนึ่งในสาม (32.6%)",
+                 "ใช้ระบบขาย 30/09/2026 (ห้องชุดขาย 347 ว่าง 719)",
+                 "As of 30 September 2026: 347 units sold (32.6%) and 719 available out of 1,066 units"):
+        assert project_report.clean(line, []) == "", line
+    # what is not a price nor the board stays: the file named "Unit Sold" is
+    # where the displayed room sizes come from
+    for line in ("ขนาดที่แสดงลูกค้าตามไฟล์ Unit Sold (ตรงกับ Msize)",
+                 "สระว่ายน้ำหลักลึกประมาณ 1.30 เมตร",
+                 "ห้องสตูดิโอมีห้องน้ำ 1 ห้อง",
+                 # the shops sold out sits on the line that counts the units
+                 "ห้องชุดทั้งหมด 1,066 ยูนิต นอกจากนี้มีร้านค้า 6 ร้าน (ขายหมดแล้ว)"):
+        assert project_report.clean(line, []) == line, line
+
+
+def test_the_old_two_bedroom_balcony_is_cut_and_the_rest_of_the_answer_stays():
+    """Owner 28 Oct: the "2.8–3.8 m" balcony lines go (23.5 has the balcony
+    read off the architect's plans; the robot said "3.8 m" on 15 and 27 Oct).
+    The lines that are only the balcony by deny_terms; inside the two-bedroom
+    answer only the clause (cut whole, the two-bedroom question took the
+    one-bedroom answer -- measured)."""
+    from pathlib import Path
+
+    real = json.loads((Path(__file__).resolve().parent.parent / "data" / "projects" / "embassy_world"
+                       / "sales" / "project_report_approval.json").read_text(encoding="utf-8"))
+    terms = real["deny_terms"]
+    assert {"2.8–3.8", "2.4–3.8"} <= set(terms)
+    # the report's own lines (19_faq 253 / 332 / 265, 14_units 281 / 257 / 31), shortened
+    answer = ("2-Bedroom มี 148 ห้อง ขนาด 51.5–52.5 ตร.ม. ส่วนใหญ่ 52 ตร.ม. (124 ห้อง) มี 2 ห้องนอน 2 ห้องน้ำ "
+              "ห้องนอนที่ 2 ประมาณ 7–9 ตร.ม. ระเบียงยาวประมาณ 2.8–3.8 เมตร กว้างประมาณ 1.37–1.40 เมตร "
+              "(ตามบทที่ 14: แบบเฟอร์นิเจอร์รายห้องวัดได้ราว 2.8–3.8 × 1.37 เมตร และโมเดลสถาปนิกวัดได้ราว "
+              "3.75 × 1.40 เมตร ตัวเลขห้องย่อยและระเบียงเป็นค่าประมาณที่วัดจากแบบ ยังไม่ใช่ตัวเลขทางการ)")
+    kept = project_report.clean(answer, terms)
+    assert kept.endswith("ห้องนอนที่ 2 ประมาณ 7–9 ตร.ม.") and "148 ห้อง" in kept
+    row = ('| 2 ห้องนอนใหญ่เท่าไร | "ห้อง 2-Bedroom มีขนาด 51.5–52.5 ตร.ม. ส่วนใหญ่ 52 ตร.ม. มีห้องนอน 2 ห้อง '
+           'ห้องน้ำ 2 ห้อง และระเบียงกว้างประมาณ 2.8–3.8 เมตร" | ขนาดห้องตาม Unit Sold |')
+    assert "ห้องน้ำ 2 ห้อง\"" in project_report.clean(row, terms) and "3.8" not in project_report.clean(row, terms)
+    for line in ("**ตอบ:** ประมาณ (ค่าวัดจากแบบ) Studio ยาว 2.4–2.55 × กว้าง 1.07–1.10 เมตร, 2-Bedroom ยาว 2.8–3.8 "
+                 "× กว้าง 1.37–1.40 เมตร",
+                 "**ตอบ:** ยังไม่มีเอกสารยืนยัน (ระเบียงกว้างประมาณ 1.0–1.4 เมตร ยาวประมาณ 2.4–3.8 เมตรตามประเภทห้อง)",
+                 "| ระเบียง | ≈ 2.8–3.8 × 1.37–1.40 ม. (โมเดลสถาปนิก ≈ 3.75 × 1.40 ม.) |",
+                 "| ระเบียง ประมาณ (กว้าง × ลึก) 🔎 | 2.4–2.55 × 1.07–1.10 ม. | 2.8–3.8 × 1.37–1.40 ม. | – |"):
+        assert project_report.clean(line, terms) == "", line
+    # 23.5's balcony -- the answer that replaces them -- passes
+    assert project_report.clean("**ตอบ:** แบบ 51 ตร.ม. ระเบียงลึกกว่า ประมาณ 1.4 เมตร กว้างเกือบ 3 เมตร", terms) != ""
+
+
+def test_a_question_about_one_room_type_never_gets_anothers_answer(report, monkeypatch):
+    """28 Oct: "How big is a two bedroom unit?" took "How big is a one bedroom
+    unit?" -- a word apart, the same meaning to the embedding. Measured on
+    1,918 questions: only those wrong answers changed."""
+    folder, write = report
+    (folder / "19_faq.md").write_text(
+        "**ถาม:** 1-Bedroom ขนาดเท่าไร มีกี่ห้อง\n**ตอบ:** 1-Bedroom มี 801 ห้อง ขนาด 33–35 ตร.ม. ส่วนใหญ่ 34 ตร.ม.\n"
+        "**ถาม:** สระว่ายน้ำกลางโครงการยาวเท่าไร\n**ตอบ:** สระกลางยาวประมาณ 155 เมตร ตามแบบ\n", encoding="utf-8")
+    write()
+    assert project_report._unit_types("How big is a two bedroom unit?") == {"2br"}
+    assert project_report._unit_types("1-Bedroom ขนาดเท่าไร มีกี่ห้อง") == {"1br"}
+    assert project_report._unit_types("ห้อง 2 ห้องนอนกับสตูดิโอต่างกันยังไง") == {"2br", "studio"}
+    assert project_report._unit_types("สระว่ายน้ำยาวเท่าไร") == frozenset()
+    one = project_report.faq("1-Bedroom ขนาดเท่าไร มีกี่ห้อง")
+    assert one and "801 ห้อง" in one[0]["text"]
+    assert project_report.faq("2-Bedroom ขนาดเท่าไร มีกี่ห้อง") == []
+    # the guard leaves a question that names no type alone
+    assert project_report.faq("สระว่ายน้ำกลางโครงการยาวเท่าไร")

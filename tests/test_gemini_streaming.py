@@ -181,7 +181,10 @@ def test_retired_connections_do_not_send_tool_results_to_new_session(monkeypatch
 
         monkeypatch.setattr(tools, "dispatch_all", dispatch)
         events = [e async for e in provider._run_tool_calls(call("lookup").tool_call.function_calls)]
-        assert [e.kind for e in events] == ["tool_call"]
+        # Audit 27 Oct (C1): the page still gets what the tool did -- it used
+        # to get nothing, and the resumed model was never asked again -- but
+        # the result enters neither socket.
+        assert [e.kind for e in events] == ["tool_call", "tool_result"]
         assert not old.responses and not replacement.responses
     asyncio.run(scenario())
 

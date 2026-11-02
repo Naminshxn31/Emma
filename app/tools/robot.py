@@ -163,6 +163,11 @@ async def stop_moving() -> dict:
     replies "I'm not moving" while rolling towards someone is the worst
     possible time to trust a cached flag.
     """
+    # The event host's walk (app/event_walk.py, staff-started board_walk) is
+    # not a face run: its own stop, before anything else is asked.
+    from app import event_walk
+
+    await event_walk.stop_from("voice")
     face = robot_nav.routes_session()
     if face is not None:
         # Routes mode: the face page's nav stop and body stop, never the

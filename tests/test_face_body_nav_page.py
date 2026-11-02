@@ -155,7 +155,10 @@ def test_only_the_exact_prompt_strings_of_the_design_reach_window_prompt():
     # + the auto-return's fixed reads and reports (owner 10 Oct; AutoReturn.java)
     fixed = {"'emma-body:list'", "'emma-body:status'", "'emma-nav:places'", "'emma-nav:status'",
              "'emma-face:token'", "message", "navGoMessage(place.id, 'tap')",
-             "'emma-nav:auto'", "'emma-nav:auto:shown'", "'emma-nav:auto:stay'", "activityMessage(kind)"}
+             "'emma-nav:auto'", "'emma-nav:auto:shown'", "'emma-nav:auto:stay'", "activityMessage(kind)",
+             # ARRAY_MIC (2 Nov): is the app still capturing the array / let go of it
+             "'emma-face:mic'", "'emma-face:mic:release'", "'emma-face:mic:hold'", "'emma-face:mic:hold:deaf'",
+             "'emma-face:mic:free'"}
     assert set(args) <= fixed, set(args) - fixed
 
     allowed = [m for m in ("emma-body:list", "emma-body:status", "emma-body:stop", "emma-body:nod",
@@ -163,13 +166,14 @@ def test_only_the_exact_prompt_strings_of_the_design_reach_window_prompt():
                            "emma-nav:go:big_room:tap", "emma-nav:go:dock:voice", "emma-face:token",
                            "emma-nav:auto", "emma-nav:auto:shown", "emma-nav:auto:stay",
                            "emma-nav:activity:call_start", "emma-nav:activity:call_end",
-                           "emma-nav:activity:speech")]
+                           "emma-nav:activity:speech", "emma-face:mic", "emma-face:mic:release",
+                           "emma-face:mic:hold", "emma-face:mic:hold:deaf", "emma-face:mic:free")]
     # the page can never start the app's own walk: no go with origin auto
     refused = ["emma-arm:greet:6", "emma-body:dance", "emma-body:Nod", "emma-body:nod\n",
                "emma-body:nod:x", "emma-nav:go:big_room:pc", "emma-nav:go:big_room", "emma-nav:go:../x:tap",
                "emma-nav:go:ห้อง:tap", "emma-nav:go:big_room:tap\n", "emma-nav:reap", "emma-face:secret", "", None,
                "emma-nav:go:dock:auto", "emma-nav:auto:go", "emma-nav:activity:touch", "emma-nav:activity:",
-               "emma-nav:auto:stay\n"]
+               "emma-nav:auto:stay\n", "emma-face:mic:take", "emma-face:mic:release\n", "emma-face:micx"]
     out = _model(*[{"fn": "allowedMessage", "args": [m]} for m in allowed + refused])
     assert out[:len(allowed)] == [True] * len(allowed)
     assert out[len(allowed):] == [False] * len(refused)
@@ -632,3 +636,64 @@ def test_body_caps_carries_whether_the_app_plays_speech_gestures():
         {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}}]},
         {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "speech": "yes"}]})
     assert on["speech"] is True and off["speech"] is False and odd["speech"] is False
+
+
+# ---- the head toward a person (owner 31 Oct; app/head_follow.py) ----------------
+
+def test_the_head_look_is_one_fixed_shape_of_the_closed_grammar():
+    cases = {
+        "emma-body:look:0:0": True,
+        "emma-body:look:-100:100": True,
+        "emma-body:look:45:-20": True,
+        "emma-body:look:101:0": False,           # out of range
+        "emma-body:look:0:-101": False,
+        "emma-body:look:05:0": False,            # not the canonical number the page writes
+        "emma-body:look:-0:0": False,
+        "emma-body:look:5": False,
+        "emma-body:look:5:0:speech": False,
+        "emma-body:look:5:0\n": False,
+        "emma-body:look:1.5:0": False,
+        "emma-body:look": False,                 # "look" is not a gesture id
+    }
+    got = _model(*[{"fn": "allowedMessage", "args": [m]} for m in cases])
+    assert dict(zip(cases, got)) == cases
+    built = _model({"fn": "lookMessage", "args": [45, -20]}, {"fn": "lookMessage", "args": [1.5, 0]},
+                   {"fn": "lookMessage", "args": ["10", 0]}, {"fn": "lookMessage", "args": [0, 101]})
+    assert built == ["emma-body:look:45:-20", None, None, None]
+
+
+def test_body_caps_carry_look_only_when_the_app_says_so():
+    a, b = _model({"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "look": True}]},
+                  {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "look": "yes"}]})
+    assert a["look"] is True and b["look"] is False
+
+
+def test_a_head_look_is_relayed_and_is_not_counted_as_her_answer():
+    page = PAGE.read_text(encoding="utf-8")
+    assert ("if (evt.type !== 'attention' && evt.type !== 'lang_pinned' && evt.type !== 'head_look') "
+            "serverSeq++;") in page
+    case = page[page.index("        case 'head_look':"):page.index("        case 'body_command':")]
+    assert "window.EmmaRobotBridge.look(evt)" in case and "break;" in case
+    bridge = page[page.index("window.EmmaRobotBridge = Object.freeze({"):]
+    look = bridge[bridge.index("look: function (evt) {"):bridge.index("speech: function ()")]
+    assert "var message = lookMessage(evt.pan, evt.tilt);" in look
+    assert "var ack = lookAckFrame(evt, ask(message));" in look
+    assert "if (ack && send && frameFits(ack)) send(ack);" in look, \
+        "the answer goes on the call's own socket only (send), never the status link"
+
+
+def test_the_apps_answer_to_a_look_goes_back_whitelisted():
+    ok, refused, junk, old, nothing = _model(
+        {"fn": "lookAckFrame", "args": [{"type": "head_look", "pan": 10, "tilt": 0, "seq": 7},
+                                        {"accepted": True, "action": "look", "reason": None, "ms": 800,
+                                         "extra": "dropped"}]},
+        {"fn": "lookAckFrame", "args": [{"seq": 8}, {"accepted": False, "reason": "busy", "ms": 500}]},
+        {"fn": "lookAckFrame", "args": [{"seq": 9}, {"accepted": "yes", "reason": "<b>", "ms": 99999}]},
+        {"fn": "lookAckFrame", "args": [{"type": "head_look", "pan": 10, "tilt": 0}, {"accepted": True}]},
+        {"fn": "lookAckFrame", "args": [{"seq": 10}, None]})
+    assert ok == {"type": "head_look_ack", "seq": 7, "accepted": True, "reason": None, "ms": 800}
+    assert refused == {"type": "head_look_ack", "seq": 8, "accepted": False, "reason": "busy", "ms": 500}
+    assert junk == {"type": "head_look_ack", "seq": 9, "accepted": False, "reason": "bad_request", "ms": None}
+    assert old is None, "a look from a server without seq gets no answer"
+    assert nothing == {"type": "head_look_ack", "seq": 10, "accepted": False, "reason": "bad_request",
+                       "ms": None}

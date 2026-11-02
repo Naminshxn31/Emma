@@ -346,7 +346,7 @@
    },
    {
     "th": "เป็นห้องโล่ง ไม่มีห้องนอนแยก มีห้องน้ำ 1 ห้อง แอร์ 1 เครื่อง",
-    "en": "It's open plan, with no separate bedroom.",
+    "en": "It's open plan, with no separate bedroom, one bathroom and one air-con.",
     "cue_th": [
      "ห้องโล่ง",
      "ห้องนอนแยก",
@@ -499,7 +499,7 @@
    },
    {
     "th": "มีห้องนอนแยก กับมุมนั่งเล่นและครัว ห้องน้ำ 1 ห้อง แอร์ 2 เครื่อง",
-    "en": "It has a separate bedroom, plus a living area and kitchen.",
+    "en": "It has a separate bedroom, plus a living area and kitchen, one bathroom and two air-cons.",
     "cue_th": [
      "ห้องนอนแยก",
      "นั่งเล่น",

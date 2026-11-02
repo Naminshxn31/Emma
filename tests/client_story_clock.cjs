@@ -615,5 +615,11 @@ async function exits() {
   const S = load(false).EmmaStory, mount = new El('div');
   assert.equal(S.play({ template: 'video', beats: [], params: {} }, { mount }), false);
   assert.equal(mount.children.length, 0);
+  // a template that throws on a malformed payload (a null row, audit 27 Oct):
+  // false, and no half-built stage left in the mount
+  assert.equal(S.play({ id: 'x', template: 'journey', beats: [{ cues: [], w: { th: 1, en: 1 } }],
+                        params: { rows: [null] } }, { mount, clock: () => null }), false);
+  assert.equal(mount.children.length, 0, 'a half-built story stayed on the stage');
+  assert.equal(S.isActive(), false);
   console.log('Story clock and ' + payloads.length + ' templates PASS');
 })().catch(e => { console.error(e); process.exit(1); });

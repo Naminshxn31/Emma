@@ -50,6 +50,51 @@ The rules the tap keeps (each one is a bug this project paid for once):
 Off (the default), none of this exists: doa_ready is unchanged, no task, no
 tap, the page's bytes go up as the same object (tests/test_array_audio.py).
 
+**ARRAY_MIC: the app as the array's ONLY owner (owner 2 Nov 2026,
+docs/emma-array-mic-2026-11-02.md).** Everything above assumed the page's
+mic and the app's capture run side by side; on this array they cannot
+(blocker 0 below). With ARRAY_MIC the page never opens its mic while the app
+holds the array -- it runs a SILENT source through the same worklet, so its
+frames still say WHEN (half-duplex, the 350 ms echo guard, mute, the
+summoned hold are byte-for-byte the page's own code) and are exact zeros --
+and the tap (`Tap(sole=True)`) puts the array's audio in every one of them:
+
+* The page enters this only when ALL hold: the switch (with DOA_ENABLED and
+  ARRAY_AUDIO), the APK's MARKER in BOTH user agents (the page's and the
+  link's -- an old APK must not get a page waiting for an array it never
+  opens: the EmmaBridge/1 lesson), `array_mic=1` in the call's URL (JS
+  that knows the mode: an open page keeps yesterday's JS across a server
+  reload -- "old_page"), and a live stream when `ready` is sent
+  (`sole_state`, waited for up to ARRAY_MIC_START_WAIT_S). Anything else
+  = `ready` says array_mic false and the page takes the mic -- after the app
+  let go (the page's bridge `emma-face:mic:release`, and `array_release` down
+  the link). An app link without the marker gets doa_off: it would take the
+  array from under the page.
+* "Fallback" is no longer a microphone: a dead array is a deaf call. Not
+  live = the silent frame goes up (a hole, never a splice); dead for
+  ARRAY_MIC_DEAF_S -- measured from the last chunk that was not all zeros,
+  so two short holes are not one long one, and never decided right after
+  an event-loop stall (`_stalled`) -- = hand-back: an `array_mic_handback`
+  row and `array_mic_lost` to the page, which holds the array for that CALL
+  (emma-face:mic:hold:deaf) and frees it once its mic tracks are stopped.
+  The tap gives every later frame of the call to the page.
+* What lasts for the app run and what for one call (lead's review, 2 Nov:
+  the first build latched every hand-back, so the robot booting or any
+  server restart -- the app's link still backing off at the first call --
+  turned the array off for the day, silently): FINAL_REASONS (an old page's
+  JS, barge-in, hold-speech, another input rate, an old app, already
+  released) are for the run, `array_release` included; every other reason
+  (no link yet, not capturing, stale, zeros, recovering) is for the call.
+  The app counts mid-call deaf holds itself (MicOwner.java): the 3rd in one
+  run is a release for good.
+* Echo: the same rules as above -- nothing from the array while the
+  server's playback clock says Emma may be audible plus the tail; those
+  frames go up silent. Half-duplex stays (the page sends nothing while she
+  plays): no barge-in, and hold-speech/ECHO_BARGE refuse the mode.
+* Levels: every threshold was tuned on the page mic. ARRAY_AUDIO_GAIN is the
+  one knob for the array's scale here too (1.0 until the robot A/B in the
+  doc sets it): two knobs for one transform drift apart.
+
 Measured (scripts/eval_array_beam.py: the app's own ArrayBeam.java on
 synthetic 4-mic rooms, 2 seeds; steering from a calibration taught by faces;
 gain over microphone 0):
@@ -77,7 +122,9 @@ On the robot (needs DOA_ENABLED; the APK with ArrayBeam):
    whole call (so "fallback to the page" is a deaf call); page first = the
    app gets 2 of 8 channels. The plan below assumed both can capture at
    once -- they cannot. DOA_ENABLED is off in robot.env until the app owns
-   the array alone.
+   the array alone. ARRAY_MIC (2 Nov, above) is that; an APK with the
+   MARKER captures ONLY as the only owner, so with it the steps below need
+   ARRAY_MIC on -- the robot plan is docs/emma-array-mic-2026-11-02.md.
 1. Server .env: DOA_ENABLED=true ARRAY_AUDIO=true (ARRAY_AUDIO_BEAM=ds),
    restart. The operator screen's DOA line shows "เสียงคุยจากไมค์ 8 ช่อง
    (ds) ส่ง N" rising; the server log shows "call audio source: array (gap)"
@@ -129,6 +176,12 @@ CHUNK_SAMPLES = 256
 MAX_BEAM_PAYLOAD = 2048
 MAX_RAW8_PAYLOAD = 2048 * 8 * 2
 MAX_BINARY = HEADER + MAX_RAW8_PAYLOAD
+#: ARRAY_MIC: the APK says it can be the array's only owner -- in the face's
+#: WebView user agent (EmmaFace.java) AND the link's (ArrayListener.java).
+#: Both, because they are checked at different moments: the link's when
+#: doa_ready is built (ask the app to hold the array?), the page's when a
+#: call's `ready` is (may this page go without its mic?).
+MARKER = "EmmaArrayMic/1"
 #: Token buckets in bytes: the stream's own rate +25 %, half a second of burst.
 BEAM_REFILL = RATE * 2 * 1.25
 BEAM_BURST = RATE * 2 * 0.5
@@ -214,13 +267,30 @@ def unsteered_weights() -> list[float]:
     return [1.0, 0.0, 0.0, 0.0]
 
 
-def ready_fields() -> dict:
-    """What doa_ready carries for the array (only the switches that are on)."""
+def sole_enabled() -> bool:
+    """ARRAY_MIC in effect. It rides the link (DOA_ENABLED) and the beam
+    stream (ARRAY_AUDIO); without either it is off, said once. Not with
+    MULTI_SESSION: one array, one owner, one conversation."""
+    if not settings.array_mic:
+        return False
+    if not (settings.doa_enabled and settings.array_audio) or settings.multi_session:
+        _once("sole_needs", "ARRAY_MIC is on but needs DOA_ENABLED and ARRAY_AUDIO (and no "
+                            "MULTI_SESSION) — the page's mic stays the call's")
+        return False
+    return True
+
+
+def ready_fields(agent: str = "") -> dict:
+    """What doa_ready carries for the array (only the switches that are on).
+    `array_mic` = hold the array as its only owner: only for a link whose
+    app says it can (MARKER in its user agent)."""
     out: dict = {}
     if settings.array_audio:
         out["array"] = {"beam": beam_mode(), "chunk": CHUNK_SAMPLES, "rate": RATE}
     if settings.array_capture8:
         out["capture8"] = {"max_s": CAPTURE8_MAX_S}
+    if settings.array_mic and sole_enabled() and MARKER in (agent or ""):
+        out["array_mic"] = {"version": 1}
     return out
 
 
@@ -264,6 +334,12 @@ class _Stream:
         #: evidence ARRAY_AUDIO_STALE_MS is tuned from (array_report
         #: `max_gap_ms`), never from theory.
         self.max_gap = 0.0
+        #: When the last chunk that was not all zeros arrived (any link):
+        #: ARRAY_MIC's "how long has this call been deaf". Kept across link
+        #: changes on purpose -- a link that reconnects mid-call has not
+        #: delivered anything yet, and "deaf since the call began" would
+        #: hand the mic back at the very moment the array returns.
+        self.last_good: float | None = None
 
 
 _STREAM = _Stream()
@@ -359,6 +435,7 @@ def _beam(link, seq: int, payload: bytes, now: float) -> None:
             s.zero_since = now if s.zero_since is None else s.zero_since
         else:
             s.zero_since = None
+            s.last_good = now
         s.fifo.extend(payload)
         if len(s.fifo) > FIFO_MAX:
             del s.fifo[:len(s.fifo) - FIFO_MAX]
@@ -392,6 +469,104 @@ def recovered(now: float) -> bool:
     return ok and _STREAM.run_start is not None and now - _STREAM.run_start >= RECOVER_S
 
 
+# ==================== ARRAY_MIC: the app as the only owner ====================
+
+#: sole_state reasons that will not change by waiting (no point holding `ready`).
+_FINAL = frozenset({"old_app", "released"})
+#: Reasons a call cannot hear with the array that will not change within this
+#: app run: the page has the mic for the rest of it (`array_release`, the
+#: page's emma-face:mic:release). Every other reason -- no_link, not_capturing,
+#: stale, zeros, recovering -- is the moment (the app's link still backing off
+#: after a server restart, the array still opening) and holds the array for
+#: that CALL only (lead's review, 2 Nov: those latched for the day).
+FINAL_REASONS = frozenset({"old_app", "old_page", "released", "input_rate", "barge_in", "hold_speech"})
+
+
+def offer_scope(reason: str) -> str:
+    """"run" = the page keeps its mic until the app restarts; "call" = for
+    this call (the app captures again once the call's mic is stopped)."""
+    return "run" if reason in FINAL_REASONS else "call"
+
+
+def sole_state(now: float) -> tuple[bool, str]:
+    """May a call start on the array alone right now? (ok, why)."""
+    link = _STREAM.link
+    if link is None:
+        return False, "no_link"
+    if not getattr(link, "sole", False):
+        return False, "old_app"
+    if getattr(link, "released", False) or (getattr(link, "status", None) or {}).get("state") == "released":
+        return False, "released"
+    ok, why = live(now)
+    if not ok:
+        return False, why
+    if not recovered(now):
+        return False, "recovering"
+    return True, "live"
+
+
+async def wait_sole(timeout: float) -> tuple[bool, str]:
+    """`sole_state`, waited for up to `timeout`: an app that resumed a moment
+    ago is still opening the array, and "not live at the first `ready`" is a
+    hand-back for the whole app run."""
+    deadline = time.monotonic() + max(0.0, float(timeout))
+    while True:
+        ok, why = sole_state(time.monotonic())
+        if ok or why in _FINAL or time.monotonic() >= deadline:
+            return ok, why
+        await asyncio.sleep(0.05)
+
+
+def sole_offer(session, *, input_rate: int, barge_in: bool, hold_speech: bool) -> str | None:
+    """What this call's `ready` says about the mic.
+
+    None = nothing (the switch is off, or this page is not the robot face
+    with an APK that can do it): `ready` and the tap exactly as before.
+    "" = try the array alone. Anything else = the reason it cannot be this
+    call's ears -- the page must take its mic, and the app must let go first.
+    """
+    if not settings.array_mic or not sole_enabled():
+        return None
+    ws = getattr(session, "ws", None)
+    agent = getattr(ws, "headers", {}).get("user-agent", "")
+    if "EmmaRobot/" not in agent or MARKER not in agent:
+        return None
+    if getattr(ws, "query_params", {}).get("array_mic") != "1":
+        # The APK can, this page's JS cannot: loaded before the server had
+        # ARRAY_MIC (an open page keeps yesterday's JS across a server
+        # reload -- the echo_barge lesson). It opens its mic on `ready` no
+        # matter what; the app must let go of the array for it.
+        return "old_page"
+    if input_rate != RATE:
+        return "input_rate"
+    if barge_in:
+        return "barge_in"          # ECHO_BARGE sends audio while Emma speaks; the array has no AEC
+    if hold_speech:
+        return "hold_speech"       # replays audio from while she spoke; same reason
+    return ""
+
+
+async def request_release(why: str) -> bool:
+    """Tell the app to let go of the array for the rest of its run
+    (`array_release` down the link). The page asks the app too, through its
+    bridge -- whichever arrives first, the app latches the same state and the
+    page waits for the capture to END before it opens its own mic. True =
+    sent (or already released)."""
+    link = _STREAM.link
+    send = getattr(link, "send_text", None) if link is not None else None
+    if send is None:
+        return False
+    if getattr(link, "released", False):
+        return True
+    link.released = True
+    try:
+        await send(json.dumps({"type": "array_release", "why": str(why)[:40]}))
+    except Exception:
+        logger.info("array_release could not be sent (the link is closing)")
+        return False
+    return True
+
+
 def _take(nbytes_align: int | None) -> bytes:
     """Everything waiting; with `nbytes_align`, only that many newest bytes
     (a boundary: what piled up before it belongs to a moment nobody sent)."""
@@ -417,6 +592,69 @@ def _gain(pcm: bytes) -> bytes:
     return np.clip(np.round(x), -32768, 32767).astype("<i2").tobytes()
 
 
+# ==================== event-loop stalls (ARRAY_MIC's deaf decision) ====================
+
+#: A beat every BEAT_S; a beat this late = the loop was stalled. The page's
+#: frames and the array's chunks arrive on two sockets: after a stall they
+#: are processed in whatever order the two receive tasks run, so a page frame
+#: can be judged before the array's queued chunks -- `last_good` (when a
+#: chunk with sound was PROCESSED) then reads as a dead array (lead's review,
+#: 2 Nov). No hand-back is decided while the watch has not beaten since the
+#: stall, nor for STALL_GRACE_S after it: the queues drain in that time.
+LOOP_BEAT_S = 0.05
+STALL_S = 0.25
+STALL_GRACE_S = 0.5
+_LOOP: dict = {"beat": None, "stall_end": None, "stall_s": 0.0, "task": None, "users": 0}
+
+
+def _stalled(now: float) -> bool:
+    """Inside or just after an event-loop stall? False when no watch runs
+    (nothing measured: the decision is as before)."""
+    beat = _LOOP["beat"]
+    if beat is None:
+        return False
+    if now - beat > STALL_S:
+        return True                     # the watch has not run since: inside/right after a stall
+    end = _LOOP["stall_end"]
+    return end is not None and now - end < STALL_GRACE_S
+
+
+async def _watch_loop() -> None:
+    while True:
+        started = time.monotonic()
+        await asyncio.sleep(LOOP_BEAT_S)
+        now = time.monotonic()
+        lag = now - started - LOOP_BEAT_S
+        if lag > STALL_S:
+            _LOOP["stall_end"] = now
+            _LOOP["stall_s"] = max(_LOOP["stall_s"], lag)
+        _LOOP["beat"] = now
+
+
+def loop_watch_start() -> None:
+    """One watch for every sole tap alive (session.py starts and stops it).
+    No running loop (a test calling in directly): nothing measured."""
+    _LOOP["users"] += 1
+    task = _LOOP["task"]
+    if task is not None and not task.done():
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    _LOOP["task"] = loop.create_task(_watch_loop())
+
+
+def loop_watch_stop() -> None:
+    _LOOP["users"] = max(0, _LOOP["users"] - 1)
+    if _LOOP["users"]:
+        return
+    task = _LOOP["task"]
+    if task is not None and not task.done():
+        task.cancel()
+    _LOOP.update(task=None, beat=None, stall_end=None, stall_s=0.0)
+
+
 # ==================== the session's tap ====================
 
 
@@ -429,8 +667,17 @@ class Tap:
     """Per session: which source each page frame becomes. See the module
     docstring for the rules; `frame` is the only entry."""
 
-    def __init__(self) -> None:
+    def __init__(self, sole: bool = False) -> None:
         self.mode = "page"
+        #: ARRAY_MIC: the page's frames are a silent clock and the array is
+        #: the only microphone (`_decide_sole`). Cleared by a hand-back.
+        self.sole = sole
+        self.was_sole = sole
+        self.handed_back = False
+        #: Called once, with the reason, when the array is handed back
+        #: (session.py: tells the page and the app).
+        self.on_handback = None
+        self.first_at: float | None = None
         #: In array mode, Emma was audible a moment ago: page frames go up
         #: until the next boundary (see `_decide`).
         self.held = False
@@ -440,7 +687,7 @@ class Tap:
         #: After her speech in a page gap: page frames until this (`frame`).
         self.echo_until: float | None = None
         self.counts = {"array": 0, "page": 0, "empty": 0, "switch_in": 0, "fallback": 0, "speaking": 0,
-                       "speech": 0}
+                       "speech": 0, "stall_held": 0}
         #: What the last WRITTEN row saw (`_eventful`): None = no row yet.
         self._reported_mode: str | None = None
         self._reported_health: tuple | None = None
@@ -460,7 +707,7 @@ class Tap:
         _record("array_source", source=mode, why=why)
 
     def frame(self, page: bytes, now: float, *, speaking: bool, in_speech: bool | None,
-              audible_until: float | None = None) -> bytes:
+              audible_until: float | None = None, verified: bool = True) -> bytes:
         prev = self.last_page
         gap = prev is None or now - prev > PAGE_GAP_S
         self.last_page = now
@@ -487,7 +734,10 @@ class Tap:
         self.page_n += n
         if in_speech:
             self.counts["speech"] += 1
-        out = self._decide(page, now, gap, speaking, in_speech)
+        if self.sole or self.handed_back:
+            out = self._decide_sole(page, now, gap, speaking, verified)
+        else:
+            out = self._decide(page, now, gap, speaking, in_speech)
         if out is page:
             self.counts["page"] += 1
         elif out:
@@ -573,6 +823,70 @@ class Tap:
             return self._join(page, now, gap)
         return _gain(_take(len(page) if gap else None))
 
+    def _decide_sole(self, page: bytes, now: float, gap: bool, speaking: bool, verified: bool) -> bytes:
+        """ARRAY_MIC. `page` is the silent source's frame (exact zeros): it
+        says WHEN, the array is the only WHAT. What goes up when the array
+        cannot be used is that silent frame -- a hole, never a second
+        microphone (there is none: the app holds the array alone).
+
+        The health check comes FIRST, before the echo hold: a stream that
+        died while Emma spoke must count toward the hand-back from the
+        moment it died, not from the end of her tail."""
+        if self.handed_back:
+            return page                 # the page's own mic, from the swap on
+        if self.first_at is None:
+            self.first_at = now
+        ok, why = live(now) if verified else (False, "not_robot_face")
+        if not ok:
+            # Deaf since the last chunk that carried sound -- not since the
+            # first bad frame: two short holes either side of a page gap
+            # (she spoke in between, the array was fine) are not one long one.
+            since = self.first_at
+            if verified and _STREAM.last_good is not None:
+                since = max(since, _STREAM.last_good)
+            if now - since >= max(0.0, float(settings.array_mic_deaf_s)):
+                if _stalled(now):
+                    # the array's chunks queued during the stall may simply not
+                    # be processed yet: decide after the queues drained
+                    self.counts["stall_held"] += 1
+                else:
+                    self._hand_back(why, now - since, now)
+                    return page
+            if self.mode == "array":
+                self._to("none", why, now)
+            discard()
+            return page
+        if speaking:
+            # No AEC on the array: what it heard while she may be audible is
+            # her. The silent frame goes up instead (the page judged WHEN).
+            discard()
+            self.counts["speaking"] += 1
+            return page
+        if self.mode != "array":
+            self._to("array", "sole" if self.why == "start" else "recovered", now)
+        # After a page gap only the newest frame-length is "now" (what piled
+        # up belongs to a moment nobody sent: mute, a hold, her voice).
+        return _gain(_take(len(page) if gap else None))
+
+    def _hand_back(self, why: str, dead_s: float, now: float) -> None:
+        """For the rest of this call: every later frame is the page's own mic
+        once it has swapped. The app captures again after the call (the page
+        frees it), unless this was the run's DEAF_HOLDS_PER_RUN-th (MicOwner)."""
+        self.handed_back = True
+        self.sole = False
+        discard()
+        logger.warning("array mic: the array delivered nothing for %.1f s (%s) — the page takes its mic "
+                       "for the rest of this call", dead_s, why)
+        self._to("page", "handback", now)
+        _record("array_mic_handback", phase="call", why=why, scope="call", dead_ms=round(dead_s * 1000),
+                deaf_s=settings.array_mic_deaf_s)
+        callback = self.on_handback
+        if callback is not None:
+            try:
+                callback(why)
+            except Exception:
+                logger.warning("array mic hand-back callback failed", exc_info=True)
+
     def _join(self, page: bytes, now: float, gap: bool) -> bytes:
         """Start forwarding the array at a boundary. After a page gap the
         array's newest frame-length is now (nothing was sent meanwhile);
@@ -606,6 +920,13 @@ class Tap:
                "beam": steer.get("mode"), "steer": steer.get("why"), "bearing": steer.get("bearing"),
                "gain": settings.array_audio_gain, "max_gap_ms": round(s.max_gap * 1000),
                "stale_ms": settings.array_audio_stale_ms}
+        if self.was_sole:
+            # ARRAY_MIC rows say so: their page_frames are the silent clock's
+            # zeros and their array_rms/sent_rms are the call's only levels --
+            # what every threshold saw (sent = after ARRAY_AUDIO_GAIN).
+            row.update(sole=True, handed_back=self.handed_back, stall_held=self.counts["stall_held"],
+                       loop_stall_ms=round(float(_LOOP["stall_s"]) * 1000))
+            _LOOP["stall_s"] = 0.0          # the longest stall since the last row
         app_beam = (getattr(s.link, "status", None) or {}).get("beam") if s.link is not None else None
         if app_beam:
             # the app's own view: chunks it could not queue, MVDR hops, guard trips
@@ -925,3 +1246,7 @@ def reset_state() -> None:
         task.cancel()
     _SWEEPER["task"] = None
     _WARNED.clear()
+    task = _LOOP["task"]
+    if task is not None and not task.done():
+        task.cancel()
+    _LOOP.update(task=None, beat=None, stall_end=None, stall_s=0.0, users=0)

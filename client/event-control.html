@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>Emma Event</title>
+<!--
+  The event staff's phone page (owner 30 Oct 2026: "ให้ทีมงานกดเปลี่ยนซีน").
+  Served by app/event_control_server.py behind its own key (cookie). Shows the
+  scenes of data/events/floor1_event.json, switches them, walks to spots and
+  records them. Polls /event/state every second -- that poll is the walk's
+  dead man's switch (app/event_walk.py): a page closed or a phone locked
+  mid-walk stops the robot. No guest's words ever reach this page.
+  Self-contained: the office Wi-Fi is all it may have.
+-->
+<style>
+  :root {
+    --bg: #f4f1ec; --card: #fffdf9; --ink: #1f1c18; --soft: #6b645a; --line: #e2dcd2;
+    --accent: #0f6d5f; --accent-ink: #ffffff; --accent-soft: #dcefe9;
+    --warn: #9a5b00; --warn-soft: #fbecd2; --bad: #c62828; --bad-ink: #ffffff; --ok: #2e7d32;
+    --chip: #ece6dc; color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12110f; --card: #1d1b18; --ink: #f2ede6; --soft: #a39b8f; --line: #34302a;
+      --accent: #3fb8a3; --accent-ink: #06231e; --accent-soft: #173a33;
+      --warn: #f0b04a; --warn-soft: #3a2c12; --bad: #e5484d; --bad-ink: #ffffff; --ok: #6cc070;
+      --chip: #2a2723; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12110f; --card: #1d1b18; --ink: #f2ede6; --soft: #a39b8f; --line: #34302a;
+    --accent: #3fb8a3; --accent-ink: #06231e; --accent-soft: #173a33;
+    --warn: #f0b04a; --warn-soft: #3a2c12; --bad: #e5484d; --bad-ink: #ffffff; --ok: #6cc070;
+    --chip: #2a2723; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.45 "Sarabun", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+    padding-inline: 16px; padding-block: 0 calc(112px + env(safe-area-inset-bottom, 0px));
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { max-width: 640px; margin: 0 auto; display: grid; gap: 14px; }
+  header {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; background: var(--bg);
+    padding-block: 12px 8px; display: grid; gap: 8px;
+  }
+  .brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .01em; }
+  .dates { color: var(--soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .lamps { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--soft); }
+  .lamp { display: inline-flex; align-items: center; gap: 6px; }
+  .lamp i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: inline-block; }
+  .lamp.on i { background: var(--ok); }
+  .lamp.off i { background: var(--bad); }
+  .banner { border-radius: 12px; padding: 10px 12px; font-size: 14px; background: var(--warn-soft); color: var(--warn); }
+  .banner.bad { background: var(--bad); color: var(--bad-ink); }
+
+  .walk { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 6px; }
+  .walk .now { font-size: 18px; font-weight: 600; }
+  .walk .sub { color: var(--soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .walk.moving { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .walk.stopped .now { color: var(--bad); }
+  details.tail summary { cursor: pointer; color: var(--soft); font-size: 13px; }
+  details.tail pre {
+    margin: 6px 0 0; font: 12px/1.4 ui-monospace, Consolas, monospace; white-space: pre-wrap;
+    overflow-wrap: anywhere; color: var(--soft);
+  }
+
+  h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--soft); margin: 10px 2px 0; }
+  .scenes { display: grid; gap: 10px; }
+  .scene {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+    display: grid; gap: 8px; min-width: 0;
+  }
+  .scene.current { border-color: var(--accent); background: var(--accent-soft); }
+  .scene .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .scene .title { font-size: 18px; font-weight: 600; }
+  .scene .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); white-space: nowrap; }
+  .scene .brief { color: var(--soft); font-size: 14px; }
+  .scene .where { font-size: 13px; color: var(--soft); }
+  .scene .where b { color: var(--ink); font-weight: 600; }
+  .scene .where.missing b { color: var(--warn); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  button {
+    font: inherit; border: 0; border-radius: 12px; min-height: 48px; padding: 0 16px; cursor: pointer;
+    background: var(--chip); color: var(--ink); touch-action: manipulation;
+  }
+  button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.confirm { background: var(--warn); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  .stops { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stops button { min-height: 44px; padding: 0 12px; font-size: 14px; }
+  .stops button.here { background: var(--accent); color: var(--accent-ink); }
+  .stops button.unset { color: var(--soft); text-decoration: line-through; }
+
+  details.setup { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px 14px; }
+  details.setup > summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+  .spot { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); min-width: 0; }
+  .spot .name { font-weight: 600; }
+  .spot .meta { font-size: 13px; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .note { font-size: 13px; color: var(--soft); margin: 0 2px; }
+
+  .stopbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--bg);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line);
+  }
+  .stopbar button {
+    width: 100%; max-width: 640px; display: block; margin: 0 auto; min-height: 72px; border-radius: 18px;
+    background: var(--bad); color: var(--bad-ink); font-size: 24px; font-weight: 700; letter-spacing: .04em;
+  }
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: calc(104px + env(safe-area-inset-bottom, 0px)); z-index: 4;
+    max-width: 608px; margin: 0 auto; background: var(--ink); color: var(--bg); border-radius: 12px;
+    padding: 12px 14px; font-size: 15px; opacity: 0; transform: translateY(8px);
+    transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand"><h1 id="eventName">Emma Event</h1><span class="dates" id="dates"></span></div>
+    <div class="lamps">
+      <span class="lamp" id="lampServer"><i></i>เซิร์ฟเวอร์</span>
+      <span class="lamp" id="lampFace"><i></i>หน้าหุ่น</span>
+      <span class="lamp" id="lampCall"><i></i>Emma โหมดงาน</span>
+      <span class="lamp" id="lampWalk"><i></i>การเดิน</span>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+  </header>
+
+  <section class="walk" id="walk">
+    <div class="now" id="walkNow">พร้อม</div>
+    <div class="sub" id="walkSub"></div>
+    <details class="tail" id="walkTailBox" hidden><summary>รายละเอียดการเดิน</summary><pre id="walkTail"></pre></details>
+  </section>
+
+  <h2>ฉาก</h2>
+  <div class="scenes" id="scenes"></div>
+  <p class="note">แตะฉากแล้วกด "เริ่มฉากนี้" · ฉากที่มีจุดหมาย หุ่นจะเดินไปเอง แล้ว Emma พูดเมื่อถึง ·
+    เปิดหน้านี้ค้างไว้ระหว่างหุ่นเดิน — ปิดหน้าหรือล็อกจอ หุ่นจะหยุดเอง</p>
+
+  <details class="setup" id="setup">
+    <summary>ตั้งค่าจุด (ทีมงาน)</summary>
+    <p class="note">ขับหุ่นไปยืนตรงจุดจริงแล้วหันหน้าตามที่ต้องการ แล้วกด "บันทึกตำแหน่งตอนนี้" (กดสองครั้งเพื่อยืนยัน)</p>
+    <div id="spots"></div>
+  </details>
+</main>
+
+<div class="stopbar"><button id="stopBtn" type="button">หยุด</button></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = null, picked = null, armed = {}, lastOk = 0, toastTimer = null, busy = false;
+
+  var WALK_TH = { starting: 'กำลังเริ่มเดินไป', walking: 'กำลังเดินไป', arrived: 'ถึงแล้ว:',
+                  stopped: 'หยุดแล้ว:', failed: 'เดินไม่สำเร็จ:' };
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function toast(text) {
+    var t = $('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3200);
+  }
+  function lamp(id, on) {
+    var l = $(id);
+    l.classList.toggle('on', on === true);
+    l.classList.toggle('off', on === false);
+  }
+  function spotById(id) {
+    var list = (state && state.spots) || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+
+  async function post(path, body) {
+    try {
+      var r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify(body || {}), credentials: 'same-origin', cache: 'no-store' });
+      var doc = await r.json();
+      return doc;
+    } catch (e) {
+      return { ok: false, error_th: 'ติดต่อเซิร์ฟเวอร์ไม่ได้' };
+    }
+  }
+
+  function walkMessage(result) {
+    var w = result && result.walk;
+    if (w && w.ok === false) return 'ไม่ได้เดิน: ' + (w.error_th || w.error) + ' — Emma พูดอยู่กับที่';
+    if (w && w.ok) return 'หุ่นกำลังเดินไป ' + w.run.name;
+    return null;
+  }
+
+  // ---- render ---------------------------------------------------------------------
+  // The lists are rebuilt only when what they show changed: rebuilt every
+  // second, a button could be replaced between a finger's touch and its click.
+  var shownKey = null;
+  function render(force) {
+    var s = state;
+    var online = Date.now() - lastOk < 3500;
+    lamp('lampServer', online);
+    if (!online) {
+      $('banner').hidden = false;
+      $('banner').className = 'banner bad';
+      $('banner').textContent = 'ติดต่อหุ่นไม่ได้ — ถ้าหุ่นกำลังเดิน มันจะหยุดเอง';
+    }
+    if (!s) return;
+    var key = JSON.stringify([s.event, s.scenes, s.spots, s.current, picked, Object.keys(armed)]);
+    if (!force && key === shownKey) {
+      renderLamps(s, online);
+      renderWalk(s.walk);
+      return;
+    }
+    shownKey = key;
+    renderWalk(s.walk);
+    if (!s.event) {
+      $('scenes').textContent = '';
+      $('spots').textContent = '';
+      return;
+    }
+    if (s.event.name_th) $('eventName').textContent = s.event.name_th;
+    $('dates').textContent = (s.event.dates || []).join(' – ');
+    renderScenes(s);
+    renderSpots(s);
+  }
+
+  function renderLamps(s, online) {
+    lamp('lampFace', !!(s.face && s.face.connected));
+    lamp('lampCall', !!(s.face && s.face.event_call));
+    lamp('lampWalk', !!(s.walk && s.walk.enabled));
+    if (!online) return;                 // the "cannot reach" banner stays
+    var warn = [];
+    if (!s.event) warn.push('เครื่องนี้ไม่มีไฟล์งาน (EVENT_FILE)');
+    if (!(s.face && s.face.connected)) warn.push('หน้าหุ่นไม่ได้เชื่อมต่อ (เปิดแอป Emma Event บนหุ่น)');
+    if (s.walk && !s.walk.enabled) warn.push('การเดินปิดอยู่ — ฉากจะให้ Emma พูดอยู่กับที่');
+    $('banner').hidden = !warn.length;
+    $('banner').className = 'banner';
+    $('banner').textContent = warn.join(' · ');
+  }
+
+  function renderWalk(walk) {
+    var run = walk && walk.run, box = $('walk');
+    box.className = 'walk';
+    $('walkTailBox').hidden = !(run && run.tail && run.tail.length);
+    if (!run) {
+      $('walkNow').textContent = 'พร้อม — หุ่นยืนอยู่กับที่';
+      $('walkSub').textContent = '';
+      return;
+    }
+    var moving = run.state === 'starting' || run.state === 'walking';
+    if (moving) box.classList.add('moving');
+    if (run.state === 'stopped' || run.state === 'failed') box.classList.add('stopped');
+    $('walkNow').textContent = (WALK_TH[run.state] || run.state) + ' ' + run.name;
+    $('walkSub').textContent = (moving ? 'เดินมา ' : 'ใช้เวลา ') + Math.round(run.elapsed_s) + ' วินาที'
+      + (run.reason_th && !moving ? ' · ' + run.reason_th : '');
+    $('walkTail').textContent = (run.tail || []).join('\n');
+  }
+
+  function renderScenes(s) {
+    var box = $('scenes');
+    box.textContent = '';
+    var cur = s.current || {};
+    s.scenes.forEach(function (sc) {
+      var card = el('section', 'scene' + (cur.scene === sc.id ? ' current' : ''));
+      var top = el('div', 'top');
+      top.appendChild(el('div', 'title', sc.title_th));
+      if (cur.scene === sc.id) top.appendChild(el('span', 'tag', 'ฉากตอนนี้'));
+      card.appendChild(top);
+      if (sc.brief_th) card.appendChild(el('div', 'brief', sc.brief_th));
+      var where = el('div', 'where');
+      if (sc.stops && sc.stops.length) {
+        var set = sc.stops.filter(function (id) { var p = spotById(id); return p && p.walkable; }).length;
+        where.textContent = 'ไปทีละจุด ';
+        where.appendChild(el('b', null, sc.stops.length + ' จุด'));
+        where.appendChild(document.createTextNode(' (บันทึกตำแหน่งแล้ว ' + set + ')'));
+        if (!set) where.classList.add('missing');
+      } else if (sc.spot) {
+        var p = spotById(sc.spot);
+        where.textContent = 'เดินไปที่ ';
+        where.appendChild(el('b', null, p ? p.name_th : sc.spot));
+        if (!(p && p.walkable)) { where.appendChild(document.createTextNode(' (ยังไม่บันทึกตำแหน่ง)')); where.classList.add('missing'); }
+      } else {
+        where.textContent = 'อยู่กับที่ ไม่เดิน';
+      }
+      card.appendChild(where);
+
+      if (cur.scene === sc.id && sc.stops && sc.stops.length) {
+        var stops = el('div', 'stops');
+        sc.stops.forEach(function (id, i) {
+          var p = spotById(id);
+          var b = el('button', (i === cur.stop ? 'here' : '') + (p && p.walkable ? '' : ' unset'), p ? p.name_th : id);
+          b.type = 'button';
+          b.onclick = function () { act('/event/stop-index', { stop: i }, 'ไป' + (p ? p.name_th : id)); };
+          stops.appendChild(b);
+        });
+        card.appendChild(stops);
+      }
+
+      var row = el('div', 'row');
+      if (picked === sc.id || cur.scene === sc.id) {
+        var start = el('button', 'primary', cur.scene === sc.id ? 'เริ่มฉากนี้อีกครั้ง' : 'เริ่มฉากนี้');
+        start.type = 'button';
+        start.onclick = function () { picked = null; act('/event/scene', { scene: sc.id }, 'เริ่มฉาก ' + sc.title_th); };
+        row.appendChild(start);
+        if (cur.scene === sc.id && sc.stops && sc.stops.length) {
+          var nxt = el('button', 'primary', 'ไปจุดถัดไป');
+          nxt.type = 'button';
+          nxt.disabled = cur.stop >= sc.stops.length - 1;
+          nxt.onclick = function () { act('/event/next', {}, 'ไปจุดถัดไป'); };
+          row.appendChild(nxt);
+        }
+      }
+      if (row.childNodes.length) card.appendChild(row);
+      card.onclick = function (e) {
+        if (e.target.tagName === 'BUTTON') return;
+        picked = picked === sc.id ? null : sc.id;
+        render();
+      };
+      box.appendChild(card);
+    });
+  }
+
+  function renderSpots(s) {
+    var box = $('spots');
+    box.textContent = '';
+    s.spots.forEach(function (p) {
+      var row = el('div', 'spot');
+      row.appendChild(el('div', 'name', p.name_th));
+      var meta = [];
+      if (p.dock) meta.push('ตำแหน่งของแท่นชาร์จ');
+      else if (p.recorded_at) meta.push('บันทึกที่หุ่น ' + p.recorded_at);
+      else if (p.walkable) meta.push('ตำแหน่งจากไฟล์');
+      else meta.push('ยังไม่บันทึกตำแหน่ง');
+      meta.push(p.arrivals ? 'เดินถึงแล้ว ' + p.arrivals + ' ครั้ง' : 'ยังไม่เคยเดินถึงจากหน้านี้');
+      row.appendChild(el('div', 'meta', meta.join(' · ')));
+      var btns = el('div', 'row');
+      var go = el('button', null, 'ไปที่นี่');
+      go.type = 'button';
+      go.disabled = !p.walkable;
+      go.onclick = function () { act('/event/go', { spot: p.id }, 'ไป' + p.name_th); };
+      btns.appendChild(go);
+      if (!p.dock) {
+        var save = el('button', armed[p.id] ? 'confirm' : null, armed[p.id] ? 'แตะอีกครั้งเพื่อบันทึก' : 'บันทึกตำแหน่งตอนนี้');
+        save.type = 'button';
+        save.onclick = function () {
+          if (!armed[p.id]) {
+            armed[p.id] = Date.now();
+            setTimeout(function () { delete armed[p.id]; render(); }, 4000);
+            render();
+            return;
+          }
+          delete armed[p.id];
+          act('/event/spot', { spot: p.id }, 'บันทึก ' + p.name_th);
+        };
+        btns.appendChild(save);
+      }
+      row.appendChild(btns);
+      box.appendChild(row);
+    });
+  }
+
+  // ---- actions --------------------------------------------------------------------
+  async function act(path, body, label) {
+    if (busy) return;
+    busy = true;
+    try {
+      var r = await post(path, body);
+      if (r.ok === false) toast(label + ' ไม่ได้: ' + (r.error_th || r.error || 'ผิดพลาด'));
+      else toast(walkMessage(r) || (label + ' แล้ว'));
+    } finally {
+      busy = false;
+      poll();
+    }
+  }
+
+  // STOP never waits on anything, not even a button that is busy.
+  $('stopBtn').onclick = async function () {
+    var r = await post('/event/stop', {});
+    toast(r.ok === false ? 'ส่งคำสั่งหยุดไม่ได้ — กดปุ่มหยุดฉุกเฉินบนตัวหุ่น'
+          : (r.stopped ? 'ส่งคำสั่งหยุดแล้ว ดูที่ตัวหุ่น' : 'ไม่มีการเดินอยู่'));
+    poll();
+  };
+
+  // ---- the poll (also the walk's heartbeat) ---------------------------------------
+  async function poll() {
+    try {
+      var r = await fetch('/event/state', { credentials: 'same-origin', cache: 'no-store' });
+      if (!r.ok) throw new Error(String(r.status));
+      state = await r.json();
+      lastOk = Date.now();
+    } catch (e) {
+      lastOk = Math.min(lastOk, Date.now() - 4000);   // show it now, not 3 s later
+    }
+    render();
+  }
+  poll();
+  setInterval(poll, 1000);
+})();
+</script>
+</body>
+</html>

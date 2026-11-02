@@ -407,16 +407,18 @@ def test_gemini_tags_calls_and_results_with_the_call_id(monkeypatch):
 
 @pytest.mark.parametrize("switch", [True, False])
 def test_gemini_reports_a_retired_connection_as_dropped_only_when_tracking(monkeypatch, switch):
+    """A call ending while the tool ran: its result will never have a reply.
+    (A socket REPLACED while it ran -- go_away -- now shows the result on the
+    page and asks again: audit 27 Oct, tests/test_audit_fixes_connection.py.)"""
     from app import tools
 
     monkeypatch.setattr(settings, "turn_idle_tracks_tools", switch)
 
     async def scenario():
         provider = _provider()
-        replacement = _Live()
 
         async def dispatch(calls):
-            provider._session = replacement
+            provider._closing = True
             return [(cid, name, {"ok": True}) for cid, name, _ in calls]
 
         monkeypatch.setattr(tools, "dispatch_all", dispatch)

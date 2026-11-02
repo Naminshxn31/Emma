@@ -964,7 +964,8 @@
       "to": 10,
       "unit_en": "projects"
      },
-     "line": 1
+     "line": 1,
+     "tap": false
     },
     {
      "label_en": "Amazon → Embassy Life",
@@ -975,7 +976,8 @@
       "to": 6,
       "unit_en": "projects"
      },
-     "line": 3
+     "line": 3,
+     "tap": false
     }
    ],
    "end_hint_en": "16 projects since 2006 · Embassy World is next"

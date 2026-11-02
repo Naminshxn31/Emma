@@ -1183,7 +1183,13 @@ def compare_unit_types(building: str | None = None) -> dict:
             "total_available": len(rows),
             "instruction": (f"ห้องว่างทั้งหมด {len(rows)} ห้อง แบ่งเป็น {len(types)} แบบ ขึ้นจอแล้ว "
                             "เริ่มคำตอบด้วยความแตกต่างด้านการใช้งานอย่างน้อยหนึ่งประโยคก่อนพูดตัวเลข "
-                            "จากนั้นใช้จำนวน ขนาด ชั้น และวิว/ทิศเป็นข้อมูลประกอบเมื่อเกี่ยวข้อง "
+                            "จากนั้นใช้ขนาด ชั้น และวิว/ทิศเป็นข้อมูลประกอบเมื่อเกี่ยวข้อง "
+                            # replay of 20 Oct (27 Oct): "I want one bedroom." got
+                            # "There are 572 one-bedroom units available" -- the
+                            # owner's remaining-count rule (12 Oct, "ยังว่าง 586
+                            # ห้อง"), as show_plan already words it
+                            "พูดจำนวนห้องว่างเฉพาะเมื่อลูกค้าถามว่ามีกี่ห้องหรือเหลือกี่ห้อง "
+                            "ห้ามพูดเองแบบ 'There are 572 one-bedroom units available' "
                             "ห้ามสรุปว่าแบบใดเหมาะลงทุนหรืออยู่เองโดยไม่มีข้อมูลจากลูกค้า "
                             "ห้ามแต่งขนาดหรือวิว ตอบความแตกต่างแล้วจบทันที ห้ามถามคำถามต่อท้าย "
                             + ("" if settings.units_show_price else

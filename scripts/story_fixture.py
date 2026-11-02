@@ -13,6 +13,7 @@ designers' (data/projects/<project>/stories/design/).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -25,7 +26,20 @@ TEMPLATE_STORY = {
     "stack": "fx_room_types", "slabs": "fx_facilities", "drill": "fx_ground",
     "spotlight": "fx_sky_pool", "assembly": "fx_tower", "details": "fx_studio",
     "distance": "fx_nearby", "metric": "fx_units_total", "features": "fx_smart_home",
-    "journey": "fx_travel", "neighborhood": "fx_where",
+    "journey": "fx_travel", "neighborhood": "fx_where", "map": "fx_map",
+}
+#: The real map's fixture: a drawn street picture and where its places lie
+#: on it (render_story_maps.py writes the real ones), by the picture's sha256.
+MAP_PICTURE = "fx_streets"
+MAP_OVERLAY = {
+    "story": "fx_map", "image": "fx_streets.png", "w": 1080, "h": 900,
+    "project": {"x": 44.0, "y": 42.0},
+    "attribution_en": "© OpenStreetMap contributors · OpenFreeMap",
+    "places": {
+        "seven": {"x": 50.0, "y": 72.0, "route": [[44.0, 42.0], [44.0, 58.0], [50.0, 64.0], [50.0, 72.0]]},
+        "whale": {"x": 41.5, "y": 45.0, "route": [[44.0, 42.0], [30.0, 42.0], [30.0, 50.0], [41.5, 45.0]],
+                  "walk_route": [[44.0, 42.0], [38.0, 44.0], [41.5, 45.0]]},
+    },
 }
 #: A template's other drawing, chosen by a param, with a story of its own
 #: (the server knows templates by name only -- a view is the page's).
@@ -344,6 +358,33 @@ def stories() -> list[dict]:
             "sources": ["facts:ทำเล"],
             "notes_th": "fixture",
         },
+        {
+            # the real map: a picture of the streets, the pin, routes along
+            # them; a place right by the pin moves clear with a stem back
+            "id": "fx_map", "template": "map",
+            "questions_th": ["ใกล้เซเว่นไหม"], "questions_en": ["Is there a 7-Eleven near here?"],
+            "lines": [
+                _line("เซเว่นที่ใกล้ที่สุดอยู่ในปั๊ม PTT ขับรถประมาณ 3 นาทีค่ะ",
+                      "The nearest 7-Eleven is in the PTT station, about 3 minutes by car,", ["เซเว่น"], ["eleven"]),
+                _line("ร้านอาหารใกล้สุดเดินไปประมาณ 11 นาที", "and the nearest restaurant is about 11 minutes on foot.",
+                      ["ร้านอาหาร"], ["restaurant"]),
+            ],
+            "params": {
+                "map_asset": MAP_PICTURE, "origin_en": "EMBASSY WORLD", "origin_sub_en": "by car, no traffic",
+                "rows": [
+                    {"icon": "shop", "label_en": "7-Eleven", "sub_en": "In the PTT petrol station",
+                     "value_en": "≈ 3 min", "line": 0, "place": "seven"},
+                    {"icon": "food", "label_en": "Big Whale Seafood BBQ Buffet", "short_en": "Big Whale",
+                     "value_en": "≈ 3 min", "walk": {"value_en": "≈ 11 min", "line": 1}, "line": 1, "place": "whale"},
+                ],
+            },
+            "taps": [
+                {"id": "story_fx_map_around", "label_en": "Around us", "label_th": "รอบโครงการ",
+                 "next_story": "fx_around", "tool": None},
+            ],
+            "sources": ["facts:ทำเล"],
+            "notes_th": "fixture",
+        },
     ]
 
 
@@ -454,6 +495,15 @@ def _draw_pictures(src: Path, width: int) -> dict[str, str]:
         d.line([w * (.2 + k * .17), 0, w * (.25 + k * .15), h], fill=(255, 255, 255), width=max(3, w // 120))
     d.line([0, h * .3, w, h * .42], fill=(255, 255, 255), width=max(3, w // 100))
     save("fx_map", im)
+    # the real map's stand-in: a night street map, the size its overlay names
+    h = int(w * MAP_OVERLAY["h"] / MAP_OVERLAY["w"])
+    im = Image.new("RGB", (w, h), (17, 30, 49))
+    d = ImageDraw.Draw(im)
+    d.rectangle([0, 0, w * .2, h], fill=(21, 43, 68))
+    for k in range(1, 7):
+        d.line([w * k / 7, 0, w * k / 7 + w * .04, h], fill=(56, 68, 88), width=max(2, w // 160))
+        d.line([0, h * k / 6, w, h * k / 6 - h * .03], fill=(56, 68, 88), width=max(2, w // 200))
+    save(MAP_PICTURE, im)
     return out
 
 
@@ -476,7 +526,16 @@ def build(folder: Path, *, approved: bool = False, size: str = "test") -> Path:
     files = _draw_pictures(src, 1080 if size == "screen" else 240)
     (root / "recipes").mkdir(parents=True, exist_ok=True)
     (root / "design").mkdir(parents=True, exist_ok=True)
-    (root / "recipes" / "fixture.json").write_text(json.dumps(recipes(files), indent=1), encoding="utf-8")
+    (root / "maps").mkdir(parents=True, exist_ok=True)
+    pictures = recipes(files)
+    # the map's overlay is tied to its picture's bytes, as render_story_maps does
+    sha = hashlib.sha256((src / files[MAP_PICTURE]).read_bytes()).hexdigest()
+    for recipe in pictures:
+        if recipe["id"] == MAP_PICTURE:
+            recipe["source_sha256"] = sha
+    (root / "maps" / "fx_map.json").write_text(json.dumps(dict(MAP_OVERLAY, image_sha256=sha), indent=1),
+                                               encoding="utf-8")
+    (root / "recipes" / "fixture.json").write_text(json.dumps(pictures, indent=1), encoding="utf-8")
     (root / "design" / "fixture.json").write_text(json.dumps(stories(), ensure_ascii=False, indent=1),
                                                   encoding="utf-8")
     _pins, problems = builder.build_assets(root, src)

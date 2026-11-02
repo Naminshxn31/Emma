@@ -32,16 +32,76 @@ from pathlib import Path
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app import display, heard, robot_contracts, robot_face_link, speech_gestures, turnlog, voices
+from app import display, face_mirror, heard, robot_contracts, robot_face_link, speech_gestures, turnlog, voices
 from app.config import settings
-from app.prompts import build_instructions, greeting_for
+from app.prompts import SALES_PROFILES, build_instructions, greeting_for
 from app.providers import ProviderError, default_voice_for, get_provider
 
 logger = logging.getLogger("condo_voice.session")
 
 
+#: Words of a failure that was the network's. The first three were the whole
+#: list until 26 Oct, when the robot's own failure strings were run through it
+#: and three outage shapes came out "provider" -- an outage read as Google's
+#: fault: robot_dns's "...(timed out)" / "no answer from" (a gaierror says
+#: "timed out", never "timeout"), websockets' "timed out during opening
+#: handshake" (a blackholed host, 10.0 s), and an SSL CERTIFICATE_VERIFY_FAILED
+#: (a captive portal's certificate, or a robot clock gone wrong).
+_NETWORK_WORDS = ("connect", "timeout", "network", "timed out", "robot_dns", "no answer from",
+                  "name resolution", "getaddrinfo", "gaierror", "nodename nor servname",
+                  "name or service not known", "no address associated", "opening handshake",
+                  "certificate", "unreachable", "no route to host", "connection reset",
+                  "connection refused", "abnormal closure", "broken pipe")
+#: Short words only as words: "tls" sits inside other words.
+_NETWORK_RE = re.compile(r"\b(ssl|tls)\b")
+#: errno of a socket that never reached anybody (POSIX, and Windows' WSA codes).
+_NETWORK_ERRNOS = frozenset(
+    code for code in (getattr(__import__("errno"), name, None) for name in (
+        "ENETUNREACH", "EHOSTUNREACH", "ENETDOWN", "EHOSTDOWN", "ETIMEDOUT",
+        "ECONNREFUSED", "ECONNRESET", "ECONNABORTED", "WSAENETUNREACH", "WSAEHOSTUNREACH",
+        "WSAENETDOWN", "WSAEHOSTDOWN", "WSAETIMEDOUT", "WSAECONNREFUSED", "WSAECONNRESET",
+        "WSAECONNABORTED"))
+    if code is not None)
+
+
+def _network_fault(exc: BaseException | None) -> bool:
+    """By TYPE, along the cause chain (ProviderError is raised `from` the real
+    failure): DNS (robot_dns raises socket.gaierror), a timeout of any layer,
+    TLS, a refused/reset socket, and a websocket closed with no close frame
+    (1006, an abnormal closure -- the link, not the server)."""
+    import socket
+    import ssl
+
+    try:
+        from websockets.exceptions import ConnectionClosed
+    except Exception:                                      # pragma: no cover - SDK dependency
+        ConnectionClosed = ()
+    seen = 0
+    while exc is not None and seen < 8:
+        seen += 1
+        if isinstance(exc, (socket.gaierror, socket.herror, TimeoutError, ssl.SSLError,
+                            ConnectionError)):
+            return True
+        if isinstance(exc, OSError) and getattr(exc, "errno", None) in _NETWORK_ERRNOS:
+            return True
+        if ConnectionClosed and isinstance(exc, ConnectionClosed):
+            rcvd = getattr(exc, "rcvd", None)
+            if rcvd is None or getattr(rcvd, "code", None) == 1006:
+                return True
+        elif getattr(exc, "code", None) == 1006:        # the SDK's APIError for that close
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
 def _provider_failure_kind(exc: Exception) -> str:
-    """Classify provider failures without logging URLs, tokens, or messages."""
+    """Classify provider failures without logging URLs, tokens, or messages.
+
+    One of permission / quota / auth / network / provider. "network" is what
+    a fallback (and the face's "No internet" line) acts on, so it is decided
+    by the exception's type first and its words second; quota and auth keep
+    their words-only test (an APIError's code is the websocket close code,
+    not the HTTP status)."""
     value = str(exc).lower()
     if "winerror 5" in value or "access is denied" in value or "permission" in value:
         return "permission"
@@ -49,9 +109,27 @@ def _provider_failure_kind(exc: Exception) -> str:
         return "quota"
     if any(word in value for word in ("api key", "api_key", "401", "403", "unauthorized")):
         return "auth"
-    if any(word in value for word in ("connect", "timeout", "network")):
+    if (_network_fault(exc) or any(word in value for word in _NETWORK_WORDS)
+            or _NETWORK_RE.search(value)):
         return "network"
     return "provider"
+
+
+#: What the page is told when the dial fails, by category -- never the
+#: exception's own text (audit 26 Oct: `str(exc)` went to the page, so the
+#: robot face painted resolver detail for a moment and then said "Ready").
+#: Thai, for the desk page that prints `message` as a system line; the robot
+#: face draws its own English from `category` (FIXED_UI_LANG). The detail is
+#: in the server's console (`_report_failed_dial`), not on a public screen.
+DIAL_FAILED_TEXT = {
+    "network": "เชื่อมต่ออินเทอร์เน็ตไปหาผู้ช่วยไม่ได้ — Emma ยังคุยไม่ได้ ลองใหม่อีกครั้ง",
+    "quota": "โควตาของผู้ช่วยเต็มชั่วคราว — ลองใหม่อีกครั้ง",
+    # {key}: the provider that dialled (review 26 Oct: hard-coded Gemini sent
+    # staff with a bad OPENAI_API_KEY to the wrong line of .env)
+    "auth": "API key ถูกปฏิเสธ — ตรวจ {key} ใน .env ของเครื่องนี้",
+    "permission": "เครื่องนี้ไม่มีสิทธิ์เปิดการเชื่อมต่อผู้ช่วย — ดู log ของเซิร์ฟเวอร์",
+    "provider": "เปิดการเชื่อมต่อผู้ช่วยไม่สำเร็จ — ลองใหม่อีกครั้ง",
+}
 
 #: Call-mic debug recorder (CALL_DEBUG). Customer audio on disk, off by
 #: default and gitignored — the WAKE_DEBUG equivalent for a live call, for
@@ -146,6 +224,58 @@ CALL_DEBUG_KEEP = 12
 CALL_DEBUG_RATE = 16000
 
 
+# ---- OFFLINE_FALLBACK: the dial that falls back (docs/emma-offline-mode.md) ----
+
+class _OfflineFallbackDial:
+    """`async with` over a Gemini dial that, when the dial fails because the
+    network did, opens the offline provider on the SAME page socket instead.
+
+    Same socket, not "send the error and let the page redial": the audit (26
+    Oct) measured what the redial is on the robot -- "Connecting..." for up to
+    10 s, a close, a pill saying "Ready" on a robot that cannot talk, and the
+    standing line ringing the same failure again ~15 s later, all day. The
+    page cannot tell this from an ordinary dial: it gets `ready` with the same
+    rates (16 kHz in, 24 kHz out) and `offline: true`.
+
+    Built only with OFFLINE_FALLBACK on (`VoiceSession._offline_dial`); off,
+    run() enters the provider itself exactly as it always did. `provider` is
+    whichever one is open; `__aexit__` closes that one."""
+
+    def __init__(self, session: "VoiceSession", provider, make_offline) -> None:
+        self.session = session
+        self.provider = provider
+        self._make_offline = make_offline
+        self.fell_back = False
+
+    async def __aenter__(self) -> "_OfflineFallbackDial":
+        from app import net_health
+
+        started = time.monotonic()
+        try:
+            await self.provider.__aenter__()
+        except ProviderError as exc:
+            if not await self.session._should_go_offline(exc, time.monotonic() - started):
+                raise
+            try:
+                offline = self._make_offline()
+                await offline.__aenter__()
+            except Exception:
+                # Never two failures on the screen: the page gets the Gemini
+                # dial's honest category ("No internet ...") as before.
+                logger.exception("the offline voice did not open either -- "
+                                 "reporting the dial's own failure")
+                raise exc
+            self.provider = offline
+            self.fell_back = True
+            return self
+        # A dial that went through: whatever failed before was not "in a row".
+        net_health.note_dial_success()
+        return self
+
+    async def __aexit__(self, *exc_info):
+        return await self.provider.__aexit__(*exc_info)
+
+
 class VoiceSession:
     #: A summoned session that never got its greeting and heard nobody
     #: ends this soon, whatever IDLE_TIMEOUT_S says.
@@ -210,7 +340,9 @@ class VoiceSession:
         #: inside build_instructions — same safety as everywhere else.
         self.profile = (profile or settings.assistant_profile).strip().lower()
         # A public mode URL cannot unlock the machine owner's private persona.
-        if self.profile not in {"condo", "emma", "joke", "translator"}:
+        # `event` = the sales host at an event (the "Emma Event" robot app,
+        # app/event_host.py): condo's rules with the event's block on top.
+        if self.profile not in {"condo", "emma", "joke", "translator", "event"}:
             self.profile = "condo"
         if self.profile == "emma" and settings.assistant_profile != "emma":
             self.profile = "condo"
@@ -221,6 +353,14 @@ class VoiceSession:
             chosen = default_voice_for(self.provider_name)
         self.voice = chosen
         self.provider = None
+        #: OFFLINE_FALLBACK (off by default: both falsy, nothing imported).
+        #: `_offline_first`: why this call opens offline without trying Gemini
+        #: -- "net_state" (app/net_health.py already knows the link is down)
+        #: or "asked" (`?provider=offline` on a machine with the switch on: how
+        #: the owner tries the backup without pulling the cable). `_offline`:
+        #: the provider that actually opened is the offline one.
+        self._offline = False
+        self._offline_first = self._offline_first_choice()
         #: Milliseconds of reply audio handed to the browser for the current
         #: turn — OpenAI needs this to truncate an interrupted reply.
         self._sent_audio_ms = 0.0
@@ -280,6 +420,9 @@ class VoiceSession:
         self._invite_at: float | None = None
         self._goodbye_done = False
         self._attention_sent = _UNSENT
+        #: HEAD_FOLLOW (app/head_follow.py): made on the first tick of a robot
+        #: face's call, None everywhere else.
+        self._head_follow = None
 
     @property
     def metrics(self):
@@ -326,13 +469,15 @@ class VoiceSession:
                       and query.get("echo_barge") == "1")
         await self.ws.accept()
 
-        if not settings.api_key_for(self.provider_name):
+        # An offline call needs no key: nothing it does leaves this machine.
+        if not self._offline_first and not settings.api_key_for(self.provider_name):
             key = "GEMINI_API_KEY" if self.provider_name == "gemini" else "OPENAI_API_KEY"
             await self._send_json({
                 "type": "error",
                 "code": "missing_api_key",
                 "message": f"{key} is not set on the server. Add it to .env and restart.",
             })
+            self._note_end("missing_api_key")
             await self.ws.close()
             return
 
@@ -344,8 +489,7 @@ class VoiceSession:
             translator_target=self.lang,
             robot_face=robot_face,
         )
-        provider = get_provider(
-            self.provider_name, self.voice, instructions,
+        dial_kwargs = dict(
             greeting=None if self.summoned else greeting_for(self.profile),
             # Toolless by config for the translator, not by prompt: a
             # declared tool is a callable tool whatever the prompt says.
@@ -354,6 +498,14 @@ class VoiceSession:
             # hears the person in front, EmmaJoke/interpreter hear the room.
             vad_floor=settings.call_vad_floor(self.profile),
         )
+        if self._offline_first:
+            # OFFLINE_FALLBACK, link already known down (or asked for): no
+            # Gemini dial to wait 10 s on -- the offline voice opens at once.
+            turnlog.record("offline_fallback", why=self._offline_first, category=None)
+            provider = get_provider("offline", self.voice, instructions, **dial_kwargs)
+        else:
+            provider = get_provider(self.provider_name, self.voice, instructions, **dial_kwargs)
+        opener = self._offline_dial(provider, instructions, dial_kwargs)
 
         from app.metrics import active
 
@@ -362,8 +514,19 @@ class VoiceSession:
                                                 if self.provider_name == "openai" else ""),
                                    vad=settings.vad_mode if self.provider_name == "gemini"
                                    else settings.openai_turn_detection)
+        # How long the dial took, to the millisecond (voice_ready.connect_ms,
+        # provider_error.ms): turnlog `t` is HH:MM:SS, and the one sign of a
+        # weak link in the robot's logs was connect time (26 Oct audit).
+        dial_started = time.monotonic()
         try:
-            async with provider:
+            async with opener:
+                if opener is not provider:
+                    # OFFLINE_FALLBACK: the one that opened (Gemini, or the
+                    # offline voice the failed dial fell back to).
+                    provider = opener.provider
+                    self._offline = self._offline or opener.fell_back
+                if self._offline_first:
+                    self._offline = True
                 if hasattr(provider, "model"):
                     self.metrics.labels["model"] = provider.model
                 self.provider = provider
@@ -374,13 +537,17 @@ class VoiceSession:
                     provider.stand_down_floor()
                 self._watch_segments(provider)
                 self._open_call_ears(provider)
-                turnlog.record("voice_ready")
+                turnlog.record("voice_ready",
+                               connect_ms=round((time.monotonic() - dial_started) * 1000),
+                               # only an offline call carries it: a healthy
+                               # call's row stays exactly as it was
+                               **({"provider": "offline"} if self._offline else {}))
                 hold_speech = bool(settings.hold_speech
                                    and settings.half_duplex and not echo_barge
                                    and not settings.listens_far(self.profile))
                 ready = {
                     "type": "ready",
-                    "provider": self.provider_name,
+                    "provider": "offline" if self._offline else self.provider_name,
                     # Which persona this session actually opened with — shown
                     # in the header, because "ไม่เห็นแปลภาษาเลย" turned out to
                     # mean a translator URL served by a pre-translator server,
@@ -422,8 +589,24 @@ class VoiceSession:
                     asks = quick_asks.for_page(self.profile, settings.project_name)
                     if asks is not None:
                         ready["quick_asks"] = asks
+                if self._offline:
+                    # OFFLINE_FALLBACK: the face says so in its status pill
+                    # (an honest "Offline mode", not a Gemini-sounding Ready).
+                    ready["offline"] = True
+                # ARRAY_MIC (docs/emma-array-mic-2026-11-02.md): whether this
+                # page goes without its mic. None with the switch off or on any
+                # page but the robot face with an APK that can: `ready` as before.
+                mic_offer = await self._array_mic_offer(provider, echo_barge, hold_speech)
+                if mic_offer is not None:
+                    ready["array_mic"] = mic_offer == ""
+                    if mic_offer:
+                        from app import array_audio as _array_audio
+
+                        ready["array_mic_why"] = mic_offer
+                        # "call" = the page holds the array for this call only
+                        ready["array_mic_scope"] = _array_audio.offer_scope(mic_offer)
                 await self._send_json(ready)
-                self._open_array_and_enhancer(provider, echo_barge, hold_speech)
+                self._open_array_and_enhancer(provider, echo_barge, hold_speech, mic_offer=mic_offer)
 
                 up = asyncio.create_task(self._browser_to_provider())
                 down = asyncio.create_task(self._provider_to_browser())
@@ -459,19 +642,29 @@ class VoiceSession:
                 # otherwise (the FIRST_COMPLETED lesson two blocks up).
                 if self._wants_engagement_watch():
                     jobs.add(asyncio.create_task(self._engagement_watch()))
+                # An offline call that fell back on its own ends at the first
+                # quiet moment once the link is back, so the next dial is
+                # Gemini (`_offline_until_online`). Only then in the race --
+                # a watcher that is not needed must not be a task at all.
+                if self._offline and self._offline_first != "asked":
+                    jobs.add(asyncio.create_task(self._offline_until_online()))
                 _done, pending = await asyncio.wait(
                     jobs, return_when=asyncio.FIRST_COMPLETED,
                 )
+                self._note_end_from(_done)
                 for task in pending:
                     task.cancel()
                 await asyncio.gather(*pending, return_exceptions=True)
 
         except ProviderError as exc:
-            turnlog.record("provider_error", category=_provider_failure_kind(exc))
-            await self._send_json({"type": "error", "code": "provider_error", "message": str(exc)})
-        except Exception as exc:
+            await self._report_failed_dial(exc, time.monotonic() - dial_started)
+        except Exception:
             logger.exception("voice session failed")
-            await self._send_json({"type": "error", "code": "internal", "message": str(exc)})
+            self._note_end("internal")
+            # Never str(exc) on the page: an internal error's text can hold
+            # anything the code had in hand, a guest's words included.
+            await self._send_json({"type": "error", "code": "internal",
+                                   "message": "ระบบขัดข้อง — ลองใหม่อีกครั้ง"})
         finally:
             # Nothing is in flight on a closed line: a set left non-empty
             # here would park announcements on this session's ghosts.
@@ -479,6 +672,10 @@ class VoiceSession:
             self._flush_call_debug()
             if getattr(self, "_array_tap", None) is not None:
                 self._array_tap.report()
+                if self._array_tap.was_sole:
+                    from app import array_audio
+
+                    array_audio.loop_watch_stop()
             self.metrics.finish("session_closed")
             active.reset(metrics_token)
             for name in ("_nudge_task", "_respeak_task", "_ears_task", "_invite_task",
@@ -511,6 +708,180 @@ class VoiceSession:
                 await self.ws.close()
             except Exception:
                 pass
+
+    # ---- why a call ended, and a dial that failed (26 Oct, bad network) ----
+
+    #: session_end.reason for the task that finished first, by its coroutine,
+    #: when that task did not say more itself (`_note_end` -- the first cause
+    #: wins). 20 Oct's two calls lost to Google read heard -> session_end with
+    #: nothing between; five robot sessions ended <20 s after an unanswered
+    #: question, and the turn log could not say why.
+    _ENDED_BY = {
+        "_browser_to_provider": "browser", "_provider_to_browser": "upstream",
+        "_resume_after_silence": "silence_watch", "_follow_canva": "canva",
+        "_close_when_nobody_is_there": "idle_timeout", "_engagement_watch": "goodbye",
+        "_offline_until_online": "network_back",
+    }
+
+    def _note_end(self, reason: str) -> None:
+        """Why this call is ending (a category, never text). First cause
+        wins: the pump that saw the socket close says it before the race
+        notices the pump returned."""
+        if not getattr(self, "_end_reason", None):
+            self._end_reason = reason
+
+    def _note_end_from(self, done) -> None:
+        names = []
+        for task in done:
+            coro = task.get_coro() if hasattr(task, "get_coro") else None
+            names.append(getattr(coro, "__name__", ""))
+        order = list(self._ENDED_BY)
+        for name in sorted(names, key=lambda n: order.index(n) if n in order else len(order)):
+            self._note_end(self._ENDED_BY.get(name, "watcher"))
+
+    async def _report_failed_dial(self, exc: Exception, took_s: float) -> None:
+        """The dial failed: a category for the turn log and the page, the
+        detail for the console only.
+
+        Audit 26 Oct: the page got `str(exc)` -- resolver and host detail on
+        the robot's public screen for a moment, then the socket closed and
+        the face's pill said "Ready" while she could not talk. The page now
+        gets `category` (network / quota / auth / permission / provider) and
+        a fixed line; the robot face draws its own English from the category
+        and keeps it after the close. The console had nothing at all before:
+        the exception text only ever went to the page."""
+        kind = _provider_failure_kind(exc)
+        # A dial's error, before a word was spoken: host, close code, reason.
+        logger.warning("could not open the voice session (%s, %.1fs): %s", kind, took_s,
+                       str(exc)[:300])
+        turnlog.record("provider_error", category=kind, ms=round(took_s * 1000))
+        self._note_end("dial_failed")
+        key = "GEMINI_API_KEY" if self.provider_name == "gemini" else "OPENAI_API_KEY"
+        await self._send_json({"type": "error", "code": "provider_error", "category": kind,
+                               "message": DIAL_FAILED_TEXT.get(kind, DIAL_FAILED_TEXT["provider"])
+                               .format(key=key)})
+
+    # ---- OFFLINE_FALLBACK: choosing the offline voice (docs/emma-offline-mode.md) ----
+    #
+    # Two ways a call becomes offline, both only with the switch on and only
+    # for a Gemini call: the link is already known down (net_health's
+    # hysteresis: two failures in a row, or two failed DIALS in a row and the
+    # back-off not over) -- no 10 s dial to wait on; or this
+    # call's own dial failed for the network -- the same page socket gets the
+    # offline voice instead of an error and a close. Either way the call ends
+    # at a quiet moment once the link answers again, so the next dial is
+    # Gemini: fixed lines and stories are a backup, never the better Emma.
+
+    def _offline_first_choice(self) -> str | None:
+        if not settings.offline_fallback:
+            return None                    # off: net_health is never imported
+        if self.provider_name == "offline":
+            return "asked"
+        if self.provider_name != "gemini":
+            return None
+        from app import net_health
+
+        if net_health.is_offline():
+            return "net_state"
+        # Two failed Gemini dials in a row: the link may answer a probe and
+        # still refuse every Live dial (review 26 Oct) -- wait out the
+        # back-off with the backup instead of another 10 s deaf dial.
+        return "dial_backoff" if net_health.dial_backoff_left() > 0 else None
+
+    def _offline_dial(self, provider, instructions: str, dial_kwargs: dict):
+        """What run() enters: the provider itself (switch off, a non-Gemini
+        call, or already offline), or the dial that can fall back."""
+        if (self._offline_first or not settings.offline_fallback
+                or self.provider_name != "gemini"):
+            return provider
+        return _OfflineFallbackDial(
+            self, provider,
+            lambda: get_provider("offline", self.voice, instructions, **dial_kwargs))
+
+    async def _should_go_offline(self, exc: Exception, took_s: float) -> bool:
+        """The Gemini dial failed: is it the network's fault? By the failure's
+        category first; any other category is asked of the network itself
+        (one probe, NET_PROBE_TIMEOUT_S) -- a quota or a refused key on a link
+        that answers stays the error it was, and is reported as before."""
+        from app import net_health
+
+        kind = _provider_failure_kind(exc)
+        net_health.note_dial_failure(kind)
+        if kind != "network" and await net_health.probe_now():
+            return False
+        logger.warning("could not open the voice session (%s, %.1fs): %s -- opening the "
+                       "offline voice on the same line", kind, took_s, str(exc)[:300])
+        # The dial's own row, as `_report_failed_dial` writes it, plus where
+        # the call went instead (categories and numbers only).
+        turnlog.record("provider_error", category=kind, ms=round(took_s * 1000),
+                       fallback="offline")
+        turnlog.record("offline_fallback", why="dial", category=kind)
+        return True
+
+    #: An offline call the link has come back for ends after this long with
+    #: nobody speaking, tapping, or hearing her -- a guest mid-question or
+    #: watching her answer keeps the backup until they pause.
+    OFFLINE_RETURN_QUIET_S = 10.0
+    #: How often the watcher looks, and how often it asks the network itself.
+    OFFLINE_WATCH_S = 1.0
+    OFFLINE_RECHECK_S = 10.0
+
+    def _offline_quiet_s(self, now: float) -> float | None:
+        """Seconds of quiet, or None while anybody is mid-turn: a voice, an
+        answer owed, her audio still playing."""
+        if self._guest_speaking() or self._reply_owed(now):
+            return None
+        audible = self._array_audible_until(now)
+        if audible > now:
+            return None
+        return now - max(self._last_heard_at, audible, getattr(self, "_quick_ask_at", -1e9))
+
+    async def _offline_until_online(self) -> None:
+        """End this offline call at its first quiet moment once the link
+        answers, with the frame an idle call ends on (the page hangs up the
+        same way, and on the robot the standing line rings again -- online).
+
+        Not left to IDLE_TIMEOUT_S: a guest who keeps talking keeps an idle
+        timeout away forever, and would be served fixed lines all afternoon
+        while Gemini was reachable again. Asked of the network, not inferred:
+        while net_health still says OFFLINE its background prober moves the
+        state (two answers in a row); without a prober (NET_PROBE_S=0), or
+        when the state never left ONLINE (one failed dial), this asks.
+
+        Never inside a dial back-off (net_health.DIAL_BACKOFF_S): there the
+        probe answering is exactly what has been wrong -- ending the call on
+        it was the all-day loop the review reproduced (dial fails, backup,
+        probe OK, hang up, dial fails ...)."""
+        from app import net_health
+
+        asked_at = -1e9
+        while True:
+            await asyncio.sleep(self.OFFLINE_WATCH_S)
+            now = time.monotonic()
+            quiet = self._offline_quiet_s(now)
+            if quiet is None or quiet < self.OFFLINE_RETURN_QUIET_S:
+                continue
+            if net_health.health.offline() and settings.net_probe_s > 0:
+                continue
+            if net_health.dial_backoff_left() > 0:
+                continue
+            if now - asked_at < self.OFFLINE_RECHECK_S:
+                continue
+            asked_at = now
+            if (not await net_health.probe_now() or net_health.health.offline()
+                    or net_health.dial_backoff_left() > 0):
+                continue
+            # the probe took time: somebody may have started talking
+            now = time.monotonic()
+            quiet = self._offline_quiet_s(now)
+            if quiet is None or quiet < self.OFFLINE_RETURN_QUIET_S:
+                continue
+            logger.info("the network is back -- ending the offline call at a quiet moment "
+                        "(%.0fs) so the next one is Gemini", quiet)
+            turnlog.record("offline_end", reason="network_back", quiet_s=round(quiet))
+            self._note_end("network_back")       # before the frame the page hangs up on
+            await self._send_json({"type": "idle_timeout", "quiet_s": round(quiet)})
+            return
 
     #: Seconds between microphone reports during a call.
     MIC_REPORT_S = 5.0
@@ -545,9 +916,13 @@ class VoiceSession:
         rms = math.sqrt(float((samples * samples).sum()) / len(samples))
         peak = float(np.abs(samples).max())
         st = getattr(self, "_mic_probe", None)
+        gate = getattr(self.provider, "_vad_gate", None)
         if st is None:
             st = self._mic_probe = {"at": time.monotonic(), "peak": 0.0,
-                                    "sum": 0.0, "n": 0, "zero": 0}
+                                    "sum": 0.0, "n": 0, "zero": 0,
+                                    "segs0": getattr(gate, "segments", None), "open": False}
+        if getattr(gate, "in_speech", False):
+            st["open"] = True
         st["peak"] = max(st["peak"], rms)
         st["sum"] += rms
         st["n"] += 1
@@ -557,8 +932,13 @@ class VoiceSession:
         if now - st["at"] < self.MIC_REPORT_S:
             return
         avg = st["sum"] / st["n"]
-        gate = getattr(self.provider, "_vad_gate", None)
         segs = getattr(gate, "segments", None)
+        # Segments opened in THIS window, not since the call began: the
+        # cumulative count read "speech level reached -- look at Gemini's
+        # side" for 43 s of speech-level audio on 28 Oct (robot, media room)
+        # while not one segment opened -- the tester then asked whether she could hear.
+        start = st.get("segs0")
+        fresh = (segs - start) if isinstance(segs, int) and isinstance(start, int) else segs
         if st["zero"] == st["n"]:
             # Measured 2026-09-01: the browser's track read live and
             # unmuted, the stream was the standby's own handed over, and
@@ -570,7 +950,15 @@ class VoiceSession:
                        "device shows NO FRAMES there too, it is the microphone "
                        "itself (mute button, replug the USB, reboot) — no page "
                        "reload or setting can help")
-            if _array_held_by_app():
+            if getattr(getattr(self, "_array_tap", None), "was_sole", False):
+                # ARRAY_MIC: the page's frames ARE zeros (a silent clock); a
+                # window of nothing else means the array sent nothing usable
+                # -- the tap hands the mic back after ARRAY_MIC_DEAF_S.
+                verdict = ("DIGITAL SILENCE — the call is on the mic array alone "
+                           "(ARRAY_MIC) and the array sent nothing usable in this "
+                           "window (or Emma was audible throughout): see "
+                           "array_report / array_mic_handback")
+            elif _array_held_by_app():
                 # Measured on the robot 2026-10-10: the Bothlent array gives
                 # Android one capture stream; with the app's 8-channel DOA
                 # capture open first, the WebView's call mic read exact zeros
@@ -582,10 +970,15 @@ class VoiceSession:
                            "DOA_ENABLED=false and restart")
         elif st["peak"] < self.MIC_SPEECH:
             verdict = ("too quiet to be speech — room noise only. Move closer, "
-                       "or raise CALL_MIC_BOOST in .env")
+                       "or raise " + ("ARRAY_AUDIO_GAIN (the call is on the mic array)"
+                                      if getattr(getattr(self, "_array_tap", None), "was_sole", False)
+                                      else "CALL_MIC_BOOST") + " in .env")
         elif segs == 0:
             verdict = ("speech level reached but Silero opened no segment — "
                        "the detector, not the microphone")
+        elif fresh == 0 and not st.get("open"):
+            verdict = ("speech level reached but no segment opened in this window — "
+                       "the detector or a door (vad floor / focus rows), not the microphone")
         else:
             verdict = "speech level reached — if nothing is heard, look at Gemini's side"
         logger.info("call audio: avg=%.4f peak=%.4f (speech >= %.2f)%s — %s",
@@ -594,22 +987,78 @@ class VoiceSession:
         # Numbers only, into the turn log: the console is the one thing a
         # screenshot never contains, and the first report of this line
         # (2026-09-01) arrived as exactly that — a screenshot.
+        tap = getattr(self, "_array_tap", None)
+        # ARRAY_MIC: these levels are the array's (after ARRAY_AUDIO_GAIN), not
+        # the page mic's every threshold was tuned on -- the row says so, so a
+        # reader never compares the two scales by accident. Off: the row as before.
+        source = ({"source": "page" if tap.handed_back else "array",
+                   "gain": settings.array_audio_gain}
+                  if getattr(tap, "was_sole", False) else {})
         turnlog.record("mic_report", avg=round(avg, 4), peak=round(st["peak"], 4),
                        zero_frames=st["zero"], frames=st["n"], vad_segments=segs,
-                       verdict=verdict.split(" — ")[0][:40])
-        st.update(at=now, peak=0.0, sum=0.0, n=0, zero=0)
+                       new_segments=fresh, verdict=verdict.split(" — ")[0][:40], **source)
+        st.update(at=now, peak=0.0, sum=0.0, n=0, zero=0, segs0=segs,
+                  open=bool(getattr(gate, "in_speech", False)))
 
     # ---- the robot's array as the call's ears (ARRAY_AUDIO, app/array_audio.py) ----
 
-    def _open_array_and_enhancer(self, provider, echo_barge: bool, hold_speech: bool) -> None:
+    async def _array_mic_offer(self, provider, echo_barge: bool, hold_speech: bool) -> str | None:
+        """ARRAY_MIC: "" = this call hears with the array alone (the page
+        runs a silent source); a reason = it cannot, and the page takes its
+        mic after the app let go -- for this CALL (a transient reason: the
+        page's own bridge hold, freed when the call's mic stops) or for the
+        app run (array_audio.FINAL_REASONS: `array_release` here and the
+        page's bridge release); None = not this page's business (`ready`
+        unchanged).
+
+        The array must be live when `ready` goes out, waited for up to
+        ARRAY_MIC_START_WAIT_S: "the page enters the mode only when the
+        stream is live" -- and a call that starts without the array keeps
+        the page's mic until it ends (a standing line can stay open long),
+        so a few hundred ms of an app still opening the array are worth
+        waiting for."""
+        from app import array_audio
+
+        offer = array_audio.sole_offer(
+            self, input_rate=getattr(provider, "input_sample_rate", 16000),
+            barge_in=echo_barge, hold_speech=hold_speech)
+        if offer is None:
+            return None
+        if offer == "":
+            ok, why = await array_audio.wait_sole(settings.array_mic_start_wait_s)
+            if ok:
+                return ""
+            offer = why
+        scope = array_audio.offer_scope(offer)
+        logger.info("array mic not used for this %s (%s) — the page takes its mic",
+                    "app run" if scope == "run" else "call", offer)
+        turnlog.record("array_mic_handback", phase="start", why=offer, scope=scope)
+        if scope == "run":
+            # final: the app lets go until it restarts (an old page's JS never
+            # asks it to). A call-scoped hold is the page's own ask through its
+            # bridge -- it must not count on this link being up (no_link).
+            await array_audio.request_release(offer)
+        return offer
+
+    def _open_array_and_enhancer(self, provider, echo_barge: bool, hold_speech: bool,
+                                 mic_offer: str | None = None) -> None:
         """Both off (the default): neither attribute is set to anything but
-        None and the page's bytes go up exactly as before."""
+        None and the page's bytes go up exactly as before. ARRAY_MIC: a
+        sole tap when the array is this call's ears, no tap at all when the
+        page took its mic (the app let go of the array for its whole run)."""
         from app import array_audio
 
         self._play_until = 0.0
-        self._array_tap = array_audio.tap_for(
-            self, input_rate=getattr(provider, "input_sample_rate", 16000),
-            barge_in=echo_barge, hold_speech=hold_speech)
+        if mic_offer is None:
+            self._array_tap = array_audio.tap_for(
+                self, input_rate=getattr(provider, "input_sample_rate", 16000),
+                barge_in=echo_barge, hold_speech=hold_speech)
+        elif mic_offer == "":
+            self._array_tap = array_audio.Tap(sole=True)
+            self._array_tap.on_handback = self._array_handback
+            array_audio.loop_watch_start()     # stops in the session's finally
+        else:
+            self._array_tap = None
         self._enhancer = None
         if settings.enhance_enabled:
             from app import enhance
@@ -637,14 +1086,39 @@ class VoiceSession:
 
     def _array_frame(self, page: bytes) -> bytes:
         """The page frame, or the array's audio in its place (never both)."""
-        if not robot_face_link.is_robot_face(self):
+        verified = robot_face_link.is_robot_face(self)
+        if not verified and not self._array_tap.sole:
             return page                 # ROBOT_FACE_TOKEN set and no hello yet
+        # ARRAY_MIC: an unverified page gets no array audio either, but its
+        # frames are a silent clock -- so the tap counts it as deaf and hands
+        # the mic back to it (never to the app: `_array_handback`).
         now = time.monotonic()
         gate = getattr(self.provider, "_vad_gate", None)
         in_speech = getattr(gate, "in_speech", None) if gate is not None else None
         audible = self._array_audible_until(now)
         return self._array_tap.frame(page, now, speaking=self._array_speaking(now),
-                                     in_speech=in_speech, audible_until=audible or None)
+                                     in_speech=in_speech, audible_until=audible or None,
+                                     verified=verified)
+
+    def _array_handback(self, why: str) -> None:
+        """ARRAY_MIC: the array delivered nothing for ARRAY_MIC_DEAF_S. The
+        page swaps its silent source for its own mic (`array_mic_lost`) for
+        the rest of THIS call -- after asking the app, through its bridge, to
+        hold the array (emma-face:mic:hold:deaf) and waiting for the capture
+        to END; it frees the app when the call's mic is stopped. Nothing goes
+        to the app from here (lead's review, 2 Nov): a call-scoped hold is
+        the page's own ask and must not count on the link, the app counts
+        deaf holds per run itself (the 3rd is a release), and a page that
+        merely claims the robot's user agent has no bridge to the app."""
+
+        async def tell() -> None:
+            await self._send_json({"type": "array_mic_lost", "why": why})
+
+        try:
+            # held: a task nobody references may be collected mid-send
+            self._handback_task = asyncio.get_running_loop().create_task(tell())
+        except RuntimeError:
+            logger.warning("array mic hand-back outside the event loop — the page was not told")
 
     def _call_debug_feed(self, pcm16: bytes) -> None:
         """Roll the last CALL_DEBUG_MAX_S of call-mic audio into a buffer.
@@ -958,7 +1432,7 @@ class VoiceSession:
 
         if not focus.enabled():
             return False
-        return bool(settings.focus_attention
+        return bool(settings.focus_attention or settings.head_follow
                     or (settings.focus_goodbye and self.summoned)
                     or (settings.focus_invite and settings.focus_invite_denied_n > 0
                         and self.summoned and settings.focus_require_face))
@@ -978,6 +1452,8 @@ class VoiceSession:
             try:
                 if settings.focus_attention:
                     await self._send_attention(now)
+                if settings.head_follow:
+                    await self._turn_head(now)
                 if (settings.focus_invite and settings.focus_invite_denied_n > 0
                         and self.summoned and settings.focus_require_face
                         and (getattr(self, "_greeting_turn_seen", False)
@@ -1013,7 +1489,22 @@ class VoiceSession:
         from app import focus
 
         cue = focus.attention(now)
-        bearing = None if cue["bearing"] is None else round(float(cue["bearing"]), 1)
+        bearing = None if cue["bearing"] is None else float(cue["bearing"])
+        if bearing is not None and cue.get("source") != "doa":
+            # A face's bearing is in the HEAD camera's degrees; the mascot is
+            # on the chest screen, which does not turn. With HEAD_FOLLOW the
+            # head turns toward the person and their camera bearing shrinks
+            # to ~0, so the mascot looked straight ahead while the head looked
+            # at them (found 2 Nov, docs/emma-multi-person-2026-11-02.md).
+            # The person stands at camera bearing + head pan. offset_deg() is
+            # (0, 0) with HEAD_FOLLOW off: the cue is what it always was. The
+            # array's direction does not turn with the head (head_follow.py).
+            from app import head_follow
+
+            pan = head_follow.offset_deg()[0]
+            if pan:
+                bearing += pan
+        bearing = None if bearing is None else round(bearing, 1)
         last = self._attention_sent
         if last is not _UNSENT:
             if bearing is None and last is None:
@@ -1024,6 +1515,17 @@ class VoiceSession:
         self._attention_sent = bearing
         await self._send_json({"type": "attention", "bearing": bearing,
                                "source": cue["source"]})
+
+    async def _turn_head(self, now: float) -> None:
+        """The robot's real head toward the same cue (HEAD_FOLLOW), the
+        robot face's call only -- a desk page has no head to turn."""
+        if not robot_face_link.is_robot_face(self):
+            return
+        if self._head_follow is None:
+            from app import head_follow
+
+            self._head_follow = head_follow.HeadFollow(self)
+        await self._head_follow.tick(now)
 
     def _left_mid_conversation(self, now: float) -> bool:
         """The person this camera-opened call was with walked away from it.
@@ -1102,6 +1604,9 @@ class VoiceSession:
         logger.info("the guest walked away mid-conversation — said goodbye, ending the call")
         turnlog.record("focus_goodbye", ended=True)
         turnlog.record("idle_timeout", quiet_s=quiet, why="left")
+        # Before the frame: the page hangs up on it, and on the robot (server
+        # on 127.0.0.1) its close can beat this task back to the race.
+        self._note_end("goodbye")
         await self._send_json({"type": "idle_timeout", "quiet_s": quiet})
         from app.tools import slides
 
@@ -1184,6 +1689,7 @@ class VoiceSession:
             while True:
                 message = await self.ws.receive()
                 if message.get("type") == "websocket.disconnect":
+                    self._note_end("browser_closed")
                     return
 
                 if (data := message.get("bytes")) is not None:
@@ -1223,6 +1729,7 @@ class VoiceSession:
                     if not isinstance(event, dict) or not isinstance(event.get("type"), str):
                         continue
                     if event.get("type") == "stop":
+                        self._note_end("stop")
                         return
                     if event.get("type") == "barge_in":
                         # A camera-summoned call normally holds its ears until
@@ -1245,6 +1752,15 @@ class VoiceSession:
                         continue
                     if event.get("type") == "client_metric":
                         self.metrics.client(event)
+                        continue
+                    if event.get("type") == "head_look_ack":
+                        # The app's answer to a head look, relayed by the
+                        # robot face (app/head_follow.py): what the head IS
+                        # doing. Only this call's controller reads it, and it
+                        # whitelists the fields itself.
+                        if (self._head_follow is not None and robot_face_link.is_robot_face(self)
+                                and len(text) <= 256):
+                            self._head_follow.ack(event)
                         continue
                     if event.get("type") == "quick_ask":
                         await self._quick_ask(event)
@@ -1360,9 +1876,11 @@ class VoiceSession:
                         if truncate is not None:
                             await truncate(int(event.get("heard_ms", 0)))
         except (WebSocketDisconnect, RuntimeError):
+            self._note_end("browser_closed")
             return
         except Exception:
             logger.exception("browser->provider pump failed")
+            self._note_end("mic_pump_failed")
 
     # ---- provider -> browser ----
 
@@ -1404,6 +1922,8 @@ class VoiceSession:
                     # only, off by default): paced from the clock just moved.
                     speech_gestures.on_audio(self)
                     await self.ws.send_bytes(event.audio)
+                    if self._mirrored():
+                        face_mirror.publish_audio(event.audio)
 
                 elif event.kind == "speech_started":
                     self.metrics.finish("new_speech")
@@ -1463,6 +1983,9 @@ class VoiceSession:
 
                 elif event.kind == "turn_complete":
                     self.metrics.finish()
+                    # she may have answered a question about a language in it
+                    # (app/talk_lang.py `_held`): the menu's button follows
+                    await self._show_held_language()
                     # Evidence line for "ทำงานแต่ไม่มีเสียง" mornings
                     # (2026-08-27, page parked overnight): a transcript with
                     # (almost) no audio behind it. When a silent morning
@@ -1499,9 +2022,14 @@ class VoiceSession:
                             idle.set()
                             self._idle_held_by_tools = False
                     await self._send_json({"type": "turn_complete"})
-                    if getattr(self, "_screen_owed", False) and not getattr(self, "_screen_staged", False):
+                    if (getattr(self, "_screen_owed", False) and not getattr(self, "_screen_staged", False)
+                            and (self._spoke_this_turn or audio_ms > 0)):
                         # The page clears its stage on this same event; the
-                        # story's taps go with it.
+                        # story's taps go with it -- but only for an answer
+                        # that said something. Audit 27 Oct: a turn with no
+                        # reply at all (a bare "ค่ะ" dropped by SILENCE_BARE_ACK,
+                        # 3.8's empty turn before its tool call) wiped the
+                        # story the guest was looking at, taps and all.
                         self._story_taps = set()
                     await self._offer_choices()
                     await self._nudge_tour_if_stalled()
@@ -1542,6 +2070,7 @@ class VoiceSession:
                     if isinstance(utterance_id, str):
                         payload["utterance_id"] = utterance_id
                     await self._send_json(payload)
+                    await self._show_held_language()
 
                 elif event.kind == "assistant_transcript":
                     if (event.text or "").strip():
@@ -1637,17 +2166,33 @@ class VoiceSession:
                     # warning, but never echo the provider's raw error body
                     # (which may contain request contents or source text).
                     rejected = "REJECTED" in (event.text or "")
+                    self._note_end("upstream_error")
+                    category = ("rejected" if rejected
+                                else _provider_failure_kind(Exception(event.text or "")))
+                    if settings.offline_fallback and not getattr(self, "_offline", False):
+                        # OFFLINE_FALLBACK: a line lost for good mid-call is
+                        # the provider's rejoin failing -- a failed dial for
+                        # the hysteresis, so the next dial knows sooner.
+                        from app import net_health
+
+                        net_health.note_dial_failure(category)
                     await self._send_json({
                         "type": "error", "code": "upstream",
+                        # A category, never the text (26 Oct): the robot face
+                        # draws its own English line from it (FIXED_UI_LANG)
+                        # instead of the Thai message below.
+                        "category": category,
                         "message": (
                             "Session setup REJECTED; guardrails unavailable. Stop this customer session."
                             if rejected else "การเชื่อมต่อผู้ช่วยขัดข้องชั่วคราว"
                         ),
                     })
+            self._note_end("upstream_closed")
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("provider->browser pump failed")
+            self._note_end("reply_pump_failed")
 
     # ---- turn_idle vs tool calls (TURN_IDLE_TRACKS_TOOLS) ----
     #
@@ -1898,7 +2443,14 @@ class VoiceSession:
                     from app import focus
 
                     away = focus.engaged_age()
-                    if away is not None and away >= self.FOCUS_AWAY_S:
+                    # ...except at a room's big screen (owner 29 Oct): people
+                    # watch the TV there, not the head camera -- the media
+                    # room's calls hung up "no_face" 30 s after every answer
+                    # (27 on 28 Oct) with the testers standing beside it. The
+                    # voice decides there: IDLE_TIMEOUT_S of nobody heard,
+                    # held by her own voice, like a call somebody tapped.
+                    if (away is not None and away >= self.FOCUS_AWAY_S
+                            and focus.at_big_screen() is None):
                         limit = min(limit, self.FOCUS_AWAY_S) if limit else self.FOCUS_AWAY_S
                         why = "no_face"
                 if not limit:
@@ -1919,6 +2471,7 @@ class VoiceSession:
                 logger.info("no guest speech for %.0fs%s — ending the session", quiet,
                             " and nobody in front of the camera" if why else "")
                 turnlog.record("idle_timeout", quiet_s=round(quiet), why=why)
+                self._note_end("idle_timeout")   # before the frame the page hangs up on
                 await self._send_json({"type": "idle_timeout",
                                        "quiet_s": round(quiet)})
                 from app.tools import slides
@@ -1969,7 +2522,7 @@ class VoiceSession:
         same answer (gemini-3.8 completes a turn before its tool call, then
         again after the tool's reply), and never armed by her own follow-up,
         greeting or announcements -- only a guest turn sets `_answer_pending`."""
-        if settings.follow_up_after_s <= 0 or getattr(self, "profile", "condo") != "condo":
+        if settings.follow_up_after_s <= 0 or getattr(self, "profile", "condo") not in SALES_PROFILES:
             return
         if not (getattr(self, "_answer_pending", False) and self._spoke_this_turn):
             return
@@ -2001,7 +2554,10 @@ class VoiceSession:
             return "robot_moving"
         if focus.enabled():
             away = focus.engaged_age(now)
-            if away is not None and away >= self.FOLLOW_UP_FACE_GONE_S:
+            # (not at a room's big screen: no face there is the TV, not an
+            # empty room -- 28 Oct, 5 follow-ups vetoed with testers present)
+            if (away is not None and away >= self.FOLLOW_UP_FACE_GONE_S
+                    and focus.at_big_screen() is None):
                 return "nobody_in_front"     # the goodbye is the walk-away's answer
         return None
 
@@ -2249,7 +2805,7 @@ class VoiceSession:
         if not said.strip() or not getattr(self, "_robot_face_claim", False):
             return
         name = None
-        if getattr(self, "profile", "condo") == "condo" and _ENDS_ON_QUESTION.search(said.strip()):
+        if getattr(self, "profile", "condo") in SALES_PROFILES and _ENDS_ON_QUESTION.search(said.strip()):
             name = quick_asks.choices_asked(said)
             if name and not _tool_visible(quick_asks.CHOICES[name]["tool"]):
                 name = None
@@ -2312,6 +2868,20 @@ class VoiceSession:
                        fps=number(report.get("fps"), 240), p95_ms=number(report.get("p95_ms"), 10000),
                        long_frames=None if long_frames is None else int(long_frames))
 
+    async def _show_held_language(self) -> None:
+        """A picked language moved by a plain spoken request ("Can you speak
+        English please?", app/talk_lang.py): the menu's button follows, so the
+        screen never names a language she is not speaking. Nothing before a
+        pick, nothing when the held language did not change."""
+        tl = getattr(getattr(self, "provider", None), "_talk", None)
+        held = tl.pinned if tl is not None else None
+        if held is None or held == getattr(self, "_lang_shown", None):
+            return
+        self._lang_shown = held
+        # the evidence analyze_log can read (review 29 Oct: a spoken switch left no trace)
+        turnlog.record("lang_pinned", lang=held, by="talk")
+        await self._send_json({"type": "lang_pinned", "lang": held})
+
     async def _quick_ask(self, event: dict) -> None:
         """A topic tapped on the robot face (app/quick_asks.py): an id and a
         language code in, the server's own words out as a user turn. An id
@@ -2322,9 +2892,17 @@ class VoiceSession:
         from app import quick_asks
 
         # The language the talk is in (owner 15 Oct: talking English, a tap
-        # was answered in Thai): her own latest words, else the guest's.
-        talk = (quick_asks.script_lang(getattr(self, "_said_since_guest", ""))
-                or quick_asks.script_lang(getattr(self, "_guest_text", "")))
+        # was answered in Thai): the provider's TalkLanguage first -- what the
+        # guest said, the language every tool result already carries
+        # (TALK_LANGUAGE_NOTE). Audit 27 Oct: `script_lang` reads any Latin
+        # script as English and kanji as Chinese, so a German talk's tap told
+        # her "answer in English" and a Japanese one "in Chinese". The script
+        # of her own latest words, else the guest's, only when it cannot tell.
+        tl = getattr(self.provider, "_talk", None)
+        talk = tl.language() if tl is not None else None
+        if talk is None:
+            talk = (quick_asks.script_lang(getattr(self, "_said_since_guest", ""))
+                    or quick_asks.script_lang(getattr(self, "_guest_text", "")))
         ask_id = event.get("id")
         tap = None
         if isinstance(ask_id, str) and ask_id.startswith("story_"):
@@ -2349,7 +2927,8 @@ class VoiceSession:
             if text is None:
                 return
         else:
-            text = quick_asks.text_for(self.profile, ask_id, event.get("lang"), talk)
+            text = quick_asks.text_for(self.profile, ask_id, event.get("lang"), talk,
+                                       cut=event.get("cut") is True)
             if text is None:
                 return
             choice_set = quick_asks.choice_set_of(ask_id)
@@ -2376,6 +2955,16 @@ class VoiceSession:
             turnlog.record("ears_open", greeted=False, why="quick_ask")
         lang = event.get("lang")
         turnlog.record("quick_ask", id=ask_id, lang=lang if lang in quick_asks.LANGS else None)
+        picked = quick_asks.picked_language(ask_id)
+        if picked is not None and tl is not None and tl.pin(picked):
+            # The language menu (owner 29 Oct): the call's language from now on,
+            # whatever is heard (app/talk_lang.py `pin`). Pinned only here, past
+            # the tap gap -- a dropped tap pins nothing -- and the page's button
+            # shows the language from this frame, not from its own tap, so it
+            # never names a language the server is not holding.
+            self._lang_shown = tl.pinned
+            turnlog.record("lang_pinned", lang=tl.pinned, by="menu")
+            await self._send_json({"type": "lang_pinned", "lang": tl.pinned})
         self._guest_started_turn()        # a tapped question is a question
         # ...and new activity, as speech is (review 26 Oct): the guest's last
         # spoken sentence is no longer the utterance the next tool call
@@ -2391,13 +2980,48 @@ class VoiceSession:
             # the story's taps live on and an answer picture does not replace it.
             self._screen_staged = True
             self._story_owns_answer = True
-        await self.provider.send_text(text)
+        # Chased like a spoken question when the answer never comes
+        # (REPLY_STALL_S; replay of 20 Oct, 27 Oct: silence after a story) --
+        # and watched BEFORE it is sent. Audit 27 Oct (B1): a tap made while a
+        # stage-2 rejoin dialed waited inside send_text, and the stalled
+        # guard, finding its own watch still in place, asked the OLD question
+        # on the new socket first; the tap followed it at once -- two user
+        # turns back to back, the second cutting off the answer to the first.
+        # Watched first, the guard sees a newer turn and stops.
+        watch = getattr(self.provider, "watch_text_turn", None)
+        # A tapped question is timed like a spoken one: from the tap to her
+        # first audio (metric_first_audio, end_signal_source "tap").
+        observer = getattr(self, "metrics", None)
+        if observer is not None:
+            observer.speech_end("tap")
+        try:
+            if watch is not None:
+                watch(text)
+            await self.provider.send_text(text)
+        except Exception:
+            # No tap may end a call. Audit 27 Oct (A2): a socket closed under
+            # the tap raised through here into `_browser_to_provider`, whose
+            # return ended the call (FIRST_COMPLETED) -- the receive loop's
+            # own rejoin would have saved it.
+            logger.exception("a tapped question could not be sent — the call goes on")
 
     async def _send_json(self, payload: dict) -> None:
         try:
             await self.ws.send_text(json.dumps(payload, ensure_ascii=False))
         except Exception:
             pass
+        if self._mirrored():
+            # the room screen's copy (app/face_mirror.py rebuilds what it may
+            # see, field by field: never the guest's words, never a command)
+            if payload.get("type") == "ready":
+                face_mirror.call_started()
+            face_mirror.publish_json(payload)
+
+    def _mirrored(self) -> bool:
+        """This call is the robot face's and a room screen may copy it
+        (MIRROR_PORT): the sales room's desk page and MULTI_SESSION never."""
+        return (bool(settings.mirror_port) and bool(getattr(self, "_robot_face_claim", False))
+                and not settings.multi_session)
 
 
 #: The voice session that owns the robot right now.
@@ -2557,6 +3181,9 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
     if previous is not None:
         logger.info("a new voice session took over — closing the previous one")
         turnlog.record("session_takeover")
+        note_end = getattr(previous, "_note_end", None)
+        if callable(note_end):
+            note_end("superseded")        # its own session_end says why
         try:
             await previous._send_json({
                 "type": "error",
@@ -2606,7 +3233,11 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
 
     plan_display.register(turnlog.session_id.get(),
                           lambda command: ws.send_text(json.dumps(command, ensure_ascii=False)))
-    turnlog.record("session_start", provider=session.provider_name, voice=session.voice)
+    # An offline-first call (OFFLINE_FALLBACK, link known down) says so from
+    # its first row; with the switch off `_offline_first` is always None.
+    turnlog.record("session_start",
+                   provider="offline" if session._offline_first else session.provider_name,
+                   voice=session.voice)
     try:
         await session.run()
     finally:
@@ -2622,7 +3253,13 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
             if _active is None:
                 await display.clear_subtitle()
                 await display.set_phase("idle")
-            turnlog.record("session_end")
+                # ...nor the room screen's face (app/face_mirror.py)
+                if session._mirrored():
+                    face_mirror.call_ended()
+            # Why, as a category (browser_closed / stop / upstream_error /
+            # upstream_closed / dial_failed / idle_timeout / goodbye /
+            # superseded / ...): 20 Oct's lost calls read heard -> session_end.
+            turnlog.record("session_end", reason=getattr(session, "_end_reason", None) or "unknown")
         finally:
             plan_display.unregister(turnlog.session_id.get())
             turnlog.session_id.reset(log_token)

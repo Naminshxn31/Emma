@@ -288,3 +288,37 @@ def test_native_greeting_is_not_fenced_by_the_body_switch(shell, monkeypatch):
     face = Face(claim=False)
     assert _native_greet(face) is True
     assert face.ws.sent == [{"type": "arm_greeting", "group": 6}]
+
+
+# ==================== the event host's own walk (31 Oct, round 2) ====================
+# board_walk runs on the server; the app's nav poll (run.pid) never sees it,
+# so the app's "navigating" gate stays open. The server holds the arm.
+
+
+def test_no_hand_out_while_the_event_host_walks(shell, monkeypatch):
+    from app import event_walk
+
+    monkeypatch.setattr(settings, "robot_greeting_arm_group", 6)
+    face = Face(claim=False)
+    monkeypatch.setattr(event_walk, "walking", lambda: True)
+    assert _native_greet(face) is False
+    assert face.ws.sent == []
+    monkeypatch.setattr(event_walk, "walking", lambda: False)
+    assert _native_greet(face) is True
+
+
+def test_the_event_hosts_walk_refuses_every_arm_command_but_stop(shell, monkeypatch):
+    from app import event_walk
+
+    face = Face(answer=True)
+    monkeypatch.setattr(event_walk, "walking", lambda: True)
+    for payload in ({"action": "raise_right_arm", "style": "speech"}, {"action": "nod"}):
+        out = asyncio.run(link.request(face, "body", payload, 0.5))
+        assert out["accepted"] is False and out["reason"] == "navigating", payload
+    assert face.ws.sent == []
+    out = asyncio.run(link.request(face, "body", {"action": "stop"}, 0.5))
+    assert out["accepted"] is True
+    assert [f["action"] for f in face.ws.sent] == ["stop"]
+    monkeypatch.setattr(event_walk, "walking", lambda: False)
+    out = asyncio.run(link.request(face, "body", {"action": "nod"}, 0.5))
+    assert out["accepted"] is True

@@ -97,6 +97,27 @@ final class BodyController {
     private volatile long lastEnd = -BodyGestures.COOLDOWN_MS;
     /** Groups move joints nobody can read back; app start knows nothing either. */
     private volatile boolean headKnown = false;
+
+    // ---- the head look (HeadLook; owner 31 Oct) -- its own lock: held only
+    // for these fields and the gate check, never while waiting on the arm
+    // (armGate may take it inside, never the other way round) ----
+    private static final Object LOOK_TIMER = new Object();
+    private final Object lookLock = new Object();
+    /** The last look's move, for HeadLook.position. moveValid=false after
+     *  anything that moved the head without saying where to (a group, a rest,
+     *  a head gesture, a stop mid-move, a failed write). */
+    private boolean moveValid = false;
+    private boolean moveFromKnown = false;
+    private int moveFromPan = HeadLook.CENTRE;
+    private int moveFromTilt = HeadLook.CENTRE;
+    private int moveToPan = HeadLook.CENTRE;
+    private int moveToTilt = HeadLook.CENTRE;
+    private long moveStart = 0L;
+    private int moveMs = 0;
+    private long lastLookAt = -HeadLook.IDLE_CENTRE_MS;
+    /** Only the newest queued look may reach the board: io is shared with the
+     *  gestures, and a backlog of old looks would swing the head back. */
+    private final AtomicInteger lookSeq = new AtomicInteger();
     /** idle | running | holding | rest_return. "holding" = a speech
      *  gesture's frames ended with the arm out, waiting for her next beat
      *  (SPEECH_REST_AFTER_MS) before group 99; busy is free in it. */
@@ -193,6 +214,7 @@ final class BodyController {
                     .put("allow_direction_known", allowDirectionKnown())
                     .put("gestures", gestures)
                     .put("speech", true)          // this build plays emma-body:<id>:speech
+                    .put("look", true)            // and emma-body:look:<pan>:<tilt> (HeadLook)
                     .toString();
         } catch (Exception e) {
             return "{\"enabled\":false,\"allow_direction_known\":false,\"gestures\":{}}";
@@ -311,6 +333,143 @@ final class BodyController {
         begin("handshake", now, false);
     }
 
+    // ---- the head toward a person (HeadLook) -------------------------------------
+
+    /** emma-body:look:<pan>:<tilt> from the trusted page: the server's camera
+     *  loop (app/head_follow.py), about once a second during a call -- never a
+     *  guest's words. The voice gestures' gates hold (switch, operator screen,
+     *  foreground, walking, stop latch), plus the arm being in a group or in a
+     *  gesture that moves the head itself. "Accepted" = queued; nothing here
+     *  waits on the board. */
+    String look(int pan, int tilt) {
+        if (!HeadLook.valid(pan, tilt)) return lookAck(false, "bad_request", -1);
+        long now = SystemClock.elapsedRealtime();
+        int toPan = HeadLook.panPulse(pan);
+        int toTilt = HeadLook.tiltPulse(tilt);
+        // every input read OUTSIDE lookLock: it guards two fields, never a call out
+        String gate = HeadLook.refusal(enabled(), host.operatorVisible(), host.foreground(), host.navBlock(),
+                latched(now), headBusy(), false, HeadLook.isCentre(toPan, toTilt));
+        String reason = gate;
+        synchronized (lookLock) {
+            if (reason == null && now - lastLookAt < HeadLook.MIN_GAP_MS) reason = "too_soon";
+            if (reason == null) lastLookAt = now;
+        }
+        if (reason != null) return lookAck(false, reason, -1);
+        // how long the move will take, from where the head is now: the server
+        // reads the next picture after it (sendLook works it out again on io)
+        int[] at = headPosition(now);
+        int ms = at == null ? HeadLook.UNKNOWN_MS : HeadLook.durationMs(true, at[0], at[1], toPan, toTilt);
+        sendLook(toPan, toTilt);
+        ui.removeCallbacksAndMessages(LOOK_TIMER);
+        ui.postAtTime(this::centreIfIdle, LOOK_TIMER, SystemClock.uptimeMillis() + HeadLook.IDLE_CENTRE_MS);
+        return lookAck(true, null, ms);
+    }
+
+    /** A vendor group, a rest, or a gesture whose frames move ch7/ch8 owns the
+     *  head. A speech gesture's arm frames (and its "holding") do not. */
+    private boolean headBusy() {
+        if (groupRunning || "rest_return".equals(phase)) return true;
+        String id = active;
+        if (!"running".equals(phase) || id == null) return false;
+        if (BodyGestures.isHead(id)) return true;
+        List<BodyGestures.Frame> frames = framesFor(id);
+        if (frames == null) return true;             // handshake, greet_arm, rest: groups
+        for (BodyGestures.Frame frame : frames) {
+            if (frame.targets.containsKey(HeadLook.PAN) || frame.targets.containsKey(HeadLook.TILT)) return true;
+        }
+        return false;
+    }
+
+    private int[] headPosition(long now) {
+        synchronized (lookLock) {
+            if (!moveValid) return null;
+            return HeadLook.position(moveFromKnown, moveFromPan, moveFromTilt, moveToPan, moveToTilt,
+                    moveStart, moveMs, now);
+        }
+    }
+
+    /** Something moved or stopped the head without saying where it left it. */
+    private void headLost() {
+        synchronized (lookLock) {
+            moveValid = false;
+        }
+    }
+
+    /** On io, like every arm command: the gates again under the arm's lock
+     *  (a stop between the prompt and here wins), then one timed line. The
+     *  move's time comes from where the head is -- the slow UNKNOWN_MS when
+     *  nobody knows (after a group, a stop, at start). */
+    private void sendLook(int toPan, int toTilt) {
+        final int gen = generation.get();
+        final int mine = lookSeq.incrementAndGet();
+        io.execute(() -> {
+            try {
+                if (mine != lookSeq.get()) return;
+                host.ensureArm();
+                synchronized (armGate) {
+                    if (mine != lookSeq.get() || gen != generation.get() || latched()
+                            || (host.navBlock() != null && !HeadLook.isCentre(toPan, toTilt))
+                            || headBusy()) return;
+                    long now = SystemClock.elapsedRealtime();
+                    int[] at = headPosition(now);
+                    int ms = at == null ? HeadLook.UNKNOWN_MS
+                            : HeadLook.durationMs(true, at[0], at[1], toPan, toTilt);
+                    String line = HeadLook.command(toPan, toTilt, ms);
+                    if (line == null) return;
+                    arm.writeLine(line);
+                    synchronized (lookLock) {
+                        moveFromKnown = at != null;
+                        if (at != null) {
+                            moveFromPan = at[0];
+                            moveFromTilt = at[1];
+                        }
+                        moveToPan = toPan;
+                        moveToTilt = toTilt;
+                        moveStart = now;
+                        moveMs = ms;
+                        moveValid = true;
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "head look failed", e);
+                headLost();
+            }
+        });
+    }
+
+    /** No look for IDLE_CENTRE_MS: the head comes back to centre by itself (a
+     *  call that ended, a server that died). Waits out a gesture that owns the
+     *  head; a stop latch skips it. A walk does not (a centre look passes it). */
+    private void centreIfIdle() {
+        long now = SystemClock.elapsedRealtime();
+        String reason = HeadLook.refusal(enabled(), host.operatorVisible(), host.foreground(), host.navBlock(),
+                latched(now), headBusy(), false, true);
+        synchronized (lookLock) {
+            if (now - lastLookAt < HeadLook.IDLE_CENTRE_MS) return;
+            if (reason == null) lastLookAt = now;
+        }
+        int[] at = headPosition(now);
+        if (reason == null && at != null && at[0] == HeadLook.CENTRE && at[1] == HeadLook.CENTRE) return;
+        if ("busy".equals(reason)) {
+            ui.postAtTime(this::centreIfIdle, LOOK_TIMER, SystemClock.uptimeMillis() + 3000L);
+            return;
+        }
+        if (reason == null) sendLook(HeadLook.CENTRE, HeadLook.CENTRE);
+    }
+
+    private static String lookAck(boolean accepted, String reason, int ms) {
+        try {
+            return new JSONObject()
+                    .put("accepted", accepted)
+                    .put("action", "look")
+                    .put("reason", reason == null ? JSONObject.NULL : reason)
+                    .put("ms", ms < 0 ? JSONObject.NULL : Integer.valueOf(ms))
+                    .toString();
+        } catch (Exception e) {
+            return "{\"accepted\":false,\"reason\":\"bad_request\"}";
+        }
+    }
+
     private List<BodyGestures.Frame> framesFor(String id) {
         BodyPoseStore.Pose pose = poses.get(id);
         if (pose != null) return pose.frames;
@@ -363,6 +522,7 @@ final class BodyController {
                     groupAgfSeen = false;
                     groupHoldMs = "handshake".equals(id) ? BodyGestures.HANDSHAKE_HOLD_MS : BodyGestures.GREET_HOLD_MS;
                     headKnown = false;
+                    headLost();          // the group moves the head too
                     arm.playGroup("handshake".equals(id) ? BodyGestures.HANDSHAKE_GROUP : BodyGestures.GREET_GROUP);
                 }
                 stopIfOvertaken(gen);
@@ -379,6 +539,7 @@ final class BodyController {
                     // (which kept moving() true and the SafetyBar up)
                     phase = "rest_return";
                     headKnown = false;
+                    headLost();
                     arm.resetHome();
                 }
                 stopIfOvertaken(gen);
@@ -424,6 +585,7 @@ final class BodyController {
                 // the slow HEAD_PREFIX_MS from an unknown pose (ch8 stalled and
                 // burned on 12 Sep).
                 if (head) headKnown = false;
+                if (head) headLost();          // a look's position is gone with it
                 arm.playFrames(poseFrames, () -> gen == generation.get() && !latched(), () -> {
                     if (gen != generation.get()) return;
                     if (head) headKnown = true;
@@ -526,6 +688,7 @@ final class BodyController {
                     // 1-26 and refuses 99 (seen live 2026-09-30)
                     arm.resetHome();
                     headKnown = false;
+                    headLost();
                 }
                 stopIfOvertaken(gen);
                 Log.i(TAG, "arm returned to rest group 99 (" + why + ")");
@@ -596,6 +759,7 @@ final class BodyController {
                 if (gen != generation.get() || latched()) return false;
                 arm.resetHome();
                 headKnown = false;
+                headLost();
             }
             rested = agf.await(timeoutMs, TimeUnit.MILLISECONDS) && gen == generation.get();
         } catch (InterruptedException e) {
@@ -674,7 +838,9 @@ final class BodyController {
     private void voidEverything(String reason) {
         synchronized (armGate) {     // review #3: never between a gate check and its arm command
             generation.incrementAndGet();
+            lookSeq.incrementAndGet();      // a queued head look is void too
         }
+        headLost();                         // a stop can leave the head mid-move
         ui.removeCallbacksAndMessages(TIMERS);
         CountDownLatch waiting = restAgf;
         if (waiting != null) waiting.countDown();    // a rest-before-run wakes, sees the new generation, refuses

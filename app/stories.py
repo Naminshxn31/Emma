@@ -35,6 +35,7 @@ import json
 import logging
 import math
 import re
+import threading
 import time
 from collections import Counter
 from pathlib import Path
@@ -50,7 +51,7 @@ CATALOG_NAME = "stories.json"
 SCHEMA = 1
 
 TEMPLATES = ("stack", "slabs", "drill", "spotlight", "assembly", "details",
-             "distance", "metric", "features", "journey", "neighborhood")
+             "distance", "metric", "features", "journey", "neighborhood", "map")
 FORMATS = {"webp": "image/webp", "jpg": "image/jpeg", "png": "image/png"}
 #: A picture pre-sized for a 1080-wide screen is ~100-250 KB; anything near
 #: this is not one of ours.
@@ -99,7 +100,10 @@ _GEOMETRY_KEYS = frozenset({"at", "x", "y", "zoom", "scale", "ground_y", "roof_y
                             # the drawn templates (journey, neighborhood): bar lengths
                             # mirror a value_en that says the figure in words
                             "x1", "y1", "x2", "y2", "to_x", "bar", "bar_max", "aspect",
-                            "label_x", "label_y", "area_x", "area_y", "footnote_x"})
+                            "label_x", "label_y", "area_x", "area_y", "footnote_x",
+                            # the real map (template "map"): where the pin, each
+                            # place and each route lie on its picture, % of it
+                            "pin", "project", "route", "walk_route"})
 
 _cache: tuple[tuple, dict | None] | None = None
 #: (path, mtime_ns, size) -> sha256, so a lookup does not hash every picture
@@ -139,6 +143,12 @@ def reset() -> None:
     # the key "" -- a story an earlier test told must not decide whether a
     # later test's search is handed to its story
     _SHOWN.clear()
+    # ...nor the story-question index built under an earlier test's tokenizer
+    _QUERY_INDEX.clear()
+    _QUERY_INDEX["key"] = None
+    _TOPIC_DF_CACHE.update(key=None, df=None)
+    with _DETAILS_LOCK:
+        _DETAILS.clear()
 
 
 def _cached(catalog: dict) -> tuple | None:
@@ -283,6 +293,56 @@ def _line_refs(template: str, params: dict) -> list:
     return refs
 
 
+def _xy(value, lo: float = 0.0, hi: float = 100.0) -> bool:
+    return (isinstance(value, dict)
+            and all(isinstance(value.get(k), (int, float)) and not isinstance(value.get(k), bool)
+                    and lo <= value[k] <= hi for k in ("x", "y")))
+
+
+def _polyline(value) -> bool:
+    """[[x, y], ...] in % of the picture; a route may run a little past its
+    edge (the picture is framed on the places, not on every road between)."""
+    return (isinstance(value, list) and 2 <= len(value) <= 400
+            and all(isinstance(p, list) and len(p) == 2
+                    and all(isinstance(v, (int, float)) and not isinstance(v, bool) and -60 <= v <= 160 for v in p)
+                    for p in value))
+
+
+def _map_problems(params: dict) -> list[str]:
+    """The real map (owner 27 Oct): its picture, and where the project and
+    every place lie on it -- inlined by build_story_assets from the overlay
+    scripts/render_story_maps.py computed on that same picture. A place
+    without a pin is a row in the list only, never a guessed mark."""
+    out = []
+    if not isinstance(params.get("map_asset"), str):
+        out.append("map: map_asset missing")
+    aspect = params.get("aspect")
+    if not isinstance(aspect, (int, float)) or isinstance(aspect, bool) or not 0.4 <= aspect <= 2.5:
+        out.append("map: aspect (the picture's width / height) missing -- run build_story_assets")
+    if not _xy(params.get("project")):
+        out.append("map: project pin missing")
+    rows = params.get("rows")
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 8:
+        return out + ["map: rows 1..8 required"]
+    pinned = 0
+    for k, row in enumerate(rows):
+        if not isinstance(row, dict):
+            out.append("map: row %d is not an object" % k)
+            continue
+        if row.get("place") and "pin" not in row:
+            out.append("map: row %d place %r has no pin on the picture (overlay?)" % (k, row["place"]))
+        if "pin" in row:
+            if not _xy(row["pin"]):
+                out.append("map: row %d pin outside the picture" % k)
+            pinned += 1
+        for key in ("route", "walk_route"):
+            if key in row and not (_polyline(row[key]) and "pin" in row):
+                out.append("map: row %d %s must be [[x, y], ...] and end at a pin" % (k, key))
+    if not pinned:
+        out.append("map: no place on the map")
+    return out
+
+
 def problems(story: object, assets: dict) -> list[str]:
     """Why this story cannot be offered (empty = it can)."""
     if not isinstance(story, dict):
@@ -314,11 +374,20 @@ def problems(story: object, assets: dict) -> list[str]:
     for ref in _line_refs(str(template), params):
         if isinstance(ref, bool) or not isinstance(ref, int) or not 0 <= ref < max(1, len(lines)):
             out.append("line index %r out of range" % (ref,))
+    # a null row passed every gate (build, approve, serve) and threw in the
+    # page's template: an empty stage under the close button (audit 27 Oct)
+    for key in ("items", "floors", "rows", "counters", "chips", "parts", "places", "roads", "measures"):
+        value = params.get(key)
+        if value is not None and (not isinstance(value, list)
+                                  or not all(isinstance(item, (dict, str)) for item in value)):
+            out.append("%s must be a list of objects" % key)
     if template == "slabs":
         floors = params.get("floors") or []
         order = params.get("order_bottom_up")
         if order is not None and sorted(order) != list(range(len(floors))):
             out.append("order_bottom_up must be a permutation of the floors")
+    if template == "map":
+        out.extend(_map_problems(params))
     for ref in asset_refs(params):
         if ref not in assets:
             out.append("asset %r not pinned" % ref)
@@ -514,9 +583,15 @@ def page_payload(story: dict, catalog: dict, *, tap_ok=None) -> dict:
             if not isinstance(element, dict):
                 continue
             chosen = element.get("tap") if binds else None
-            if binds and not chosen and key == "floors" and element.get("next_story"):
+            # "tap": false -- this row has none, whatever the count says
+            # (review 27 Oct: developer_projects' two timeline rows took its
+            # two chips by position, and "Amazon -> Embassy Life" opened the
+            # executives story)
+            opted_out = element.get("tap") is False
+            if binds and not chosen and not opted_out and key == "floors" and element.get("next_story"):
                 chosen = next((t["id"] for t in every if t.get("next_story") == element["next_story"]), None)
-            if binds and not chosen and template == "stack" and len(every) == len(elements):
+            if (binds and not chosen and not opted_out and template == "stack"
+                    and len(every) == len(elements)):
                 chosen = every[k]["id"]
             element.pop("tap", None)
             element.pop("next_story", None)
@@ -548,8 +623,11 @@ def page_payload(story: dict, catalog: dict, *, tap_ok=None) -> dict:
 # the server's -- the picture's catalog label and the approved report's own
 # passages about it.
 
-#: Holograms are a flipbook (assembly frames), not a picture to look at.
-_NOT_ZOOMED = frozenset({"frames"})
+#: Holograms are a flipbook (assembly frames), not a picture to look at; the
+#: real map's base is the ground its pins and routes are drawn on -- enlarged
+#: alone it is a street map with none of them, and there is nothing in the
+#: report "about" it to tell (27 Oct).
+_NOT_ZOOMED = frozenset({"frames", "map_asset"})
 _MORE_TAP = re.compile(r"story_([a-z0-9_]{1,64})_more_(\d{1,3})")
 
 
@@ -595,7 +673,7 @@ def zoom_targets(story: dict) -> list[dict]:
                     add(v, tag.strip() if isinstance(tag, str) and tag.strip() else label)
                 else:
                     walk(v, label, key, holder)
-        elif isinstance(value, str) and (key == "asset" or key.endswith("_asset")):
+        elif isinstance(value, str) and (key == "asset" or key.endswith("_asset")) and key not in _NOT_ZOOMED:
             add(value, label)
 
     walk(story.get("params") or {}, "")
@@ -610,7 +688,11 @@ from app.tools.retrieval import SPOKEN_NUMBERS  # noqa: E402  (no @tool there)
 _MORE_RULES = (
     "ไม่ต้องเรียกเครื่องมือ ห้ามเรียก present_story ห้ามบรรยายจอ (เช่น 'ดูบนจอนะคะ') "
     "ห้ามพูดราคา ผลตอบแทน หรือค่าเช่า ห้ามพูดว่า 'ไม่มีข้อมูล' ห้ามพูดว่าแนวคิดเบื้องต้นหรืออาจเปลี่ยนแปลง "
-    "ห้ามเติมตัวเลขหรือคำบรรยายเอง")
+    "ห้ามเติมตัวเลขหรือคำบรรยายเอง "
+    # the hand-off the search results carry (knowledge.GROUNDED_ONLY, A/B 27 Oct)
+    "ส่วนที่ข้อมูลไม่ได้บอก ให้บอกว่าส่วนนั้นทีมขายจะยืนยันให้ "
+    "ห้ามพูดถึงว่าข้อมูลของเรามีหรือไม่มีอะไร ทุกภาษา "
+    "ห้ามคำว่า 'not specified' 'our details' 'our records' 'I don't have'")
 _MORE_FACT_RULES = (
     " พูดได้เฉพาะสิ่งที่เขียนในข้อมูลด้านล่าง ห้ามพูดซ้ำสิ่งที่เพิ่งเล่าไป พูดตัวเลขพร้อมคำกำกับ เช่น 'ประมาณ' "
     + SPOKEN_NUMBERS + " ส่วนที่ข้อมูลบอกว่ายังไม่สรุป ให้พูดว่าทีมขายจะยืนยันให้ ห้ามอ่านสัญลักษณ์ตาราง "
@@ -1032,7 +1114,7 @@ def tap_more_text(tap: dict, lang: object = None, talk: object = None) -> str:
     """The user turn a tapped picture becomes: tell more about it, from the
     report, without repeating the story she just told. A picture that names
     a place asks what it is like, what is inside and why the name."""
-    from app.quick_asks import LANGS, _LANG_NAMES_TH, _lang
+    from app.quick_asks import LANGS, _LANG_NAMES_TH, _lang, talk_name_en
 
     story = tap["story"]
     label = tap.get("label_en") or ""
@@ -1047,6 +1129,12 @@ def tap_more_text(tap: dict, lang: object = None, talk: object = None) -> str:
     described = bool(place) and any(_describes({"text": fact}, place) for fact in facts)
     if talk in LANGS:
         head = _MORE_PREAMBLE[talk] % shown
+    elif talk_name_en(talk):
+        # German, Japanese...: said by name (audit 27 Oct -- a German guest's
+        # tap was told "This conversation is in English")
+        name = talk_name_en(talk)
+        head = ("[The guest tapped the picture \"%s\" on the screen to see it large and did not speak; it is "
+                "enlarged on the screen now. This conversation is in %s: answer in %s.] " % (shown, name, name))
     else:
         head = ("[ลูกค้าแตะภาพ \"%s\" บนจอเพื่อดูภาพขยาย ไม่ได้พูด ภาพขยายอยู่บนจอแล้ว — ตอบเป็นภาษาเดียวกับที่ลูกค้า"
                 "พูดล่าสุด ถ้ายังไม่ได้พูด ตอบเป็นภาษา%s] " % (shown, _LANG_NAMES_TH[_lang(lang)]))
@@ -1103,14 +1191,16 @@ INSTRUCTION = (
     "ห้ามบรรยายจอ เช่น \"ดูบนจอนะคะ\" นอกจากที่บรรทัดพูดเอง "
     "เรื่องที่บรรทัดพูดถึงแล้วไม่ต้องเรียก search_condo_info ซ้ำ "
     "แต่บรรทัดไม่ใช่ข้อมูลทั้งหมดของโครงการ: ถ้าลูกค้าถามรายละเอียดที่บรรทัดไม่ได้พูด (ในคำถามนี้หรือคำถามต่อไป) "
-    "ให้เรียก search_condo_info ก่อนตอบทุกครั้ง ห้ามตอบเองว่า "
-    "\"ข้อมูลความลึกของสระว่ายน้ำไม่มีระบุในระบบค่ะ\" หรือ "
-    "\"For more information about our CEO, our sales team can provide you with the most detailed background\" โดยไม่ค้น "
+    # Short fragments, not her whole wrong sentences: a whole sentence quoted
+    # here is a sentence she can say back (A/B 27 Oct on the search's hand-off:
+    # whole 3/30 "no information", fragments 0/30 -- audit 27 Oct found these)
+    "ให้เรียก search_condo_info ก่อนตอบทุกครั้ง ห้ามตอบเองโดยไม่ค้น แบบ "
+    "\"ไม่มีระบุในระบบ\" หรือ \"our sales team can provide\" "
     "ถามว่าเป็นยังไง เป็นแบบไหน ข้างในมีอะไร หรือทำไมชื่อนี้ = ถามลักษณะ ให้ค้นแล้วตอบลักษณะ "
     "ห้ามตอบซ้ำขนาดหรือตำแหน่งที่บรรทัดพูดไปแล้ว (ผิด: ถาม \"What is so special about this gym?\" "
     "แล้วเล่าว่าอยู่ชั้นไหน กี่ตารางเมตรอีกรอบ) "
-    "สิ่งที่บรรทัดเอ่ยถึง (เช่น โครงการเก่าของผู้พัฒนา ผู้บริหาร) ไม่ใช่นอกเรื่อง ให้ค้น ห้ามปฏิเสธว่า "
-    "\"I apologize, but I can only provide information about the project\" "
+    "สิ่งที่บรรทัดเอ่ยถึง (เช่น โครงการเก่าของผู้พัฒนา ผู้บริหาร) ไม่ใช่นอกเรื่อง ให้ค้น ห้ามปฏิเสธแบบ "
+    "\"I can only provide information about\" "
     "พูดจบแล้วหยุดรอลูกค้า ห้ามเรียก present_story ซ้ำในคำตอบนี้"
 )
 
@@ -1168,11 +1258,37 @@ QUERY_MARGIN = 0.2
 #: question lost; "ที่นี่คืออะไรคะ" and a bare "บริษัท" now name none. Not
 #: "อยู่" ("Sky Pool อยู่ตึกอะไร ชั้นอะไรคะ" lost its story) and not
 #: "embassy"/"world" ("Embassy World คืออะไร" is the concept story's own).
+#: And the guest's openers (replay of the 20 Oct robot log, 27 Oct): "Okay,
+#: and where is the nearest restaurant?" named no story while "Where is the
+#: nearest restaurant?" names nearby_restaurants -- "okay" and "and" cost the
+#: cover. Measured the server's way on the catalog's 733 listed questions
+#: (688 own, 0 to another story -- unchanged) and the 1,004 real utterances of
+#: 9-20 Oct: 4 more project questions reach their story (restaurant, ground
+#: floor, the site plan, a room recommendation), no new story on noise,
+#: greetings or price.
 _ASKING_WORDS = ("หน่อย", "ช่วย", "ขอ", "แนะนำ", "บอก", "เล่า", "อยาก", "รู้", "ดู", "ค่ะ", "คะ", "ครับ",
                  "นะ", "please", "tell", "me", "about", "show", "can", "could", "you", "i", "want",
                  "know", "to",
-                 "ของ", "นี้", "นี่", "จาก", "ที่นี่")
+                 "ของ", "นี้", "นี่", "จาก", "ที่นี่",
+                 "okay", "ok", "and", "so", "um", "uh", "well", "alright", "also", "then", "yeah", "yes",
+                 "hi", "hello", "emma", "โอเค", "เอ่อ", "อ่า", "งั้น", "แล้วก็")
 _QUERY_INDEX: dict = {"key": None}
+
+#: One spelling per Thai loanword, on both sides, before words are compared
+#: (robot 27 Oct: "ใกล้ซุปเปอร์มาร์เก็ตไหม" asked three times -- the story
+#: lists "ใกล้ซูเปอร์มาร์เก็ตไหม", and to the tokenizer the transcriber's
+#: "ซุป" is another word: no story, the search found nothing, and the guest
+#: got the sales hand-off three times for an approved answer).
+_SPELLINGS = (
+    (re.compile(r"ซ[ุู][ปบ]?เปอ(?:ร์|ร)?"), "ซูเปอร์"),
+    (re.compile(r"มา(?:ร์)?เก็?[ตท]"), "มาร์เก็ต"),
+)
+
+
+def _respell(text: str) -> str:
+    for pattern, spelling in _SPELLINGS:
+        text = pattern.sub(spelling, text)
+    return text
 
 
 def _query_words(text: str, story_side: bool = False) -> set[str]:
@@ -1181,7 +1297,7 @@ def _query_words(text: str, story_side: bool = False) -> set[str]:
     if _QUERY_INDEX.get("asking") is None:
         _QUERY_INDEX["asking"] = frozenset(t for w in _ASKING_WORDS for t in tokenize(w))
     out = set()
-    for word in tokenize(text):
+    for word in tokenize(_respell(text)):
         if word in _QUERY_INDEX["asking"]:
             continue
         out.add(word)
@@ -1201,13 +1317,35 @@ def story_for_query(query: object, offered: dict | None = None) -> str | None:
     offered = available() if offered is None else offered
     if len(offered) < 2:
         return None
-    asks = tuple((sid, tuple((s.get("questions_th") or []) + (s.get("questions_en") or [])))
-                 for sid, s in sorted(offered.items()))
+    from app.tools import retrieval
+
+    if not retrieval._tokeniser_ready:
+        retrieval.init_tokeniser()
+    # The tokenizer is part of the key (audit 27 Oct): a robot-face search
+    # before the slide index taught it the deck's words indexed every story
+    # question with the bare dictionary, and kept that index after the deck
+    # was in -- 76 listed questions found no story until a restart.
+    asks = (retrieval._tokeniser_gen,) + tuple(
+        (sid, tuple((s.get("questions_th") or []) + (s.get("questions_en") or [])))
+        for sid, s in sorted(offered.items()))
     if _QUERY_INDEX["key"] != asks:
+        _QUERY_INDEX["asking"] = None
         docs = {sid: _query_words(" ".join(q for q in qs if isinstance(q, str)), story_side=True)
-                for sid, qs in asks}
-        _QUERY_INDEX.update(key=asks, docs=docs, df=Counter(w for ws in docs.values() for w in ws))
+                for sid, qs in asks[1:]}
+        exact: dict[str, set] = {}
+        for sid, qs in asks[1:]:
+            for q in qs:
+                if isinstance(q, str) and _NORM.sub("", _respell(q).lower()):
+                    exact.setdefault(_NORM.sub("", _respell(q).lower()), set()).add(sid)
+        _QUERY_INDEX.update(key=asks, docs=docs, df=Counter(w for ws in docs.values() for w in ws),
+                            exact={k: next(iter(v)) for k, v in exact.items() if len(v) == 1})
     docs, df = _QUERY_INDEX["docs"], _QUERY_INDEX["df"]
+    # A question a story lists word for word is that story's (audit 27 Oct:
+    # "Is there a gym?", "มีซาวน่าไหม", "ห้องมีกี่แบบ" scored the same for two
+    # stories each and went to none -- 45 of the 733 listed questions)
+    own = _QUERY_INDEX.get("exact", {}).get(_NORM.sub("", _respell(query).lower()))
+    if own in offered:
+        return own
     hit = _best_story(_query_words(query), docs, df)
     if hit is None:
         # The model names the project in its query ("โครงการ Embassy World ห่าง
@@ -1218,6 +1356,37 @@ def story_for_query(query: object, offered: dict | None = None) -> str | None:
         if bare != query:
             hit = _best_story(_query_words(bare), docs, df)
     return hit
+
+
+def story_for_guest(query: object, guest: object, offered: dict | None = None) -> str | None:
+    """The story the GUEST's own words ask for, when the model's search query
+    shares a word with that story -- or None.
+
+    Replay of the 20 Oct robot log (27 Oct): "Where is the nearest
+    restaurant?" was searched as "nearest restaurant distance location", and
+    "What interesting places are around the project?" as "nearby attractions
+    interesting locations". The guest's sentences name nearby_restaurants and
+    nearby_attractions; the model's keyword lists name nothing (the extra
+    words cost them the cover), and both answers became "not specified in our
+    current information". The shared word is the check that the search is
+    still about what the guest said -- a caption left from an earlier
+    question must not pull an unrelated search into a story."""
+    if not isinstance(query, str) or not isinstance(guest, str) or not guest.strip():
+        return None
+    offered = available() if offered is None else offered
+    topic = story_for_query(guest, offered)
+    if topic is None:
+        return None
+    # A CONTENT word (review 27 Oct): "is", "the", "what", "ไหน", "มี" sit in
+    # 23-55 of the 63 stories' word sets, so "what is the ceiling height"
+    # passed the check with "Where is the nearest restaurant?" still captioned
+    # and was sent to nearby_restaurants. A shared word must be one that at
+    # most a quarter of the stories use.
+    docs, df = _QUERY_INDEX.get("docs") or {}, _QUERY_INDEX.get("df") or {}
+    common = max(3, len(docs) // 4)
+    if not {w for w in _query_words(query) & docs.get(topic, set()) if df.get(w, 0) <= common}:
+        return None
+    return topic
 
 
 #: The project's own name as a guest or the model writes it (English, Thai).
@@ -1299,6 +1468,77 @@ def _mark_shown(topic: str) -> None:
     _SHOWN[_call_key()] = (topic, now)
 
 
+#: The report's own answers about the story's place, handed to her with the
+#: story for the questions that come next. Replay of the robot's 20 Oct call
+#: (27-28 Oct, runs 7 and 8): after a place's story, "Why biogenesis?", "Is it
+#: really Himalayan salt stone?" (twice), "What other information can you give
+#: me about the Junior World?" and the glowing floor of the Journey to Mars
+#: pool were answered from memory -- the sales team for the salt's origin --
+#: with no search, although INSTRUCTION asks for one, and chapter 21 answers
+#: every one of them. What rides on the tool result reaches this model; a
+#: rule about the next turn does not. The tap's lookup (`_more_facts`) by the
+#: place's own name: what it is like, what is inside, why the name.
+DETAILS = ("details = ข้อมูลที่อนุมัติเพิ่มของสถานที่ในเรื่องนี้ ไม่ต้องพูดตอนนี้ (ตอนนี้พูดแค่ say): "
+           "ถ้าลูกค้าถามต่อว่าเป็นยังไง ข้างในมีอะไร ทำไมชื่อนี้ หรือของจริงไหม ให้ตอบจาก details ได้เลย "
+           "เป็นภาษาของลูกค้า ห้ามส่งทีมขายเรื่องที่ details ตอบไว้แล้ว")
+#: How long the tool waits for a story's details it has not looked up yet --
+#: once the search model is warm (main._warm_search) a lookup takes ~0.05 s;
+#: cold it is ~13 s, which a story must not wait for: the lookup goes on in
+#: the background, the story goes out now and the next one has them.
+DETAILS_WAIT_S = 1.0
+_DETAILS: dict[str, list[str] | None] = {}
+_DETAILS_LOCK = threading.Lock()
+
+
+def _place_label(story: dict) -> str:
+    params = story.get("params") if isinstance(story.get("params"), dict) else {}
+    photo = params.get("photo") if isinstance(params.get("photo"), dict) else {}
+    spot = params.get("spot") if isinstance(params.get("spot"), dict) else {}
+    return str(photo.get("title_en") or spot.get("label_en") or "").strip()
+
+
+def story_details(story: dict) -> list[str]:
+    """`_more_facts` for the story's place, cached per story; [] for a story
+    with no place of its own (its lines are the report's answer already)."""
+    sid = story.get("id")
+    label = _place_label(story)
+    if not isinstance(sid, str) or not label:
+        return []
+    with _DETAILS_LOCK:
+        if sid in _DETAILS:
+            return list(_DETAILS[sid] or [])
+        _DETAILS[sid] = None                     # being looked up
+
+    def look() -> None:
+        try:
+            from app.tools.retrieval import sanitize_common_area_dimensions
+
+            # the door every piece of project text takes to the model: no
+            # width x length of a common area (Bungee Gym's "16.125 x 5.85
+            # m" rode along, 28 Oct), no concept caveat, nothing overruled
+            facts = [sanitize_common_area_dimensions(f) for f in _more_facts(story, label)]
+        except Exception:
+            logger.exception("story details: lookup failed for %s", sid)
+            facts = []
+        with _DETAILS_LOCK:
+            if sid in _DETAILS:                  # not reset meanwhile
+                _DETAILS[sid] = facts
+
+    worker = threading.Thread(target=look, name="story-details-%s" % sid, daemon=True)
+    worker.start()
+    worker.join(DETAILS_WAIT_S)
+    with _DETAILS_LOCK:
+        return list(_DETAILS.get(sid) or [])
+
+
+def warm_details() -> int:
+    """Look every offered story's details up once, at boot after the search
+    model is warm (main._warm_search): the guest's first story has them."""
+    if not settings.stories_enabled:
+        return 0
+    return sum(1 for story in available().values() if story_details(story))
+
+
 def tool_result(topic: object) -> dict:
     """The tool's answer: the page payload, the lines to say, the rules."""
     catalog = load_catalog()
@@ -1317,15 +1557,19 @@ def tool_result(topic: object) -> dict:
     turnlog.record("story_shown", topic=story["id"], taps=len(payload["taps"]))
     _mark_shown(story["id"])
     nexts = follow_ups(story, stories)
-    return {
+    details = story_details(story)
+    out = {
         "ok": True,
         "screen": "story",
         "topic": story["id"],
         "story": payload,
         "say": [{"th": line["th"], "en": line["en"]} for line in story["lines"]],
         "instruction": INSTRUCTION + (" " + FOLLOW_UP % "; ".join(nexts) if nexts else "")
-                       + (" " + extra if extra else ""),
+                       + (" " + DETAILS if details else "") + (" " + extra if extra else ""),
     }
+    if details:
+        out["details"] = details
+    return out
 
 
 def _tap_allowed(tap: dict, stories: dict) -> bool:
@@ -1368,11 +1612,12 @@ def tap_text(tap: dict, lang: object = None, talk: object = None) -> str:
     the reply stays in the language the guest speaks). `talk` = the
     conversation's language as the server knows it (owner 15 Oct: talking
     English, a tap was answered in Thai): the tap then says it, in it."""
-    from app.quick_asks import LANGS, _LANG_NAMES_TH, _lang, tap_call, tap_preamble
+    from app.quick_asks import _LANG_NAMES_TH, _lang, tap_call, tap_preamble, tap_talk
 
     if tap.get("more"):
         return tap_more_text(tap, lang, talk)
-    if talk in LANGS:
+    # any language the server knows the guest speaks, by name (audit 27 Oct)
+    if tap_talk(talk):
         if tap.get("next_story"):
             call = 'present_story(topic="%s")' % tap["next_story"]
         else:

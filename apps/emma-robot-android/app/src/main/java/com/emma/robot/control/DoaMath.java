@@ -387,6 +387,17 @@ final class DoaMath {
         return LINK_IGNORE;
     }
 
+    /** A server code fit for a log line or the operator screen: lower-case
+     *  letters, digits and underscores, at most 32; anything else is "". */
+    static String codeOrEmpty(String code) {
+        if (code == null || code.isEmpty() || code.length() > 32) return "";
+        for (int k = 0; k < code.length(); k++) {
+            char c = code.charAt(k);
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) return "";
+        }
+        return code;
+    }
+
     /** Redial delay after `failures` drops in a row; reset only by doa_ready. */
     static long backoffMs(int failures) {
         int f = Math.max(0, Math.min(failures, 6));

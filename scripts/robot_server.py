@@ -52,6 +52,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(1, str(ROOT))
 import robot_python as rp  # noqa: E402  (adb plumbing, Debian pins, the nav runtime)
 from app import embed_onnx  # noqa: E402  (the embedding model's pins; stdlib only at import)
+from app.offline import asr as offline_asr  # noqa: E402  (the offline ASR pins; stdlib only at import)
 
 BASE = "/data/local/emma-server"
 RUNTIME = BASE + "/runtime"
@@ -86,9 +87,13 @@ SKIP_WHEELS = re.compile(r"^opencv_python-\d")
 
 #: What a deploy copies besides git-tracked app/ client/ (no client/rive: no
 #: robot page loads it) -- the server's entry points and the data it reads.
-CODE_FILES = ["run_server.py", "scripts/emma_server.py", "scripts/emma_server.sh", "scripts/robot_dns.py"]
+#: scripts/board_walk.py + data/robot/waypoints/: the event host's walks
+#: (app/event_walk.py, owner 30 Oct) run floor 1's walker from the code
+#: directory -- the rest of data/robot/ (floor 2's lanes, logs) stays home.
+CODE_FILES = ["run_server.py", "scripts/emma_server.py", "scripts/emma_server.sh", "scripts/robot_dns.py",
+              "scripts/board_walk.py"]
 TRACKED_DIRS = ["app", "client", "data"]
-TRACKED_SKIP = re.compile(r"^(client/rive/|data/robot/|data/eval|data/review/|data/robot-inspection/|"
+TRACKED_SKIP = re.compile(r"^(client/rive/|data/robot/(?!waypoints/)|data/eval|data/review/|data/robot-inspection/|"
                           r"data/canva-render/|data/slides-backup/|data/showroom/|data/call_debug/|"
                           r"data/wake_debug/|data/wake_enroll/|data/logs/|data/emma-corpus/)")
 #: Untracked data the server needs (gitignored on purpose: staff faces,
@@ -118,6 +123,9 @@ EXTRA_GLOBS = [
     "data/wake/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01/bpe.model",
     "data/slides/**/*",
     "certs/lan-cert.pem",
+    # Floor 1's remembered points (gitignored with the rest of data/robot/):
+    # the dock pose and approach the event host's walks dock with.
+    "data/robot/waypoints/*.json",
 ]
 #: Big files the robot downloads itself (pinned) instead of 0.3 MB/s over adb.
 #: Shipped only if this PC has the file (its sha256 is the pin), so fetch here
@@ -147,7 +155,20 @@ FETCH_ON_ROBOT = {
 #: .env keys that never leave this PC (they do nothing on the robot, or
 #: they are keys the robot has no use for -- fewer secrets on the robot).
 ENV_DROP = {"OPENAI_API_KEY", "PRINTER_NAME", "PDF_PRINT_EXE", "ROBOT_ARM_ADB", "ROBOT_ARM_ADB_SERIAL"}
+#: .env keys whose robot value is robot.env's alone: this PC's line is never
+#: carried over. OFFLINE_FALLBACK (review 26 Oct, reproduced): the owner
+#: trying the backup on this PC (docs/emma-offline-mode.md step 3) and then
+#: running `secrets`/`deploy` for anything at all turned it on for the robot
+#: -- 0.9 GB of recognizers fetched, beside a lines file of drafts -- while
+#: the lock test, which reads robot.env, stayed green. Now robot.env is the
+#: only switch for the robot and the lock reads the file that decides.
+ROBOT_ENV_ONLY = {"OFFLINE_FALLBACK"}
 SECRET_FILES = {"certs/lan-key.pem": "certs/lan-key.pem"}
+#: Pushed by `secrets` when this PC has them. data/room-screens.json holds each
+#: room PC's agent key (app/room_screens.py; robot.env points ROOM_SCREENS_FILE
+#: at the copy beside the robot's .env, root-owned like it -- under data/ the
+#: server could rewrite it).
+OPTIONAL_SECRET_FILES = {"data/room-screens.json": "room-screens.json"}
 
 
 class Fail(Exception):
@@ -182,7 +203,7 @@ def compose_env(pc_env: str, overrides: str) -> str:
     over = dict(parse_env(overrides))
     pc: dict[str, str] = {}
     for k, v in parse_env(pc_env):
-        if k not in ENV_DROP:
+        if k not in ENV_DROP and k not in ROBOT_ENV_ONLY:
             pc[k] = v                     # dict: first position, last value
     out = ["%s=%s" % (k, over.pop(k) if k in over else v) for k, v in pc.items()]
     for k, v in over.items():
@@ -192,7 +213,8 @@ def compose_env(pc_env: str, overrides: str) -> str:
 
 #: Never shipped as code/data. Secrets reach the robot only through `secrets`
 #: (root:nobody 0640, hash-checked); a deployed copy would be 0644 under code/.
-_SECRET_NAME = re.compile(r"(^|/)(\.env[^/]*|[^/]*\.env|[^/]*key[^/]*\.pem|[^/]*\.key)$", re.IGNORECASE)
+_SECRET_NAME = re.compile(r"(^|/)(\.env[^/]*|[^/]*\.env|[^/]*key[^/]*\.pem|[^/]*\.key|room-screens\.json)$",
+                          re.IGNORECASE)
 _JUNK_SUFFIX = (".pyc", ".lock", ".bak", ".part")
 #: Slide pictures (78 MB): no robot tool shows them (`slides` is not in the
 #: robot's TOOL_GROUPS; Canva needs a desktop Chromium). Today only
@@ -276,6 +298,71 @@ def story_asset_files(root: Path = ROOT) -> set[str]:
     return out
 
 
+_TRUE = {"1", "true", "yes", "on"}
+
+
+def offline_on(root: Path = ROOT) -> bool:
+    """OFFLINE_FALLBACK as the robot will run it: the `secrets` merge
+    (compose_env), in which this key is robot.env's alone (ROBOT_ENV_ONLY) --
+    this PC's .env turning it on for a desk trial does not reach the robot.
+    Only the flag is read."""
+    pc = root / ".env"
+    over = root / "data" / "robot-server" / "robot.env"
+    env = compose_env(pc.read_text(encoding="utf-8") if pc.is_file() else "",
+                      over.read_text(encoding="utf-8") if over.is_file() else "")
+    value = dict(parse_env(env)).get("OFFLINE_FALLBACK", "")
+    return value.split("#", 1)[0].strip().strip("'\"").lower() in _TRUE
+
+
+def offline_lines_warning(root: Path = ROOT) -> str | None:
+    """A line for `deploy` when the robot will run offline mode beside fixed
+    lines nobody signed (drafts are never said: the backup would answer only
+    with stories, and nobody at the robot would know why). The lock test
+    covers the committed files; this covers a working tree edited by hand."""
+    if not offline_on(root):
+        return None
+    from app.config import settings
+    from app.offline import lines as offline_lines
+
+    status = offline_lines.status(offline_lines.load(
+        root / "data" / "projects" / settings.project_id / "offline" / "lines.json"))
+    if status["approved"] >= len(offline_lines.IDS) and not status["missing"]:
+        return None
+    return ("WARNING: OFFLINE_FALLBACK is on in robot.env but only %d of %d offline lines are approved -- "
+            "drafts are never said (python scripts/approve_offline_lines.py --status)"
+            % (status["approved"], len(offline_lines.IDS)))
+
+
+def offline_voice_files(root: Path = ROOT) -> set[str]:
+    """Emma's pre-rendered offline clips + their index (scripts/render_offline_
+    voice.py; gitignored, so nothing else ships them) -- only while the robot
+    runs OFFLINE_FALLBACK. Off, nothing changes. A clip the index pins and this
+    PC lacks is simply not there: the robot then shows that line without its
+    voice instead of a wrong one (app/offline/voice.py re-hashes every clip)."""
+    if not offline_on(root):
+        return set()
+    folder = root / "data" / "offline" / "voice"
+    out: set[str] = set()
+    if folder.is_dir():
+        for p in folder.iterdir():
+            rel = p.relative_to(root).as_posix()
+            if p.is_file() and (p.suffix == ".wav" or p.name == "index.json") and _deployable(rel):
+                out.add(rel)
+    return out
+
+
+def offline_asr_pins(root: Path = ROOT) -> dict[str, str]:
+    """data/offline/asr/<model>/<file> -> sha256, for the two recognizers the
+    robot downloads and unpacks ITSELF (0.9 GB of archives at ~0.3 MB/s over
+    adb Wi-Fi is most of an hour; the robot fetches at ~6 MB/s) -- only while
+    the robot runs OFFLINE_FALLBACK. The pins are app/offline/asr.py's, so the
+    robot gets exactly the files this PC's code loads."""
+    if not offline_on(root):
+        return {}
+    return {"data/offline/asr/%s/%s" % (m["dir"], name): sha
+            for m in offline_asr.MODELS.values() for name, sha in m["files"].items()}
+
+
 def deploy_files(root: Path = ROOT) -> list[str]:
     files = set(tracked_files(root)) | {f for f in CODE_FILES if (root / f).is_file()}
     for pattern in EXTRA_GLOBS:
@@ -286,7 +373,10 @@ def deploy_files(root: Path = ROOT) -> list[str]:
                     files.add(rel)
     files |= answer_image_files(root)
     files |= story_asset_files(root)
-    return sorted(f for f in files if f not in FETCH_ON_ROBOT)
+    files |= offline_voice_files(root)
+    # the recognizers never go over adb (the robot fetches them itself), even
+    # when a future glob or tracked rule would catch them
+    return sorted(f for f in files if f not in FETCH_ON_ROBOT and not f.startswith("data/offline/asr/"))
 
 
 def manifest(root: Path, files: list[str]) -> dict[str, str]:
@@ -532,6 +622,9 @@ def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
     note = refresh_faq_cache()
     if note:
         print(note)
+    warning = offline_lines_warning()
+    if warning:
+        print(warning)
     files = deploy_files()
     local = manifest(ROOT, files)
     # Diff against what is REALLY on the robot, not against our MANIFEST: the
@@ -543,7 +636,8 @@ def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
     push, _ = changed(expect, remote)
     kept = [] if force else robot_edited(expect, remote, previous)
     push = [f for f in push if f not in kept]
-    gone = sorted(f for f in previous if f not in local and f not in FETCH_ON_ROBOT)
+    asr_pins = offline_asr_pins()
+    gone = sorted(f for f in previous if f not in local and f not in FETCH_ON_ROBOT and f not in asr_pins)
     spared = [] if force else spared_deletes(gone, robot.hashes(CODE, gone), previous)
     gone = [f for f in gone if f not in spared]
     size = sum((ROOT / f).stat().st_size for f in push)
@@ -588,12 +682,14 @@ def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
         bad = [f for f, p in need.items() if have.get(f) != p["sha256"]]
         if bad:
             raise Fail("model copy failed: %s" % bad)
+    if asr_pins:
+        _fetch_offline_asr(robot, asr_pins)
     # A kept file stays recorded as what we LAST pushed (or not at all), so the
     # next deploy still sees the robot's edit instead of adopting it as ours.
     deployed = {f: h for f, h in expect.items() if f not in kept}
     deployed.update({f: previous[f] for f in kept if f in previous})
     man = json.dumps({"deployed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                      "files": {**deployed, **{f: p["sha256"] for f, p in pins.items()}}},
+                      "files": {**deployed, **{f: p["sha256"] for f, p in pins.items()}, **asr_pins}},
                      sort_keys=True).encode()
     robot.root("rm -f %s/MANIFEST.json.new" % CODE)
     robot.feed("cat > %s/MANIFEST.json.new" % CODE, man)
@@ -602,6 +698,39 @@ def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
     robot.root("mv %s/MANIFEST.json.new %s/MANIFEST.json" % (CODE, CODE))
     _permissions(robot)
     print("deployed")
+
+
+def _fetch_offline_asr(robot: Robot, asr_pins: dict[str, str]) -> None:
+    """The offline recognizers onto the robot: the robot downloads the pinned
+    archives (scripts/fetch_offline_models.py under the nav Python -- the same
+    script this PC uses: sha256 checked BEFORE extracting, only the pinned
+    files taken, a member outside its model folder refused), into the shell-
+    owned stage; root copies them under code/data/offline/asr; every file is
+    hash-checked where it lands. Skipped when they are already there."""
+    have = robot.hashes(CODE, list(asr_pins))
+    need = {name: pin for name, pin in offline_asr.fetch_map().items()
+            if any(have.get("data/offline/asr/%s/%s" % (pin["dir"], f)) != h for f, h in pin["files"].items())}
+    if not need:
+        return
+    robot.shell("mkdir -p %s %s" % (SETUP_DIR, STAGE))
+    robot.put(json.dumps(need).encode(), SETUP_DIR + "/offline_pins.json")
+    robot.put((ROOT / "scripts" / "fetch_offline_models.py").read_bytes(), SETUP_DIR + "/fetch_offline_models.py")
+    robot.put((ROOT / "scripts" / "robot_dns.py").read_bytes(), SETUP_DIR + "/robot_dns.py")
+    out = robot.shell("cd %s && %s fetch_offline_models.py --pins offline_pins.json --dest %s/offline-asr "
+                      "--stage %s/offline-archives" % (SETUP_DIR, NAV_PY, STAGE, STAGE),
+                      check=False, timeout=3600)
+    print(out.strip()[-400:])
+    if "offline models ok" not in out:
+        raise Fail("offline ASR download failed (see above) -- nothing copied")
+    for pin in need.values():
+        for name in pin["files"]:
+            robot.root("set -e; mkdir -p %s/data/offline/asr/%s; cp %s/offline-asr/%s/%s %s/data/offline/asr/%s/%s"
+                       % (CODE, pin["dir"], STAGE, pin["dir"], name, CODE, pin["dir"], name))
+    landed = robot.hashes(CODE, list(asr_pins))
+    bad = [f for f, h in asr_pins.items() if landed.get(f) != h]
+    if bad:
+        raise Fail("offline ASR copy failed: %s" % bad[:3])
+    robot.shell("rm -rf %s/offline-asr" % STAGE, check=False)
 
 
 #: Runs on the robot under the nav Python: pinned model downloads into STAGE/models.
@@ -634,7 +763,8 @@ def _permissions(robot: Robot) -> None:
     robot.root(
         "set -e; chown -R 0:0 %(c)s; chmod -R go-w %(c)s; mkdir -p %(c)s/data/tmp;"
         " chown -R %(u)s:%(u)s %(c)s/data; chmod 0750 %(c)s/data;"
-        " for f in %(c)s/.env %(c)s/certs/lan-key.pem; do if [ -f $f ]; then chown 0:%(u)s $f; chmod 0640 $f; fi; done;"
+        " for f in %(c)s/.env %(c)s/certs/lan-key.pem %(c)s/room-screens.json; do"
+        " if [ -f $f ]; then chown 0:%(u)s $f; chmod 0640 $f; fi; done;"
         " chown 0:%(u)s %(b)s; chmod 0750 %(b)s"
         % {"c": CODE, "u": UID, "b": BASE})
 
@@ -642,11 +772,17 @@ def _permissions(robot: Robot) -> None:
 def cmd_secrets(robot: Robot) -> None:
     env = compose_env((ROOT / ".env").read_text(encoding="utf-8"), OVERRIDES.read_text(encoding="utf-8"))
     robot.write_secret(".env", env.encode("utf-8"))
+    sent = []
     for src, dst in SECRET_FILES.items():
         robot.write_secret(dst, (ROOT / src).read_bytes())
+        sent.append(dst)
+    for src, dst in OPTIONAL_SECRET_FILES.items():
+        if (ROOT / src).is_file():
+            robot.write_secret(dst, (ROOT / src).read_bytes())
+            sent.append(dst)
     # Say which keys went, never their values.
     print("secrets: .env with %d keys, %s (root:nobody 0640, hash-checked) -- `restart` to apply"
-          % (len(parse_env(env)), ", ".join(SECRET_FILES.values())))
+          % (len(parse_env(env)), ", ".join(sent)))
 
 
 def server(robot: Robot, action: str) -> str:

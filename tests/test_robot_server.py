@@ -411,8 +411,13 @@ def test_one_starter_at_a_time_and_off_the_apps_process_group():
 
 def test_the_script_parses():
     sh = shutil.which("sh") or shutil.which("bash")
+    # Run from PowerShell on Windows, "bash" is System32's WSL relay, which
+    # fails before reading the script when no Linux distro is installed (the
+    # full suite, 27 Oct): that is this machine, not the script
+    if sh is not None and subprocess.run([sh, "-c", "exit 0"], capture_output=True).returncode != 0:
+        sh = None
     if sh is None:
-        pytest.skip("no sh: emma_server.sh was NOT syntax-checked")
+        pytest.skip("no working sh: emma_server.sh was NOT syntax-checked")
     r = subprocess.run([sh, "-n", str(SCRIPT)], capture_output=True, encoding="utf-8", errors="replace")
     assert r.returncode == 0, r.stderr
 

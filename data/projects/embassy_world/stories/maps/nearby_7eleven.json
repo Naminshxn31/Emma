@@ -1,0 +1,162 @@
+{
+ "story": "nearby_7eleven",
+ "image": "maps/nearby_7eleven.png",
+ "image_sha256": "484f1e3d04e9e6ee8014946171f750ecae73b9c12272e9b7fbdda9a1031c9fc7",
+ "w": 1080,
+ "h": 1080,
+ "camera": {
+  "zoom": 15.228,
+  "pitch": 0,
+  "bearing": 0
+ },
+ "attribution_en": "© OpenStreetMap contributors · OpenFreeMap",
+ "palette": "night",
+ "places": {
+  "ptt_7eleven": {
+   "x": 52.9,
+   "y": 40.93,
+   "straight_km": 0.333,
+   "source": "owner's map places.json (the owner's own annotation 22 Oct, ±35 m; report 23_owner_review 23.2: nearest 7-Eleven in the PTT station)",
+   "route": [
+    [
+     52.09,
+     15.0
+    ],
+    [
+     47.34,
+     18.43
+    ],
+    [
+     47.26,
+     19.17
+    ],
+    [
+     47.76,
+     21.23
+    ],
+    [
+     53.55,
+     31.32
+    ],
+    [
+     55.85,
+     34.18
+    ],
+    [
+     59.2,
+     37.52
+    ],
+    [
+     54.8,
+     40.91
+    ],
+    [
+     63.12,
+     50.54
+    ],
+    [
+     65.48,
+     53.94
+    ],
+    [
+     69.89,
+     62.33
+    ],
+    [
+     69.25,
+     62.68
+    ],
+    [
+     64.82,
+     54.4
+    ],
+    [
+     62.31,
+     50.9
+    ],
+    [
+     53.37,
+     40.55
+    ],
+    [
+     52.9,
+     40.93
+    ]
+   ],
+   "route_km": 1.18
+  },
+  "familymart": {
+   "x": 47.1,
+   "y": 85.0,
+   "straight_km": 0.953,
+   "source": "report 92 ค.4.2 #11 (FamilyMart nearest by road) · OSM via the owner's map",
+   "route": [
+    [
+     52.09,
+     15.0
+    ],
+    [
+     47.34,
+     18.43
+    ],
+    [
+     47.26,
+     19.17
+    ],
+    [
+     47.76,
+     21.23
+    ],
+    [
+     53.55,
+     31.32
+    ],
+    [
+     55.85,
+     34.18
+    ],
+    [
+     59.2,
+     37.52
+    ],
+    [
+     54.8,
+     40.91
+    ],
+    [
+     63.12,
+     50.54
+    ],
+    [
+     65.48,
+     53.94
+    ],
+    [
+     72.24,
+     66.53
+    ],
+    [
+     39.4,
+     76.4
+    ],
+    [
+     45.06,
+     84.49
+    ],
+    [
+     46.77,
+     83.95
+    ],
+    [
+     47.1,
+     85.0
+    ]
+   ],
+   "route_km": 1.51
+  }
+ },
+ "project": {
+  "x": 52.09,
+  "y": 15.0
+ }
+}

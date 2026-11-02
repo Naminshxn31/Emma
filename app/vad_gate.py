@@ -65,7 +65,7 @@ class VadGate:
 
     def __init__(self, detector, prefix_padding_ms: int, sample_rate: int = 16000,
                  min_rms: float = 0.0, floor_grace_s: float = 3.0,
-                 focus_ratio: float = 0.0) -> None:
+                 focus_ratio: float = 0.0, head_hold_ms: int = 0) -> None:
         self._detector = detector
         self._rate = sample_rate
         #: Speaker focus (VAD_FOCUS_RATIO) — see `_for_detector`. 0 = off.
@@ -76,10 +76,25 @@ class VadGate:
         self._focus_quiet_rms = 0.0  # loudest thing inside that run
         #: Bytes of pre-roll to keep: ms * (2 bytes/sample) * samples/ms.
         self._preroll_max = int(prefix_padding_ms * 2 * sample_rate / 1000)
+        #: VAD_HEAD_HOLD_MS: how much MORE the pre-roll may hold while the
+        #: detector hears speech that a door (the floor, listening focus)
+        #: has not let through yet. Those doors re-ask on every frame and
+        #: the comments below promised "the segment opens then, head
+        #: intact" -- but the pre-roll was trimmed to prefix_padding_ms the
+        #: whole time, so a sentence let in on its loudest syllable arrived
+        #: beheaded. Robot log 28 Oct (the floor-1 media room, no face in
+        #: the camera all evening): 73 of 124 opens came within 2 s of a
+        #: denial, and a tester's first sentence reached the model as its
+        #: last word or two; on 20 Oct English guests' questions arrived
+        #: starting mid-sentence (a leading comma, a dangling "is ..."). 0 = the old
+        #: 300 ms exactly (the sales-room PC); robot.env sets it.
+        self._head_max = int(max(0, int(head_hold_ms)) * 2 * sample_rate / 1000)
         self._preroll = bytearray()
         self.in_speech = False
         #: Speech segments opened so far — read by the call's mic report.
         self.segments = 0
+        #: The rms of the frame that opened the latest segment (None before one).
+        self.open_rms: float | None = None
         #: Near-field floor (VAD_MIN_RMS): a speech segment may only *open*
         #: if its trigger chunk is at least this loud. Silero answers "is
         #: somebody speaking", not "is somebody speaking to us" — in the
@@ -244,6 +259,9 @@ class VadGate:
         samples = np.frombuffer(pcm16, dtype="<i2").astype("float32") / 32768.0
         self._detector.accept_waveform(self._for_detector(samples))
         speaking = bool(self._detector.is_speech_detected())
+        # What the detector said, before any door below says no to it: the
+        # pre-roll may grow past prefix_padding_ms only while this is true.
+        detector_speech = speaking
         self._drop_finished_segments()
 
         import time as _time
@@ -319,6 +337,9 @@ class VadGate:
         if speaking and not self.in_speech:
             self.in_speech = True
             self.segments += 1
+            # how loud the voice that opened this segment was (the turn log's
+            # focus_open rms): the noise-reply gate's "near or far"
+            self.open_rms = rms
             # The opener sets the reference — the person this turn belongs to.
             self._focus_level = float(np.sqrt(max(self._energy, 0.0)))
             self._focus_quiet_s = 0.0
@@ -352,8 +373,14 @@ class VadGate:
             actions.append(("end", b""))
         else:
             self._preroll.extend(pcm16)
-            if len(self._preroll) > self._preroll_max:
-                del self._preroll[:len(self._preroll) - self._preroll_max]
+            # Speech a door is still refusing is the head of a sentence the
+            # door may let in on its next frame (a louder syllable, a face
+            # turning): kept, up to VAD_HEAD_HOLD_MS more. The detector's
+            # "no" ends the run and the buffer shrinks back to the pre-roll
+            # on this very frame, so a refused run never reaches the next one.
+            cap = self._preroll_max + (self._head_max if detector_speech else 0)
+            if len(self._preroll) > cap:
+                del self._preroll[:len(self._preroll) - cap]
         return actions
 
     def _keep_segment_audio(self, pcm16: bytes) -> None:
@@ -451,7 +478,8 @@ def for_session(min_rms: float | None = None):
     return VadGate(detector, prefix_padding_ms=settings.vad_prefix_padding_ms,
                    min_rms=floor,
                    floor_grace_s=settings.vad_floor_grace_s,
-                   focus_ratio=settings.vad_focus_ratio)
+                   focus_ratio=settings.vad_focus_ratio,
+                   head_hold_ms=getattr(settings, "vad_head_hold_ms", 0))
 
 
 def reset_warnings() -> None:

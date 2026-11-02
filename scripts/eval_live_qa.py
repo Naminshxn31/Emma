@@ -91,6 +91,8 @@ sys.path.insert(0, str(ROOT))
 SCENARIOS = ROOT / "data" / "eval" / "qa_live_scenarios.json"
 ROBOT_SCENARIOS = ROOT / "data" / "eval" / "qa_live_robot.json"
 CONTENT_SCENARIOS = ROOT / "data" / "eval" / "qa_live_robot_content.json"
+#: The event host (app/event_host.py, owner 30 Oct): scenes switched by staff.
+EVENT_SCENARIOS = ROOT / "data" / "eval" / "qa_live_event.json"
 FAQ = (ROOT / "data" / "personal-docs" / "embassy-world" / "project-report-2026-10-06"
        / "19_faq.md")
 OUT_DIR = ROOT / "data" / "eval-runs"
@@ -181,6 +183,12 @@ def load_cases(suite: str, faq_path: Path) -> list[dict]:
             raise ValueError("qa_live_robot_content.json: " + "; ".join(problems))
         for case in data["cases"]:
             case.setdefault("suite", "content")
+            cases.append(case)
+    # Not part of "all": the event profile, its scenes from EVENT_FILE.
+    if suite == "event":
+        data = json.loads(EVENT_SCENARIOS.read_text(encoding="utf-8"))
+        for case in data["cases"]:
+            case.setdefault("suite", "event")
             cases.append(case)
     return cases
 
@@ -283,7 +291,7 @@ def validate_robot_cases(data: dict) -> list[str]:
 
 _CONTENT_EXPECT_KEYS = {"tools_none", "face_none", "said_none", "said_any", "mode_switch_max"}
 _TURN_EXPECT_KEYS = {"max_chars", "lang", "said_none", "said_any", "silent_ok", "filler_ok"}
-_LANGS = {"th", "en", "he", "zh"}
+_LANGS = {"th", "en", "he", "zh", "ru"}
 
 
 def validate_content_cases(data: dict) -> list[str]:
@@ -373,11 +381,13 @@ _MODE_SWITCH = re.compile(r"หน้าอก|สลับ.{0,4}โหมด|�
 _DENIES_LANGUAGE = re.compile(r"ไม่เข้าใจภาษา|לא מבינה|don'?t (understand|speak) (hebrew|that)",
                               re.IGNORECASE)
 _SCRIPTS = {"th": re.compile(r"[฀-๿]"), "he": re.compile(r"[֐-׿]"),
-            "zh": re.compile(r"[一-鿿]"), "en": re.compile(r"[A-Za-z]")}
+            "zh": re.compile(r"[一-鿿]"), "en": re.compile(r"[A-Za-z]"),
+            # Russian joined the robot face's language menu (owner 29 Oct)
+            "ru": re.compile(r"[Ѐ-ӿ]")}
 
 
 def main_script(text: str) -> str | None:
-    """The writing system most of `text` is in (th/he/zh/en), None for none."""
+    """The writing system most of `text` is in (th/he/zh/en/ru), None for none."""
     counts = {k: len(p.findall(text or "")) for k, p in _SCRIPTS.items()}
     best = max(counts, key=counts.get)
     return best if counts[best] else None
@@ -776,7 +786,16 @@ _SAYS_NO_INFO = re.compile(
     # robot 20 Oct, English: the gap said as a gap in our records
     r"|I don'?t have the exact|not (specified|mentioned|listed) in (my|our|the) (current )?"
     r"(details|information|data|records|documents)"
-    r"|not (in|available in) (my|our) system|I don'?t know)",
+    r"|not (in|available in) (my|our) system|I don'?t know"
+    # replay of 20 Oct on 27 Oct: the same gap in more words ("not specified
+    # in our current project information", "not available in our records",
+    # "Our current project details do not specify", "I don't have the
+    # specific completion date in my current information")
+    r"|not (specified|mentioned|listed|available|included|stated) in (my|our|the) (current )?(project )?"
+    r"(details|information|data|records|documents)"
+    r"|(details|information|records|documents) (do|does) not (specify|mention|include|state)"
+    r"|I don'?t have (that |this |the |any )?((specific|exact) )?(\w+ )?"
+    r"(information|info|details|data|date|number|figure)s?\b)",
     re.IGNORECASE)
 
 
@@ -1266,6 +1285,13 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                 return False
             if (state["tc_since_tool"] > 0 and state["pending"] == 0
                     and time.monotonic() - state["last"] > quiet):
+                # A turn that ended without a word while the robot's watchdog
+                # still chases it (REPLY_STALL_S): wait for it as a guest at
+                # the robot would, instead of sending the next question 2.5 s
+                # in (replay of 20 Oct, 27 Oct: three silences scored that the
+                # nudge at 8 s would have answered). Never past its own ceiling.
+                if _watchdog_still_chasing(turn, provider, time.monotonic() - state["last"], quiet):
+                    continue
                 return True
         return False
 
@@ -1291,6 +1317,68 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                     ok = await wait_turn(greet_turn)
                     record["greeting"] = close_turn(greet_turn, ok)
                 for n, text in enumerate(case["turns"]):
+                    if text.startswith(SERVER_LINE):
+                        # A line the server writes itself (events.announce):
+                        # the session's own text, the held language on it the
+                        # way announce puts it -- no guest, no caption.
+                        from app import events
+                        from app.session import FOLLOW_UP_TEXT, GOODBYE_TEXT
+
+                        what = text[len(SERVER_LINE):]
+                        if what.startswith(("scene:", "arrive:")):
+                            # The event host (app/event_host.py): staff switched
+                            # to a scene -- acted where she stands, walking is
+                            # staff's and off here -- or its walk arrived.
+                            from app import event_host
+
+                            kind, _, sid = what.partition(":")
+                            sc = event_host.scene(sid)
+                            if sc is None:
+                                raise ValueError("unknown scene %r (EVENT_FILE)" % sid)
+                            event_host.STATE.update(scene=sid, stop=0)
+                            spot = (event_host.load() or {}).get("spots", {}).get(event_host._here(sc) or "")
+                            base = (event_host.scene_text(sc, walking=False, spot_id=event_host._here(sc))
+                                    if kind == "scene" else
+                                    event_host.arrival_text(sc, spot["name_th"] if spot else sid))
+                        else:
+                            base = {"follow_up": FOLLOW_UP_TEXT, "goodbye": GOODBYE_TEXT}[what]
+                        turn = new_turn(text)
+                        await provider.send_text(events.with_held_language(base, provider))
+                        ok = await wait_turn(turn)
+                        turns.append(close_turn(turn, ok))
+                        if not ok and turn["errors"]:
+                            break
+                        continue
+                    if text.startswith(TAP):
+                        # A tap on the robot face (session._quick_ask): the
+                        # server's words as a user turn, no caption, and a pick
+                        # on the language menu pins the talk's language first.
+                        from app import quick_asks
+
+                        tap, _, flag = text[len(TAP):].partition("!")
+                        talk = getattr(provider, "_talk", None)
+                        words = quick_asks.text_for(profile, tap, None,
+                                                    talk.language() if talk is not None else None,
+                                                    cut=flag == "cut")
+                        if words is None:
+                            raise ValueError("unknown tap %r" % tap)
+                        picked = quick_asks.picked_language(tap)
+                        if picked is not None and talk is not None:
+                            talk.pin(picked)
+                        turn = new_turn(text)
+                        # session._quick_ask's order: new activity, the tap
+                        # watched BEFORE it is sent (a stalled tap is asked
+                        # again as itself, not as "the guest said ...")
+                        heard.mark_activity(listener)
+                        watch = getattr(provider, "watch_text_turn", None)
+                        if watch is not None and settings.reply_stall_s > 0:
+                            watch(words)
+                        await provider.send_text(words)
+                        ok = await wait_turn(turn)
+                        turns.append(close_turn(turn, ok))
+                        if not ok and turn["errors"]:
+                            break
+                        continue
                     turn = new_turn(text)
                     # What local VAD + the recogniser hand the heard guard
                     # in the room: an activity_start, then this caption.
@@ -1300,6 +1388,14 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                     # language tracker in the room (TALK_LANGUAGE_NOTE)
                     getattr(provider, "note_guest", lambda _t: None)(text)
                     await provider.send_text(text)
+                    # Armed after the `interrupted` a text sent mid-reply draws
+                    # (it comes within ~0.1 s): on the robot the guest's speech
+                    # interrupts at activity_start and the guard arms at
+                    # activity_end, after it. Armed before it, the interruption
+                    # cleared the watch (replay of 20 Oct, 27 Oct: two turns
+                    # scored silent that the robot would have chased).
+                    await asyncio.sleep(0.3)
+                    _watch_like_heard(provider, text)
                     ok = await wait_turn(turn)
                     turns.append(close_turn(turn, ok))
                     if not ok and turn["errors"]:
@@ -1343,6 +1439,16 @@ def split_serial(todo: list[dict]) -> tuple[list[dict], list[dict]]:
     return parallel, serial
 
 
+#: A turn that is a tap on the robot face, not speech: "tap:<quick ask id>"
+#: (cat 32, the language menu -- "tap:lang_ru" pins the talk to Russian;
+#: "tap:lang_ru!cut" is the pick that stopped her mid-answer).
+TAP = "tap:"
+#: ...and a line the server writes itself: "server:follow_up" / "server:goodbye",
+#: and the event host's "server:scene:<scene id>" / "server:arrive:<scene id>"
+#: (events.announce's texts, with what announce adds to them).
+SERVER_LINE = "server:"
+
+
 #: A story case (`"stories": true`, data/eval/qa_live_scenarios.json, cat 27)
 #: runs the robot face's motion stories (app/stories.py) the way the robot's
 #: server would with them switched on: STORIES_ENABLED, `stories` in the
@@ -1356,7 +1462,44 @@ STORY_CASE_SETTINGS = {"stories_enabled": True, "answer_images": True,
                        "talk_language_note": True,
                        # the robot has no web window (S31-map-story); and a PC
                        # .env with WEB_STAGE=true would open a real browser here
-                       "web_stage": False}
+                       "web_stage": False,
+                       # robot.env's reply watchdog (27 Oct): the replay of 20 Oct
+                       # scored 9 silences the robot would have chased -- a
+                       # text turn never armed it (`_watch_like_heard`)
+                       "reply_stall_s": 8.0, "reply_stall_reconnect_s": 8.0}
+
+
+def _stall_patience() -> float:
+    """How long a silent turn is waited on past its quiet point: the nudge,
+    the rejoin and a reply after it -- 0 with the watchdog off."""
+    from app.config import settings
+
+    if settings.reply_stall_s <= 0:
+        return 0.0
+    return settings.reply_stall_s + max(settings.reply_stall_reconnect_s, 0) + 6.0
+
+
+def _watchdog_still_chasing(turn: dict, provider, quiet_for: float, quiet: float) -> bool:
+    """A turn with no word of audio yet, the provider's watchdog pending, and
+    still inside its patience: not over (wait_turn)."""
+    return (not turn.get("audio_bytes") and getattr(provider, "_stall_wait", None) is not None
+            and quiet_for < quiet + _stall_patience())
+
+
+def _watch_like_heard(provider, text: str) -> None:
+    """What GeminiProvider does at the activity_end of a transcribed segment on
+    the robot (REPLY_STALL_S): the words are the question being waited on. A
+    text turn here never comes through the mic, so the guard was never armed
+    and a turn the model left silent was scored as silence the robot would
+    have nudged, then asked again on a new socket. Off when the setting is."""
+    from app.config import settings
+
+    if settings.reply_stall_s <= 0 or not hasattr(provider, "_arm_stall_guard"):
+        return
+    provider._stall_restart()
+    provider._stall_heard = text
+    provider._replied_since_end = False
+    provider._arm_stall_guard()
 
 
 @contextlib.contextmanager
@@ -1410,7 +1553,9 @@ def resolve_profile(suite: str, profile: str | None) -> str:
     """The robot suite measures the robot face, which on the owner's machine
     is the public EmmaJoke profile (design §6c D3); everything else measures
     the sales room. An explicit --profile wins."""
-    return profile or ("joke" if suite in ("robot", "content") else "condo")
+    if profile:
+        return profile
+    return {"robot": "joke", "content": "joke", "event": "event"}.get(suite, "condo")
 
 
 def check_offline(args) -> int:
@@ -1599,11 +1744,11 @@ def write_summary(out: Path, *, profile: str, model: str | None) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--suite", choices=["scenarios", "faq", "all", "robot", "content"],
+    ap.add_argument("--suite", choices=["scenarios", "faq", "all", "robot", "content", "event"],
                     default="all",
                     help="robot = body/walk commands on the robot face; content = what "
                          "EmmaJoke says on the robot face (neither is part of all)")
-    ap.add_argument("--profile", choices=["condo", "joke", "emma"],
+    ap.add_argument("--profile", choices=["condo", "joke", "emma", "event"],
                     help="profile under test (default: joke for --suite robot, else condo)")
     ap.add_argument("--model", help="Live model for this run only (e.g. "
                     "gemini-3.8-live-extended-thinking); .env is not touched")

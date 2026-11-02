@@ -6,11 +6,19 @@
 <meta name="theme-color" content="#090b10">
 <title>Emma Voice — Preview</title>
 <script>
-  if (new URLSearchParams(location.search).get('app') === '1') {
+  // /mirror = the room screen's copy of the face (app/mirror_server.py): the
+  // app shell, laid out for a big landscape screen (html.mirror below).
+  if (new URLSearchParams(location.search).get('app') === '1' || location.pathname === '/mirror') {
     document.documentElement.classList.add('app-shell');
   }
+  if (location.pathname === '/mirror') {
+    document.documentElement.classList.add('mirror');
+    // A room PC's Chrome is English: it offered to translate Emma's Thai in a
+    // bubble over the kiosk (28 Oct, the first open on a real desktop).
+    document.documentElement.setAttribute('translate', 'no');
+  }
 </script>
-<link rel="stylesheet" href="/assets/emma-story.css?v=20261026-a">
+<link rel="stylesheet" href="/assets/emma-story.css?v=20261029-a">
 <style>
   :root {
     color-scheme: dark;
@@ -882,27 +890,93 @@
     font-size: clamp(.78rem, 1.9vw, .95rem);
     letter-spacing: .04em;
   }
+  /* The language menu (owner 29 Oct: "ปุ่ม dropdown ก็ได้ออกแบบมาสวยๆ ใช้งานง่าย").
+     A pill at the top right, a list under it: read and tapped from standing
+     height, so big type and tall rows. Light like the rest of the face (10
+     Oct): no backdrop-filter, no infinite animation, the menu opens on
+     opacity/transform only. */
+  /* above the stage (z 20) and a story in it: the open list drops over them */
+  html.app-shell .topbar { position: relative; z-index: 32; }
   html.app-shell .langs:not([hidden]) {
-    display: inline-flex; grid-column: 3; justify-self: end;
-    padding: 4px; gap: 4px;
-    border: 1px solid rgba(255,255,255,.10);
+    display: block; position: relative; z-index: 30;
+    grid-column: 3; justify-self: end;
+  }
+  /* a picture on the stage brings its close button to the same corner */
+  html.app-shell body.emma-staging .langs:not([hidden]) { margin-right: 40px; }
+  html.app-shell .lang-toggle {
+    display: inline-flex; align-items: center; gap: 10px;
+    min-height: 60px; padding: 0 18px 0 16px;
+    border: 1px solid rgba(255, 255, 255, .16);
     border-radius: 999px;
-    background: rgba(8,17,28,.55);
-    backdrop-filter: blur(12px);
-  }
-  html.app-shell .langs button {
-    min-width: 64px; min-height: 48px; padding: 0 14px;
-    border: 0; border-radius: 999px;
-    background: transparent;
-    color: #a9bccb;
-    font: inherit; font-size: clamp(.9rem, 2.3vw, 1.05rem); font-weight: 600;
+    background: rgba(18, 14, 48, .88);
+    color: #eef1fb;
+    font: inherit; font-size: clamp(1.05rem, 2.5vw, 1.55rem); font-weight: 650;
+    letter-spacing: .01em;
     cursor: pointer;
+    transition: transform .12s ease;
   }
-  html.app-shell .langs button[aria-pressed="true"] {
-    background: rgba(105,237,186,.18);
-    color: #c8ffe8;
-    box-shadow: inset 0 0 0 1px rgba(105,237,186,.45);
+  html.app-shell .lang-toggle:active { transform: scale(.96); }
+  html.app-shell .lang-globe { width: 1.25em; height: 1.25em; flex: none; color: rgb(var(--fx-teal)); }
+  html.app-shell .lang-chev { width: .9em; height: .9em; flex: none; opacity: .75; transition: transform .2s ease; }
+  html.app-shell .langs.is-open .lang-chev { transform: rotate(180deg); }
+  html.app-shell .langs.is-picked .lang-toggle {
+    border-color: rgba(var(--fx-pink), .55);
+    background: linear-gradient(90deg, rgba(var(--fx-pink), .30), rgba(var(--fx-violet), .30)), rgba(18, 14, 48, .92);
   }
+  html.app-shell .lang-menu {
+    position: absolute; top: calc(100% + 12px); right: 0;
+    display: grid; gap: 8px;
+    width: max-content; min-width: 340px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 28px;
+    background: rgb(22, 17, 54);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transform: translateY(-10px) scale(.97); transform-origin: top right;
+    transition: opacity .16s ease, transform .16s ease, visibility 0s linear .16s;
+  }
+  html.app-shell .langs.is-open .lang-menu {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transform: none;
+    transition: opacity .16s ease, transform .16s ease, visibility 0s;
+  }
+  html.app-shell .lang-option {
+    display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto;
+    column-gap: 18px; align-items: center; align-content: center; text-align: left;
+    min-height: 88px; padding: 10px 22px;
+    border: 1px solid transparent;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, .045);
+    color: #f3f5fc;
+    font: inherit;
+    cursor: pointer;
+    transition: transform .12s ease;
+  }
+  html.app-shell .lang-option[hidden] { display: none; }
+  html.app-shell .lang-option:active { transform: scale(.97); }
+  html.app-shell .lang-name { grid-column: 1; font-size: clamp(1.3rem, 3.1vw, 2rem); font-weight: 700; line-height: 1.15; }
+  html.app-shell .lang-sub { grid-column: 1; color: #a9a6cf; font-size: clamp(.85rem, 1.9vw, 1.1rem); letter-spacing: .03em; }
+  html.app-shell .lang-sub:empty { display: none; }
+  html.app-shell .lang-check {
+    grid-column: 2; grid-row: 1 / span 2;
+    width: 34px; height: 34px; padding: 6px; box-sizing: border-box;
+    border-radius: 50%;
+    color: #0f1630; background: rgb(var(--fx-teal));
+    opacity: 0; transform: scale(.6);
+    transition: opacity .16s ease, transform .16s ease;
+  }
+  html.app-shell .lang-option[aria-selected="true"] {
+    border-color: rgba(var(--fx-pink), .55);
+    background: linear-gradient(90deg, rgba(var(--fx-pink), .26), rgba(var(--fx-violet), .26));
+  }
+  html.app-shell .lang-option[aria-selected="true"] .lang-check { opacity: 1; transform: none; }
+  html.app-shell .lang-note {
+    margin: 4px 8px 4px; max-width: 340px;
+    color: #9d9ac4; font-size: clamp(.8rem, 1.7vw, 1rem); line-height: 1.35;
+  }
+  html.app-shell .lang-toggle:focus-visible,
+  html.app-shell .lang-option:focus-visible { outline: 2px solid #69edba; outline-offset: 2px; }
+  html.mirror .langs { display: none !important; }
   html.app-shell .shell { grid-template-rows: 64px minmax(0, 1fr) auto auto; }
   html.app-shell .quick:not([hidden]) {
     display: block;
@@ -940,8 +1014,7 @@
     border-color: rgba(105,237,186,.55);
     background: rgba(105,237,186,.14);
   }
-  html.app-shell .quick-grid button:focus-visible,
-  html.app-shell .langs button:focus-visible { outline: 2px solid #69edba; outline-offset: 2px; }
+  html.app-shell .quick-grid button:focus-visible { outline: 2px solid #69edba; outline-offset: 2px; }
   /* Her question's choices while a picture is up (a follow-up asked over an
      answer's card): pinned to the bottom beside Emma's corner, where the
      centred card does not reach -- in flow they would sit under it. */
@@ -1078,6 +1151,57 @@
   html.app-shell body.emma-staging .reply::before { content: none; }
   html.app-shell body.emma-staging .reply .reply-text { color: #eef7f4; font-weight: 500; }
 
+  /* Her words as she says them (owner 27 Oct, "motion ตัวหนังสือ"; the
+     script is `captions`, beside paintReply): a window of 3 lines in the
+     bubble, 2 in the band over a card or a story, in type read from about a
+     metre, that slides up one line when it is full -- never a growing
+     paragraph. Each word fades in once; the block slides by transform; no
+     blur, nothing infinite, nothing at all between words. The paragraph the
+     line used to be stays in the DOM for a screen reader, out of sight, and
+     an answer with no word said yet shows no empty bubble. */
+  html.app-shell .reply.has-cap > .reply-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+  html.app-shell .reply.cap-wait { visibility: hidden; }
+  html.app-shell .reply-cap {
+    --cap-lines: 3;
+    position: relative;
+    overflow: hidden;
+    max-height: calc(var(--cap-lines) * 1.45em);
+    line-height: 1.45;
+    text-align: left;
+    /* the bubble's own type, scaled with Emma (trackReply) */
+    font-size: calc(clamp(1.25rem, 2.1vw, 1.5rem) * var(--reply-scale, 1));
+    color: #231c45;
+    font-weight: 600;
+  }
+  /* the band: ~28 px on the robot's 1080-wide screen (it was 16), two lines */
+  html.app-shell body.emma-staging .reply-cap {
+    --cap-lines: 2;
+    font-size: clamp(1.4rem, 2.6vw, 1.85rem);
+    color: #eef7f4;
+    font-weight: 500;
+  }
+  html.app-shell .reply-cap-track {
+    position: relative;
+    transition: transform .42s cubic-bezier(.22, .8, .3, 1);
+  }
+  /* a word is one box: a line never breaks inside it (Thai has no spaces;
+     the words are the browser's own segmenter's). Laid out unseen as its
+     text arrives, it fades in when her voice reaches it (.on). */
+  html.app-shell .reply-cap .cw {
+    display: inline-block;
+    max-width: 100%;
+    opacity: 0;
+    transition: opacity .18s ease-out;
+  }
+  html.app-shell .reply-cap .cw.on { opacity: 1; }
+
   /* the status pill: what she is doing, drawn, not only written. The marks
      change shape with the state and do not move: measured, a 10px dot
      beating in the pill cost ~3 fps of 30 on its own (the first pass also
@@ -1127,12 +1251,6 @@
     border-color: rgba(var(--fx-teal), .75);
     background: linear-gradient(160deg, rgba(var(--fx-teal), .26), rgba(var(--fx-violet), .12));
   }
-  html.app-shell .langs:not([hidden]) { background: rgba(18, 14, 48, .86); }
-  html.app-shell .langs button[aria-pressed="true"] {
-    background: linear-gradient(90deg, rgba(var(--fx-pink), .35), rgba(var(--fx-violet), .35));
-    color: #fff;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35);
-  }
   html.app-shell .controls .control.mic .control-icon {
     background: radial-gradient(circle at 36% 25%, #ffe4f4 0%, #ff8fd0 40%, #a78bfa 100%);
     box-shadow: 0 18px 40px rgba(var(--fx-pink), .36), 0 0 0 12px rgba(var(--fx-violet), .10);
@@ -1164,6 +1282,9 @@
 
   @media (prefers-reduced-motion: reduce) {
     html.app-shell .reply.fx-pop { animation: none !important; }
+    /* still a window of lines, still in step with her voice: no fade, no slide */
+    html.app-shell .reply-cap .cw,
+    html.app-shell .reply-cap-track { transition: none; }
   }
 
   html.app-shell .controls {
@@ -1986,6 +2107,113 @@
   .emma-auto-sub:empty { display: none; }
   .emma-auto-btn { min-height: 88px; font-size: clamp(1.6rem, 4.8vw, 2.2rem); }
   .emma-auto-btn[hidden] { display: none; }
+
+  /* ---- the room screen (/mirror, app/face_mirror.py; owner 28 Oct: "ให้จอ
+     ห้องนั้นโชว์ตัวหน้าเหมือนในจอหุ่น ... ปรับ uxui ให้เหมาะกับจอใหญ่") ----
+     A big landscape screen read from across the room: the real one is a
+     48" DCI 4K TV (4096 x 2160, ~1.9:1), seen from 3-6 m. Everything here
+     is in vw/vh, so a 2x or 3x Windows scale is the same picture.
+     The owner on that TV, three times:
+       1. 28 Oct: "จอใหญ่ motion ภาพเล็กไป ... ให้เอาไว้ขอบขวา ส่วนข้อความก็ให้
+          เป็นบทพูดข้างหุ่น" -> Emma to the right edge, her words a bubble.
+       2. 28 Oct night: "ยังไม่ใหญ่พอ แล้วตัวหุ่นก็ใหญ่อยู่ทำให้เล็กว่านี้ ...
+          ทำให้พวกภาพต่างๆเด่นกว่าตัวหุ่นให้คนเห็น" -> the portrait story's
+          own rows fitted to the height, Emma half the size.
+       3. 29 Oct: "ทำเรื่องเล่าแบบแนวนอน" and "ตอนไม่มีภาพ ก็ให้ตัวหุ่นอยู่
+          กลางจอ" -> now:
+     - A story (and an answer picture) is laid out ACROSS the TV: the frame
+       (story-stage.html) is a landscape stage the size of the screen left of
+       Emma's column, and the engine lays the same story out on it
+       (emma-story.js play(..., {layout: 'land'})) -- the picture large on one
+       side, its words and figures beside it. A template with no landscape
+       layout shows the robot's own portrait screen in the same place.
+       fitMirrorStage scales the frame to that area; nothing here clips it.
+     - No picture up (idle, or Emma talking without one): Emma in the middle
+       of the screen, her words in a bubble under her. A picture comes up:
+       she moves to the bottom-right corner, small, her words a bubble above
+       her -- one transform on her (the 3D canvas keeps its size, so nothing
+       re-renders), back when the picture goes. The bubble's two places are
+       two layouts, switched at once.
+     - The frame has no box: story-stage.html is transparent, so the story
+       draws over this page's sky as it does over the face's on the robot.
+     Nothing to press -- no mic, no topics, no hold menu: the room screen
+     only watches. */
+  .mirror-stage { display: none; }
+  html.mirror { --mirror-emma: 10.5vw; --mirror-side: 19vw; }
+  html.mirror .controls, html.mirror .quick, html.mirror .langs, html.mirror .brand,
+  html.mirror .emma-actions, html.mirror .emma-hold-ring, html.mirror .vp-stage-close { display: none !important; }
+  html.mirror .mascot-wrap { pointer-events: none; }
+  html.mirror .shell { display: block; min-height: 100vh; padding: 0; }
+  /* the status pill at the top of Emma's column: the pictures take the rest */
+  html.mirror .topbar { position: fixed; z-index: 6; top: 3vh; left: auto; right: 1.5vw; display: flex; justify-content: flex-end; }
+  html.mirror .topbar .status { font-size: clamp(14px, .95vw, 36px); padding: .45em 1.15em; }
+  html.mirror .hero { position: fixed; inset: 0; display: block; padding: 0; }
+  /* Emma in the middle (22vw, the box keeps her own 720:860 shape) ... */
+  html.mirror .mascot-wrap {
+    position: fixed; left: 39vw; top: 9vh; right: auto; bottom: auto;
+    width: 22vw; height: auto; max-width: none; margin: 0;
+    transform: none; transform-origin: 0 0;
+    transition: transform .7s cubic-bezier(.22, .8, .3, 1);
+  }
+  /* ... and in the bottom-right corner while a picture is up: 10.5vw wide
+     (22 x .4773), 2vw from the right edge, standing on the bottom --
+     translate = corner - middle: x 87.5vw - 39vw, y (100vh - 10.5vw x
+     860/720) - 9vh */
+  html.mirror body.mirror-story .mascot-wrap {
+    transform: translate(48.5vw, calc(91vh - 12.542vw)) scale(.4773);
+  }
+  /* Her words: under her in the middle (the tail up at her), above her in
+     the corner (the tail down at her head) -- a fixed width in each place,
+     so nothing moves sideways as her words come in; dark like the TV around
+     it (a white card was the brightest thing on the screen, brighter than
+     the pictures). ~17-19 mm type on the 48" TV: read from ~5 m. */
+  html.mirror .reply {
+    position: fixed; right: auto; bottom: auto; left: 31vw; top: calc(9vh + 22.6vw);
+    width: 38vw; max-width: none; margin: 0;
+    /* the bubble's own size is its words' size: the padding and corners
+       below are in em, so a 4K screen gets the same bubble, not a tight one */
+    font-size: clamp(16px, 1.75vw, 76px); padding: .65em .95em .75em; border-radius: .75em;
+    background: rgba(17, 18, 52, .9); border: 1px solid rgba(var(--fx-violet), .5); box-shadow: none;
+  }
+  html.mirror body.mirror-story .reply {
+    left: auto; top: auto; right: 1.2vw; bottom: calc(var(--mirror-emma) * 1.16);
+    width: calc(var(--mirror-side) - 2.4vw); font-size: clamp(16px, 1.6vw, 70px);
+  }
+  html.mirror .reply .reply-text { font-size: 1em; line-height: 1.45; color: #f1efff; font-weight: 500; }
+  html.mirror .reply-cap { --cap-lines: 4; font-size: 1em; color: #f1efff; font-weight: 500; }
+  /* the tail: up at her from the middle, down at her head in the corner
+     (she stands 2vw + half her width from the edge) */
+  html.mirror .reply::after {
+    left: calc(50% - .55vw); right: auto; top: -.55vw; bottom: auto; margin: 0;
+    width: 1.1vw; height: 1.1vw; transform: rotate(45deg); border-radius: 3px 0 0 0;
+    background: rgb(17, 18, 52); border-left: 1px solid rgba(var(--fx-violet), .5); border-top: 1px solid rgba(var(--fx-violet), .5);
+  }
+  html.mirror body.mirror-story .reply::after {
+    left: auto; right: calc(2vw + var(--mirror-emma) / 2 - 1.2vw - .5vw); top: auto; bottom: -.5vw;
+    width: 1vw; height: 1vw; transform: rotate(225deg);
+  }
+  html.mirror .reply::before {
+    font-size: clamp(11px, .72vw, 30px); top: -1.15em; left: 1.2em; padding: .25em 1em .3em; box-shadow: none;
+  }
+  /* The story: a box with no size and no clip; fitMirrorStage sizes the
+     frame (landscape or the robot's portrait screen) and places and scales
+     it inside the screen left of Emma's column (one transform). */
+  html.mirror .mirror-stage {
+    display: block; position: fixed; z-index: 4; left: 0; top: 0; width: 0; height: 0;
+    overflow: visible; background: transparent;
+    opacity: 0; visibility: hidden; transition: opacity .35s ease;
+  }
+  html.mirror body.mirror-story .mirror-stage { opacity: 1; visibility: visible; }
+  html.mirror .mirror-frame {
+    position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; border: 0; transform-origin: 0 0;
+    background: transparent; color-scheme: dark;
+  }
+  /* the browser held her voice back until a gesture (no kiosk autoplay flag) */
+  html.mirror-tap .hero::after {
+    content: "แตะหน้าจอหนึ่งครั้งเพื่อเริ่ม · Tap once to start";
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+    background: rgba(3,7,12,.82); color: #f7f7f4; font-size: clamp(22px, 2.4vw, 80px); font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -1998,7 +2226,23 @@
       <div class="status" data-emma-status role="status" aria-live="polite">
         Listening...
       </div>
-      <div class="langs" data-emma-langs role="group" aria-label="ภาษา / Language" hidden></div>
+      <!-- The language menu (owner 29 Oct: "ปุ่ม dropdown ... ไทย อังกฤษ จีน
+           จะเพิ่มรัสเซีย"): a pick sends lang_<id>; the server pins the call's
+           language and answers lang_pinned, which is what the button shows. -->
+      <div class="langs" data-emma-langs hidden>
+        <button class="lang-toggle" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="ภาษา / Language">
+          <svg class="lang-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.2"/><path d="M2.8 12h18.4"/><path d="M12 2.8c2.6 2.6 3.9 5.6 3.9 9.2s-1.3 6.6-3.9 9.2c-2.6-2.6-3.9-5.6-3.9-9.2s1.3-6.6 3.9-9.2z"/></svg>
+          <span class="lang-current">Language</span>
+          <svg class="lang-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="lang-menu" role="listbox" aria-label="ภาษา / Language">
+          <button class="lang-option" type="button" role="option" data-lang="th" aria-selected="false"><span class="lang-name" lang="th">ไทย</span><span class="lang-sub">Thai</span><svg class="lang-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+          <button class="lang-option" type="button" role="option" data-lang="en" aria-selected="false"><span class="lang-name" lang="en">English</span><span class="lang-sub"></span><svg class="lang-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+          <button class="lang-option" type="button" role="option" data-lang="zh" aria-selected="false"><span class="lang-name" lang="zh">中文</span><span class="lang-sub">Chinese</span><svg class="lang-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+          <button class="lang-option" type="button" role="option" data-lang="ru" aria-selected="false"><span class="lang-name" lang="ru">Русский</span><span class="lang-sub">Russian</span><svg class="lang-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+          <p class="lang-note">Emma replies only in the language you choose</p>
+        </div>
+      </div>
     </header>
 
     <section class="hero" aria-label="Emma voice assistant">
@@ -2613,7 +2857,7 @@
   <script src="/assets/echo-barge-gate.js?v=20260930-b"></script>
   <!-- The robot face's motion stories (present_story, app/stories.py):
        drawn with her voice, beat by beat; see docs/emma-story-engine.md -->
-  <script src="/assets/emma-story.js?v=20261026-a"></script>
+  <script src="/assets/emma-story.js?v=20261029-a"></script>
   <script>
   (function () {
     var Emma = window.EmmaVoicePreview;
@@ -2624,6 +2868,17 @@
     // behaviour: don't hijack it with a live call.
     var designOnly = q.get('demo') === '1';
     var appShell = q.get('app') === '1';
+    // The room screen's copy of the robot face (owner 28 Oct, app/face_mirror.py):
+    // served only on the mirror listener at /mirror. It watches the robot's
+    // call on /ws/mirror and never dials /ws (the newest socket there takes
+    // the robot over), never opens a mic, and sends nothing: its socket's send
+    // is a no-op (startMirror), so every upstream frame below -- played,
+    // story_report, a tap, a plan ACK -- goes nowhere by construction.
+    var mirror = location.pathname === '/mirror';
+    if (mirror) appShell = true;
+    // ?sound=1: the room screen plays her voice too (default muted -- the
+    // robot speaks; the muted playback still keeps the pictures in her time)
+    var mirrorSound = mirror && q.get('sound') === '1';
     // Every load of the robot face opens in the sales mode (owner, 12 Oct:
     // "ให้เปิดโหมด emma ขายขึ้นมาอันแรกทุกครั้ง"). cycleMode writes the tapped
     // mode into the URL, and EmmaFace reloads that URL on resume and after a
@@ -2635,6 +2890,12 @@
       q.delete('lang');
       try { history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } catch (e) {}
     }
+    // The "Emma Event" robot app (owner 30 Oct, app/event_host.py) adds event=1:
+    // every call it dials is the event host. Into `q` only -- startCall dials
+    // from q -- so the URL the app reloads is still the app's own, and the
+    // chest tap cannot leave it (cycleMode).
+    var eventApp = appShell && !mirror && q.get('event') === '1';
+    if (eventApp) q.set('profile', 'event');
 
     // Owner, 12 Oct, on the robot: "แก้เป็นภาษาอังกฤษ ทั้งหมด" -- the face's
     // own words (status pill, the mic and the two buttons, the transcript
@@ -2683,6 +2944,7 @@
         lastStatusKey = statusNode.textContent;
         statusNode.textContent = chromeText(lastStatusKey, appStatus, appStatusZh);
       }
+      if (statusNode && offlineCall) statusNode.textContent = offlineMark(statusNode.textContent);
       paintReply();
     }
     var appStatus = {
@@ -2701,7 +2963,10 @@
       'Thank you': 'ขอบคุณค่ะ',
       'Muted': 'ปิดไมโครโฟนแล้ว',
       'Connection error': 'เชื่อมต่อ Emma ไม่สำเร็จ',
-      'Disconnected — tap the mic to try again': 'การเชื่อมต่อสิ้นสุด · แตะไมค์เพื่อลองใหม่'
+      'Disconnected — tap the mic to try again': 'การเชื่อมต่อสิ้นสุด · แตะไมค์เพื่อลองใหม่',
+      "No internet — Emma can't talk right now": 'ไม่มีอินเทอร์เน็ต · ตอนนี้ Emma ยังคุยไม่ได้',
+      "Emma can't connect right now": 'ตอนนี้ Emma ยังเชื่อมต่อไม่ได้',
+      'Offline mode': 'โหมดออฟไลน์'
     };
     // The language buttons (tap-to-ask, below) also switch the chrome: the
     // engine speaks English keys; Thai is the app's default, English is the
@@ -2712,7 +2977,10 @@
       'Explaining — ask anytime': 'Emma 正在讲解 · 随时可以提问',
       'Muted': '麦克风已关闭', 'Ready': '准备好了', 'Loading...': '正在准备…',
       'Connection error': '连接失败', 'Something went wrong': '抱歉，出了点问题',
-      'Disconnected — tap the mic to try again': '连接已断开 · 点击麦克风重试'
+      'Disconnected — tap the mic to try again': '连接已断开 · 点击麦克风重试',
+      "No internet — Emma can't talk right now": '没有网络 · Emma 暂时无法对话',
+      "Emma can't connect right now": 'Emma 暂时无法连接',
+      'Offline mode': '离线模式'
     };
     var lastStatusKey = '';
     function chromeText(key, thai, zh) {
@@ -2734,7 +3002,18 @@
     function status(text) {
       text = storyStatus(text);
       lastStatusKey = text;
-      if (statusNode) statusNode.textContent = chromeText(text, appStatus, appStatusZh);
+      if (statusNode) statusNode.textContent = offlineMark(chromeText(text, appStatus, appStatusZh));
+    }
+    // OFFLINE_FALLBACK (26 Oct): a call on the offline backup -- approved
+    // lines and stories with their pictures, no Gemini -- says so after the
+    // state in the same pill: "Listening... · Offline mode". Words only: no
+    // new element, nothing that moves (the face's performance rules). Set by
+    // `ready.offline`, cleared with the call; an online call never sees it.
+    var offlineCall = false;
+    function offlineMark(text) {
+      if (!offlineCall || !text) return text;
+      var tag = chromeText('Offline mode', appStatus, appStatusZh);
+      return text.indexOf(tag) >= 0 ? text : text + ' · ' + tag;
     }
     // The reply line shows for every answer Emma gives (owner, 2026-09-24
     // "ให้ขึ้นทุกครั้งที่ emma ตอบ") — but still never the resting greeting
@@ -2752,10 +3031,152 @@
     function paintReply() {
       var visible = !!(inCall && curBot);
       if (replyNode) replyNode.textContent = visible ? curBot : '';
-      if (replySection) replySection.style.display = visible ? '' : 'none';
-      if (visible) { if (!replyRaf) replyRaf = requestAnimationFrame(trackReply); }
+      // The robot face draws the same line as motion captions (below), and
+      // keeps her last answer's words up while a new answer takes over
+      // (curBot already empty, her old voice still playing) -- in a call.
+      var up = (captions ? captions.paint(visible ? curBot : '') : false) && inCall;
+      if (replySection) replySection.style.display = visible || up ? '' : 'none';
+      if (visible || up) { if (!replyRaf) replyRaf = requestAnimationFrame(trackReply); }
       else stopReplyTracking();
     }
+
+    // ---- her words as she says them: motion captions (robot face only) ----
+    // Owner, 27 Oct: "อันนี้มันยาวเกินไม่สวย อยากให้ทำเป็น motion ตัวหนังสือ".
+    // The line was the whole turn's text, painted the moment it arrived --
+    // seconds AHEAD of her voice (Gemini's text runs several times faster
+    // than she speaks) -- as a growing paragraph: 5-7 lines of 16 px over the
+    // story in the band. A guest the same day: "พูดใหม่ซิ ... ฟังไม่ทัน". The
+    // owner kept her voice's pace; the caption follows it now. A word goes up
+    // when the audio that carries it has played (the story engine's clock,
+    // EmmaStory.caption -- one clock for the pictures and the words), fades
+    // in, and the line is a window of 3 lines beside her / 2 in the band that
+    // slides up one line when full: his 14 Sep "ขึ้นทีละบรรทัดแล้วเลื่อน",
+    // never built until now. curBot, the gate above and the drawer are
+    // untouched -- this is only how the line is drawn -- and replyNode keeps
+    // the whole line, out of sight, for a screen reader. Opacity and
+    // transform only; a look ~10 times a second only while words wait for
+    // her voice, nothing at all otherwise (the face's frame budget). No
+    // audio clock = the words as they come; her voice played out = all.
+    var captions = (function () {
+      var engine = window.EmmaStory;
+      if (!appShell || !replySection || !engine || typeof engine.caption !== 'function') return null;
+      var box = document.createElement('div');
+      box.className = 'reply-cap';
+      box.setAttribute('aria-hidden', 'true');
+      replySection.appendChild(box);
+      replySection.classList.add('has-cap');
+      var track = null, core = null, drawnFor = null, placed = [], shown = 0, shift = 0, height = -1, timer = 0;
+      // a re-wrap (the bubble scaled with Emma, a card opened: the band's
+      // bigger type) moves lines without a new word
+      var resized = window.ResizeObserver ? new ResizeObserver(function () { fit(); }) : null;
+      if (resized) resized.observe(box);
+      // A new track for every answer: the old one's slide must not carry
+      // over (its words would slide in from above).
+      function fresh() {
+        var t = document.createElement('div');
+        t.className = 'reply-cap-track';
+        if (track) { if (resized) resized.unobserve(track); box.replaceChild(t, track); } else box.appendChild(t);
+        if (resized) resized.observe(t);
+        track = t; placed = []; shown = 0; shift = 0; height = 0;
+        box.style.height = '0px';
+        replySection.classList.add('cap-wait');     // no word yet: no empty box
+      }
+      fresh();
+      // The window: the line her newest word is on is the bottom line, and
+      // the window is as tall as the lines said so far, up to the CSS's own
+      // count (max-height = lines x line height, read back here so the two
+      // never disagree). Every word received is already laid out, unseen
+      // (below), so lines break where they will stay and the bubble has its
+      // width before the first word shows: nothing moves sideways.
+      function fit() {
+        if (!shown) return;
+        var last = placed[shown - 1];
+        var cs = getComputedStyle(box);
+        var pitch = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.45;
+        var rows = Math.round(parseFloat(cs.maxHeight) / pitch);
+        if (!(pitch > 0) || !(rows > 0)) return;
+        var lines = Math.round(last.offsetTop / pitch) + 1;
+        var h = Math.round(Math.min(lines, rows) * pitch);
+        var want = Math.round(Math.max(0, lines - rows) * pitch);
+        if (h !== height) { height = h; box.style.height = h + 'px'; }
+        if (want !== shift) { shift = want; track.style.transform = want ? 'translate3d(0,' + (-want) + 'px,0)' : ''; }
+      }
+      // The words of `c` (the answer on the line) that are due now: laid out
+      // as they come, shown as her voice reaches them.
+      function draw(c, now, wall) {
+        var n = c.due(now, wall);
+        for (var k = placed.length; k < c.words.length; k++) {
+          var word = c.words[k];
+          if (word.sep && placed.length) track.appendChild(document.createTextNode(' '));
+          var w = document.createElement('span');
+          w.className = 'cw';
+          w.textContent = word.t;
+          placed.push(track.appendChild(w));
+        }
+        if (n > shown) {
+          for (var j = shown; j < n; j++) placed[j].classList.add('on');
+          shown = n;
+          replySection.classList.remove('cap-wait');
+          fit();
+        }
+      }
+      // A new answer that began while the last one's words are up -- her
+      // last answer's voice still playing (gemini-3.8 completes a turn
+      // before its tool call and speaks again after it): the old words keep
+      // following her old voice, and the new answer takes the line at its
+      // own first word. beginAssistantTurn empties curBot at once, and the
+      // line used to vanish there with seconds of her old voice still to
+      // come (review 27 Oct). Only a clear (the guest spoke or tapped, the
+      // call ended) takes it down at once.
+      function handingOver() { return !!(core && drawnFor && drawnFor !== core); }
+      function sync() {
+        clearTimeout(timer); timer = 0;
+        if (!core) return;
+        var now = heardClock(), wall = performance.now();
+        if (handingOver()) {
+          if (!(core.due(now, wall) > 0)) {
+            draw(drawnFor, now, wall);
+            // A new answer that is complete with no words at all (her audio
+            // and no transcript) never takes the line: the old words stay,
+            // and this look re-armed 10 times a second for good (audit 27
+            // Oct). Its next text or turn starts a sync again (paint/complete).
+            if (core.clock.complete && !core.pending() && !drawnFor.pending()) return;
+            timer = setTimeout(sync, 100);
+            return;
+          }
+          fresh();
+        }
+        drawnFor = core;
+        draw(core, now, wall);
+        if (core.pending()) timer = setTimeout(sync, 100);
+      }
+      function clear() {
+        clearTimeout(timer); timer = 0;
+        if (placed.length || !replySection.classList.contains('cap-wait')) fresh();
+        drawnFor = null;
+      }
+      return {
+        // her answer's first audio or text (beginAssistantTurn): a new clock
+        begin: function () { core = engine.caption(); },
+        audio: function (at, dur) { if (core) core.audio(at, dur, performance.now()); },
+        text: function (piece) { if (core) core.text(piece, performance.now()); },
+        complete: function () { if (core) { core.complete(); sync(); } },
+        // the guest spoke or tapped over her, the call ended: down at once
+        clear: function () { core = null; clear(); },
+        // From paintReply: '' takes the line down -- unless a new answer is
+        // taking it over (above) -- and text keeps it in step. True while
+        // the line stays up for her last answer with curBot already empty.
+        // paintReply runs on every audio chunk (show()), 40 a second while
+        // her answer streams in: with a look already due within 100 ms, the
+        // chunk waits for it (measured, CPU x12: the band 45 -> 50 fps).
+        paint: function (text) {
+          if (!text && !handingOver()) { clear(); return false; }
+          if (!drawnFor) fresh();
+          if (!timer) sync();
+          return handingOver();
+        }
+      };
+    })();
 
     // ---- the bubble follows Emma (owner, 2026-09-24) ----
     // She is draggable and resizable, and `.mascot-wrap` carries both in one
@@ -2782,6 +3203,8 @@
     }
     function trackReply() {
       replyRaf = 0;
+      // the room screen lays the bubble out itself (html.mirror): no pin
+      if (mirror) { clearPin(); return; }
       if (!replySection || replySection.style.display === 'none') { clearPin(); return; }
       // While a card is on the stage the reply is a caption band across the
       // top by design, and Emma has stepped into the corner. Leave it alone,
@@ -2917,6 +3340,7 @@
       try { window.EmmaMascot && window.EmmaMascot.setAccent(accent, mode && mode.aura); } catch (e) {}
     }
     function cycleMode() {
+      if (eventApp) return;          // the event app is one mode: the event host
       var next = MODES[(modeIndex() + 1) % MODES.length];
       modeId = next.id;
       var u = new URLSearchParams(location.search);
@@ -3061,6 +3485,64 @@
     registerProcessor('cap', Cap);
     `;
 
+    // ---- ARRAY_MIC (docs/emma-array-mic-2026-11-02.md): the robot app holds
+    //      the mic array alone ----
+    // Owner 2 Nov 2026: "ต้องแก้แอปให้ถือไมค์เองและทำเส้นเสียงใหม่". The array
+    // gives Android ONE capture stream (measured 10 Oct: app first = this
+    // page's mic reads exact zeros, Emma deaf), so when the server says
+    // `ready.array_mic: true` this page opens NO microphone: a silent source
+    // runs through this worklet instead, and its frames -- exact zeros, on
+    // the same 20 ms clock, through the same handleMicAudio (half-duplex, the
+    // 350 ms echo guard, mute) -- tell the server WHEN; the server puts the
+    // array's audio in each one. `false` = the server wants the array but it
+    // cannot be this call's ears: the app is asked to let go, and the page's
+    // mic opens only once the app's capture has ENDED. Absent = today's path.
+    // Only an APK that says EmmaArrayMic/1 (and EmmaBridge/1: it answers the
+    // emma-face:mic prompts) -- the EmmaBridge/1 lesson: a page must never
+    // wait on an app for something an older APK cannot do.
+    var SILENT_WORKLET_SRC = `
+    class CapSilent extends AudioWorkletProcessor {
+      constructor(o) {
+        super();
+        const p = (o && o.processorOptions) || {};
+        const target = p.targetRate || 16000;
+        this.ratio = sampleRate / target;
+        this.chunk = Math.round(target * 0.02);
+        this.acc = 0;
+      }
+      process(inputs) {
+        // Time, not input: a render quantum is 128 frames whether or not
+        // the input carries channels (a silent input may arrive with none).
+        const n = (inputs[0] && inputs[0][0] && inputs[0][0].length) || 128;
+        this.acc += n / this.ratio;
+        while (this.acc >= this.chunk) {
+          this.acc -= this.chunk;
+          const a = new Int16Array(this.chunk);
+          this.port.postMessage(a.buffer, [a.buffer]);
+        }
+        return true;
+      }
+    }
+    registerProcessor('cap-silent', CapSilent);
+    `;
+    var UA_ARRAY = navigator.userAgent || '';
+    var ARRAY_MIC_APP = appShell && !mirror && /EmmaRobot\//.test(UA_ARRAY)
+      && /EmmaBridge\/1\b/.test(UA_ARRAY) && /EmmaArrayMic\/1\b/.test(UA_ARRAY);
+    // The app's capture must END before this page opens its mic; the app's
+    // AudioRecord closes within a read (64 ms) -- 3 s covers a capture still
+    // starting. Past it the page opens anyway and says so (mic_state).
+    var ARRAY_RELEASE_WAIT_MS = 3000;
+    // The silent clock must tick: no frame from it this long after it started
+    // = this WebView does not run the worklet on a silent input, and nothing
+    // would ever reach the server -- not even the zeros its deaf check counts.
+    // The page takes its own mic then (the one deafness the server cannot see).
+    var ARRAY_CLOCK_CHECK_MS = 2000;
+    // ready.array_mic of the call being set up: true, 'call' / 'run' (false,
+    // with its scope), or null; whether this call is on the silent source
+    // now; and whether this call holds the app off the array (freed by
+    // releaseCallHardware, after the call's mic tracks are stopped).
+    var arrayMicOffer = null, arrayMicSilent = false, arrayMicHeld = false;
+
     // ---- far-field mic chain (verbatim from index.html) ----
     function buildMicChain(ctx, source, boost) {
       if (boost === 1) return source;
@@ -3088,6 +3570,12 @@
       // Keep the ordinary /preview page at unity gain.
       playbackGainNode = ctx.createGain();
       playbackBaseGain = appShell ? 1.75 : 1;
+      // the room screen plays her muted (?sound=1: aloud): the robot speaks.
+      // Not 0: a stream of exact zeros is one Chrome stops rendering, and the
+      // context's clock -- the one her pictures and words wait on -- stalled
+      // with it (live 28 Oct: 16 s of her voice queued behind the robot's).
+      // -80 dB keeps the stream running and is not heard.
+      if (mirror) playbackBaseGain = mirrorSound ? 1 : 0.0001;
       playbackGainNode.gain.value = playbackBaseGain;
       if (appShell) {
         playbackLimiterNode = ctx.createDynamicsCompressor();
@@ -3134,6 +3622,7 @@
       src.start(at);
       playHead = at + buf.duration;
       storyHook('audio', at, buf.duration);
+      captionHook('audio', at, buf.duration);
       var playbackContext = audioCtx;
       sources.push(src);
       playing = true;
@@ -3153,13 +3642,17 @@
           // Her sentence is finished: whatever was said over it goes up NOW,
           // as the next turn, so the person never has to repeat themselves.
           flushHeldSpeech();
-          if (inCall) playListenCue();
+          // Muted, her mic is closed: no "speak now" chime and the pill stays
+          // "Muted" -- it read "Listening..." over a muted mic when her voice
+          // ended (audit 27 Oct). toggleMute and the tap fallback already
+          // rest on "Muted"; show() alone writes the state's own word.
+          if (inCall && !muted) playListenCue();
           try { Emma.clearMouthLevel(); } catch (e) {}
           // curBot survives the end of playback on purpose: her last answer
           // stays readable until the guest speaks again (speech_started and
           // interrupted still wipe it). Clearing here is what made the bubble
           // unreachable for replies whose transcript arrives after the audio.
-          if (inCall) show('listening'); else paintReply();
+          if (inCall) { show('listening'); if (muted) status('Muted'); } else paintReply();
         }
       };
     }
@@ -3172,7 +3665,7 @@
     // ?cue=0 turns it off without a new APK.
     var cueOff = new URLSearchParams(location.search).get('cue') === '0';
     function playListenCue() {
-      if (cueOff || !audioCtx) return;
+      if (cueOff || !audioCtx || mirror) return;
       try {
         var t = audioCtx.currentTime;
         [660, 880].forEach(function (freq, i) {
@@ -3224,6 +3717,15 @@
       audioCtx && audioCtx.close().catch(function () {});
       playbackGainNode = playbackLimiterNode = playbackOutputContext = null;
       audioCtx = micStream = micSource = worklet = null;
+      arrayMicSilent = false;
+      // ARRAY_MIC: a call that took its mic held the app off the array for
+      // the call only (lead's review, 2 Nov: it used to be for the whole app
+      // run). Freed HERE, after the tracks above are stopped -- the app also
+      // waits for this WebView's recording to end before it reopens.
+      if (arrayMicHeld) {
+        arrayMicHeld = false;
+        if (window.EmmaRobotBridge && window.EmmaRobotBridge.arrayMic) window.EmmaRobotBridge.arrayMic.free();
+      }
     }
 
     function stopFailedCall() {
@@ -3236,7 +3738,7 @@
       // ws = null makes the socket's own onclose return early, so its cleanup
       // happens here, as endCall does it (review 12 Oct: after a mic failure
       // the bridge kept its call sender and caps timer, the topics stayed up).
-      choiceSet = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
+      choiceSet = null; pickedLang = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
       clearTranscript();
       planDisplay.reset();
       attendFromServer(null);
@@ -3371,7 +3873,117 @@
       holdQueue = []; holdBytes = 0; holdPre = []; holdVoicedUntil = 0;
     }
 
+    // The page's own call mic: one constraint object for the call's start
+    // and for taking the mic back from the array (two copies drift).
+    function pageMicConstraints() {
+      return {
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: callAGC() },
+      };
+    }
+
+    // ARRAY_MIC: what the call's mic is doing, into the server's turn log
+    // (mic_state). Fixed words only.
+    function reportArrayMic(why, state) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      try {
+        ws.send(JSON.stringify({ type: 'mic_state', why: 'array_' + why, state: state,
+                                 label: 'array', muted: false, handed: false }));
+      } catch (e) { /* closing */ }
+    }
+
+    // The app lets go of the array -- for this call ('call': the bridge's
+    // emma-face:mic:hold, or :hold:deaf mid-call, which the app counts per
+    // run) or for the rest of its run ('run': emma-face:mic:release; the
+    // server tells the app too). Resolves once the app's capture has ENDED --
+    // two captures of this array and this page reads zeros -- or after
+    // ARRAY_RELEASE_WAIT_MS. A call hold is marked BEFORE the ask, so a call
+    // torn down while it waits still frees the app (releaseCallHardware).
+    function takeArrayMic(why, scope) {
+      var bridge = window.EmmaRobotBridge;
+      var arr = bridge && bridge.arrayMic;
+      if (!arr) { reportArrayMic(why, 'no_bridge'); return Promise.resolve(false); }
+      var started = performance.now();
+      if (scope !== 'run') arrayMicHeld = true;
+      var first = scope === 'run' ? arr.release() : arr.hold(why === 'start' ? 'start' : 'deaf');
+      return new Promise(function (resolve) {
+        (function poll(state) {
+          if (state && state.capturing === false) {
+            reportArrayMic(why, scope === 'run' || state.released ? 'released' : 'held');
+            resolve(true);
+            return;
+          }
+          if (performance.now() - started >= ARRAY_RELEASE_WAIT_MS) { reportArrayMic(why, 'timeout'); resolve(false); return; }
+          setTimeout(function () { poll(arr.state()); }, 100);
+        })(first);
+      });
+    }
+
+    // The call on the array alone: the silent source on the page's clock.
+    async function startArrayMic(callCtx) {
+      var url = URL.createObjectURL(new Blob([WORKLET_SRC + SILENT_WORKLET_SRC], { type: 'application/javascript' }));
+      try { await callCtx.audioWorklet.addModule(url); }
+      finally { URL.revokeObjectURL(url); }
+      if (audioCtx !== callCtx) return;
+      var silent = callCtx.createConstantSource();
+      silent.offset.value = 0;
+      silent.start();
+      micSource = silent;                 // releaseCallHardware disconnects it
+      worklet = new AudioWorkletNode(callCtx, 'cap-silent', { processorOptions: { targetRate: inputRate } });
+      var ticks = 0;
+      worklet.port.onmessage = function (e) { ticks++; handleMicAudio(e.data); };
+      silent.connect(worklet);            // never to destination, like the mic
+      arrayMicSilent = true;
+      setTimeout(function () {
+        if (audioCtx === callCtx && arrayMicSilent && !ticks) arrayMicLost('no_clock');
+      }, ARRAY_CLOCK_CHECK_MS);
+      reportArrayMic('start', 'array');
+      setMicLabel('Listening');
+      show(playing ? 'speaking' : 'listening');
+      status(playing ? 'Speaking...' : 'Listening...');
+    }
+
+    // The server's `array_mic_lost` (the array went quiet for ARRAY_MIC_DEAF_S),
+    // or the silent clock never ticked: the app holds the array for THIS call
+    // (a deaf hold -- the app's 3rd in one run is for the run), then this
+    // page's own mic replaces the silent source in the same call -- the same
+    // chain and worklet startMic builds ('cap' is in the module startArrayMic
+    // added). Never both capturing: the mic opens only after takeArrayMic resolved.
+    async function arrayMicLost(why) {
+      if (!arrayMicSilent || !audioCtx) return;
+      var ctx = audioCtx;
+      why = why === 'no_clock' ? 'no_clock' : 'lost';
+      arrayMicSilent = false;
+      await takeArrayMic(why, 'call');
+      if (audioCtx !== ctx) return;
+      var stream = null;
+      try { stream = await navigator.mediaDevices.getUserMedia(pageMicConstraints()); }
+      catch (e) { stream = null; }
+      if (audioCtx !== ctx) { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+      if (!stream) {
+        reportArrayMic(why, 'mic_failed');
+        stopFailedCall();
+        show('error');
+        setMicLabel('Mic unavailable');
+        status(thaiUi() ? 'เปิดไมโครโฟนไม่ได้ · แตะไมค์เพื่อลองใหม่' : 'Mic unavailable · tap the mic to try again');
+        return;
+      }
+      try { worklet && (worklet.port.onmessage = null, worklet.disconnect()); } catch (e) {}
+      try { micSource && micSource.disconnect(); } catch (e) {}
+      micStream = stream;
+      micSource = ctx.createMediaStreamSource(stream);
+      var shaped = buildMicChain(ctx, micSource, micCallBoost);
+      worklet = new AudioWorkletNode(ctx, 'cap', { processorOptions: { targetRate: inputRate } });
+      worklet.port.onmessage = function (e) {
+        if (e.data && e.data.level !== undefined) return;   // level meter unused here
+        handleMicAudio(e.data);
+      };
+      shaped.connect(worklet);
+      reportArrayMic(why, 'page');
+    }
+
     async function startMic() {
+      // the room screen (/mirror): her voice to play, never a microphone
+      if (mirror) { startMirrorAudio(); return; }
       audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
       var callCtx = audioCtx;
       armAudioUnlock(audioCtx);
@@ -3379,11 +3991,19 @@
       audioCtx.onstatechange = function () {
         if (audioCtx === callCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
       };
+      // ARRAY_MIC: true = no microphone on this page (the array is the call's
+      // ears); 'call' / 'run' = the app lets go first, for this call or for
+      // the rest of its run. null = today's path.
+      var arrayOffer = ARRAY_MIC_APP ? arrayMicOffer : null;
+      arrayMicOffer = null;
+      if (arrayOffer === true) { await startArrayMic(callCtx); return; }
+      if (arrayOffer === 'call' || arrayOffer === 'run') {
+        await takeArrayMic('start', arrayOffer);
+        if (audioCtx !== callCtx) return;
+      }
       var micFailure = null;
       try {
-        var openedStream = await navigator.mediaDevices.getUserMedia({
-          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: micNS, autoGainControl: callAGC() },
-        });
+        var openedStream = await navigator.mediaDevices.getUserMedia(pageMicConstraints());
         if (audioCtx !== callCtx) { openedStream.getTracks().forEach(function (t) { t.stop(); }); return; }
         micStream = openedStream;
       } catch (e) {
@@ -3432,6 +4052,7 @@
     // ---- server -> client (slimmed: no slides / stage / camera here) ----
     function onMessage(msg) {
       if (msg.data instanceof ArrayBuffer) {
+        serverSeq++;
         // The person has already interrupted locally. Do not restart Emma's
         // old queued reply while the provider is processing those mic frames.
         if (bargePendingUntil > performance.now()) return;
@@ -3447,13 +4068,16 @@
         // sound of an answer that put nothing on screen is the moment it goes
         // (a story or slide of this answer arrives before her voice and sets
         // answerStaged; a follow-up keeps the picture it follows).
-        if (answerOwed && !answerStaged && document.body.classList.contains('emma-staging')) clearStage();
+        if (answerOwed && !answerStaged && (document.body.classList.contains('emma-staging') || document.body.classList.contains('mirror-story'))) clearStage();
         sentMs += (msg.data.byteLength / 2 / outputRate) * 1000;
         playChunk(msg.data);
         return;
       }
       var evt;
       try { evt = JSON.parse(msg.data); } catch (e) { return; }
+      // lang_pinned is the server confirming a pick, not her answer to it: counted,
+      // it kept a tap's "Thinking..." fallback from ever firing (review 29 Oct)
+      if (evt.type !== 'attention' && evt.type !== 'lang_pinned' && evt.type !== 'head_look') serverSeq++;
       switch (evt.type) {
         case 'arm_greeting':
           // Only the robot's own WebView handles this fixed native request.
@@ -3461,6 +4085,11 @@
           if (evt.group === 6 && /EmmaRobot\//.test(navigator.userAgent)) {
             window.prompt('emma-arm:greet:6', '');
           }
+          break;
+        case 'head_look':
+          // The robot's real head (HEAD_FOLLOW): relayed as a fixed-shape
+          // prompt, like the attention cue it follows -- not her answer.
+          if (window.EmmaRobotBridge && window.EmmaRobotBridge.look) window.EmmaRobotBridge.look(evt);
           break;
         case 'body_command':
         case 'nav_command':
@@ -3486,7 +4115,7 @@
             status('Thinking...');
             clearTimeout(thinkingTimer);
             thinkingTimer = setTimeout(function () {
-              if (inCall && !playing) { show('listening'); status('Listening...'); }
+              if (inCall && !playing) { show('listening'); status(muted ? 'Muted' : 'Listening...'); }
             }, THINKING_FALLBACK_MS);
           }
           break;
@@ -3503,6 +4132,8 @@
           inputRate = evt.input_rate || inputRate;
           outputRate = evt.output_rate || outputRate;
           providerName = evt.provider || providerName;
+          offlineCall = !!evt.offline;
+          if (offlineCall && lastStatusKey) status(lastStatusKey);
           halfDuplex = !!evt.half_duplex;
           bargeIn = !!evt.barge_in && !!bargeGate;
           if (evt.barge_in && !bargeGate) halfDuplex = true;
@@ -3520,7 +4151,13 @@
           choiceSet = null;
           quickAsks = appShell && evt.quick_asks && typeof evt.quick_asks === 'object' ? evt.quick_asks : null;
           renderQuick();
+          arrayMicOffer = evt.array_mic === true ? true
+            : (evt.array_mic === false ? (evt.array_mic_scope === 'run' ? 'run' : 'call') : null);
           startMic();
+          break;
+        case 'array_mic_lost':
+          // ARRAY_MIC: the array went quiet -- this page takes its own mic
+          arrayMicLost();
           break;
         case 'speech_started':
           answerOwed = true;              // a new question: its answer owns the screen
@@ -3541,6 +4178,7 @@
             if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'played', heard_ms: heard }));
           }
           curBot = '';                       // a reply talked over is gone
+          captionHook('clear');
           resetAssistantTurn();
           if (inCall) { show('listening'); status('Listening...'); } else paintReply();
           // somebody is being served: the robot's walk back to the dock waits
@@ -3552,8 +4190,9 @@
           sentMs = 0;
           if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'played', heard_ms: h }));
           curBot = '';
+          captionHook('clear');
           resetAssistantTurn();
-          if (inCall) show('listening'); else paintReply();
+          if (inCall) { show('listening'); if (muted) status('Muted'); } else paintReply();   // as her voice ending
           break;
         }
         case 'user_transcript':
@@ -3589,18 +4228,29 @@
           break;
         case 'turn_complete':
           storyHook('turnComplete');
+          captionHook('complete');
           // Don't clear curBot here: the model has stopped generating but its
           // audio can still be playing for seconds, and the reply line stays
           // up until that audio ends (see playChunk onended).
           sentMs = 0;
+          // Only a turn that SAID something (audio or words: beginAssistantTurn)
+          // is the answer that owns the screen. A turn with neither -- the bare
+          // "ค่ะ" the server drops (SILENCE_BARE_ACK), gemini-3.8's empty
+          // turn_complete before its tool call -- took the story the guest was
+          // looking at down with nothing in its place (audit 27 Oct).
+          var turnSaid = assistantTurnStarted;
           resetAssistantTurn();
-          if (answerOwed && !answerStaged && document.body.classList.contains('emma-staging')) clearStage();
+          if (turnSaid && answerOwed && !answerStaged && (document.body.classList.contains('emma-staging') || document.body.classList.contains('mirror-story'))) clearStage();
           break;
         case 'choices':
           // ids and labels for the choice she just asked; an empty list
           // takes them down (app/quick_asks.py CHOICES, session._offer_choices)
           choiceSet = appShell && evt.items && evt.items.length ? evt : null;
           renderQuick();
+          break;
+        case 'lang_pinned':
+          // the language the server now holds this call to (session._quick_ask)
+          langPinned(evt.lang);
           break;
         case 'tool_result': {
           // Emma put something on screen. The visual displays go on the stage
@@ -3616,6 +4266,16 @@
           if ('slide' in evt && evt.slide && !storyOwns) showSlide(evt.slide);
           break;
         }
+        case 'mirror_hello':
+          if (!evt.in_call) mirrorIdle();
+          break;
+        case 'mirror_start':
+          inCall = true;
+          show('listening');
+          break;
+        case 'mirror_end':
+          mirrorIdle();
+          break;
         case 'idle_timeout':
         case 'farewell':
           endCall();
@@ -3625,9 +4285,8 @@
         case 'error':
           callError = true;
           show('error');
-          if (evt.code === 'unauthorized') status(evt.message || 'A token is required');
-          else if (evt.code === 'superseded') status('Another tab is using Emma');
-          else status(evt.message || 'Something went wrong');
+          errorStatus = errorStatusFor(evt);
+          status(errorStatus);
           manualEnd = true;
           break;
       }
@@ -3671,15 +4330,48 @@
       if (!engine || typeof engine[kind] !== 'function') return;
       try { engine[kind](a, b); } catch (e) {}
     }
+    // The motion captions (`captions`, beside paintReply) hear the same
+    // stream: her audio schedule, her transcript, her turn_complete -- and a
+    // clear. Guarded the same way (a page or a harness without them).
+    function captionHook(kind, a, b) {
+      if (typeof captions !== 'object' || !captions || typeof captions[kind] !== 'function') return;
+      try { captions[kind](a, b); } catch (e) {}
+    }
+    // Every frame from the server but the head-turn cue counts: a tap the
+    // server drops (sendQuickAsk) is one after which nothing at all came.
+    var serverSeq = 0;
+
+    // A failed dial or a lost line, in the screen's own words (26 Oct, bad
+    // network). The server's `message` is Thai, for the desk page -- and on a
+    // failed dial it used to be the exception's own text, resolver detail
+    // painted on the robot's public screen. And every error is followed by
+    // the close, whose idle pose writes "Ready": a robot that could not talk
+    // said it was ready. The line comes from the server's `category`, and
+    // the close keeps it (keepErrorStatus) until the next dial says
+    // "Connecting...".
+    var errorStatus = '';
+    function errorStatusFor(evt) {
+      if (evt.code === 'unauthorized') return evt.message || 'A token is required';
+      if (evt.code === 'superseded') return 'Another tab is using Emma';
+      // safety-critical, kept word for word (session.py)
+      if (evt.category === 'rejected' || /REJECTED/.test(evt.message || '')) return evt.message || 'Something went wrong';
+      if (evt.category === 'network') return "No internet — Emma can't talk right now";
+      if (evt.code === 'provider_error') return "Emma can't connect right now";
+      if (evt.code === 'upstream') return 'Disconnected — tap the mic to try again';
+      if (evt.code === 'internal') return 'Something went wrong';
+      return evt.message || 'Something went wrong';
+    }
+    function keepErrorStatus() { if (callError && errorStatus) status(errorStatus); }
 
     // ---- dial / hang up ----
     function startCall() {
+      if (mirror) return;
       if (inCall) return;
       if (window.EmmaFaceScan && window.EmmaFaceScan.isOpen()) return;
       if (!apiKeyOK) { show('error'); return; }
       clearTranscript();
       planDisplay.reset();
-      manualEnd = false; inCall = true; callError = false;
+      manualEnd = false; inCall = true; callError = false; offlineCall = false;
       if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
       try { ws && ws.close(); } catch (e) {}
       releaseCallHardware();
@@ -3701,6 +4393,11 @@
         + (urlLang ? '&lang=' + encodeURIComponent(urlLang) : '')
         + (urlToken ? '&token=' + encodeURIComponent(urlToken) : '')
         + (bargeGate ? '&echo_barge=1' : '')
+        // ARRAY_MIC: this page's JS can run without its mic. A page loaded
+        // before the server learnt ARRAY_MIC (yesterday's JS after a server
+        // reload, the echo_barge lesson) does not say so -- and gets told to
+        // keep its mic, with the app asked to let go of the array.
+        + (ARRAY_MIC_APP ? '&array_mic=1' : '')
         + (summonedDial ? '&summoned=1' : ''));
       summonedDial = false;             // one dial; the next one earns its own
       ws.binaryType = 'arraybuffer';
@@ -3714,23 +4411,275 @@
         attendFromServer(null);          // the call's gaze ends with the call
         if (window.EmmaRobotBridge) window.EmmaRobotBridge.detach();
         releaseCallHardware();
-        inCall = false;
-        choiceSet = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
+        inCall = false; offlineCall = false;
+        choiceSet = null; pickedLang = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
         if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
         clearTranscript();
         // held: no redial, says why -- unless the call ended on an error, whose
         // message ("Another tab is using Emma", a token) is the real reason
-        if (muteHold) { show('idle'); setMicLabel('Muted'); if (!callError) status('Muted'); return; }
+        if (muteHold) { show('idle'); setMicLabel('Muted'); keepErrorStatus(); if (!callError) status('Muted'); return; }
         setMicLabel('Tap to talk');
         if (!manualEnd) { show('idle'); status('Disconnected — tap the mic to try again'); }
-        else { show('idle'); }
+        else { show('idle'); keepErrorStatus(); }
       };
+    }
+
+    // ---- the room screen (mirror): watch the robot's call ----
+    var mirrorRetry = 0, mirrorFrame = null, mirrorFrameReady = false, mirrorPending = null, mirrorStoryId = null,
+        mirrorLand = false;
+    // The band of the robot's 1080x1920 screen the stories draw in, in its
+    // pixels (owner 28 Oct: "motion ภาพเล็กไป"). Above it: the robot's status
+    // pill and caption band; below it: the tap chips (hidden here,
+    // story-stage.html). Measured on all 63 stories of the catalog, every
+    // beat and the end state, 28 Oct: nothing above y 269 or below 1741.
+    // Only for a template with no landscape layout (emma-story.js LAND:
+    // distance, neighborhood -- no story uses them): every story is laid out
+    // across the TV (owner 29 Oct: "ทำเรื่องเล่าแบบแนวนอน").
+    var MIRROR_BAND = { top: 250, height: 1500 };
+    function startMirror() {
+      var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      var tok = q.get('token');
+      var sock = new WebSocket(proto + '://' + location.host + '/ws/mirror'
+        + (tok ? '?token=' + encodeURIComponent(tok) : ''));
+      sock.binaryType = 'arraybuffer';
+      // view only: nothing this page does reaches the robot
+      sock.send = function () {};
+      ws = sock;
+      // read-only diagnostics for whoever sets the room screen up (devtools)
+      window.EmmaMirror = Object.freeze({
+        state: function () {
+          return { socket: ws ? ws.readyState : -1, inCall: inCall, playing: playing,
+                   audio: audioCtx ? audioCtx.state : 'none', rate: outputRate,
+                   queued: audioCtx ? Math.max(0, Math.round((playHead - audioCtx.currentTime) * 10) / 10) : 0,
+                   story: document.body.classList.contains('mirror-story') };
+        }
+      });
+      sock.onopen = function () { mirrorRetry = 0; };
+      sock.onmessage = function (m) {
+        if (ws !== sock) return;
+        // never the guest's words on the room screen (the server sends none)
+        if (typeof m.data === 'string') {
+          var t = null;
+          try { t = JSON.parse(m.data).type; } catch (e) { return; }
+          if (t === 'user_transcript') return;
+        }
+        onMessage(m);
+      };
+      sock.onclose = function () {
+        if (ws !== sock) return;
+        ws = null;
+        mirrorIdle();
+        status('Reconnecting…');
+        mirrorRetry = Math.min(30000, mirrorRetry ? mirrorRetry * 2 : 2000);
+        setTimeout(startMirror, mirrorRetry);
+      };
+    }
+    function startMirrorAudio() {
+      if (audioCtx) return;
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
+      } catch (e) { audioCtx = null; return; }
+      playHead = 0;
+      // A context the browser has not let start (no gesture yet) keeps no
+      // time: the pictures would wait for a voice that never plays. One tap
+      // anywhere starts it; a kiosk browser with autoplay allowed never asks.
+      if (audioCtx.state !== 'running') {
+        document.documentElement.classList.add('mirror-tap');
+        var go = function () {
+          if (audioCtx) audioCtx.resume().catch(function () {});
+          document.documentElement.classList.remove('mirror-tap');
+          document.removeEventListener('pointerdown', go);
+        };
+        document.addEventListener('pointerdown', go);
+        audioCtx.resume().then(function () {
+          if (audioCtx && audioCtx.state === 'running') {
+            document.documentElement.classList.remove('mirror-tap');
+            document.removeEventListener('pointerdown', go);
+          }
+        }).catch(function () {});
+      }
+    }
+    function mirrorIdle() {
+      inCall = false;
+      stopPlayback();
+      curBot = '';
+      captionHook('clear');
+      resetAssistantTurn();
+      clearStage();
+      show('idle');
+      status('Talk to Emma at the robot');
+    }
+    // The story frame: the robot's own screen, 1080 x 1920, scaled to the
+    // room screen's height -- every story keeps the layout it was designed
+    // and approved in (emma-story.css sizes in vw/vh of the robot's screen);
+    // the part this story draws on fills the TV (fitMirrorStage), nothing
+    // of it is cut off by this page.
+    function mirrorStage() {
+      if (mirrorFrame) return mirrorFrame;
+      var box = document.createElement('div');
+      box.className = 'mirror-stage';
+      var f = document.createElement('iframe');
+      f.className = 'mirror-frame';
+      f.setAttribute('title', 'story');
+      f.setAttribute('scrolling', 'no');
+      f.onload = function () {
+        mirrorFrameReady = true;
+        // a click there opens or closes a picture large (emma-story.js
+        // showZoom): its own part of the screen, fitted again
+        try { f.contentDocument.addEventListener('click', function () { setTimeout(fitMirrorStage, 0); }); } catch (e) {}
+        if (mirrorPending) { var p = mirrorPending; mirrorPending = null; showMirrorStory(p); }
+      };
+      f.src = '/assets/story-stage.html?v=20261029-a';
+      box.appendChild(f);
+      document.body.appendChild(box);
+      mirrorFrame = f;
+      fitMirrorStage();
+      window.addEventListener('resize', fitMirrorStage);
+      return f;
+    }
+    // Where pictures go on the TV [x0, y0, x1, y1]: the screen left of Emma's
+    // column (--mirror-side), a sliver from its edges.
+    function mirrorArea() {
+      var w = window.innerWidth, h = window.innerHeight;
+      var side = w * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mirror-side')) || 0) / 100;
+      return [w * 0.015, h * 0.015, w - side - w * 0.006, h * 0.985];
+    }
+    // The frame's shape for what comes up: landscape = the area's own shape,
+    // 1080 px tall (a story with a landscape layout, an answer picture);
+    // portrait = the robot's own screen. Set before the story lays out.
+    function mirrorFrameMode(land) {
+      var f = mirrorStage(), a = mirrorArea();
+      mirrorLand = !!land;
+      f.style.width = (land ? Math.round(1080 * (a[2] - a[0]) / Math.max(1, a[3] - a[1])) : 1080) + 'px';
+      f.style.height = (land ? 1080 : 1920) + 'px';
+      void f.offsetWidth;   // the frame's new size before the story inside it lays out
+      return f;
+    }
+    // The part of the frame [x0, y0, x1, y1] to fit to the area: the whole
+    // landscape stage, an answer picture's own drawn box (showMirrorSlide:
+    // object-fit contain), the robot's zoom view (a picture opened large,
+    // under its caption band), else the robot's story band.
+    function mirrorCrop() {
+      var doc = mirrorFrame.contentDocument;
+      var fw = parseFloat(mirrorFrame.style.width) || 1080, fh = parseFloat(mirrorFrame.style.height) || 1920;
+      var pic = !mirrorStoryId && doc && doc.querySelector('.vp-stage-inner > img.mirror-pic');
+      if (pic && pic.naturalWidth > 0 && pic.naturalHeight > 0 && pic.offsetWidth > 0) {
+        var bw = pic.offsetWidth, bh = pic.offsetHeight;
+        var s = Math.min(bw / pic.naturalWidth, bh / pic.naturalHeight);
+        var pw = pic.naturalWidth * s, ph = pic.naturalHeight * s;
+        var px = pic.offsetLeft + (bw - pw) / 2, py = pic.offsetTop + (bh - ph) / 2;
+        return [px, py, px + pw, py + ph];
+      }
+      if (mirrorLand) return [0, 0, fw, fh];
+      if (doc && doc.querySelector('.es-zoomview')) return [0, 200, 1080, 1540];
+      return [0, MIRROR_BAND.top, 1080, MIRROR_BAND.top + MIRROR_BAND.height];
+    }
+    function fitMirrorStage() {
+      if (!mirrorFrame) return;
+      var c = mirrorCrop(), a = mirrorArea();
+      var cw = c[2] - c[0], ch = c[3] - c[1], aw = a[2] - a[0], ah = a[3] - a[1];
+      // one scale for both axes: a story is never stretched; centred in the
+      // area left of Emma's column
+      var k = Math.min(aw / cw, ah / ch) || 0.5;
+      var x = a[0] + (aw - cw * k) / 2 - c[0] * k, y = a[1] + (ah - ch * k) / 2 - c[1] * k;
+      mirrorFrame.style.transform = 'translate(' + x.toFixed(1) + 'px, ' + y.toFixed(1) + 'px) scale(' + k.toFixed(4) + ')';
+    }
+    // The story's beats hear her voice through storyHook -> window.EmmaStory;
+    // on the room screen those calls go to the engine INSIDE the frame (the
+    // one that drew the story), the captions keep the page's own engine.
+    function forwardStoryEngine() {
+      var own = window.EmmaStory;
+      if (!own || own.__mirrored) return;
+      var fwd = {};
+      Object.keys(own).forEach(function (k) { fwd[k] = own[k]; });
+      ['audio', 'transcript', 'turnComplete', 'settle', 'teardown'].forEach(function (k) {
+        fwd[k] = function (a, b) {
+          var eng = mirrorFrame && mirrorFrame.contentWindow && mirrorFrame.contentWindow.EmmaStory;
+          if (eng && typeof eng[k] === 'function') return eng[k](a, b);
+        };
+      });
+      fwd.__mirrored = true;
+      window.EmmaStory = fwd;
+    }
+    function showMirrorStory(story) {
+      if (!story || !story.template) return;
+      var f = mirrorStage();
+      if (!mirrorFrameReady) { mirrorPending = story; return; }
+      var doc = f.contentDocument, eng = f.contentWindow && f.contentWindow.EmmaStory;
+      var mount = doc && doc.querySelector('.vp-stage-inner');
+      if (!eng || !mount) return;
+      try { eng.teardown && eng.teardown(); } catch (e) {}
+      mount.innerHTML = '';
+      answerStaged = true;
+      storyOwns = true;
+      mirrorStoryId = story.id || null;
+      // across the TV when the template has a landscape layout (the engine
+      // lays the same story out for the frame's shape), else the robot's screen
+      var land = !!(eng.landscape && eng.landscape(story.template));
+      mirrorFrameMode(land);
+      document.body.classList.add('mirror-story');
+      fitMirrorStage();
+      var drawn = eng.play(story, {
+        mount: mount,
+        layout: land ? 'land' : null,
+        clock: heardClock,
+        assetUrl: function (src) { return new URL(src, location.href).href; },
+        // a touch on the room screen enlarges a picture right there, and
+        // asks nothing of the robot (there is no way to)
+        onTap: function () { return false; },
+        onReport: function () {}
+      });
+      if (!drawn) mirrorStoryDown();
+    }
+    function mirrorStoryDown() {
+      document.body.classList.remove('mirror-story');
+      if (mirrorFrame && mirrorFrame.contentDocument) {
+        var inner = mirrorFrame.contentDocument.querySelector('.vp-stage-inner');
+        if (inner) inner.innerHTML = '';
+      }
+    }
+    // An answer picture (ANSWER_IMAGES) on the room screen: where the stories
+    // draw -- the robot's own screen in the frame, its story band fitted to
+    // the TV -- not the face's stage, whose app-shell rules would move Emma
+    // and her bubble. Robot log 28 Oct: the robot showed these and the TV
+    // never did (face_mirror passed stories only). Cleared like a story
+    // (clearStage -> endStory -> mirrorStoryDown).
+    function showMirrorSlide(slide) {
+      var f = mirrorStage();
+      if (!mirrorFrameReady) {
+        f.addEventListener('load', function () { showMirrorSlide(slide); }, { once: true });
+        return;
+      }
+      var doc = f.contentDocument, eng = f.contentWindow && f.contentWindow.EmmaStory;
+      var mount = doc && doc.querySelector('.vp-stage-inner');
+      if (!mount) return;
+      try { eng && eng.teardown && eng.teardown(); } catch (e) {}
+      mount.innerHTML = '';
+      // on the landscape stage, as large as it allows (owner 29 Oct: the
+      // pictures across the TV, Emma small in the corner)
+      mirrorFrameMode(true);
+      var img = doc.createElement('img');
+      // fitted to the TV by its own drawn box once its shape is known
+      // (mirrorCrop): a landscape slide in the band was ~0.6 of the size the
+      // TV's width gives it
+      img.className = 'mirror-pic';
+      img.onload = function () { fitMirrorStage(); };
+      img.src = new URL(slide.url, location.href).href;
+      img.alt = slide.title_th || slide.title_en || '';
+      var fw = parseFloat(f.style.width) || 1080, gap = 32;
+      img.style.cssText = 'position:absolute;left:' + gap + 'px;top:' + gap + 'px;width:' + (fw - 2 * gap)
+        + 'px;height:' + (1080 - 2 * gap) + 'px;object-fit:contain;display:block;';
+      mount.appendChild(img);
+      answerStaged = true;
+      mirrorStoryId = null;
+      document.body.classList.add('mirror-story');
+      fitMirrorStage();
     }
 
     function endCall() {
       manualEnd = true;
-      inCall = false;
-      choiceSet = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
+      inCall = false; offlineCall = false;
+      choiceSet = null; pickedLang = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();
       var closingSocket = ws;
       ws = null;                       // late audio from this call cannot play over a scan
       if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
@@ -3801,6 +4750,66 @@
     // (the status pill and the two buttons follow it); only the three blocks
     // stop drawing. One switch, so bringing them back is one word.
     var SHOW_TOPICS = false;
+    // ...and the language menu came back on its own (owner 29 Oct: "เพิ่มปุ่ม
+    // ภาษา หุ่นจะได้ตอบแค่ภาษานั้นๆ" -- "ปุ่ม dropdown ... ไทย อังกฤษ จีน จะเพิ่ม
+    // รัสเซีย"): a pill at the top right during a call. A pick sends lang_<id>;
+    // the server pins the call's language (app/talk_lang.py) and answers
+    // lang_pinned -- the pill names that, never its own tap, so it cannot show
+    // a language the server dropped. A call's end clears it with quickAsks.
+    var SHOW_LANG_MENU = true;
+    var pickedLang = null, langMenuTimer = 0;
+    var PICK_LANGS = ['th', 'en', 'zh', 'ru'];
+    var langToggle = langsNode && langsNode.querySelector('.lang-toggle');
+    function langMenuOpen(open) {
+      if (!langsNode) return;
+      langsNode.classList.toggle('is-open', !!open);
+      if (langToggle) langToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      clearTimeout(langMenuTimer);
+      // a kiosk has no "click elsewhere" habit: an open menu folds itself away
+      if (open) langMenuTimer = setTimeout(function () { langMenuOpen(false); }, 10000);
+    }
+    function renderLangMenu() {
+      if (!langsNode) return;
+      var offered = {};
+      if (quickAsks && quickAsks.langs) quickAsks.langs.forEach(function (l) {
+        if (l && PICK_LANGS.indexOf(l.id) >= 0) offered[l.id] = l;
+      });
+      var on = !!(SHOW_LANG_MENU && appShell && !mirror && quickAsks && inCall && Object.keys(offered).length);
+      langsNode.hidden = !on;
+      if (!on) { langMenuOpen(false); return; }
+      var current = pickedLang && offered[pickedLang] ? offered[pickedLang] : null;
+      langsNode.classList.toggle('is-picked', !!current);
+      langsNode.querySelector('.lang-current').textContent = current ? String(current.label || current.id) : 'Language';
+      Array.prototype.forEach.call(langsNode.querySelectorAll('.lang-option'), function (b) {
+        var l = offered[b.dataset.lang];
+        b.hidden = !l;
+        if (!l) return;
+        b.querySelector('.lang-name').textContent = String(l.label || l.id);
+        b.querySelector('.lang-sub').textContent = String(l.sub || '');
+        b.setAttribute('aria-selected', b.dataset.lang === pickedLang ? 'true' : 'false');
+      });
+    }
+    function langPinned(code) {
+      pickedLang = PICK_LANGS.indexOf(code) >= 0 ? code : null;
+      if (pickedLang) setUiLang(pickedLang);   // a no-op while the screen is fixed English
+      renderLangMenu();
+    }
+    if (langsNode) {
+      langToggle.addEventListener('click', function () {
+        langMenuOpen(!langsNode.classList.contains('is-open'));
+      });
+      Array.prototype.forEach.call(langsNode.querySelectorAll('.lang-option'), function (b) {
+        b.addEventListener('click', function () {
+          langMenuOpen(false);
+          // the same language again asks nothing: she is already speaking it
+          if (b.dataset.lang === pickedLang) return;
+          if (sendQuickAsk('lang_' + b.dataset.lang) && window.EmmaFx) window.EmmaFx.burstAt(langToggle);
+        });
+      });
+      document.addEventListener('pointerdown', function (e) {
+        if (langsNode.classList.contains('is-open') && !langsNode.contains(e.target)) langMenuOpen(false);
+      }, true);
+    }
     function renderQuick() {
       var on = !!(SHOW_TOPICS && appShell && quickAsks && inCall);
       if (brandNode) {
@@ -3808,19 +4817,7 @@
         brandNode.querySelector('.brand-name').textContent = name;
         brandNode.hidden = !name;
       }
-      if (langsNode) {
-        langsNode.textContent = '';
-        langsNode.hidden = !on;
-        if (on) (quickAsks.langs || []).forEach(function (l) {
-          if (QUICK_LANGS.indexOf(l.id) < 0) return;
-          var b = document.createElement('button');
-          b.type = 'button';
-          b.textContent = String(l.label || l.id);
-          b.setAttribute('aria-pressed', l.id === uiLang ? 'true' : 'false');
-          b.onclick = function () { setUiLang(l.id); sendQuickAsk('lang_' + l.id); };
-          langsNode.appendChild(b);
-        });
-      }
+      renderLangMenu();
       if (!quickNode) return;
       // Her question's choices take the topics' row while they are up: they
       // are the thing she just asked (and the topics are off on the robot).
@@ -3888,6 +4885,11 @@
     }
     function sendQuickAsk(id) {
       if (!quickAsks || !inCall || !ws || ws.readyState !== WebSocket.OPEN) return false;
+      // A pick on the language menu is not a question (review 29 Oct): it
+      // leaves the screen as it is -- answerOwed cleared the card or story at
+      // the first sound of her one-line "I'll speak Russian" -- and when it cut
+      // her off, the server has her say that answer again in the new language.
+      var langPick = id.indexOf('lang_') === 0, cut = !!playing;
       if (playing) {
         // A tap over her is the guest's turn: the reply being said is gone,
         // exactly as when the server reports `interrupted`.
@@ -3896,14 +4898,27 @@
         sentMs = 0;
         ws.send(JSON.stringify({ type: 'played', heard_ms: h }));
         curBot = '';
+        captionHook('clear');
         resetAssistantTurn();
       }
-      ws.send(JSON.stringify({ type: 'quick_ask', id: id, lang: uiLang }));
-      answerOwed = true;
-      answerStaged = false;
-      storyOwns = false;
+      ws.send(JSON.stringify({ type: 'quick_ask', id: id, lang: uiLang, cut: cut }));
+      if (!langPick) {
+        answerOwed = true;
+        answerStaged = false;
+        storyOwns = false;
+      }
       show('thinking');
       status('Thinking...');
+      // The server drops some taps without a word (a second tap inside its
+      // 1.2 s gap, a story's id that is no longer on screen): nothing comes
+      // back, and "Thinking..." stood for good (review 27 Oct). heard_end's
+      // fallback, for a tap: nothing at all from the server since it went --
+      // and she is not speaking -- is back to listening.
+      var asked = serverSeq;
+      clearTimeout(thinkingTimer);
+      thinkingTimer = setTimeout(function () {
+        if (inCall && !playing && serverSeq === asked) { show('listening'); status(muted ? 'Muted' : 'Listening...'); }
+      }, THINKING_FALLBACK_MS);
       return true;
     }
 
@@ -4009,6 +5024,7 @@
     function clearTranscript() {
       transcript = [];
       curBot = '';
+      captionHook('clear');
       resetAssistantTurn();
       curUser = '';
       userLine = null;
@@ -4026,6 +5042,7 @@
       assistantTurnText = '';
       assistantLine = null;
       curBot = '';
+      captionHook('begin');           // a new answer: a new caption clock
     }
     function resetAssistantTurn() {
       assistantTurnStarted = false;
@@ -4038,6 +5055,7 @@
       if (!text) return;
       beginAssistantTurn();
       assistantTurnText += text;
+      captionHook('text', text);      // before paintReply below draws it
       curBot = assistantTurnText;
       if (!assistantLine) {
         assistantLine = { who: 'emma', text: assistantTurnText };
@@ -4081,6 +5099,7 @@
     function endStory() {
       storyHook('teardown');
       document.body.classList.remove('emma-story');
+      if (mirror) mirrorStoryDown();
       // the pill said "Explaining" for the story; with it gone and her voice
       // still playing, it is plain "Speaking..." again (review 13 Oct)
       if (playing && lastStatusKey === 'Explaining — ask anytime') status('Speaking...');
@@ -4115,6 +5134,7 @@
 
     function showSlide(slide) {
       if (!slide || !slide.url) return;
+      if (mirror) { showMirrorSlide(slide); return; }
       openStage();
       var img = new Image();
       var assetUrl = new URL(slide.url, location.href);
@@ -4128,27 +5148,35 @@
       stageInner.appendChild(img);
     }
 
+    // The clock her audio is scheduled on (playChunk -> storyHook('audio')),
+    // less the time a sample takes from the context to the speaker: the
+    // context's clock is when it is RENDERED, the guest hears it later (on
+    // Android tens of ms to more), and a beat must not lead her voice. One
+    // function for the story's beats and the caption's words: two copies of
+    // "when did she say it" are how a picture and its words drift apart.
+    function heardClock() {
+      if (!audioCtx) return null;
+      var lat = (+audioCtx.outputLatency || 0) + (+audioCtx.baseLatency || 0);
+      return audioCtx.currentTime - Math.min(0.5, Math.max(0, lat));
+    }
+
     // present_story (robot face only): the story engine draws on the whole
     // stage while Emma stands in the corner. Every word, number and picture
     // in `story` is the server's; a tap sends only the tap's id, through the
     // same door as the topic buttons (sendQuickAsk).
     function showStory(story) {
+      if (mirror) { showMirrorStory(story); return; }
       if (!window.EmmaStory || !story || !story.template) return;
       openStage();
       storyOwns = true;
       document.body.classList.add('emma-story');
       var tok = q.get('token');
-      window.EmmaStory.play(story, {
+      // false = the engine could not draw it (a template that throws on a
+      // malformed payload, an unknown template): an empty stage under the
+      // close button that nobody owned (audit 27 Oct). Take the screen back.
+      var drawn = window.EmmaStory.play(story, {
         mount: stageInner,
-        // the clock her audio is scheduled on (playChunk -> storyHook('audio')),
-        // less the time a sample takes from the context to the speaker: the
-        // context's clock is when it is RENDERED, the guest hears it later
-        // (on Android tens of ms to more), and a beat must not lead her voice
-        clock: function () {
-          if (!audioCtx) return null;
-          var lat = (+audioCtx.outputLatency || 0) + (+audioCtx.baseLatency || 0);
-          return audioCtx.currentTime - Math.min(0.5, Math.max(0, lat));
-        },
+        clock: heardClock,
         assetUrl: function (src) {
           var u = new URL(src, location.href);
           // the token only on this server's own story pictures, never remote
@@ -4172,6 +5200,7 @@
           if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'story_report', report: r }));
         }
       });
+      if (!drawn) { storyOwns = false; clearStage(); }
     }
 
     var UNIT_STATUS_EN = { available: 'Available', reserved: 'Reserved', sold: 'Sold' };
@@ -4270,6 +5299,7 @@
       // greeting appears when Emma actually speaks it, not printed under an
       // idle mascot. The invitation lives in the status line and the button.
       curBot = '';
+      captionHook('clear');
       clearStage();
       show('idle');
       status(muteHold ? 'Muted' : 'Tap the mic to talk');
@@ -4348,6 +5378,10 @@
     // ---- boot: mirror index.html's /voices + /health handshake ----
     Emma.stopPoseDemo && Emma.stopPoseDemo();
     restScreen();
+    // the story frame loads now, hidden: the first story must not wait for
+    // story-stage.html + the engine to come over the LAN (live 28 Oct: its
+    // opening beat was an empty frame)
+    if (mirror) { forwardStoryEngine(); mirrorStage(); mirrorIdle(); startMirror(); return; }
     Promise.all([
       fetch('/voices').then(function (r) { return r.json(); }),
       fetch('/health').then(function (r) { return r.json(); }),
@@ -5864,6 +6898,11 @@
     // app saying it has §2b; without it the page asks nothing.
     var UA = navigator.userAgent || '';
     var ON_ROBOT = IN_APP && /EmmaRobot\//.test(UA) && /EmmaBridge\/1\b/.test(UA);
+    // ARRAY_MIC (docs/emma-array-mic-2026-11-02.md): an APK that can hold the
+    // mic array alone answers emma-face:mic / emma-face:mic:release; one
+    // without EmmaArrayMic/1 is never asked (its WebView would show the
+    // prompt itself -- the EmmaBridge/1 lesson).
+    var ARRAY_MIC = ON_ROBOT && /EmmaArrayMic\/1\b/.test(UA);
 
     // <nav-model>
     // Pure, and run as-is by tests/face_nav_model.cjs: the rules a test must
@@ -5955,12 +6994,41 @@
     // new call site cannot widen the grammar by building its own string.
     var FIXED_MESSAGES = ['emma-body:list', 'emma-body:status', 'emma-nav:places', 'emma-nav:status',
       'emma-nav:stop', 'emma-face:token', 'emma-nav:auto', 'emma-nav:auto:shown', 'emma-nav:auto:stay',
-      'emma-nav:activity:call_start', 'emma-nav:activity:call_end', 'emma-nav:activity:speech'];
+      'emma-nav:activity:call_start', 'emma-nav:activity:call_end', 'emma-nav:activity:speech',
+      'emma-face:mic', 'emma-face:mic:release', 'emma-face:mic:hold', 'emma-face:mic:hold:deaf',
+      'emma-face:mic:free'];
+    // ARRAY_MIC: the app's answer about the array, whitelisted. `capturing`
+    // stays null unless the app said true or false -- the call opens its own
+    // mic only on an explicit false (anything else waits, then times out).
+    function micAnswer(r) {
+      if (!r || typeof r !== 'object') return null;
+      return { capturing: r.capturing === true ? true : (r.capturing === false ? false : null),
+               released: r.released === true, held: r.held === true };
+    }
     function bodyMessage(action) {
       return has(BODY_IDS, action) && isId(action) ? 'emma-body:' + action : null;
     }
     function speechMessage(action) {
       return has(SPEECH_BODY_IDS, action) && isId(action) ? 'emma-body:' + action + ':speech' : null;
+    }
+    // The head toward a person (owner 31 Oct; app/head_follow.py): two whole
+    // numbers -100..100, PERCENT of the app's own head span -- no pulse here.
+    function lookMessage(pan, tilt) {
+      return isInt(pan) && isInt(tilt) && pan >= -100 && pan <= 100 && tilt >= -100 && tilt <= 100
+        ? 'emma-body:look:' + pan + ':' + tilt : null;
+    }
+    // The app's answer to a look, back to the server (31 Oct, round 2): a refused look
+    // is not where the head is, and `ms` is how long the move takes -- the
+    // server reads the next picture after it. Whitelisted fields only; a
+    // look without a seq (a server from before) gets no answer.
+    function lookAckFrame(evt, r) {
+      if (!evt || !isInt(evt.seq) || evt.seq <= 0) return null;
+      var ack = { type: 'head_look_ack', seq: evt.seq, accepted: false, reason: null, ms: null };
+      if (!r) { ack.reason = 'bad_request'; return ack; }
+      ack.accepted = r.accepted === true;
+      ack.reason = ack.accepted ? null : (codeOrNull(r.reason) || 'bad_request');
+      if (isInt(r.ms) && r.ms >= 0 && r.ms <= 10000) ack.ms = r.ms;
+      return ack;
     }
     function navGoMessage(place, origin) {
       return isId(place) && (origin === 'tap' || origin === 'voice') ? 'emma-nav:go:' + place + ':' + origin : null;
@@ -5973,6 +7041,8 @@
       if (has(FIXED_MESSAGES, message)) return true;
       var m = /^emma-body:([^:]+):speech$/.exec(message);
       if (m) return speechMessage(m[1]) === message;
+      m = /^emma-body:look:(-?[0-9]{1,3}):(-?[0-9]{1,3})$/.exec(message);
+      if (m) return lookMessage(Number(m[1]), Number(m[2])) === message;
       m = /^emma-body:(.+)$/.exec(message);
       if (m) return bodyMessage(m[1]) === message;
       m = /^emma-nav:go:([^:]+):(tap|voice)$/.exec(message);
@@ -6019,7 +7089,7 @@
       var g = r.gestures && typeof r.gestures === 'object' ? r.gestures : {};
       BODY_IDS.forEach(function (id) { if (has(BODY_STATUSES, g[id])) gestures[id] = g[id]; });
       return { type: 'body_caps', enabled: r.enabled, allow_direction_known: r.allow_direction_known === true,
-        gestures: gestures, speech: r.speech === true };
+        gestures: gestures, speech: r.speech === true, look: r.look === true };
     }
     // `emma-body:status` holds the app's running state plus the LAST gesture's
     // outcome; a body_status goes only for a seq not sent yet (§5 P5 dedupe).
@@ -6609,12 +7679,41 @@
       else addEventListener('load', function () { setTimeout(openLink, 0); });
     }
 
+    // ARRAY_MIC: a call-scoped hold belongs to a document. One left by the
+    // last document (reloaded on resume, a renderer that died, a navigation)
+    // has no call behind it any more: freed as this page's first act, before
+    // any call of this page can hold the array (lead's review, 2 Nov -- a hold
+    // must not outlive its page). The app then waits for the old document's
+    // recording to end before it reopens.
+    if (ARRAY_MIC) ask('emma-face:mic:free');
+
     window.EmmaRobotBridge = Object.freeze({
       ready: ready,
       detach: detach,
       command: command,
+      // the server's head look (head_look): one prompt; the app's gates
+      // decide, and its answer goes back as head_look_ack (lookAckFrame)
+      look: function (evt) {
+        if (!evt || evt.type !== 'head_look') return;
+        var message = lookMessage(evt.pan, evt.tilt);
+        if (!message) return;
+        var ack = lookAckFrame(evt, ask(message));
+        if (ack && send && frameFits(ack)) send(ack);
+      },
       // the call heard somebody (either side): the auto-return count restarts
       speech: function () { activity('speech'); },
+      // ARRAY_MIC: is the app still capturing the array; let go of it (for
+      // the rest of the app run). null from an APK that cannot hold it.
+      arrayMic: Object.freeze({
+        state: function () { return ARRAY_MIC ? micAnswer(ask('emma-face:mic')) : null; },
+        release: function () { return ARRAY_MIC ? micAnswer(ask('emma-face:mic:release')) : null; },
+        // for one call: 'deaf' (it went quiet mid-call -- counted per app run) or the start of a call
+        hold: function (kind) {
+          if (!ARRAY_MIC) return null;
+          return micAnswer(kind === 'deaf' ? ask('emma-face:mic:hold:deaf') : ask('emma-face:mic:hold'));
+        },
+        free: function () { return ARRAY_MIC ? micAnswer(ask('emma-face:mic:free')) : null; }
+      }),
       onNav: function (fn) { if (typeof fn === 'function') navListeners.push(fn); }
     });
 
@@ -7048,6 +8147,50 @@
   })();
   </script>
   <script>
+  // ---- the big screen: slot 3 of the hold menu (app/room_screens.py) ----
+  // Owner 28 Oct: "ตัวฟังก์ชั่น big screen เอาไปไว้กับพวกแสกนหน้า กับนำทาง".
+  // A press puts Emma's face up on the room's big screen, or takes it down --
+  // the server decides which from its own state (the robot walking away, or
+  // a spoken "ปิดจอ", may have changed it since). Over HTTP like the scan and
+  // the navigation, so it works between calls too; the token, when the page
+  // has one, goes in the body (the face-scan rule: request lines are logged).
+  // A slot only where the server says a room screen is set up -- asked at
+  // load and again as each press on her begins, so the answer is fresh when
+  // the menu draws 0.5 s later. Everywhere else it stays the empty slot.
+  (function () {
+    if (location.pathname === '/mirror') return;
+    var token = new URLSearchParams(location.search).get('token');
+    var offered = false, busy = false;
+    function post(action) {
+      var body = { action: action, source: 'face' };
+      if (token) body.token = token;
+      return fetch('/room-screen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        cache: 'no-store'
+      }).then(function (r) { return r.json().catch(function () { return null; }); },
+              function () { return null; });
+    }
+    function refresh() {
+      post('status').then(function (j) { offered = !!(j && j.ok && j.offered); });
+    }
+    function toggle() {
+      if (busy) return Promise.resolve('กำลังสั่งจอใหญ่อยู่…');
+      busy = true;
+      return post('toggle').then(function (j) {
+        busy = false;
+        if (!j || !j.ok) return 'จอใหญ่ไม่ตอบ ลองใหม่อีกครั้ง';
+        return j.open ? 'ขึ้นจอใหญ่แล้ว' : 'เอาลงจากจอใหญ่แล้ว';
+      });
+    }
+    refresh();
+    var wrap = document.querySelector('.mascot-wrap');
+    if (wrap) wrap.addEventListener('emma-press-start', refresh);
+    window.EmmaScreen = Object.freeze({ toggle: toggle, offered: function () { return offered; } });
+  })();
+  </script>
+  <script>
   // ---- press-and-hold action buttons around Emma (owner, 2026-09-29) ----
   // mascot.js detects the hold -- it owns every one-finger gesture on her --
   // and reports 'emma-press-start' / 'emma-press-end' / 'emma-long-press' on
@@ -7076,6 +8219,12 @@
   // answer comes from the server after the page has loaded. Everywhere else
   // (a desk browser, the sales room, the switch off) it stays the honest
   // empty slot it was.
+  //
+  // Slot 3 is the big screen ("จอใหญ่", owner 28 Oct): Emma's face on the
+  // room's own screen, up or down. Only where the server has a room screen
+  // set up (`when`); its run() answers with a line, shown once the menu has
+  // closed -- the room PC takes a second or two, and a press that says
+  // nothing reads as a press that did nothing.
   (function () {
     var openFaceScan = window.EmmaFaceScan ? window.EmmaFaceScan.open : null;
     var openNav = window.EmmaNav ? window.EmmaNav.open : null;
@@ -7087,10 +8236,15 @@
       + '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>'
       + '<path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>'
       + '<path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/></svg>';
+    var toggleScreen = window.EmmaScreen ? window.EmmaScreen.toggle : null;
+    var screenOffered = window.EmmaScreen ? window.EmmaScreen.offered : null;
+    var SCREEN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>';
     var ACTIONS = [
       { label: 'สแกนใบหน้า', icon: SCAN_ICON, run: openFaceScan },
       { label: 'นำทาง', icon: NAV_ICON, run: openNav, when: navOffered },
-      {}, {}, {}, {}
+      { label: 'จอใหญ่', icon: SCREEN_ICON, run: toggleScreen, when: screenOffered },
+      {}, {}, {}
     ];
     var wrap = document.querySelector('.mascot-wrap');
     var layer = document.getElementById('emmaActions');
@@ -7238,14 +8392,19 @@
       var action = ACTIONS[i];
       if (!isEmpty(action)) {
         closeActions(false);
-        action.run();
+        var said = action.run();
+        // A function that reports back (the big screen) says how it went --
+        // on the page itself, the menu's own layer is closing.
+        if (said && typeof said.then === 'function') {
+          said.then(function (text) { if (text) toast(text, document.body); });
+        }
         return;
       }
       toast('ช่องที่ ' + (i + 1) + ' ยังไม่มีฟังก์ชัน');
     }
 
-    function toast(text) {
-      var old = layer.querySelector('.emma-actions-toast');
+    function toast(text, host) {
+      var old = document.querySelector('.emma-actions-toast');
       if (old) old.remove();
       var m = wrap.getBoundingClientRect();
       var t = document.createElement('div');
@@ -7254,7 +8413,7 @@
       t.textContent = text;
       t.style.setProperty('--x', (m.left + m.width / 2).toFixed(1) + 'px');
       t.style.setProperty('--y', Math.min(innerHeight - 56, m.top + m.height * 0.94).toFixed(1) + 'px');
-      layer.appendChild(t);
+      (host || layer).appendChild(t);
       clearTimeout(toastTimer);
       toastTimer = setTimeout(function () { t.remove(); }, 1900);
     }
@@ -7412,11 +8571,14 @@
       // bursts still start from her.
       var wrap = document.querySelector('.mascot-wrap');
 
-      // A new reply pops in (the bubble is shown and filled by the engine).
+      // A new reply pops in (the bubble is shown and filled by the engine) --
+      // with the motion captions, when her first word does (`cap-wait` is
+      // the bubble waiting for it; the first word's span is the mutation).
       var reply = document.querySelector('.reply'), shownBefore = false;
       if (reply && window.MutationObserver) {
         new MutationObserver(function () {
-          var visible = reply.style.display !== 'none' && !!(reply.textContent || '').trim();
+          var visible = reply.style.display !== 'none' && !reply.classList.contains('cap-wait')
+                        && !!(reply.textContent || '').trim();
           if (visible && !shownBefore && !reduced) {
             reply.classList.remove('fx-pop');
             void reply.offsetWidth;

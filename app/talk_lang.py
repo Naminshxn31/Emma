@@ -30,14 +30,26 @@ The rule, in order:
 * the same script (English -> German, where an accent does exactly that)
   moves only on two utterances in a row; after a request, any language
   needs three -- a misread request must not hold a whole talk;
-* short ones ("ใช่", "OK", "de") say too little to count either way.
+* short ones ("ใช่", "OK", "de") say too little to count either way;
+* a language chosen on the robot face's language menu (`pin`, owner 29 ต.ค.:
+  "เพิ่มปุ่มภาษา ... หุ่นจะได้ตอบแค่ภาษานั้นๆ จะได้ไม่มีการเปลี่ยนภาษาระหว่างคุย")
+  is above all of the above: no run in another language, no accent, no short
+  word moves it -- only another pick, or a guest plainly asking for another
+  language ("Can you speak English please?"), which then holds the same way.
+  Measured live (eval cat 32, 29 ต.ค.): pinned Chinese, that request got
+  "...using the language button ... I will continue in English now." -- in a
+  turn with no tool result the prompt's own rule (a request is used at once)
+  wins, so a pin that ignored requests left her English and every later tool
+  result saying Chinese. It lives as long as this TalkLanguage, i.e. one
+  call: the next guest starts on the rules above again.
 
 Replayed over the robot's logs 12-19 ต.ค. (252 replies): it disagrees with the
 language Emma answered in 10 times -- the 19 ต.ค. slips above, a Chinese reply
 to "快去外面玩了吧" in a Thai talk, a Thai reply to a knock heard as words.
 
-Pure: no I/O, no settings. Script for th/zh/ja/ko/ru/he/ar/hi; inside Latin a
-handful of function words tells English from German/French/Spanish/Italian.
+Pure: no I/O, no settings. Script for th/zh/ja/ko/ru/he/ar/hi; inside Latin
+Vietnamese by its own letters, and a handful of function words tells English
+from German/French/Spanish/Italian.
 """
 from __future__ import annotations
 
@@ -47,13 +59,19 @@ import re
 #: instruction the tools hand the model).
 NAMES = {"th": "ไทย", "en": "อังกฤษ", "zh": "จีน", "ja": "ญี่ปุ่น", "ko": "เกาหลี", "ru": "รัสเซีย",
          "he": "ฮีบรู", "ar": "อาหรับ", "de": "เยอรมัน", "fr": "ฝรั่งเศส", "es": "สเปน", "it": "อิตาลี",
-         "hi": "ฮินดี"}
+         "hi": "ฮินดี", "vi": "เวียดนาม"}
 
 _SCRIPTS = (("th", re.compile(r"[฀-๿]")), ("ja", re.compile(r"[぀-ヿ]")),
             ("zh", re.compile(r"[一-鿿]")), ("ko", re.compile(r"[가-힯]")),
             ("ru", re.compile(r"[Ѐ-ӿ]")), ("he", re.compile(r"[֐-׿]")),
             ("ar", re.compile(r"[؀-ۿ]")), ("hi", re.compile(r"[ऀ-ॿ]")))
-_LATIN = re.compile(r"[A-Za-zÀ-ɏ]")
+#: ...and Latin Extended Additional (U+1E00-1EFF): Vietnamese writes most of
+#: its tone-marked vowels there ("Ở tầng hầm có"), which the range above did
+#: not count -- robot log 28 Oct, Emma answering in Vietnamese.
+_LATIN = re.compile(r"[A-Za-zÀ-ɏ\u1e00-\u1eff]")
+#: Letters only Vietnamese uses among the Latin languages here: ă đ ơ ư and
+#: the stacked tone marks of U+1EA0-1EF9 (not â ê ô: French has those).
+_VIET = re.compile(r"[ăđơưĂĐƠƯ\u1ea0-\u1ef9]")
 _WORDS = {
     "en": {"the", "is", "are", "you", "what", "how", "do", "does", "can", "i", "we", "my", "it", "this",
            "there", "have", "a", "an", "of", "to", "in", "and", "for", "where", "much", "many", "room"},
@@ -80,7 +98,7 @@ LOCKED_RUN = 3
 #: is somebody asking in English, and two-in-a-row answered it in Thai.
 #: 12 letters: "ตึ้ง ตึง ตึง" (a knock heard as words, 10) stays out.
 SCRIPT_SWITCH_LETTERS = 12
-_LATIN_LANGS = {"en", "de", "fr", "es", "it"}
+_LATIN_LANGS = {"en", "de", "fr", "es", "it", "vi"}
 
 _VERB_EN = (r"\b((speak|talk|answer|reply|respond)( to (me|us))?( in)?|switch( back)? to"
             r"|change( back)? to|continue in)\s+")
@@ -100,6 +118,17 @@ _ASK = [
     ("ru", re.compile(_VERB_EN + r"russian\b|" + _VERB_TH + r"ภาษารัสเซีย|по-русски", re.I)),
     ("fr", re.compile(_VERB_EN + r"french\b|" + _VERB_TH + r"ภาษาฝรั่งเศส|en français", re.I)),
     ("es", re.compile(_VERB_EN + r"spanish\b|" + _VERB_TH + r"ภาษาสเปน|en español", re.I)),
+    # Robot log 28 Oct: a guest in a Thai talk was heard as "ภาษาเวียดนาม"
+    # and Emma went Vietnamese for three turns while this module, which had
+    # no Vietnamese, kept handing every tool result "ตอบเป็นภาษาไทย" -- a
+    # request it cannot hear is one it contradicts. The languages NAMES
+    # already had with no way to ask for them, plus Vietnamese.
+    ("vi", re.compile(_VERB_EN + r"vietnamese\b|" + _VERB_TH + r"ภาษาเวียดนาม|(说|讲|用)越南语"
+                      r"|nói tiếng việt", re.I)),
+    ("it", re.compile(_VERB_EN + r"italian\b|" + _VERB_TH + r"ภาษาอิตาลี|in italiano", re.I)),
+    ("hi", re.compile(_VERB_EN + r"hindi\b|" + _VERB_TH + r"ภาษาฮินดี", re.I)),
+    ("ar", re.compile(_VERB_EN + r"arabic\b|" + _VERB_TH + r"ภาษาอาหรับ", re.I)),
+    ("he", re.compile(_VERB_EN + r"hebrew\b|" + _VERB_TH + r"ภาษาฮีบรู", re.I)),
 ]
 #: English "can you speak X?" is a question about her: it moves nothing
 #: (the eval's S21-speak-zh: say yes, switch only when told).
@@ -139,6 +168,17 @@ _NEG_TH_AFTER = re.compile(r"\s*((ก็|ยัง)?\s*ไม่\s*(ได้|�
 _THIRD_TH = re.compile(r"((?<!ให้)(?<!ให้ )เขา|ภรรยา|ภริยา|สามี|แฟน|ลูก(?!ค้า)|เพื่อน|พ่อ|แม่|ญาติ)(ชาย|สาว|ๆ)?\s*(ของ)?\s*"
                        r"(ผม|ฉัน|ดิฉัน|เรา|หนู)?\s*(ก็|จะ|เอง|ยัง)?\s*$")
 _THAI_START = re.compile(r"\s*[฀-๿]")
+#: While a language is held (the menu): a request in a polite question's
+#: shape -- Thai ได้ไหม, Chinese 吗/能不能/会不会, Russian можете/можно ли -- is a
+#: question; what she answers decides (TalkLanguage._held). Unheld talks keep
+#: reading Thai ได้ไหม as a request ("Thai asks politely", 19 ต.ค.).
+_ASKS_POLITELY = re.compile(r"ได้\s*(ไหม|มั้ย|มั๊ย|หรือ\s*(เปล่า|ไม่)|รึ\s*(เปล่า|ป่าว)|ป่ะ|ปะ)|เป็น\s*(ไหม|มั้ย)"
+                            r"|吗|能不能|会不会|可不可以|можете|можно\s+ли|умеете", re.I)
+#: The guest accepting her offer of the language they asked about: a short
+#: yes in any of the menu's languages (a longer line counts by its language).
+_YES = re.compile(r"\s*(yes|yeah|yep|sure|ok(ay)?|please|of course|go ahead|ใช่|ได้|เอา|ครับ|ค่ะ|คะ|จ้า|โอเค|ตกลง"
+                  r"|да|конечно|пожалуйста|давайте|是|好|可以|对|行)", re.I)
+YES_LETTERS = 20
 #: "Can she speak Chinese?" asks about her (`_QUESTION_EN`), not about a third
 #: person: it stays a question, which moves nothing.
 _ASKS_HER_EN = re.compile(r"\b(can|could|do|does)\s+(you|she|emma)\s+(also\s+)?$", re.I)
@@ -186,6 +226,8 @@ def detect(text: str) -> str | None:
     if counts[best] > latin:
         # kana marks Japanese even among kanji; kanji alone read as Chinese
         return "ja" if counts["ja"] else best
+    if len(_VIET.findall(t)) >= max(2, latin // 6):
+        return "vi"
     words = re.findall(r"[a-zà-ɏ]+", t.lower())
     scores = {code: sum(w in vocab for w in words) for code, vocab in _WORDS.items()}
     lang = max(scores, key=scores.get)
@@ -214,22 +256,57 @@ class TalkLanguage:
     def __init__(self) -> None:
         self._utterances: list[str] = []
         self._open = False             # the last thing heard was the guest's
+        self._pinned: str | None = None    # chosen on the language menu
+        #: Both sides since the pick, as [role, text]: a held language follows
+        #: what SHE does after a language is raised (`language`), so her
+        #: replies are kept too, from the pick on.
+        self._after: list[list[str]] = []
+
+    def pin(self, code) -> bool:
+        """The guest chose `code` on the screen's language menu: the language
+        of this conversation from now on, whatever is heard (module doc).
+        A code this module cannot name changes nothing."""
+        if not isinstance(code, str) or code not in NAMES:
+            return False
+        self._pinned = code
+        self._after = []
+        self._open = False             # what she hears next is after the pick
+        return True
+
+    @property
+    def pinned(self) -> str | None:
+        """The language the call is held to (a pick, or a request after it),
+        or None while nothing has been picked."""
+        return self.language() if self._pinned is not None else None
 
     def guest(self, text: str) -> None:
         text = (text or "").strip()
         if not text:
             return
-        if self._open and self._utterances:
+        joined = bool(self._open and self._utterances)
+        if joined:
             self._utterances[-1] += " " + text
         else:
             self._utterances.append(text)
             self._open = True
+        if self._pinned is not None:
+            if joined and self._after and self._after[-1][0] == "guest":
+                self._after[-1][1] += " " + text
+            else:
+                self._after.append(["guest", text])
 
     def emma(self, text: str) -> None:
         if (text or "").strip():
             self._open = False
+            if self._pinned is not None:
+                if self._after and self._after[-1][0] == "emma":
+                    self._after[-1][1] += text
+                else:
+                    self._after.append(["emma", text])
 
     def language(self) -> str | None:
+        if self._pinned is not None:
+            return self._held()
         lang, locked, streak, run = None, False, None, 0
         for u in self._utterances:
             asked, question = asked_for(u)
@@ -262,6 +339,44 @@ class TalkLanguage:
                     lang, locked, streak, run = got, False, None, 0
         return lang
 
+    def _held(self) -> str:
+        """The language a picked talk is in now (module doc): the pick, moved
+        only by a plain request ("Please speak English", which she obeys at
+        once -- live eval cat 32), or by a QUESTION about a language that she
+        then answers in it, or that the guest then accepts (a yes, or a whole
+        sentence in it). Review 29 Oct: "Can you speak Russian?" -> "พูดได้ค่ะ
+        ต้องการให้ใช้ภาษารัสเซียไหมคะ" -> "Да, пожалуйста..." switched her while
+        every tool result kept saying Thai; and "พูดภาษาจีนได้ไหมคะ" (a Thai
+        request by the rules above) held Chinese over five Thai questions --
+        while a language is held, a polite question form is a question, and
+        what she answers decides."""
+        lang, raised = self._pinned, None
+        for role, text in self._after:
+            if role == "emma":
+                if raised and detect(text) == raised:
+                    lang, raised = raised, None        # she switched: follow her
+                continue
+            asked, question = asked_for(text)
+            if asked and not question and not _ASKS_POLITELY.search(text):
+                lang, raised = asked, None             # asked for plainly
+                continue
+            if asked:
+                raised = asked if asked != lang else None
+                continue
+            if raised and (detect(text) == raised
+                           or (_YES.match(text) and letters(text) <= YES_LETTERS)):
+                lang = raised                          # the guest took her offer
+            raised = None
+        return lang
+
+    def held_note(self) -> str | None:
+        """The note for a server-written turn (an announcement, a stall's
+        ask) while a language is held, else None. Those texts say "the
+        guest's language" -- right until the language is a pick: an English
+        pick with a Thai colleague's line in between asked its follow-up in
+        Thai (review 29 ต.ค.). Unheld talks keep their texts as they were."""
+        return self.note() if self._pinned is not None else None
+
     def note(self) -> str | None:
         """The line a tool result carries, or None before the guest has said
         anything that tells."""
@@ -269,6 +384,10 @@ class TalkLanguage:
         if lang is None:
             return None
         name = NAMES.get(lang, lang)
+        if self._pinned is not None:
+            return ("ลูกค้าเลือกภาษา%sเอง (เมนูภาษาบนจอหรือขอตรงๆ): ตอบเป็นภาษา%sเท่านั้นทุกคำตอบ "
+                    "แม้ได้ยินภาษาอื่น หรือข้อความในผลนี้เป็นภาษาอื่น; เปลี่ยนเมื่อลูกค้าเลือกใหม่ที่ปุ่มภาษา "
+                    "หรือขอเปลี่ยนภาษาตรงๆ เท่านั้น" % (name, name))
         return ("ภาษาของบทสนทนานี้คือภาษา%s: ตอบเป็นภาษา%sทั้งคำตอบ แม้ข้อความในผลนี้เป็นภาษาอื่น; "
                 "คำสั้นหรือประโยคเดียวที่ฟังเหมือนภาษาอื่น (สำเนียง เสียงหลุด) ไม่ใช่การเปลี่ยนภาษา "
                 "เปลี่ยนเมื่อลูกค้าขอ หรือพูดภาษาใหม่สองประโยคติดเท่านั้น" % (name, name))

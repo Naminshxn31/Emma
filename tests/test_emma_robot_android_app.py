@@ -16,8 +16,29 @@ def test_production_android_app_is_independent_and_portrait():
     assert 'rootProject.name = "EmmaRobotAndroid"' in settings
     assert "applicationId 'com.emma.robot.control'" in build
     assert 'android:screenOrientation="portrait"' in manifest
-    assert 'android:label="Emma Robot"' in manifest
+    # The label is a resValue since "Emma Event" (owner 30 Oct) is built from
+    # the same sources: a plain build is still "Emma Robot".
+    assert 'android:label="@string/app_label"' in manifest
+    assert "resValue 'string', 'app_label', emmaEvent ? 'Emma Event' : 'Emma Robot'" in build
     assert (APP / "app" / "libs" / "aoborobotsdk-v2.1.2.aar").is_file()
+
+
+def test_emma_event_is_a_second_package_only_when_asked_for():
+    """`-PemmaApp=event` builds the event host's app beside this one: its own
+    package (own icon, own settings), the face opened with event=1. Without
+    the property the build is the robot app, unchanged."""
+    build = (APP / "app" / "build.gradle").read_text(encoding="utf-8")
+    face = (JAVA / "EmmaFace.java").read_text(encoding="utf-8")
+    main = (JAVA / "MainActivity.java").read_text(encoding="utf-8")
+
+    assert "def emmaEvent = project.findProperty('emmaApp') == 'event'" in build
+    assert "if (emmaEvent) {\n            applicationId 'com.emma.robot.event'" in build
+    assert 'page.appendQueryParameter("event", "1")' in face
+    load = face.split("private void loadEmma()", 1)[1].split("webView.loadUrl", 1)[0]
+    assert "isEventApp(" in load
+    # the sibling app lets go of the arm's serial port before this one takes it
+    stop = main.split("private void stopConflictingVendorApp()", 1)[1].split("\n    }\n", 1)[0]
+    assert "siblingPackage()" in stop
 
 
 def test_production_app_starts_motion_locked_and_stops_on_control_loss():

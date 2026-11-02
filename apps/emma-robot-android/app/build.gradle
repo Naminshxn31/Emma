@@ -2,12 +2,26 @@ plugins {
     id 'com.android.application'
 }
 
+// "Emma Event" (owner 30 Oct 2026: "ทำโหมดใหม่ แยกเป็นอีกแอป ... แยกกับแอพตอนนี้
+// ก่อนนะ"): the same sources built as a second app beside this one --
+//     gradlew assembleDebug -PemmaApp=event
+// Its own package = its own icon and its own settings (server, token, nav and
+// body switches, arm poses -- none carried over), installed beside
+// com.emma.robot.control without touching it. EmmaFace opens the face with
+// event=1 for it (the event host, app/event_host.py). A plain build is this
+// app, unchanged.
+def emmaEvent = project.findProperty('emmaApp') == 'event'
+
 android {
     namespace 'com.emma.robot.control'
     compileSdk 34
 
     defaultConfig {
         applicationId 'com.emma.robot.control'
+        if (emmaEvent) {
+            applicationId 'com.emma.robot.event'
+        }
+        resValue 'string', 'app_label', emmaEvent ? 'Emma Event' : 'Emma Robot'
         minSdk 26
         targetSdk 34
         versionCode 1

@@ -156,11 +156,11 @@ def run_fence() -> None:
     stays open (a PC `robot_python run` with no face page is the operator
     at the PC).
     """
-    from app import robot_face_link
+    from app import event_walk, robot_face_link
     from app.config import settings
 
     activity = robot_face_link.nav_activity()
-    if activity in ("active", "stale"):
+    if activity in ("active", "stale") or event_walk.walking():
         logger.warning("chassis primitive refused — a route run is active on the robot")
         raise Fenced("run_active")
     if activity == "unknown" and settings.robot_nav_routes_enabled:

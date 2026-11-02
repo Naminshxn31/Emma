@@ -413,6 +413,10 @@ def test_compare_unit_types_result_leads_with_use_not_inventory_numbers(monkeypa
     assert "ห้ามสรุปว่าแบบใดเหมาะลงทุนหรืออยู่เอง" in out["instruction"]
     assert "ห้ามถามคำถามต่อท้าย" in out["instruction"]
     assert "เทียบให้ฟังสั้นๆ จากตัวเลข" not in out["instruction"]
+    # replay of 20 Oct (27 Oct): "I want one bedroom." -> "There are 572 one-bedroom
+    # units available"; the count is said only when the guest asks how many
+    assert "พูดจำนวนห้องว่างเฉพาะเมื่อลูกค้าถามว่ามีกี่ห้องหรือเหลือกี่ห้อง" in out["instruction"]
+    assert "ใช้จำนวน ขนาด" not in out["instruction"]
 
 
 def test_pasted_annotation_junk_does_not_take_the_link_down(monkeypatch):

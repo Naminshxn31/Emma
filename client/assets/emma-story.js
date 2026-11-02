@@ -244,6 +244,194 @@
     return out;
   };
 
+  // ------------------------------------------------------------- the caption
+  // Her reply line on the robot face, word by word WITH her voice (owner 27
+  // Oct: "อันนี้มันยาวเกินไม่สวย อยากให้ทำเป็น motion ตัวหนังสือ"). The page
+  // painted the whole turn's text the moment it arrived -- seconds ahead of
+  // her voice, the text comes several times faster than she speaks -- and a
+  // guest asked her the same day to say it again ("ฟังไม่ทัน"). The owner kept
+  // her pace; the words follow it on this clock, the beats' own: a word may
+  // go up once the audio carrying its LAST character has played, less
+  // `leadS`, never when its text arrives. Pure, like the clock (node runs it
+  // in tests/client_captions.cjs); the page owns the DOM (voice-preview.html,
+  // `captions`).
+  var CAPTION = {
+    leadS: 0.25,      // a word may show this long before her voice finishes it
+    endMs: 1500,      // her audio has played out, no turn_complete: the rest after this
+    quietMs: 500,     // no new audio this long mid-turn: her last piece's audio is all here
+    slackS: 0.6,      // the page's clock runs this far behind the context's (output latency, <= 0.5)
+    noAudioMs: 3000,  // text and no audio (or audio that never plays) this long: as it is
+    holdWords: 8      // word segments after the last space that wait for more text (split)
+  };
+  var OPENER = /^[(\[{"'“‘]+$/;      // goes with the word after it
+  var REPEAT = /^[ๆฯ]+$/;             // Thai repetition marks go with the word before
+  // A lone Thai consonant is the segmenter missing a loanword, not a word:
+  // "สปา" came out "ส" + "ปา", and the caption broke the line between them
+  // (27 Oct, first render). It goes with the Thai after it.
+  var LONE_TH = /^[ก-ฮ]$/, TH_START = /^[ก-ฮเ-ไ]/;
+  var SPACE = /^\s+$/;
+  var segmenters = {};
+  // [{s, word}] -- words never split: Thai has no spaces, so the browser's
+  // own word segmenter (Chrome 124 has Intl.Segmenter), else whitespace.
+  function segments(text, lang) {
+    var out = [];
+    var Seg = typeof Intl === 'object' && Intl ? Intl.Segmenter : null;
+    if (typeof Seg === 'function') {
+      try {
+        var seg = segmenters[lang] || (segmenters[lang] = new Seg(lang, { granularity: 'word' }));
+        var it = seg.segment(text)[Symbol.iterator]();
+        for (var r = it.next(); !r.done; r = it.next()) out.push({ s: r.value.segment, word: !!r.value.isWordLike });
+        return out;
+      } catch (e) { out = []; }
+    }
+    String(text).split(/(\s+)/).forEach(function (s) { if (s) out.push({ s: s, word: !SPACE.test(s) }); });
+    return out;
+  }
+  function Caption() {
+    this.clock = new BeatClock([]);
+    this.raw = '';         // her transcript of this answer, as it came
+    this.cut = 0;          // characters of `raw` already made into words
+    this.words = [];       // {t: the word as written, sep: a space before it, end: `norm` chars through it}
+    this.normAt = 0;
+    this.sep = false;      // a space is owed before the next word
+    this.shown = 0;        // words that may be on screen
+    this.firstText = null; // wall-clock ms of her first text
+    this.audioAt = null;   // wall-clock ms of the latest audio chunk
+    this.stuckSince = 0;   // wall ms her audio clock stood at its start, nothing played
+    this.overSince = 0;    // wall ms her voice was first seen played out
+  }
+  // An audio chunk the page scheduled for this answer: [start, start + dur).
+  Caption.prototype.audio = function (start, dur, wall) {
+    this.clock.audio(start, dur);
+    this.audioAt = wall;
+    this.overSince = 0;    // more of her voice: whatever was "over" is not
+  };
+  Caption.prototype.text = function (piece, wall) {
+    piece = String(piece == null ? '' : piece);
+    if (!piece) return;
+    this.clock.addText(piece);
+    this.raw += piece;
+    if (this.firstText == null) this.firstText = wall;
+    // a new piece after her voice played out (a tool call, a stalled stream)
+    // is not "over": it waits for its own audio (review 27 Oct: it showed
+    // whole on arrival, from a stale overSince)
+    this.overSince = 0;
+    this.quiet = false;    // more text came: the stream is not quiet
+    this.split(false);
+  };
+  // turn_complete: her text is all in (and her audio, once some has come)
+  Caption.prototype.complete = function () { this.clock.turnComplete(); this.split(true); };
+  Caption.prototype.split = function (all) {
+    var rest = this.raw.slice(this.cut);
+    if (!rest) return;
+    var segs = segments(rest, this.clock.lang || scriptOf(rest) || 'th');
+    var stop = segs.length;
+    // A piece may end inside a word ("ห้อง" + "นอน", "51." + "5", "Bioge" +
+    // "nesis") -- and a half word is not one segment: "สำหรั" segments
+    // "สำ" + "หรั", "อำนวยค" "อำ" + "นวย" + "ค", so holding only the last
+    // segment let "สำ|หรับ", "มา|กมาย" through (review 27 Oct). Text up to
+    // the last space is final (the segmenter never looks across one). After
+    // it, the dictionary looks a few words ahead, so the last `holdWords`
+    // word segments of that run wait for more text (measured on the 63
+    // catalog stories' Thai, cut into pieces of every size 1-40: holding 5
+    // still let a wrong word out in 29 of 2,560 runs, 6 in none; 8 for
+    // margin) -- not the whole run, which would hold the first words of a
+    // long first clause back by up to a second (estimated, not measured). That
+    // costs nothing either: the clock cannot place a piece's text before the
+    // next piece comes.
+    if (!all && !/\s$/.test(rest)) {
+      var run = segs.length, held = 0, k;
+      for (k = segs.length - 1; k >= 0 && !SPACE.test(segs[k].s); k--) run = k;
+      for (k = segs.length - 1; k >= run && held < CAPTION.holdWords; k--) if (segs[k].word) { held++; stop = k; }
+      if (held < CAPTION.holdWords) stop = run;
+      // never between pieces glued together (an opener, a lone consonant,
+      // a repetition mark or punctuation and the word they go with)
+      while (stop > run && (OPENER.test(segs[stop - 1].s) || LONE_TH.test(segs[stop - 1].s) ||
+                            REPEAT.test(segs[stop].s) || !segs[stop].word)) stop--;
+    }
+    var cur = null, made = [];
+    for (var j = 0; j < stop; j++) {
+      var s = segs[j].s;
+      this.cut += s.length;
+      if (SPACE.test(s)) { this.sep = true; cur = null; continue; }
+      // Punctuation closes the word before it ("Emma." "ค่ะ," "เยอะๆ"); a word
+      // after an opener ("(Sky" ) joins it -- one piece, so a line never
+      // starts on a comma or ends on a bracket. Within this batch only: a word
+      // already on screen is never rewritten.
+      if (cur && (cur.open || !segs[j].word || REPEAT.test(s) || (LONE_TH.test(cur.t) && TH_START.test(s)))) {
+        cur.t += s;
+        if (segs[j].word) cur.open = false;
+        continue;
+      }
+      cur = { t: s, sep: this.sep && this.words.length + made.length > 0, open: !segs[j].word && OPENER.test(s) };
+      this.sep = false;
+      made.push(cur);
+    }
+    for (var m = 0; m < made.length; m++) {
+      this.normAt += norm(made[m].t).length;
+      this.words.push({ t: made[m].t, sep: made[m].sep, end: this.normAt });
+    }
+  };
+  Caption.prototype.all = function () {
+    this.split(true);
+    this.shown = this.words.length;
+    return this.shown;
+  };
+  // How many words may be on screen at `now` (the page's audio clock, null
+  // = it has none: as the text comes) and `wall` (ms, for the fallbacks).
+  Caption.prototype.due = function (now, wall) {
+    var c = this.clock;
+    if (now == null) return this.all();
+    if (!c.segs.length) {
+      return this.firstText != null && wall - this.firstText > CAPTION.noAudioMs ? this.all() : this.shown;
+    }
+    var played = c.played(now);
+    if (!(played > 0)) {
+      // Nothing of it has played yet. Queued behind her previous answer's
+      // voice (gemini-3.8 completes a turn before its tool call and speaks
+      // again after it): its start is still ahead on the audio clock, so it
+      // waits, however long -- timed from the chunk's arrival, a whole answer
+      // stood up ~7 s before she said it (review 27 Oct). A clock standing
+      // at the start (a suspended context: it never plays): as it is, after
+      // a while.
+      if (now < c.segs[0][0] - CAPTION.slackS) { this.stuckSince = 0; return this.shown; }
+      if (!this.stuckSince) this.stuckSince = wall;
+      return wall - this.stuckSince > CAPTION.noAudioMs ? this.all() : this.shown;
+    }
+    this.stuckSince = 0;
+    // No audio for a while in the middle of her turn (a tool call with no
+    // turn_complete before it, a pause in the stream): her last piece's
+    // audio is all here, so its words are placed by it -- not held for a
+    // next piece that is not coming, then shown all at once after her
+    // voice ended (review 27 Oct).
+    // The held word tail is released only once her voice reaches it: released
+    // with the settle, a word split across a >0.5 s gap in the stream came
+    // out in two ("ความ | สะ | ดวก", audit 27 Oct) -- the hold rule above.
+    if (c.pend.length && c.audioSince && wall - this.audioAt > CAPTION.quietMs) { c.settleText(); this.quiet = true; }
+    // (her voice at the END of the text so far: the last word made is not
+    // enough -- with a whole Thai run held, that is its first word, and the
+    // half word went out at once)
+    if (this.quiet && this.cut < this.raw.length &&
+        c.charTime(Math.max(0, norm(this.raw).length - 1)) <= played + CAPTION.leadS) this.split(true);
+    if (played >= c.sched - CLOCK.endEpsS) {
+      // her voice has played out: with turn_complete, all of it; without
+      // one (a rotation, a stalled stream, text that came after its audio),
+      // a moment after the later of her voice ending and her last text
+      if (c.complete) return this.all();
+      if (!this.overSince) this.overSince = wall;
+      else if (wall - this.overSince > CAPTION.endMs) return this.all();
+    } else {
+      this.overSince = 0;
+    }
+    while (this.shown < this.words.length &&
+           c.charTime(Math.max(0, this.words[this.shown].end - 1)) <= played + CAPTION.leadS) this.shown++;
+    return this.shown;
+  };
+  // Words not on screen yet, or text not yet made into words.
+  Caption.prototype.pending = function () {
+    return this.shown < this.words.length || this.cut < this.raw.length;
+  };
+
   // ------------------------------------------------------------- DOM helpers
 
   function el(tag, cls, text) {
@@ -267,6 +455,8 @@
     return String(t == null ? '' : t)
       .replace(/(\d)\s+(km|min|hr|h|m|sq\.m\.|SQ\.M\.)(?![A-Za-z])/g, '$1\u00a0$2')
       .replace(/≈\s+/g, '≈\u00a0')
+      // "≤ 31.4 sq.m." broke after its "≤" (ice_bath_where, audit 27 Oct)
+      .replace(/([≤≥<>~])\s+(?=\d)/g, '$1\u00a0')
       .replace(/\s·\s/g, ' ·\u00a0');
   }
   function fmt(x, dec) {
@@ -292,6 +482,16 @@
     catch (e) { return false; }
   }
   var TOP_VH = 14;       // below the status pill and her caption band
+  // The templates with a landscape layout (the room TV, Story.land). Each
+  // one keeps its beats and its parts; only where things go changes. distance
+  // and neighborhood (no story uses them) stay portrait: the page shows the
+  // robot's own screen for those.
+  var LAND = { spotlight: 1, metric: 1, features: 1, stack: 1, drill: 1, map: 1, journey: 1,
+               assembly: 1, details: 1, slabs: 1 };
+  // The landscape unit: one robot "vw" is 0.9% of the stage's height -- the
+  // chips' 3.4vw type is ~3% of the TV's height (~64 px of a 4K TV), about
+  // what the portrait story fitted to the TV made it (v2, read from 3-6 m).
+  var LAND_UNIT = 0.009;
   // a plan: on white paper, or on the dark stage when the picture is
   // transparent lines (the build's lines_to_alpha)
   function planClass(it) {
@@ -335,6 +535,24 @@
     this.root.addEventListener('click', function (e) { self.onPictureTap(e); });
     this.W = this.root.clientWidth || root.innerWidth || 1080;
     this.H = this.root.clientHeight || root.innerHeight || 1920;
+    // The room TV (owner 29 Oct: "ทำเรื่องเล่าแบบแนวนอน"): the SAME story laid
+    // out across a landscape stage -- the picture large on one side, its words
+    // and figures beside it -- asked for by the page (opts.layout), never on
+    // the robot. W/H become the robot's screen scaled to the stage (so every
+    // size a template computes from them is the robot's at that scale, as is
+    // every CSS size: --es-vw/--es-vh, set here on the root), and LW/LH are
+    // the stage the landscape branches (`S.land`) place things in.
+    this.land = this.opts.layout === 'land' && LAND[data.template] === 1 && this.W > this.H;
+    if (this.land) {
+      this.LW = this.W; this.LH = this.H;
+      var unit = this.LH * LAND_UNIT;
+      this.W = unit * 100; this.H = unit * 100 * 1920 / 1080;
+      this.root.style.setProperty('--es-vw', unit.toFixed(3) + 'px');
+      this.root.style.setProperty('--es-vh', (unit * 1920 / 1080).toFixed(3) + 'px');
+      this.root.classList.add('es-land');
+      this.M = Math.round(this.LH * 0.03);       // the stage's margin
+      this.G = Math.round(this.LW * 0.028);      // between a picture and its words
+    }
     // The overview's chips are laid out now (still invisible), so the lowest
     // point content may reach is measured, not guessed: three chips can wrap
     // onto three rows.
@@ -344,8 +562,9 @@
       var top = this.tapRow.offsetTop;
       this.floorY = top > this.H * 0.5 ? top - this.H * 0.015 : this.H * 0.885;
     }
+    if (this.land) this.floorY = this.LH - this.M;
     this.tpl = TEMPLATES[data.template](this, p);
-    if (BALANCED[data.template]) this.balance();
+    if (BALANCED[data.template] && !this.land) this.balance();
     if (this.tpl.layout) this.tpl.layout();
     this.t0 = Date.now();
     this.fireAt = [];
@@ -519,11 +738,24 @@
   Story.prototype.onPictureTap = function (e) {
     if (this.dead) return;
     if (this.zoomView && this.zoomView.contains(e.target)) { this.closeZoom(); return; }
+    // A thumbnail in the drill's strip is the strip's own control: it brings
+    // its place's card up, on this screen, and sends nothing (TEMPLATES.drill).
+    // Its picture is a story picture too, so this listener -- the root's,
+    // after the thumbnail's own -- opened it large and sent its "more" tap
+    // as well (review 27 Oct).
+    if (e.target && e.target.closest && e.target.closest('.es-thumb')) return;
     var pick = null;
     var under = document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [e.target];
     for (var k = 0; k < under.length && !pick; k++) {
       var n = under[k];
       if (n && n._zoom && this.root.contains(n) && seen(n, this.root)) pick = n;
+    }
+    // ...or, on a row with no story of its own (the stack's .es-pictap), that
+    // row's picture wherever the row was tapped
+    if (!pick && e.target && e.target.closest) {
+      var row = e.target.closest('.es-pictap');
+      var im = row && this.root.contains(row) ? row.querySelector('.es-zoomable') : null;
+      if (im && im._zoom && seen(im, this.root)) pick = im;
     }
     if (!pick) return;
     this.showZoom(pick._zoom, pick.src, pick.naturalWidth, pick.naturalHeight);
@@ -553,6 +785,8 @@
     // a 640 px portrait stayed a third of the screen -- "enlarged" was not
     // (16 Oct, the first recording of every picture tap).
     var W = this.root.clientWidth || this.W, H = this.root.clientHeight || this.H;
+    // the landscape stage: the whole stage is its room (no caption band)
+    if (this.land) H = H * 0.78 / 0.58;
     if (nw > 0 && nh > 0) {
       var s = Math.min(W * 0.94 / nw, H * 0.58 / nh);
       im.style.width = Math.round(nw * s) + 'px';
@@ -646,7 +880,13 @@
     var self = this, dec = decimals(v), range = num(v.from) != null;
     var node = el('em', (cls || 'es-v') + (range ? ' es-range' : ''));
     if (v.prefix_en) node.appendChild(document.createTextNode(v.prefix_en + ' '));
-    var b = el('span', null, range ? fmt(v.to, dec) : fmt(0, dec));
+    // A value under 100 never counts (it lands): it starts at its own figure.
+    // It started at "0" -- "0 sq.m.", "0 items" at full strength on every
+    // room-type card for the 350 ms before go() (audit 27 Oct). One that
+    // counts starts at the dimmed round step 0, as its count goes on.
+    var counts = !range && countStep(v.to) > 0;
+    var b = el('span', null, range || !counts ? fmt(num(v.to) != null ? v.to : 0, dec) : fmt(0, dec));
+    if (counts) { b.classList.add('es-count'); b.classList.add('es-counting'); }
     // its final figure is known now: an overview put up before go() ran (the
     // guest cut in) shows it, not "≈ 0 CAR SPACES" (review 13 Oct)
     if (!range) { b._final = fmt(num(v.to) != null ? v.to : 0, dec); self.counts.push(b); }
@@ -685,6 +925,134 @@
     b.style.width = b._w + 'px'; b.style.height = b._h + 'px';
     b.style.left = b._left + 'px'; b.style.top = b._top + 'px';
     return b;
+  };
+  // ---- landscape (the room TV) ----
+  // A frame of the picture's own shape, at most maxW x maxH px, its top-left
+  // at (left, top) of the stage.
+  Story.prototype.lbox = function (ref, maxW, maxH, left, top, cls) {
+    var ar = ref && ref.w && ref.h ? ref.w / ref.h : 4 / 3;
+    var w = maxW, h = w / ar;
+    if (h > maxH) { h = maxH; w = h * ar; }
+    var b = el('div', 'es-box' + (cls ? ' ' + cls : ''));
+    b._w = Math.round(w); b._h = Math.round(h); b._left = Math.round(left); b._top = Math.round(top);
+    b.style.width = b._w + 'px'; b.style.height = b._h + 'px';
+    b.style.left = b._left + 'px'; b.style.top = b._top + 'px';
+    return b;
+  };
+  // A block put where the landscape layout wants it (its CSS left/right in
+  // robot units would span the stage): left/top/width in px, null = unset.
+  Story.prototype.place = function (node, left, top, width, height) {
+    if (left != null) { node.style.left = Math.round(left) + 'px'; node.style.right = 'auto'; }
+    if (top != null) { node.style.top = Math.round(top) + 'px'; node.style.bottom = 'auto'; }
+    if (width != null) { node.style.width = Math.round(width) + 'px'; node.style.maxWidth = 'none'; }
+    if (height != null) node.style.height = Math.round(height) + 'px';
+    return node;
+  };
+  // The picture side of a landscape story: pictures sharing one width (the
+  // narrower sets it, as on the robot) as tall as the stage allows, and the
+  // column beside them for the words (`info`: false = none, the picture
+  // centred; true = 30% of the stage at least; a number = that share). The
+  // two are centred together, the words never wider than 42% of the stage.
+  Story.prototype.lpics = function (refs, info) {
+    var M = this.M, G = this.G, LW = this.LW, LH = this.LH;
+    var need = info ? Math.round(LW * (info === true ? 0.3 : info)) : 0;
+    var vh = LH - 2 * M, w = LW - 2 * M - (info ? G + need : 0);
+    refs.forEach(function (ref) { if (ref && ref.w > 0 && ref.h > 0) w = Math.min(w, vh * ref.w / ref.h); });
+    var h = 0;
+    refs.forEach(function (ref) {
+      var ar = ref && ref.w > 0 && ref.h > 0 ? ref.w / ref.h : 4 / 3;
+      h = Math.max(h, Math.min(vh, w / ar));
+    });
+    if (!refs.some(function (ref) { return ref; })) h = vh;
+    var infoW = info ? Math.min(Math.round(LW * 0.42), LW - 2 * M - G - w) : 0;
+    var group = w + (info ? G + infoW : 0);
+    var left = Math.round((LW - group) / 2);
+    return { left: left, top: Math.round((LH - h) / 2), w: w, h: h, maxH: vh,
+             infoLeft: Math.round(left + w + G), infoW: Math.round(infoW) };
+  };
+  // The picture(s) and the blocks of words that go with them (top to
+  // bottom), laid out the way that leaves the picture more of the stage:
+  // BESIDE it (the words in a column on the right, centred on the picture)
+  // or, when the picture is wide, UNDER it (the words as wide as the
+  // picture, the whole centred). Measured, before anything shows: each
+  // block at the width it would have. `prep(mode)` lets a template set a
+  // block's own columns for that mode first. The blocks are placed here;
+  // the picture's frame comes back ({left, top, w, maxH, mode}).
+  Story.prototype.lplace = function (refs, blocks, prep) {
+    var M = this.M, G = this.G, LW = this.LW, LH = this.LH, gap = Math.round(this.H * 0.025);
+    blocks = blocks.filter(function (b) { return b; });
+    var mode = 'side';
+    function heightAt(w) {
+      var t = 0;
+      blocks.forEach(function (b) { b.style.width = Math.round(w) + 'px'; b.style.maxWidth = 'none'; });
+      if (prep) prep(mode);
+      blocks.forEach(function (b, k) { t += (b.offsetHeight || 0) + (k ? gap : 0); });
+      return t;
+    }
+    function widthFor(avail, cap) {
+      var w = cap;
+      refs.forEach(function (ref) { if (ref && ref.w > 0 && ref.h > 0) w = Math.min(w, avail * ref.w / ref.h); });
+      return w;
+    }
+    function tallest(w) {
+      var h = 0;
+      refs.forEach(function (ref) { var ar = ref && ref.w > 0 && ref.h > 0 ? ref.w / ref.h : 4 / 3; h = Math.max(h, w / ar); });
+      return h;
+    }
+    var vh = LH - 2 * M;
+    // the words' column as narrow as its longest line allows (22-30% of the
+    // stage): short chips leave the picture more width
+    var need = true;
+    if (blocks.length) {
+      var nat = 0;
+      blocks.forEach(function (b) { b.style.width = 'max-content'; });
+      if (prep) prep('side');
+      blocks.forEach(function (b) { nat = Math.max(nat, b.offsetWidth || 0); });
+      if (nat > 0) need = Math.max(0.22, Math.min(0.3, (nat + 4) / LW));
+    }
+    var side = this.lpics(refs, blocks.length ? need : false), sideH = blocks.length ? heightAt(side.infoW) : 0;
+    var g = { mode: 'side', left: side.left, top: side.top, w: side.w, maxH: vh };
+    if (blocks.length) {
+      mode = 'stack';
+      var ih = heightAt(LW * 0.7), w = 0, avail = 0;
+      for (var it = 0; it < 2; it++) {
+        avail = vh - ih - gap * 1.5;
+        w = widthFor(avail, LW - 2 * M);
+        ih = heightAt(Math.max(w, LW * 0.5));
+      }
+      avail = vh - ih - gap * 1.5;
+      w = widthFor(avail, LW - 2 * M);
+      var h = Math.min(avail, tallest(w));
+      // under it only when that gives the picture clearly more of the
+      // stage: the landscape stage reads side by side
+      if (avail > LH * 0.3 && w * h > side.w * Math.min(vh, tallest(side.w)) * 1.2) {
+        var bw = Math.max(w, LW * 0.5);
+        ih = heightAt(bw);
+        var top = Math.max(M, Math.round((LH - (h + gap * 1.5 + ih)) / 2)), y = top + h + gap * 1.5;
+        blocks.forEach(function (b) {
+          b.style.left = Math.round((LW - bw) / 2) + 'px'; b.style.right = 'auto';
+          b.style.top = Math.round(y) + 'px'; b.style.bottom = 'auto';
+          y += (b.offsetHeight || 0) + gap;
+        });
+        return { mode: 'stack', left: Math.round((LW - w) / 2), top: top, w: w, maxH: avail };
+      }
+      mode = 'side';
+      sideH = heightAt(side.infoW);
+      var y0 = Math.max(M, Math.min(LH - M - sideH, side.top + Math.min(vh, tallest(side.w)) / 2 - sideH / 2));
+      blocks.forEach(function (b) {
+        b.style.left = side.infoLeft + 'px'; b.style.right = 'auto';
+        b.style.top = Math.round(y0) + 'px'; b.style.bottom = 'auto';
+        y0 += (b.offsetHeight || 0) + gap;
+      });
+    }
+    return g;
+  };
+  // A block in the words' column, centred on the picture's middle, inside the stage.
+  Story.prototype.lmid = function (node, mid) {
+    var h = node.offsetHeight || 0;
+    var top = Math.max(this.M, Math.min(this.LH - this.M - h, mid - h / 2));
+    node.style.top = Math.round(top) + 'px';
+    return top;
   };
   Story.prototype.spot = function (x, y) {
     var s = el('div', 'es-spot');
@@ -861,15 +1229,36 @@
     // a guest taps, and three small rows left the lower half of the screen bare
     var dock = S.add(el('div', 'es-dock' + (items.length <= 3 ? ' roomy' : '')));
     var LIST_TOP = S.H * 0.15;
+    // landscape: the list down the left of the stage at its own size from the
+    // start, each item's big card on the right as tall as the stage; at rest
+    // the last card stays up beside the list (a picture, not an empty half)
+    var LD = null;
+    if (S.land) {
+      // more than four: the list in two columns (eight room types in one
+      // column came out at 0.43 of their size)
+      var two = items.length > 4, dw = Math.round(S.LW * (two ? 0.54 : 0.4));
+      LD = { dw: dw, two: two, cardLeft: S.M + dw + S.G, cardW: S.LW - 2 * S.M - dw - S.G, k: 1 };
+      LIST_TOP = S.M;
+      S.place(dock, S.M, null, dw);
+      // columns that never grow past their half (a long name wraps instead)
+      if (two) { dock.classList.add('two'); dock.style.display = 'grid'; dock.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))'; }
+    }
     dock.style.top = Math.round(LIST_TOP) + 'px';
     // the big card may come down to just above Emma's head (it stopped at
     // 68% of the height: a third of the screen stood empty under every plan)
     var SMALL = 0.56, CARD_BOTTOM = S.contentBottom() - S.H * 0.008;
+    if (LD) CARD_BOTTOM = S.LH - S.M;
     var rows = items.map(function (it) {
       var tapId = it.tap && S.taps[it.tap] ? it.tap : null;
       var row = el(tapId ? 'button' : 'div', 'es-row');
       var th = el('div', 'es-th' + planClass(it));
-      if (it.asset) th.appendChild(S.img(it.asset));
+      var pic = it.asset ? th.appendChild(S.img(it.asset)) : null;
+      // A row with no story of its own is its picture (owner 27 Oct, room
+      // types: "1 Bedroom, large", the combined units -- only the small plan
+      // answered a tap, the words were dead): a tap anywhere on it opens that
+      // plan large and asks her for more, as the plan itself does
+      // (onPictureTap). A row with a story keeps its own tap.
+      if (!tapId && pic && pic._zoom) row.classList.add('es-pictap');
       var tx = el('div', 'es-tx');
       tx.appendChild(el('b', null, it.label_en || ''));
       if (it.sub_en) tx.appendChild(el('span', null, tidy(it.sub_en)));
@@ -884,6 +1273,7 @@
     });
     var hint = p.end_hint_en ? S.add(el('p', 'es-hint es-fade', p.end_hint_en)) : null;
     if (hint) hint.style.bottom = Math.round(S.H - S.floorY + S.H * 0.01) + 'px';
+    if (hint && LD) { S.place(hint, S.M, null, LD.dw); hint.style.bottom = S.M + 'px'; }
     // The list at rest fills the tall screen: each row's picture as large as
     // its share of the height allows (two layouts, measured once before
     // anything shows). Three room plans were 25vw thumbnails in a list that
@@ -892,17 +1282,35 @@
       var n = rows.length;
       if (!n) return;
       var limit = S.contentBottom();
+      if (LD) limit = S.LH - S.M;
       if (hint && hint.offsetTop) limit = Math.min(limit, hint.offsetTop - S.H * 0.012);
       var gap = S.H * (n <= 3 ? 0.022 : 0.016), pad = S.W * 0.02;
       var each = (limit - LIST_TOP - gap * (n - 1)) / n;
+      if (LD && LD.two) { var rn = Math.ceil(n / 2); each = (limit - LIST_TOP - gap * (rn - 1)) / rn; }
       // 36vw at most: wider, a long size ("51.5–52.5 sq.m.") ran off the row
       var tw = Math.max(S.W * 0.22, Math.min(S.W * (n <= 3 ? 0.36 : 0.3), (each - pad * 2) * 4 / 3));
+      if (LD) tw = Math.min(tw, LD.dw * (LD.two ? 0.14 : 0.4));
       dock.style.gap = Math.round(gap) + 'px';
       rows.forEach(function (r) { var th = r.querySelector('.es-th'); if (th) th.style.width = Math.round(tw) + 'px'; });
       // while she talks the list is small under her caption: one row about
       // 8.5% of the height, whatever size the rows are at rest
       var rh = rows[0].offsetHeight || 0;
       if (rh > 0) SMALL = Math.max(0.36, Math.min(0.56, S.H * 0.085 / rh));
+      // eight layouts (22 Oct): seven docked rows at 0.56 reached ~y 1000 and
+      // the last cards had 480 px for a title and a plan -- the combined
+      // one-bedrooms' plan came up 49 x 29 px (audit 27 Oct)
+      if (n > 5) SMALL = 0.36;
+      if (LD) {
+        // the whole list in its column: smaller when long, centred when short
+        var room = limit - LIST_TOP, lh = dock.offsetHeight || 0;
+        LD.k = lh > room ? room / lh : 1;
+        // the cards start where the (smaller) list ends
+        LD.cardLeft = Math.round(S.M + LD.dw * LD.k + S.G);
+        LD.cardW = S.LW - S.M - LD.cardLeft;
+        dock.style.transformOrigin = '0 0';
+        if (LD.k < 1) dock.style.transform = 'scale(' + LD.k.toFixed(4) + ')';
+        else dock.style.top = Math.round(LIST_TOP + (room - lh) / 2) + 'px';
+      }
     })();
     var cur = null, presented = false;
     // Her opening line names no item ("We have three room types"): the rows
@@ -911,6 +1319,7 @@
     function ghosts() { rows.forEach(function (r) { if (!r.classList.contains('on')) r.classList.add('ghost'); }); }
     // the next card's top: under the last row already in the list
     function cardTop() {
+      if (LD) return S.M;
       var top = LIST_TOP, base = S.root.getBoundingClientRect().top || 0;
       rows.forEach(function (r) {
         if (r.classList.contains('on') || r._docked) top = Math.max(top, r.getBoundingClientRect().bottom - base + S.H * 0.012);
@@ -924,6 +1333,7 @@
       var top = S.instant ? LIST_TOP : cardTop();
       big.style.top = Math.round(top) + 'px';
       big.style.height = Math.round(CARD_BOTTOM - top) + 'px';
+      if (LD) S.place(big, LD.cardLeft, null, LD.cardW);
       var ph = el('div', 'es-ph');
       if (it.asset) ph.appendChild(S.img(it.asset));
       var lab = el('div', 'es-lab');
@@ -935,6 +1345,14 @@
       big.appendChild(ph);
       big.appendChild(lab);
       S.add(big);
+      // the picture keeps a fifth of the screen under its title, over the
+      // last docked rows if it must (they are back in the list at the end)
+      var minH = (lab.offsetHeight || 0) + S.H * 0.2;
+      if (!LD && !S.instant && CARD_BOTTOM - top < minH) {
+        top = Math.max(LIST_TOP, CARD_BOTTOM - minH);
+        big.style.top = Math.round(top) + 'px';
+        big.style.height = Math.round(CARD_BOTTOM - top) + 'px';
+      }
       S.reveal(big, function () { if (v) S.later(350, v.go); });
       cur = { big: big, k: k };
     }
@@ -971,7 +1389,7 @@
     return {
       // after balance(): the small list sits under the caption band
       layout: function () {
-        if (S.instant) return;
+        if (S.instant || LD) return;
         small = true;
         var dy = Math.round(LIST_TOP - (parseFloat(dock.style.top) || 0));
         dock.style.transform = 'translate3d(0,' + dy + 'px,0) scale(' + SMALL + ')';
@@ -984,6 +1402,15 @@
         ks.forEach(function (k, j) { if (j < ks.length - 1) rows[k].classList.add('on'); else present(k); });
       },
       rest: function (instant) {
+        if (LD) {
+          // the list complete beside the last card she named (or, cut short
+          // before any, the last item's), never an empty half of the stage
+          rows.forEach(function (r) { r.classList.add('on'); });
+          if (hint) hint.classList.add('on');
+          if (!cur && items.length) present(items.length - 1);
+          if (cur) cur.big.classList.add('on');
+          return;
+        }
         dockCurrent();
         rows.forEach(function (r) { r.classList.add('on'); });
         if (hint) hint.classList.add('on');
@@ -1012,6 +1439,19 @@
     var areaTop = S.H * 0.16, areaBottom = Math.min(S.contentBottom(), S.floorY - S.H * 0.05);
     var slot = Math.min((areaBottom - areaTop) / Math.max(n, 1), S.H * 0.26);
     var pw = Math.max(S.W * 0.5, Math.min(S.W * 0.6, slot * 0.94 / 0.543));
+    // landscape: the stack as tall as the stage, its plates larger, the
+    // labels in a column on the right
+    var cx0 = S.W * 0.36, LS = null;
+    if (S.land) {
+      areaTop = S.M; areaBottom = S.LH - S.M;
+      slot = Math.min((areaBottom - areaTop) / Math.max(n, 1), S.LH * 0.42);
+      pw = Math.min(S.LW * 0.5, slot * 0.94 / 0.543);
+      // the plates (turned, ~0.95 of their width on screen) and the labels
+      // centred together
+      var lw0 = Math.round(S.LW * 0.34), left0 = (S.LW - (pw * 0.95 + S.G + lw0)) / 2;
+      cx0 = left0 + pw * 0.475;
+      LS = { left: Math.round(left0 + pw * 0.95 + S.G), w: lw0 };
+    }
     var ph = pw * 9 / 16;
     // centred on the room the stack actually takes
     var used = slot * n, y0 = areaTop + Math.max(0, (areaBottom - areaTop - used) * 0.4);
@@ -1022,13 +1462,14 @@
       var tapId = f.tap && S.taps[f.tap] ? f.tap : null;
       var slab = el(tapId ? 'button' : 'div', 'es-slab');
       slab.style.width = Math.round(pw) + 'px';
-      slab.style.left = Math.round(S.W * 0.36 - pw / 2) + 'px';
+      slab.style.left = Math.round(cx0 - pw / 2) + 'px';
       slab.style.top = Math.round(mid - ph / 2) + 'px';
       slab._mid = mid;
       slab.style.zIndex = String(10 + n - rankTop);
       if (f.asset) slab.appendChild(S.img(f.asset));
       slab.appendChild(el('i', 'es-glow'));
       var lab = el(tapId ? 'button' : 'div', 'es-fl');
+      if (LS) S.place(lab, LS.left, null, LS.w);
       lab._mid = mid;
       lab.style.zIndex = '30';
       lab.appendChild(el('i', 'es-flmark'));
@@ -1086,7 +1527,15 @@
   // ~80% of the height on the right), so not in BALANCED.
   TEMPLATES.drill = function (S, p) {
     var items = arr(p.items), n = items.length;
-    var box = S.add(S.box(p.base_asset, 92, 21, TOP_VH, 'es-fade'));
+    // landscape: the place's card big on the left, the height of the stage;
+    // the plan, the strip and the note in a column on the right
+    var LR = null;
+    if (S.land) {
+      var cw0 = Math.round(S.LW * 0.56);
+      LR = { cw: cw0, left: S.M + cw0 + S.G, w: S.LW - 2 * S.M - cw0 - S.G };
+    }
+    var box = S.add(LR ? S.lbox(p.base_asset, LR.w, S.LH * 0.42, LR.left, S.M, 'es-fade')
+      : S.box(p.base_asset, 92, 21, TOP_VH, 'es-fade'));
     box.appendChild(S.img(p.base_asset, 'es-fill'));
     var spots = items.map(function (it) {
       if (!Array.isArray(it.at) || it.at.length !== 2) return null;
@@ -1096,6 +1545,7 @@
     });
     var y = S.floorY;
     var more = p.more_en ? S.add(el('p', 'es-more es-fade', tidy(p.more_en))) : null;
+    if (more && LR) S.place(more, LR.left, null, LR.w);
     // by its own height: a two-line note ("Sea view depends on the room ...")
     // sat on the taps when this assumed one line (13 Oct recording)
     if (more) {
@@ -1106,10 +1556,15 @@
     // the strip stays left of Emma's corner, however many places there are
     var gap = S.W * 0.015;
     var tw = Math.min(S.W * 0.13, (S.W * 0.64 - (n - 1) * gap) / Math.max(n, 1));
+    // landscape: up to five thumbnails a row under the plan
+    var perRow = Math.max(1, Math.min(n, 5));
+    if (LR) tw = Math.floor(Math.min(S.W * 0.17, (LR.w - (perRow - 1) * gap) / perRow)) - 1;
     var strip = S.add(el('div', 'es-strip es-fade'));
     strip.style.top = Math.round(y - tw * 0.75 - S.H * 0.006) + 'px';
+    if (LR) { S.place(strip, LR.left, null, LR.w); strip.style.flexWrap = 'wrap'; strip.style.rowGap = Math.round(gap * 1.6) + 'px'; }
     var cardTop = box._top + box._h + S.H * 0.016;
     var cardBottom = Math.min(parseFloat(strip.style.top) - S.H * 0.014, S.H * 0.78);
+    if (LR) { cardTop = S.M; cardBottom = S.LH - S.M; }
     var cur = -1;
     var cards = items.map(function (it, k) {
       // a place with a story of its own (the Sky Pool, the fitness) is a
@@ -1148,6 +1603,17 @@
       strip.appendChild(t);
       return t;
     });
+    if (LR) {
+      cards.forEach(function (c) { S.place(c, S.M, null, LR.cw); });
+      // the plan, the strip and the note centred together in their column
+      var g2 = Math.round(S.H * 0.03), sh = strip.offsetHeight || 0, mh2 = more ? more.offsetHeight || 0 : 0;
+      var total = box._h + g2 + sh + (more ? g2 + mh2 : 0);
+      var t0 = Math.max(S.M, Math.round((S.LH - total) / 2));
+      box._top = t0;
+      box.style.top = t0 + 'px';
+      strip.style.top = (t0 + box._h + g2) + 'px';
+      if (more) more.style.top = (t0 + box._h + g2 + sh + g2) + 'px';
+    }
     // the place on screen: cards before it wait (or leave) to the left, the
     // ones after it to the right -- forward slides left, a thumbnail back
     // slides right
@@ -1244,6 +1710,13 @@
       var plain = chips.filter(function (r) { return !r.classList.contains('es-key'); }).length;
       if (plain >= 3) rows.classList.add('grid');
     }
+    // landscape: the pictures on the left as tall as the stage, the chips in
+    // one column beside them, centred on the photo
+    var gridOK = !!(rows && rows.classList.contains('grid'));
+    var L = S.land ? S.lplace([p.base_asset, ph.asset], [rows], function (mode) {
+      // one column beside the picture; two under a wide one
+      if (rows) rows.classList.toggle('grid', gridOK && mode === 'stack');
+    }) : null;
     var rowsH = rows ? rows.offsetHeight || 0 : 0;
     var maxH = Math.max(30, Math.min(56, (S.room() - rowsH - S.H * 0.03) / S.H * 100));
     // the plan and the photo share one width, so the plan insets into the
@@ -1254,7 +1727,8 @@
       var w = Math.min(S.W * 0.94, S.H * maxH / 100 * ref.w / ref.h);
       mw = Math.min(mw, w / S.W * 100);
     });
-    var base = S.box(p.base_asset, mw, maxH, TOP_VH, 'es-spbase');
+    var base = L ? S.lbox(p.base_asset, L.w, L.maxH, L.left, L.top, 'es-spbase')
+      : S.box(p.base_asset, mw, maxH, TOP_VH, 'es-spbase');
     S.root.insertBefore(base, rows);
     base.style.opacity = '0';
     var zoom = el('div', 'es-zoom');
@@ -1278,10 +1752,20 @@
       // the photo in a frame of its OWN shape, sharing the picture's top and
       // width (so the zoomed picture insets into its top-right corner): in the
       // picture's frame a 2.5:1 site plan cut a 4:3 photo to a strip
-      photo = S.box(ph.asset, mw, maxH, TOP_VH, 'es-photo es-fade');
+      photo = L ? S.lbox(ph.asset, L.w, L.maxH, L.left, L.top, 'es-photo es-fade')
+        : S.box(ph.asset, mw, maxH, TOP_VH, 'es-photo es-fade');
       if (photo._w < base._w) {
         photo._left = base._left + base._w - photo._w;
         photo.style.left = photo._left + 'px';
+      }
+      if (L) {
+        // landscape: each centred on the same middle line (the plan stood
+        // at the photo's top, over an empty band, until the photo came);
+        // the plan still lands in the photo's top-right corner
+        var hm = Math.max(base._h, photo._h);
+        base._top = Math.round(L.top + (hm - base._h) / 2); base.style.top = base._top + 'px';
+        photo._top = Math.round(L.top + (hm - photo._h) / 2); photo.style.top = photo._top + 'px';
+        base.style.setProperty('--inset-dy', (photo._top - base._top) + 'px');
       }
       phImg = photo.appendChild(S.img(ph.asset, 'es-fill es-cover'));
       phImg._onBroken = function () { dropPhoto(); };
@@ -1293,8 +1777,12 @@
       S.root.insertBefore(photo, base);
       // the chips come with the photo, under it (the picture is inset by
       // then); full width when they end above Emma's head, as they now do
-      rows.style.top = Math.round(photo._top + photo._h + S.H * 0.025) + 'px';
-      if (photo._top + photo._h + S.H * 0.025 + rowsH > S.contentBottom()) rows.classList.add('narrow');
+      if (L) {
+        // placed by lplace: beside the pictures, or under them
+      } else {
+        rows.style.top = Math.round(photo._top + photo._h + S.H * 0.025) + 'px';
+        if (photo._top + photo._h + S.H * 0.025 + rowsH > S.contentBottom()) rows.classList.add('narrow');
+      }
     }
     var spotLine = num(p.spot_line) != null ? p.spot_line : 0, photoLine = num(ph.line);
     var zoomed = false, photoOn = false, ringAt = 0, gone = false;
@@ -1332,7 +1820,9 @@
       photo.classList.remove('on');
       photo.style.visibility = 'hidden';
       base.classList.remove('inset');
-      rows.style.top = Math.round(base._top + base._h + S.H * 0.025) + 'px';
+      if (L && L.mode === 'stack') rows.style.top = Math.round(base._top + base._h + S.H * 0.025) + 'px';
+      else if (L) S.lmid(rows, base._top + base._h / 2);
+      else rows.style.top = Math.round(base._top + base._h + S.H * 0.025) + 'px';
       if (photoOn && zoomed) ringOn();
     }
     function showPhoto() {
@@ -1402,9 +1892,21 @@
       chipRow.appendChild(ch);
       return ch;
     });
+    // landscape: the building as tall as the stage on the left, the figures
+    // and the chips in one column beside it
+    var LB = null;
+    if (S.land) {
+      chipRow.style.marginRight = '0';
+      // one column of figures beside the building, two under a wide one
+      LB = S.lplace([fin || frames[frames.length - 1]], [below], function (mode) {
+        figRow.style.gridTemplateColumns = mode === 'side' ? '1fr' : '';
+        figEls.forEach(function (f, k) { f.fig.style.textAlign = mode === 'side' || !(k % 2) ? 'left' : 'right'; });
+      });
+    }
     var belowH = below.offsetHeight || 0;
     var maxH = Math.max(30, Math.min(50, (S.room() - belowH - S.H * 0.035) / S.H * 100));
-    var box = S.box(fin || frames[frames.length - 1], 96, maxH, TOP_VH, 'es-fade');
+    var box = LB ? S.lbox(fin || frames[frames.length - 1], LB.w, LB.maxH, LB.left, LB.top, 'es-fade')
+      : S.box(fin || frames[frames.length - 1], 96, maxH, TOP_VH, 'es-fade');
     S.root.insertBefore(box, below);
     box.style.background = '#03050f';
     var fwrap = el('div', 'es-frames es-fill');
@@ -1430,7 +1932,7 @@
     var gy = num(p.ground_y), ry = num(p.roof_y), lines = gy != null && ry != null && gy > ry;
     var ground = null;
     if (gy != null) { ground = el('i', 'es-hline'); ground.style.top = gy + '%'; box.appendChild(ground); }
-    below.style.top = Math.round(box._top + box._h + S.H * 0.03) + 'px';
+    if (!LB) below.style.top = Math.round(box._top + box._h + S.H * 0.03) + 'px';
     counters.forEach(function (c, k) {
       var fig = figEls[k].fig, val = figEls[k].val;
       var isFloors = c.ticks === true || (c.ticks !== false && /floor/i.test(c.unit_en || ''));
@@ -1539,7 +2041,10 @@
   // up, then the mood pictures (labelled as mood, not this room).
   TEMPLATES.details = function (S, p) {
     var ref = p.solid_asset || p.wire_asset;
-    var box = S.add(S.box(ref, 94, 38, TOP_VH, 'es-fade'));
+    // landscape: the room as tall as the stage on the left; its area, notes
+    // and the mood pictures in a column beside it, top to bottom
+    var LT = S.land ? S.lpics([ref], 0.36) : null;
+    var box = S.add(LT ? S.lbox(ref, LT.w, LT.maxH, LT.left, LT.top, 'es-fade') : S.box(ref, 94, 38, TOP_VH, 'es-fade'));
     box.style.background = '#070a1f';
     if (p.wire_asset) box.appendChild(S.img(p.wire_asset, 'es-fill es-contain'));
     var solid = p.solid_asset ? S.img(p.solid_asset, 'es-fill es-contain es-solid') : null;
@@ -1548,6 +2053,10 @@
     var below = S.add(el('div', 'es-below'));
     below.style.top = Math.round(box._top + box._h + S.H * 0.022) + 'px';
     below.style.bottom = Math.round(S.H - S.floorY) + 'px';
+    if (LT) {
+      S.place(below, LT.infoLeft, Math.max(S.M, box._top), LT.infoW);
+      below.style.bottom = Math.round(S.LH - Math.min(S.LH - S.M, box._top + box._h)) + 'px';
+    }
     var area = below.appendChild(el('div', 'es-area es-up'));
     var v = p.value ? S.valueNode(p.value, 'es-n') : null;
     if (v) area.appendChild(v.node);
@@ -1694,8 +2203,18 @@
   TEMPLATES.metric = function (S, p) {
     // 96% of the width (a wide plan is width-bound: every point of width is
     // height too), up to 46% of the height for a taller picture
-    var box = S.add(S.box(p.bg_asset, 96, 46, TOP_VH, 'es-fade'));
-    var h = box._h, over = h >= S.H * 0.3;
+    // landscape: the figure over a picture that is not a wide strip (as on
+    // the robot); the parts -- and a wide picture's figure -- beside it or
+    // under it, whichever leaves the picture more (lplace, below)
+    var L = null, lover = false;
+    if (S.land) {
+      var ar0 = p.bg_asset && p.bg_asset.w > 0 && p.bg_asset.h > 0 ? p.bg_asset.w / p.bg_asset.h : 4 / 3;
+      lover = ar0 < 2;
+      L = S.lpics([p.bg_asset], false);
+    }
+    var box = S.add(L ? S.lbox(p.bg_asset, L.w, L.maxH, L.left, L.top, 'es-fade')
+      : S.box(p.bg_asset, 96, 46, TOP_VH, 'es-fade'));
+    var h = box._h, over = L ? lover : h >= S.H * 0.3;
     if (p.bg_asset) box.appendChild(S.img(p.bg_asset, 'es-fill es-contain'));
     if (over) box.appendChild(el('i', 'es-shade-all'));
     S.sheen(box);
@@ -1709,6 +2228,9 @@
     var below = box._top + h;
     if (over) {
       box.appendChild(big);
+    } else if (L) {
+      S.add(big);
+      big.style.textAlign = 'left';
     } else {
       big.style.top = Math.round(below + S.H * 0.02) + 'px';
       S.add(big);
@@ -1717,7 +2239,7 @@
     var parts = arr(p.parts), max = 0;
     parts.forEach(function (q) { if (num(q.to) > max) max = q.to; });
     var list = S.add(el('div', 'es-rows'));
-    list.style.top = Math.round(below + S.H * 0.025) + 'px';
+    if (!L) list.style.top = Math.round(below + S.H * 0.025) + 'px';
     var rows = parts.map(function (q) {
       var r = el('div', 'es-r es-part es-left');
       var bar = el('i', 'es-bar');
@@ -1733,7 +2255,37 @@
       return { r: r, bar: bar, b: n, q: q };
     });
     // full width when the parts end above Emma's head, else clear of her
-    if (parts.length && below + S.H * 0.025 + (list.offsetHeight || 0) > S.contentBottom()) list.classList.add('narrow');
+    if (L) {
+      // the figure measured at its FINAL value (it counts from 0: "0 UNITS"
+      // fit one line, "1,066 UNITS" wrapped and ran into the parts), kept on
+      // one line, smaller if its column is narrow
+      var finals = [];
+      if (!over && v) {
+        Array.prototype.forEach.call(big.querySelectorAll('.es-count'), function (c) {
+          if (c._final != null) { finals.push([c, c.textContent]); c.textContent = c._final; }
+        });
+      }
+      var blocks = over ? [] : [big];
+      if (parts.length) blocks.push(list);
+      var g = S.lplace([p.bg_asset], blocks, function () {
+        if (over || !v) return;
+        v.node.style.whiteSpace = 'nowrap';
+        v.node.style.fontSize = '';
+        var cw = big.clientWidth || 0, sw = v.node.getBoundingClientRect().width || 0;   // an inline em: no scrollWidth
+        if (cw > 0 && sw > cw) {
+          var fs = parseFloat(root.getComputedStyle(v.node).fontSize) || 0;
+          if (fs) v.node.style.fontSize = Math.floor(fs * cw / sw) + 'px';
+        }
+      });
+      finals.forEach(function (f) { f[0].textContent = f[1]; });
+      var arB = p.bg_asset && p.bg_asset.w > 0 && p.bg_asset.h > 0 ? p.bg_asset.w / p.bg_asset.h : 4 / 3;
+      var bw = g.w, bh0 = bw / arB;
+      if (bh0 > g.maxH) { bh0 = g.maxH; bw = bh0 * arB; }
+      box._w = Math.round(bw); box._h = Math.round(bh0); box._left = g.left; box._top = g.top;
+      box.style.width = box._w + 'px'; box.style.height = box._h + 'px';
+      box.style.left = box._left + 'px'; box.style.top = box._top + 'px';
+      h = box._h;
+    } else if (parts.length && below + S.H * 0.025 + (list.offsetHeight || 0) > S.contentBottom()) list.classList.add('narrow');
     var line = num(p.line) != null ? p.line : 0, opened = false, counted = false;
     function showPart(x) {
       if (x.r.classList.contains('on')) return;
@@ -1752,6 +2304,18 @@
       S.reveal(box, function () { big.classList.add('on'); if (then) then(); });
     }
     return {
+      // six buildings' parts ran past the screen's edge, over the tap chips
+      // and into Emma's corner (audit 27 Oct, units_by_building): a list
+      // that grows with the catalog fits (as journey's and stack's do) --
+      // clear of her head, or of the taps when it keeps to the left
+      layout: function () {
+        var narrow = list.classList.contains('narrow');
+        var k = S.fitScale(list, L ? S.LH - S.M : narrow ? S.floorY - S.H * 0.015 : S.contentBottom());
+        if (k < 1) {
+          list.style.transformOrigin = '0 0';
+          list.style.transform = 'scale(' + k.toFixed(4) + ')';
+        }
+      },
       beat: function (i) {
         if (i === 0) open(line === 0 ? countNow : null);
         else if (i === line) open(countNow);
@@ -1779,8 +2343,12 @@
     var items = arr(p.items).slice(0, 6);
     // one or two: one column of wide cards; more: two columns
     var n = items.length, cols = n <= 2 ? 1 : 2, rowsN = Math.max(1, Math.ceil(n / cols));
-    var grid = S.add(el('div', 'es-feats' + (cols === 1 ? ' wide' : '')));
+    // landscape: the cards side by side across the stage -- all in one row up
+    // to three, else two rows (2 + 2, 3 + 2, 3 + 3), a short row centred
+    if (S.land) { cols = n <= 3 ? Math.max(1, n) : n === 4 ? 2 : 3; rowsN = Math.max(1, Math.ceil(n / cols)); }
+    var grid = S.add(el('div', 'es-feats' + (cols === 1 || (S.land && n <= 2) ? ' wide' : '')));
     var top = Math.round(S.H * TOP_VH / 100);
+    if (S.land) top = S.M;
     grid.style.top = top + 'px';
     if (cols === 1) grid.style.gridTemplateColumns = '1fr';
     var cards = items.map(function (it) {
@@ -1796,6 +2364,12 @@
     });
     var foot = p.footnote_en ? S.add(el('p', 'es-foot es-fade', p.footnote_en)) : null;
     if (foot) foot.style.bottom = Math.round(S.H - S.floorY + S.H * 0.01) + 'px';
+    if (S.land) {
+      S.place(grid, S.M, null, S.LW - 2 * S.M);
+      grid.classList.add('es-lgrid');
+      grid.style.setProperty('--cols', String(cols));
+      if (foot) { S.place(foot, S.M, null, S.LW - 2 * S.M); foot.style.bottom = S.M + 'px'; }
+    }
     // The pictures are as tall as the screen allows (two smart-home cards
     // were 300 px pictures with half the screen empty under them, 21 Oct),
     // computed from the room above Emma's head and the footnote -- so two
@@ -1809,12 +2383,26 @@
       var limit = S.contentBottom();
       if (foot && foot.offsetTop) limit = Math.min(limit, foot.offsetTop - S.H * 0.015);
       var gap = S.W * 0.022, colW = (S.W * 0.9 - gap * (cols - 1)) / cols;
+      if (S.land) {
+        // the stage's width shared by the cards of a row (each its own width,
+        // so a short last row centres), the pictures as tall as the rows allow
+        limit = foot && foot.offsetTop ? foot.offsetTop - S.H * 0.015 : S.LH - S.M;
+        colW = (S.LW - 2 * S.M - gap * (cols - 1)) / cols;
+        grid.style.gap = Math.round(gap) + 'px';
+        cards.forEach(function (c) { c.style.width = Math.floor(colW) + 'px'; });
+      }
       var text = 0;
       cards.forEach(function (c) { text = Math.max(text, (c.offsetHeight || 0) - (c._ci.offsetHeight || 0)); });
       var each = (limit - top - gap * (rowsN - 1)) / rowsN - text;
       var lo = colW / (cols === 1 ? 2.4 : 2), hi = colW / (cols === 1 ? 1.5 : 1.25);
+      if (S.land) { lo = colW / 2.6; hi = colW / 1.05; }
       var ih = Math.round(Math.max(lo, Math.min(hi, each)));
       cards.forEach(function (c) { c._ci.style.aspectRatio = 'auto'; c._ci.style.height = ih + 'px'; });
+      if (S.land) {
+        // the grid centred in the room above the footnote
+        var gh = grid.offsetHeight || 0;
+        grid.style.top = Math.round(Math.max(S.M, (limit + S.M - gh) / 2)) + 'px';
+      }
     })();
     // `footnote_line`: the line that says it ("an optional package, not
     // included in the room price") puts it up; without one, the overview does
@@ -1895,6 +2483,8 @@
     // whole to fit, they left a fifth of the width empty on the right
     var wrap = S.add(el('div', 'es-jr' + (rows.length <= 2 ? ' xl' : rows.length <= 4 ? ' roomy' : ' dense')));
     wrap.style.top = Math.round(S.H * (TOP_VH + 1) / 100) + 'px';
+    // landscape: the same road and lanes across the stage (one scale, longer)
+    if (S.land) S.place(wrap, S.M + S.G, S.M, S.LW - 2 * (S.M + S.G));
     var spine = el('i', 'es-jr-spine');
     wrap.appendChild(spine);
     var head = el('div', 'es-jr-o es-up');
@@ -1947,6 +2537,7 @@
       var h = wrap.offsetHeight || 0, n = items.length;
       if (!h || !n) return;
       var spare = S.room() - S.H * 0.01 - h;
+      if (S.land) spare = S.LH - 2 * S.M - h;
       if (!(spare > 0)) return;
       var cs = root.getComputedStyle ? root.getComputedStyle(wrap) : null;
       var gap = cs ? parseFloat(cs.rowGap || cs.gap) || 0 : 0;
@@ -1988,10 +2579,12 @@
         spine.style.height = Math.max(0, Math.round(y1 - y0)) + 'px';
         items.forEach(function (x) { x.f = y1 > y0 ? Math.max(0, Math.min(1, (mid(x.row) - y0) / (y1 - y0))) : 1; });
         // six places (nearby_places) ran under Emma and pushed the taps off
-        var k = S.fitScale(wrap, S.contentBottom());
+        var k = S.fitScale(wrap, S.land ? S.LH - S.M : S.contentBottom());
         if (k < 1) {
           wrap.style.transformOrigin = '0 0';
           wrap.style.transform = 'scale(' + k.toFixed(4) + ')';
+        } else if (S.land) {
+          wrap.style.top = Math.round((S.LH - (wrap.offsetHeight || 0)) / 2) + 'px';
         }
       },
       beat: function (i) {
@@ -2080,7 +2673,9 @@
         body.appendChild(walk);
       }
       d.appendChild(body);
-      if (r.value_en) d.appendChild(timeText(r.value_en, 'es-ar-v'));
+      // landscape: the time under the name (a narrow column: a long name and
+      // its time side by side ran into each other)
+      if (r.value_en) (S.land ? body : d).appendChild(timeText(r.value_en, 'es-ar-v'));
       list.appendChild(d);
       return { node: d, walk: walk };
     });
@@ -2088,37 +2683,67 @@
     // took 0.6 of the screen (first recording, 21 Oct): a long list first
     // tightens (one more layout, measured), and only then gives way by
     // scale; the disc keeps at least ~half the width.
+    // landscape: the disc as tall as the stage on the left, the project's
+    // name and the list in a column beside it (MW = the map's own width; on
+    // the robot it is the screen's)
+    var MW = W, LA = null;
+    if (S.land) {
+      var mw0 = Math.min(Math.round(S.LW * 0.56), S.LH - 2 * S.M);
+      LA = { iw: Math.min(Math.round(S.LW * 0.42), S.LW - 2 * S.M - mw0 - S.G) };
+      LA.left = Math.round((S.LW - (mw0 + S.G + LA.iw)) / 2);
+      LA.ileft = LA.left + mw0 + S.G;
+      MW = mw0;
+      S.place(head, LA.ileft, null, LA.iw);
+      S.place(list, LA.ileft, null, LA.iw);
+    }
     var headH = head.offsetHeight || 0;
     var spare = S.room() - headH - gap * 2;
     var minH = Math.round(W * (size === 'dense' ? 0.52 : 0.56));
     var listH = n ? list.offsetHeight || 0 : 0;
-    if (spare - listH < minH && size !== 'xl') {
-      list.classList.add('tight');
-      listH = list.offsetHeight || 0;
-    }
-    var Hb = Math.round(spare - listH);
-    if (Hb < minH) {
-      Hb = minH;
-      var k = (spare - Hb) / Math.max(1, listH);
-      if (k < 1) {
-        list.style.transformOrigin = '50% 0';
-        list.style.transform = 'scale(' + Math.max(0.6, k).toFixed(4) + ')';
+    var Hb, mapTop;
+    if (LA) {
+      var roomA = S.LH - 2 * S.M - headH - gap;
+      if (listH > roomA && size !== 'xl') { list.classList.add('tight'); listH = list.offsetHeight || 0; }
+      var kA = listH > roomA ? roomA / Math.max(1, listH) : 1;
+      if (kA < 1) {
+        list.style.transformOrigin = '0 0';
+        list.style.transform = 'scale(' + kA.toFixed(4) + ')';
       }
+      var gA = Math.max(S.M, Math.round(S.LH / 2 - (headH + gap + listH * kA) / 2));
+      head.style.top = gA + 'px';
+      list.style.top = (gA + headH + gap) + 'px';
+      Hb = S.LH - 2 * S.M;
+      mapTop = S.M;
+    } else {
+      if (spare - listH < minH && size !== 'xl') {
+        list.classList.add('tight');
+        listH = list.offsetHeight || 0;
+      }
+      Hb = Math.round(spare - listH);
+      if (Hb < minH) {
+        Hb = minH;
+        var k = (spare - Hb) / Math.max(1, listH);
+        if (k < 1) {
+          list.style.transformOrigin = '50% 0';
+          list.style.transform = 'scale(' + Math.max(0.6, k).toFixed(4) + ')';
+        }
+      }
+      Hb = Math.min(Hb, Math.round(W * 0.84));
+      mapTop = top0 + headH + gap;
+      list.style.top = (mapTop + Hb + gap) + 'px';
     }
-    Hb = Math.min(Hb, Math.round(W * 0.84));
-    var mapTop = top0 + headH + gap;
-    list.style.top = (mapTop + Hb + gap) + 'px';
     var map = el('div', 'es-ar es-fade ' + size);
     S.root.insertBefore(map, list);
     map.style.top = mapTop + 'px';
     map.style.height = Hb + 'px';
+    if (LA) S.place(map, LA.left, null, MW);
     // the caption ("... not a map") on a line of its own under the disc:
     // in a corner of the map it met the marks of the places nearest the rim
     var note = p.footnote_en ? map.appendChild(el('div', 'es-ar-note es-fade', tidy(p.footnote_en))) : null;
     var noteH = note ? Math.round(W * 0.036) : 0;   // its CSS (2.6vw, one line): no read, no layout
     var Hd = Hb - noteH;                          // the disc's own height
-    var cx = W / 2, cy = Hd / 2;
-    var R = Math.max(W * 0.2, Math.min(Hd / 2 - W * 0.012, W * 0.34));
+    var cx = MW / 2, cy = Hd / 2;
+    var R = Math.max(W * 0.2, Math.min(Hd / 2 - W * 0.012, LA ? MW / 2 - W * 0.012 : W * 0.34));
     var rOut = R * 0.93;                         // the outer ring, inside the disc's rim
     var M = Math.round(W * (size === 'xl' ? 0.104 : size === 'roomy' ? 0.092 : 0.082));
     var pinW = W * 0.08, pinH = W * 0.1;         // .es-ar-pin .es-pinsvg
@@ -2242,8 +2867,8 @@
       return c;
     }
     if (note) {
-      put(note, (W - noteW) / 2, Hb - noteH);
-      taken.push([(W - noteW) / 2, Hb - noteH, (W + noteW) / 2, Hb]);
+      put(note, (MW - noteW) / 2, Hb - noteH);
+      taken.push([(MW - noteW) / 2, Hb - noteH, (MW + noteW) / 2, Hb]);
     }
     // the routes: a label may lie over one (a map's labels do), at a cost,
     // so it does only where every other side is taken
@@ -2281,7 +2906,7 @@
         var dx = cands[c][0], dy = cands[c][1], reach = cands[c][2];
         var tx = x.mx + dx * reach + (dx > 0.25 ? w / 2 : dx < -0.25 ? -w / 2 : 0) + cands[c][3];
         var ty = x.my + dy * reach + (dy > 0.25 ? h / 2 : dy < -0.25 ? -h / 2 : 0) + cands[c][4];
-        tx = Math.max(w / 2 + edge, Math.min(W - w / 2 - edge, tx));
+        tx = Math.max(w / 2 + edge, Math.min(MW - w / 2 - edge, tx));
         // up into the gap under the header (the place at 12 o'clock)
         ty = Math.max(h / 2 - gap * 0.8, Math.min(Hb - h / 2 - edge * 0.5, ty));
         var c2 = cost([tx - w / 2 - pad, ty - h / 2 - pad, tx + w / 2 + pad, ty + h / 2 + pad], true, fixed);
@@ -2822,16 +3447,452 @@
     return count ? s : null;
   }
 
+  // The real map (owner 27 Oct: "พวกแมพเอาจากตรงนี้" -- the sales gallery's own
+  // map export -- and his choice, "แผนที่จริง + motion ตามเสียง"). The picture
+  // IS the map, rendered on the PC from that export by
+  // scripts/render_story_maps.py: its OSM streets and buildings, the project's
+  // 3D model, its night palette. Over it, what moves: the project's pin drops
+  // onto the model; as she names a place, its route draws itself along the
+  // real streets (the car route the report's times were taken on), the place
+  // drops at its end with one ripple, its short name and time beside it, its
+  // row slides into the list under the map. On foot (a row's `walk`): its own
+  // route, dotted, drawn on the line that says it.
+  // Every position is the projection the renderer computed on that very
+  // picture (`project`, `rows[].pin`, `rows[].route` in % of it -- the build
+  // refuses an overlay computed on another picture); every figure on screen
+  // is the catalog's `value_en`, never a length measured off a route. A row
+  // without a pin (no checked coordinate) is a row in the list only.
+  // Motion is transform/opacity, plus the routes' stroke-dashoffset (a few
+  // short SVG paths, each drawn once).
+  var mapSeq = 0;
+  TEMPLATES.map = function (S, p) {
+    var rows = arr(p.rows).filter(function (r) { return r && typeof r === 'object'; });
+    var n = rows.length, W = S.W;
+    var size = n <= 2 ? 'xl' : n <= 4 ? 'roomy' : 'dense';
+    var top0 = Math.round(S.H * TOP_VH / 100), gap = Math.round(S.H * 0.014);
+    var aspect = num(p.aspect) > 0 ? p.aspect : 1;
+    var head = S.add(el('div', 'es-ar-o es-up ' + size));
+    head.appendChild(el('b', null, p.origin_en || ''));
+    if (p.origin_sub_en) {
+      var hs = el('span');
+      if (p.origin_icon !== 'none') hs.appendChild(icon(p.origin_icon || 'car'));
+      hs.appendChild(document.createTextNode(tidy(p.origin_sub_en)));
+      head.appendChild(hs);
+    }
+    head.style.top = top0 + 'px';
+    // the list under the map, built and measured first (the rings' rows)
+    var list = S.add(el('div', 'es-ar-list es-mp-list ' + size));
+    var legend = rows.map(function (r) {
+      var d = el('div', 'es-ar-r es-left' + kindCls(r.icon));
+      var ic = el('i', 'es-jr-node');
+      ic.appendChild(icon(r.icon));
+      d.appendChild(ic);
+      var body = el('div', 'es-ar-b');
+      body.appendChild(el('b', null, r.label_en || ''));
+      if (r.sub_en) body.appendChild(el('span', null, tidy(r.sub_en)));
+      var walk = null;
+      if (r.walk && r.walk.value_en) {
+        walk = el('em', 'es-ar-walk es-pop');
+        walk.appendChild(icon('walk'));
+        walk.appendChild(document.createTextNode(tidy(r.walk.value_en)));
+        body.appendChild(walk);
+      }
+      d.appendChild(body);
+      // landscape: the time under the name (a narrow column: a long name and
+      // its time side by side ran into each other)
+      if (r.value_en) (S.land ? body : d).appendChild(timeText(r.value_en, 'es-ar-v'));
+      list.appendChild(d);
+      return { node: d, walk: walk };
+    });
+    // The map takes what the list leaves above Emma's head, its own shape
+    // kept (the pins are % of THIS picture: a cropped or stretched map moves
+    // every pin off its street). A long list tightens first, then the map
+    // gives way down to ~0.62 of the width, and only then the list scales.
+    // landscape: the map as tall as the stage on the left (its own shape),
+    // the project's name and the list in a column beside it
+    var LM = null;
+    if (S.land) {
+      var cwL = Math.min(Math.round(S.LW * 0.6), Math.round((S.LH - 2 * S.M) * aspect));
+      LM = { cw: cwL, ch: Math.round(cwL / aspect), iw: Math.min(Math.round(S.LW * 0.42), S.LW - 2 * S.M - cwL - S.G) };
+      LM.left = Math.round((S.LW - (cwL + S.G + LM.iw)) / 2);
+      LM.ileft = LM.left + cwL + S.G;
+      S.place(head, LM.ileft, null, LM.iw);
+      S.place(list, LM.ileft, null, LM.iw);
+    }
+    var headH = head.offsetHeight || 0;
+    var spare = S.room() - headH - gap * 2;
+    var mx = Math.round(W * 0.045), cw = W - 2 * mx, ch = Math.round(cw / aspect);
+    var listH = n ? list.offsetHeight || 0 : 0;
+    if (LM) {
+      cw = LM.cw; ch = LM.ch;
+      var roomL = S.LH - 2 * S.M - headH - gap;
+      if (listH > roomL && size !== 'xl') { list.classList.add('tight'); listH = list.offsetHeight || 0; }
+      var kL = listH > roomL ? roomL / Math.max(1, listH) : 1;
+      if (kL < 1) {
+        list.style.transformOrigin = '0 0';
+        list.style.transform = 'scale(' + kL.toFixed(4) + ')';
+      }
+      var gTop = Math.max(S.M, Math.round(S.LH / 2 - (headH + gap + listH * kL) / 2));
+      head.style.top = gTop + 'px';
+    } else {
+      if (spare - listH < ch && size !== 'xl') {
+        list.classList.add('tight');
+        listH = list.offsetHeight || 0;
+      }
+      if (spare - listH < ch) {
+        ch = Math.max(Math.round(W * 0.62 / aspect), Math.round(spare - listH));
+        cw = Math.min(W - 2 * mx, Math.round(ch * aspect));
+        ch = Math.round(cw / aspect);
+      }
+      if (spare - listH < ch) {
+        var k = (spare - ch) / Math.max(1, listH);
+        if (k < 1) {
+          list.style.transformOrigin = '50% 0';
+          list.style.transform = 'scale(' + Math.max(0.6, k).toFixed(4) + ')';
+        }
+      }
+    }
+    var cardTop = top0 + headH + gap;
+    if (LM) cardTop = Math.round((S.LH - ch) / 2);
+    var card = el('div', 'es-ar es-mp es-fade ' + size);
+    S.root.insertBefore(card, list);
+    card.style.left = Math.round(LM ? LM.left : (W - cw) / 2) + 'px';
+    card.style.width = cw + 'px';
+    card.style.top = cardTop + 'px';
+    card.style.height = ch + 'px';
+    list.style.top = (LM ? gTop + headH + gap : cardTop + ch + gap) + 'px';
+    var base = S.img(p.map_asset, 'es-mp-img');
+    card.appendChild(base);
+    function px(pt) { return [pt.x / 100 * cw, pt.y / 100 * ch]; }
+    // the routes: one SVG over the picture, in its pixels
+    var svg = svgEl('svg', { viewBox: '0 0 ' + cw + ' ' + ch, 'class': 'es-mp-svg', 'aria-hidden': 'true' });
+    card.appendChild(svg);
+    var uid = 'esmp' + (++mapSeq);
+    function d3(line) {
+      return arr(line).map(function (q, j) {
+        return (j ? 'L' : 'M') + (q[0] / 100 * cw).toFixed(1) + ' ' + (q[1] / 100 * ch).toFixed(1);
+      }).join('');
+    }
+    // its length on screen, for how long it takes to draw (the farther, the
+    // longer: 0.7-1.6 s, so every route draws at about the same speed)
+    function len(line) {
+      var L = 0, a = arr(line);
+      for (var j = 1; j < a.length; j++) {
+        L += Math.hypot((a[j][0] - a[j - 1][0]) / 100 * cw, (a[j][1] - a[j - 1][1]) / 100 * ch);
+      }
+      return L;
+    }
+    var M = Math.round(W * (size === 'xl' ? 0.088 : size === 'roomy' ? 0.078 : 0.07));
+    var pinW = W * 0.08, pinH = W * 0.1;
+    var pr = p.project ? px(p.project) : [cw / 2, ch / 2];
+    function put(node, x, y, w, h) {
+      node.style.left = Math.round(x) + 'px'; node.style.top = Math.round(y) + 'px';
+      if (w != null) { node.style.width = Math.round(w) + 'px'; node.style.height = Math.round(h) + 'px'; }
+    }
+    // the project: its ground ring, a shadow, the pin standing on the model
+    var ground = S.spot(50, 50);
+    ground.classList.add('es-nb-ring');
+    put(ground, pr[0], pr[1]);
+    card.appendChild(ground);
+    var shadow = el('i', 'es-nb-shadow es-fade');
+    put(shadow, pr[0], pr[1]);
+    card.appendChild(shadow);
+    var pin = el('div', 'es-nb-pin es-ar-pin es-drop');
+    put(pin, pr[0], pr[1]);
+    pin.appendChild(pinGlyph());
+    card.appendChild(pin);
+    var area = p.area_label_en ? card.appendChild(el('div', 'es-mp-area es-fade', tidy(p.area_label_en))) : null;
+    var attr = card.appendChild(el('div', 'es-mp-attr es-fade', tidy(p.attribution_en || '© OpenStreetMap contributors')));
+    var attrBox = [0, ch - (attr.offsetHeight || W * 0.04) - W * 0.01, (attr.offsetWidth || W * 0.5) + W * 0.03, ch];
+    var areaBox = null;
+    if (area) {
+      var aw = area.offsetWidth || W * 0.4, ah = area.offsetHeight || W * 0.05;
+      put(area, (cw - aw) / 2, W * 0.02);
+      areaBox = [(cw - aw) / 2, W * 0.02, (cw + aw) / 2, W * 0.02 + ah];
+    }
+    var places = rows.map(function (r, k) {
+      var x = { r: r, k: k, line: num(r.line) != null ? r.line : 0, row: legend[k].node, walk: legend[k].walk,
+                walkLine: r.walk && num(r.walk.line) != null ? r.walk.line : null };
+      if (!r.pin) return x;
+      var kc = kindCls(r.icon), at = px(r.pin);
+      x.tx = at[0]; x.ty = at[1];
+      if (r.route) {
+        var dd = d3(r.route);
+        x.case = svg.appendChild(svgEl('path', { d: dd, pathLength: 1, 'class': 'es-mp-case' + kc }));
+        x.path = svg.appendChild(svgEl('path', { d: dd, pathLength: 1, 'class': 'es-mp-route' + kc }));
+        x.drawS = Math.max(0.7, Math.min(1.6, len(r.route) / (W * 0.55)));
+        x.case.style.setProperty('--d', x.drawS.toFixed(2) + 's');
+        x.path.style.setProperty('--d', x.drawS.toFixed(2) + 's');
+      }
+      if (r.walk_route) {
+        // dotted, drawn by a mask that grows along it (a dotted line has no
+        // dash left to animate itself with)
+        var wd = d3(r.walk_route), mid = uid + 'w' + k;
+        var mask = svgEl('mask', { id: mid, maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: cw, height: ch });
+        x.wmask = mask.appendChild(svgEl('path', { d: wd, pathLength: 1, 'class': 'es-mp-wmask' }));
+        svg.appendChild(mask);
+        x.wpath = svg.appendChild(svgEl('path', { d: wd, 'class': 'es-mp-walkline' + kc, mask: 'url(#' + mid + ')' }));
+      }
+      x.kc = kc;
+      return x;
+    });
+    var marked = places.filter(function (x) { return x.tx != null; });
+    // A place too near the pin or another place to be seen (Big Whale is
+    // 150 m from the project: ~20 px on a map that must also reach Na
+    // Jomtien) moves to the nearest clear spot round its real point, away
+    // from the pin first, and keeps a thin stem back to a dot ON its real
+    // point -- the map still says exactly where it is. Places that are clear
+    // where they are stay there; then the others, in the order she names them.
+    var r0 = M / 2 + W * 0.006, edge0 = W * 0.012;
+    var pinBox = [pr[0] - pinW / 2 - W * 0.008, pr[1] - pinH - W * 0.008, pr[0] + pinW / 2 + W * 0.008, pr[1] + W * 0.035];
+    var spots = [];
+    function clash(cx, cy) {
+      var nx = Math.max(pinBox[0], Math.min(pinBox[2], cx)), ny = Math.max(pinBox[1], Math.min(pinBox[3], cy));
+      if (Math.hypot(cx - nx, cy - ny) < r0) return true;
+      if (cx < r0 + edge0 || cx > cw - r0 - edge0 || cy < r0 + edge0 || cy > ch - r0 - edge0) return true;
+      // under the map's credit line (7-Eleven's mark half behind it, first recording)
+      if (cx + r0 > attrBox[0] && cx - r0 < attrBox[2] && cy + r0 > attrBox[1]) return true;
+      if (areaBox && cx + r0 > areaBox[0] && cx - r0 < areaBox[2] && cy - r0 < areaBox[3]) return true;
+      for (var s = 0; s < spots.length; s++) if (Math.hypot(cx - spots[s][0], cy - spots[s][1]) < M + W * 0.01) return true;
+      return false;
+    }
+    marked.forEach(function (x) {
+      if (!clash(x.tx, x.ty)) { x.mx = x.tx; x.my = x.ty; spots.push([x.mx, x.my]); }
+    });
+    marked.forEach(function (x) {
+      if (x.mx != null) return;
+      var th0 = Math.atan2(x.ty - pr[1], x.tx - pr[0]);
+      if (Math.hypot(x.ty - pr[1], x.tx - pr[0]) < 1) th0 = Math.PI / 2;
+      var radii = [0.75, 1.05, 1.4, 1.8, 2.3, 2.9, 3.6], found = null;
+      for (var ri = 0; ri < radii.length && !found; ri++) {
+        for (var ai = 0; ai < 16 && !found; ai++) {
+          var th = th0 + (ai % 2 ? 1 : -1) * Math.ceil(ai / 2) * Math.PI / 8;
+          var cx = x.tx + radii[ri] * M * Math.cos(th), cy = x.ty + radii[ri] * M * Math.sin(th);
+          if (!clash(cx, cy)) found = [cx, cy];
+        }
+      }
+      // nowhere clear (a crowded corner): on its point, over the others
+      x.mx = found ? found[0] : x.tx; x.my = found ? found[1] : x.ty;
+      spots.push([x.mx, x.my]);
+    });
+    marked.forEach(function (x) {
+      var kc = x.kc, r = x.r;
+      var moved = Math.hypot(x.mx - x.tx, x.my - x.ty);
+      if (moved > M * 0.5) {
+        // the real point and the stem to it, under the mark
+        var tdot = el('i', 'es-mp-true es-fade' + kc);
+        put(tdot, x.tx, x.ty);
+        card.appendChild(tdot);
+        var stem = el('i', 'es-ar-lead es-mp-stem' + kc);
+        var ex = (x.mx - x.tx) / moved, ey = (x.my - x.ty) / moved;
+        put(stem, x.tx, x.ty);
+        stem.style.width = Math.round(moved - M / 2) + 'px';
+        stem.style.transform = 'rotate(' + Math.atan2(ey, ex).toFixed(4) + 'rad)';
+        card.appendChild(stem);
+        x.tdot = tdot; x.stem = stem;
+      }
+      var m = el('div', 'es-ar-m es-drop' + kc);
+      put(m, x.mx, x.my);
+      var ping = el('b', 'es-ar-mping');
+      put(ping, -M / 2, -M / 2, M, M);
+      m.appendChild(ping);
+      var dot = el('i', 'es-jr-node es-ar-dot');
+      put(dot, -M / 2, -M / 2, M, M);
+      dot.appendChild(icon(r.icon));
+      m.appendChild(dot);
+      card.appendChild(m);
+      // four places or more: the name only on the map (its time is in its row
+      // right under it) -- five name-and-time labels on one map covered each
+      // other's marks (first recording, nearby_attractions)
+      var tag = el('div', 'es-ar-tag es-pop' + kc + (n >= 4 ? ' brief' : ''));
+      tag.appendChild(el('b', null, r.short_en || r.label_en || ''));
+      if (r.value_en && n < 4) tag.appendChild(timeText(r.value_en));
+      card.appendChild(tag);
+      x.m = m; x.tag = tag;
+    });
+    // Every label measured at once, then placed beside its mark: clear of the
+    // pin, the marks, the labels placed before it, the map's own credit line
+    // and the area name, inside the map; a route under it costs a little (a
+    // map's labels lie over roads). Deterministic -- arithmetic on one read.
+    var tagSize = marked.map(function (x) { return [x.tag.offsetWidth || W * 0.25, x.tag.offsetHeight || W * 0.1]; });
+    var pad = W * 0.008, edge = W * 0.012, half = M / 2 + 2;
+    var taken = [[pr[0] - pinW / 2, pr[1] - pinH, pr[0] + pinW / 2, pr[1] + W * 0.012], attrBox];
+    if (areaBox) taken.push(areaBox);
+    marked.forEach(function (x) {
+      taken.push([x.mx - half, x.my - half, x.mx + half, x.my + half]);
+      if (x.tdot) taken.push([x.tx - W * 0.012, x.ty - W * 0.012, x.tx + W * 0.012, x.ty + W * 0.012]);
+    });
+    var routePts = [];
+    marked.forEach(function (x) {
+      arr(x.r.route).concat(arr(x.r.walk_route)).forEach(function (q) { routePts.push(px({ x: q[0], y: q[1] })); });
+    });
+    function cost(box, more) {
+      var c = 0, all = more ? taken.concat(more) : taken;
+      for (var t = 0; t < all.length; t++) { var a = boxHit(box, all[t]); if (a) c += W * 4 + a; }
+      for (var q = 0; q < routePts.length; q++) {
+        var pt = routePts[q];
+        if (pt[0] > box[0] && pt[0] < box[2] && pt[1] > box[1] && pt[1] < box[3]) c += W * 0.03;
+      }
+      return c;
+    }
+    var DIRS8 = [[1, 0], [-1, 0], [0, -1], [0, 1], [0.71, -0.71], [-0.71, -0.71], [0.71, 0.71], [-0.71, 0.71]];
+    function label(x, i, fixed) {
+      var w = tagSize[i][0], h = tagSize[i][1], reach0 = half + W * 0.01, best = null, bestCost = Infinity;
+      // away from the project first: a label toward the pin hides where it is
+      var ox = x.mx - pr[0], oy = x.my - pr[1], ol = Math.hypot(ox, oy) || 1;
+      var dirs = DIRS8.slice().sort(function (a, b) { return (b[0] * ox + b[1] * oy) / ol - (a[0] * ox + a[1] * oy) / ol; });
+      [1, 1.8, 2.6, 3.4].forEach(function (f) {
+        dirs.forEach(function (d) {
+          if (bestCost === 0) return;
+          var tx = x.mx + d[0] * reach0 * f + (d[0] > 0.25 ? w / 2 : d[0] < -0.25 ? -w / 2 : 0);
+          var ty = x.my + d[1] * reach0 * f + (d[1] > 0.25 ? h / 2 : d[1] < -0.25 ? -h / 2 : 0);
+          tx = Math.max(w / 2 + edge, Math.min(cw - w / 2 - edge, tx));
+          ty = Math.max(h / 2 + edge, Math.min(ch - h / 2 - edge, ty));
+          var c = cost([tx - w / 2 - pad, ty - h / 2 - pad, tx + w / 2 + pad, ty + h / 2 + pad], fixed);
+          c += Math.max(0, Math.hypot(tx - x.mx, ty - x.my) - (reach0 + Math.max(w, h))) * 2;
+          if (c < bestCost) { bestCost = c; best = [tx - w / 2, ty - h / 2, tx + w / 2, ty + h / 2]; }
+        });
+      });
+      return { box: best, cost: bestCost };
+    }
+    var orders = [marked.map(function (x, i) { return i; }),
+                  marked.map(function (x, i) { return i; }).reverse()];
+    var layout = null;
+    orders.forEach(function (order) {
+      if (layout && layout.cost === 0) return;
+      var fixed = [], total = 0, boxes = [];
+      order.forEach(function (i) {
+        var got = label(marked[i], i, fixed);
+        boxes[i] = got.box;
+        fixed.push(got.box);
+        total += got.cost;
+      });
+      if (!layout || total < layout.cost) layout = { cost: total, boxes: boxes };
+    });
+    marked.forEach(function (x, i) {
+      var bx = layout.boxes[i];
+      put(x.tag, bx[0], bx[1]);
+      var nx = Math.max(bx[0], Math.min(bx[2], x.mx)), ny = Math.max(bx[1], Math.min(bx[3], x.my));
+      var d = Math.hypot(nx - x.mx, ny - x.my);
+      if (d - M / 2 > W * 0.028) {
+        var ex = (nx - x.mx) / d, ey = (ny - x.my) / d, lead = el('i', 'es-ar-lead');
+        put(lead, x.mx + ex * M / 2, x.my + ey * M / 2);
+        lead.style.width = Math.round(d - M / 2) + 'px';
+        lead.style.transform = 'rotate(' + Math.atan2(ey, ex).toFixed(4) + 'rad)';
+        card.insertBefore(lead, x.m);
+        x.lead = lead;
+      }
+    });
+    var rested = false;
+    function act(x, on) {
+      [x.m, x.tag, x.row, x.path].forEach(function (e) { if (e) e.classList.toggle('act', !!on && !rested); });
+    }
+    function draw(x) {
+      if (x.case) x.case.classList.add('on');
+      if (x.path) x.path.classList.add('on');
+      // the route being drawn is the bright one, from its first pixel
+      if (x.path && !rested) {
+        places.forEach(function (o) { if (o.line !== x.line && o.path) o.path.classList.remove('act'); });
+        x.path.classList.add('act');
+        card.classList.add('has-act');
+      }
+    }
+    function land(x) {
+      places.forEach(function (o) { if (o.line !== x.line) act(o, false); });
+      x.row.classList.add('on');
+      if (x.m) x.m.classList.add('on');
+      if (x.tdot) { x.tdot.classList.add('on'); x.stem.classList.add('on'); }
+      act(x, true);
+      card.classList.toggle('has-act', !rested && !!x.path);
+      if (x.m && !S.instant && !rested) {
+        x.m.classList.add('ping');
+        S.later(1700, function () { x.m.classList.remove('ping'); });
+      }
+    }
+    function walkOn(x) {
+      if (x.wmask) x.wmask.classList.add('on');
+      if (x.walk) x.walk.classList.add('on');
+    }
+    function show(x, delay) {
+      S.later(delay, function () {
+        if (x.shown) return;
+        x.shown = true;
+        draw(x);
+        var ms = x.path ? Math.round(x.drawS * 1000) - 150 : 0;
+        S.later(ms, function () { land(x); });
+        S.later(ms + 220, function () { if (x.tag) x.tag.classList.add('on'); if (x.lead) x.lead.classList.add('on'); });
+        if (x.walkLine != null && x.walkLine <= x.line) S.later(ms + 500, function () { walkOn(x); });
+      });
+    }
+    var opened = false;
+    function open() {
+      if (opened) return;
+      opened = true;
+      head.classList.add('on');
+      S.reveal(card, function () {
+        S.later(250, function () { pin.classList.add('on'); shadow.classList.add('on'); });
+        S.later(800, function () { ground.classList.add('on'); });
+        S.later(400, function () { attr.classList.add('on'); if (area) area.classList.add('on'); });
+      });
+    }
+    return {
+      beat: function (i) {
+        if (i === 0) open();
+        var j = 0;
+        places.forEach(function (x) { if (x.line === i) show(x, (i === 0 ? 700 : 0) + 420 * j++); });
+        places.forEach(function (x) {
+          if (x.walkLine === i && x.walkLine > x.line) S.later(200, function () { walkOn(x); });
+        });
+      },
+      rest: function (instant) {
+        rested = true;
+        open();
+        card.classList.add('on');
+        card.classList.remove('has-act');
+        pin.classList.add('on'); shadow.classList.add('on'); ground.classList.add('on');
+        if (instant) ground.classList.add('done');
+        attr.classList.add('on');
+        if (area) area.classList.add('on');
+        places.forEach(function (x) {
+          x.shown = true;
+          draw(x);
+          x.row.classList.add('on');
+          if (x.m) { x.m.classList.add('on'); if (instant) x.m.classList.remove('ping'); }
+          if (x.tdot) { x.tdot.classList.add('on'); x.stem.classList.add('on'); }
+          if (x.tag) x.tag.classList.add('on');
+          if (x.lead) x.lead.classList.add('on');
+          walkOn(x);
+          act(x, false);
+        });
+      }
+    };
+  };
+
   // ------------------------------------------------------------- public API
 
   var active = null;
   var api = {
     templates: Object.keys(TEMPLATES),
+    // Does this template lay out across a landscape stage (play's
+    // opts.layout = 'land', the room TV)? Else the page shows it portrait.
+    landscape: function (template) { return LAND[template] === 1; },
     // A new story replaces whatever story was on screen.
     play: function (data, opts) {
       api.teardown();
       if (!data || !TEMPLATES[data.template] || !opts || !opts.mount) return false;
-      active = new Story(data, opts);
+      // A template that throws on a malformed payload (a null row: audit 27
+      // Oct) left a half-built stage nobody owned and the error escaped the
+      // socket handler: an empty stage under the close button. Gone, and the
+      // page is told (false) so it can take its screen back.
+      try {
+        active = new Story(data, opts);
+      } catch (e) {
+        if (root.console) console.warn('story', data.id, e);
+        active = null;                   // the template throws before any timer starts
+        var left = opts.mount.querySelectorAll ? opts.mount.querySelectorAll('.es-root') : [];
+        for (var k = 0; k < left.length; k++) if (left[k].parentNode) left[k].parentNode.removeChild(left[k]);
+        return false;
+      }
       return true;
     },
     // An audio chunk the page scheduled: [start, start + dur) on its clock.
@@ -2843,6 +3904,8 @@
     settle: function () { if (active && !active.dead) active.toEnd(); },
     teardown: function () { if (active) { active.teardown(); active = null; } },
     isActive: function () { return !!(active && !active.dead); },
+    // One answer's caption timing (the page's reply line): see Caption.
+    caption: function () { return new Caption(); },
     // For the dev harness (scripts/record_stories.py) and debugging only.
     state: function () {
       if (!active) return null;
@@ -2852,7 +3915,7 @@
                played: now != null ? active.clock.played(now) : null, sched: active.clock.sched,
                complete: active.clock.complete, cueAt: active.clock.cueAt.slice() };
     },
-    _clock: { BeatClock: BeatClock, norm: norm, CLOCK: CLOCK, tidy: tidy,
+    _clock: { BeatClock: BeatClock, norm: norm, CLOCK: CLOCK, tidy: tidy, CAPTION: CAPTION, segments: segments,
               leadRateFor: leadRateFor, resetRates: function () { learnedRate = {}; } },
     // tests/client_story_clock.cjs only: apply beats up to i, as the clock would
     _fireTo: function (i) { if (active && !active.dead) active.fire(i); }

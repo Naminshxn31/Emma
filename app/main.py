@@ -391,6 +391,13 @@ async def _warm_search() -> None:
             turnlog.origin.set("startup_warm_up")
             await asyncio.to_thread(search_condo_info, "warm up")
             log.info("search: embedding model warmed")
+            # ...and each place story's details for the questions after it
+            # (stories.DETAILS), looked up now that the model is warm
+            from app import stories
+
+            if settings.stories_enabled:
+                count = await asyncio.to_thread(stories.warm_details)
+                log.info("stories: follow-up details ready for %d place(s)", count)
         except Exception:
             log.debug("search warm-up skipped", exc_info=True)
 
@@ -464,6 +471,168 @@ async def _reach_the_chassis() -> None:
     robot_chassis.start()
 
 
+@app.on_event("startup")
+async def _watch_the_network() -> None:
+    """OFFLINE_FALLBACK (docs/emma-offline-mode.md): probe the Live API's host
+    every NET_PROBE_S so a dial knows the link is down before it waits 10 s
+    on it. Off by default, and then net_health is never even imported.
+
+    The two speech models are NOT loaded here: ~0.9 GB that a good-network
+    day never uses (robot RAM beside the greeter and the embedder is not
+    measured). The first offline call starts loading them in a thread the
+    moment it opens -- on the robot that is the standing line, rung long
+    before a guest speaks; a greeting or a tap never waits for them."""
+    if not settings.offline_fallback:
+        return
+    from app import net_health
+
+    net_health.start()
+
+
+#: The room screen's listener (app/mirror_server.py), held so it isn't
+#: garbage-collected while it serves.
+_mirror_task = None
+
+
+@app.on_event("startup")
+async def _start_room_mirror() -> None:
+    """The room screen's view-only copy of the face (MIRROR_PORT; off = 0).
+    Its own listener in this process, beside the call server -- which stays
+    where it is (127.0.0.1 on the robot)."""
+    global _mirror_task
+    if not settings.mirror_port:
+        return
+    import asyncio
+
+    from app import mirror_server
+
+    _mirror_task = asyncio.create_task(mirror_server.serve())
+
+
+@app.on_event("shutdown")
+async def _stop_room_mirror() -> None:
+    if _mirror_task is None:
+        return
+    from app import mirror_server
+
+    mirror_server.stop()
+
+
+#: The event staff page's listener (app/event_control_server.py).
+_event_control_task = None
+
+
+@app.on_event("startup")
+async def _start_event_control() -> None:
+    """The event host's phone page (EVENT_CONTROL_PORT; off = 0), a listener of
+    its own beside the call server -- it starts walks, so it is not the
+    view-only mirror's."""
+    global _event_control_task
+    if not settings.event_control_port:
+        return
+    import asyncio
+
+    from app import event_control_server
+
+    _event_control_task = asyncio.create_task(event_control_server.serve())
+
+
+@app.on_event("shutdown")
+async def _stop_event_control() -> None:
+    from app import event_walk
+
+    # a server going down leaves no board_walk behind it
+    await event_walk.stop_from("shutdown")
+    if _event_control_task is None:
+        return
+    from app import event_control_server
+
+    event_control_server.stop_server()
+
+
+@app.on_event("startup")
+async def _start_room_screens() -> None:
+    """The robot opens/closes room screens itself (app/room_screens.py).
+    Off unless ROOM_SCREENS_ENABLED -- nothing reaches any room PC."""
+    from app import room_screens
+
+    room_screens.start()
+
+
+@app.on_event("shutdown")
+async def _stop_room_screens() -> None:
+    from app import room_screens
+
+    await room_screens.stop()
+
+
+@app.on_event("startup")
+async def _start_walk_frames() -> None:
+    """Head-camera pictures + pose + lidar of every walk (app/walk_frames.py).
+    Off unless WALK_FRAMES -- nothing is written."""
+    from app import walk_frames
+
+    walk_frames.start()
+
+
+@app.on_event("shutdown")
+async def _stop_walk_frames() -> None:
+    from app import walk_frames
+
+    await walk_frames.stop()
+
+
+@app.on_event("startup")
+async def _start_lidar_people() -> None:
+    """People round the base from the lidar, for the head (app/lidar_people.py).
+    No task unless LIDAR_PEOPLE; reads the board only while HEAD_FOLLOW is on."""
+    from app import lidar_people
+
+    lidar_people.start()
+
+
+@app.on_event("shutdown")
+async def _stop_lidar_people() -> None:
+    from app import lidar_people
+
+    await lidar_people.stop()
+
+
+@app.post("/room-screen")
+async def room_screen_command(request: Request) -> Response:
+    """Emma's face on a room's big screen (app/room_screens.py): slot 3 of the
+    robot face's hold menu, and staff. `status` | `open` | `close` | `toggle`
+    in a JSON body; the token rides in the body too, never the URL (uvicorn
+    logs request lines) -- or the robot face's own same-origin page, the gate
+    the scan and the navigation already use (`_robot_nav_body`)."""
+    from fastapi.responses import JSONResponse
+
+    from app import room_screens
+
+    body = await _robot_nav_body(request)
+    if isinstance(body, Response):
+        return body
+    action = body.get("action")
+    offered = room_screens.offered()
+    if action == "status":
+        return JSONResponse(dict(room_screens.state(), ok=True, offered=offered,
+                                 screens=room_screens.names() if offered else []))
+    if not offered:
+        return JSONResponse({"ok": False, "offered": False,
+                             "error": "room screens are off or not configured on this machine"})
+    by = "tap" if body.get("source") == "face" else "staff"
+    screen = body.get("screen") if isinstance(body.get("screen"), str) else None
+    if action == "open":
+        result = await room_screens.open_screen(screen or None, by=by)
+    elif action == "close":
+        result = await room_screens.close_screen(screen or None, by=by)
+    elif action == "toggle":
+        result = await room_screens.toggle(by=by)
+    else:
+        return JSONResponse({"ok": False, "error": "action must be status, open, close or toggle"})
+    return JSONResponse(dict(result, offered=True, **room_screens.state()))
+
+
 @app.on_event("shutdown")
 async def _let_go_of_the_chassis() -> None:
     """Stop polling and close the socket. Deliberately does not cancel a walk
@@ -472,6 +641,15 @@ async def _let_go_of_the_chassis() -> None:
     from app import robot_chassis
 
     await robot_chassis.stop()
+
+
+@app.on_event("shutdown")
+async def _stop_watching_the_network() -> None:
+    if not settings.offline_fallback:
+        return
+    from app import net_health
+
+    net_health.stop()
 
 
 @app.on_event("shutdown")
@@ -531,8 +709,17 @@ def _same_origin_loopback_websocket(websocket: WebSocket) -> bool:
 
     The TCP peer, page Origin and request Host must all be the same loopback
     origin. An internet page can ask a browser to reach localhost, but its
-    Origin will not match this WebSocket Host and is rejected. LAN clients and
-    non-browser clients still need the configured token.
+    Origin will not match this WebSocket Host and is rejected. LAN clients
+    still need the configured token.
+
+    What this does NOT stop (audit 27 Oct -- the old docstring said
+    "non-browser clients still need the token", and that was false): Origin and
+    Host are headers the CLIENT writes. Only a browser fills Origin in for the
+    page and will not let a page forge it; any other process on this machine
+    -- another app on the robot, which serves on 127.0.0.1 -- can send
+    `Origin: https://127.0.0.1:8001` with a matching Host and passes without
+    the token. The check stops web pages, nothing else; whoever can run code
+    on this machine is inside the gate.
     """
     client = websocket.client
     if client is None:
@@ -700,7 +887,7 @@ async def health() -> dict:
     from app.tools import robot_link
 
     provider = settings.provider
-    return {
+    body = {
         "ok": True,
         "project": settings.project_name,
         "provider": provider,
@@ -748,6 +935,13 @@ async def health() -> dict:
             "openai": bool(settings.openai_api_key),
         },
     }
+    if settings.offline_fallback:
+        # OFFLINE_FALLBACK only (the sales room's /health is unchanged): the
+        # link as app/net_health.py sees it -- state, seconds, a category.
+        from app import net_health
+
+        body["network"] = net_health.snapshot()
+    return body
 
 
 @app.get("/voices")
@@ -1223,8 +1417,11 @@ async def robot_command(request: Request) -> dict:
             # SIGINT"). No DELETE first: drive_route's SIGINT handler sends
             # its own zero/cancel. The page is told "requested", not
             # "stopped" — the ack means the app queued it.
-            from app import robot_nav
+            from app import event_walk, robot_nav
 
+            # The event host's walk (app/event_walk.py) is this server's own
+            # board_walk: its SIGTERM goes first, whatever the plan below.
+            await event_walk.stop_from("desk")
             plan, face = robot_nav.stop_plan()
             if plan == "face":
                 nav = await robot_nav.stop(face)
@@ -1717,6 +1914,9 @@ def _same_origin_loopback_request(request: Request) -> bool:
     loopback origin, and it is *this* server's origin (Origin == Host). A
     site open in the same browser can make it post to localhost, but its
     Origin is its own; a DNS-rebound name matches Host but is not loopback.
+    Safe against web pages only: a local process that is not a browser writes
+    both headers itself and passes without the token (audit 27 Oct; see the
+    socket function's docstring).
 
     Not a second copy of the check: Starlette's Request and WebSocket are
     both HTTPConnection, with the same `client` and `headers`, so the socket

@@ -1,0 +1,168 @@
+{
+ "story": "location_beach",
+ "image": "maps/location_beach.png",
+ "image_sha256": "eed3c485327a66fe5bbb1c9020d945f5c4dfaf3fed0426673eb9847ec914e441",
+ "w": 1080,
+ "h": 900,
+ "camera": {
+  "zoom": 14.444,
+  "pitch": 45,
+  "bearing": 0
+ },
+ "attribution_en": "© OpenStreetMap contributors · OpenFreeMap",
+ "palette": "night",
+ "places": {
+  "nong_phrong_park": {
+   "x": 38.01,
+   "y": 46.01,
+   "straight_km": 0.1,
+   "source": "facts:ทำเล (ติดสวนสาธารณะหนองโพรง) · report 04 line 7 (park edge ≈ 40 m) · the owner's map"
+  },
+  "jomtien_beach": {
+   "x": 13.21,
+   "y": 57.67,
+   "straight_km": 0.601,
+   "source": "report 92 ค.3 #1 (nearest sand) · the owner's map",
+   "route": [
+    [
+     37.48,
+     43.04
+    ],
+    [
+     34.69,
+     44.59
+    ],
+    [
+     34.62,
+     45.36
+    ],
+    [
+     35.2,
+     46.63
+    ],
+    [
+     38.03,
+     51.26
+    ],
+    [
+     40.77,
+     53.9
+    ],
+    [
+     38.01,
+     55.68
+    ],
+    [
+     42.79,
+     60.96
+    ],
+    [
+     44.19,
+     62.91
+    ],
+    [
+     48.38,
+     70.57
+    ],
+    [
+     25.8,
+     77.1
+    ],
+    [
+     15.99,
+     61.11
+    ],
+    [
+     13.47,
+     57.51
+    ],
+    [
+     13.21,
+     57.67
+    ]
+   ],
+   "route_km": 1.92
+  },
+  "sukhumvit": {
+   "x": 84.17,
+   "y": 46.46,
+   "straight_km": 1.256,
+   "source": "facts:ทำเล (ถึงถนนสุขุมวิทประมาณ 1.85 กม.) · the owner's map's Sukhumvit Road point (its straight line is not the report's junction, so only the road km is checked)",
+   "route": [
+    [
+     37.48,
+     43.04
+    ],
+    [
+     34.69,
+     44.59
+    ],
+    [
+     34.62,
+     45.36
+    ],
+    [
+     35.2,
+     46.63
+    ],
+    [
+     38.03,
+     51.26
+    ],
+    [
+     40.77,
+     53.9
+    ],
+    [
+     38.01,
+     55.68
+    ],
+    [
+     42.79,
+     60.96
+    ],
+    [
+     44.19,
+     62.91
+    ],
+    [
+     47.63,
+     69.24
+    ],
+    [
+     48.72,
+     70.05
+    ],
+    [
+     49.34,
+     70.19
+    ],
+    [
+     60.28,
+     67.36
+    ],
+    [
+     89.99,
+     58.39
+    ],
+    [
+     86.92,
+     53.51
+    ],
+    [
+     85.25,
+     49.87
+    ],
+    [
+     84.17,
+     46.46
+    ]
+   ],
+   "route_km": 2.19
+  }
+ },
+ "project": {
+  "x": 37.48,
+  "y": 43.04
+ }
+}

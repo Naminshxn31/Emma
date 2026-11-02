@@ -199,17 +199,18 @@
     "page": 1,
     "dpi": 200,
     "crop": [
-      446,
-      624,
-      1312,
-      1900
+      662,
+      794,
+      1134,
+      1500
     ],
     "max_w": 1080,
     "format": "webp",
     "post": [
       "lines_to_alpha:#bad6ff"
     ],
-    "why": "Main layout 1 of 5: STUDIO 24 SQ.M. (page 1 left). Balcony on the drawing 2.45 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+    "why": "Main layout 1 of 5: STUDIO 24 SQ.M. (page 1 left). Balcony on the drawing 2.45 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+    "strip_dimensions": true
   },
   {
     "id": "layout_studio_b107",
@@ -218,17 +219,18 @@
     "page": 4,
     "dpi": 200,
     "crop": [
-      284,
-      730,
-      1557,
-      1762
+      530,
+      943,
+      1402,
+      1500
     ],
     "max_w": 1080,
     "format": "webp",
     "post": [
       "lines_to_alpha:#bad6ff"
     ],
-    "why": "Main layout 2 of 5: STUDIO B107, trapezoid where building B turns (page 4 left). The crop stops under 'STUDIO B107' and leaves out its '28.87 SQ.M.' line: two decimals on screen break the owner's one-decimal rule (21 Oct); the row says '≈ 29 sq.m.'. Balcony 2.55 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+    "why": "Main layout 2 of 5: STUDIO B107, trapezoid where building B turns (page 4 left). The crop stops under 'STUDIO B107' and leaves out its '28.87 SQ.M.' line: two decimals on screen break the owner's one-decimal rule (21 Oct); the row says '≈ 29 sq.m.'. Balcony 2.55 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+    "strip_dimensions": true
   },
   {
     "id": "layout_1br_33",
@@ -237,17 +239,18 @@
     "page": 2,
     "dpi": 200,
     "crop": [
-      305,
-      624,
-      1323,
-      1900
+      508,
+      774,
+      1142,
+      1500
     ],
     "max_w": 1080,
     "format": "webp",
     "post": [
       "lines_to_alpha:#bad6ff"
     ],
-    "why": "Main layout 3 of 5: 1 - BEDROOM 33 SQ.M. (page 2 left). Balcony 2.55 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+    "why": "Main layout 3 of 5: 1 - BEDROOM 33 SQ.M. (page 2 left). Balcony 2.55 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+    "strip_dimensions": true
   },
   {
     "id": "layout_1br_b113",
@@ -256,17 +259,18 @@
     "page": 4,
     "dpi": 200,
     "crop": [
-      1704,
-      645,
-      2795,
-      1900
+      1871,
+      866,
+      2607,
+      1500
     ],
     "max_w": 1080,
     "format": "webp",
     "post": [
       "lines_to_alpha:#bad6ff"
     ],
-    "why": "Main layout 4 of 5: 1 - BEDROOM B113 33 SQ.M., slanted plan where building B turns (page 4 right). Balcony 2.55 (along the railing) x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+    "why": "Main layout 4 of 5: 1 - BEDROOM B113 33 SQ.M., slanted plan where building B turns (page 4 right). Balcony 2.55 (along the railing) x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+    "strip_dimensions": true
   },
   {
     "id": "layout_51_2br",
@@ -275,17 +279,18 @@
     "page": 3,
     "dpi": 200,
     "crop": [
-      1705,
-      603,
-      3008,
-      1900
+      1922,
+      753,
+      2838,
+      1500
     ],
     "max_w": 1080,
     "format": "webp",
     "post": [
       "lines_to_alpha:#bad6ff"
     ],
-    "why": "Main layout 5 of 5: the 51 sq.m. unit as 2 - BEDROOM 51 SQ.M. (page 3 right), two bathrooms. Balcony 2.85 x 1.40 m (the 0.80 m box beside it is walled, not counted). Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+    "why": "Main layout 5 of 5: the 51 sq.m. unit as 2 - BEDROOM 51 SQ.M. (page 3 right), two bathrooms. Balcony 2.85 x 1.40 m (the 0.80 m box beside it is walled, not counted). Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+    "strip_dimensions": true
   },
   {
     "id": "layout_51_1br",
@@ -294,17 +299,18 @@
     "page": 3,
     "dpi": 200,
     "crop": [
-      368,
-      603,
-      1621,
-      1900
+      535,
+      753,
+      1451,
+      1500
     ],
     "max_w": 1080,
     "format": "webp",
     "post": [
       "lines_to_alpha:#bad6ff"
     ],
-    "why": "The 51 sq.m. unit's other option: 1 - BEDROOM 51 SQ.M. (page 3 left) -- one large bedroom and a wider living room, one bathroom. Same balcony 2.85 x 1.40 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+    "why": "The 51 sq.m. unit's other option: 1 - BEDROOM 51 SQ.M. (page 3 left) -- one large bedroom and a wider living room, one bathroom. Same balcony 2.85 x 1.40 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+    "strip_dimensions": true
   },
   {
     "id": "layout_combined_48",
@@ -313,17 +319,18 @@
     "page": 1,
     "dpi": 200,
     "crop": [
-      1461,
-      580,
-      2866,
-      1989
+      1677,
+      794,
+      2593,
+      1500
     ],
     "max_w": 1080,
     "format": "webp",
     "post": [
       "lines_to_alpha:#bad6ff"
     ],
-    "why": "Combined layout 1 of 2: 2 - BEDROOM 48 SQ.M. (STUDIO COMBINED) (page 1 right), two bathrooms. Balcony 5.07 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+    "why": "Combined layout 1 of 2: 2 - BEDROOM 48 SQ.M. (STUDIO COMBINED) (page 1 right), two bathrooms. Balcony 5.07 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+    "strip_dimensions": true
   },
   {
     "id": "layout_combined_66",
@@ -332,16 +339,17 @@
     "page": 2,
     "dpi": 200,
     "crop": [
-      1385,
-      580,
-      3028,
-      1989
+      1588,
+      774,
+      2822,
+      1500
     ],
     "max_w": 1080,
     "format": "webp",
     "post": [
       "lines_to_alpha:#bad6ff"
     ],
-    "why": "Combined layout 2 of 2: 2 - BEDROOM 66 SQ.M. (1-BR COMBINED) (page 2 right), two bathrooms. Balcony 5.25 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures."
+    "why": "Combined layout 2 of 2: 2 - BEDROOM 66 SQ.M. (1-BR COMBINED) (page 2 right), two bathrooms. Balcony 5.25 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+    "strip_dimensions": true
   }
 ]

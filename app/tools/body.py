@@ -51,4 +51,10 @@ from app.tools.registry import tool
     preempt=lambda args: args.get("action") == "stop",
 )
 async def move_body(action: str) -> dict:
+    if action == "stop":
+        # "หยุด" during the event host's walk (app/event_walk.py) may come
+        # out as the body's stop: that walk stops too, first.
+        from app import event_walk
+
+        await event_walk.stop_from("voice")
     return await robot_body.request(action)

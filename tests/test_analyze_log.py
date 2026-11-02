@@ -185,3 +185,36 @@ def test_a_stalled_speaker_note_is_shouted_in_the_report(tmp_path, monkeypatch, 
     monkeypatch.setattr(sys, "argv", ["analyze_log.py", str(log)])
     assert al.main() == 0
     assert "บันทึกผู้พูดทำให้หุ่นค้างไม่ตอบ 1 ครั้ง" in capsys.readouterr().out
+
+
+def test_the_head_section_reads_the_first_bench_run(capsys):
+    al = _al()
+    rows = [
+        {"event": "head_calibration", "ok": True, "pan_deg_per_100": -18.4, "tilt_deg_per_100": 21.0,
+         "texture": 9.1, "shifts": {}},
+        {"event": "head_look", "why": "face", "pan": 30, "tilt": 0},
+        {"event": "head_look", "why": "refused", "reason": "busy", "pan": 40, "tilt": 0},
+        {"event": "head_look", "why": "off", "reason": "app_disabled", "pan": 0, "tilt": 0},
+        {"event": "face_link_refused", "command": "body", "action": "nod", "why": "event_walk"},
+    ]
+    al.head(rows)
+    out = capsys.readouterr().out
+    assert "sweep OK: pan -18.4 deg / tilt +21.0 deg" in out and "RIGHT" in out
+    assert "refused by the app: busy 1" in out
+    assert "stopped following: app_disabled 1" in out
+    assert "event host's walk: 1" in out
+    al.head([{"event": "lookup"}])
+    assert capsys.readouterr().out == "", "no head rows, no section"
+
+
+def test_the_head_section_reads_the_lidar_check(capsys):
+    al = _al()
+    al.head([{"event": "head_lidar_check", "n": 30, "a": -0.82, "b": 2.0, "mad_deg": 1.1, "hfov_deg": 60.0,
+              "trusted": True},
+             {"event": "lidar_people", "n": 1, "nearest_deg": 12.0, "nearest_m": 0.8},
+             {"event": "head_look", "why": "lidar", "pan": 40, "tilt": 30}])
+    out = capsys.readouterr().out
+    assert "lidar check HOLDS (30 pairs)" in out and "~60.0 deg wide" in out and "other way" in out
+    assert "turned toward a lidar person 1 times" in out
+    al.head([{"event": "head_lidar_check", "n": 20, "trusted": False, "why": "disagree", "spread_deg": 8.0}])
+    assert "not (yet) holding: disagree" in capsys.readouterr().out

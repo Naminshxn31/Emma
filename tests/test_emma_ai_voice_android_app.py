@@ -121,5 +121,6 @@ def test_preview_has_the_android_home_layout_without_forking_the_engine():
     # One call engine. The robot camera sender after it (?cam=1, for the
     # greeter) is a second socket on purpose and is not an engine.
     engine = preview.split("// ---- the robot's own camera, sent to the server (`?cam=1`) ----", 1)[0]
-    assert engine.count("new WebSocket(") == 1
+    # ...nor is the room screen's read-only watch (/mirror, app/face_mirror.py)
+    assert engine.count("new WebSocket(") == 2 and engine.count("'/ws?voice='") == 1
     assert "/ws?voice=" in preview

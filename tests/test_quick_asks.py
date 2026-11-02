@@ -17,7 +17,8 @@ PAGE = ROOT / "client" / "voice-preview.html"
 def test_the_page_gets_labels_in_every_language_and_never_the_words():
     page = quick_asks.for_page("condo", "Embassy World")
     assert page["brand"] == "Embassy World"
-    assert [b["id"] for b in page["langs"]] == ["th", "en", "zh"]
+    # the language menu (29 Oct) offers Russian too; topics stay th/en/zh
+    assert [b["id"] for b in page["langs"]] == ["th", "en", "zh", "ru"]
     assert set(page["hint"]) == {"th", "en", "zh"}
     assert len(page["items"]) == 6
     for item in page["items"]:
@@ -52,8 +53,12 @@ def test_a_tap_is_marked_as_a_tap_and_keeps_the_spoken_language():
 
 
 def test_language_buttons_switch_and_say_one_sentence():
+    # Since 29 Oct a pick holds for the whole call, and a pick other than Thai
+    # is written in English (tests/test_language_menu.py has the rest).
     text = quick_asks.text_for("condo", "lang_zh")
-    assert "ไม่ได้พูด" in text and "ตั้งแต่นี้ตอบเป็นภาษาจีน" in text and "ห้ามถามต่อ" in text
+    assert "did not speak" in text and "answer only in Chinese" in text and "do not ask anything" in text
+    text = quick_asks.text_for("condo", "lang_th")
+    assert "ไม่ได้พูด" in text and "ตั้งแต่นี้ตอบเป็นภาษาไทยเท่านั้น" in text and "ห้ามถามต่อ" in text
     assert quick_asks.text_for("condo", "lang_fr") is None
 
 
@@ -151,7 +156,8 @@ def _quick_code():
 def test_the_page_sends_an_id_and_a_language_never_text():
     code = _quick_code()
     sends = re.findall(r"ws\.send\(JSON\.stringify\(\{ type: 'quick_ask'[^)]*\)\)", code)
-    assert sends == ["ws.send(JSON.stringify({ type: 'quick_ask', id: id, lang: uiLang }))"]
+    # `cut` (29 Oct): whether the tap stopped her voice -- a flag, never words
+    assert sends == ["ws.send(JSON.stringify({ type: 'quick_ask', id: id, lang: uiLang, cut: cut }))"]
     assert "textContent = quickLabel(item.label)" in code      # labels as text, never HTML
     assert "innerHTML" not in code
 
@@ -445,7 +451,9 @@ def test_the_page_draws_her_choices_and_drops_them_when_answered():
     assert "choiceSet = appShell && evt.items && evt.items.length ? evt : null;" in branch
     spoke = html.split("case 'speech_started':", 1)[1].split("break;", 1)[0]
     assert "if (choiceSet) { choiceSet = null; renderQuick(); }" in spoke
-    assert html.count("choiceSet = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); renderQuick();") == 3
+    # (the language menu's pick goes with them since 29 Oct)
+    assert html.count("choiceSet = null; pickedLang = null; quickAsks = null; setUiLang(FIXED_UI_LANG || 'th'); "
+                      "renderQuick();") == 3
     ready = html.split("case 'ready':", 1)[1].split("break;", 1)[0]
     assert "choiceSet = null;" in ready
     # a tap is a new question: its answer owns the screen, as a spoken one's does
@@ -502,3 +510,86 @@ def test_the_session_taps_in_the_language_she_is_speaking(monkeypatch):
     sess._guest_text = "ห้องมีกี่แบบครับ อยากรู้รายละเอียด"
     asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "units", "lang": "en"}))
     assert sess.provider.sent == [quick_asks.text_for("condo", "units", "en", "th")]
+
+
+def test_a_tap_in_another_language_names_it_not_english():
+    """Audit 27 Oct: any language TalkLanguage can tell, outside th/en/zh, gets
+    one bracketed preamble naming it -- a German talk's tap used to say "This
+    conversation is in English" (the tap itself switched her)."""
+    text = quick_asks.text_for("condo", "units", "th", "de")
+    assert text.startswith('[The guest tapped "Unit types" on the screen and did not speak. '
+                           "This conversation is in German: answer in German, do not switch language.]")
+    assert text.endswith("What unit types are there, and how big are they?")
+    assert "English" not in text and not re.search("[฀-๿]", text)
+    choice = quick_asks.text_for("condo", "type_1br", "th", "ja")
+    assert "This conversation is in Japanese: answer in Japanese" in choice
+    assert 'show_room_type(type="1br")' in choice
+    assert quick_asks.tap_call("present_story()", "de") == "Call present_story() and tell it from the result."
+    # the helpers story taps can call (stories.tap_text / the picture preamble)
+    assert quick_asks.tap_talk("de") == "de" and quick_asks.talk_name_en("de") == "German"
+    assert quick_asks.tap_talk("xx") is None and quick_asks.talk_name_en("xx") is None
+    assert quick_asks.tap_talk(None) is None
+    # th/en/zh read exactly as before
+    assert quick_asks.text_for("condo", "units", "th", "en").startswith(
+        '[The guest tapped "Unit types" on the screen and did not speak. This conversation is in English')
+    # a code nobody can name is the old wording, as for no talk at all
+    assert quick_asks.text_for("condo", "units", "en", "xx") == quick_asks.text_for("condo", "units", "en")
+
+
+def test_script_lang_does_not_read_japanese_as_chinese():
+    """Kanji with kana is Japanese, which script_lang cannot name: None, not
+    "zh" (a Japanese talk's tap was told "This conversation is in Chinese")."""
+    assert quick_asks.script_lang("日本語で話してください") is None
+    assert quick_asks.script_lang("スタジオの広さはどのくらいですか") is None
+    assert quick_asks.script_lang("我可以为您介绍项目") == "zh"
+
+
+class _TalkingProvider(_Provider):
+    """A provider that knows the conversation's language, as GeminiProvider
+    does (`_talk`, app/talk_lang.py -- what the guest said)."""
+
+    def __init__(self, *guest):
+        super().__init__()
+        from app.talk_lang import TalkLanguage
+
+        self._talk = TalkLanguage()
+        for line in guest:
+            self._talk.guest(line)
+            self._talk.emma("ok")
+
+
+def test_the_session_taps_in_the_language_the_guest_speaks_not_the_script():
+    """Audit 27 Oct (verified on the robot's own wording): German talk, a tap
+    -> "This conversation is in English"; Japanese talk -> "in Chinese".
+    `script_lang` reads any Latin script as English and kanji as Chinese; the
+    provider's TalkLanguage -- the language every tool result already
+    carries -- is asked first."""
+    sess = _session()
+    sess.provider = _TalkingProvider("Wo ist das Fitnessstudio und wie gross ist es bitte?")
+    sess._said_since_guest = "Das Fitnessstudio Biogenesis ist im Erdgeschoss von Gebaeude A."
+    asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "units", "lang": "en"}))
+    assert sess.provider.sent == [quick_asks.text_for("condo", "units", "en", "de")]
+    assert "in German" in sess.provider.sent[0] and "English" not in sess.provider.sent[0]
+    sess = _session()
+    sess.provider = _TalkingProvider("この部屋の広さはどのくらいですか")
+    sess._said_since_guest = "このお部屋は約三十平方メートルです"
+    asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "units", "lang": "en"}))
+    assert "in Japanese" in sess.provider.sent[0] and "Chinese" not in sess.provider.sent[0]
+    # the guest said nothing that tells: her own words' script, as before
+    sess = _session()
+    sess.provider = _TalkingProvider()
+    sess._said_since_guest = "Our facilities are spread over three floors."
+    asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "units", "lang": "th"}))
+    assert sess.provider.sent == [quick_asks.text_for("condo", "units", "th", "en")]
+
+
+
+def test_a_tap_is_watched_like_a_spoken_question():
+    """Replay of the 20 Oct robot log (27 Oct): a tapped topic whose answer
+    never came was never chased. The session hands the tap's own text to the
+    provider's reply watchdog right after sending it."""
+    sess = _session()
+    watched = []
+    sess.provider.watch_text_turn = watched.append
+    asyncio.run(sess._quick_ask({"type": "quick_ask", "id": "units", "lang": "en"}))
+    assert watched == sess.provider.sent == [quick_asks.text_for("condo", "units", "en")]

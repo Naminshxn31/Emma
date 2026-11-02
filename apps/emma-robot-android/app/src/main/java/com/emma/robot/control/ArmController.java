@@ -114,6 +114,10 @@ final class ArmController {
      * a real one.
      */
     private final Object linkLock = new Object();
+    /** The two writers of raw board lines -- a pose run's frames and the head
+     *  look (writeLine) -- take this around the write, so their bytes never
+     *  interleave on the serial line. */
+    private final Object writeLock = new Object();
     private volatile boolean linkDown = false;
     /** The current frame run's abort, once; null when none is playing. */
     private final AtomicReference<Runnable> frameAbort = new AtomicReference<>(null);
@@ -355,7 +359,9 @@ final class ArmController {
                     }
                     PoseFrame frame = frames.get(index);
                     String command = frameCommand(frame);
-                    armManager.f(command + "\r\n");
+                    synchronized (writeLock) {
+                        armManager.f(command + "\r\n");
+                    }
                     listener.onArmCommand(command + " · คีย์เฟรม " + (index + 1)
                             + "/" + frames.size());
                     long deadline = SystemClock.elapsedRealtime() + frame.durationMs;
@@ -376,6 +382,20 @@ final class ArmController {
                 frameAbort.compareAndSet(abort, null);
             }
         });
+    }
+
+    /** One raw line for the head look (HeadLook.command, owner 31 Oct). Not a
+     *  pose run: poseGeneration is NOT bumped, so a speech gesture's frames on
+     *  the arm channels keep playing while the head turns (the board takes
+     *  each channel's target on its own -- to be watched on the bench). A
+     *  stop still wins: stopAll is the board's stop for every channel. */
+    void writeLine(String command) {
+        requireConnected();
+        if (!linkUp()) throw new IllegalStateException("arm link down");
+        synchronized (writeLock) {
+            armManager.f(command + "\r\n");
+        }
+        listener.onArmCommand(command + " · หันหัว");
     }
 
     private static boolean ownerCurrent(BooleanSupplier stillCurrent) {

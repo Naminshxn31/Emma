@@ -544,9 +544,11 @@ async def stop(session) -> dict:
     holds both, one that refuses, times out or dropped is not the end of a
     stop, and a quiet one must not hold the others back by its timeout.
     """
-    from app import robot_face_link
+    from app import event_walk, robot_face_link
     from app.config import settings
 
+    # the event host's own walk, if one is under way (a no-op otherwise)
+    await event_walk.stop_from("voice")
     nav_ack, body_ack = await asyncio.gather(
         robot_face_link.request_stop(session, "nav", settings.robot_nav_ack_timeout_s),
         robot_face_link.request_stop(session, "body", settings.robot_body_ack_timeout_s))

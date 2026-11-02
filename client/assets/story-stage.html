@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Emma story stage</title>
+<!-- The room screen's story frame (voice-preview.html in /mirror mode,
+     app/face_mirror.py), a page of its own the parent sizes and scales:
+     - landscape (29 Oct, owner: "ทำเรื่องเล่าแบบแนวนอน"): a 1.5:1 stage the
+       story is laid out across (emma-story.js play(..., {layout: 'land'}),
+       Story.land) -- the same story data, the picture large on one side and
+       its words beside it; the engine sets its own units on its root;
+     - portrait: the robot's own screen, 1080 x 1920, for a template with no
+       landscape layout (distance, neighborhood: no story uses them).
+     The parent drives this page's EmmaStory with its own audio clock. Same
+     ?v= as the face page (tests/test_stories.py ENGINE_TAG). -->
+<link rel="stylesheet" href="/assets/emma-story.css?v=20261029-a">
+<style>
+  /* Transparent (owner 28 Oct on the room screen: "motion ภาพอยากให้ใหญ่เต็มจอ"):
+     the story draws over the room screen's own sky, as it draws over the
+     face's sky on the robot -- a dark box of its own read as a small phone
+     in the middle of the TV. The same color-scheme as the page around it,
+     or Chrome paints an opaque backdrop behind the frame. */
+  :root { color-scheme: dark; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  body {
+    color: #f7f7f4;
+    font: 16px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .vp-stage { position: fixed; inset: 0; display: block; overflow: hidden; }
+  .vp-stage-inner { width: 100%; height: 100%; display: block; }
+  /* The tap chips are the robot guest's buttons: the room screen only
+     watches (a tap there asks nothing of the robot). */
+  .es-taps { display: none !important; }
+  /* ...and the line that points at them ("Tap a floor", "Tap a room type
+     to look inside"): nothing here can be tapped from across the room. Kept
+     in the layout (the stack measures its rows against the hint's place, as
+     on the robot), only not drawn; a hint that states a fact ("Not in the
+     package: ...") stays. Marked by the script at the end of the body. */
+  .es-hint.es-tap-hint { visibility: hidden !important; }
+  /* the same for the "Tap for details ›" pill on a drill card's photo and
+     the "›" at the end of a row that leads to a story: not drawn, still in
+     their place (the card and the row keep the robot's layout) */
+  .es-fc-go, .es-go { visibility: hidden !important; }
+</style>
+</head>
+<body class="emma-story emma-staging">
+<section class="vp-stage"><div class="vp-stage-inner"></div></section>
+<script src="/assets/emma-story.js?v=20261029-a"></script>
+<script>
+  // A story's hint is created with its words (emma-story.js end_hint_en,
+  // always English): a tap instruction is marked before it is ever painted.
+  new MutationObserver(function (changes) {
+    changes.forEach(function (c) {
+      c.addedNodes.forEach(function (n) {
+        if (!n.querySelectorAll) return;
+        var hints = n.classList.contains('es-hint') ? [n] : n.querySelectorAll('.es-hint');
+        for (var k = 0; k < hints.length; k++) {
+          if (/^\s*tap\b/i.test(hints[k].textContent || '')) hints[k].classList.add('es-tap-hint');
+        }
+      });
+    });
+  }).observe(document.querySelector('.vp-stage-inner'), { childList: true, subtree: true });
+</script>
+</body>
+</html>

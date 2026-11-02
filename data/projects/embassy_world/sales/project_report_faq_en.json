@@ -36,7 +36,10 @@
   {
    "th": "โครงการเหมาะกับใคร",
    "en": [
-    "Who is the project suitable for?"
+    "Who is the project suitable for?",
+    "Who are the buyers of this project?",
+    "Who is this project for?",
+    "Who is the target buyer?"
    ]
   },
   {
@@ -61,12 +64,6 @@
    "th": "โครงการมี facility ทั้งหมดกี่รายการ แบ่งอย่างไร",
    "en": [
     "How many facilities does the project have, and how are they grouped?"
-   ]
-  },
-  {
-   "th": "ข้อมูลที่แชทบอทใช้ล่าสุดวันไหน",
-   "en": [
-    "When was the chatbot's information last updated?"
    ]
   },
   {
@@ -230,12 +227,6 @@
    ]
   },
   {
-   "th": "ห้องไหนเป็นห้องฝั่งสวนสาธารณะ",
-   "en": [
-    "Which units are on the public park side?"
-   ]
-  },
-  {
    "th": "โครงการติดทะเลหรือไม่",
    "en": [
     "Is the project on the beach?",
@@ -384,12 +375,6 @@
    ]
   },
   {
-   "th": "พื้นที่ห้องรวมระเบียงหรือไม่",
-   "en": [
-    "Does the unit area include the balcony?"
-   ]
-  },
-  {
    "th": "มีห้องสำหรับผู้พิการหรือห้องที่มีสวนหรือเทอร์เรซส่วนตัวไหม",
    "en": [
     "Are there units for disabled people, or units with a private garden or terrace?"
@@ -493,12 +478,6 @@
    ]
   },
   {
-   "th": "ระเบียงใหญ่แค่ไหน",
-   "en": [
-    "How big is the balcony?"
-   ]
-  },
-  {
    "th": "เพดานห้องสูงเท่าไร",
    "en": [
     "How high is the ceiling in the room?",
@@ -537,21 +516,9 @@
    ]
   },
   {
-   "th": "ห้องมุมยังเหลือกี่ห้อง",
-   "en": [
-    "How many corner units are still available?"
-   ]
-  },
-  {
    "th": "ห้อง Pool Access มีสระส่วนตัวหรือเทอร์เรซลงสระโดยตรงไหม",
    "en": [
     "Do Pool Access units have a private pool or a terrace straight into the pool?"
-   ]
-  },
-  {
-   "th": "วิว \"สระ ABC\" และ \"สระ DEF\" คืออะไร",
-   "en": [
-    "What are the \"Pool ABC\" and \"Pool DEF\" views?"
    ]
   },
   {
@@ -1102,7 +1069,9 @@
    "th": "โครงการจะสร้างเสร็จเมื่อไร",
    "en": [
     "When will the project be completed?",
-    "When will construction be finished?"
+    "When will construction be finished?",
+    "What is the expected completion date?",
+    "What is the completion date of the project?"
    ]
   },
   {
@@ -1161,75 +1130,9 @@
    ]
   },
   {
-   "th": "โครงการขายไปแล้วเท่าไร ยังเหลือกี่ห้อง",
-   "en": [
-    "How much of the project has been sold, and how many units are left?"
-   ]
-  },
-  {
-   "th": "ขายแล้วกี่ห้อง แยกตามประเภทห้อง",
-   "en": [
-    "How many units are sold, by unit type?"
-   ]
-  },
-  {
-   "th": "ขายแล้วกี่ห้อง แยกตามอาคาร",
-   "en": [
-    "How many units are sold, by building?"
-   ]
-  },
-  {
-   "th": "ชั้นไหนขายแล้วเยอะ ชั้นไหนยังว่าง",
-   "en": [
-    "Which floors have sold the most, and which floors are still available?"
-   ]
-  },
-  {
-   "th": "ห้องวิวไหนหรืออาคารไหนขายดีที่สุด",
-   "en": [
-    "Which view or which building sells best?"
-   ]
-  },
-  {
-   "th": "ห้องที่ผมสนใจขายแล้ว มีห้องใกล้เคียงไหม",
-   "en": [
-    "The unit I wanted is sold. Is there a similar one nearby?"
-   ]
-  },
-  {
-   "th": "ควรรีบซื้อไหม ห้องกำลังจะหมดหรือเปล่า",
-   "en": [
-    "Should I hurry to buy? Are the units about to sell out?"
-   ]
-  },
-  {
-   "th": "ร้านค้าในโครงการเหลือขายไหม",
-   "en": [
-    "Are there any shops in the project still for sale?"
-   ]
-  },
-  {
    "th": "ห้องรหัส C-723 ถึง C-732 มีไหม",
    "en": [
     "Do units C-723 to C-732 exist?"
-   ]
-  },
-  {
-   "th": "ได้ยินตัวเลขยอดขายอื่น เช่น ขาย 326 จอง 7 ว่าง 739 ใช้ตัวเลขไหน",
-   "en": [
-    "I heard other sales figures, such as 326 sold, 7 reserved and 739 available. Which numbers are right?"
-   ]
-  },
-  {
-   "th": "สถานะ \"ขายแล้ว\" หมายถึงอะไร ชำระครบแล้วหรือแค่จอง",
-   "en": [
-    "What does \"sold\" mean? Fully paid or only reserved?"
-   ]
-  },
-  {
-   "th": "ห้องที่ขายแล้ว ขายให้ใคร ราคาเท่าไร",
-   "en": [
-    "Who bought the sold units, and at what price?"
    ]
   },
   {

@@ -57,6 +57,9 @@ _TOOL_MODULES = {
     # Opt-in below: a new screen on a public robot is never on by omission,
     # and STORIES_ENABLED is the second key (app/tools/registry.py).
     "app.tools.stories": "stories",
+    # The robot's face on a room's big screen (app/room_screens.py, owner
+    # 28 Oct 2026). Opt-in below: it reaches another machine in another room.
+    "app.tools.screens": "screens",
 }
 
 #: Groups that load only when *named* in the enabled set. "Everything"
@@ -69,7 +72,9 @@ _OPT_IN = {"reminders", "memory", "mydocs", "websearch", "computer",
            "body",
            # A story on the robot face's screen. Never on by omission either:
            # the sales room's tool list must not change on a pull.
-           "stories"}
+           "stories",
+           # Puts the robot's face up on a PC in another room.
+           "screens"}
 
 
 def unknown_groups(enabled: set[str] | None) -> set[str]:

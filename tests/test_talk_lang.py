@@ -184,5 +184,5 @@ def test_the_recognisers_words_feed_it(provider, monkeypatch):
     from app.providers import gemini
     src = inspect.getsource(gemini.GeminiProvider._input_event)
     assert "self._talk.guest(text)" in src
-    assert "self._talk.emma(text)" in inspect.getsource(gemini.GeminiProvider)
+    assert "self._talk.emma(shown)" in inspect.getsource(gemini.GeminiProvider)   # her words, markup stripped (27 Oct)
     assert "_with_talk_language(" in inspect.getsource(gemini.GeminiProvider)

@@ -289,6 +289,11 @@ def check_picture_taps(page, payload: dict, sdir: Path) -> dict:
             if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.3) return false; }
             return true; };
         for (const im of document.querySelectorAll('.es-root img.es-zoomable')) {
+            // a drill strip's thumbnail brings its card up and sends nothing
+            // (27 Oct); it came first in the page, took its picture's src, and
+            // every drill place reported FAILED while its card photo went
+            // unclicked (audit 27 Oct) -- the card photo is the target
+            if (im.closest('.es-thumb')) continue;
             const src = new URL(im.src).pathname;
             if (!srcs.includes(src) || seen.has(src) || !visible(im)) continue;
             const r = im.getBoundingClientRect();

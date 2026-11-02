@@ -6,8 +6,8 @@
   "translator": "e66b02637e8a49324df48e2cc89a2495d27ae817b3374d6bf4a2e3bbc0195662"
  },
  "prompts": {
-  "condo/face=False": "3fe28d32cd8eaede182f77e6905a4dc71b3740a93c841334eb6c039be4385eb1",
-  "condo/face=True": "96479d1d9def049c827e7e4b0b9270facfcbac2ccea818b9a865f5b425bcb2b6",
+  "condo/face=False": "71060168d95f7474ccffdc6c7ee5e1fe0767aea1f2075a1a49164bda1acb3e4f",
+  "condo/face=True": "7e79320838883758a62f78f75473ab8d84b8dbc1333f58eb6df24b851ee4eb27",
   "emma/face=False": "31a9d531454fdae569c076120e47bc7832ec89258e8ef69463e31f4a29e0ed6a",
   "emma/face=True": "1be507baedd98f166d4b964d83ac6f80fad0378ebb76e68805757f866f6289e4",
   "joke/face=False": "98073466f2c7c1e84423bd6d17025a9273c1a7fbe3adb853ce2ec4800c63c27d",

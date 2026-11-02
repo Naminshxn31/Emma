@@ -55,7 +55,7 @@ function loadModel() {
   const src = between('// <nav-model>', '// </nav-model>');
   const ctx = vm.createContext({ TextEncoder, unescape, encodeURIComponent });
   vm.runInContext(src + `
-    this.__api = { navModel, relayCommand, bodyMessage, speechMessage, navGoMessage, allowedMessage, bodyCapsFrame,
+    this.__api = { navModel, relayCommand, bodyMessage, speechMessage, lookMessage, lookAckFrame, navGoMessage, allowedMessage, bodyCapsFrame,
       bodyStatusFrame, navStatusFrame, navCapsFrame, frameFits, holdController, joinDoors,
       NAV_REASONS_TH, BODY_IDS, SPEECH_BODY_IDS, START_HOLD_MS, MAX_INBOUND_BYTES, ID_RE: ID_RE.source,
       COMMAND_ID_RE: COMMAND_ID_RE.source, BODY_STATUSES, NAV_STATES, BODY_STATUS_STATES,

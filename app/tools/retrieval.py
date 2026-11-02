@@ -74,6 +74,9 @@ _DIMENSION = re.compile(
     # Thai "ลากูน 155 เมตร" beside them was stripped, so an English-speaking
     # guest would have heard the one number a Thai guest never does. `m\b`
     # needs the word to end there: "5 min" and "2 million" are not metres.
+    # A width x length takes its first number with it: "ขนาด 16.125 × 5.85
+    # เมตร" (Bungee Gym, the report) was cut to "ขนาด 16.125 ×" (28 Oct).
+    r"(?:\d[\d,]*(?:\.\d+)?\s*[×xX]\s*)?"
     r"\d[\d,]*(?:\.\d+)?\s*-?\s*"
     r"(?:ตาราง\s*เมตร|ตร\.?\s*ม\.?|เมตร|ม\.|sqm|sq\.?\s*m\.?|m(?:etre|eter)s?|m\b)",
     re.IGNORECASE,
@@ -387,6 +390,9 @@ def _chunks(text: str) -> list[str]:
 
 _tokeniser: Any = None
 _tokeniser_ready = False
+#: +1 per (re)build: what a cache of tokenized text keys on (stories'
+#: question index, audit 27 Oct) -- an id() can come back for a later object
+_tokeniser_gen = 0
 
 
 def _build_tokeniser(vocabulary: list[str]) -> Any:
@@ -413,8 +419,9 @@ def _build_tokeniser(vocabulary: list[str]) -> Any:
 
 def init_tokeniser(vocabulary: list[str] | None = None) -> bool:
     """Returns True if real word segmentation is available."""
-    global _tokeniser, _tokeniser_ready
+    global _tokeniser, _tokeniser_ready, _tokeniser_gen
     _tokeniser_ready = True
+    _tokeniser_gen += 1
     try:
         _tokeniser = _build_tokeniser(vocabulary or [])
         logger.info("Thai word segmentation enabled (pythainlp)")
@@ -1346,8 +1353,12 @@ def is_commercial(query: str) -> bool:
     Non-Thai terms keep substring matching: Latin scripts have spaces, and
     there is no segmenter here for Han or kana.
     """
+    return _commercial_by(query, _THAI_TERMS, _NON_THAI_TERMS)
+
+
+def _commercial_by(query: str, thai_terms: tuple, non_thai_terms: tuple) -> bool:
     q = (query or "").lower()
-    if any(term in q for term in _NON_THAI_TERMS):
+    if any(term in q for term in non_thai_terms):
         return True
 
     from app.tools.retrieval import tokenize
@@ -1357,11 +1368,34 @@ def is_commercial(query: str) -> bool:
         return False
     haystack = " %s " % " ".join(words)
     measures = _measures_something(words) and not _asks_a_price_anyway(words, q)
-    for term in _THAI_TERMS:
+    for term in thai_terms:
         needle = " %s " % " ".join(tokenize(term))
         if needle in haystack:
             if term in _BARE_AMOUNT and measures:
                 continue   # "how far/long/big", not "how much" — see _BARE_AMOUNT
             return True
     return False
+
+
+#: When the project is finished. In the gate since before the report existed
+#: (a completion date is a developer's commitment, never a caption's), but the
+#: owner approved the report for answering everything but unit prices (12 Oct)
+#: and its FAQ carries the date with its own caveat ("ตามระบบขาย ... ยืนยันใน
+#: สัญญา"). Replay of the 20 Oct log (27 Oct): "expected completion date" was
+#: refused at this gate and handed to the sales team while the approved
+#: answer sat in the FAQ. A question that is commercial ONLY because of these
+#: words may take the report's FAQ answer (knowledge.search_condo_info) --
+#: still never a slide; any other COMMERCIAL_TERMS word keeps it a price
+#: question, and only the FAQ's completion-date answers are taken
+#: (knowledge._DATE_QUESTION -- COMMERCIAL_TERMS has no word for every
+#: payment term, review 27 Oct).
+_DATE_TERMS = ("เสร็จเมื่อไหร่", "สร้างเสร็จ", "completion", "handover", "完工")
+
+
+def asks_only_a_date(query: str) -> bool:
+    """`is_commercial`, and only because it asks when the project is done."""
+    if not is_commercial(query):
+        return False
+    return not _commercial_by(query, tuple(t for t in _THAI_TERMS if t not in _DATE_TERMS),
+                              tuple(t for t in _NON_THAI_TERMS if t not in _DATE_TERMS))
 

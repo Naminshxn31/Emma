@@ -81,6 +81,23 @@ import javax.net.ssl.HttpsURLConnection;
  * size, no binary frame is ever sent. The debug-only `do capture8` uploads
  * N seconds of the RAW 8 channels (the channels 4-7 question) only when
  * doa_ready carries `capture8` (ARRAY_CAPTURE8 on the server).
+ *
+ * ARRAY_MIC (owner 2 Nov 2026: "ต้องแก้แอปให้ถือไมค์เองและทำเส้นเสียงใหม่";
+ * docs/emma-array-mic-2026-11-02.md): the measured answer to the question
+ * above is NO -- the array gives Android one capture stream (10 Oct: this
+ * capture first = the WebView's mic reads exact zeros, the WebView first =
+ * this one gets 2 of 8 channels). So when doa_ready carries `array_mic` this
+ * capture is the array's ONLY owner and the conversation's audio is its
+ * beam; the face page runs a silent source instead of getUserMedia. The page
+ * takes the mic back only after this capture has ENDED -- for one call
+ * ({@link #micHold}: emma-face:mic:hold / :hold:deaf, lifted by
+ * {@link #micFree} once the call's mic tracks are stopped or a page loads) or
+ * for the rest of this app run ({@link #micRelease}, or the server's
+ * `array_release` for a final reason) -- and {@link #micState} says
+ * "capturing" until the AudioRecord is released: the page polls it before it
+ * opens its own mic. The rules are {@link MicOwner}'s; never both capturing
+ * at once: startCapture checks {@code micOwner.mayStart()} inside
+ * {@code synchronized (micOwner)}, the lock every hold and release takes.
  */
 final class ArrayListener {
     interface Host {
@@ -96,7 +113,11 @@ final class ArrayListener {
     private static final String PREF_ENABLED = "enabled";
     private static final String TAG = "EmmaArray";
     /** EmmaRobot/ is what the server checks (like /ws/robot-face). */
-    static final String USER_AGENT = "EmmaRobot/0.1 EmmaArray/1";
+    /** EmmaArrayMic/1: this build can hold the array alone (ARRAY_MIC); the
+     *  server never asks an app without it (an older one gets doa_off). */
+    static final String USER_AGENT = "EmmaRobot/0.1 EmmaArray/1 EmmaArrayMic/1";
+    /** micState when there is no listener at all: nothing holds the array. */
+    static final String NO_ARRAY_STATE = "{\"sole\":false,\"capturing\":false,\"released\":false,\"held\":false}";
     private static final int RATE = 16000;
     private static final int INDEX_MASK_8 = 0xff;
     private static final int CONNECT_TIMEOUT_MS = 8000;
@@ -154,6 +175,14 @@ final class ArrayListener {
     private volatile long capture8Left = 0;
     private volatile int capture8Seq = 0;
     private volatile long raw8Sent = 0;
+    /** ARRAY_MIC: doa_ready's `array_mic` -- this capture is the array's only owner. */
+    private volatile boolean soleMode = false;
+    /** ARRAY_MIC: who may capture the array (held for a call / released for
+     *  the run); also the lock of startCapture's last check. resume() does NOT
+     *  reset it: a hold is lifted by the page (micFree), a release by a restart. */
+    private final MicOwner micOwner = new MicOwner();
+    /** After a hold is lifted: the page's recordings must end first (up to this). */
+    private static final long FREE_WAIT_MS = 3000L;
 
     // status (any thread writes, the sender and the screen read)
     private volatile String state = "stopped";
@@ -431,6 +460,13 @@ final class ArrayListener {
                 beamSteer = readSteer(message, params.maxLag);
                 continue;
             }
+            if ("array_release".equals(message.optString("type"))) {
+                // ARRAY_MIC: the call found the array deaf (or could not start
+                // on it); the page takes its mic. The why is the server's code,
+                // shape-checked before it reaches a log or the operator screen.
+                micTake("release", "server:" + DoaMath.codeOrEmpty(message.optString("why", "")));
+                continue;
+            }
             int action = DoaMath.linkAction(message.optString("type"), message.optString("code"));
             if (action == DoaMath.LINK_READY) {
                 ready = true;
@@ -468,7 +504,8 @@ final class ArrayListener {
         capture8Allowed = c8 != null;
         capture8MaxS = c8 == null ? 0 : Math.max(1, Math.min(10, c8.optDouble("max_s", 10)));
         capture8Left = 0;
-        if (beamMode != null) Log.i(TAG, "array audio on: beam=" + beamMode);
+        soleMode = beamMode != null && m.optJSONObject("array_mic") != null;
+        if (beamMode != null) Log.i(TAG, "array audio on: beam=" + beamMode + (soleMode ? " (the array's only owner)" : ""));
     }
 
     /** `array_steer`: the target's arrival times etc., checked by Steer.parse
@@ -579,6 +616,10 @@ final class ArrayListener {
      *  set and skip the capture for the whole new link). */
     private void startCapture(Run r) {
         if (captureWanted) return;
+        if (!micOwner.mayStart()) {
+            ownedElsewhere();
+            return;
+        }
         if (debugHeld) {
             state = "stopped";
             detail = "held closed by adb (do off)";
@@ -602,12 +643,112 @@ final class ArrayListener {
                 return;
             }
         }
-        captureWanted = true;
-        Thread capture = new Thread(() -> captureLoop(r), "emma-doa-capture");
-        capture.setDaemon(true);
-        capture.setPriority(Thread.NORM_PRIORITY + 1);
-        captureThread = capture;
-        capture.start();
+        synchronized (micOwner) {
+            // ARRAY_MIC: checked again under the lock every hold and release
+            // takes -- one that landed during the join above must win, or the
+            // array opens after the page was told it may open its mic.
+            if (!micOwner.mayStart()) {
+                ownedElsewhere();
+                return;
+            }
+            captureWanted = true;
+            Thread capture = new Thread(() -> captureLoop(r), "emma-doa-capture");
+            capture.setDaemon(true);
+            capture.setPriority(Thread.NORM_PRIORITY + 1);
+            captureThread = capture;
+            capture.start();
+        }
+    }
+
+    /** The page holds the array (for a call) or has it for the run: the state
+     *  the status line and the server read. */
+    private void ownedElsewhere() {
+        state = micOwner.released() ? "released" : "held";
+        detail = micOwner.why();
+        statusNow();
+    }
+
+    /** ARRAY_MIC: let go of the array -- `kind` "release" (the rest of this
+     *  app run), "start" or "deaf" (one call; MicOwner counts deaf ones and
+     *  the DEAF_HOLDS_PER_RUN-th is a release). Any thread (the page's bridge
+     *  on the UI thread, the link's reader). */
+    private String micTake(String kind, String why) {
+        boolean wasReleased;
+        boolean released;
+        synchronized (micOwner) {
+            wasReleased = micOwner.released();
+            if ("release".equals(kind)) micOwner.release(why);
+            else micOwner.hold(kind);
+            released = micOwner.released();
+            stopCapture();
+        }
+        if (released && !wasReleased) {
+            Log.w(TAG, "array handed back to the page (" + micOwner.why() + ") -- closed until the app restarts");
+        } else if (!released) {
+            Log.i(TAG, "array held for the page's call (" + kind + ")");
+        }
+        // a running capture says it itself when its finally has run
+        if (!captureRunning()) ownedElsewhere();
+        else statusNow();
+        return micState();
+    }
+
+    /** The AudioRecord may still be open: wanted, or its thread not ended
+     *  (the thread ends only after r.release()). */
+    private boolean captureRunning() {
+        Thread t = captureThread;
+        return captureWanted || (t != null && t.isAlive());
+    }
+
+    /** ARRAY_MIC (emma-face:mic): the page opens its own mic only on capturing=false. */
+    String micState() {
+        return "{\"sole\":" + soleMode + ",\"capturing\":" + captureRunning()
+                + ",\"released\":" + micOwner.released() + ",\"held\":" + micOwner.held() + "}";
+    }
+
+    /** ARRAY_MIC (emma-face:mic:release): for the rest of this run; answers like micState. */
+    String micRelease(String why) {
+        return micTake("release", why);
+    }
+
+    /** ARRAY_MIC (emma-face:mic:hold / :hold:deaf): for the page's call only. */
+    String micHold(String kind) {
+        return micTake("deaf".equals(kind) ? "deaf" : "start", null);
+    }
+
+    /** ARRAY_MIC (emma-face:mic:free): the page's call mic is stopped (it calls
+     *  this after stopping its tracks) or a page just loaded. The app captures
+     *  again once the link offers -- but only after the recordings this app's
+     *  WebView still has open have ENDED (a track stop is asynchronous in the
+     *  renderer; opening on top of it is the 10 Oct concurrency again, and
+     *  checkConcurrency would latch "conflict" until the next resume). */
+    String micFree() {
+        if (micOwner.free()) {
+            final Set<Integer> page = activeOthers(-1);
+            Thread t = new Thread(() -> {
+                long until = SystemClock.elapsedRealtime() + FREE_WAIT_MS;
+                while (SystemClock.elapsedRealtime() < until) {
+                    Set<Integer> now = activeOthers(-1);
+                    now.retainAll(page);
+                    if (now.isEmpty()) break;
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+                Run r = run;
+                if (r != null && live(r) && "ready".equals(linkState) && soleMode) startCapture(r);
+                else if (!captureRunning()) {
+                    state = "stopped";
+                    detail = null;
+                    statusNow();
+                }
+            }, "emma-doa-free");
+            t.setDaemon(true);
+            t.start();
+        }
+        return micState();
     }
 
     private void stopCapture() {
@@ -859,7 +1000,10 @@ final class ArrayListener {
             }
             r.release();
             captureWanted = false;
-            if (latched == null) {
+            if (micOwner.released() || micOwner.held()) {
+                state = micOwner.released() ? "released" : "held";
+                detail = micOwner.why();
+            } else if (latched == null) {
                 state = "stopped";
                 if (debugHeld) detail = "held closed by adb (do off)";
             }
@@ -968,6 +1112,9 @@ final class ArrayListener {
             case "conflict": return "ทิศเสียง: หยุดเพราะชนกับไมค์ของหน้า Emma — " + detail
                     + " (กลับหน้า Emma เพื่อลองใหม่)";
             case "starting": return "ทิศเสียง: กำลังเปิดไมค์ 8 ช่อง…";
+            case "released": return "ไมค์ 8 ช่อง: คืนให้หน้า Emma แล้ว (" + detail
+                    + ") — หน้า Emma ใช้ไมค์ของตัวเองจนกว่าจะเปิดแอปใหม่";
+            case "held": return "ไมค์ 8 ช่อง: พักให้หน้า Emma ใช้ไมค์ของตัวเองระหว่างสายนี้ (" + detail + ")";
             case "stopped": return "ทิศเสียง: ปิดไมค์ 8 ช่องอยู่" + (detail == null ? "" : " — " + detail);
             default: return "ทิศเสียง: " + st;
         }
@@ -977,14 +1124,14 @@ final class ArrayListener {
     private String beamLine() {
         if (beamMode == null) return capture8Left > 0 ? " · กำลังส่งเสียงดิบ 8 ช่อง (ทดสอบ)" : "";
         ArrayBeam.Steer st = beamSteer;
-        return " · เสียงคุยจากไมค์ 8 ช่อง (" + beamMode + ") ส่ง " + beamSent
+        return " · เสียงคุยจากไมค์ 8 ช่อง (" + beamMode + (soleMode ? ", ถือไมค์คนเดียว" : "") + ") ส่ง " + beamSent
                 + (beamDropped > 0 ? " ทิ้ง " + beamDropped : "")
                 + (st.steered() ? " · เล็งไปที่คนพูด" : " · ยังไม่เล็ง")
                 + (capture8Left > 0 ? " · กำลังส่งเสียงดิบ 8 ช่อง (ทดสอบ)" : "");
     }
 
     int statusColor() {
-        if (!enabled() || refusedForGood != null) return 0xFFB8C7D9;
+        if (!enabled() || refusedForGood != null || "released".equals(state) || "held".equals(state)) return 0xFFB8C7D9;
         if ("capturing".equals(state) && "ready".equals(linkState)) return 0xFF5EE6A8;
         if ("conflict".equals(state) || "capture_refused".equals(state) || "no_array".equals(state)) return 0xFFFF5F73;
         return 0xFFFFC857;

@@ -149,6 +149,9 @@ def _fresh_async_state():
     # Speaker focus (VAD_FOCUS_RATIO) at its code default, whatever this
     # machine's .env says — the real-detector tests measure turn ends.
     _settings.vad_focus_ratio = 0.30
+    # VAD_HEAD_HOLD_MS (robot.env 1500, 28 Oct): the pre-roll every VAD test
+    # was written against is prefix_padding_ms alone. Code default here.
+    _settings.vad_head_hold_ms = 0
     _settings.transcribe_mode = "SMART"
     # The live inventory link would send every unit test's show_unit call to
     # the real Supabase — network in unit tests, and results that change
@@ -190,6 +193,22 @@ def _fresh_async_state():
     # defaults; focus tests set what they mean. The module's memory (faces
     # seen, ordinals) is per process, so it is wiped like the locks above.
     _settings.focus_enabled = False
+    # ...and the newer robot.env tuning (audit 27 Oct: with robot.env's values
+    # exported, 24 tests went red -- the conversation hold, the near-voice
+    # floor, the reply window, the follow-up question, the bare-"ค่ะ" gate,
+    # the reply watchdog). Code defaults; their own tests set what they mean.
+    _settings.focus_converse_hold_s = 0.0
+    _settings.focus_near_rms = 0.0
+    _settings.focus_reply_window_s = 0.0
+    # FOCUS_SCREEN_RMS (robot.env, 29 Oct): the face rule waived at a room's
+    # big screen. Off here; its own tests set it.
+    _settings.focus_screen_rms = 0.0
+    _settings.follow_up_after_s = 0.0
+    _settings.silence_bare_ack = False
+    # NOISE_REPLY_NEAR_RMS (robot.env, 29 Oct): off here; its own tests set it.
+    _settings.noise_reply_near_rms = 0.0
+    _settings.reply_stall_s = 0.0
+    _settings.reply_stall_reconnect_s = 8.0
     _settings.focus_require_face = True
     _settings.focus_face_min_px = 90
     _settings.focus_yaw_max_deg = 35.0
@@ -206,11 +225,17 @@ def _fresh_async_state():
     _settings.focus_invite_denied_n = 0
     _settings.focus_engage_mode = "semi"
     _settings.focus_attention = False
+    # A group in front (2 Nov, docs/emma-multi-person-2026-11-02.md): the
+    # round of looks and the one greeting for everybody. Code defaults (off);
+    # their own tests set them.
+    _settings.focus_gaze_visit_s = 0.0
+    _settings.face_group_greeting = False
     _settings.focus_goodbye = False
     _settings.focus_goodbye_after_s = 8.0
     _settings.asd_enabled = False
     _settings.voiceprint_enabled = False
     _settings.doa_enabled = False
+    _settings.doa_focus = True
     # The array as the call's ears (app/array_audio.py) and the GTCRN
     # enhancer: the robot's .env turns these on; every session test would
     # then route audio through a tap or a model. Code defaults here.
@@ -222,6 +247,11 @@ def _fresh_async_state():
     _settings.array_audio_echo_tail_s = 0.25
     _settings.array_capture8 = False
     _settings.array_capture8_keep_min = 10.0
+    # The app as the array's only owner (ARRAY_MIC, docs/emma-array-mic-2026-11-02.md):
+    # code defaults; tests/test_array_mic.py turns it on per test.
+    _settings.array_mic = False
+    _settings.array_mic_deaf_s = 2.0
+    _settings.array_mic_start_wait_s = 1.5
     _settings.enhance_enabled = False
     _array_mod = __import__("sys").modules.get("app.array_audio")
     if _array_mod is not None:
@@ -285,6 +315,56 @@ def _fresh_async_state():
     # by accident; tests pass their fixture explicitly.
     _settings.robot_body_enabled = False
     _settings.speech_gestures = False
+    # The room screen's listener (app/mirror_server.py): a machine whose .env
+    # set MIRROR_PORT must not open a LAN port from a unit test, nor publish.
+    _settings.mirror_port = 0
+    _settings.mirror_token = ""
+    from app import face_mirror as _face_mirror
+
+    _face_mirror.reset()
+    # ...nor ask a real room PC for its screen (app/room_screens.py): no file
+    # read from this machine, nothing remembered from the last test.
+    _settings.room_screens_enabled = False
+    _settings.room_screens_file = ""
+    _settings.room_screen_sound = False
+    from app import room_screens as _room_screens
+
+    _room_screens.reset()
+    from app.tools import screens as _screen_tool
+
+    _screen_tool._asked["at"] = None
+    # The event host (app/event_host.py): no staff listener on a LAN port, no
+    # walk, no event file read from this machine, no scene left from the last
+    # test. Tests that want the event point event_file at their own fixture.
+    _settings.event_control_port = 0
+    _settings.event_control_key = ""
+    _settings.event_walk_enabled = False
+    _settings.event_file = ""
+    from app import event_host as _event_host
+
+    _event_host.reset()
+    # Walk pictures (app/walk_frames.py) write people's pictures to the robot's
+    # disk: never from a unit test, whatever this machine's .env says.
+    _settings.walk_frames = False
+    # ...nor turn a real head (app/head_follow.py): code defaults every test.
+    _settings.head_follow = False
+    _settings.head_pan_full_deg = 20.0
+    _settings.head_tilt_full_deg = 20.0
+    _settings.head_pan_max = 60
+    _settings.head_tilt_down_max = 40
+    _settings.head_tilt_up_max = 20
+    _settings.head_search_tilt = 30
+    _settings.head_search_rms = 0.06
+    _settings.head_follow_doa = False
+    _settings.head_calibrate = True
+    _settings.lidar_people = False
+    _settings.lidar_people_every_s = 0.5
+    from app import lidar_people as _lidar_people
+
+    _lidar_people.reset()
+    from app import head_follow as _head_follow
+
+    _head_follow.reset()
     _settings.robot_nav_routes_enabled = False
     _settings.robot_nav_panel = "off"
     _settings.robot_nav_pin = ""
@@ -294,6 +374,11 @@ def _fresh_async_state():
     _settings.robot_nav_places_file = ""
     _settings.announce_settle_s = 0.0
     _settings.robot_heard_max_age_s = 10.0
+    # --- bad network, robustness (26 Oct): CONNECT_TIMEOUT_S bounds every
+    # Gemini dial; a robot-style value in a machine's .env would race the
+    # provider tests' fake dials. Off = the dial the tests were written for;
+    # tests/test_bad_network.py sets its own.
+    _settings.connect_timeout_s = 0.0
     _settings.robot_body_require_heard = True
     _settings.robot_nav_require_heard = True
     _settings.robot_nav_voice_unverified = False
@@ -576,3 +661,33 @@ def _no_real_tts(monkeypatch, tmp_path):
     # production; carried between tests it makes the result depend on the
     # order they ran in. Exactly why conftest resets `_embedding_failed`.
     monkeypatch.setattr(voice, "_spent", set())
+
+
+# --- offline fallback (docs/emma-offline-mode.md, 26 Oct 2026) ---------------
+@pytest.fixture(autouse=True)
+def _no_machine_offline_mode(monkeypatch, tmp_path):
+    """OFFLINE_FALLBACK off and no probe, whatever the machine's .env says;
+    the two recognizers and the rendered clips never loaded from this
+    machine's data/offline/ (gitignored: present here after
+    fetch_offline_models.py, absent on CI -- the "green because the machine
+    lacks it" table, row one). The recognizer builder is stubbed to load
+    nothing: tests/test_offline_*.py hand the engine a fake recognizer, and
+    the one real-model test puts the real builder back itself."""
+    from app import net_health
+    from app.config import settings as _settings
+    from app.offline import asr, lines, router, voice
+
+    monkeypatch.setattr(_settings, "offline_fallback", False)
+    monkeypatch.setattr(_settings, "net_probe_s", 0.0)
+    monkeypatch.setattr(_settings, "offline_asr_dir", str(tmp_path / "offline_asr"))
+    monkeypatch.setattr(_settings, "offline_voice_dir", str(tmp_path / "offline_voice"))
+    monkeypatch.setattr(asr, "_build", lambda base, threads, usable: {})
+    net_health.reset()
+    asr.reset()
+    lines.reset()
+    voice.reset()
+    router.reset()
+    yield
+    net_health.stop()
+    net_health.reset()
+    asr.reset()

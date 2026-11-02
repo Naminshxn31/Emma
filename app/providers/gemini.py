@@ -16,6 +16,7 @@ import json
 import logging
 import re
 import time
+from array import array
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -23,7 +24,7 @@ from app import heard
 from app.config import settings
 from app.providers.base import ProviderError, ProviderEvent, VoiceProvider
 from app.providers.thai_spacing import ThaiSpacing
-from app.providers.transcript_filter import BareAckGate, TranscriptBudget, TranscriptFilter
+from app.providers.transcript_filter import BareAckGate, NoiseReplyGate, TranscriptBudget, TranscriptFilter
 
 logger = logging.getLogger("condo_voice.gemini")
 
@@ -485,10 +486,61 @@ _UNAVAILABLE_SIGNS = (
 #: after the gate closes (measured 2026-10-07); a tool call is announced
 #: before it runs. Six seconds of nothing at all is not a slow model.
 NOTE_STALL_S = 6.0
+#: How long a text (a tap, an announce, a re-ask) waits for a socket that is
+#: being rotated or rejoined before it is dropped as before.
+TEXT_WAIT_S = 10.0
+#: Stages where WE just asked (the nudge's turn_complete, a re-ask): the
+#: server's bare turn_complete answering it is the echo, not the reply.
+_ASKED_STAGES = ("nudge", "silent_turn", "reconnect", "rotated", "fresh", "fallback")
+#: Models that close the session on an empty `turn_complete=True` (stage 1's
+#: nudge). Measured live 28 Oct: gemini-2.5-flash-native-audio-preview-12-2025
+#: answered "1007 Request contains an invalid argument" 0.8 s after it, with
+#: our session config; on the replay of 20 Oct a stall after the switch to it
+#: dropped the socket the same way (resumed, asked again -- 8 s more). 3.8
+#: takes it (the same replay nudged it without a close).
+_EMPTY_TURN_REFUSED = ("gemini-2.5-",)
+
+
+def _takes_empty_turn(model: str) -> bool:
+    return not (model or "").removeprefix("models/").startswith(_EMPTY_TURN_REFUSED)
+#: How long after she ENDS a turn without a word, a tool's result in hand,
+#: before the question is asked again (`_chase_silent_turn`). Robot logs 9-27
+#: Oct: after present_story her first word came 1 s after the call (median
+#: and p90 of 149); 12 times none came before the guest spoke again -- on 27
+#: Oct at +5-6 s ("ไม่พูดอะไรมาก"), inside REPLY_STALL_S. Her turn is over,
+#: so no reply is being generated for this to cut.
+SILENT_TURN_S = 2.0
+#: A turn_complete this soon after a tool's result went back is the tool
+#: turn's own (sent with the call, read after a fast tool), not her reply.
+AFTER_TOOL_SETTLE_S = 0.3
+#: A stream that ends or drops with nothing received this soon after a rejoin
+#: is that rejoin yielding nothing right back: no second reconnect on top of
+#: it (the tight loop `_receive_events` guards against). Later than this, on a
+#: line that stayed idle -- a resumed model is idle, the standing line is idle
+#: by design -- it is a new drop and gets its own rejoin (audit 27 Oct, D1:
+#: only a received message cleared the mark, so the next drop of an idle line
+#: ended the call however long after the first).
+REJOIN_SETTLE_S = 5.0
+
+
+def _compression_config(types):
+    """Context window compression, bounded by LIVE_CONTEXT_COMPRESS_AT
+    (config.py says why). Unset: exactly the API default as before."""
+    trigger = max(0, int(getattr(settings, "live_context_compress_at", 0) or 0))
+    if not trigger:
+        return types.ContextWindowCompressionConfig(sliding_window=types.SlidingWindow())
+    target = max(0, int(getattr(settings, "live_context_keep", 0) or 0))
+    if not target or target >= trigger:
+        target = trigger // 2
+    return types.ContextWindowCompressionConfig(
+        trigger_tokens=trigger, sliding_window=types.SlidingWindow(target_tokens=target))
+
+
 #: The question asked again after rejoining (REPLY_STALL_S, stage 2): the
 #: guest's own transcribed words, the language rule, and the tools rule --
 #: a question that is a story's topic still gets its story.
-STALL_ASK = ("ลูกค้าพูดว่า \"%s\" แล้วยังไม่ได้คำตอบ ตอบตอนนี้ตามกฎเดิมทุกข้อ เป็นภาษาเดียวกับที่ลูกค้าพูด "
+STALL_ASK_LANG = "เป็นภาษาเดียวกับที่ลูกค้าพูด "
+STALL_ASK = ("ลูกค้าพูดว่า \"%s\" แล้วยังไม่ได้คำตอบ ตอบตอนนี้ตามกฎเดิมทุกข้อ " + STALL_ASK_LANG +
              "ถ้าต้องใช้เครื่องมือให้เรียกก่อนตอบ ห้ามพูดถึงระบบหรือความล่าช้า")
 #: The same question on a FRESH session -- one opened without the handle,
 #: because the server no longer knew it (robot 20 Oct, twice in one English
@@ -518,6 +570,128 @@ def _model_is_unavailable(exc: Exception) -> bool:
     """
     text = str(exc).lower()
     return any(sign in text for sign in _UNAVAILABLE_SIGNS)
+
+
+def _model_refused(exc: Exception) -> bool:
+    """`_model_is_unavailable`, minus the resume's own "not found": "1008
+    BidiGenerateContent session not found or expired" is a session gone (a
+    handle past its two hours, a 1011 that took the session down -- 20 Oct),
+    not a model gone. Matching it switched models on every expired resume
+    (caught by the 27 Oct test, before it ran anywhere)."""
+    return _model_is_unavailable(exc) and "session not found" not in str(exc).lower()
+
+
+# ---- a bad network: the dial's ceiling, a socket that is gone -------------
+#
+# Network audit, 26 Oct (read from the code, the SDK and websockets 16.1.1, and
+# measured against blackholed resolvers and hosts): the dial had no ceiling of its own
+# -- websockets' open_timeout 10 s covers DNS+TCP+TLS+upgrade (robot_dns adds
+# 2 s per blackholed resolver), and after the upgrade the SDK waits for the
+# setup reply with nothing but keepalive (~40 s, computed). And a send on a
+# socket the server had already closed raised straight through the mic pump
+# or the tool runner and ended a call a resume would have saved.
+
+class ConnectTimeout(TimeoutError):
+    """CONNECT_TIMEOUT_S ran out before the Live session was set up. A
+    TimeoutError, so the session classifies it as the network's."""
+
+
+def _ws_closed_types() -> tuple:
+    try:
+        from websockets.exceptions import ConnectionClosed
+    except Exception:                                      # pragma: no cover - SDK dependency
+        return ()
+    return (ConnectionClosed,)
+
+
+def _socket_gone(exc: BaseException) -> bool:
+    """A send that failed because the socket is closed. The SDK sends with the
+    raw websocket, so this is websockets' ConnectionClosed (or the transport's
+    ConnectionError) -- never a bug in what we sent, which must still raise."""
+    return isinstance(exc, _ws_closed_types() + (ConnectionError,))
+
+
+def _close_code(exc: BaseException | None) -> int | None:
+    """The websocket close code behind an upstream failure, for the turn log
+    (numbers only: the error's text can carry request contents). The SDK
+    turns a close into APIError(code, reason); a raw websockets
+    ConnectionClosed with no close frame is 1006, an abnormal closure."""
+    closed = _ws_closed_types()
+    seen = 0
+    while exc is not None and seen < 6:
+        seen += 1
+        if closed and isinstance(exc, closed):
+            rcvd = getattr(exc, "rcvd", None)
+            return int(rcvd.code) if rcvd is not None else 1006
+        code = getattr(exc, "code", None)
+        if isinstance(code, int) and not isinstance(code, bool) and 100 <= code <= 4999:
+            return code
+        exc = exc.__cause__ or exc.__context__
+    return None
+
+
+#: Peak below which an audio chunk is silence, not her voice (~-40 dBFS;
+#: speech peaks two orders above). The "<no speech>{pause}" turn of 27 Oct
+#: came with a moment of audio.
+VOICED_PEAK = 328
+
+
+def _voiced(pcm: bytes) -> bool:
+    """Is there voice in this 16-bit PCM chunk (every 4th sample read)?"""
+    n = len(pcm) // 2
+    if n <= 0:
+        return False
+    samples = array("h")
+    samples.frombytes(pcm[: n * 2])
+    return any(s >= VOICED_PEAK or s <= -VOICED_PEAK for s in samples[::4])
+
+
+def _has_words(text: str) -> bool:
+    """A letter or a digit: words, not spacing or punctuation left over."""
+    return any(ch.isalnum() for ch in text or "")
+
+
+def _close_late_dial(cm, task: asyncio.Task) -> None:
+    """A dial abandoned at CONNECT_TIMEOUT_S that opened anyway (it ignored
+    the cancel): nobody will ever read that session, so close it."""
+    if task.cancelled() or task.exception() is not None:
+        return
+
+    async def close() -> None:
+        try:
+            await cm.__aexit__(None, None, None)
+        except Exception:
+            pass
+
+    try:
+        asyncio.ensure_future(close())
+    except RuntimeError:                                   # pragma: no cover - loop gone
+        pass
+
+
+async def _enter_within(cm, timeout_s: float):
+    """`cm.__aenter__()` -- the whole dial, the SDK's setup reply included --
+    bounded by `timeout_s` (CONNECT_TIMEOUT_S; 0 = no ceiling of ours, the
+    old behaviour). A task of its own rather than asyncio.wait_for: wait_for
+    waits for the cancelled dial to clean up, and websockets' close on a dead
+    link is another close_timeout (10 s) -- the very wait being bounded. The
+    abandoned dial finishes its cancel in the background."""
+    if not timeout_s or timeout_s <= 0:
+        return await cm.__aenter__()
+    task = asyncio.ensure_future(cm.__aenter__())
+    try:
+        done, _pending = await asyncio.wait({task}, timeout=timeout_s)
+    except asyncio.CancelledError:
+        task.cancel()
+        # cancelled from outside (the call closing, a newer watch): a dial
+        # that opens anyway is read by nobody -- close it (review 27 Oct)
+        task.add_done_callback(lambda t: _close_late_dial(cm, t))
+        raise
+    if task in done:
+        return task.result()
+    task.cancel()
+    task.add_done_callback(lambda t: _close_late_dial(cm, t))
+    raise ConnectTimeout("the Gemini Live dial took longer than CONNECT_TIMEOUT_S=%gs" % timeout_s)
 
 
 class GeminiProvider(VoiceProvider):
@@ -563,6 +737,10 @@ class GeminiProvider(VoiceProvider):
         #: SILENCE_BARE_ACK (robot): a reply that is only "ค่ะ" never reaches
         #: the speaker or the screen (owner 15 Oct, transcript_filter.BareAckGate).
         self._ack_gate = BareAckGate(settings.silence_bare_ack)
+        #: NOISE_REPLY_NEAR_RMS (robot): her reply to a quiet sound nobody could
+        #: make out never reaches the speaker or the screen (owner 29 Oct,
+        #: transcript_filter.NoiseReplyGate). Ahead of the "ค่ะ" gate.
+        self._noise_gate = NoiseReplyGate(settings.noise_reply_near_rms)
         #: Model reasoning once arrived as output transcript (2026-10-11):
         #: text with no audio behind it is cut here — see TranscriptBudget.
         self._out_budget = TranscriptBudget(self.output_sample_rate * 2)
@@ -598,6 +776,9 @@ class GeminiProvider(VoiceProvider):
         #: reply that finally comes is logged against it.
         self._stall_wait: float | None = None
         self._stall_heard = ""
+        #: The words being chased came in as text -- a tap on the robot face
+        #: (`watch_text_turn`) -- not through the mic: asked again as they are.
+        self._stall_text_turn = False
         self._stall_guard: asyncio.Task | None = None
         self._stall_stage: str | None = None
         #: The wait is for the words after a tool's result (`_watch_after_tool`).
@@ -637,13 +818,27 @@ class GeminiProvider(VoiceProvider):
         self._input_finished: bool | None = None
         self._pending_tool_ids: set[str] = set()
         self._cancelled_tool_ids: set[str] = set()
+        # Every live stall guard, not only the newest: a re-arm while a
+        # cut-over dials leaves the dialing one running (`_arm_stall_guard`),
+        # and `__aexit__` must stop it too -- or it opens a session after the
+        # call ended, and nobody closes it (review 27 Oct, 2nd pass).
+        self._stall_guards: set[asyncio.Task] = set()
 
     def _build_config(self):
         from google.genai import types
 
+        instructions = self.instructions
+        talk = getattr(self, "_talk", None)
+        held = talk.held_note() if talk is not None and not getattr(self, "_resume_handle", None) else None
+        if held:
+            # A session opened without the handle (fresh, or the fallback model)
+            # remembers nothing -- not the pick either: its next untooled reply
+            # followed whatever language it heard (review 29 Oct). The pick goes
+            # in its instructions; a resume keeps the instructions it had.
+            instructions = instructions + "\n\n" + held
         config: dict = {
             "response_modalities": [types.Modality.AUDIO],
-            "system_instruction": self.instructions,
+            "system_instruction": instructions,
             "speech_config": types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=self.voice)
@@ -683,10 +878,9 @@ class GeminiProvider(VoiceProvider):
                 )
             ),
             # Keeps a long conversation inside the context window instead of
-            # dying when it fills up.
-            "context_window_compression": types.ContextWindowCompressionConfig(
-                sliding_window=types.SlidingWindow()
-            ),
+            # dying when it fills up -- and, with LIVE_CONTEXT_COMPRESS_AT,
+            # inside the tokens-per-minute quota too (`_compression_config`, LIVE_CONTEXT_COMPRESS_AT).
+            "context_window_compression": _compression_config(types),
             # Ask the server for a resumption handle so the session can be
             # rejoined after the audio-duration cap. On a fresh connect the
             # handle is None ("start me, and give me a handle"); on a reconnect
@@ -768,7 +962,11 @@ class GeminiProvider(VoiceProvider):
         return config
 
     async def _connect(self) -> None:
-        """Open one Live session with the current config (handle included)."""
+        """Open one Live session with the current config (handle included).
+
+        Every dial goes through here -- the first, the model fallback, a
+        resume, a fresh session, the stall cut-over -- so CONNECT_TIMEOUT_S
+        bounds each of them (`_enter_within`)."""
         from google import genai
 
         # Affective dialog / proactive audio are v1beta-only features.
@@ -777,7 +975,28 @@ class GeminiProvider(VoiceProvider):
         self._cm = client.aio.live.connect(
             model=self.model, config=self._build_config()
         )
-        self._session = await self._cm.__aenter__()
+        self._session = await _enter_within(
+            self._cm, float(getattr(settings, "connect_timeout_s", 0.0) or 0.0))
+
+    async def _dial(self, model: str, handle: str | None):
+        """A session for `model` / `handle`, handed back as (cm, session)
+        WITHOUT touching the call's own state: `_connect` points `_cm` at the
+        socket before it is open and needs `model` and the handle set for the
+        whole dial; stage 3 must leave the stalled session in charge until it
+        swaps (`_cut_over_to_fallback`). The config is built before the first
+        await, so the temporary model/handle never outlive this line."""
+        from google import genai
+
+        saved = self.model, self._resume_handle
+        self.model, self._resume_handle = model, handle
+        try:
+            http_options = {"api_version": "v1beta"} if "native-audio" in model else None
+            client = genai.Client(api_key=settings.gemini_api_key, http_options=http_options)
+            cm = client.aio.live.connect(model=model, config=self._build_config())
+        finally:
+            self.model, self._resume_handle = saved
+        session = await _enter_within(cm, float(getattr(settings, "connect_timeout_s", 0.0) or 0.0))
+        return cm, session
 
     async def __aenter__(self) -> GeminiProvider:
         if not settings.gemini_api_key:
@@ -843,20 +1062,42 @@ class GeminiProvider(VoiceProvider):
         Returns False — and leaves the session ended — when there is nothing
         to resume with (no handle, or we're deliberately closing), so the
         caller falls back to ending cleanly rather than looping.
+
+        Roads in: go_away, with the old socket still open (it keeps taking
+        the mic until the new one is up); a drop, where the receive loop has
+        already retired the dead socket (`_retire`) -- so `_session` is None
+        on entry; and a stream that just ended (`_upstream_closed` noted the
+        socket). Each attempt is a `reconnect` turnlog row (road, outcome,
+        ms): before 26 Oct a rejoin, good or failed, was in the console only.
         """
-        if self._closing or not self._resume_handle:
+        if self._session is None:
+            road = "drop"
+        elif getattr(self, "_closed_noted", None) is self._session:
+            road = "ended"
+        else:
+            road = "go_away"
+        if self._closing:
+            return False
+        fallback_fresh = getattr(self, "_fresh_after_fallback", False)
+        self._fresh_after_fallback = False
+        if not self._resume_handle and not fallback_fresh:
+            self._reconnect_log(road, "no_handle", None)
             return False
         # Marked, so the REPLY_STALL_S cut-over never runs on top of it (review
         # 14 Oct: both took `self._cm` mid-connect and one resumed socket was
         # never closed).
         self._reconnecting = True
         fresh = False
+        started = time.monotonic()
         try:
             old = self._cm
             try:
-                fresh = await self._connect_resumed_or_fresh("reconnect")
+                fresh = await self._connect_resumed_or_fresh("reconnect") or fallback_fresh
+                if fallback_fresh:
+                    self._fresh_pending = True
             except Exception:
                 logger.exception("session resumption failed, and a fresh session too — ending the session")
+                self._reconnect_log(road, "failed", started)
                 return False
             if old is not None:
                 try:
@@ -865,6 +1106,7 @@ class GeminiProvider(VoiceProvider):
                     pass
             if not fresh:
                 logger.info("resumed the Gemini Live session past the duration cap")
+            self._reconnect_log(road, "fresh" if fresh else "resumed", started)
             return True
         finally:
             self._reconnecting = False
@@ -888,9 +1130,20 @@ class GeminiProvider(VoiceProvider):
             return False
         except Exception as exc:
             reason = str(exc)[:160]
+            refused = exc
             logger.warning("resume refused (%s) — opening a fresh session in its place", reason)
         self._resume_handle = None
-        await self._connect()
+        # At its quota (27 Oct: "1011 You exceeded your current quota" -- the
+        # robot's 20 Oct drops said only "Internal error"), the same model
+        # refuses the fresh session too: the fallback model has its own quota.
+        if _model_refused(refused):
+            self._fall_back(road, reason)
+        try:
+            await self._connect()
+        except Exception as exc:
+            if not (_model_refused(exc) and self._fall_back(road, str(exc)[:160])):
+                raise
+            await self._connect()
         self._fresh_pending = True
         try:
             from app import turnlog
@@ -904,6 +1157,58 @@ class GeminiProvider(VoiceProvider):
                     "the server's history", road)
         return True
 
+    # ---- a lost socket, in the turn log (categories and numbers only) -----
+
+    def _reconnect_log(self, road: str, outcome: str, started: float | None) -> None:
+        """One `reconnect` row per attempt to rejoin: road (go_away / drop /
+        ended / stall), outcome (resumed / fresh / failed / no_handle) and how long it
+        took. 20 Oct's two lost calls read heard -> session_end in the turn
+        log and nothing else; the cause was in server.log only."""
+        ms = None if started is None else round((time.monotonic() - started) * 1000)
+        try:
+            from app import turnlog
+
+            turnlog.record("reconnect", road=road, outcome=outcome, ms=ms)
+        except Exception:                                  # pragma: no cover - belt
+            pass
+
+    def _upstream_closed(self, exc: BaseException | None, stage: str, session=None) -> None:
+        """One `upstream_closed` row per lost socket: the close code (1006 =
+        the link, 1011 = Google's side, 1008 = refused) and where it was
+        noticed -- `receive` (the stream raised), `ended` (it stopped),
+        `mic` / `tool_response` (a send found it closed). Never the error's
+        text: an APIError's reason can carry request contents. Not when we
+        are the ones closing."""
+        if self._closing:
+            return
+        session = self._session if session is None else session
+        if session is not None and getattr(self, "_closed_noted", None) is session:
+            return                       # the same socket, seen again by another path
+        self._closed_noted = session
+        try:
+            from app import turnlog
+
+            turnlog.record("upstream_closed", code=_close_code(exc), stage=stage)
+        except Exception:                                  # pragma: no cover - belt
+            pass
+
+    def _retire(self, session) -> None:
+        """The socket the receive loop was reading is dead: stop writing to it.
+
+        `_reconnect` used to leave `_session` on the dead socket until the new
+        one was up, so a guest who spoke in that window made
+        `send_realtime_input` raise inside the mic pump -- which returns, and
+        FIRST_COMPLETED ends the call (audit 26 Oct, mode 3c) -- even when the
+        resume would have worked. `_cut_over` already drops the mic this way
+        while it rejoins (14 Oct); `send_audio`, `send_text` and the stall
+        guards all read None as "no socket right now"."""
+        if session is not None and self._session is session:
+            self._session = None
+        if session is not None:
+            # A tool still running on it delivers its result to the page, not
+            # to a replacement (`_run_tool_calls`).
+            self._dead_session = session
+
     def _recap(self) -> str:
         turns = self._history[-RECAP_TURNS:]
         return " / ".join('%s: "%s"' % ("ลูกค้า" if role == "guest" else "Emma", text[-RECAP_CHARS:])
@@ -912,7 +1217,13 @@ class GeminiProvider(VoiceProvider):
     def _ask_text(self, heard: str) -> str:
         """STALL_ASK, with the recap and the conversation's language first
         when the session is a fresh one (consumed once)."""
-        text = STALL_ASK % heard[-300:]
+        text = heard if getattr(self, "_stall_text_turn", False) else STALL_ASK % heard[-300:]
+        held = self._talk.held_note()
+        if held and not getattr(self, "_stall_text_turn", False):
+            # "in the language the guest spoke" is the pick's language now: the
+            # unanswered words may be a colleague's Thai in a picked English
+            # talk (app/talk_lang.py `pin`, review 29 Oct)
+            text = text.replace(STALL_ASK_LANG, "").rstrip() + " — " + held
         if getattr(self, "_fresh_pending", False):
             self._fresh_pending = False
             recap = self._recap()
@@ -929,6 +1240,14 @@ class GeminiProvider(VoiceProvider):
         heard = " ".join(self._stall_heard.split())
         if not heard or self._stall_wait is None or self._closing or self._session is None:
             return
+        if getattr(self, "_stall_text_turn", False) and (
+                getattr(self, "_tap_waiting", 0) or getattr(self, "_tap_sent_on", None) is self._session):
+            # The pending turn is a tap that is waiting in `send_text` for this
+            # socket (it folds the recap in itself), or already went out on it
+            # -- `_reconnect` awaits the old socket's close between the new one
+            # opening and here. Asking it too was two user turns back to back
+            # (audit 27 Oct, B2). Its own guard chases it from here.
+            return
         self._stall_stage = "fresh"
         self._stall_log("fresh", chars=len(heard))
         try:
@@ -940,7 +1259,8 @@ class GeminiProvider(VoiceProvider):
 
     async def __aexit__(self, *exc) -> None:
         self._closing = True
-        for guard in (getattr(self, "_note_guard", None), getattr(self, "_stall_guard", None)):
+        for guard in (getattr(self, "_note_guard", None), getattr(self, "_stall_guard", None),
+                      *list(getattr(self, "_stall_guards", ()))):
             if guard is not None and not guard.done():
                 guard.cancel()
         await self._stop_event_tasks()
@@ -956,7 +1276,7 @@ class GeminiProvider(VoiceProvider):
         if self._session is None:
             return
         if self._vad_gate is None:
-            await self._session.send_realtime_input(
+            await self._send_input(
                 audio=types.Blob(data=pcm16, mime_type=f"audio/pcm;rate={self.input_sample_rate}")
             )
             return
@@ -968,14 +1288,16 @@ class GeminiProvider(VoiceProvider):
             if kind == "start":
                 self._note_reopen()
                 self._stall_restart()
+                gate = getattr(self, "_noise_gate", None)
+                if gate is not None:
+                    gate.segment(getattr(self._vad_gate, "open_rms", None))
                 await self._event_queue.put(ProviderEvent(kind="speech_started"))
                 # New speech begins: every caption already recorded belongs
                 # to an earlier utterance and may no longer authorise motion
                 # (design §2d step 4 — a caption landing *after* a tool call
                 # used to leave the previous sentence in charge).
                 heard.mark_activity()
-                await self._session.send_realtime_input(
-                    activity_start=types.ActivityStart())
+                await self._send_input(activity_start=types.ActivityStart())
             elif kind == "end":
                 from app.metrics import active
 
@@ -989,17 +1311,40 @@ class GeminiProvider(VoiceProvider):
                 # rule) — the nudge-cuts-the-tour bug in a new place. Inside
                 # the open activity nothing is being generated.
                 noted = await self._report_segment()
-                await self._session.send_realtime_input(
-                    activity_end=types.ActivityEnd())
+                await self._send_input(activity_end=types.ActivityEnd())
                 if noted:
                     self._arm_note_guard()
                 if settings.reply_stall_s > 0:
                     self._arm_stall_guard()
             else:
-                await self._session.send_realtime_input(
+                await self._send_input(
                     audio=types.Blob(data=data,
                                      mime_type=f"audio/pcm;rate={self.input_sample_rate}")
                 )
+
+    async def _send_input(self, **kw) -> bool:
+        """One realtime-input send on the socket of THIS moment. True = sent.
+
+        Read per send, not once per frame: `_report_segment` awaits the note,
+        and a drop retired the socket meanwhile (`_retire`) -- `None` then is
+        "no socket right now", dropped like the top of `send_audio`. And a
+        socket the server already closed before the receive loop noticed is
+        not the mic pump's to die of: the send raised ConnectionClosed through
+        `_browser_to_provider`, which returned, and FIRST_COMPLETED ended a
+        call the loop's resume would have saved (audit 26 Oct, mode 3c). The
+        receive loop sees the same close and decides; the gate's bookkeeping
+        (the stall guard, the reopen clock) carries on regardless."""
+        session = self._session
+        if session is None:
+            return False
+        try:
+            await session.send_realtime_input(**kw)
+            return True
+        except Exception as exc:
+            if not _socket_gone(exc):
+                raise
+            self._upstream_closed(exc, "mic", session)
+            return False
 
     def _note_reopen(self) -> None:
         """Record a guest who started again before Emma said anything.
@@ -1078,15 +1423,34 @@ class GeminiProvider(VoiceProvider):
         (`_watch_after_tool`): that is the model ending the turn without a
         word -- robot 20 Oct, four times in one English call, 3 to 19 s of
         silence after the picture came up, the guest asking again."""
-        if kind == "turn_complete" and getattr(self, "_stall_after_tool", False):
+        if kind == "turn_complete" and getattr(self, "_stall_stage", None) in _ASKED_STAGES:
+            # The nudge IS a turn_complete; the server answering it with a bare
+            # turn_complete is not the answer. Replay of 20 Oct on the final
+            # code (27 Oct): 18 nudges in one long call, every one cleared by
+            # that echo, so the rejoin-and-ask-again never ran once -- and the
+            # robot's own reply_stall rows never reached "reconnect" either.
+            # (Checked before the after-tool case: the echo of OUR ask is not
+            # her ending a turn silently -- chasing it again would loop.)
             return
+        if kind == "turn_complete" and getattr(self, "_stall_after_tool", False):
+            self._chase_silent_turn()
+            return
+        if kind == "interrupted" and getattr(self, "_stall_text_turn", False):
+            # the tap itself cut the answer it landed on (client content
+            # during a reply interrupts it): that is the OLD turn ending, not
+            # the tapped one starting (review 27 Oct, finding 3)
+            return
+        if kind in ("reply", "interrupted"):
+            # words (or a barge-in): the tapped turn is being answered. A
+            # tool_call is not words -- the watch goes on to its result.
+            self._stall_text_turn = False
         self._note_wait = None
         self._stall_wait = None
         self._stall_after_tool = False
         if getattr(self, "_stall_stage", None):
             self._stall_log("answered")
 
-    def _watch_after_tool(self) -> None:
+    def _watch_after_tool(self, session=None) -> None:
         """A tool's result went back for a question the guest asked aloud and
         Emma has not said a word since: watch for the answer again. The
         tool_call itself counted as the reply starting (`_reply_seen`), so
@@ -1094,12 +1458,15 @@ class GeminiProvider(VoiceProvider):
         silent (robot 20 Oct 15:53, "What is a social lounge?": the story
         came up, no voice for 19 s). A tap or a follow-up of ours (no guest
         speech since the last reply audio) is not watched."""
-        if settings.reply_stall_s <= 0 or self._closing or self._replied_since_end:
+        if settings.reply_stall_s <= 0 or self._closing:
+            return
+        if self._replied_since_end and not getattr(self, "_stall_text_turn", False):
             return
         if not " ".join(getattr(self, "_stall_heard", "").split()):
             return
         self._stall_after_tool = True
-        self._arm_stall_guard()
+        self._after_tool_at = time.monotonic()
+        self._arm_stall_guard(session=session)
 
     # ---- REPLY_STALL_S: a heard question the server never answers ----------
 
@@ -1114,7 +1481,36 @@ class GeminiProvider(VoiceProvider):
             self._stall_log("guest_spoke")
         self._stall_wait = None
         self._stall_after_tool = False
+        self._silent_asks = 0              # a new question gets its own silent-turn ask
+        if getattr(self, "_stall_text_turn", False):
+            # an unanswered TAP stays owed until the guest's WORDS replace it
+            # (`_input_event`): a cough or an "อืม" near the robot opens a
+            # segment with no words, and clearing here left the tap with
+            # nothing to chase (review 27 Oct, finding 2)
+            return
         self._stall_heard = (getattr(self, "_stall_heard", "") + " ") if pending else ""
+
+    def watch_text_turn(self, text: str) -> None:
+        """A guest's turn that came in as text -- a topic or picture tapped on
+        the robot face (session._quick_ask) -- watched like a heard question.
+
+        Replay of the 20 Oct robot log (27 Oct): after a story or a room-type
+        card the model ended the turn without a word, and the next turns got
+        nothing at all (9 of 115). A spoken question is chased (the nudge,
+        the rejoin, `_watch_after_tool`); a tap never was: `_stall_heard`
+        comes only from the input transcript, and `_replied_since_end` still
+        held the previous answer's audio. What is asked again is the tap's
+        own text, not STALL_ASK's "the guest said ...": nobody said it."""
+        if settings.reply_stall_s <= 0 or self._closing:
+            return
+        text = " ".join((text or "").split())
+        if not text:
+            return
+        self._stall_restart()
+        self._stall_heard = text
+        self._stall_text_turn = True
+        self._silent_asks = 0
+        self._arm_stall_guard()
 
     def _stall_log(self, stage: str, **fields) -> None:
         wait = round(time.monotonic() - self._stall_t0, 1) if getattr(self, "_stall_t0", None) else None
@@ -1128,20 +1524,67 @@ class GeminiProvider(VoiceProvider):
         except Exception:                                  # pragma: no cover - belt
             pass
 
-    def _arm_stall_guard(self) -> None:
+    def _chase_silent_turn(self) -> None:
+        """She ended a turn without a word while a tool's result was waiting
+        to be told (robot 27 Oct: a story came up, she said nothing -- or
+        "<no speech>{pause}" -- and the guest asked again 5-6 s later, inside
+        REPLY_STALL_S). Ask the question again SILENT_TURN_S from now rather
+        than wait out REPLY_STALL_S for an empty nudge (the 20 Oct replay: a
+        nudge is answered with a bare turn_complete). Once per QUESTION: the
+        echo of that ask is an `_ASKED_STAGES` turn_complete, and a second
+        silence -- even after the ask was answered with a tool call, which
+        clears the watch -- goes the plain way (nudge, rejoin, fallback)."""
+        if settings.reply_stall_s <= 0 or self._closing or self._stall_wait is None:
+            return
+        # Too soon after the result went back: the TOOL turn's own late
+        # turn_complete (3.8 sends one with the call), not her reply ending.
+        if time.monotonic() - getattr(self, "_after_tool_at", 0.0) < AFTER_TOOL_SETTLE_S:
+            return
+        # Once per question (review 27 Oct): answered with a tool call (the
+        # story again) and silent again, the chase began over every 3-4 s --
+        # each ask a whole prompt on a key at its tokens-per-minute ceiling.
+        # The second silence goes the normal way (nudge, rejoin, fallback).
+        # A new question resets it (`_stall_restart`, `watch_text_turn`).
+        if getattr(self, "_silent_asks", 0) >= 1:
+            return
+        self._silent_asks = getattr(self, "_silent_asks", 0) + 1
+        self._arm_stall_guard(wait=SILENT_TURN_S, silent=True)
+
+    def _arm_stall_guard(self, wait: float | None = None, silent: bool = False,
+                         session=None) -> None:
+        """`session`: the socket the question was asked on, when that is not
+        the current one -- a go_away that replaced it while a tool ran
+        (`_run_tool_calls`): bound to the old one, the guard's first step is
+        `_stall_rotated`, which asks again on the new socket."""
         since = time.monotonic()
         self._stall_wait = since
         self._stall_t0 = since
         old = getattr(self, "_stall_guard", None)
-        if old is not None and not old.done():
+        # Not while a rejoin is dialing (`_reconnecting`: the old socket is
+        # already closed -- review 27 Oct, a tap then cancelled the guard
+        # mid-connect: no session, and the call ended), nor the guard itself
+        # (a rotated re-ask re-arms from inside it). The old guard stops on
+        # its own: every step checks `_stall_wait == since`, and this re-arm
+        # moved it; `__aexit__` stops it with the rest (`_stall_guards`).
+        # Stage 3's dial is not a `_reconnecting` one: it touches nothing of
+        # the call's, so a newer turn cancelling it is just the moot case.
+        if (old is not None and not old.done() and not self._reconnecting
+                and old is not asyncio.current_task()):
             old.cancel()
-        self._stall_guard = asyncio.create_task(self._reply_stall_guard(self._session, since))
+        task = asyncio.create_task(self._reply_stall_guard(
+            self._session if session is None else session, since, wait, silent))
+        self._stall_guard = task
+        guards = getattr(self, "_stall_guards", None)
+        if guards is not None:
+            guards.add(task)
+            task.add_done_callback(guards.discard)
 
     def _stall_pending(self, session, since: float) -> bool:
         return (self._stall_wait == since and not self._closing
                 and self._session is session and session is not None)
 
-    async def _reply_stall_guard(self, session, since: float) -> None:
+    async def _reply_stall_guard(self, session, since: float, wait: float | None = None,
+                                 silent: bool = False) -> None:
         """Chase a heard question the server has not answered.
 
         Robot, 14 Oct 13:19: after "Is there a hospital nearby?" the server
@@ -1162,9 +1605,14 @@ class GeminiProvider(VoiceProvider):
         Only for a segment that was transcribed into words: the model staying
         quiet after room noise is right, and making her answer it is the
         "ค่ะ"-to-chatter bug.
+
+        `silent` (`_chase_silent_turn`): she already ENDED a turn without a
+        word after a tool's result -- step 1 asks the question again (stage
+        `silent_turn`) after `wait`, rather than an empty nudge after
+        REPLY_STALL_S; the rest of the chain is the same.
         """
         try:
-            await asyncio.sleep(settings.reply_stall_s)
+            await asyncio.sleep(settings.reply_stall_s if wait is None else wait)
         except asyncio.CancelledError:
             return
         if await self._stall_rotated(session, since):
@@ -1175,14 +1623,35 @@ class GeminiProvider(VoiceProvider):
         if not heard:
             self._stall_wait = None
             return
-        logger.warning("no reply %.0fs after a heard question — completing the turn again",
-                       settings.reply_stall_s)
-        self._stall_stage = "nudge"
-        self._stall_log("nudge", chars=len(heard), after_tool=bool(getattr(self, "_stall_after_tool", False)))
-        try:
-            await session.send_client_content(turn_complete=True)
-        except Exception:
-            logger.exception("could not nudge the stalled turn")
+        if silent:
+            logger.warning("she ended her turn without a word after a tool's result — asking again")
+            self._stall_stage = "silent_turn"
+            self._stall_log("silent_turn", chars=len(heard))
+            try:
+                await self.send_text(self._ask_text(heard))
+            except Exception:
+                logger.exception("could not ask again after a silent turn")
+        elif not _takes_empty_turn(self.model):
+            # The fallback model closes the socket on the empty turn (1007,
+            # `_EMPTY_TURN_REFUSED`): the nudge there is the question asked again.
+            logger.warning("no reply %.0fs after a heard question — asking it again (%s takes no "
+                           "empty turn)", settings.reply_stall_s, self.model)
+            self._stall_stage = "nudge"
+            self._stall_log("nudge", chars=len(heard), after_tool=bool(getattr(self, "_stall_after_tool", False)),
+                            form="ask")
+            try:
+                await self.send_text(self._ask_text(heard))
+            except Exception:
+                logger.exception("could not ask the stalled question again")
+        else:
+            logger.warning("no reply %.0fs after a heard question — completing the turn again",
+                           settings.reply_stall_s)
+            self._stall_stage = "nudge"
+            self._stall_log("nudge", chars=len(heard), after_tool=bool(getattr(self, "_stall_after_tool", False)))
+            try:
+                await session.send_client_content(turn_complete=True)
+            except Exception:
+                logger.exception("could not nudge the stalled turn")
         if settings.reply_stall_reconnect_s <= 0:
             return
         try:
@@ -1209,6 +1678,154 @@ class GeminiProvider(VoiceProvider):
             await self.send_text(self._ask_text(heard))
         except Exception:
             logger.exception("could not ask the question again after rejoining")
+        await self._stall_fallback(since, heard)
+
+    async def _stall_fallback(self, since: float, heard: str) -> None:
+        """Stage 3: rejoined, asked again, and still not a word.
+
+        Replay of the 20 Oct call, 27 Oct (instrumented): nudge at 8 s, rejoin
+        at ~17.6 s, the question asked again -- and 9 times out of 13 nothing
+        for the next minute, others 20-50 s late. The key was at its free-tier
+        tokens-per-minute ceiling (65K, AI Studio), so the same model on a new
+        socket is the same model at the same ceiling. GEMINI_MODEL_FALLBACK has
+        its own per-model quota (1M tokens/minute on this key): a FRESH
+        session there, with the recap, asks once more. The rest of this call
+        stays on it; the next call dials the configured model again."""
+        if self._fallback_model() is None:
+            return
+        try:
+            await asyncio.sleep(settings.reply_stall_s)
+        except asyncio.CancelledError:
+            return
+        while self._reconnecting:
+            await asyncio.sleep(0.05)
+        if self._stall_wait != since or self._closing or self._session is None:
+            return
+        if not await self._cut_over_to_fallback(since):
+            return
+        self._stall_stage = "fallback"
+        self._stall_log("fallback", model=self.model)
+        try:
+            await self.send_text(self._ask_text(heard))
+        except Exception:
+            logger.exception("could not ask the question again on the fallback model")
+
+    def _check_context_floor(self, prompt_tokens) -> None:
+        """The first turn of a session is the floor every compression keeps:
+        system instruction + tools (12,245-12,373 tokens on the robot, 20 Oct).
+        Near LIVE_CONTEXT_KEEP, compressing keeps no conversation at all; at
+        the trigger, every turn compresses. Said once per provider (review 27 Oct)."""
+        trigger = int(getattr(settings, "live_context_compress_at", 0) or 0)
+        if not trigger or not prompt_tokens or getattr(self, "_floor_checked", False):
+            return
+        self._floor_checked = True
+        keep = int(getattr(settings, "live_context_keep", 0) or 0)
+        keep = keep if 0 < keep < trigger else trigger // 2
+        if prompt_tokens >= 0.8 * keep:
+            logger.warning("LIVE_CONTEXT_KEEP %d leaves little conversation: the first turn is "
+                           "already %d tokens (system instruction + tools)", keep, prompt_tokens)
+            try:
+                from app import turnlog
+
+                turnlog.record("context_floor", first_turn=int(prompt_tokens), keep=keep, trigger=trigger)
+            except Exception:                              # pragma: no cover - belt
+                pass
+
+    def _fallback_model(self) -> str | None:
+        fallback = (settings.gemini_model_fallback or "").strip()
+        return fallback if fallback and fallback != self.model else None
+
+    def _fall_back(self, road: str, reason: str) -> bool:
+        """Switch this call to GEMINI_MODEL_FALLBACK (False: none, or on it
+        already). A handle belongs to its model's session: the next connect is
+        a fresh one."""
+        fallback = self._fallback_model()
+        if fallback is None:
+            return False
+        logger.error("MODEL FALLBACK mid-call (%s): %s -> %s (%s)", road, self.model, fallback, reason)
+        try:
+            from app import turnlog
+
+            turnlog.record("model_fallback", wanted=self.model, using=fallback, road=road,
+                           reason=reason[:200])
+        except Exception:                                  # pragma: no cover - belt
+            pass
+        self.model = fallback
+        self._resume_handle = None
+        try:
+            from app.metrics import active
+
+            observer = active.get()
+            if observer is not None:
+                observer.labels["model"] = fallback   # every metric_* row after this
+        except Exception:                                  # pragma: no cover - belt
+            pass
+        return True
+
+    async def _cut_over_to_fallback(self, since: float | None = None) -> bool:
+        """`_cut_over`, onto a fresh session of the fallback model -- dialed
+        FIRST, the stalled session closed only once the new one is up.
+
+        Review 27 Oct: closing first meant a failed dial (timeout, network,
+        the fallback refused) left no session and no handle, and the call
+        ended -- where the stalled session had still answered 4 times in 13 on
+        the replay. A fresh session on another model is no resume, so there is
+        no "already connected" refusal to close first for. Until the swap the
+        mic keeps writing to the old socket, as on go_away.
+
+        The dial touches nothing of the call's (`_dial`): `_cm`, `_session`,
+        the model and the handle stay the stalled session's until the swap,
+        which has no await between its check and itself. Review 27 Oct, 2nd
+        pass: dialing through `_connect` left them on the fallback's values for
+        the whole dial -- the receive loop, seeing the stalled socket close (a
+        quota close: the case this is for), found no handle and ended the call;
+        `__aexit__` closed the half-open socket and leaked the old one; a handle
+        the old socket sent meanwhile was thrown away.
+
+        Moot -- the new session closed unused -- when, by the end of the dial,
+        the call moved on without it: `since` moved (the stalled socket's answer
+        started, the guest began talking, a tap went out on it -- swapping then
+        cuts that answer off or splits an utterance across two sockets, and the
+        newer turn has its own watch), another road replaced the socket, or the
+        call is closing."""
+        fallback = self._fallback_model()
+        if fallback is None or self._reconnecting or self._closing:
+            return False
+        old_cm, old = self._cm, self._session
+        self._fallback_dial_from = old      # the receive loop waits for us (`_dial_swapped`)
+        started = time.monotonic()
+        try:
+            try:
+                cm, session = await self._dial(fallback, None)
+            except Exception:
+                logger.exception("could not open a session on the fallback model -- staying on %s",
+                                 self.model)
+                self._reconnect_log("stall", "failed", started)
+                self._stall_log("fallback_failed")
+                return False
+            moot = (self._closing or self._reconnecting or self._session is not old
+                    or (since is not None and self._stall_wait != since))
+            if moot or not self._fall_back("stall", "no reply after the rejoin"):
+                try:
+                    await cm.__aexit__(None, None, None)
+                except Exception:
+                    pass
+                if not self._closing:
+                    self._reconnect_log("stall", "moot", started)
+                    self._stall_log("fallback_moot")
+                return False
+            # the swap (`_fall_back` above: the row, the label, the model, no handle)
+            self._cm, self._session = cm, session
+            self._cut_over_from = old
+            self._fresh_pending = True
+            try:
+                await old_cm.__aexit__(None, None, None)
+            except Exception:
+                pass
+            self._reconnect_log("stall", "fallback", started)
+            return True
+        finally:
+            self._fallback_dial_from = None
 
     async def _stall_rotated(self, session, since: float) -> bool:
         """The socket rotated under a still-unanswered question (go_away, a
@@ -1229,6 +1846,9 @@ class GeminiProvider(VoiceProvider):
             await self.send_text(self._ask_text(heard))
         except Exception:
             logger.exception("could not ask the question again after the socket rotated")
+        # ...and chased like any ask (review 27 Oct: asked once, then nothing
+        # watched it -- no nudge, no rejoin, no fallback)
+        self._arm_stall_guard()
         return True
 
     async def _cut_over(self) -> bool:
@@ -1250,17 +1870,20 @@ class GeminiProvider(VoiceProvider):
         old_cm, old = self._cm, self._session
         self._cut_over_from = old
         self._session = None
+        started = time.monotonic()
         try:
             try:
                 await old_cm.__aexit__(None, None, None)
             except Exception:
                 pass
             try:
-                await self._connect_resumed_or_fresh("stall")
+                fresh = await self._connect_resumed_or_fresh("stall")
             except Exception:
                 logger.exception("could not rejoin the Gemini Live session after a stalled reply")
+                self._reconnect_log("stall", "failed", started)
                 return False
             logger.info("rejoined the Gemini Live session after a stalled reply")
+            self._reconnect_log("stall", "fresh" if fresh else "resumed", started)
             return True
         finally:
             self._reconnecting = False
@@ -1276,6 +1899,23 @@ class GeminiProvider(VoiceProvider):
         while self._reconnecting:
             await asyncio.sleep(0.05)
         self._cut_over_from = None
+        return self._session is not None and self._session is not reading
+
+    async def _dial_swapped(self, reading) -> bool:
+        """The stream this pass read ENDED while stage 3 dialed the fallback
+        (review 27 Oct, 2nd pass: a quota close of the stalled socket -- the
+        case stage 3 is for -- ended the call, or reconnected on top of the
+        dial). Waits for the dial. True = it swapped: read the new session.
+        False = it failed or was moot: a drop like any other. Only for an
+        ended stream: `_cut_over_elsewhere` runs at the end of every pass, and
+        waiting there would stop the old socket being read while the dial is
+        out -- the answer that makes the dial moot would never be seen."""
+        if reading is None or reading is not getattr(self, "_fallback_dial_from", None):
+            return False
+        while getattr(self, "_fallback_dial_from", None) is reading and not self._closing:
+            await asyncio.sleep(0.05)
+        if getattr(self, "_cut_over_from", None) is reading:
+            self._cut_over_from = None
         return self._session is not None and self._session is not reading
 
     async def _note_stall_guard(self, session, since: float) -> None:
@@ -1369,15 +2009,59 @@ class GeminiProvider(VoiceProvider):
         """
         from google.genai import types
 
-        if self._session is None:
+        # Her next reply answers this text (a greeting, an announcement, a tap,
+        # a stall's ask) -- never judged as a reply to noise (NoiseReplyGate).
+        gate = getattr(self, "_noise_gate", None)
+        if gate is not None:
+            gate.text_turn()
+        # The tap being watched (session._quick_ask arms `watch_text_turn`
+        # BEFORE it sends): while it waits out a rejoin, the rejoin must not ask
+        # it as well. Audit 27 Oct (B2): a fresh session's `_ask_again_fresh`
+        # asked the pending turn with the recap, then this waiting send put the
+        # same tap out again -- two user turns back to back, the second cutting
+        # off the answer to the first. The tap carries the recap itself instead.
+        tap = (getattr(self, "_stall_text_turn", False)
+               and " ".join((text or "").split()) == " ".join(getattr(self, "_stall_heard", "").split()))
+        # A tap while the socket is being rotated or rejoined (review 27 Oct:
+        # dropped here, silently): wait for the new one, a little.
+        waited = 0.0
+        if tap:
+            self._tap_waiting = getattr(self, "_tap_waiting", 0) + 1
+        try:
+            while self._session is None and self._reconnecting and not self._closing and waited < TEXT_WAIT_S:
+                await asyncio.sleep(0.1)
+                waited += 0.1
+        finally:
+            if tap:
+                self._tap_waiting -= 1
+        # Read once: every send below goes to THIS socket, and a close found on
+        # it is noted against it (`_send_input`'s shape).
+        session = self._session
+        if session is None:
             return
-        if self.model.removeprefix("models/").startswith("gemini-3.1-flash-live"):
-            await self._session.send_realtime_input(text=text)
-            return
-        await self._session.send_client_content(
-            turns=types.Content(role="user", parts=[types.Part(text=text)]),
-            turn_complete=True,
-        )
+        if tap and waited and getattr(self, "_fresh_pending", False):
+            text = self._ask_text(text)         # the recap and the language, then the tap
+        if tap:
+            self._tap_sent_on = session         # `_ask_again_fresh` reads it: asked already
+        # A socket the server closed before the receive loop noticed is not the
+        # caller's to die of. Audit 27 Oct (A1-A3): a tap during stage 3's dial,
+        # or during a slow go_away resume, found the old socket closed; the
+        # ConnectionClosed went through session._quick_ask into the mic pump,
+        # which returned, and FIRST_COMPLETED ended a call the loop's own
+        # rejoin would have saved. The loop sees the same close and decides; a
+        # watched tap is asked again on the new socket by its guard.
+        try:
+            if self.model.removeprefix("models/").startswith("gemini-3.1-flash-live"):
+                await session.send_realtime_input(text=text)
+                return
+            await session.send_client_content(
+                turns=types.Content(role="user", parts=[types.Part(text=text)]),
+                turn_complete=True,
+            )
+        except Exception as exc:
+            if not _socket_gone(exc):
+                raise                    # what we sent was wrong: fail as before
+            self._upstream_closed(exc, "text", session)
 
     async def _run_tool_calls(self, function_calls) -> AsyncIterator[ProviderEvent]:
         """Execute what the model asked for and hand the results back."""
@@ -1410,6 +2094,9 @@ class GeminiProvider(VoiceProvider):
             # are worth keeping, by name, under TURN_LOG_KEEP_DAYS.
             logger.info("tool call: %s(%s)", name, ", ".join(sorted(args)))
             announced[index] = _cid or self._local_call_id()
+            gate = getattr(self, "_noise_gate", None)
+            if gate is not None:
+                gate.tool_call()            # her reply answers the tool, not a noise
             yield _with_call_id(ProviderEvent(kind="tool_call", text=name),
                                 announced[index])
 
@@ -1433,14 +2120,48 @@ class GeminiProvider(VoiceProvider):
                 tools.model_view(name, result)))
             for cid, name, result in results
         ]
-        # A result from a retired connection must not enter its replacement.
-        if self._closing or self._session is not session:
+        # The line DROPPED while the tool ran (the receive loop retired this
+        # socket as dead) -- not a rotation that replaced it on purpose.
+        lost = session is not None and session is getattr(self, "_dead_session", None)
+        # ...or REPLACED while the tool ran (go_away's `_reconnect`, a stall
+        # swap). Audit 27 Oct (C1): this used to drop the result -- the page
+        # never showed the story, and nothing asked the question again on the
+        # resumed model, which is idle. Now the drop road's shape: shown on the
+        # page, never sent to the replacement (a result from a retired
+        # connection must not enter it), and watched on the OLD socket, so the
+        # guard's `_stall_rotated` asks again on the new one after REPLY_STALL_S.
+        rotated = (session is not None and self._session is not session
+                   and not lost and not self._closing)
+        if self._closing or (self._session is not session and not lost and not rotated):
             for index in announced:
                 if _tracking_tools():
                     yield self._dropped(calls[index][1], announced[index])
             return
-        if session is not None and responses:
-            await session.send_tool_response(function_responses=responses)
+        if rotated and kept:
+            logger.warning("the socket rotated under %d tool result(s) — shown on the page, "
+                           "not delivered to the model", len(kept))
+            self._watch_after_tool(session)
+        if not lost and not rotated and session is not None and responses:
+            try:
+                await session.send_tool_response(function_responses=responses)
+            except Exception as exc:
+                if not _socket_gone(exc):
+                    raise                    # what we sent was wrong: fail as before
+                self._upstream_closed(exc, "tool_response", session)
+                lost = True
+            else:
+                self._watch_after_tool()
+        if lost and kept:
+            # Audit 26 Oct (mode 3c): the result going back on a socket that
+            # had just died raised inside the tool runner, which put an error
+            # and ended the call -- and the page never saw what the tool did,
+            # because the yields come after the send. The action ran (the
+            # story was chosen, the card built): the page gets it now; the
+            # model never will. The receive loop rejoins; with REPLY_STALL_S
+            # on, the guard asks her question again on the new socket
+            # (`_stall_rotated`), and that answer calls the tool again.
+            logger.warning("the line dropped under %d tool result(s) — shown on the page, "
+                           "not delivered to the model", len(kept))
             self._watch_after_tool()
 
         delivered = set()
@@ -1465,6 +2186,37 @@ class GeminiProvider(VoiceProvider):
     def _ack(self, event: ProviderEvent) -> list:
         gate = getattr(self, "_ack_gate", None)
         return [event] if gate is None else gate.push(event)
+
+    def _gated(self, event: ProviderEvent) -> list:
+        """Her output through the noise gate, then the bare-"ค่ะ" gate."""
+        gate = getattr(self, "_noise_gate", None)
+        passed = [event] if gate is None else gate.push(event)
+        return [out for kept in passed for out in self._ack(kept)]
+
+    def _noise_reset(self) -> None:
+        gate = getattr(self, "_noise_gate", None)
+        if gate is not None:
+            gate.reset()
+
+    def _noise_close(self) -> list:
+        """turn_complete: what the noise gate still owes (on through the "ค่ะ"
+        gate), and a row when a reply to noise was not played."""
+        gate = getattr(self, "_noise_gate", None)
+        if gate is None:
+            return []
+        owed, dropped = gate.close()
+        if dropped is not None:
+            logger.info("a reply to a sound nobody made out was not played "
+                        "(NOISE_REPLY_NEAR_RMS, rms=%s, %d letters heard)",
+                        dropped.get("rms"), dropped.get("letters", 0))
+            try:
+                from app import turnlog
+
+                turnlog.record("noise_reply_dropped", rms=dropped.get("rms"),
+                               letters=dropped.get("letters"))
+            except Exception:                              # pragma: no cover - belt
+                pass
+        return [out for kept in owed for out in self._ack(kept)]
 
     def _ack_reset(self) -> None:
         gate = getattr(self, "_ack_gate", None)
@@ -1520,8 +2272,16 @@ class GeminiProvider(VoiceProvider):
     def _input_event(self, text: str) -> ProviderEvent:
         self._talk.guest(text)
         self._remember("guest", text)
+        gate = getattr(self, "_noise_gate", None)
+        if gate is not None:
+            gate.heard(text)
         heard = getattr(self, "_stall_heard", "")
-        if settings.reply_stall_s > 0 and text.strip() and len(heard) < 600:
+        if settings.reply_stall_s > 0 and text.strip() and getattr(self, "_stall_text_turn", False):
+            # the guest's words replace an unanswered tap -- never glued onto
+            # its instruction and re-sent raw (review 27 Oct, finding 4)
+            self._stall_heard = text
+            self._stall_text_turn = False
+        elif settings.reply_stall_s > 0 and text.strip() and len(heard) < 600:
             self._stall_heard = heard + text
         if self._input_turn_id is None:
             self._input_serial += 1
@@ -1596,12 +2356,19 @@ class GeminiProvider(VoiceProvider):
         """
         if self._session is None:
             return
-        # True only for the span between reconnecting and receiving the first
-        # message of the resumed session. If a reconnect yields nothing right
-        # back, we must not reconnect again on top of it — that is the tight
-        # loop this guards against. Any real message clears it, so a *later*
-        # duration cap still gets its own resume.
-        just_reconnected = False
+        # When we last rejoined, until the first message of the resumed session
+        # (None after it). If a reconnect yields nothing right back, we must not
+        # reconnect again on top of it — that is the tight loop this guards
+        # against. Any real message clears it, so a *later* duration cap still
+        # gets its own resume -- and so does a drop REJOIN_SETTLE_S or more
+        # after the rejoin on a line that said nothing since (audit 27 Oct, D1:
+        # a resumed model is idle, and a flag cleared only by a message ended
+        # the call at the next drop, however much later).
+        reconnected_at: float | None = None
+
+        def just_reconnected() -> bool:
+            return reconnected_at is not None and time.monotonic() - reconnected_at < REJOIN_SETTLE_S
+
         while True:
             # The session this pass reads. `_cut_over` (REPLY_STALL_S) may
             # replace it from outside this loop; then the old stream's end,
@@ -1614,7 +2381,7 @@ class GeminiProvider(VoiceProvider):
                     if self._session is not reading:
                         break
                     received_anything = True
-                    just_reconnected = False
+                    reconnected_at = None
 
                     # Resumption bookkeeping. The server hands out a fresh
                     # handle through the session and warns with go_away shortly
@@ -1647,7 +2414,7 @@ class GeminiProvider(VoiceProvider):
                         left = getattr(message.go_away, "time_left", "?")
                         logger.info("Gemini go_away (%s left) — resuming now", left)
                         if await self._reconnect():
-                            just_reconnected = True
+                            reconnected_at = time.monotonic()
                             # Tell the session it happened. A resumed model is
                             # awake but idle: it has no turn to finish and no
                             # reason to speak, so a tour that was mid-flight
@@ -1671,6 +2438,7 @@ class GeminiProvider(VoiceProvider):
                                 "cached_content_token_count", "tool_use_prompt_token_count",
                                 "thoughts_token_count")
                         data = {key: getattr(usage, key, None) for key in keys}
+                        self._check_context_floor(data.get("prompt_token_count"))
                         yield ProviderEvent(kind="usage", data={
                             "source": "gemini_report", **counts(data, keys)})
 
@@ -1681,7 +2449,7 @@ class GeminiProvider(VoiceProvider):
                             & self._pending_tool_ids)
                     tool_call = getattr(message, "tool_call", None)
                     if tool_call and getattr(tool_call, "function_calls", None):
-                        self._reply_seen()
+                        self._reply_seen("tool_call")
                         self._pending_tool_ids.update(
                             fc.id for fc in tool_call.function_calls if getattr(fc, "id", None))
                         await self._tool_batches.put(
@@ -1692,9 +2460,21 @@ class GeminiProvider(VoiceProvider):
                         continue
                     # The reply side, not the input transcript: a stalled turn
                     # still gets its user audio transcribed (_note_stall_guard).
-                    if (getattr(content, "model_turn", None) is not None
-                            or getattr(content, "output_transcription", None) is not None
-                            or getattr(content, "interrupted", False)):
+                    # And her WORDS or her VOICE, not any reply-shaped message
+                    # (robot 27 Oct 17:21): after a story she "said" "<no
+                    # speech>{pause}" over a moment of silent audio and ended
+                    # the turn; that counted as her answer, nothing chased the
+                    # silence, and the guest swore and asked again.
+                    said = getattr(getattr(content, "output_transcription", None), "text", None)
+                    shown = self._out_filter.feed(said) if said else ""
+                    model_turn = getattr(content, "model_turn", None)
+                    audio = [(blob.data, _voiced(blob.data))
+                             for blob in (getattr(part, "inline_data", None)
+                                          for part in (getattr(model_turn, "parts", None) or []))
+                             if blob is not None and blob.data]
+                    if getattr(content, "interrupted", False):
+                        self._reply_seen("interrupted")
+                    elif any(voiced for _, voiced in audio) or _has_words(shown):
                         self._reply_seen()
                     elif getattr(content, "turn_complete", False):
                         self._reply_seen("turn_complete")
@@ -1706,6 +2486,7 @@ class GeminiProvider(VoiceProvider):
                         self._out_budget.reset()
                         self._out_spacing.reset()
                         self._ack_reset()           # what it held was cut off anyway
+                        self._noise_reset()
                         yield ProviderEvent(kind="interrupted")
 
                     if getattr(content, "input_transcription", None):
@@ -1724,26 +2505,23 @@ class GeminiProvider(VoiceProvider):
                             self._input_turn_id = None
                             self._input_finished = None
 
-                    if getattr(content, "output_transcription", None):
-                        text = content.output_transcription.text
-                        if text:
-                            self._talk.emma(text)
-                            clean = self._out_spacing.feed(self._out_filter.feed(text))
-                            clean = self._out_budget.allow(clean)
-                            if clean:
-                                self._remember("emma", clean)
-                                for event in self._ack(ProviderEvent(kind="assistant_transcript", text=clean)):
-                                    yield event
+                    if said:
+                        if shown:
+                            self._talk.emma(shown)      # her language from her words, not "<no speech>"
+                        clean = self._out_spacing.feed(shown)
+                        clean = self._out_budget.allow(clean)
+                        if clean:
+                            self._remember("emma", clean)
+                            for event in self._gated(ProviderEvent(kind="assistant_transcript", text=clean)):
+                                yield event
 
-                    model_turn = getattr(content, "model_turn", None)
-                    if model_turn and model_turn.parts:
-                        for part in model_turn.parts:
-                            blob = getattr(part, "inline_data", None)
-                            if blob is not None and blob.data:
-                                self._out_budget.add_audio(len(blob.data))
-                                self._replied_since_end = True
-                                for event in self._ack(ProviderEvent(kind="audio", audio=blob.data)):
-                                    yield event
+                    for data, voiced in audio:
+                        self._out_budget.add_audio(len(data))
+                        if voiced:
+                            self._replied_since_end = True
+                            self._stall_text_turn = False
+                        for event in self._gated(ProviderEvent(kind="audio", audio=data)):
+                            yield event
 
                     if getattr(content, "turn_complete", False):
                         # Release any text the filters were holding back —
@@ -1752,8 +2530,10 @@ class GeminiProvider(VoiceProvider):
                         tail += self._out_spacing.flush()
                         tail = self._out_budget.allow(tail)
                         if tail:
-                            for event in self._ack(ProviderEvent(kind="assistant_transcript", text=tail)):
+                            for event in self._gated(ProviderEvent(kind="assistant_transcript", text=tail)):
                                 yield event
+                        for event in self._noise_close():
+                            yield event
                         for event in self._ack_close():
                             yield event
                         if self._out_budget.dropped:
@@ -1775,7 +2555,7 @@ class GeminiProvider(VoiceProvider):
                         yield ProviderEvent(kind="turn_complete")
 
                 if await self._cut_over_elsewhere(reading):
-                    just_reconnected = True
+                    reconnected_at = time.monotonic()
                     if _tracking_tools():
                         yield ProviderEvent(kind="reconnected")
                     continue
@@ -1783,8 +2563,18 @@ class GeminiProvider(VoiceProvider):
                     # The stream ended. If the server had given us a handle,
                     # this is almost always the duration cap rather than a real
                     # goodbye — rejoin and carry the conversation across it.
-                    if not just_reconnected and await self._reconnect():
-                        just_reconnected = True
+                    # Logged, not retired: with google-genai 2.24 a closed
+                    # socket raises out of receive() (the branch below) and
+                    # never lands here; what does land here (test fakes, an
+                    # SDK that swallows the close) keeps the old behaviour.
+                    self._upstream_closed(None, "ended", reading)
+                    if await self._dial_swapped(reading):
+                        reconnected_at = time.monotonic()
+                        if _tracking_tools():
+                            yield ProviderEvent(kind="reconnected")
+                        continue
+                    if not just_reconnected() and await self._reconnect():
+                        reconnected_at = time.monotonic()
                         # Event plumbing only: the session clears what it
                         # tracks per connection (TURN_IDLE_TRACKS_TOOLS).
                         # Not "resumed" — that one restarts a tour, and the
@@ -1798,14 +2588,34 @@ class GeminiProvider(VoiceProvider):
                 raise
             except Exception as exc:
                 if await self._cut_over_elsewhere(reading):
-                    just_reconnected = True
+                    reconnected_at = time.monotonic()
                     if _tracking_tools():
                         yield ProviderEvent(kind="reconnected")
                     continue
                 # An upstream drop mid-stream. A resumption handle turns it
-                # from fatal into the same cutover as a clean cap.
-                if not just_reconnected and await self._reconnect():
-                    just_reconnected = True
+                # from fatal into the same cutover as a clean cap. The dead
+                # socket is retired first: the mic writes nothing while the
+                # new one opens (`_retire`).
+                self._upstream_closed(exc, "receive", reading)
+                if await self._dial_swapped(reading):
+                    reconnected_at = time.monotonic()
+                    if _tracking_tools():
+                        yield ProviderEvent(kind="reconnected")
+                    continue
+                self._retire(reading)
+                # Closed for quota mid-session (review 27 Oct): the same model
+                # resumed is the same model at its quota -- a fresh session on
+                # the fallback (its own quota), the pending question asked again.
+                fell_back = _model_refused(exc) and self._fall_back("drop", str(exc)[:160])
+                if fell_back:
+                    self._fresh_after_fallback = True
+                # ...even right after a reconnect: `just_reconnected` stops a
+                # reconnect on top of one that yielded nothing, on the SAME
+                # model (2nd pass: a quota close of the stage-2 rejoin, before
+                # it sent a thing, ended the call with the fallback unused).
+                # `_fall_back` succeeds once a call, so this cannot loop.
+                if (not just_reconnected() or fell_back) and await self._reconnect():
+                    reconnected_at = time.monotonic()
                     if _tracking_tools():
                         yield ProviderEvent(kind="reconnected")
                     continue

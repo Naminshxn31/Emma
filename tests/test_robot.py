@@ -86,6 +86,12 @@ def test_walking_somewhere_does_not_hold_the_conversation(robot):
     `start_presentation` waited on a browser window and measured four seconds
     of silence in front of a guest who had just asked to see something.
     """
+    # The Thai word segmenter's first use in a process costs ~0.3 s (measured
+    # 27 Oct); find_place paid it inside the timed window and the test failed
+    # 2 runs in 3 on a loaded machine. Warm it: what is timed is the walk.
+    from app.tools.retrieval import tokenize
+    tokenize("ห้องตัวอย่าง")
+
     async def body():
         started = asyncio.get_event_loop().time()
         out = await registry.dispatch("go_to_place", {"place": "ห้องตัวอย่าง"})

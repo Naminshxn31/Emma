@@ -11,6 +11,7 @@ import asyncio
 import dataclasses
 import json
 import time
+from pathlib import Path
 
 import pytest
 
@@ -92,8 +93,12 @@ def talk(face, seconds, run_for):
 
 
 def test_off_by_default():
-    field = {f.name: f for f in dataclasses.fields(Settings)}["speech_gestures"]
-    assert field.default is False, "the sales room PC must not change on a pull"
+    # the CODE default (the field's own default is whatever this machine's
+    # environment said at import: robot.env's true turned this red, audit 27 Oct)
+    source = (Path(__file__).resolve().parents[1] / "app" / "config.py").read_text(encoding="utf-8")
+    assert 'speech_gestures: bool = _get_bool("SPEECH_GESTURES", False)' in source, \
+        "the sales room PC must not change on a pull"
+    assert {f.name for f in dataclasses.fields(Settings)} >= {"speech_gestures"}
     face = Face()
     caps(face)
     talk(face, 10, 0.3)

@@ -134,6 +134,18 @@ def latency(rows: list[dict]) -> None:
               % (len(lat), _pct(lat, 50), _pct(lat, 90)))
         print("  (บวกเวลารอเงียบของด่าน VAD ก่อนหน้านั้นอีก ≈ VAD_SILENCE_MS + 100 ms"
               " และเวลาเล่นเสียงฝั่งเบราว์เซอร์ที่ไม่ได้วัด)")
+        # Answers that went through tools carry `tool_hops` (app/metrics.py,
+        # 28 Oct: before it they logged no end signal at all, so this line
+        # only described the fast, tool-free answers).
+        direct = [r["end_signal_to_audio_ms"] for r in firsts if not r.get("tool_hops")]
+        chained = [r["end_signal_to_audio_ms"] for r in firsts if r.get("tool_hops")]
+        if chained:
+            print("  ตอบตรง n=%d p50 %.0f ms p90 %.0f ms / ผ่านเครื่องมือ n=%d p50 %.0f ms p90 %.0f ms"
+                  % (len(direct), _pct(direct, 50) if direct else 0, _pct(direct, 90) if direct else 0,
+                     len(chained), _pct(chained, 50), _pct(chained, 90)))
+        taps = [r["end_signal_to_audio_ms"] for r in firsts if r.get("end_signal_source") == "tap"]
+        if taps:
+            print("  แตะปุ่มถาม -> เสียงแรก: n=%d p50 %.0f ms" % (len(taps), _pct(taps, 50)))
         thoughts: dict[str, int] = {}
         for r in rows:
             tid, n = r.get("observed_turn_id"), r.get("thoughts_token_count")
@@ -177,10 +189,11 @@ def focus(rows: list[dict]) -> None:
     labels = [r for r in rows if r.get("event") == "focus_label"]
     away = [r for r in rows if r.get("event") == "idle_timeout" and r.get("why") == "no_face"]
     missing = [r for r in rows if r.get("event") == "focus_unavailable"]
+    has_noise = any(r.get("event") == "noise_reply_dropped" for r in rows)
     stalled = [r for r in rows if r.get("event") == "focus_note_stalled"]
     engaged = [r for r in rows if r.get("event") in
                ("focus_wake", "focus_wake_cpu", "focus_release", "focus_gap", "focus_goodbye")]
-    if not (opens or denies or labels or away or missing or stalled or engaged):
+    if not (opens or denies or labels or away or missing or stalled or engaged or has_noise):
         return
     section("โฟกัสการฟัง (ฟังเฉพาะคนหน้าหุ่น)")
     if missing:
@@ -211,6 +224,13 @@ def focus(rows: list[dict]) -> None:
               % (len(labels), ", ".join("%s %d" % kv for kv in whys.most_common()), named))
     if away:
         print("  วางสายเพราะไม่มีใครหน้ากล้อง %d ครั้ง" % len(away))
+    noise = [r for r in rows if r.get("event") == "noise_reply_dropped"]
+    if noise:
+        # NOISE_REPLY_NEAR_RMS (owner 29 Oct): her reply to a quiet sound that
+        # made 0-4 letters of caption, not played
+        xs = [r["rms"] for r in noise if isinstance(r.get("rms"), (int, float))]
+        print("  ไม่ตอบเสียงเบาที่ฟังไม่ออก %d ครั้ง%s" % (
+            len(noise), "  (rms p50 %.3g, สูงสุด %.3g)" % (_pct(xs, 50), max(xs)) if xs else ""))
     if stalled:
         # The speaker note held a turn open (gemini._note_stall_guard): that
         # reply came NOTE_STALL_S late and notes are off until restart.
@@ -247,6 +267,107 @@ def stories(rows: list[dict]) -> None:
               f"  · frames over 50 ms: {longs}")
     by = Counter(r.get("topic") for r in reports)
     print("  most shown: " + ", ".join(f"{k} {v}" for k, v in by.most_common(8)))
+
+
+def head(rows: list[dict]) -> None:
+    """The real head (HEAD_FOLLOW, 31 Oct, round 2): what the sweep measured, what the
+    loop sent and what the app refused. The bench reads its first run here."""
+    cal = [r for r in rows if r.get("event") == "head_calibration"]
+    looks = [r for r in rows if r.get("event") == "head_look"]
+    fenced = [r for r in rows if r.get("event") == "face_link_refused" and r.get("why") == "event_walk"]
+    lidar_rows = [r for r in rows if r.get("event") in ("head_lidar_check", "lidar_people")]
+    if not (cal or looks or fenced or lidar_rows):
+        return
+    section("Head follow (head_calibration / head_look)")
+    for r in cal[-3:]:
+        if r.get("ok"):
+            print("  sweep OK: pan %+.1f deg / tilt %+.1f deg at 100%% (texture %s)%s" % (
+                r.get("pan_deg_per_100") or 0, r.get("tilt_deg_per_100") or 0, r.get("texture"),
+                "  <- '+' turns the head to the robot's RIGHT on this robot"
+                if (r.get("pan_deg_per_100") or 0) < 0 else ""))
+        else:
+            print("  sweep FAILED: %s  shifts %s" % (r.get("reason"), r.get("shifts")))
+    by = Counter(r.get("why") for r in looks)
+    if looks:
+        print("  looks by why: " + ", ".join(f"{k} {v}" for k, v in by.most_common()))
+    refused = Counter(r.get("reason") for r in looks if r.get("why") == "refused")
+    if refused:
+        print("  refused by the app: " + ", ".join(f"{k} {v}" for k, v in refused.most_common())
+              + "  (busy = a gesture/group held the head; disabled = the voice-gesture switch is off)")
+    off = Counter(r.get("reason") for r in looks if r.get("why") in ("off", "calibrate"))
+    if off:
+        print("  stopped following: " + ", ".join(f"{k} {v}" for k, v in off.most_common()))
+    if fenced:
+        print("  arm commands refused during the event host's walk: %d" % len(fenced))
+    checks = [r for r in rows if r.get("event") == "head_lidar_check"]
+    if checks:
+        r = checks[-1]
+        if r.get("trusted"):
+            print("  lidar check HOLDS (%s pairs): lidar = %.2f x camera %+.1f deg, off by %.1f deg typically"
+                  " -> camera ~%s deg wide%s" % (
+                      r.get("n"), r.get("a") or 0, r.get("b") or 0, r.get("mad_deg") or 0, r.get("hfov_deg"),
+                      "  (lidar angles run the other way)" if (r.get("a") or 0) < 0 else ""))
+        else:
+            print("  lidar check not (yet) holding: %s (%s pairs, spread %s deg, head_ratio %s)" % (
+                r.get("why"), r.get("n"), r.get("spread_deg"), r.get("head_ratio")))
+    seen = [r for r in rows if r.get("event") == "lidar_people"]
+    turned = sum(1 for r in looks if r.get("why") == "lidar")
+    if seen or turned:
+        print("  lidar people rows %d · head turned toward a lidar person %d times" % (len(seen), turned))
+
+
+def array_mic(rows: list[dict]) -> None:
+    """ARRAY_MIC (2 Nov, docs/emma-array-mic-2026-11-02.md): which calls heard
+    with the mic array alone, every hand-back to the page and why, and the
+    levels every threshold saw on each source -- the robot A/B that sets
+    ARRAY_AUDIO_GAIN reads its numbers here (numbers only, like every row)."""
+    sole = {r.get("session_id") for r in rows
+            if r.get("event") == "array_source" and r.get("why") == "sole"} - {None}
+    backs = [r for r in rows if r.get("event") == "array_mic_handback"]
+    states = [r for r in rows if r.get("event") == "mic_state" and str(r.get("why") or "").startswith("array_")]
+    if not (sole or backs or states):
+        return
+    section("Array mic (ARRAY_MIC: the app holds the mic array alone)")
+    handed = {r.get("session_id") for r in backs if r.get("phase") == "call"}
+    print("  calls on the array alone: %d (handed back mid-call: %d)" % (len(sole), len(sole & handed)))
+    by = Counter("%s/%s:%s" % (r.get("phase"), r.get("scope") or "?", r.get("why")) for r in backs)
+    if by:
+        print("  hand-backs: " + ", ".join(f"{k} {v}" for k, v in by.most_common())
+              + "  (phase start = not live at ready, call = went quiet for ARRAY_MIC_DEAF_S;"
+                " scope call = that call only, run = until the app restarts)")
+    dead = [float(r["dead_ms"]) for r in backs if isinstance(r.get("dead_ms"), (int, float))]
+    if dead:
+        print("  silent before a mid-call hand-back: p50 %.0f ms, max %.0f ms" % (_pct(dead, 50), max(dead)))
+    page = Counter("%s:%s" % (r.get("why"), r.get("state")) for r in states)
+    if page:
+        print("  the page: " + ", ".join(f"{k} {v}" for k, v in page.most_common())
+              + "  (timeout = the app never said its capture ended; no_clock = the silent source never ticked)")
+    gaps = [float(r["max_gap_ms"]) for r in rows
+            if r.get("event") == "array_report" and r.get("sole") and isinstance(r.get("max_gap_ms"), (int, float))]
+    if gaps:
+        print("  longest chunk gap per report: p50 %.0f ms, p95 %.0f ms, max %.0f ms (ARRAY_MIC_DEAF_S must sit well above)"
+              % (_pct(gaps, 50), _pct(gaps, 95), max(gaps)))
+    sole_rows = [r for r in rows if r.get("event") == "array_report" and r.get("sole")]
+    held = sum(int(r.get("stall_held") or 0) for r in sole_rows)
+    stalls = [float(r["loop_stall_ms"]) for r in sole_rows if isinstance(r.get("loop_stall_ms"), (int, float))
+              and r["loop_stall_ms"] > 0]
+    if held or stalls:
+        print("  event-loop stalls: %d windows with one (longest %.0f ms) · hand-backs deferred by a stall: %d"
+              % (len(stalls), max(stalls) if stalls else 0, held))
+    # The A/B: the same thresholds, two sources. Sessions handed back mid-call
+    # are in neither column (half of each).
+    on_array = sole - handed
+    for name, pick in (("array", lambda sid: sid in on_array),
+                       ("page ", lambda sid: sid not in sole and sid not in handed)):
+        parts = []
+        for event, field in (("focus_open", "rms"), ("vad_floor", "rms"), ("mic_report", "avg")):
+            xs = [float(r[field]) for r in rows if r.get("event") == event and pick(r.get("session_id"))
+                  and isinstance(r.get(field), (int, float))]
+            if xs:
+                parts.append("%s %s p10/p50/p90 %.4f/%.4f/%.4f (n %d)" % (
+                    event, field, _pct(xs, 10), _pct(xs, 50), _pct(xs, 90), len(xs)))
+        if parts:
+            print("  %s: %s" % (name, " · ".join(parts)))
 
 
 def _engagement(rows: list[dict]) -> None:
@@ -421,6 +542,8 @@ def main() -> int:
     latency(rows)
     focus(rows)
     stories(rows)
+    head(rows)
+    array_mic(rows)
 
     # ---- mishearings ------------------------------------------------------
     heard = [r.get("text", "") for r in rows if r.get("event") == "heard"]
@@ -482,6 +605,7 @@ def _save_summary(rows: list[dict]) -> None:
         "remote_presses": kinds.get("remote", 0),
         # Listening focus, as counts: reasons are fixed machine strings.
         "focus_opens": kinds.get("focus_open", 0),
+        "noise_replies_dropped": kinds.get("noise_reply_dropped", 0),
         "focus_denies": dict(Counter(r.get("reason") for r in rows
                                      if r.get("event") == "focus_deny")),
     }
