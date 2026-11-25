@@ -397,6 +397,29 @@
     "\\b(?:rooms?|units?) does building [a-f]\\b"
    ],
    "not": []
+  },
+  "x_smart_environment": {
+   "means": [
+    "\\bsmart (?:irrigation|garden(?:s|ing)?|landscap\\w*|environment\\w*|watering|sprinklers?)\\b",
+    "\\birrigat\\w*\\b",
+    "\\b(?:water|watering|waters|watered)\\b.{0,15}\\b(?:the |our )?(?:garden|gardens|plants|planting|trees|lawn|greenery)\\b",
+    "\\b(?:garden|gardens|plants|planting|trees|lawn|greenery)\\b.{0,20}\\bwater(?:ed|ing|s)?\\b",
+    "\\bair quality\\b",
+    "\\b(?:co2|co 2|carbon dioxide|pm ?2 ?5|air pollution)\\b",
+    "\\b(?:weather|uv)\\b.{0,20}\\b(?:system|systems|station|monitor\\w*|index|sensors?)\\b",
+    "\\bsensors?\\b",
+    "\\b(?:monitor\\w*|looks? after|looking after|take care of|takes care of|care for|protect\\w*)\\b.{0,30}\\b(?:environment|air|nature|greenery)\\b",
+    "\\benvironment(?:al)?\\b.{0,30}\\b(?:technolog\\w*|system|systems|monitor\\w*|smart)\\b",
+    "\\b(?:technolog\\w*|smart)\\b.{0,30}\\b(?:environment|nature|garden|gardens|landscape)\\b",
+    "\\beco ?system\\b"
+   ],
+   "not": [
+    "\\b(?:video|videos|film|movie|clip|page|screen)\\b",
+    "\\bsmart home\\b",
+    "\\b(?:lights?|lighting|curtains?|door ?lock)\\b",
+    "\\b(?:app|application|ev|charg\\w*|parking)\\b",
+    "\\bwater quality\\b"
+   ]
   }
  }
 }

@@ -1329,6 +1329,86 @@
   ],
   "alpha": false
  },
+ "n_env_air_quality": {
+  "file": "n_env_air_quality.webp",
+  "sha256": "a8d37d23c37f9260e27ba4dd76fd5d03b22b9e1b8592bb0d8e8c63dbc7d4f970",
+  "bytes": 334910,
+  "w": 1672,
+  "h": 941,
+  "format": "webp",
+  "source": "owner_tech_1125/air_quality.png",
+  "crop": [
+   0,
+   0,
+   1672,
+   941
+  ],
+  "alpha": false
+ },
+ "n_env_irrigation": {
+  "file": "n_env_irrigation.webp",
+  "sha256": "68f0053401d268b5fbce5228499d4dc5c4a694767c319669e137ea95d629978e",
+  "bytes": 280378,
+  "w": 1672,
+  "h": 941,
+  "format": "webp",
+  "source": "owner_tech_1125/garden_mist.png",
+  "crop": [
+   0,
+   0,
+   1672,
+   941
+  ],
+  "alpha": false
+ },
+ "n_env_pool_sensor": {
+  "file": "n_env_pool_sensor.webp",
+  "sha256": "c775dd78b42fd07271fefb27af096914974755ba4b27ed055cbc54eaff3d6bbb",
+  "bytes": 325320,
+  "w": 1672,
+  "h": 941,
+  "format": "webp",
+  "source": "owner_tech_1125/pool_sensor.png",
+  "crop": [
+   0,
+   0,
+   1672,
+   941
+  ],
+  "alpha": false
+ },
+ "n_env_weather_court": {
+  "file": "n_env_weather_court.webp",
+  "sha256": "e5f01402ee5a7735cc008101aaeaefeaae05cb0ff13242674e0a60f1ebd655c9",
+  "bytes": 354966,
+  "w": 1672,
+  "h": 941,
+  "format": "webp",
+  "source": "owner_tech_1125/pool_courtyard.png",
+  "crop": [
+   0,
+   0,
+   1672,
+   941
+  ],
+  "alpha": false
+ },
+ "n_env_zones": {
+  "file": "n_env_zones.webp",
+  "sha256": "9517772539600816a460453078af10144829b389e5cb7fe75668ed4bbc6d9a35",
+  "bytes": 237246,
+  "w": 1672,
+  "h": 941,
+  "format": "webp",
+  "source": "owner_tech_1125/tulip_soil.png",
+  "crop": [
+   0,
+   0,
+   1672,
+   941
+  ],
+  "alpha": false
+ },
  "n_exec_ceo": {
   "file": "n_exec_ceo.webp",
   "sha256": "38557341a28435623a790ab2f320252d989385d1d0ac87a1791da0bd09e443ec",

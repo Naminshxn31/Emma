@@ -1,6 +1,7 @@
 """Card 1 with a line at Khun Miki's handshake and an end spot of its own (app/event_tour.py, owner 24 Nov 2026)."""
 from __future__ import annotations
 
+import math
 import time
 
 import pytest
@@ -119,8 +120,9 @@ def test_a_stop_while_she_says_it_ends_the_tour_before_the_next_walk(tour, monke
 # ---- the owner's marked round: the event file itself (24 Nov evening) -------------------------------------------
 # "แต่จุดที่ออกตัวไปจุดแรกให้ตั้งฉากนะ ไปยืนแนวนั้นแล้วก็ค่อยหันขวา" + five marks on the map (mark_spots_round.html)
 
-MARKS = {"beside_host": (-8.92, -4.24, 0.0), "guest_1": (-9.53, -2.09, 116.0), "guest_2": (-8.88, -1.91, 100.0),
-         "guest_3": (-8.23, -1.82, 63.5), "screen_end": (-10.9, -7.18, 45.0)}
+# 25 Nov ~10:30 (owner: "ยืนเป็นแนวโค้งได้ ... ไปจุดตรงกลางแล้วหมุน"): the guests in an arc round ONE spot, right to left
+MARKS = {"beside_host": (-8.92, -4.24, 0.0), "guest_1": (-8.88, -1.91, 55.0), "guest_2": (-8.88, -1.91, 100.0),
+         "guest_3": (-8.88, -1.91, 145.0), "screen_end": (-10.9, -7.18, 45.0)}
 
 
 def _real():
@@ -143,6 +145,34 @@ def test_the_event_files_round_is_the_owners_marks_in_his_order():
         ("walk", "screen_end")]
     # card 3 walks on from Khun Miki's spot: its first point is that spot's
     assert doc["spots"]["guest_front"]["steps"][0]["to"] == [-8.92, -4.24]
+
+
+def test_a_guest_where_she_already_stands_is_a_turn_on_the_spot_not_a_glide():
+    """Owner 25 Nov ~10:30, the guests in an arc round one spot: a glide to a point a few cm away turns to face THAT
+    point first (any heading), then to the spot's -- a turn on the spot instead; further than TURN_ONLY_M, the glide."""
+    doc, debut = _real()
+    spots, dock = doc["spots"], event_host.dock_doc(doc)
+    x, y, _ = MARKS["guest_2"]
+    turn = [{"do": "turn", "face": 100.0, "look": True, "label": "หันหาแขก 2"}]
+    near = event_tour.leg_steps(spots["guest_2"], (x + 0.06, y - 0.05, 55.0), dock, glide=0.5)
+    assert near == turn, near                            # no undock: a turn alone skips the map gates (board_walk)
+    # held short of the middle spot by guest 2 standing in her way (review 25 Nov: 0.12-0.32 m): still the turn
+    short = event_tour.leg_steps(spots["guest_2"], (x, y - 0.30, 89.0), dock, glide=0.5)
+    assert short == turn, short
+    far = event_tour.leg_steps(spots["guest_2"], (x, y - 0.40, 89.0), dock, glide=0.5)
+    assert any("glide" in s for s in far) and not any(s.get("do") == "turn" for s in far), far
+    # the staff's walk by hand (no glide): the same turn under her feet, not a MoveTo to it behind the map gates
+    hand = event_tour.leg_steps(spots["guest_2"], (x + 0.06, y - 0.05, 55.0), dock)
+    assert hand == turn, hand
+    assert any(s.get("to") for s in event_tour.leg_steps(spots["guest_2"], (x, y - 0.30, 89.0), dock))
+    # the round: up to the middle spot once, then turns -- right to left, the guests one by one
+    here, kinds = (-8.92, -4.24, 0.0), []
+    for g in ("guest_1", "guest_2", "guest_3"):
+        legs = [s for s in event_tour.leg_steps(spots[g], here, dock, glide=0.5) if s.get("do") != "undock"]
+        kinds.append("glide" if "glide" in legs[0] else legs[0]["do"])
+        here = (MARKS[g][0] + 0.03, MARKS[g][1] - 0.02, MARKS[g][2])
+    assert kinds == ["glide", "turn", "turn"], kinds
+    assert MARKS["guest_1"][2] < MARKS["guest_2"][2] < MARKS["guest_3"][2]
 
 
 def test_the_way_to_khun_miki_is_a_right_angle_straight_out_then_right_then_up_his_line():
@@ -310,6 +340,13 @@ def test_the_rounds_walks_are_glides_and_the_other_walks_are_not():
         spot = doc["spots"][st["spot"]]
         steps = event_tour.leg_steps(spot, here, None, head_on=bool(st.get("head_on")), via=st.get("via"),
                                      glide=st.get("glide"))
+        x, y, face = event_tour.spot_pose(spot)
+        if math.hypot(x - here[0], y - here[1]) < event_tour.TURN_ONLY_M:
+            # the guests' arc round one spot (owner 25 Nov ~10:30): a turn where she stands, no glide
+            assert [s for s in steps if s.get("do") != "undock"] == [
+                {"do": "turn", "face": float(face), "look": True, "label": "หันหา" + spot["name_th"]}], steps
+            here = event_tour.spot_pose(spot)
+            continue
         assert [s for s in steps if s.get("glide")] and not [s for s in steps if s.get("to") or s.get("do") == "turn"], steps
         assert steps[-1]["speed"] == 0.5 and steps[-1]["face"] == event_tour.spot_pose(spot)[2]
         # the same spot walked to by anything else (a card's own walk, by hand): the board's, with its watched turns

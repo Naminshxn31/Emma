@@ -1003,13 +1003,16 @@ def test_a_person_stopping_the_one_walk_on_the_way_to_the_corner_ends_the_card(s
     box["walkers"][1] = (STARTED + LINE(0.0, end=False) + "import time; time.sleep(0.1); " + LINE(1.0)
                          + "print('[ 1.0] step 2', flush=True); time.sleep(30)")
 
+    from app import event_box
+
     async def red(b):
         await _until(lambda: len(b["routes"]) >= 1)
         await asyncio.sleep(0.4)
         await event_walk.stop("staff")
+        # 25 Nov ~12:00: whoever sees the stop first (the card's tick, or the walker's end), the latch goes
+        await _until(lambda: not event_box.held(), 8.0)
     _run(box, then=red, timeout=25.0)
     assert ("pageant", "pageant") not in box["log"] and event_tour.STATE["ended"] not in (None, "done"), event_tour.view()
-    from app import event_box
 
     # final review 05:5x: out of the box all of it, then stopped -- not latched in a box she has left (every later walk
     # would be refused in_box until staff cleared it)

@@ -226,6 +226,57 @@ def test_a_forward_only_route_passes_no_map_gate_and_any_moveto_does_not(monkeyp
     with pytest.raises(bw.Stop, match="localization quality 30"):
         w.run([{"do": "undock"}, {"forward": 1.0}], 1)  # the undock goes by the dock's pose
     assert bw.needs_map([]) and bw.needs_map([{"do": "wait", "s": 1}]) and not bw.needs_map([{"forward": 1}])
+    # card 1's guests in an arc round one spot (25 Nov): a turn on the spot goes to no point on the map -- the guests
+    # round her fill the lidar's arc (the simulator: fit 0.17); with a MoveTo, a glide or an undock: the gates as ever
+    turn = {"do": "turn", "face": 100.0, "look": True}
+    assert not bw.needs_map([turn]) and not bw.needs_map([turn, {"do": "wait", "s": 1}])
+    # a turn that asks for the gates keeps them (the wave's turn out of the box: refused softly at a low fit)
+    assert bw.needs_map([{"do": "turn", "face": 85.0, "map": True}])
+    assert bw.needs_map([turn, {"to": [1.0, 0.0]}]) and bw.needs_map([turn, {"glide": [[1.0, 0.0]]}])
+    assert bw.needs_map([{"do": "undock"}, turn])
+    ran.clear()
+    w.run([turn], 1)                                     # Q30: a turn alone still runs
+    assert len(ran) == 1
+
+
+def test_a_looking_turn_is_the_glides_turn_and_a_plain_one_is_as_it_was(monkeypatch):
+    """Review 25 Nov ~11:20: the arc's turn between guests checked the arms' room once and refused at once -- a guest
+    0.1 m nearer than planned ended the card. `look` turns by the glide's turn: looked ahead every tick, held."""
+    bw = _walk()
+
+    class B:
+        def pose(self):
+            return (1.0, 2.0, 0.5)
+
+    w = bw.Walker.__new__(bw.Walker)
+    w.b = B()
+    calls, said = [], []
+    monkeypatch.setattr(w, "_drop_events", lambda why: None, raising=False)
+    monkeypatch.setattr(w, "_sdk", lambda: None, raising=False)
+    monkeypatch.setattr(w, "_glide_turn", lambda v, i, label, yaw, tol: calls.append(("glide_turn", label, round(yaw, 4))),
+                        raising=False)
+    monkeypatch.setattr(w, "turn_to", lambda yaw, **kw: calls.append(("turn_to", round(yaw, 4))), raising=False)
+    monkeypatch.setattr(w, "say", lambda text: said.append(text), raising=False)
+
+    class V:
+        def __init__(self, sdk):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    import app.slamware_sdk as sdk
+
+    monkeypatch.setattr(sdk, "VelocitySession", V)
+    w.step({"do": "turn", "face": 100.0, "look": True, "label": "หันหาแขก 2"}, 3)
+    w.step({"do": "turn", "face": 100.0, "w_spin": 0.3}, 4)
+    import math
+
+    assert calls == [("glide_turn", "หันหาแขก 2", round(math.radians(100.0), 4)), ("turn_to", round(math.radians(100.0), 4))]
+    assert said and said[0].startswith("step 3 หันหาแขก 2: facing")
 
 
 def test_after_box_steps_are_gated_at_their_first_step_not_in_the_box(monkeypatch):

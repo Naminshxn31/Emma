@@ -1,0 +1,22 @@
+[
+ {"id": "n_env_pool_sensor", "source": "owner_tech_1125/pool_sensor.png",
+  "source_sha256": "987b3890a459e1ab9262093e1f35e164e585e6f8103b39fcd883edd86502a16f",
+  "crop": [0, 0, 1672, 941], "max_w": 1672, "format": "webp", "max_kb": 420,
+  "why": "Owner's image 25 Nov ('Underwater Pool Sensor Readings'): a pool water sensor under water with sample readings. For the Water Quality Dashboard line (report 13.3). The readings on it are the owner's illustration, not project data; her line names no figure."},
+ {"id": "n_env_air_quality", "source": "owner_tech_1125/air_quality.png",
+  "source_sha256": "713e63cc21d415f6edc2e476797484af504b3dc8e71107736503f4bf24faf4c1",
+  "crop": [0, 0, 1672, 941], "max_w": 1672, "format": "webp", "max_kb": 420,
+  "why": "Owner's image 25 Nov ('Air quality sensor beside a building'): a sensor pole and an air-quality display in front of the curved buildings. For the Air Quality Dashboard and CO2 sensors line (report 13.3). Sample readings are the owner's illustration."},
+ {"id": "n_env_weather_court", "source": "owner_tech_1125/pool_courtyard.png",
+  "source_sha256": "f7fc82c720aaded85cb13edf2fbb8884228bf5e892822828ccbb0db339d66ae3",
+  "crop": [0, 0, 1672, 941], "max_w": 1672, "format": "webp", "max_kb": 420,
+  "why": "Owner's image 25 Nov ('Turquoise Pool Courtyard with Curved Apartments'): the courtyard between the pools with a sensor pole on the path. For the Weather and UV System line (report 13.3). No people."},
+ {"id": "n_env_irrigation", "source": "owner_tech_1125/garden_mist.png",
+  "source_sha256": "e5ae6640c6b373f9260e61b1632aecbc8786f2b389a6c2247be636dc1da1f378",
+  "crop": [0, 0, 1672, 941], "max_w": 1672, "format": "webp", "max_kb": 420,
+  "why": "Owner's image 25 Nov ('Misty garden path with golden sculpture'): sprinkler heads watering the planting beside the path. For the Smart Irrigation System line (report 13.3); not used for a cooling claim. No people."},
+ {"id": "n_env_zones", "source": "owner_tech_1125/tulip_soil.png",
+  "source_sha256": "a7b3b4d789f4c307a83598b664660398eb7747f9fa88755eaf85b9f51422cab2",
+  "crop": [0, 0, 1672, 941], "max_w": 1672, "format": "webp", "max_kb": 420,
+  "why": "Owner's image 25 Nov ('Sunlit tulip bed with soil sensor'): a planting bed with a soil sensor. For the line on irrigation managed by garden zone and weather (the owner's landscape document, 'Intelligent Irrigation'). The reading on it is the owner's illustration."}
+]

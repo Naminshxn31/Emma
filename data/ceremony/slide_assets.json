@@ -1397,6 +1397,46 @@
       "about": [],
       "text": "",
       "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_env_weather_court": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Turquoise pool courtyard (the owner's picture for the weather and UV line)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (25 Nov, the owner's smart-environment pictures): the extra line x_smart_environment has its own film"
+    },
+    "n_env_pool_sensor": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Underwater pool sensor readings (the owner's picture)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (25 Nov, the owner's smart-environment pictures): the extra line x_smart_environment has its own film"
+    },
+    "n_env_air_quality": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Air quality sensor (the owner's picture)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (25 Nov, the owner's smart-environment pictures): the extra line x_smart_environment has its own film"
+    },
+    "n_env_irrigation": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Misty garden path (the owner's picture for the smart irrigation line)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (25 Nov, the owner's smart-environment pictures): the extra line x_smart_environment has its own film"
+    },
+    "n_env_zones": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Sunlit tulip bed (the owner's picture for the zone-by-zone line)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (25 Nov, the owner's smart-environment pictures): the extra line x_smart_environment has its own film"
     }
   }
 }

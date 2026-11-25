@@ -77,6 +77,21 @@ TURN_FIRST_DEG = 100.0
 TURN_W_SPIN = 0.3
 #: A first point nearer than this: no turn of ours -- the board's own last turn to the spot's heading.
 TURN_MIN_M = 0.30
+#: Card 1's guests by name (owner 25 Nov ~10:50, the scan booth: "ให้ไปทักโดยพูดชื่อเขา ... ถ้าไม่เวิร์คก็ทักปกติ"): from
+#: her arrival at a guest, how long the camera may take to name that guest (facewatch.named_since: a booth guest, every
+#: naming rule, >= 2 frames, nobody else). Not named in that time = the handshake in silence, as ever.
+NAME_LOOK_S = 3.0
+#: What a guest's name may be before it goes into the model's instruction (it was typed at the booth): letters (any
+#: script, with their marks), spaces and . ' - only, this long at most.
+NAME_MAX_CHARS = 40
+#: A tour spot nearer than this to where she stands is a turn on the spot to its heading, no glide (owner 25 Nov
+#: ~10:30: the guests in an arc round one spot, "ไปจุดตรงกลางแล้วหมุน"): a glide to a point a few cm away turns to face
+#: THAT point first -- any heading -- and then to the spot's. Its rate: quicker than the watched turn behind her
+#: (TURN_W_SPIN), inside board_walk's TURN_W_SPIN_MIN..MAX; the turn checks the arms' room first (turn_sweep_gap).
+TURN_ONLY_M = 0.15
+#: The same for a leg of the round (`glide`): what the glide itself counts as "there" (board_walk GLIDE_SHORT_OK_M) --
+#: guest 2 stands in her way up to the middle spot and holds her 0.12-0.32 m short of it (review 25 Nov ~11:20).
+TURN_ONLY_ROUND_M = 0.35
 #: A walk that ENDS IN THE HANDSHAKE at a spot with `head_on_m` (the event file's beside_host: Khun Miki's counter) comes
 #: the last of the way straight in (owner 23 Nov, after card 1 ran on the robot: "ตอนเดินปรับเป็นเดินให้ไกลกว่าโต๊ะเคาน์เตอร์
 #: แล้วค่อยเดินเข้ามาจับมือกับคุณมิกิ" -- that run went from the dock's approach point north along the counter's front
@@ -544,6 +559,23 @@ def glide_steps(steps: list[dict], speed: float, name: str, end: bool = False) -
                       **({"short_ok": END_SHORT_OK_M} if end else {})}]
 
 
+def _turn_only(steps: list[dict], at, name: str, within: float = TURN_ONLY_M) -> list[dict] | None:
+    """The spot's steps as one turn on the spot, when they are a single point under her feet (< TURN_ONLY_M) with a
+    heading; None = walk them as ever."""
+    # spot_steps puts an undock in front of every walk; a point under her feet is no dock (the dock's spot walks its
+    # `dock` steps), and a walk of turns alone is not stopped at the map gates (board_walk.needs_map) -- an undock in it
+    # would be: the guests round her fill the lidar's arc there (the simulator, 25 Nov: fit 0.17 < 0.20)
+    before = [s for s in steps if s.get("do") == "undock"]
+    pts = [s for s in steps if s.get("to")]
+    if len(pts) != 1 or len(before) + 1 != len(steps) or pts[0].get("face") is None:
+        return None
+    tx, ty = float(pts[0]["to"][0]), float(pts[0]["to"][1])
+    if math.hypot(tx - at[0], ty - at[1]) >= within:
+        return None
+    # `look`: board_walk's look_turn -- the arms' room watched every tick, held while someone stands in it
+    return [{"do": "turn", "face": float(pts[0]["face"]), "look": True, "label": "หันหา%s" % name}]
+
+
 def leg_steps(spot: dict | None, here, dock: dict | None, *, head_on: bool = False,
               via: list | None = None, glide: float | None = None, end: bool = False,
               via_heading: float | None = None) -> list[dict] | None:
@@ -572,6 +604,13 @@ def leg_steps(spot: dict | None, here, dock: dict | None, *, head_on: bool = Fal
     if steps is None or here is None:
         return steps
     x, y, heading = float(here[0]), float(here[1]), here[2]
+    if heading is not None and not via:
+        # a spot under her feet: a turn there that looks while it turns (the round's own legs, and the staff's walk
+        # by hand to a guest of the arc -- not a MoveTo to a point she stands on, behind the map gates)
+        on = _turn_only(steps, (x, y), (spot or {}).get("name_th") or "จุดถัดไป",
+                        TURN_ONLY_ROUND_M if glide else TURN_ONLY_M)
+        if on is not None:
+            return on
     steps = event_host.route_from(steps, (x, y), dock)
     if heading is None:
         return steps
@@ -953,6 +992,69 @@ async def _say_line(seq: int, i: int, step: dict) -> bool:
     return said
 
 
+def _hello(name: str) -> str | None:
+    """'Hello, Khun <name>!' for a guest's name from the booth, or None when the name is not one to say."""
+    import unicodedata
+
+    name = " ".join(str(name or "").split())
+    if not name or len(name) > NAME_MAX_CHARS:
+        return None
+    if not all(unicodedata.category(ch)[0] in "LM" or ch in " .'-" for ch in name):
+        return None
+    if name.lower().startswith("khun ") or name.startswith("คุณ"):
+        return "Hello, %s!" % name
+    return "Hello, Khun %s!" % name
+
+
+async def _name_line(seq: int, i: int, step: dict, since: float) -> bool:
+    """A guest's handshake in the ceremony: the camera names the booth guest in front (facewatch.named_since, from
+    her arrival) within NAME_LOOK_S = the music ducks and the live model says hello with the name (said_private: her
+    words with the name stay out of the log); else nothing. Never ends the tour."""
+    from app import event_script, events, facewatch
+
+    said, why = False, "not_seen"
+    try:
+        deadline = since + NAME_LOOK_S
+        text = None
+        while True:
+            if _why_not(seq) is not None or STATE["at"] != i:
+                why = "moved_on"
+                break
+            name = facewatch.named_since(since)
+            if name:
+                text = _hello(name)
+                why = None if text else "bad_name"
+                break
+            if time.monotonic() >= deadline:
+                break
+            await asyncio.sleep(0.2)
+        if text:
+            music("duck")
+            said = bool(await events.announce(event_script.READ_RULE_EN % text, source="event_tour_name",
+                                              still_relevant=lambda: _why_not(seq) is None and STATE["at"] == i,
+                                              said_private=True, held_language=False))
+            why = None if said else "not_sent"
+    except Exception:                                    # noqa: BLE001 -- a hello never ends the tour
+        logger.exception("event tour: the name at %s", step.get("spot"))
+        why = "error"
+    turnlog.record("event_tour", phase="name", spot=step["spot"], said=said, why=why)
+    return said
+
+
+async def _release_box_when_still() -> bool:
+    """Out of the box all of it, then stopped on the way to the corner: seen still = the latch goes ("out"); not seen
+    still = it stays "not_still", as after the walk out itself (staff look, and clear it by hand)."""
+    from app import event_box, event_host
+
+    try:
+        if await event_host._wheels_still(lambda: True) is not False:
+            event_box.outcome("out")
+            return True
+    except Exception:                                    # noqa: BLE001 -- the latch stays, as when not seen still
+        logger.exception("event tour: the box after the stop on the way to the corner")
+    return False
+
+
 async def _line_over(seq: int, saying: "asyncio.Task | None") -> bool:
     """After the hand is down: the step's line is out and her voice is over (LINE_OVER_S at most) before the next walk.
     False = the tour ended meanwhile."""
@@ -1078,6 +1180,15 @@ async def _walk(seq: int, spot_id: str, name_th: str, steps: list[dict], dock, *
             out["box"] = event_box.walk_ended(run, box_of, tol_m=event_host.WALKED_OUT_TOL_M, first_step=corner)
             out["walked"] = event_walk.walked_m(run)
             out["out_of_box"] = out["box"] == "full"
+            if corner and out["out_of_box"] and run.state != "arrived":
+                # the walk out done, then stopped on the way to the corner -- by anything, a person's stop too: out of
+                # the box, the latch must not outlive it (final review 25 Nov 05:5x). From HERE, the walker's own end:
+                # the card's tick may see a person's stop first and leave its wait (25 Nov ~12:00: the release after
+                # the wait was then never reached). Detached: it outlives the card; the card's way on waits for it
+                task = asyncio.get_running_loop().create_task(_release_box_when_still())
+                event_host._tasks.add(task)
+                task.add_done_callback(event_host._tasks.discard)
+                out["release"] = task
         if run.state == "arrived" and run.spot != event_host.FORWARD_SPOT:
             event_host._count_arrival(run.spot)
         done.set()
@@ -1150,15 +1261,10 @@ async def _walk(seq: int, spot_id: str, name_th: str, steps: list[dict], dock, *
         walked = out.get("walked")
         _end(seq, "debut_short", detail_th="ไม่รู้ระยะ" if walked is None else "เดินได้ %.2f จาก %.2f ม." % (walked, box_of))
         return False
-    if box_of is not None and corner and out.get("out_of_box") and out.get("state") != "arrived":
-        # the walk out done (its forward's own closing line), then stopped on the way to the corner -- by anything, a
-        # person's stop too: she is out of the box and the latch must not outlive it (final review 25 Nov 05:5x: every
-        # later walk was refused in_box until staff cleared it). Seen still = out; not seen still = latched, as after
-        # the walk out itself
-        from app import event_box
-
-        if await event_host._wheels_still(lambda: True) is not False:
-            event_box.outcome("out")
+    if out.get("release") is not None:
+        # the latch's release (started at the walker's end, `ended`): over before anything else -- the wave needs the arm
+        with contextlib.suppress(Exception):
+            await out["release"]
     STATE["walk_arrived"] = out.get("state") == "arrived"
     if out.get("state") != "arrived" and corner and out.get("out_of_box") and _why_not(seq) is None \
             and out.get("reason") not in event_walk.REASONS_TH:
@@ -1196,6 +1302,7 @@ async def _handshake(seq: int, i: int, step: dict) -> bool:
     STATE["phase"] = "settling"
     STATE.pop("hand_rested", None)
     _note()
+    arrived = time.monotonic()                           # a guest's name: frames from here on (_name_line)
     first = not any(s["kind"] == "handshake" for s in STATE["plan"][:i])
     if first and music("hit"):
         # Khun Miki's: the music is off before the hand goes up, and she says her line into the quiet (owner 24 Nov)
@@ -1248,6 +1355,10 @@ async def _handshake(seq: int, i: int, step: dict) -> bool:
                 begun = float(st.get("at") or 0.0)
             if step.get("line") and saying is None and state in ("started", "done"):
                 saying = asyncio.get_running_loop().create_task(_say_line(seq, i, step))
+            elif (not step.get("line") and saying is None and state == "started" and not first
+                  and STATE.get("owner") == "ceremony"):
+                # a guest (Khun Miki's is the first hand, with its recorded line): by name when the camera knows them
+                saying = asyncio.get_running_loop().create_task(_name_line(seq, i, step, arrived))
             if state == "done":
                 at = float(st.get("at") or 0.0)
                 if begun is not None and 0.0 < at - begun < HANDSHAKE_SURE_S:
@@ -1859,7 +1970,9 @@ async def _wave_and_line(seq: int, sc: dict) -> bool:
         doc = event_host.load() or {}
         out_at = await _where()
         STATE["via_heading"] = out_at[2] if out_at is not None else None
-        steps = [{"do": "turn", "face": float(face), "w_spin": WAVE_TURN_W, "label": "หันหาแขก"}]
+        # `map`: this turn keeps the map gates (a low Q / fit refuses it softly: the wave where she stands, as ever);
+        # board_walk lets a turn alone skip them since the guests' arc (25 Nov)
+        steps = [{"do": "turn", "face": float(face), "w_spin": WAVE_TURN_W, "label": "หันหาแขก", "map": True}]
         # owner 25 Nov ~03:10: "จุดจะให้หุ่นโยกมือทักทายท่านางงามคือให้หุ่นเดินมาที่มุมก่อนจะเลี้ยวหาคุณมิกิ" -- with the scene's
         # `wave_at_via`, on straight to the tour's corner first (it lies ahead of the walk out: the same line the first
         # leg used to take), then the turn there. Not ahead (the box moved) = the turn where she stands, as before.

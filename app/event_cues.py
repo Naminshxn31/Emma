@@ -311,7 +311,10 @@ EN_CHARS_PER_S = 14.0
 
 def _slide(c: dict) -> dict | None:
     """The cue's motion slide for the room screen, or None. Whatever goes wrong with a
-    slide, the line's subtitle still goes out."""
+    slide, the line's subtitle still goes out. A scene's own line (`play_line`) brings its slide
+    built already (card 2's opener: `ceremony_slides.opener_slide`) -- never looked up by its id."""
+    if "slide" in c:
+        return c["slide"] if isinstance(c["slide"], dict) else None
     try:
         from app import ceremony_slides
         return ceremony_slides.for_cue(c.get("id"), lang=_lang(c))
@@ -539,7 +542,8 @@ async def play(cue_id: str, *, by: str = "staff", show: str | None = None) -> di
 
 
 async def play_line(line_id: str, text: str, pcm: bytes, *, lang: str = "en",
-                    scene_th: str | None = None, still=None) -> dict:
+                    scene_th: str | None = None, still=None, sub_th: str | None = None,
+                    slide: dict | None = None) -> dict:
     """A scene's own line recorded ahead (app/event_host.py `recorded`; owner 10 Nov 2026: the
     debut's English pageant line in the voice the owner picked by ear -- "Jessica v3 รอบแรก (C)
     ชอบเสียงนี้"). Not a cue of the ceremony script: the scene pins the file's sha256 and
@@ -558,6 +562,12 @@ async def play_line(line_id: str, text: str, pcm: bytes, *, lang: str = "en",
     gen = STATE["cut_gen"]
     c = {"id": str(line_id or "")[:48], "th": " ".join(str(text or "").split()), "lang": lang,
          "scene_th": scene_th}
+    if isinstance(sub_th, str) and sub_th.strip():
+        # the hall screen's Thai line under an English recording (card 2's opener, owner 25 Nov): `_subtitle`
+        c["sub_th"] = " ".join(sub_th.split())
+    # its hall-screen film, built by the caller from a signed slide (card 2's opener); none = no slide, never the
+    # slide some cue of the script that happens to share the id would have
+    c["slide"] = slide if isinstance(slide, dict) else None
     run = {"seq": None, "id": c["id"], "by": "scene", "mode": None, "pressed": pressed, "phase": None,
            "known": True, "cut_gen": gen}
     if not c["id"] or not c["th"] or not pcm:

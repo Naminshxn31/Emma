@@ -126,7 +126,11 @@
     };
   }
 
-  register('features', function (id) { return id === 'executives' ? executives : id === 'park_green' ? park : null; });
+  // smart_environment (owner 25 Nov: "เอามาทำบทเพิ่มแล้วทำโมชั่นให้หน่อย", his own pictures of the sensors and the
+  // gardens): the same full-screen cuts as the park, one picture per system as she names it
+  register('features', function (id) {
+    return id === 'executives' ? executives : (id === 'park_green' || id === 'smart_environment') ? park : null;
+  });
 
   // ======================================================================== metric
   function metric(S, p) {

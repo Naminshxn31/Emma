@@ -799,8 +799,12 @@ def right_side_hit(points, clear_m: float, ahead_m: float) -> bool:
 def _off_map(step: dict) -> bool:
     """A step that never goes by the board's map: a `forward` (from its own start pose) and a
     `back_to` (back along that same line, 11 Nov) -- velocity along a line in the pose's own
-    frame, wherever that frame sits on whatever map. NOT a MoveTo, an undock or a dock."""
-    return "forward" in step or "back_to" in step
+    frame, wherever that frame sits on whatever map -- and a `turn` on the spot (25 Nov: card 1's
+    guests in an arc round one spot; she turns to each, about her own axis, to no point on the
+    map, after the lidar says the arms have room -- the simulator had the turn to guest 2 refused
+    at fit 0.17, the guest 0.8 m in front filling the lidar's arc), unless it asks for the gates
+    (`map`: the wave's turn out of the box). NOT a MoveTo, an undock or a dock."""
+    return "forward" in step or "back_to" in step or (step.get("do") == "turn" and not step.get("map"))
 
 
 def needs_map(steps: list[dict]) -> bool:
@@ -2048,6 +2052,20 @@ class Walker:
         note["jumps"] += filt.jumps
         note["held_off"] = tuple(round(c, 3) for c in filt.corr) if filt.holding else None
 
+    def look_turn(self, step: dict, i: int) -> None:
+        """A route's turn on the spot that LOOKS while it turns (`look`; card 1's guests in an arc round one spot, owner
+        25 Nov): the glide's own turn -- the arms' room ahead of every tick, held (`held` said) while someone stands in
+        it, the patience, the bumper -- not `_spot_turn`'s single look before it (review 25 Nov: with the arc's guests
+        0.1 m nearer than planned that one look refused, and the card ended)."""
+        from app.slamware_sdk import VelocitySession
+
+        label = step.get("label") or "turn"
+        self._drop_events("step %d" % i)
+        with VelocitySession(self._sdk()) as v:
+            self._glide_turn(v, i, label, math.radians(float(step["face"])), 2.0)
+        x, y, h = self.b.pose()
+        self.say("step %d %s: facing %.0f° at (%.2f, %.2f)" % (i, label, math.degrees(h), x, y))
+
     def _glide_turn(self, v, i: int, label: str, yaw: float, tol_deg: float) -> None:
         """On the spot to `yaw`, the shorter way, one move: looked ahead of every tick (the arms' rectangle round the
         turn still to come), waited for when someone stands in it. Behind her nobody looks: the bumper stops it."""
@@ -3145,6 +3163,8 @@ class Walker:
             self.dock()
         elif step.get("do") == "screen":
             self.screen(step["action"])
+        elif step.get("do") == "turn" and step.get("look"):
+            self.look_turn(step, i)
         elif step.get("do") == "turn":
             # on the spot, after the lidar says the arms have room (_spot_turn) -- in FRONT and to the sides:
             # behind her nobody looks, so it is watched while it turns (a bumper, B) and may be slower

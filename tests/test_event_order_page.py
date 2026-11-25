@@ -695,8 +695,8 @@ def test_the_page_runs_the_ceremony_as_a_running_order():
         assert piece in PAGE, piece
     kinds = _js("var KIND_TH = {", "};\n")
     for do, th in (("walk", "เดิน"), ("body", "ท่า"), ("cue", "พูด"), ("clip", "คลิป"), ("screen", "จอใหญ่"),
-                   ("handoff", "ส่งต่อ"), ("manual", "ทำเอง")):
-        assert f"{do}: '{th}'" in kinds, do
+                   ("handoff", "ส่งต่อ"), ("manual", "ทำเอง"), ("follow", "คุยสด")):
+        assert f"{do}: '{th}'" in kinds, do     # (card 2's chip read the code word "follow" -- readiness check 25 Nov)
     assert "scene:" not in kinds and "scene:" not in _js("var DO_TH = {", "};\n")
     voices = _js("var VOICE_TH = {", "};\n")
     for voice, th in (("recorded", "เสียงอัด"), ("read", "Gemini อ่าน"), ("live", "ตอบสด")):

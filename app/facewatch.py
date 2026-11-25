@@ -535,6 +535,8 @@ class Watcher:
                                     "guest" if meta.get("source") == "booth" else name, score, unnamed)
                         self._unnamed_logged[name] = unnamed
                     name, meta = None, {"unnamed": unnamed, "would_be": best}
+        if name is not None:
+            _note_named(now, name, meta.get("source") == "booth")
 
         if name is None and (self._probable_on() or settings.face_zoom_enabled):
             # Under the bar (or a close second) but in the band: probably
@@ -1297,6 +1299,42 @@ class _Tracks:
 
 
 _latest_lock = threading.Lock()
+#: Frames whose nearest face passed every naming rule: [(t, name, booth guest?)] -- before the cooldown, which only
+#: decides whether a frame ends in a greeting. For card 1's guests (app/event_tour.py, owner 25 Nov: the scan booth's
+#: guests greeted by name at their handshake). Bounded; names stay in memory only (never logged from here).
+NAMED_KEEP = 40
+#: Frames of one name since the asked time before it counts: one frame is one draw of a noisy match.
+NAMED_FRAMES = 2
+_named: list[tuple[float, str, bool]] = []
+_named_lock = threading.Lock()
+
+
+def _note_named(now: float, name: str, booth: bool) -> None:
+    with _named_lock:
+        _named.append((float(now), str(name), bool(booth)))
+        del _named[:-NAMED_KEEP]
+
+
+def named_since(since: float, *, booth_only: bool = True, frames: int = NAMED_FRAMES) -> str | None:
+    """The one person the camera has named since `since` (time.monotonic()), in at least `frames` frames, with no
+    other name among them; None = nobody, too few frames, or two people. `booth_only`: the scan booth's guests only
+    (app/guests.py rows, meta source "booth") -- staff in the gallery are not named at a guest's handshake."""
+    with _named_lock:
+        rows = [(n, b) for t, n, b in _named if t >= since]
+    names = {n for n, _b in rows}
+    if len(names) != 1:
+        return None
+    name = next(iter(names))
+    if booth_only and not all(b for _n, b in rows):
+        return None
+    return name if len(rows) >= frames else None
+
+
+def forget_named() -> None:
+    with _named_lock:
+        _named.clear()
+
+
 #: The last published frame's faces: [(track, bbox, kps, t)].
 _latest: list[tuple] = []
 #: That frame's [width, height] -- where a box sits vertically, for the head's

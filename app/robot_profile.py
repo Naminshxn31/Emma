@@ -159,9 +159,11 @@ EMMA = RobotProfile(
     ),
     camera=Camera(hfov_deg=19.0, mirrored=True),   # 4 Nov: base spot turns against odometry
     motion=Motion(
-        max_speed_mps=0.45,      # the fastest our route files ask (floor1.json); the board's own limit unknown.
+        max_speed_mps=0.5,       # the fastest our route files ask; the board's own limit unknown.
                                  # 0.35 -> 0.45 on 20 Nov (owner "ให้หุ่นเดินไวกว่านี้"): rehearsal_back_home's MoveTo
-                                 # legs at 0.45 ran on the robot 7 times that evening, the same 0-4 cm at the stops
+                                 # legs at 0.45 ran on the robot 7 times that evening, the same 0-4 cm at the stops.
+                                 # 0.45 -> 0.5 on 25 Nov: the event file's own glides (card 1's round, card 3's walk to
+                                 # the globe) ask 0.5 (board_walk GLIDE_SPEED_MAX) and walked at it in rehearsals 6-8
         spot_turn_rad_s=0.38,    # 16 Nov frames
         accel_mps2=0.4,
     ),

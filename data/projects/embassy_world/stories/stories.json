@@ -11167,6 +11167,141 @@
    "notes_th": "ภาพฐานไม่ใช่ผังชั้น G: fac_plan_g วาดแค่ตัวอาคาร ไม่มีป้าย Playground ให้ชี้ (ลานอยู่นอกอาคาร) และผังโครงการก็ไม่มีป้ายนี้ — วงบนที่ว่างจะเป็นการเดา จึงใช้ภาพมุมสูงของลาน Playscape จากชุดเว็บ (Scene 55) แล้ววงชี้ที่โดมยานอวกาศในภาพเอง (42.4%, 57.0%) ส่วน 'ตรงไหน' พูดเป็นคำ: ริมสระ ถัดจาก Junior World ตามรายงาน 9.9 · ตัดไปภาพระดับสายตา (Scene 64: ยาน สไลเดอร์ประติมากรรม ชิงช้าห่วง น้ำพุพื้น) + ชิป 137 ตร.ม. (ตารางภูมิสถาปัตย์ ✅) · องค์ประกอบทุกชิ้นตามรายงาน 9.9/12.10 พูดตรงๆ ไม่พูดว่าเป็นแบบแนวคิด (กฎเจ้าของ 10 ต.ค.) · ไม่พูดช่วงอายุ ความจุ วัสดุพื้น ความลึกน้ำ ความปลอดภัย (ยังไม่มีในแบบ) ไม่พูดเรื่องลดอุณหภูมิ 4–5 °C ของ Fog Canopy (คำผู้นำเสนอ) · คนในภาพเป็นจุดเล็ก ไม่ใช่ตัวหลักของภาพ · 22 ต.ค. รอบรีวิว: บรรทัด 1 ไทยไม่ลงท้ายค่ะ (อังกฤษจบด้วยจุลภาค พูดต่อบรรทัด 2)"
   },
   {
+   "id": "smart_environment",
+   "template": "features",
+   "questions_th": [
+    "โครงการดูแลสภาพแวดล้อมยังไง",
+    "ระบบรดน้ำต้นไม้อัจฉริยะทำงานยังไง",
+    "มีระบบวัดสภาพอากาศกับรังสียูวีไหม",
+    "รดน้ำต้นไม้อัตโนมัติไหม"
+   ],
+   "questions_en": [
+    "How does the project look after its environment?",
+    "How does the smart irrigation work?",
+    "Is there a weather and UV system?",
+    "How are the gardens watered?"
+   ],
+   "lines": [
+    {
+     "th": "โครงการของเราดูแลสภาพแวดล้อมด้วยระบบอัจฉริยะ เช่น ระบบตรวจสภาพอากาศและรังสียูวีที่บอกสภาพอากาศภายนอกค่ะ",
+     "en": "Our project looks after its environment with smart systems, like a Weather and UV System for the conditions outside.",
+     "cue_th": [
+      "สภาพแวดล้อม",
+      "รังสียูวี"
+     ],
+     "cue_en": [
+      "environment",
+      "Weather and UV System"
+     ],
+     "cue_zh": [
+      "环境",
+      "紫外线"
+     ]
+    },
+    {
+     "th": "แดชบอร์ดคุณภาพน้ำติดตามน้ำในสระ เช่น อุณหภูมิและค่า pH",
+     "en": "A Water Quality Dashboard keeps watch on the pool water, such as its temperature and pH.",
+     "cue_th": [
+      "คุณภาพน้ำ"
+     ],
+     "cue_en": [
+      "Water Quality Dashboard",
+      "pool water"
+     ],
+     "cue_zh": [
+      "水质"
+     ]
+    },
+    {
+     "th": "แดชบอร์ดคุณภาพอากาศและเซ็นเซอร์ CO₂ ติดตามอากาศรอบอาคาร",
+     "en": "An Air Quality Dashboard and CO₂ sensors watch the air around the buildings.",
+     "cue_th": [
+      "คุณภาพอากาศ",
+      "เซ็นเซอร์"
+     ],
+     "cue_en": [
+      "Air Quality Dashboard",
+      "sensors"
+     ],
+     "cue_zh": [
+      "空气质量",
+      "传感器"
+     ]
+    },
+    {
+     "th": "ระบบรดน้ำอัจฉริยะดูแลต้นไม้ทั่วโครงการ",
+     "en": "A Smart Irrigation System looks after the planting,",
+     "cue_th": [
+      "รดน้ำ"
+     ],
+     "cue_en": [
+      "Smart Irrigation System",
+      "planting"
+     ],
+     "cue_zh": [
+      "智能灌溉",
+      "灌溉"
+     ]
+    },
+    {
+     "th": "โดยจัดการตามแต่ละโซนของสวนและตามสภาพอากาศ ให้สวนเขียวสวยตลอดปีค่ะ",
+     "en": "managed zone by zone and with the weather, so the gardens stay green all year.",
+     "cue_th": [
+      "โซน"
+     ],
+     "cue_en": [
+      "zone by zone",
+      "green all year"
+     ],
+     "cue_zh": [
+      "分区"
+     ]
+    }
+   ],
+   "params": {
+    "items": [
+     {
+      "label_en": "Weather & UV System",
+      "asset": "n_env_weather_court",
+      "note_en": "The conditions outside",
+      "line": 0
+     },
+     {
+      "label_en": "Water Quality Dashboard",
+      "asset": "n_env_pool_sensor",
+      "note_en": "Pool water · temperature · pH",
+      "line": 1
+     },
+     {
+      "label_en": "Air Quality Dashboard",
+      "asset": "n_env_air_quality",
+      "note_en": "Air around the buildings · CO₂ sensors",
+      "line": 2
+     },
+     {
+      "label_en": "Smart Irrigation System",
+      "asset": "n_env_irrigation",
+      "note_en": "Water for the planting",
+      "line": 3
+     },
+     {
+      "label_en": "Zone by zone",
+      "asset": "n_env_zones",
+      "note_en": "Each garden area, with the weather",
+      "line": 4
+     }
+    ]
+   },
+   "taps": [],
+   "sources": [
+    "report:13_technology.md#13.3 (Air Quality Dashboard, CO₂ Sensors, Water Quality Dashboard, Smart Irrigation System, Weather & UV System)",
+    "report:13_technology.md#13.4 (เซ็นเซอร์ตรวจคุณภาพอากาศ CO₂ คุณภาพน้ำในสระ และสภาพอากาศ)",
+    "report:03_concept.md (Deck หน้า 15: 7 ระบบ Future Nature; Water Quality Dashboard = ตรวจคุณภาพน้ำในสระ, Smart Irrigation = ระบบกระจายน้ำรดต้นไม้)",
+    "assets:owner_tech_1125 (ภาพของเจ้าของ 25 พ.ย.: ค่าที่อ่านบนภาพเป็นภาพประกอบ ไม่ใช่ข้อมูลโครงการ)"
+   ],
+   "notes_th": "เจ้าของ 25 พ.ย. ~11:45 ส่งภาพ 6 ภาพ 'เอามาทำบทเพิ่มแล้วทำโมชั่นให้หน่อย' — ใช้ 5 ภาพ (ภาพ EMW TECHNOLOGY มีคนและเครื่องวัดร่างกาย/ยิมอัจฉริยะที่ไม่อยู่ในข้อมูลอนุมัติ: ไม่ใช้) · ไม่พูดตัวเลขใดๆ · ไม่พูดเรื่องพ่นละอองลดอุณหภูมิ (รายงานติด ⚠️ ว่าเป็นคำของผู้นำเสนอ) · คนละเรื่องกับ project_tech (แอป/Smart Home/EV) และบทหลัก s07_l07 (แดชบอร์ดคุณภาพน้ำบนจอ LED) · ที่มาเพิ่มเติมของถ้อยคำ (ไม่มีตัวเลข): embassy-world/future-climate-landscape.md (เอกสารภูมิทัศน์ของเจ้าของ: Smart Pool Monitoring = water temperature, pH, water quality; Intelligent Irrigation = managed by landscape zone and changing weather, a landscape beautiful throughout the year) · บรรทัดแรกพูดถึงระบบตรวจสภาพอากาศและรังสียูวีด้วย ทุกบรรทัดมีภาพของตัวเอง (ฉากตัดภาพเต็มจอบนจอใหญ่ไม่มีช่วงว่าง)"
+  },
+  {
    "id": "room_types",
    "template": "stack",
    "questions_th": [
@@ -13535,6 +13670,86 @@
     970,
     2780,
     2920
+   ],
+   "alpha": false
+  },
+  "n_env_air_quality": {
+   "file": "n_env_air_quality.webp",
+   "sha256": "a8d37d23c37f9260e27ba4dd76fd5d03b22b9e1b8592bb0d8e8c63dbc7d4f970",
+   "bytes": 334910,
+   "w": 1672,
+   "h": 941,
+   "format": "webp",
+   "source": "owner_tech_1125/air_quality.png",
+   "crop": [
+    0,
+    0,
+    1672,
+    941
+   ],
+   "alpha": false
+  },
+  "n_env_irrigation": {
+   "file": "n_env_irrigation.webp",
+   "sha256": "68f0053401d268b5fbce5228499d4dc5c4a694767c319669e137ea95d629978e",
+   "bytes": 280378,
+   "w": 1672,
+   "h": 941,
+   "format": "webp",
+   "source": "owner_tech_1125/garden_mist.png",
+   "crop": [
+    0,
+    0,
+    1672,
+    941
+   ],
+   "alpha": false
+  },
+  "n_env_pool_sensor": {
+   "file": "n_env_pool_sensor.webp",
+   "sha256": "c775dd78b42fd07271fefb27af096914974755ba4b27ed055cbc54eaff3d6bbb",
+   "bytes": 325320,
+   "w": 1672,
+   "h": 941,
+   "format": "webp",
+   "source": "owner_tech_1125/pool_sensor.png",
+   "crop": [
+    0,
+    0,
+    1672,
+    941
+   ],
+   "alpha": false
+  },
+  "n_env_weather_court": {
+   "file": "n_env_weather_court.webp",
+   "sha256": "e5f01402ee5a7735cc008101aaeaefeaae05cb0ff13242674e0a60f1ebd655c9",
+   "bytes": 354966,
+   "w": 1672,
+   "h": 941,
+   "format": "webp",
+   "source": "owner_tech_1125/pool_courtyard.png",
+   "crop": [
+    0,
+    0,
+    1672,
+    941
+   ],
+   "alpha": false
+  },
+  "n_env_zones": {
+   "file": "n_env_zones.webp",
+   "sha256": "9517772539600816a460453078af10144829b389e5cb7fe75668ed4bbc6d9a35",
+   "bytes": 237246,
+   "w": 1672,
+   "h": 941,
+   "format": "webp",
+   "source": "owner_tech_1125/tulip_soil.png",
+   "crop": [
+    0,
+    0,
+    1672,
+    941
    ],
    "alpha": false
   },

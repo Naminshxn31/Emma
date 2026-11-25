@@ -806,6 +806,21 @@
       "approved_voice_sha256": null
     },
     {
+      "id": "x_smart_environment",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "smart_environment",
+      "host_th": null,
+      "th": "โครงการของเราดูแลสภาพแวดล้อมด้วยระบบอัจฉริยะ เช่น ระบบตรวจสภาพอากาศและรังสียูวีที่บอกสภาพอากาศภายนอกค่ะ แดชบอร์ดคุณภาพน้ำติดตามน้ำในสระ เช่น อุณหภูมิและค่า pH แดชบอร์ดคุณภาพอากาศและเซ็นเซอร์ CO₂ ติดตามอากาศรอบอาคาร ระบบรดน้ำอัจฉริยะดูแลต้นไม้ทั่วโครงการ โดยจัดการตามแต่ละโซนของสวนและตามสภาพอากาศ ให้สวนเขียวสวยตลอดปีค่ะ",
+      "en": "Our project looks after its environment with smart systems, like a Weather and UV System for the conditions outside. A Water Quality Dashboard keeps watch on the pool water, such as its temperature and pH. An Air Quality Dashboard and CO₂ sensors watch the air around the buildings. A Smart Irrigation System looks after the planting, managed zone by zone and with the weather, so the gardens stay green all year.",
+      "numbers": [],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: smart_environment) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
       "id": "x_social_lounge_where",
       "scene": null,
       "scene_th": "คุณมิกิถามเรื่องนอกบท",

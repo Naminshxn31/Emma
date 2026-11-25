@@ -805,6 +805,67 @@ def for_cue(cue_id: object, *, lang: str = "en", drafts: bool = False) -> dict |
         return None
 
 
+#: The one film a line outside the script may borrow (card 2's opener, owner 25 Nov): the act and scene whose
+#: greeting heading `opener_slide` knows how to retitle.
+OPENER_FILM = ("emma_console", "intro")
+
+
+def opener_slide(base_id: object, en: object, th: object, *, lang: str = "en", drafts: bool = False) -> dict | None:
+    """Card 2's opener on the hall screen (owner 25 Nov, "อย่าลืมโมชั่นด้วยนะ"): the film of the line it stands in for
+    (`instead_of`, s02_l03 -- the opener is that line with its greeting swapped for "Allow me to introduce myself once
+    again"), retitled. Built from the SIGNED slide, never a file of its own: the greeting heading (`hello`) says the
+    opener's first sentence, the second greeting ("Hello, everyone": `every`) is gone and the beat that showed it goes
+    when her name comes. Nothing else changes -- the same pictures, the same beats at the same words. Then the whole
+    slide is checked against the opener's own words, as every slide is against its cue (`problems`): a word on the
+    screen she does not say = None. None too when the base slide is not served itself (unsigned file, a broken rule)
+    or is not the console's intro. Never raises: a slide must not be able to stop a line."""
+    try:
+        import copy
+
+        doc = _doc()
+        if doc is None or not isinstance(base_id, str) or not isinstance(en, str) or not isinstance(th, str):
+            return None
+        base = doc["slides"].get(base_id)
+        if not isinstance(base, dict) or base.get("template") != ACT or (
+                base.get("act"), (base.get("options") or {}).get("mode")) != OPENER_FILM:
+            return None
+        if not drafts and not approved(doc):
+            _tell("the slides file is %s -- no slide for card 2's opener", "changed since its approval"
+                  if doc.get("approved_by") else "a draft")
+            return None
+        if problems(base, event_script.cue(base_id)):
+            return None                           # (for_cue says why, the line itself has no slide either)
+        line = norm(en)
+        first = re.split(r"(?<=[.!?])\s+", line, maxsplit=1)[0].rstrip(".!?")
+        slide = copy.deepcopy(base)
+        texts = slide.get("texts") or {}
+        if "hello" not in texts or not first or first == line:
+            return None
+        texts["hello"] = first
+        texts.pop("every", None)
+        beats = slide.get("beats") or []
+        for k, beat in enumerate(beats):
+            if isinstance(beat, dict) and beat.get("key") == "every":
+                nxt = beats[k + 1] if k + 1 < len(beats) and isinstance(beats[k + 1], dict) else {}
+                if not nxt.get("at_en"):
+                    return None
+                beats[k] = {"at_en": nxt["at_en"], "do": beat.get("do")}
+        cue = {"id": "card2_open", "en": line, "th": norm(th)}
+        bad = problems(slide, cue)
+        if bad:
+            _tell("card 2's opener has no slide: %s", ", ".join(bad))
+            return None
+        if _used_assets(slide, set()):
+            from app.config import settings
+
+            if not settings.stories_enabled:
+                return None
+        return page_payload(slide, cue, lang)
+    except Exception:
+        logger.exception("ceremony slides: card 2's opener from %r", base_id)
+        return None
+
+
 def status(doc: dict | None = None) -> list[dict]:
     """Every slide of the file with what is wrong with it, for the approval script."""
     doc = doc if doc is not None else load()

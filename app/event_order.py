@@ -1754,10 +1754,16 @@ async def _card_two_opener() -> dict:
     """Her first words of card 2 to Khun Miki (owner 25 Nov: "อาจจะเป็นคนพูดเปิดกับมิกิเลย"): the event file's top-level
     `card2_open` = {file under data/events/clips/, sha256 of the take the owner picked by ear, text, lang} -- the scenes'
     `recorded` rules and road (event_host.recorded_pcm, event_cues.play_line: her reply first, the lock, the red stop).
-    None in the file = nothing said: card 2 just listens. Never raises."""
+    None in the file = nothing said: card 2 just listens. Never raises.
+
+    Owner 25 Nov ~11:00 ("ตอนไปจุดการ์ดสองที่จะเริ่มพูด เราอาจจะต้องเป็นคนเปิด ... ขอแนะนำตัวอีกครั้ง ... แล้วก็ตามบทต่อเลย
+    ไม่ต้องทักมิกิ เพราะว่าตอนการ์ดแรกมีไปจับมือทักทายแล้ว"): optional `sub_th` (the hall screen's Thai line under it),
+    `then` (the cue pressed once the opener is over, card 2's own press) and `instead_of` (the cue the opener stands for:
+    skipped, never played -- its "Hello, Khun Miki" was said with the handshake). Without `then` nothing follows."""
     try:
         from app import event_cues, event_host
 
+        stops = _stop_gen()
         path = event_host._path()
         raw = event_host._read_json(path) if path is not None else None
         if not isinstance(raw, dict) or raw.get("card2_open") is None:
@@ -1765,19 +1771,87 @@ async def _card_two_opener() -> dict:
         rec = event_host._recorded_entry({"id": "card2_open", "recorded": raw["card2_open"]})
         if rec is None:
             return {"ok": False, "error": "format"}
+        extra = raw["card2_open"] if isinstance(raw["card2_open"], dict) else {}
+        sub = extra.get("sub_th") if isinstance(extra.get("sub_th"), str) and extra["sub_th"].strip() else None
+        then = extra.get("then") if isinstance(extra.get("then"), str) else None
+        instead = extra.get("instead_of") if isinstance(extra.get("instead_of"), str) else None
+        scene_th = ((event_script.cue(then) or {}).get("scene_th") if then else None) or None
         import asyncio
 
         pcm, why = await asyncio.to_thread(event_host.recorded_pcm, {"recorded": rec})
         if pcm is None:
             turnlog.record("event_order", do="card2_open", ok=False, error=why, via="after_opening")
             return {"ok": False, "error": why or "missing"}
-        result = await event_cues.play_line("card2_open", rec["text"], pcm, lang=rec["lang"])
+        # its film (owner 25 Nov, "อย่าลืมโมชั่นด้วยนะ"): the signed film of the line it stands in for, retitled with its
+        # own first sentence (ceremony_slides.opener_slide) -- only with the Thai line under it, as every slide
+        slide = None
+        if instead and sub:
+            from app import ceremony_slides
+
+            slide = ceremony_slides.opener_slide(instead, rec["text"], sub, lang=rec["lang"])
+        result = await event_cues.play_line("card2_open", rec["text"], pcm, lang=rec["lang"], sub_th=sub,
+                                            scene_th=scene_th, slide=slide)
         turnlog.record("event_order", do="card2_open", ok=bool(result.get("ok")), error=result.get("error"),
                        via="after_opening")
+        if result.get("ok") and then:
+            task = asyncio.get_running_loop().create_task(
+                _after_opener(then, instead, stops, len(pcm) / 2 / event_host.RECORDED_RATE))
+            _CHAIN_TASKS.add(task)
+            task.add_done_callback(_CHAIN_TASKS.discard)
         return {"ok": bool(result.get("ok")), "error": result.get("error")}
     except Exception:                                    # noqa: BLE001 -- card 2 listens all the same
         logger.exception("event order: card 2's first words")
         return {"ok": False, "error": "error"}
+
+
+#: After card 2's opener: the line after it waits for her voice to be over (and the host's), at most this long past the
+#: clip's own length, then this beat -- one breath between the two lines, as between a chain's set-up and punchline.
+OPENER_THEN_SLACK_S = 12.0
+OPENER_THEN_PAUSE_S = 0.6
+
+
+async def _after_opener(then: str, instead: str | None, stops: tuple, seconds: float) -> None:
+    """Card 2's opener is over: its `then` cue, pressed the way card 2 presses a line (ceremony_follow._play: the window
+    closes, every gate of the order's press), with `instead_of` skipped. Nothing after a red stop, with card 2 paused or
+    off, or when `then` was already taken (asked meanwhile). Never raises."""
+    import asyncio
+
+    try:
+        from app import ceremony_follow, event_cues
+
+        deadline = time.monotonic() + seconds + OPENER_THEN_SLACK_S
+        await asyncio.sleep(0.5)
+        while event_cues.line_audible() or ceremony_follow._host_talking():
+            if time.monotonic() > deadline or _stop_gen() != stops:
+                break
+            await asyncio.sleep(0.25)
+        await asyncio.sleep(OPENER_THEN_PAUSE_S)
+        why = None
+        if _stop_gen() != stops:
+            why = "stopped"
+        elif not ceremony_follow.STATE.get("on") or ceremony_follow.STATE.get("paused"):
+            why = "follow_off"
+        elif event_cues.line_audible():
+            why = "still_speaking"
+        scenes = _scenes() or []
+        at = {st.get("cue"): (sc["n"], st["i"]) for sc in scenes for st in sc["steps"] if st.get("do") == "cue"}
+        if why is None and then not in at:
+            why = "no_step"
+        if why is None and (STATE["marks"].get(_key(*at[then])) or {}).get("state") in ("done", "running"):
+            why = "taken"
+        if why is not None:
+            turnlog.record("event_order", do="card2_open_then", ok=False, error=why, cue=then)
+            return
+        skipped = []
+        if instead in at and (STATE["marks"].get(_key(*at[instead])) or {}).get("state") not in ("done", "running"):
+            skipped = [{"n": at[instead][0], "i": at[instead][1]}]
+        cand = {"n": at[then][0], "i": at[then][1], "cue": then}
+        result = await ceremony_follow._play(cand, None, "card2_open", skipped=skipped)
+        ok = bool(isinstance(result, dict) and result.get("ok"))
+        turnlog.record("event_order", do="card2_open_then", ok=ok, cue=then,
+                       error=None if ok else (result or {}).get("error"))
+    except Exception:                                    # noqa: BLE001 -- staff / his question still play it
+        logger.exception("event order: the line after card 2's opener")
 
 
 async def opening_hand(n, i, k) -> dict:
