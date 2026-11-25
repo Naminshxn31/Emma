@@ -334,6 +334,21 @@ _PROMO_SELECT = ("unit_id,active,thai_price,foreign_price,note,updated_at,"
                  + _SCOPE_EMBED + ",unit_types(name))")
 
 
+#: The sales system's "POOL ACCESS" (a view and an option, 28 G-floor rooms): its approved meaning,
+#: wherever the label reaches her. Robot 6 Nov 09:11: two minutes after the room-type table (with its
+#: per-type views and options) she offered "ห้องที่เชื่อมต่อกับสระว่ายน้ำ", which the report forbids
+#: ("ห้ามบอกว่าลงสระได้โดยตรงจากห้อง", 01_overview.md / 06_masterplan.md / 14_units.md; the FAQ's
+#: wording, 19_faq.md: ทางลงสระ "ยังไม่ยืนยัน", the sales team confirms per room).
+_POOL_ACCESS = re.compile(r"pool\s*access", re.IGNORECASE)
+POOL_ACCESS_NOTE = (" ป้าย POOL ACCESS ในระบบขาย = ห้องชั้น G ฝั่งสระ รูปแบบทางลงสระยังไม่ยืนยัน "
+                    "ห้ามบอกว่าลงสระได้จากห้องหรือห้องเชื่อมกับสระ ทีมขายยืนยันรายห้อง")
+
+
+def _pool_access_note(*texts) -> str:
+    """POOL_ACCESS_NOTE when any of `texts` carries the label, else ""."""
+    return POOL_ACCESS_NOTE if any(_POOL_ACCESS.search(str(x or "")) for x in texts) else ""
+
+
 def _card_from_live(row: dict) -> dict:
     """DB row -> the card the screen already renders.
 
@@ -531,6 +546,7 @@ def show_unit_live(room: str) -> dict:
                 % (card.get("status_th") or card.get("status")))
     if promo:
         note += " ห้องนี้มีโปรโมชั่นในระบบ รายละเอียดและตัวเลขให้ฝ่ายขายยืนยัน"
+    note += _pool_access_note(card.get("aspect"), card.get("collection"))
     _attach_unit_plan(card)
     return {"ok": True, "screen": "unit", "unit": card, "sample": False,
             "policy_trace": prepared.trace(), "instruction": note}
@@ -1193,7 +1209,8 @@ def compare_unit_types(building: str | None = None) -> dict:
                             "ห้ามสรุปว่าแบบใดเหมาะลงทุนหรืออยู่เองโดยไม่มีข้อมูลจากลูกค้า "
                             "ห้ามแต่งขนาดหรือวิว ตอบความแตกต่างแล้วจบทันที ห้ามถามคำถามต่อท้าย "
                             + ("" if settings.units_show_price else
-                               "ไม่พูดตัวเลขราคา ถ้าลูกค้าบอกงบให้ใช้ find_units แทน"))}
+                               "ไม่พูดตัวเลขราคา ถ้าลูกค้าบอกงบให้ใช้ find_units แทน")
+                            + _pool_access_note(*(v for t in types for v in t["views"] + t["options"])))}
 
 
 #: The tool's enum -> the sales DB's unit type (names read from the live
@@ -1307,7 +1324,33 @@ def show_room_type(type: str) -> dict:  # noqa: A002 -- the model-facing name
                             "ห้ามพูดจำนวนห้องที่เหลือ "
                             "ห้ามบรรยายสิ่งที่อยู่ในผังหรือรูปเพราะคุณมองไม่เห็น (เช่น ตำแหน่งเฟอร์นิเจอร์ ทิศ วิว) "
                             "ห้ามสรุปว่าเหมาะลงทุนหรืออยู่เอง ห้ามพูดราคา "
-                            "ถ้าลูกค้าอยากเห็นห้องอื่นของแบบนี้ ให้ทีมขายเปิดผังขายให้ดู")}
+                            "ถ้าลูกค้าอยากเห็นห้องอื่นของแบบนี้ ให้ทีมขายเปิดผังขายให้ดู")
+                            + _pool_access_note(card.get("aspect"), card.get("collection"))
+                            + _view_story_clause()}
+
+
+#: The view, asked over the example room on the robot face (robot 6 Nov
+#: 09:06: "มีรูปวิวไหม" right after the 1-bedroom card -- no tool at all, and
+#: the sales team "ยืนยันเรื่องภาพวิว"; the ban above, "ห้ามบรรยาย ... วิว", is
+#: the only thing this result said about views). The ban is about the plan
+#: she cannot see; the approved view pictures are the views_collections story,
+#: whose last line hands the room-by-room check to the sales team itself.
+#: Only where that story is offered (robot face, condo, STORIES_ENABLED,
+#: approved): every other session's result is the room's, byte for byte.
+VIEW_STORY_CLAUSE = (" ถ้าลูกค้าถามเรื่องวิวหรือขอดูรูปวิว ให้เรียก present_story(topic=\"views_collections\") "
+                     "ก่อนตอบ ห้ามส่งต่อทีมขายโดยไม่เรียก")
+
+
+def _view_story_clause() -> str:
+    try:
+        from app import stories
+        from app.prompts import _stories_told
+
+        if _stories_told() and "views_collections" in stories.available():
+            return VIEW_STORY_CLAUSE
+    except Exception:
+        logger.exception("view story clause: stories unreadable -- left out")
+    return ""
 
 
 @tool(
@@ -1404,9 +1447,9 @@ def _no_web_map() -> str:
     project" is the map; elsewhere, words."""
     try:
         from app import stories
-        from app.prompts import _tool_visible
+        from app.prompts import _stories_told
 
-        if _tool_visible("present_story"):
+        if _stories_told():
             offered = stories.available()
             topic = (stories.story_for_query("Where is the project?", offered)
                      or stories.story_for_query("โครงการอยู่ที่ไหน", offered))

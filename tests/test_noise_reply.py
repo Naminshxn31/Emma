@@ -184,7 +184,7 @@ def test_the_robot_plays_nothing_for_a_quiet_unclear_sound(monkeypatch):
         _message(turn_complete=True)])
     assert "audio" not in kinds and "assistant_transcript" not in kinds
     assert "turn_complete" in kinds, "the turn still ends: the watchdog and the page see it"
-    assert ("noise_reply_dropped", {"rms": 0.03, "letters": 2}) in rows
+    assert ("noise_reply_dropped", {"rms": 0.03, "letters": 2, "why": "noise"}) in rows
 
 
 def test_an_answer_to_words_plays_as_before(monkeypatch):
@@ -235,3 +235,61 @@ def test_the_vad_gate_keeps_the_opening_rms():
     feed = inspect.getsource(VadGate.feed)
     opened = feed[feed.index("self.segments += 1"):]
     assert "self.open_rms = rms" in opened[:opened.index('actions.append(("start"')]
+
+
+# ---- WALK_QUIET (owner 4 Nov: "พูดเองด้วย") ----------------------------------------
+
+def test_a_test_walk_keeps_every_reply_off_the_speaker_and_the_screen():
+    """The floor-2 survey: she answered the office's own talk two dozen times
+    ("ขออภัยค่ะ ดิฉันดูแลเฉพาะโครงการ..."). While the base walks on a walk no
+    guest is on, nothing she says plays -- a loud clear question included --
+    and the row says why. Off the walk, the gate is what it was."""
+    walking = {"on": True}
+    for near in (0.06, 0.0):                         # the robot's gate, and one with the noise rule off
+        g = NoiseReplyGate(near, quiet=lambda: walking["on"])
+        g.segment(0.2)
+        g.heard("ที่จอดรถมีกี่คัน")
+        assert g.push(_t("ขออภัยค่ะ ดิฉันดูแลเฉพาะโครงการ")) == [] and g.push(_a()) == []
+        owed, dropped = g.close()
+        assert owed == [] and dropped["why"] == "walking", near
+    walking["on"] = False
+    g = NoiseReplyGate(0.06, quiet=lambda: walking["on"])
+    g.segment(0.2)
+    g.heard("ที่จอดรถมีกี่คัน")
+    first = _t("มีค่ะ")
+    assert g.push(first) == [first]
+    assert g.close() == ([], None)
+
+
+def test_a_quiet_probe_that_fails_is_not_quiet():
+    def broken():
+        raise RuntimeError("no link")
+
+    g = NoiseReplyGate(0.06, quiet=broken)
+    g.segment(0.2)
+    g.heard("สวัสดี")
+    first = _t("สวัสดีค่ะ")
+    assert g.push(first) == [first]
+
+
+def test_the_walk_quiet_question_is_every_walk_but_the_event_hosts(monkeypatch):
+    from app import event_walk, robot_face_link as link, walk_frames
+
+    monkeypatch.setattr(event_walk, "walking", lambda: False)
+    monkeypatch.setattr(walk_frames, "base_moving", lambda: False)
+    monkeypatch.setattr(link, "nav_activity", lambda session=None: "idle")
+    assert link.walk_quiet() is False
+    monkeypatch.setattr(link, "nav_activity", lambda session=None: "active")     # a route run from the PC
+    assert link.walk_quiet() is True
+    monkeypatch.setattr(link, "nav_activity", lambda session=None: "idle")
+    monkeypatch.setattr(walk_frames, "base_moving", lambda: True)               # board_walk over adb, a joystick
+    assert link.walk_quiet() is True
+    monkeypatch.setattr(event_walk, "walking", lambda: True)                    # guests walk with her
+    assert link.walk_quiet() is False
+    from app.providers import gemini
+
+    monkeypatch.setattr(event_walk, "walking", lambda: False)                   # a test walk again
+    monkeypatch.setattr(settings, "walk_quiet", False)
+    assert gemini._walk_quiet() is False, "off unless robot.env says"
+    monkeypatch.setattr(settings, "walk_quiet", True)
+    assert gemini._walk_quiet() is True

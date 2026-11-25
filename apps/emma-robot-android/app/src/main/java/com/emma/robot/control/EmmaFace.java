@@ -89,6 +89,8 @@ final class EmmaFace {
         String bodySpeech(String id);
         /** The head toward a person: percent of the app's head span (HeadLook). */
         String bodyLook(int pan, int tilt);
+        /** The Emma Event debut's pageant (Pageant.java): start, or bring the hand down. */
+        String bodyPageant(boolean start);
         String navPlaces();
         String navStatus();
         String navGo(String placeId, String origin);
@@ -119,6 +121,10 @@ final class EmmaFace {
         String micHold(String kind);
         /** ARRAY_MIC: the page's call mic is stopped, or a page just loaded. */
         String micFree();
+        /** The end of the ceremony (owner 9 Nov 2026): open another of the three apps --
+         *  `app` is one of this class's literals ("event"), never page text. Honoured by
+         *  the ceremony app alone; every other build answers not_ceremony_app. */
+        String openApp(String app);
         /** The page died with its renderer (review #14): whatever it asked to
          *  move has nobody answering for it now. */
         void pageLost();
@@ -360,8 +366,24 @@ final class EmmaFace {
         return EVENT_PACKAGE.equals(context.getPackageName());
     }
 
+    /** "Emma Ceremony" (owner 9 Nov 2026: "อันนี้ทำแยกกับอันเดิมนะ ไม่งั้นจะปนกัน อันนี้จะเป็น
+     *  สำหรับพิธี"; build.gradle -PemmaApp=ceremony): the opening ceremony's own app, told
+     *  apart the same way. */
+    static boolean isCeremonyApp(Context context) {
+        return CEREMONY_PACKAGE.equals(context.getPackageName());
+    }
+
+    /** The builds that play the pageant (BodyController.requestPageant): Emma Event, and Emma Ceremony
+     *  since 23 Nov (owner: "ช่วงพิธีอยู่แอปพิธีทั้งหมด" -- card 1's debut is the ceremony's first step,
+     *  waved in the ceremony app, no app switch on stage). Only these two: the sales app answers
+     *  not_event_app as before. */
+    static boolean playsPageant(Context context) {
+        return isEventApp(context) || isCeremonyApp(context);
+    }
+
     static final String EVENT_PACKAGE = "com.emma.robot.event";
     static final String ROBOT_PACKAGE = "com.emma.robot.control";
+    static final String CEREMONY_PACKAGE = "com.emma.robot.ceremony";
 
     private FrameLayout buildUi() {
         FrameLayout container = new FrameLayout(activity);
@@ -496,7 +518,11 @@ final class EmmaFace {
         // EmmaArrayMic/1 (ARRAY_MIC, 2 Nov 2026): this APK can hold the mic
         // array alone and answers emma-face:mic / emma-face:mic:release -- a
         // page goes without its own mic only for an app that says so.
-        settings.setUserAgentString(settings.getUserAgentString() + " EmmaRobot/0.1 EmmaBridge/1 EmmaArrayMic/1");
+        // EmmaOpenApp/1 (owner 9 Nov 2026, the ceremony app): this APK answers
+        // emma-face:open:event -- the ceremony app opens Emma Event at the ceremony's
+        // end, every other build refuses it (not_ceremony_app). Same lesson: a page
+        // asks it only of an app that says so. One literal for all three builds.
+        settings.setUserAgentString(settings.getUserAgentString() + " EmmaRobot/0.1 EmmaBridge/1 EmmaArrayMic/1 EmmaOpenApp/1");
         WebView.setWebContentsDebuggingEnabled(debugBuild());
 
         webView.setWebViewClient(new WebViewClient() {
@@ -699,6 +725,14 @@ final class EmmaFace {
                 return bridge.micHold("deaf");
             case "emma-face:mic:free":
                 return bridge.micFree();
+            case "emma-face:open:event":
+                return bridge.openApp("event");
+            // the debut's pageant (owner 9 Nov): two fixed messages; BodyController refuses them
+            // in every app but Emma Event and Emma Ceremony (not_event_app; 23 Nov: the ceremony's own)
+            case "emma-body:pageant:event":
+                return bridge.bodyPageant(true);
+            case "emma-body:pageant_end:event":
+                return bridge.bodyPageant(false);
             default:
                 break;
         }
@@ -1041,6 +1075,9 @@ final class EmmaFace {
         // "Emma Event" (owner 30 Oct, build.gradle -PemmaApp=event): the same
         // face, every call the event host (app/event_host.py on the server).
         if (isEventApp(activity)) page.appendQueryParameter("event", "1");
+        // "Emma Ceremony" (owner 9 Nov): every call it dials is the ceremony (profile
+        // ceremony on the server) -- opening this app is the ceremony's mode.
+        if (isCeremonyApp(activity)) page.appendQueryParameter("ceremony", "1");
         if (token != null && !token.isEmpty()) page.appendQueryParameter("token", token);
         progress.setVisibility(View.VISIBLE);
         errorText.setVisibility(View.GONE);

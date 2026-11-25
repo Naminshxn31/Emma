@@ -1,0 +1,42 @@
+{
+ "template": "act",
+ "act": "location_site",
+ "texts": {
+  "name": "Embassy World",
+  "name2": "Embassy World",
+  "road_tag": "Jomtien Second Road area",
+  "beach_tag": "Jomtien Beach",
+  "t_attr": "Attractions",
+  "t_shop": "Shopping",
+  "t_hosp": "Hospitals",
+  "t_school": "Schools",
+  "small": "Getting around is easy · everyday life in",
+  "city": "Pattaya"
+ },
+ "figures": {
+  "dist": {"lead": "about", "value": "600", "unit": "metres", "label": "from Jomtien Beach in a straight line"}
+ },
+ "pictures": {
+  "m_hosp": {"asset": "map_nearby_hospitals"},
+  "m_places": {"asset": "map_nearby_places"},
+  "m_rest": {"asset": "map_nearby_restaurants"},
+  "m_near": {"asset": "map_nearby_7eleven"},
+  "park": {"asset": "liv_park"}
+ },
+ "beats": [
+  {"at_en": "Embassy World is in", "do": "intro", "key": ["name"]},
+  {"at_en": "the Jomtien Second Road area", "do": "road", "key": ["road_tag"]},
+  {"at_en": "about 600 metres", "do": "swing", "key": ["dist"]},
+  {"at_en": "from Jomtien Beach", "do": "beach", "key": ["beach_tag"]},
+  {"at_en": "in a straight line", "do": "lights"},
+  {"at_en": "Around the project", "do": "around", "key": ["name2"]},
+  {"at_en": "attractions", "do": "attr", "key": ["t_attr", "park"]},
+  {"at_en": "shopping", "do": "shop", "key": ["t_shop"]},
+  {"at_en": "hospitals", "do": "hosp", "key": ["t_hosp"]},
+  {"at_en": "schools", "do": "school", "key": ["t_school"]},
+  {"at_en": "getting around", "do": "getting"},
+  {"at_en": "everyday life", "do": "small", "key": ["small"]},
+  {"at_en": "Pattaya", "do": "city", "key": ["city"]}
+ ],
+ "options": {"mode": "map"}
+}

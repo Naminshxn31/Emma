@@ -1,0 +1,30 @@
+/* The worked example's own styles (docs/emma-ceremony-slides.md, section 0). Every selector
+   starts with .cs-act-example_panel; sizes in --cu; only transform and opacity move. */
+
+/* the picture's panel: out of the depth and turned away until the slide is live */
+.cs-act-example_panel .frame {
+  position: absolute;
+  left: calc(var(--x) * var(--cu)); top: calc(var(--y) * var(--cu));
+  width: calc(var(--w) * var(--cu)); height: calc(var(--w) * .64 * var(--cu));
+  opacity: 0;
+  transform: perspective(calc(120 * var(--cu))) translate3d(calc(8 * var(--cu)), 0, calc(-30 * var(--cu))) rotateY(-26deg);
+  transition: opacity .7s ease, transform 1.3s cubic-bezier(.16, .84, .24, 1);
+}
+.cs-act-example_panel.cs-live .frame {
+  opacity: 1;
+  transform: perspective(calc(120 * var(--cu))) rotateY(calc(var(--tilt) * 1deg));
+}
+
+/* the words: a column on the left, above the subtitle band */
+.cs-act-example_panel .words {
+  position: absolute; left: calc(5 * var(--cu)); top: calc(8 * var(--cu)); width: calc(38 * var(--cu));
+  display: flex; flex-direction: column; align-items: flex-start; gap: calc(1.6 * var(--cu));
+}
+
+/* the figure: the core hides it until its beat; then it rises into place */
+.cs-act-example_panel .cs-fig {
+  margin-top: calc(1.2 * var(--cu)); font-size: calc(8.6 * var(--cu));
+  opacity: 0; transform: translate3d(0, calc(2.4 * var(--cu)), 0);
+  transition: opacity .6s ease, transform .9s cubic-bezier(.16, .84, .24, 1);
+}
+.cs-act-example_panel .cs-fig.in { opacity: 1; transform: none; }

@@ -103,7 +103,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_g_spinning",
+    "asset": "n_fac_g_spinning",
     "title_en": "SPINNING CLASS",
     "sub_en": "Cycling studio · Ground floor",
     "chips_en": [
@@ -250,7 +250,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_g_pilates",
+    "asset": "n_fac_g_pilates",
     "title_en": "PILATES STUDIO",
     "sub_en": "Reformer studio · Ground floor",
     "chips_en": [
@@ -580,7 +580,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_b_aqua_cinema",
+    "asset": "n_fac_b_aqua_cinema",
     "title_en": "AQUA CINEMA",
     "sub_en": "Indoor pool · Basement · Building A",
     "chips_en": [
@@ -595,7 +595,12 @@
      "Flows into Journey to Mars"
     ],
     "line": 1
-   }
+   },
+   "shots": [
+    {
+     "asset": "n_aqua1"
+    }
+   ]
   },
   "taps": [
    {
@@ -729,7 +734,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_b_journey_mars",
+    "asset": "n_fac_b_journey_mars",
     "title_en": "JOURNEY TO MARS",
     "sub_en": "Space-themed waterway · Basement",
     "chips_en": [
@@ -744,7 +749,12 @@
      "Linked to the Aqua Cinema pool"
     ],
     "line": 1
-   }
+   },
+   "shots": [
+    {
+     "asset": "n_mars2"
+    }
+   ]
   },
   "taps": [
    {
@@ -843,7 +853,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_b_salt_sauna",
+    "asset": "n_fac_b_salt_sauna",
     "title_en": "HIMALAYAN SALT SAUNA",
     "sub_en": "Basement · Building A",
     "chips_en": [
@@ -976,7 +986,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_b_ice_bath",
+    "asset": "n_fac_b_ice_bath",
     "title_en": "ICE BATH",
     "sub_en": "Basement · Building A",
     "chips_en": [
@@ -1118,7 +1128,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_b_swing_sauna",
+    "asset": "n_fac_b_swing_sauna",
     "title_en": "FLOATING SWING SAUNA",
     "sub_en": "Basement · Building A",
     "chips_en": [
@@ -1256,7 +1266,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_b_crystal_sauna",
+    "asset": "n_fac_b_crystal_sauna",
     "title_en": "CRYSTAL STONE SAUNA",
     "sub_en": "Basement · Building A",
     "chips_en": [
@@ -1400,7 +1410,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_b_hydro_capsule",
+    "asset": "n_fac_b_hydro_capsule",
     "title_en": "HYDROTHERAPY CAPSULE",
     "sub_en": "Basement · Building A",
     "chips_en": [
@@ -1539,7 +1549,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_3_social",
+    "asset": "n_fac_3_social",
     "title_en": "SOCIAL LOUNGE",
     "sub_en": "Level 3 · Building A",
     "chips_en": [
@@ -1682,7 +1692,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_3_coworking",
+    "asset": "n_fac_3_coworking",
     "title_en": "CO-WORKING LOUNGE",
     "sub_en": "Level 3 · Building A",
     "chips_en": [
@@ -1821,7 +1831,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_3_common_sphere",
+    "asset": "n_fac_3_common_sphere",
     "title_en": "COMMON SPHERE",
     "sub_en": "Level 3 · Building A",
     "chips_en": [
@@ -1965,7 +1975,7 @@
    "items": [
     {
      "label_en": "Himalayan Salt Sauna",
-     "asset": "fac_b_salt_sauna",
+     "asset": "n_fac_b_salt_sauna",
      "at": [
       22.2,
       49.8
@@ -1976,7 +1986,7 @@
     },
     {
      "label_en": "Floating Swing Sauna",
-     "asset": "fac_b_swing_sauna",
+     "asset": "n_fac_b_swing_sauna",
      "at": [
       42.4,
       43.4
@@ -1987,7 +1997,7 @@
     },
     {
      "label_en": "Crystal Stone Sauna",
-     "asset": "fac_b_crystal_sauna",
+     "asset": "n_fac_b_crystal_sauna",
      "at": [
       53.5,
       43.2
@@ -1998,7 +2008,7 @@
     },
     {
      "label_en": "Ice Bath",
-     "asset": "fac_b_ice_bath",
+     "asset": "n_fac_b_ice_bath",
      "at": [
       31.6,
       43.2

@@ -1,0 +1,26 @@
+/* sequence: the names of a run of places (sequence.js) */
+.sq-cap { position: absolute; z-index: 60; left: 5%; right: 5%; display: flex; align-items: flex-end; justify-content: space-between; gap: calc(4 * var(--es-vw)); pointer-events: none; opacity: 0; transition: opacity .3s cubic-bezier(.3, 0, 1, 1), transform .4s cubic-bezier(.3, 0, 1, 1); }
+.sq-cap.on { opacity: 1; }
+.sq-cap.out { opacity: 0; transform: translate3d(0, calc(-1.6 * var(--es-vw)), 0); }
+.sq-tx { min-width: 0; }
+.sq-name { font-size: calc(6.6 * var(--es-vw)); font-weight: 600; line-height: 1.05; letter-spacing: .01em; }
+.sq-sub { margin-top: calc(.9 * var(--es-vw)); font-size: calc(3.5 * var(--es-vw)); font-weight: 400; color: #cfdcff; }
+.sq-val { flex: none; text-align: right; font-size: calc(9.4 * var(--es-vw)); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; color: #fff; }
+.sq-val .sq-v { font-style: normal; }
+.sq-val .sq-v small { font-size: calc(4.2 * var(--es-vw)); font-weight: 500; color: #cfdcff; }
+/* a drawing, whole, on its own sheet */
+.sq-sheet { overflow: hidden; border-radius: calc(1.5 * var(--es-vw)); }
+.sq-sheet.sq-white { background: #fff; }
+.es-root .sq-sheet img { object-fit: contain; }
+.es-root .sq-white img { padding: calc(1 * var(--es-vw)); box-sizing: border-box; }
+.sw-cam.sq-sheet { transform: none; transition: none; }
+/* the pair */
+.sq-two { position: absolute; z-index: 61; left: 3.4%; right: 3.4%; display: flex; gap: calc(3 * var(--es-vw)); opacity: 0; transform: translate3d(0, calc(2 * var(--es-vw)), 0); transition: opacity .5s ease, transform .8s cubic-bezier(.05, .7, .1, 1); }
+.sq-two.on { opacity: 1; transform: none; }
+.sq-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: calc(1.4 * var(--es-vw)); }
+.sq-pic { position: relative; flex: 1 1 0; min-height: 0; }
+.es-root .sq-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.sq-lab { flex: none; display: flex; align-items: flex-end; justify-content: flex-start; gap: calc(3 * var(--es-vw)); }
+.sq-name2 { font-size: calc(5.4 * var(--es-vw)); font-weight: 600; line-height: 1.05; }
+.sq-lab .sq-val { font-size: calc(6.4 * var(--es-vw)); }
+.sq-lab .sq-val .sq-v small { font-size: calc(3.4 * var(--es-vw)); }

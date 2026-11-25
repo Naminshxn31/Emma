@@ -1,0 +1,642 @@
+{
+ "format": "emma-ceremony-slides-v1",
+ "about": "สไลด์โมชั่นบนจออีเวนต์ 16:9 ของบทพิธีเปิด (เจ้าของ 17 พ.ย. 2026: 'ทำตัวพรีเซ้นต์โมชั่น ... ลิ้งระหว่างสไลด์กับเสียงหุ่น ... มีซับภาษาไทยด้านล่าง') · หนึ่งสไลด์ต่อคิวใน floor1_ceremony.json (คีย์ = id ของคิว) · คำบนจอเป็นภาษาอังกฤษและต้องเป็นคำของบท en ของคิวนั้นเอง ตัวเลขต้องเป็นตัวเลขที่บทพูด (app/ceremony_slides.py ตรวจทุกครั้ง) · beats: show = ส่วนของสไลด์, at_en = ท่อนของบท en ที่เสียงมาถึงแล้วให้ส่วนนั้นขึ้น (at_th = ท่อนของบทไทย, at = สัดส่วน 0–1) · ทั้งไฟล์เป็นร่างจนกว่าคนจะเซ็นด้วย scripts/approve_ceremony_slides.py --by ชื่อ (แก้สไลด์ใดๆ = ร่างอีกครั้ง) · ร่าง = เซิร์ฟเวอร์ของหุ่นไม่ส่งสไลด์ (พื้นหลังชื่อโครงการ + ซับไทยแบบเดิม) · ดูร่างได้ด้วย scripts/preview_ceremony_show.py",
+ "approved_by": "pete",
+ "approved_at": "2026-11-24T19:39:21+07:00",
+ "approved_sha256": "5580e18c2d1269ab0875dde8cfe2f801597c7ccffce4abd829c8c7766856c895",
+ "slides": {
+  "s02_l03": {
+   "template": "hero",
+   "kicker": "Embassy World",
+   "icon": "spark",
+   "title": "Hello, everyone",
+   "sub": "I'm Emma",
+   "chips": [
+    "Smart assistant",
+    "Sales team",
+    "Agents"
+   ],
+   "beats": [
+    {
+     "show": "sub",
+     "at_en": "I'm Emma"
+    },
+    {
+     "show": "chip:0",
+     "at_en": "the smart assistant"
+    },
+    {
+     "show": "chip:1",
+     "at_en": "sales team"
+    },
+    {
+     "show": "chip:2",
+     "at_en": "all of our agents"
+    }
+   ]
+  },
+  "s02_l05": {
+   "template": "list",
+   "kicker": "Embassy World",
+   "title": "I can help",
+   "items": [
+    {
+     "text": "Project information",
+     "icon": "info"
+    },
+    {
+     "text": "Recommend unit types",
+     "icon": "home"
+    },
+    {
+     "text": "Floor plans and visualisations",
+     "icon": "plan"
+    },
+    {
+     "text": "Quotation details",
+     "icon": "doc"
+    }
+   ],
+   "foot": "Get to know Embassy World better",
+   "beats": [
+    {
+     "show": "item:0",
+     "at_en": "project information"
+    },
+    {
+     "show": "item:1",
+     "at_en": "recommend unit types"
+    },
+    {
+     "show": "item:2",
+     "at_en": "show floor plans"
+    },
+    {
+     "show": "item:3",
+     "at_en": "help prepare quotation"
+    },
+    {
+     "show": "foot",
+     "at_en": "I'd be glad"
+    }
+   ]
+  },
+  "s02_l09": {
+   "template": "list",
+   "kicker": "Embassy World",
+   "title": "What makes Embassy World distinctive",
+   "items": [
+    {
+     "text": "Futuristic design",
+     "icon": "orbit"
+    },
+    {
+     "text": "An atmosphere made for relaxing",
+     "icon": "relax"
+    },
+    {
+     "text": "Technology that makes everyday living easier",
+     "icon": "chip"
+    },
+    {
+     "text": "Smart Home",
+     "icon": "home"
+    }
+   ],
+   "foot": "For people who welcome innovation",
+   "beats": [
+    {
+     "show": "item:0",
+     "at_en": "futuristic design"
+    },
+    {
+     "show": "item:1",
+     "at_en": "an atmosphere"
+    },
+    {
+     "show": "item:2",
+     "at_en": "technology that"
+    },
+    {
+     "show": "item:3",
+     "at_en": "a Smart Home"
+    },
+    {
+     "show": "foot",
+     "at_en": "people who welcome"
+    }
+   ]
+  },
+  "s03_l03": {
+   "template": "number",
+   "kicker": "Embassy World",
+   "title": "Jomtien Second Road area",
+   "lead": "about",
+   "value": "600",
+   "unit": "metres",
+   "label": "from Jomtien Beach in a straight line",
+   "graphic": "span",
+   "from_icon": "pin",
+   "to_icon": "sea",
+   "chips": [
+    "Attractions",
+    "Shopping",
+    "Hospitals",
+    "Schools"
+   ],
+   "beats": [
+    {
+     "show": "value",
+     "at_en": "about 600"
+    },
+    {
+     "show": "graphic",
+     "at_en": "from Jomtien Beach"
+    },
+    {
+     "show": "label",
+     "at_en": "from Jomtien Beach"
+    },
+    {
+     "show": "chip:0",
+     "at_en": "attractions"
+    },
+    {
+     "show": "chip:1",
+     "at_en": "shopping"
+    },
+    {
+     "show": "chip:2",
+     "at_en": "hospitals"
+    },
+    {
+     "show": "chip:3",
+     "at_en": "schools"
+    }
+   ]
+  },
+  "s04_l03": {
+   "template": "number",
+   "kicker": "Embassy World",
+   "value": "1,066",
+   "unit": "units in total",
+   "label": "To suit different ways of living",
+   "chips": [
+    "Studios",
+    "1-bedroom units",
+    "2-bedroom units"
+   ],
+   "beats": [
+    {
+     "show": "value",
+     "at": 0
+    },
+    {
+     "show": "chip:0",
+     "at_en": "studios"
+    },
+    {
+     "show": "chip:1",
+     "at_en": "1-bedroom"
+    },
+    {
+     "show": "chip:2",
+     "at_en": "2-bedroom"
+    },
+    {
+     "show": "label",
+     "at_en": "to suit"
+    }
+   ]
+  },
+  "s04_l06": {
+   "template": "list",
+   "kicker": "Embassy World",
+   "title": "Main common areas in Building A",
+   "items": [
+    {
+     "text": "Basement level",
+     "icon": "layers"
+    },
+    {
+     "text": "Ground floor",
+     "icon": "building"
+    },
+    {
+     "text": "Floor 3",
+     "icon": "building"
+    },
+    {
+     "text": "Outdoors",
+     "icon": "tree"
+    }
+   ],
+   "highlight": {
+    "text": "Swimming pool · 155 metres long",
+    "icon": "pool"
+   },
+   "foot": "Several more places to relax",
+   "beats": [
+    {
+     "show": "item:0",
+     "at_en": "on the basement level"
+    },
+    {
+     "show": "item:1",
+     "at_en": "the ground floor"
+    },
+    {
+     "show": "item:2",
+     "at_en": "floor 3"
+    },
+    {
+     "show": "item:3",
+     "at_en": "outdoors"
+    },
+    {
+     "show": "highlight",
+     "at_en": "A real highlight"
+    },
+    {
+     "show": "foot",
+     "at_en": "several more places"
+    }
+   ]
+  },
+  "s04_l09": {
+   "template": "hero",
+   "kicker": "Embassy World",
+   "icon": "book",
+   "title": "I've studied this project very carefully",
+   "sub": "There's just a single thing I still haven't tried...",
+   "beats": [
+    {
+     "show": "sub",
+     "at_en": "There's just"
+    }
+   ]
+  },
+  "s04_l11": {
+   "template": "joke",
+   "kicker": "Embassy World",
+   "punch": "Swimming in the 155-metre pool myself!",
+   "icon": "pool",
+   "beats": [
+    {
+     "show": "icon",
+     "at": 0
+    },
+    {
+     "show": "punch",
+     "at": 0
+    }
+   ]
+  },
+  "s04_l13": {
+   "template": "joke",
+   "kicker": "Embassy World",
+   "title": "The day I'm completely waterproof",
+   "tail": true,
+   "punch": "I'd love to show off a few laps",
+   "icon": "drop",
+   "beats": [
+    {
+     "show": "icon",
+     "at_en": "completely waterproof"
+    },
+    {
+     "show": "punch",
+     "at_en": "I'd love"
+    }
+   ]
+  },
+  "s04_l15": {
+   "template": "hero",
+   "kicker": "Embassy World",
+   "icon": "heart",
+   "title": "With pleasure, Khun Miki!",
+   "beats": []
+  },
+  "s05_l03": {
+   "template": "choice",
+   "kicker": "Embassy World",
+   "title": "What kind of view do you like?",
+   "options": [
+    {
+     "text": "A view of the sea",
+     "icon": "sea"
+    },
+    {
+     "text": "A ground-floor unit facing the pool",
+     "icon": "pool"
+    },
+    {
+     "text": "The common areas and the swimming pool",
+     "icon": "tree"
+    }
+   ],
+   "beats": [
+    {
+     "show": "option:0",
+     "at_en": "a view of the sea"
+    },
+    {
+     "show": "option:1",
+     "at_en": "a ground-floor unit"
+    },
+    {
+     "show": "option:2",
+     "at_en": "a view over"
+    }
+   ]
+  },
+  "s05_l06": {
+   "template": "hero",
+   "kicker": "I'd suggest starting with",
+   "icon": "sea",
+   "title": "A 2-bedroom unit with a view of the sea",
+   "sub": "For everyone in the family",
+   "chips": [
+    "Room to live",
+    "Privacy"
+   ],
+   "beats": [
+    {
+     "show": "sub",
+     "at_en": "everyone in the family"
+    },
+    {
+     "show": "chip:0",
+     "at_en": "room to live"
+    },
+    {
+     "show": "chip:1",
+     "at_en": "some privacy"
+    }
+   ]
+  },
+  "s05_l08": {
+   "template": "hero",
+   "kicker": "Embassy World",
+   "icon": "doc",
+   "title": "Prepare a quotation for this unit?",
+   "beats": []
+  },
+  "s05_l11": {
+   "template": "status",
+   "kicker": "Embassy World",
+   "state": "working",
+   "device": "document",
+   "title": "Preparing the quotation",
+   "detail": "For this unit",
+   "beats": [
+    {
+     "show": "detail",
+     "at_en": "for this unit"
+    }
+   ]
+  },
+  "s05_l13": {
+   "template": "hero",
+   "title": "Our staff will bring the details",
+   "kicker": "Embassy World"
+  },
+  "s05_backup_quote": {
+   "template": "hero",
+   "kicker": "Embassy World",
+   "icon": "doc",
+   "title": "A sample quotation for this unit",
+   "sub": "Our staff will explain the details",
+   "beats": [
+    {
+     "show": "sub",
+     "at_en": "Our staff"
+    }
+   ]
+  },
+  "s06_l03": {
+   "template": "stats",
+   "kicker": "Embassy World",
+   "title": "The information is ready",
+   "stats": [
+    {
+     "value": "1.3",
+     "unit": "metres deep",
+     "label": "Main swimming pool"
+    },
+    {
+     "value": "8",
+     "unit": "storeys high",
+     "label": "The building"
+    },
+    {
+     "lead": "about",
+     "value": "23",
+     "unit": "metres above road level",
+     "label": "Roof level"
+    },
+    {
+     "lead": "around",
+     "value": "2,500",
+     "unit": "square metres in total",
+     "label": "Indoor facilities · sales team estimate"
+    }
+   ],
+   "beats": [
+    {
+     "show": "stat:0",
+     "at_en": "main swimming pool"
+    },
+    {
+     "show": "stat:1",
+     "at_en": "The building is"
+    },
+    {
+     "show": "stat:2",
+     "at_en": "the roof level"
+    },
+    {
+     "show": "stat:3",
+     "at_en": "the sales team estimates"
+    }
+   ]
+  },
+  "s06_l05": {
+   "template": "joke",
+   "kicker": "Embassy World",
+   "title": "Besides my good looks",
+   "tail": true,
+   "punch": "I've studied everything about Embassy World",
+   "icon": "book",
+   "beats": [
+    {
+     "show": "title",
+     "at_en": "Besides"
+    },
+    {
+     "show": "punch",
+     "at_en": "I've studied"
+    }
+   ]
+  },
+  "s06_l07": {
+   "template": "joke",
+   "kicker": "Embassy World",
+   "title": "If there's ever an Embassy World superfan quiz",
+   "tail": true,
+   "punch": "First place!",
+   "icon": "trophy",
+   "beats": [
+    {
+     "show": "icon",
+     "at_en": "first place"
+    },
+    {
+     "show": "punch",
+     "at_en": "first place"
+    }
+   ]
+  },
+  "s07_l02": {
+   "template": "hero",
+   "kicker": "Embassy World",
+   "icon": "play",
+   "title": "Please enjoy the video",
+   "beats": []
+  },
+  "s07_l07": {
+   "template": "list",
+   "kicker": "Embassy World",
+   "title": "The water-quality dashboard",
+   "items": [
+    {
+     "text": "On a single screen",
+     "icon": "screen"
+    },
+    {
+     "text": "The information the system shows",
+     "icon": "info"
+    },
+    {
+     "text": "Help monitor the project's water quality",
+     "icon": "drop"
+    }
+   ],
+   "beats": [
+    {
+     "show": "item:0",
+     "at_en": "On a single screen"
+    },
+    {
+     "show": "item:1",
+     "at_en": "the information the system"
+    },
+    {
+     "show": "item:2",
+     "at_en": "help monitor"
+    }
+   ]
+  },
+  "s08_l06": {
+   "template": "status",
+   "kicker": "Embassy World",
+   "state": "working",
+   "device": "lights_off",
+   "title": "Turning off the lobby lights",
+   "beats": []
+  },
+  "s08_l08": {
+   "template": "status",
+   "kicker": "Embassy World",
+   "state": "done",
+   "device": "lights_off",
+   "title": "The lobby lights are off",
+   "beats": [
+    {
+     "show": "title",
+     "at": 0
+    }
+   ]
+  },
+  "s08_l10": {
+   "template": "status",
+   "kicker": "Embassy World",
+   "state": "working",
+   "device": "lights_on",
+   "title": "Turning the lobby lights on",
+   "beats": []
+  },
+  "s08_l12": {
+   "template": "status",
+   "kicker": "Embassy World",
+   "state": "done",
+   "device": "lights_on",
+   "title": "The lobby lights are on",
+   "beats": [
+    {
+     "show": "title",
+     "at": 0
+    }
+   ]
+  },
+  "s08_l14": {
+   "template": "status",
+   "kicker": "Embassy World",
+   "state": "working",
+   "device": "curtain",
+   "title": "Opening the lobby curtains",
+   "beats": []
+  },
+  "s08_l16": {
+   "template": "status",
+   "kicker": "Embassy World",
+   "state": "done",
+   "device": "curtain",
+   "title": "The curtains are open",
+   "beats": [
+    {
+     "show": "title",
+     "at": 0
+    }
+   ]
+  },
+  "s09_l02": {
+   "template": "hero",
+   "kicker": "Please enjoy",
+   "icon": "play",
+   "title": "The story of Embassy World",
+   "beats": []
+  },
+  "s10_l05": {
+   "template": "hero",
+   "mood": "closing",
+   "kicker": "Embassy World",
+   "icon": "heart",
+   "title": "Thank you all",
+   "sub": "For being part of Embassy World today",
+   "chips": [
+    "Project details",
+    "Talk with our team",
+    "Try the Smart Home experience"
+   ],
+   "beats": [
+    {
+     "show": "sub",
+     "at_en": "for being part"
+    },
+    {
+     "show": "chip:0",
+     "at_en": "the project details"
+    },
+    {
+     "show": "chip:1",
+     "at_en": "talk with our team"
+    },
+    {
+     "show": "chip:2",
+     "at_en": "try the Smart Home"
+    }
+   ]
+  }
+ }
+}

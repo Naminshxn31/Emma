@@ -1201,6 +1201,10 @@ INSTRUCTION = (
     "แล้วเล่าว่าอยู่ชั้นไหน กี่ตารางเมตรอีกรอบ) "
     "สิ่งที่บรรทัดเอ่ยถึง (เช่น โครงการเก่าของผู้พัฒนา ผู้บริหาร) ไม่ใช่นอกเรื่อง ให้ค้น ห้ามปฏิเสธแบบ "
     "\"I can only provide information about\" "
+    # robot 6 Nov (Common Sphere seats): present_story and a search in the
+    # same answer -- she said only the search's hand-off and the story ran
+    # 9 s with 1 of 4 cues. Its own sentence, not inside the search rule above.
+    "ถ้าเรียกค้นในคำตอบเดียวกับเรื่องนี้ ให้พูดบรรทัด say ก่อน แล้วต่อด้วยส่วนที่ผลค้นเพิ่ม "
     "พูดจบแล้วหยุดรอลูกค้า ห้ามเรียก present_story ซ้ำในคำตอบนี้"
 )
 
@@ -1282,6 +1286,18 @@ _QUERY_INDEX: dict = {"key": None}
 _SPELLINGS = (
     (re.compile(r"ซ[ุู][ปบ]?เปอ(?:ร์|ร)?"), "ซูเปอร์"),
     (re.compile(r"มา(?:ร์)?เก็?[ตท]"), "มาร์เก็ต"),
+    # Not a spelling, the same gap (robot 6 Nov 09:15): "how big" is asked
+    # as ใหญ่แค่ไหน or as ขนาดเท่าไหร่, and a story lists one of them. The
+    # model searched "ขนาดของ Sky Pool"; sky_pool_where lists "Sky Pool
+    # ใหญ่แค่ไหน", the cover stopped at 0.745 of 0.75, and the search read out
+    # the report's width, reach and area instead of the story's one area.
+    # The how-big phrase gains ขนาด; ขนาด does not become ใหญ่ -- that turned
+    # the smallest-room questions ("ห้องที่เล็กที่สุดขนาดเท่าไหร่") into "big"
+    # ones, and "ห้องใหญ่ที่สุด" (the largest room) went to unit_studio.
+    # Measured the server's way on the 734 listed questions, the eval turns
+    # and the logged queries and sentences of 9 Oct - 6 Nov: that one query
+    # moves, nothing else.
+    (re.compile(r"ใหญ่(?=\s*(?:แค่ไหน|เท่าไหร่|เท่าไร))"), "ใหญ่ขนาด"),
 )
 
 
@@ -1570,6 +1586,52 @@ def tool_result(topic: object) -> dict:
     if details:
         out["details"] = details
     return out
+
+
+def picture(topic: object, *, taps: bool = True) -> dict:
+    """A story's picture ALONE, for a line the server says itself -- a ceremony cue
+    staff pressed with a picture (app/event_cues.py `show`, owner 7 Nov: the map
+    on the TV with the location line). Exactly the part of `tool_result` the face
+    and the room screen draw -- {ok, screen, topic, story} -- and nothing for a
+    model: no `say` (the story's lines are not hers to tell under a script line),
+    no instruction, no details. No row and no "just told" mark here: the session
+    writes both when the picture really goes up (`mark_shown`), in the call's own
+    context -- which is also why the taps are worked out where this is called
+    there: which tools exist is that call's. A tap to the next story needs
+    present_story itself on that call (here no tool ran, so nothing says it is).
+    `taps=False` (a ceremony line's picture, review 7 Nov B2: a touch on the chest
+    screen made her talk over the host and changed the TV's picture): no tap at
+    all -- no chip, no row bound to one, no picture that opens large and asks her
+    for more (`zoom`).
+    {"ok": False, "error": "stories_off" | "not_approved" | "unknown_story"}."""
+    if not settings.stories_enabled:
+        return {"ok": False, "error": "stories_off"}
+    catalog = load_catalog()
+    if not catalog or not approved(catalog):
+        return {"ok": False, "error": "not_approved"}
+    stories = _valid_stories(catalog)
+    story = stories.get(topic) if isinstance(topic, str) else None
+    if story is None:
+        return {"ok": False, "error": "unknown_story"}
+    from app.prompts import _tool_visible
+
+    def tap_ok(tap: dict) -> bool:
+        if not taps:
+            return False
+        if tap.get("next_story") and not _tool_visible("present_story"):
+            return False
+        return _tap_allowed(tap, stories)
+
+    payload = page_payload(story, catalog, tap_ok=tap_ok)
+    if not taps:
+        payload["zoom"] = []                 # a picture tap is a "tell me more" to her
+    return {"ok": True, "screen": "story", "topic": story["id"], "story": payload}
+
+
+def mark_shown(topic: str) -> None:
+    """A story went up on this call without present_story (`picture`): it is the
+    story "already up" for search_condo_info's hand-back, as a told one is."""
+    _mark_shown(topic)
 
 
 def _tap_allowed(tap: dict, stories: dict) -> bool:

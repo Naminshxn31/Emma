@@ -1,0 +1,32 @@
+/* One room type and the company on the event screen (units.js). */
+.es-film > .un-model { background: #000 !important; }
+.es-film > .un-model .sw-win { background: #000 !important; }
+.es-root .un-model .sw-cam { bottom: 22%; }
+.es-root .un-model .sw-cam img { object-fit: contain; }
+.es-root .un-model .un-solid { opacity: 0; transition: opacity 1s ease; }
+.es-root .un-model .un-solid.on { opacity: 1; }
+.un-model.sw-push > .sw-win > .sw-cam { transform: scale(.96); }
+.un-model.sw-push.on > .sw-win > .sw-cam { transform: scale(1.06); }
+.un-size { position: absolute; z-index: 60; left: calc(5 * var(--es-vw)); top: calc(4.4 * var(--es-vw)); opacity: 0; transform: translate3d(0, calc(1.6 * var(--es-vw)), 0); transition: opacity .45s ease, transform .7s cubic-bezier(.05, .7, .1, 1); }
+.un-size.on { opacity: 1; transform: none; }
+.un-size::before { content: ""; position: absolute; z-index: -1; left: calc(-12 * var(--es-vw)); top: calc(-12 * var(--es-vw)); right: calc(-22 * var(--es-vw)); bottom: calc(-10 * var(--es-vw)); background: radial-gradient(ellipse closest-side at 46% 46%, rgba(4, 6, 20, .72), rgba(4, 6, 20, .4) 55%, rgba(4, 6, 20, 0)); }
+.un-v { font-style: normal; font-size: calc(11.5 * var(--es-vw)); font-weight: 600; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.un-v small { font-size: calc(4.6 * var(--es-vw)); font-weight: 500; color: #cfdcff; }
+
+/* the company */
+.un-board { position: absolute; z-index: 3; left: 4%; right: 4%; top: calc(3 * var(--es-vw)); opacity: 0; transition: opacity .6s ease; }
+.un-board.on { opacity: 1; }
+.un-board.away { opacity: 0; transition: opacity .4s cubic-bezier(.3, 0, 1, 1); }
+.un-logo { position: absolute; left: 50%; top: 0; width: calc(74 * var(--es-vw)); height: 100%; margin-left: calc(-37 * var(--es-vw)); transform-origin: 50% 0; transition: transform .9s cubic-bezier(.05, .7, .1, 1); }
+.es-root .un-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: calc(2 * var(--es-vw)); }
+.un-board.up .un-logo { transform: scale(.42); }
+.un-figs { position: absolute; left: 0; right: 0; top: 46%; display: flex; justify-content: space-around; align-items: flex-start; }
+.un-fig { flex: 1; text-align: center; opacity: 0; transform: translate3d(0, calc(3 * var(--es-vw)), 0); transition: opacity .5s ease, transform .8s cubic-bezier(.05, .7, .1, 1); }
+.un-fig.on { opacity: 1; transform: none; }
+.un-n { font-size: calc(17 * var(--es-vw)); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.un-n small { font-size: calc(8 * var(--es-vw)); color: rgb(110, 196, 255); }
+.un-l { margin-top: calc(1.2 * var(--es-vw)); font-size: calc(4 * var(--es-vw)); color: #cfdcff; }
+.un-names { position: absolute; left: 0; right: 0; bottom: calc(1 * var(--es-vw)); display: flex; justify-content: center; gap: calc(5 * var(--es-vw)); }
+.un-name { font-size: calc(4.8 * var(--es-vw)); font-weight: 600; opacity: 0; transform: translate3d(0, calc(1.6 * var(--es-vw)), 0); transition: opacity .45s ease, transform .7s cubic-bezier(.05, .7, .1, 1); }
+.un-name.on { opacity: 1; transform: none; }
+.es-film > .un-awards .sw-cam { background: #fff; }

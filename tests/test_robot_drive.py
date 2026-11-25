@@ -481,6 +481,21 @@ def test_past_the_landing_spot_it_does_not_try_to_drive_backwards(monkeypatch):
     assert r.calls == [("turn", -0.089)]
 
 
+def test_a_look_with_a_dwell_stands_still_after_its_turn(monkeypatch):
+    """The head's scan round needs the base still: turn, then hold (and log it)."""
+    dr = _drive_route()
+    r = _landing_runner(dr, _LandingBoard((-2.5, 2.9, math.pi)), monkeypatch)
+    order = []
+    r.rotate_to = lambda heading, **kw: order.append(("turn", round(heading, 3)))
+    monkeypatch.setattr(dr.time, "sleep", lambda s: order.append(("hold", s)))
+    r.look(rl.Step(do="look", heading_deg=180.0, label="north end", dwell_s=15.0))
+    assert order == [("turn", round(math.pi, 3)), ("hold", 15.0)]
+    assert r.logged[-1]["kind"] == "look" and r.logged[-1]["dwell_s"] == 15.0
+    order.clear()
+    r.look(rl.Step(do="look", heading_deg=90.0, label="no dwell"))
+    assert order == [("turn", round(math.pi / 2, 3))], "no dwell: straight on"
+
+
 def test_without_a_dock_marker_it_still_turns_round_for_gohome(monkeypatch):
     dr = _drive_route()
     r = _landing_runner(dr, _LandingBoard((-3.0, 1.43, math.pi), home_fails=True), monkeypatch)

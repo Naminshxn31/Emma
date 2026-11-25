@@ -222,6 +222,17 @@ class Settings:
         """The near-field floor a call on this profile opens with."""
         return self.vad_min_rms_far if self.listens_far(profile) else self.vad_min_rms
 
+    def call_vad_silence_ms(self, profile: str | None) -> int | None:
+        """The end-of-turn silence a call on this profile opens with, or None = VAD_SILENCE_MS
+        (every call but the live-first ceremony's)."""
+        ms = int(self.ceremony_live_end_silence_ms or 0)
+        # (+ the script shown, CEREMONY_SCRIPT_SHOW_ONLY, owner 24 Nov ~14:58: "มิกิพูดยาวๆ แบบอธิบายให้แขกฟัง แล้วกลับมาถามหุ่น"
+        # -- a pause in his speech must not close his turn and start her answer, in the pressed mode too)
+        if (ms > 0 and (profile or "").strip().lower() == "ceremony" and self.ceremony_follow_host
+                and (not self.ceremony_follow_cues or self.ceremony_script_show_only)):
+            return ms
+        return None
+
     # --- Recognising faces at the door ---
     # Off by default, and for the usual reason: the showroom machine pulls
     # this repo and its behaviour must not change. A camera that starts
@@ -308,6 +319,15 @@ class Settings:
     # code. The cooldown applies to strangers as one group, so the worst
     # case is one session per FACE_COOLDOWN_S, not one per person.
     face_greet_strangers: bool = _get_bool("FACE_GREET_STRANGERS", True)
+    #: A line somebody already used stops being "a conversation" for the camera's
+    #: greeting this long after her last words, once nobody is mid-sentence and no
+    #: answer of hers is on its way (app/greeter.py `_conversation_state`). Owner,
+    #: 6 Nov: "ไม่เห็นทักเลย" -- the standing line opened at boot heard two staff
+    #: talking to each other 20 s later, she answered once, and every face after it
+    #: (two she knew) was "during a live session": the line never went quiet for the
+    #: 120 s that ends it while people stood there talking. 0 = the 30 Sep rule as it
+    #: was: a used line is a conversation until it ends.
+    face_greet_lapse_s: float = float(os.getenv("FACE_GREET_LAPSE_S", "0") or 0)
     # Narrower than this and they are across the room, not at the door —
     # which is also where recognition is least reliable, so both reasons
     # point the same way.
@@ -420,6 +440,87 @@ class Settings:
     #: people. Off = the gesture rides every camera greeting as before
     #: (still behind ROBOT_GREETING_GESTURE_ENABLED and every arm gate).
     face_handshake_named_only: bool = _get_bool("FACE_HANDSHAKE_NAMED_ONLY", False)
+
+    # --- The launch event's scan booth (docs/emma-face-approach.md) ---
+    #: The guests' vectors on the robot, beside the staff gallery (app/guests.py).
+    #: Empty = no guests: the greeter loads what it always loaded.
+    face_guests_file: str = os.getenv("FACE_GUESTS_FILE", "").strip()
+    #: The robot's listener for the booth (app/guest_sync_server.py): HTTPS only,
+    #: its own key. 0 = off; with no key or no certificate it does not start.
+    guest_sync_port: int = int(os.getenv("GUEST_SYNC_PORT", "0") or 0)
+    guest_sync_host: str = os.getenv("GUEST_SYNC_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    guest_sync_key: str = _get_token("GUEST_SYNC_KEY")
+    #: Walking up to a scanned guest (app/face_approach.py). Off; and even on it
+    #: does nothing until EVENT_WALK_ENABLED and staff press "on" on the phone page.
+    face_approach: bool = _get_bool("FACE_APPROACH", False)
+    #: Everything worked out and logged ("would_walk"), nothing moved or said:
+    #: the first stage of the bench plan, and needs no EVENT_WALK_ENABLED.
+    face_approach_dry_run: bool = _get_bool("FACE_APPROACH_DRY_RUN", False)
+    #: FACE_THRESHOLD is the door's bar for a gallery of ten. See the table in
+    #: docs/emma-face-approach.md (scripts/eval_face_crowd.py) before moving these.
+    face_approach_threshold: float = float(os.getenv("FACE_APPROACH_THRESHOLD", "0.60"))
+    face_approach_margin: float = float(os.getenv("FACE_APPROACH_MARGIN", "0.10"))
+    #: Frames of one face's own track, FACE_APPROACH_EVERY_S apart.
+    face_approach_frames: int = int(os.getenv("FACE_APPROACH_FRAMES", "3"))
+    face_approach_every_s: float = float(os.getenv("FACE_APPROACH_EVERY_S", "0.4"))
+    face_approach_max_faces: int = int(os.getenv("FACE_APPROACH_MAX_FACES", "2"))
+    #: Face width to be judged at all. 19 deg lens: 110 px = ~4.4 m.
+    face_approach_min_px: int = int(os.getenv("FACE_APPROACH_MIN_PX", "110"))
+    #: Robot's front to the person, metres; the code never goes under 1.0.
+    face_approach_stop_m: float = float(os.getenv("FACE_APPROACH_STOP_M", "1.0"))
+    #: Longest walk, metres (code ceiling 4.0) and its speed, m/s (ceiling 0.3).
+    face_approach_max_m: float = float(os.getenv("FACE_APPROACH_MAX_M", "3.0"))
+    face_approach_speed: float = float(os.getenv("FACE_APPROACH_SPEED", "0.25"))
+    #: Board localization quality under which it does not start, and stops.
+    face_approach_min_quality: int = int(os.getenv("FACE_APPROACH_MIN_QUALITY", "60"))
+    #: One attempt per person this often; any two attempts this far apart; and
+    #: none this soon after staff switched scene.
+    face_approach_person_cooldown_s: float = float(os.getenv("FACE_APPROACH_PERSON_COOLDOWN_S", "600"))
+    face_approach_gap_s: float = float(os.getenv("FACE_APPROACH_GAP_S", "45"))
+    face_approach_after_scene_s: float = float(os.getenv("FACE_APPROACH_AFTER_SCENE_S", "60"))
+    #: See somebody, walk up, greet (owner 5 Nov: "เวลาเห็นคนก็ให้หุ่นเดินไปทัก",
+    #: docs/emma-face-approach.md section 9). On top of FACE_APPROACH and all its
+    #: gates; the lidar finds the person, the door camera decides the greeting at
+    #: the stop. Off = only scanned guests the camera recognised, as before.
+    face_approach_anyone: bool = _get_bool("FACE_APPROACH_ANYONE", False)
+    #: Robot's front to the person on that road, metres (the floor of 1.0 still
+    #: holds). Further than for a named guest because of the lens: 19 deg wide and
+    #: faces 0.15 m under its axis (measured on 114 real faces), 1.0 m front =
+    #: a picture 0.34 m tall with half the face under it; 1.4 m front = 0.44 m.
+    face_approach_person_stop_m: float = float(os.getenv("FACE_APPROACH_PERSON_STOP_M", "1.4"))
+    #: Standing this long, after arriving on their own feet (lidar_people.Follower).
+    face_approach_person_still_s: float = float(os.getenv("FACE_APPROACH_PERSON_STILL_S", "2.0"))
+    #: How long she looks for a face at the stop before she greets without one.
+    face_approach_check_s: float = float(os.getenv("FACE_APPROACH_CHECK_S", "6.0"))
+    #: While that road is armed the door camera greets from here up: FACE_MIN_PX 50 (65 for a
+    #: stranger: ~7.5 m through the 19 deg lens) would say hello across the lobby, and then
+    #: there is a conversation and no walk. 126 = ~3.9 m named, 164 (x 1.3) = ~3 m stranger.
+    #: Further than that, a face she can see is a reason to walk up.
+    face_approach_door_px: int = int(os.getenv("FACE_APPROACH_DOOR_PX", "126"))
+    #: The head camera says whether that is a person (app/person_vision.py; owner 5 Nov: "ให้กล้องช่วย
+    #: ตรวจดูไม่ได้หรอ แบบเห็นเป็นคน ก็เข้าไปทัก"). On top of FACE_APPROACH_ANYONE: somebody who stood still
+    #: all along, in the lens or glanced at, becomes somebody to walk up to, and what the lidar found
+    #: is looked at before she walks. Off = the lidar's word, as before.
+    person_vision: bool = _get_bool("PERSON_VISION", False)
+    #: 8,189 real head-camera frames: with a face >= 80 px a box at 0.5 in 98% of them (>= 110 px: 100%),
+    #: and none of 166 frames with a real chair and no face had one on it. 0.6 loses 9% of the faces.
+    person_vision_score: float = float(os.getenv("PERSON_VISION_SCORE", "0.5"))
+    #: One look this often (97 ms on one of the robot's cores), and this many running, in about
+    #: the same place, make somebody to walk up to: a person who stays, not one going past.
+    person_vision_every_s: float = float(os.getenv("PERSON_VISION_EVERY_S", "1.0"))
+    person_vision_looks: int = int(os.getenv("PERSON_VISION_LOOKS", "3"))
+    #: At most one glance at something the lidar found that the map does not have, this often: the
+    #: head and its servo (ch8 smoked on 12 Sep; owner: "อย่าหันหัวไวเกินและถี่เกิน"). 0 = no glances.
+    face_approach_look_every_s: float = float(os.getenv("FACE_APPROACH_LOOK_EVERY_S", "20"))
+    #: SCRFD's input side for the door camera's frames (5 Nov, "แสกนหน้าให้ไว").
+    #: 640 = as ever. Measured on 142 real frames of the 1024 px head camera, 2
+    #: threads: 136 -> 35 ms at 320, the same faces but 1-3 in 143, known people's
+    #: scores unchanged (0.615 -> 0.620). A portrait for the gallery stays at 640.
+    face_det_size: int = int(os.getenv("FACE_DET_SIZE", "640") or 640)
+    #: No sleep between the frames of a NAME being confirmed, the streak at least 0.3 s long
+    #: (Watcher.deciding, NAME_SPAN_S; a stranger keeps FACE_FPS's pace), no pause before a
+    #: greeting nothing plays before, and `track_s` + `face_perf` rows. Off = as before.
+    face_fast_confirm: bool = _get_bool("FACE_FAST_CONFIRM", False)
 
     # --- Wake word ("Emma") ---
     # Off by default: the gallery robot is started by staff each morning and
@@ -967,11 +1068,25 @@ class Settings:
     # Louder than this, prompt rule 3's "please say it again" stands. 0 = off
     # (the sales room's PC unchanged); robot.env sets it.
     noise_reply_near_rms: float = float(os.getenv("NOISE_REPLY_NEAR_RMS", "0") or 0)
+    #: While the base walks on a walk no guest is on (a route run from the PC,
+    #: board_walk over adb, a joystick -- not the event host's), nothing she
+    #: says reaches the speaker or the screen; tool calls (a stop) go through.
+    #: Owner 4 Nov, the floor-2 survey: "พูดเองด้วย อาจจะต้องปรับเรื่องนี้ด้วย"
+    #: -- she answered the office's own talk two dozen times. Robot.env on.
+    walk_quiet: bool = _get_bool("WALK_QUIET", False)
     # Every tool result carries the conversation's language, kept by the server
     # from what the guest said (app/talk_lang.py) -- robot log 19 Oct: an English
     # talk went German on one accented line and Thai on a "yeah" heard as "ใช่".
     # Off by default: the sales room's PC unchanged; the robot turns it on.
     talk_language_note: bool = _get_bool("TALK_LANGUAGE_NOTE", False)
+    # The language she starts in until the guest speaks (prompt rule "เริ่มต้น
+    # ด้วยภาษา..."), and the language of the camera's greeting for somebody
+    # recognised on the robot. Owner, 3 Nov 2026, on the robot: "ภาษาให้ตั้ง eng
+    # เป็น default" -- that greeting came out Thai ("สวัสดีค่ะคุณโชกุน รู้จัก
+    # โครงการของเรามาก่อนไหมคะ") and he picked English on the menu. A default,
+    # not a pin: the guest's first sentence still sets the language (talk_lang).
+    # "th" = the sales room's PC unchanged; robot.env sets "en".
+    talk_default_language: str = (os.getenv("TALK_DEFAULT_LANGUAGE", "th") or "th").strip().lower()
     robot_body_enabled: bool = _get_bool("ROBOT_BODY_ENABLED", False)
     robot_body_ack_timeout_s: float = float(os.getenv("ROBOT_BODY_ACK_TIMEOUT_S", "2.5"))
     #: The heard-word guard (the `heard.py` precedent: "bit like" closed the
@@ -996,7 +1111,15 @@ class Settings:
     #: The same two knobs when the app plays speech gestures back to back
     #: (body_caps "speech": true -- no rest and no cooldown between beats,
     #: short keyframes; owner 15 Oct "ท่ายังช้าแล้วดูไม่เป็นธรรมชาติ").
-    speech_gesture_beat_gap_s: float = float(os.getenv("SPEECH_GESTURE_BEAT_GAP_S", "4.5"))
+    #: 5.3 since 6 Nov: the arm comes down over 2 s (owner "ให้ขยับลงช้าๆ",
+    #: BodyGestures.ARM_LOWER_MIN_MS), so a recorded beat is 1.0+0.8+0.8+2.0 =
+    #: 4.6 s and a beat asked at 4.5 s found the arm still busy. The next ask
+    #: must land while the arm HOLDS (4.6 .. 4.6+1.5 s, then group 99): the
+    #: middle of that window, so a late start or a late ask has room either
+    #: way (review 6 Nov; a "busy" retry 1.5 s later lands on group 99). Needs
+    #: the app build with the slow lowering -- an older build's 3.6 s beat
+    #: is resting by 5.1 s.
+    speech_gesture_beat_gap_s: float = float(os.getenv("SPEECH_GESTURE_BEAT_GAP_S", "5.3"))
     speech_gesture_beat_min_left_s: float = float(os.getenv("SPEECH_GESTURE_BEAT_MIN_LEFT_S", "3"))
     #: Voice nav on the robot face goes to the on-robot launcher, and the
     #: chassis planner refuses moves — one navigation system at a time.
@@ -1074,6 +1197,121 @@ class Settings:
     room_screens_enabled: bool = _get_bool("ROOM_SCREENS_ENABLED", False)
     room_screens_file: str = os.getenv("ROOM_SCREENS_FILE", "data/room-screens.json").strip()
     room_screen_sound: bool = _get_bool("ROOM_SCREEN_SOUND", False)
+    # The room's amplifier goes to standby when nothing plays and wakes too late for her
+    # first words (owner 16 Nov, the lobby screen: "พอไม่มีเสียงก็จะพักเสียงไปเองเลย ... กลัววันงาน
+    # จะมีปัญหา"). "<hz>,<dB>" = the screen page holds one quiet tone the whole time it is
+    # open, between her sentences and between calls too (only with ROOM_SCREEN_SOUND). "" = none (default). Which tone an
+    # amplifier counts as a signal is its own: found by ear on the room's own set.
+    room_screen_keep_tone: str = os.getenv("ROOM_SCREEN_KEEP_TONE", "").strip()
+    # Her voice out of the room's speakers, a guest's voice in through a microphone that hears
+    # those speakers (owner 17 Nov: the host wears the wireless mic, the sound comes out of the
+    # lobby screen's amplifier, "ให้หุ่นแสดงท่าทางขยับตามพอ"). The robot face already drops its mic
+    # while ITS speaker plays and 350 ms after (HALF_DUPLEX); the room's copy plays later (the
+    # LAN, the screen page's queue, the amplifier, the room) and nothing knew. While a screen
+    # is open with ROOM_SCREEN_SOUND, mic frames go up as silence until this long after her
+    # voice ended by the server's clock. 0 = off (default: every machine as it was). The price
+    # is the head of an answer that starts inside it -- set from the room, not from a guess.
+    room_screen_echo_tail_s: float = float(os.getenv("ROOM_SCREEN_ECHO_TAIL_S", "0") or 0)
+    # The ceremony's voice comes out of the ROBOT only (owner 24 Nov: "อาจจะเปลี่ยนให้ตอนที่คุยกะมิกิ ให้เสียงออก
+    # หุ่นแทนแล้ว จะได้เหมือนคุยกับหุ่นจริงๆ" -> "ทั้งพิธีออกหุ่น": every recorded line and every ตอบสด answer).
+    # On: the room screen in the ceremony's show mode plays her voice at its silent gain (the pictures, slides and
+    # Thai subtitles still follow it; the debut's music and the keep-alive tone stay aloud where sound=1) and the
+    # room echo tail is off (nothing of her voice is replayed late in the hall). Off (default): every page and the
+    # sales robot exactly as they were.
+    ceremony_voice_on_robot: bool = _get_bool("CEREMONY_VOICE_ON_ROBOT", False)
+    #: The mic is held while the Live socket is down and being rejoined (gemini.py `_hold_mic`, 24 Nov): a
+    #: sentence begun in those 1-4 s is heard whole. Off = those seconds are dropped, as before.
+    reconnect_keeps_mic: bool = _get_bool("RECONNECT_KEEPS_MIC", False)
+    #: The music of card 1's walk on the hall's screen (app/catwalk_music.py, owner 24 Nov): the files of
+    #: data/events/clips/catwalk_*. Off = nothing of it is sent or served.
+    catwalk_music: bool = _get_bool("CATWALK_MUSIC", False)
+    # The ceremony's film on the robot's own chest screen too (owner 24 Nov: "อยากจะให้ตอนพูด จอหุ่น กับจอคอมนี้ขึ้น
+    # พรีเซ้นต์โมชั่นเหมือนกันเลย จะได้เหมือนซ้อมจริง"; app/face_film.py). On: in the Emma Ceremony app's call only, the
+    # face page lays the room screen's own page (silent, same acts, same Thai subtitles, same clock) in a frame over
+    # Emma, and her 3D body stops drawing under it. Needs MIRROR_TOKEN (the frame's entrance is a one-time ticket made
+    # from it). Off (default): every page, the Event app and the sales robot exactly as they were.
+    ceremony_face_film: bool = _get_bool("CEREMONY_FACE_FILM", False)
+    # How sharp the chest screen's film is drawn: the frame is laid out at this fraction of its size and scaled up
+    # again on its own layer (1 = every pixel). Measured on a desktop with the CPU slowed x4 (scripts/perf_face_film.py):
+    # the heavy acts are bound by pixels -- 15 -> 31 fps at 0.5. The robot's own WebView is unmeasured.
+    ceremony_face_film_scale: float = max(0.4, min(1.0, float(os.getenv("CEREMONY_FACE_FILM_SCALE", "1") or 1)))
+    # "ทั้งพิธีคุยสด ไม่ใช้บทกด" (owner 24 Nov 2026; app/ceremony_follow.py): card 2 of the ceremony's order turns on
+    # follow mode -- the SERVER matches the host's words (the input transcription) against the host line that
+    # comes before each next cue of the running order and plays that cue exactly as a staff press would; anything
+    # else the host says she answers live (the "ตอบสด" window, no 2-minute cap). Off (default): card 2 is not in
+    # the order at all, nothing here runs -- the ceremony and the sales robot exactly as they were.
+    ceremony_follow_host: bool = _get_bool("CEREMONY_FOLLOW_HOST", False)
+    # "เพราะเขาจะพูดสด ... ให้หุ่นสามารถตอบได้แม้จะไม่ตรงกับบทมาก" (owner 24 Nov 11:00): in follow mode, while its live
+    # window is open, her live answer does not need her name (NoiseReplyGate.named_only is relaxed for that window
+    # only; the noise floor, focus rule 2 and the banter rule stay). A reply to an utterance is held until follow has
+    # decided it (a matched cue = that reply is dropped, the recorded line plays alone). Off (default): named-only as before.
+    ceremony_follow_answer_all: bool = _get_bool("CEREMONY_FOLLOW_ANSWER_ALL", False)
+    # Owner 24 Nov rehearsal "เอาเรื่องกล้องไม่เห็นหน้าออกเลย ฟังเสียงจากไมค์พอ": in the ceremony's live window focus
+    # does not ask the camera (app/focus.py `_decide`). Off (default) = rule 2 then rules 3-5 as before.
+    ceremony_mic_only: bool = _get_bool("CEREMONY_MIC_ONLY", False)
+    # Owner 24 Nov rehearsal "ทำไมยังพูดไทยเอาออกเลย": the ceremony call speaks English only (the language pin +
+    # a rule in event_host.ceremony_block + the live brief). Off (default) = the language follows the host.
+    ceremony_english_only: bool = _get_bool("CEREMONY_ENGLISH_ONLY", False)
+    # "เอาที่พูดสดเหมือนที่เราทำแอพเก่ามาใช้ได้นะ" (owner 24 Nov): in follow mode her live answer has the approved script
+    # in context (event_host.script_block, the EVENT_SCRIPT_PROMPT mechanism of 6-7 Nov), so a lead-in the matcher
+    # missed still gets roughly the scripted answer. Only the cues the server does not play itself (not the chain
+    # punchlines / continuations). Needs CEREMONY_FOLLOW_HOST. Off (default): the system prompt is unchanged.
+    ceremony_follow_script_prompt: bool = _get_bool("CEREMONY_FOLLOW_SCRIPT_PROMPT", False)
+    # "อยากให้มันตอบสดเลย ไม่ต้องมากดตามบท การกดตามจะเป็นวิธีสุดท้ายหลังจากการตอบสดทำได้ดี" (owner 24 Nov ~11:40): True
+    # (default) = follow mode as of 24 Nov morning -- a matched host line presses the cue, her live reply to it is held
+    # and dropped. False = LIVE FIRST: nothing is pressed, held or dropped; she answers every time (Gemini, with the
+    # script in context); a matched line only puts that cue's slide on the hall screen and moves the pointer on.
+    # The staff's own press stays as the fallback.
+    ceremony_follow_cues: bool = _get_bool("CEREMONY_FOLLOW_CUES", True)
+    # "เวลามิกิพูดบางทีอาจจะพูดยาวแล้วค่อยมาถามเกี่ยวกับบทด้วย" (owner 24 Nov ~12:15): in LIVE FIRST (follow on, cues off) the
+    # ceremony call's local VAD waits this many ms of silence before it closes the host's turn, so she does not start
+    # answering in a pause of a long speech to the guests. 0 (default) = VAD_SILENCE_MS as every call. Ceremony call only.
+    ceremony_live_end_silence_ms: int = int(os.getenv("CEREMONY_LIVE_END_SILENCE_MS", "0"))
+    #: The pre-roll of the ceremony call's segments (that call alone: the one with CEREMONY_LIVE_END_SILENCE_MS). Long-talk
+    #: test 24 Nov night: after a 2-4 s pause in a quiet hall "Emma," -- one short word, then a breath -- was over before the
+    #: detector flagged speech, and 300 ms of pre-roll did not reach back to it (4 of 10): the caption had no name and the
+    #: name-first rule refused the question. 0 = VAD_PREFIX_PADDING_MS as before.
+    ceremony_prefix_padding_ms: int = int(os.getenv("CEREMONY_PREFIX_PADDING_MS", "0"))
+    # "ส่วนมุก ... ให้หุ่นเล่นไปเองเลย ต่อจากบทก่อนหน้า" (owner 24 Nov): in LIVE FIRST the two chain jokes (a set-up whose
+    # step carries `chain`) are pressed by the server itself once the cue before them was taken and her live answer to it
+    # is over and the host is quiet -- the approved words, through the staff press path. Off (default) = staff press them.
+    ceremony_jokes_auto: bool = _get_bool("CEREMONY_JOKES_AUTO", False)
+    # "งั้นเราอย่าไปโฟกัสกับสคริปเยอะไหม เพราะสุดท้ายก็คุยด้นสด ... เราแค่ปรับโมชั่นให้มันดีขึ้น โชว์อะไรมากขึ้น ... แค่ตอนที่โชว์โมชั่นจบก็ขึ้นหน้าโลโก้
+    # แล้วรอฟังที่คุยกะมิกิ" (owner 24 Nov ~12:40): FREE TALK, on top of LIVE FIRST (follow on, cues off). She answers him freely and briefly
+    # (no script line in her prompt, no nudge, no joke auto-play); the picker never marks/skips order steps; the hall shows the best motion
+    # of each exchange (cue slide > a story she tells > topic slide) and returns to the logo CEREMONY_LOGO_AFTER_S after her answer ends.
+    # Off (default) = live first exactly as before.
+    ceremony_free_talk: bool = _get_bool("CEREMONY_FREE_TALK", False)
+    ceremony_logo_after_s: float = max(0.0, float(os.getenv("CEREMONY_LOGO_AFTER_S", "4") or 4))
+    # "ถ้าคำถามที่เขาคล้ายกับเรา ก็ให้ตอบตามสคริปที่เราทำ แล้วก็โชว์ไปเลย ส่วนโหมดเก่าก็เอาออกไปก่อน อันนั้นเอาไว้ใช้หลังคุยกับคุณมิกิเสร็จ
+    # ... อะไรที่ไม่มีในบท ก็ให้หุ่นตอบแบบสดไปได้ แต่ไม่ต้องโชว์อะไร" (owner 24 Nov ~13:50): in the Emma Ceremony app's call the screens
+    # show only the script's own slides (a matched/pressed cue). No motion story (present_story is not offered to the ceremony
+    # profile: the robot face and the hall both) and no topic slide from the host's words. The Event app after the ceremony
+    # keeps its stories. Off (default) = as before.
+    ceremony_script_show_only: bool = _get_bool("CEREMONY_SCRIPT_SHOW_ONLY", False)
+    # "ต่อให้มิกิจะพูดนานแค่ไหน แต่ถ้าบอกชื่อ emma หรือออกเสียงเรียก พร้อมคำถาม ถึงหุ่นจะตอบ" (owner 24 Nov ~15:38): in the answer-all
+    # window her LIVE answer (off the script) goes out only when his words name her; a question of the script still plays
+    # its line without the name (the matcher decides those). Off (default) = answer-all as before.
+    ceremony_answer_named: bool = _get_bool("CEREMONY_ANSWER_NAMED", False)
+    # "ให้ทั้งหมดที่หุ่นจะตอบก็ต่อเมื่อมีคำว่า emma ไม่ว่าจะถามไปแล้วหรือยังไม่ถาม" (owner 24 Nov ~17:40): with the script shown, a line
+    # plays and she answers only when his words CALL her (or answer a question she just asked him); he may go on talking
+    # after her name, nothing is decided until he stops; and a question that MEANS a line plays it whatever its words
+    # (app/ceremony_call.py, host.json `means`). Off (default) = as before.
+    ceremony_name_first: bool = _get_bool("CEREMONY_NAME_FIRST", False)
+    # "บางคำถามที่ในบทเราไม่มีโมชั่น ก้ไปเอาโมชั่นมาได้ไหม" (owner 24 Nov ~18:10): with her name first, the approved motion stories the
+    # script does not answer (data/ceremony/offscript_stories.json) are told in the ceremony too (app/ceremony_stories.py).
+    ceremony_offscript_stories: bool = _get_bool("CEREMONY_OFFSCRIPT_STORIES", False)
+    # "ก็ให้มันทำเป็นบททั้งหมดเลย จะได้ไม่มีปัญหา ก็เหมือนเพิ่มสคริปให้เยอะขึ้น" (owner 24 Nov ~19:20): the same stories as lines of their
+    # own -- recorded in her voice, signed, played by the server (app/ceremony_extra.py); the story tool above is then only
+    # the fallback while none of them is signed.
+    ceremony_extra_lines: bool = _get_bool("CEREMONY_EXTRA_LINES", False)
+    # "ถ้าเอาซับไทยที่หุ่นตอบพอ ไม่มีซับคนพูด จะไวไหม" (owner 24 Nov): the hall screen's Thai subtitle band for her LIVE answers
+    # (app/live_subtitle.py): her output transcript, sentence by sentence, translated to Thai by a fast Gemini text model off the
+    # event loop (never delays her audio), shown by the hall page on the audio clock it plays. Only HER words: never the host's,
+    # never English; a failed/late translation = no subtitle for that sentence. Live first (CEREMONY_FOLLOW_HOST on, cues off) only.
+    ceremony_live_subtitle_th: bool = _get_bool("CEREMONY_LIVE_SUBTITLE_TH", False)
+    ceremony_live_subtitle_model: str = os.getenv("CEREMONY_LIVE_SUBTITLE_MODEL", "gemini-3.5-flash-lite")
+    ceremony_live_subtitle_timeout_s: float = max(0.5, float(os.getenv("CEREMONY_LIVE_SUBTITLE_TIMEOUT_S", "2.5") or 2.5))
     # Emma as the host of an event (owner 30 Oct: "ให้ emma เป็น host งานคอยรับแขก
     # ในวันงานอีเว้น ... เชิญลูกค้า แล้วพาไปยังจุดต่างๆ และคอยไปทักทายคนต่างๆที่โต๊ะ"
     # -- 25-26 Nov, office floor 1; app/event_host.py). A separate robot app
@@ -1083,6 +1321,13 @@ class Settings:
     # key: the phone never holds WS_TOKEN). 0 = no listener (default: every
     # machine unchanged). Never starts without the key.
     event_file: str = os.getenv("EVENT_FILE", "data/events/floor1_event.json").strip()
+    # The opening ceremony is an app of its own since 9 Nov (owner: "อันนี้ทำแยกกับอันเดิมนะ
+    # ไม่งั้นจะปนกัน อันนี้จะเป็นสำหรับพิธี ที่สามารถใช้ข้อมูลอันเก่าได้" -- "Emma Ceremony",
+    # profile `ceremony`, app/ceremony.py): its script, its running order and its `replies`
+    # (app/event_script.py), with its recorded lines in voice/ beside it. It shares the
+    # event file's spots and clips (the order names them by id) but none of its scenes.
+    # Empty = no ceremony on this machine (conftest empties it, like EVENT_FILE).
+    ceremony_file: str = os.getenv("CEREMONY_FILE", "data/ceremony/floor1_ceremony.json").strip()
     event_control_port: int = int(os.getenv("EVENT_CONTROL_PORT", "0") or 0)
     event_control_host: str = os.getenv("EVENT_CONTROL_HOST", "0.0.0.0").strip() or "0.0.0.0"
     event_control_key: str = _get_token("EVENT_CONTROL_KEY")
@@ -1091,10 +1336,105 @@ class Settings:
     # be tried while the robot is off its spot -- 29 Oct: "อย่าเดินนะ ตอนนี้
     # หุ่นไม่ได้อยู่ที่ตำแหน่ง". Off = a scene with a spot only says so.
     event_walk_enabled: bool = _get_bool("EVENT_WALK_ENABLED", False)
+    # A scene's line recorded ahead in a voice the owner picked by ear (`recorded` in the event file;
+    # owner 10 Nov 2026, the debut's English pageant line in ElevenLabs' "Jessica" v3: "Jessica v3
+    # รอบแรก (C) ชอบเสียงนี้ ... เราใช้โชว์แค่วันงาน"). Off = she says every line herself, as before;
+    # robot.env turns it on. app/event_host.py `recorded_pcm`, scripts/voice_line.py.
+    event_recorded_lines: bool = _get_bool("EVENT_RECORDED_LINES", False)
+    # Card 1's whole opening in one press (owner 23 Nov 2026: "การ์ดแรก ให้หุ่นเปิดตัวตามที่ซ้อมไว้ ... จากนั้นไปหน้า
+    # เคาน์เตอร์แล้วจับมือมิกิ แล้วหันหลัง ไปจับมือกับแขกสักสามจุด ... แล้วก็กลับมาหน้าเคาน์เตอร์"): a scene's `tour`
+    # in the event file runs after its walk arrives (app/event_tour.py). Off = the scene as before (the debut alone);
+    # robot.env turns it on.
+    event_tour: bool = _get_bool("EVENT_TOUR", False)
+    # The arm at rest before a walk the server runs (app/event_walk.py `_arm_rested`): the app does it
+    # for its own walks, and cannot see these (review 6 Nov: a handshake's arm out ~20 s, a leg at 45 s).
+    event_walk_arm_rest: bool = _get_bool("EVENT_WALK_ARM_REST", True)
+    # The debut's hand leads her line by this (owner 11 Nov: "เหมือนมือจะขึ้นช้ากว่าเสียงที่พูด" -- the
+    # raise was 6.9 s, the line went with its start): seconds from the app's "started" for the pageant
+    # (its frames going) to her line, app/event_pageant.hand_up. 2.7 = the raise's first two stages
+    # (the arm out, the forearm up: Pageant.RAISE_MS + RAISE_UP_MS, 1.5 + 1.2); the last two (1.6 s) land on
+    # her "Hello everyone". 4.5 of the 6.9 s raise until 23 Nov (owner at the ceremony's opening on the robot:
+    # "ยกมือช้าไปหน่อย อยากให้ไวกว่านี้ได้ไหม" -- the raise is 4.3 s now). 0 = the line with the start, as
+    # before 11 Nov. Since 24 Nov only the FALLBACK for an app that says `pageant_v` 2 without its numbers
+    # (or no caps at all): the app reports its own lead in body_caps (`pageant_lead_ms`, PageantTiming.java)
+    # and an app without `pageant_v` is the old APK, 4.5 (event_pageant.lead_s; review 24 Nov: no version
+    # handshake). tests/test_pageant_timing.py ties it to the app's frames.
+    event_pageant_lead_s: float = float(os.getenv("EVENT_PAGEANT_LEAD_S", "2.7") or 0)
+    # The ceremony's running order (app/event_order.py): progress older than this is a
+    # rehearsal's and is cleared, and the live window never outlasts it. Not the mode's clock any
+    # more (9 Nov): the mode is the Emma Ceremony app being open (app/ceremony.py), and an app
+    # does not outlive the event the way scene.json did.
+    event_ceremony_max_s: float = float(os.getenv("EVENT_CEREMONY_MAX_S", "10800") or 10800)
+    # After a recorded ceremony cue (app/event_cues.py): tell the model the line as a context
+    # note (send_context_note, turn_complete=False). Off: never measured live, and on 3.8 such
+    # a note may hold the host's next reply -- nothing releases it on a PC, on the robot only
+    # the reply watchdog's nudge (in a ceremony, only when she was named). The model learns of
+    # the cue from the scene note beside tool results instead (event_host.scene_note).
+    event_cue_context_note: bool = _get_bool("EVENT_CUE_CONTEXT_NOTE", False)
+    # A cue-only ceremony ("replies": "cues" in CEREMONY_FILE, app/ceremony.py cue_only): the one live
+    # step's window (event_host.live_open, the host asks, she answers live) closes by itself after
+    # this long if staff never press "ถัดไป" -- or the mic would stay open through the speeches after it.
+    event_live_max_s: float = float(os.getenv("EVENT_LIVE_MAX_S", "180") or 180)
+    # The ceremony page's "ตอบสด" (owner 23 Nov: the host may go off-script, app/ceremony.py `adhoc_open`):
+    # the same live window, opened by staff at any moment, closes by itself after this long (capped by
+    # EVENT_CEREMONY_MAX_S). Shorter than the order's step: an ad-lib exchange is a question or two, and a
+    # window forgotten open answers the host's next scripted "Emma ..." live before the cue is pressed --
+    # staff press "ตอบสด" again (one tap) when he is still going.
+    ceremony_adhoc_max_s: float = float(os.getenv("CEREMONY_ADHOC_MAX_S", "120") or 120)
+    # The event venue's lights and curtains, sent by the robot's own server (owner 20 Nov 2026:
+    # "เตรียมด้วยนะ หุ่นอาจจะต้องสั่งปิดไฟ ปิดม่านได้ ... อาจจะต้องทำระบบเผื่อไว้"; app/venue_devices.py).
+    # What drives the floor-1 lobby's lights and curtains is not known yet: the devices are named in
+    # VENUE_DEVICES_FILE (tracked, no secrets), each with an adapter (manual / broadlink / http).
+    # Off = no device is in use: the ceremony's device steps are not in its order, the staff page has
+    # no lights card, the morning check no row -- the ceremony exactly as before (conftest pins it).
+    venue_devices: bool = _get_bool("VENUE_DEVICES", False)
+    # A rehearsal without the hardware: a device press answers "mock" and nothing leaves the machine.
+    # The morning check calls it NO-GO (on the day a press must send).
+    venue_devices_dry_run: bool = _get_bool("VENUE_DEVICES_DRY_RUN", False)
+    venue_devices_file: str = os.getenv("VENUE_DEVICES_FILE", "data/events/venue_devices.json").strip()
+    # The learned IR/RF frames (scripts/venue_devices.py learn): never the sales room's IR_CODES_FILE.
+    venue_codes_file: str = os.getenv("VENUE_CODES_FILE", "data/events/venue_codes.json").strip()
+    # The venue's Broadlink hub (an RM4 Pro does IR and RF 433/315 MHz): `scripts/venue_devices.py find`
+    # prints these three lines. A fixed IP (a DHCP reservation): there is no rediscovery here.
+    venue_broadlink_host: str = _get_token("VENUE_BROADLINK_HOST")
+    venue_broadlink_mac: str = _get_token("VENUE_BROADLINK_MAC")
+    venue_broadlink_devtype: str = _get_token("VENUE_BROADLINK_DEVTYPE")
+    # A webhook / Home Assistant: the base URL and the bearer token live in .env only (the devices file
+    # names a method, a path and a body -- never a URL or a secret).
+    venue_http_base_url: str = _get_token("VENUE_HTTP_BASE_URL")
+    venue_http_token: str = _get_token("VENUE_HTTP_TOKEN")
+    # One command's whole budget (the hub's auth retries, an http call and its state read back): past
+    # it the press answers "unknown" -- it may have gone out.
+    venue_device_timeout_s: float = float(os.getenv("VENUE_DEVICE_TIMEOUT_S", "8") or 8)
+    # The launch ceremony's script (CEREMONY_FILE, app/event_script.py; owner
+    # 6 Nov: "ส่ง gemini หรือให้ตอบจากสคริปต์ อันไหนดีกว่า วัดดู"): two ways for the LIVE session
+    # to answer the host's script questions, measured by scripts/eval_live_qa.py --suite ceremony.
+    # Both off = the event prompt and its tools byte for byte as before. Only approved cues ever
+    # reach either (event_script.servable()).
+    # EVENT_SCRIPT_PROMPT: a call of the ceremony app gets each cue -- the host's line and hers --
+    # in its system prompt (event_host.script_block, in the ceremony block only since 9 Nov).
+    event_script_prompt: bool = _get_bool("EVENT_SCRIPT_PROMPT", False)
+    # EVENT_SCRIPT_TOOL: the `say_script_line(cue)` tool (app/tools/ceremony.py) -- the model
+    # names which script question the host asked, the line is played recorded or said word for
+    # word (app/event_cues.py). Group `ceremony` is opt-in: TOOL_GROUPS must name it too. The
+    # ceremony profile only since 9 Nov (registry.allowed); a cue plays only while the ceremony app is on.
+    event_script_tool: bool = _get_bool("EVENT_SCRIPT_TOOL", False)
+    # A scene with `roam` walks a list of stops by itself (app/event_roam.py). She goes home under
+    # the first figure, comes back at the second; both guesses until the rehearsal has measured
+    # the battery over a day. Nobody about for IDLE_DOCK_S sends her home too (0 = never).
+    event_roam_dock_battery: float = float(os.getenv("EVENT_ROAM_DOCK_BATTERY", "30") or 30)
+    event_roam_resume_battery: float = float(os.getenv("EVENT_ROAM_RESUME_BATTERY", "70") or 70)
+    event_roam_idle_dock_s: float = float(os.getenv("EVENT_ROAM_IDLE_DOCK_S", "600") or 0)
+    # After the scene's press, before the first leg: her line, staff's hands off the phone.
+    event_roam_first_wait_s: float = float(os.getenv("EVENT_ROAM_FIRST_WAIT_S", "15") or 0)
     # The staff page is the walk's dead man's switch: it polls every second,
     # and a walk with no poll for this long is stopped (a phone locked, its
     # Wi-Fi gone in the multimedia room -- CLAUDE.md "จุดอับ").
     event_walk_heartbeat_s: float = float(os.getenv("EVENT_WALK_HEARTBEAT_S", "5") or 5)
+    # Below this % a walk is refused unless it goes to the dock (the staff page shows
+    # the battery; nothing did before, review 5 Nov). A guess until the rehearsal has
+    # measured the battery over an event day (docs/emma-event-rehearsal.md).
+    event_walk_min_battery: int = int(os.getenv("EVENT_WALK_MIN_BATTERY", "20") or 20)
     # Pictures of every walk (app/walk_frames.py; owner 31 Oct: "ลองให้เดินแล้วดู
     # ภาพประกอบด้วยจะได้ประเมินถูก"): while the robot walks, the head camera's
     # newest frame + the board's pose and lidar every WALK_FRAMES_EVERY_S, to
@@ -1212,6 +1552,20 @@ class Settings:
     # VAD_MODE=gemini. Off by default — the sales machine keeps wake/button.
     standing_line: bool = _get_bool("STANDING_LINE", False)
 
+    # The mute hold outlives the page (owner, 5 Nov: "ปิดไมค์ แต่เหมือนรีแล้วก็
+    # กลับมาพูด"). On: the server keeps it in MIC_HOLD_FILE, through an app
+    # restart, a server restart and an Android reboot, until a tap on the mic or
+    # the next MIC_HOLD_RESET_HOUR:00 on this machine's clock (app/wake.py).
+    # Off (default): the page's sessionStorage, as before.
+    mic_hold_persist: bool = _get_bool("MIC_HOLD_PERSIST", False)
+    mic_hold_file: str = os.getenv("MIC_HOLD_FILE", "data/robot/mic_hold.json")
+    mic_hold_reset_hour: int = int(os.getenv("MIC_HOLD_RESET_HOUR", "6"))
+    # Owner, 14 Oct: "ตอน Mute ถ้ากล้องจับหน้าคนได้ จะต้องทักนะ" -- a face still
+    # opens a call while muted, with the mic on for the person greeted. False:
+    # muted means nothing opens and she greets nobody. Server log of 26-27 Oct:
+    # the camera ended 5 of 10 mute spells, 2 of them within ~3 minutes.
+    mute_camera_greets: bool = _get_bool("MUTE_CAMERA_GREETS", True)
+
     # Hold-speech (owner, 2026-09-30 "ทำเลย"): the third road between
     # barge-in (any noise cuts her sentence — rejected the same morning) and
     # plain half-duplex (words spoken while she talks are DROPPED, and
@@ -1301,6 +1655,20 @@ class Settings:
     #: denied its follow-up for want of one (focus.at_big_screen). 0 = off =
     #: today's rules everywhere (the sales-room PC); robot.env sets it.
     focus_screen_rms: float = float(os.getenv("FOCUS_SCREEN_RMS", "0"))
+    #: Near voices in, far voices out, by the lidar (app/near_voice.py, owner 5 Nov:
+    #: "ฟังเสียงคนใกล้ คนไกลออก"). off | shadow (log what it would do, change nothing) |
+    #: on. Needs HEAD_FOLLOW and LIDAR_PEOPLE, whose poller it only reads; any failure
+    #: = no opinion = the rules above. Off = one setting read per door frame.
+    voice_near_door: str = os.getenv("VOICE_NEAR_DOOR", "off")
+    #: Somebody within this many metres of the lidar is "at the robot". The replay's
+    #: best trade; a person at the chest screen read 0.4-1.5 m on 5 Nov.
+    voice_near_m: float = float(os.getenv("VOICE_NEAR_M", "1.5"))
+    #: Nobody on the lidar, but a frame this loud: they must be here. Level alone does
+    #: not measure distance (the module's table), so only a high bar, as a way out.
+    voice_near_loud_rms: float = float(os.getenv("VOICE_NEAR_LOUD_RMS", "0.2"))
+    #: After any move the door has no opinion for this long: somebody who was standing
+    #: there when she stopped is background until a leg moves (0 of 120 scans).
+    voice_near_warm_s: float = float(os.getenv("VOICE_NEAR_WARM_S", "180"))
     #: A camera-summoned call is deaf until its greeting is heard, or this
     #: long if no greeting comes (the face was lost before it was judged).
     #: 13 Oct robot logs: ears opened 9-10 s after the dial on call after
@@ -1361,6 +1729,30 @@ class Settings:
     # the app's -- HeadLook.java); it never holds a pulse. Off by default, and
     # the app's "สั่งท่าทางด้วยเสียง" switch must be on too.
     head_follow: bool = _get_bool("HEAD_FOLLOW", False)
+    #: The head locks on the first person it turns to and follows only them,
+    #: and goes back to centre once they are gone -- owner 10 Nov: "เวลาหุ่นเห็น
+    #: หน้าใครคนแรก อยากให้กล้องแทร็กตามคนนั้น ... พอเขาไปหุ่นก็กลับมาตรงเหมือนเดิม
+    #: ไม่ต้องหันไปมาตลอดเวลา" (app/head_follow.py `_first_person`). The mascot's
+    #: eyes still follow the attention cue. false = the head follows the cue too,
+    #: as before (the nearest face / the visiting round / whoever speaks); the
+    #: wider pan deadband (10, head_follow.PAN_DEADBAND_DEG) stays either way.
+    head_follow_first: bool = _get_bool("HEAD_FOLLOW_FIRST", True)
+    #: The head stays still in a ceremony call (profile `ceremony`, the Emma Ceremony app) -- owner 24 Nov
+    #: 2026: "ไม่ต้องให้หุ่นหันหัวไปมาตอนพูดแล้วให้ขยับมือเหมือนที่ทำตอนแรกพอ". head_follow.py then sends
+    #: ONE look to centre at the call's start and nothing else (no face lock, lidar/voice turn, look down,
+    #: calibration sweep, walk scan). Server side only; other profiles are not touched. Her talking arms
+    #: (SPEECH_GESTURES) are a separate switch.
+    ceremony_head_still: bool = _get_bool("CEREMONY_HEAD_STILL", False)
+    #: WHO that first person may be (owner 12 Nov 2026: "อยากให้หันตามคนที่พูดคนแรก
+    #: หรืออยู่ด้านหน้า"). "first" = the first face attention gives -- what the robot
+    #: did on 12 Nov: 37 locks, every one on "the biggest face in view", 35 gone within
+    #: 10 s (people walking across the 19 deg lens). "speaker" = only a face whose voice
+    #: opened her ears (attention's mouth / label / main), a face found where a voice
+    #: aimed the head (the look down or the lidar's turn), or one that has stood in the
+    #: picture HEAD_FRONT_STAND_S -- the most central first. Nobody else is turned to.
+    #: Anything but "speaker" is "first" (the sales room PC and every test).
+    head_lock_by: str = os.getenv("HEAD_LOCK_BY", "first").strip().lower()
+    head_front_stand_s: float = float(os.getenv("HEAD_FRONT_STAND_S", "2.5") or 2.5)
     #: Degrees the head turns / tilts at 100% -- UNMEASURED (assumes ~10 us per
     #: degree over the app's +-200 us). Read it on the bench: the face's bearing
     #: shift after a look, divided into the percent sent (`head_look` rows).
@@ -1373,6 +1765,21 @@ class Settings:
     #: never seen turns AWAY from a guest (neither ch7's sign nor the camera's
     #: mirroring has been checked on the robot). false = trust the two numbers above.
     head_calibrate: bool = _get_bool("HEAD_CALIBRATE", True)
+    #: On a walk the head sweeps left / down / right / ahead instead of staying
+    #: ahead, so the walk pictures see round the robot (owner 4 Nov: "หันตอนเดิน
+    #: ไปด้วยไม่ได้หรอ ให้มันสแกนไปด้วยว่ารอบมีอะไร ตำแหน่งถูกไหม"). Needs HEAD_FOLLOW
+    #: and an APK whose HeadLook has the walk box (4 Nov); an older one refuses
+    #: the turn ("navigating") and the walk stays looking ahead.
+    head_walk_scan: bool = _get_bool("HEAD_WALK_SCAN", False)
+    #: The head camera as measured on the robot (4 Nov): ~19 deg wide (the
+    #: base's own spot turns: 53-55 px a degree of yaw on a 1024 px picture,
+    #: board odometry), and left-right mirrored (a left turn slides the picture
+    #: left; text reads backwards). For the walk pictures and the map check's
+    #: pictures (map_check.lens). The head loop and the face bearings stay in
+    #: facewatch.ROBOT_CAMERA_HFOV_DEG's units -- the head sweep is measured in
+    #: them. 0 / false = not measured.
+    robot_camera_hfov_measured: float = float(os.getenv("ROBOT_CAMERA_HFOV_MEASURED", "0") or 0)
+    robot_camera_mirrored: bool = _get_bool("ROBOT_CAMERA_MIRRORED", False)
     #: The lidar's people for the head (app/lidar_people.py; owner 31 Oct
     #: "เช็คเรดาห์ เลเซอร์ และภาพประกอบกัน"): where somebody stands round the
     #: base, for a voice with no face in view (turn toward them, not just look
@@ -1383,15 +1790,33 @@ class Settings:
     lidar_people_every_s: float = float(os.getenv("LIDAR_PEOPLE_EVERY_S", "0.5") or 0.5)
     #: How far of that span the server may use, percent: the runtime range,
     #: inside the app's hard one. Small to start (the bench widens it).
+    #: 4 Nov, measured at the dock (5 % steps, the head camera's picture shift):
+    #: the head STOPS going down at ~22-23 % and up at ~16 % -- past that the
+    #: servo pushes on a head that no longer moves (the walk scan's 40 % and an
+    #: 80 % try both did; 12 Sep ch8 smoked "stuck, not knowing where it was").
+    #: Pan ran to 60 % both ways without a stop. So down 18 / up 12, under the
+    #: app's own ch8 clamp (HeadLook 1472-1540). Never raise these past the stops.
     head_pan_max: int = int(os.getenv("HEAD_PAN_MAX", "60") or 60)
-    head_tilt_down_max: int = int(os.getenv("HEAD_TILT_DOWN_MAX", "40") or 40)
-    head_tilt_up_max: int = int(os.getenv("HEAD_TILT_UP_MAX", "20") or 20)
+    head_tilt_down_max: int = int(os.getenv("HEAD_TILT_DOWN_MAX", "18") or 18)
+    head_tilt_up_max: int = int(os.getenv("HEAD_TILT_UP_MAX", "12") or 12)
+    # Where the head is straight, in pan % of the app's span (owner 25 Nov: "หุ่นมันหันไปซ้ายเยอะกว่าปกติ" -- at the app's
+    # centre, ch7 1500, it looks left of the body). Added to every look this server sends (robot_face_link.look), and a
+    # centred head in the ceremony is re-sent (the app takes it to its own 1500 after 10 s of no look). 0 = as before.
+    head_pan_trim_pct: int = max(-30, min(30, int(os.getenv("HEAD_PAN_TRIM_PCT", "0") or 0)))
     #: A voice AT the robot (rms >= HEAD_SEARCH_RMS) with no face in view: tilt
     #: down this much (percent) to find a guest under the camera -- 12-13 Oct,
     #: 983 of 983 "no face in front" had no face at all while people stood at
-    #: the chest screen. 0 = no search.
-    head_search_tilt: int = int(os.getenv("HEAD_SEARCH_TILT", "30") or 0)
+    #: the chest screen. 0 = no search. Never past head_tilt_down_max (it was
+    #: 30 = into the 4 Nov stop).
+    head_search_tilt: int = int(os.getenv("HEAD_SEARCH_TILT", "18") or 0)
     head_search_rms: float = float(os.getenv("HEAD_SEARCH_RMS", "0.06") or 0.06)
+    #: ...and only when the lidar has somebody within the head's reach (owner 12 Nov "ทำเลย":
+    #: 15:42-16:20 that day, with the GCK mic as her ears, nearly every voice was loud enough --
+    #: 39 looks down and back in 37 min, the camera seeing a face in 45 of 5,971 frames, the
+    #: lidar's nearest person mostly 60-100 deg off ahead where the head cannot reach). Nobody
+    #: in reach = no look down (a `search_skipped` row says where they were). No fresh lidar,
+    #: or LIDAR_PEOPLE off = the search as before.
+    head_search_needs_lidar: bool = _get_bool("HEAD_SEARCH_NEEDS_LIDAR", False)
     #: That search turns toward the mic array's direction first ("ได้ยินเสียง
     #: คนมาจากทางซ้าย ... ให้หุ่นหันทัก", owner 31 Oct) -- only with the app
     #: owning the array (ARRAY_MIC) and a calibrated DOA (app/doa.py turns
@@ -1413,6 +1838,16 @@ class Settings:
     #: clustered per session only -- never stored across sessions.
     voiceprint_enabled: bool = _get_bool("VOICEPRINT_ENABLED", False)
     voiceprint_model: str = os.getenv("VOICEPRINT_MODEL", "")
+    #: One enrolled voice (app/one_voice.py, owner 19 Nov "ให้ไมค์มันจับแค่เสียงคนนั้น"): the profiles
+    #: whose calls send speech upstream only when it is the voice recorded on /voice-lock --
+    #: sentences judged by voice, short words by loudness (the policy and its risk: one_voice.py).
+    #: Empty = off everywhere, the default: every profile byte-identical. Not in robot.env.
+    one_voice_profiles: frozenset = frozenset(
+        p.strip().lower() for p in os.getenv("ONE_VOICE_PROFILES", "").split(",") if p.strip())
+    #: Which print (data/voice-lock/prints/<name>.npz); empty = the only one on file.
+    one_voice_name: str = os.getenv("ONE_VOICE_NAME", "")
+    one_voice_threshold: float = float(os.getenv("ONE_VOICE_THRESHOLD", "0.50"))
+    one_voice_short_db: float = float(os.getenv("ONE_VOICE_SHORT_DB", "8"))
     #: Direction of arrival from the robot's mic array (the face app reads
     #: the 8-channel Bothlent array natively and reports TDOA features).
     doa_enabled: bool = _get_bool("DOA_ENABLED", False)
@@ -1610,6 +2045,11 @@ class Settings:
     #: session can open app/providers/offline.py instead of Gemini (approved
     #: fixed lines + approved story lines, pre-rendered audio, local ASR).
     offline_fallback: bool = _get_bool("OFFLINE_FALLBACK", False)
+    #: The staff pages' "เน็ต" lamp (owner 10 Nov: "วิธีทำเน็ตไม่หลุด ... วันงานคนน่าจะต้องเยอะมาก"):
+    #: the same probe of Google's Live host (app/net_health.py) every NET_PROBE_S, SHOWN only --
+    #: every decision the probe feeds (the offline voice, the dial back-off) stays behind
+    #: OFFLINE_FALLBACK. Before it, a dropped internet looked like Emma going quiet.
+    net_status: bool = _get_bool("NET_STATUS", False)
     #: Seconds between background probes (DNS + TCP + TLS to the Live API
     #: host, no API call, no quota). 0 = no background probe.
     net_probe_s: float = float(os.getenv("NET_PROBE_S", "15"))

@@ -206,7 +206,8 @@ def test_the_greeting_gesture_returns_the_arm_to_rest_and_a_stop_voids_it():
     # a timer carrying an older generation does nothing: overtaken returns are void
     later = code_only(method(body, "private void later(int gen, Runnable work, long delayMs)"))
     assert "if (gen == generation.get()) work.run();" in later
-    home = code_only(method(body, "private void restReturn(int gen, String why)"))
+    # the 2-argument restReturn is "from running"; the body lives in the 3-argument one (6 Nov)
+    home = code_only(method(body, "private void restReturn(int gen, String why, String from)"))
     assert "gen != generation.get()" in home
     assert "host.operatorVisible()" in home             # the operator owns the arm
     # resetHome, not playGroup: playGroup's operator range (1-26) refuses 99 --

@@ -1,0 +1,12 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "texts": {
+    "say": "Please enjoy the video"
+  },
+  "beats": [
+    {"at_en": "Everyone", "do": "doors"},
+    {"at_en": "please enjoy the video", "do": "disc", "key": "say"}
+  ],
+  "options": {"mode": "doors", "end": "zoom"}
+}

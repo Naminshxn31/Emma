@@ -1,0 +1,1402 @@
+{
+  "format": "emma-ceremony-slide-assets-v1",
+  "about": "รูปที่สไลด์พิธีใช้ได้ (เจ้าของ 17 พ.ย. 2026: 'โชว์รูปต่างๆให้คนเห็นภาพ ... พวกโมเดลกับภาพเราก็มีแล้ว') · คีย์ = id ของรูปในแคตตาล็อกเรื่องเล่า (stories.json assets — ปัก sha256 ผ่านการครอป/ปิดส่วนของท่อเรื่องเล่าและอนุมัติแล้ว) · ไม่อยู่ในไฟล์นี้หรือ ok:false = ใช้ไม่ได้ (ปฏิเสธเป็นค่าเริ่ม) · about = คำ/วลีของบท en ที่รองรับรูป (ต้องมีอย่างน้อยหนึ่งในบทของคิว) · shows/text = สิ่งที่ผมเห็นในรูปจาก contact sheet 17 พ.ย. (scripts/build_ceremony_asset_catalog.py) · แก้ไฟล์นี้ไม่ทำให้ไฟล์สไลด์เป็นร่าง แต่รูปที่ถูกถอดจะทำให้สไลด์ที่ใช้มันไม่ถูกส่ง",
+  "assets": {
+    "bld_c_holo": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Building C as a blue wire hologram, front elevation, on black",
+      "about": [
+        "storeys",
+        "units",
+        "buildings"
+      ],
+      "text": "",
+      "establishing": true
+    },
+    "bld_c_real": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Building C lit model, front elevation, on black",
+      "about": [
+        "storeys",
+        "units",
+        "buildings"
+      ],
+      "text": ""
+    },
+    "campus_holo_f1060": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: an almost empty black frame (the first spark)",
+      "about": [
+        "units",
+        "buildings"
+      ],
+      "text": "none (no buildings yet)",
+      "establishing": true
+    },
+    "campus_holo_f1120": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: the lagoon outline appearing",
+      "about": [
+        "units",
+        "buildings"
+      ],
+      "text": "none (no buildings yet)",
+      "establishing": true
+    },
+    "campus_holo_f1180": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: the lagoon glowing on the site outline",
+      "about": [
+        "units",
+        "buildings"
+      ],
+      "text": "none (no buildings yet)",
+      "establishing": true
+    },
+    "campus_holo_f1240": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: site and lagoon",
+      "about": [
+        "units",
+        "buildings"
+      ],
+      "text": "none (no buildings yet)",
+      "establishing": true
+    },
+    "campus_holo_f1300": {
+      "ok": false,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: the first building rising",
+      "about": [],
+      "text": "MIRRORED 'BUILDING A/F...' lettering on the roofs (the letters are reversed in the model itself; the layout is not mirrored -- do not flip the picture)",
+      "why": "mirrored 'BUILDING A/D/F' lettering on the roofs is readable on the event screen (picture review 17 Nov); flipping would mirror the real layout -- needs a clean render"
+    },
+    "campus_holo_f1500": {
+      "ok": false,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: half the buildings up",
+      "about": [],
+      "text": "MIRRORED 'BUILDING A/F...' lettering on the roofs (the letters are reversed in the model itself; the layout is not mirrored -- do not flip the picture)",
+      "why": "mirrored 'BUILDING A/D/F' lettering on the roofs is readable on the event screen (picture review 17 Nov); flipping would mirror the real layout -- needs a clean render"
+    },
+    "campus_holo_f1814": {
+      "ok": false,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: all buildings as wire hologram",
+      "about": [],
+      "text": "MIRRORED 'BUILDING A/F...' lettering on the roofs (the letters are reversed in the model itself; the layout is not mirrored -- do not flip the picture)",
+      "why": "mirrored 'BUILDING A/D/F' lettering on the roofs is readable on the event screen (picture review 17 Nov); flipping would mirror the real layout -- needs a clean render"
+    },
+    "campus_holo_f1900": {
+      "ok": false,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: all buildings, hologram",
+      "about": [],
+      "text": "MIRRORED 'BUILDING A/F...' lettering on the roofs (the letters are reversed in the model itself; the layout is not mirrored -- do not flip the picture)",
+      "why": "mirrored 'BUILDING A/D/F' lettering on the roofs is readable on the event screen (picture review 17 Nov); flipping would mirror the real layout -- needs a clean render"
+    },
+    "campus_holo_f2054": {
+      "ok": false,
+      "kind": "model",
+      "shows": "Campus assembly sequence on black: the whole campus, hologram, final frame",
+      "about": [],
+      "text": "MIRRORED 'BUILDING A/F...' lettering on the roofs (the letters are reversed in the model itself; the layout is not mirrored -- do not flip the picture)",
+      "why": "mirrored 'BUILDING A/D/F' lettering on the roofs is readable on the event screen (picture review 17 Nov); flipping would mirror the real layout -- needs a clean render"
+    },
+    "campus_real": {
+      "ok": false,
+      "kind": "model",
+      "shows": "The whole campus as a lit white model on black, aerial",
+      "about": [],
+      "text": "MIRRORED 'BUILDING A/F...' lettering on the roofs (the letters are reversed in the model itself; the layout is not mirrored -- do not flip the picture)",
+      "why": "mirrored 'BUILDING A/D/F' lettering on the roofs is readable on the event screen (picture review 17 Nov); flipping would mirror the real layout -- needs a clean render"
+    },
+    "dev_timeline_early": {
+      "ok": false,
+      "why": "no ceremony line is about the developer's other projects",
+      "kind": "other",
+      "shows": "The developer's earlier projects on a timeline (white page)",
+      "about": [],
+      "text": "project names and dates"
+    },
+    "dev_timeline_late": {
+      "ok": false,
+      "why": "no ceremony line is about the developer's other projects",
+      "kind": "other",
+      "shows": "The developer's earlier projects on a timeline (white page)",
+      "about": [],
+      "text": "project names and dates"
+    },
+    "exec_ceo": {
+      "ok": false,
+      "why": "a photo of a person: only for a line about the executives, and no ceremony line is",
+      "kind": "other",
+      "shows": "An executive's portrait photo",
+      "about": [],
+      "text": ""
+    },
+    "exec_cfo": {
+      "ok": false,
+      "why": "a photo of a person: only for a line about the executives, and no ceremony line is",
+      "kind": "other",
+      "shows": "An executive's portrait photo",
+      "about": [],
+      "text": ""
+    },
+    "exec_coo": {
+      "ok": false,
+      "why": "a photo of a person: only for a line about the executives, and no ceremony line is",
+      "kind": "other",
+      "shows": "An executive's portrait photo",
+      "about": [],
+      "text": ""
+    },
+    "exec_gm": {
+      "ok": false,
+      "why": "a photo of a person: only for a line about the executives, and no ceremony line is",
+      "kind": "other",
+      "shows": "An executive's portrait photo",
+      "about": [],
+      "text": ""
+    },
+    "fac_3_common_sphere": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Level 3 Common Sphere: round meeting lounge, blue chairs",
+      "about": [
+        "floor 3",
+        "indoor facilities"
+      ],
+      "text": ""
+    },
+    "fac_3_coworking": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Level 3 Co-working Lounge: cream sofas, curved ceiling",
+      "about": [
+        "floor 3",
+        "indoor facilities"
+      ],
+      "text": ""
+    },
+    "fac_3_sky_pool": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Level 3 Sky Pool at sunset with the bay behind (level 3 -- NOT a roof: never caption it as one)",
+      "about": [
+        "floor 3"
+      ],
+      "text": ""
+    },
+    "fac_3_social": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Level 3 Social Lounge: bar under a moon dome (a robot bartender in the picture)",
+      "about": [
+        "floor 3",
+        "indoor facilities"
+      ],
+      "text": ""
+    },
+    "fac_b_aqua_cinema": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Basement Aqua Cinema: indoor pool with loungers under arches",
+      "about": [
+        "basement"
+      ],
+      "text": ""
+    },
+    "fac_b_crystal_sauna": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Basement Crystal Stone Sauna (a CG person lying down)",
+      "about": [
+        "basement"
+      ],
+      "text": ""
+    },
+    "fac_b_hydro_capsule": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Basement Hydrotherapy Capsules",
+      "about": [
+        "basement"
+      ],
+      "text": "'aquamassageSPA' on the capsules"
+    },
+    "fac_b_ice_bath": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Basement Ice Bath: blue room, water column",
+      "about": [
+        "basement"
+      ],
+      "text": ""
+    },
+    "fac_b_journey_mars": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Basement Journey to Mars: water tunnel under a projected dome",
+      "about": [
+        "basement"
+      ],
+      "text": ""
+    },
+    "fac_b_salt_sauna": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Basement Himalayan Salt Sauna: glowing orange salt wall",
+      "about": [
+        "basement"
+      ],
+      "text": ""
+    },
+    "fac_b_swing_sauna": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Basement Floating Swing Sauna: hanging seats",
+      "about": [
+        "basement"
+      ],
+      "text": ""
+    },
+    "fac_g_biogenesis": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Biogenesis gym under a glass-bottom pool, lagoon outside",
+      "about": [
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "fac_g_bungee": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Bungee Gym & Yoga: a yoga class (CG people)",
+      "about": [
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "fac_g_bungee_02": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Bungee Gym: bungee workout (CG people)",
+      "about": [
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "fac_g_junior": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Junior World: space-themed kids' room (CG children)",
+      "about": [
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "fac_g_junior_ballpit": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Junior World ball pit (CG children)",
+      "about": [
+        "ground floor"
+      ],
+      "text": "game-screen lettering"
+    },
+    "fac_g_pilates": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Pilates Studio at sunset (CG people)",
+      "about": [
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "fac_g_spinning": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Spinning Class: bikes round a screen pillar (CG people)",
+      "about": [
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "fac_plan_b": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "Basement facilities plan, wide strip",
+      "about": [
+        "basement"
+      ],
+      "text": "room names of the basement facilities; back-of-house labels (MDB/PUMP, OFFICE & CONTROL, LIFT HALL, WC); no numbers"
+    },
+    "fac_plan_g": {
+      "ok": false,
+      "kind": "plan",
+      "shows": "Ground floor facilities plan",
+      "about": [],
+      "text": "room names, SHOP-1..6, ø1200 x5",
+      "why": "has dimension marks in the bungee studio (five 'ø1200') -- use fac_plan_g_west, the same plan without that end"
+    },
+    "fac_plan_g_west": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "Ground floor plan, west half, closer",
+      "about": [
+        "ground floor"
+      ],
+      "text": "JUNIOR WORLD, SPINNING CLASS, PILATES STUDIO, BIOGENESIS, LOBBY, JOURNEY TO THE FUTURE, SHOP-4..6; no numbers"
+    },
+    "fac_plan_l3": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "Level 3 facilities plan",
+      "about": [
+        "floor 3"
+      ],
+      "text": "SOCIAL LOUNGE, CO-WORKING LOUNGE, COMMON SPHERE, CORRIDOR, LIFT HALL, WC; no numbers"
+    },
+    "fac_ue_building_a": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Building A hologram, front, with the round wing",
+      "about": [
+        "building a",
+        "units",
+        "buildings"
+      ],
+      "text": "",
+      "establishing": true
+    },
+    "lagoon_islands_aerial": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Water Lagoon from above: islands, bridges, the egg pavilion",
+      "about": [
+        "swimming pool",
+        "pool"
+      ],
+      "text": ""
+    },
+    "lagoon_scene58": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Water Lagoon from above, taller crop",
+      "about": [
+        "swimming pool",
+        "pool"
+      ],
+      "text": ""
+    },
+    "layout_1br_33": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "1-bedroom layout, line drawing, no dimensions (see-through)",
+      "about": [
+        "1-bedroom",
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "layout_1br_b113": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "1-bedroom slanted layout, line drawing (see-through)",
+      "about": [
+        "1-bedroom",
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "layout_51_1br": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "Large 1-bedroom layout, line drawing (see-through)",
+      "about": [
+        "1-bedroom",
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "layout_51_2br": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "2-bedroom layout, line drawing (see-through)",
+      "about": [
+        "2-bedroom",
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "layout_combined_48": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "Combined-unit layout, line drawing (see-through)",
+      "about": [
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "layout_combined_66": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "Combined-unit layout, line drawing (see-through)",
+      "about": [
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "layout_studio_24": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "Studio layout, line drawing (see-through)",
+      "about": [
+        "studios",
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "layout_studio_b107": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "Studio layout, line drawing (see-through)",
+      "about": [
+        "studios",
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "liv_courtyard_top": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Curved balconies above the lagoon, steep aerial",
+      "about": [
+        "pool",
+        "common areas"
+      ],
+      "text": ""
+    },
+    "liv_garden": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Garden path between the pools, buildings behind",
+      "about": [
+        "outdoors",
+        "relax",
+        "relaxing",
+        "common areas"
+      ],
+      "text": "",
+      "establishing": true
+    },
+    "liv_kid_pool": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Kids' pool and space playground from above",
+      "about": [
+        "family",
+        "outdoors"
+      ],
+      "text": ""
+    },
+    "liv_lagoon_night": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Water Lagoon at night from above",
+      "about": [
+        "swimming pool",
+        "pool"
+      ],
+      "text": ""
+    },
+    "liv_lawn": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Lawn with chrome canopy sculptures and loungers",
+      "about": [
+        "outdoors",
+        "relax",
+        "relaxing",
+        "common areas"
+      ],
+      "text": ""
+    },
+    "liv_park": {
+      "ok": true,
+      "kind": "other",
+      "shows": "The public park next door at sunset (a photograph, no people)",
+      "about": [
+        "attractions",
+        "around the project"
+      ],
+      "text": ""
+    },
+    "liv_playscape": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Space playground: rocket slide, kids' pool",
+      "about": [
+        "family",
+        "outdoors"
+      ],
+      "text": ""
+    },
+    "liv_trees": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Pools, trees and the buildings at eye level -- an establishing view",
+      "about": [
+        "common areas",
+        "outdoors"
+      ],
+      "text": "",
+      "establishing": true
+    },
+    "map_jomtien": {
+      "ok": true,
+      "kind": "map",
+      "shows": "Drawn map: Jomtien Beach, the sea, the project's block beside the road",
+      "about": [
+        "jomtien beach"
+      ],
+      "text": "JOMTIEN BEACH, CHAIYAPRUK 1, PTT"
+    },
+    "map_location_beach": {
+      "ok": true,
+      "kind": "map",
+      "shows": "Dark street map: the coast and the project's plot (no pins: the engine draws none here)",
+      "about": [
+        "jomtien beach"
+      ],
+      "text": "small street names"
+    },
+    "map_nearby_7eleven": {
+      "ok": true,
+      "kind": "map",
+      "shows": "Dark street map, close",
+      "about": [
+        "shopping",
+        "conveniences"
+      ],
+      "text": "small street names"
+    },
+    "map_nearby_attractions": {
+      "ok": true,
+      "kind": "map",
+      "shows": "Dark map of the Pattaya coast, wide",
+      "about": [
+        "attractions"
+      ],
+      "text": "place names"
+    },
+    "map_nearby_hospitals": {
+      "ok": true,
+      "kind": "map",
+      "shows": "Dark map of Pattaya, wide",
+      "about": [
+        "hospitals"
+      ],
+      "text": "place names"
+    },
+    "map_nearby_places": {
+      "ok": true,
+      "kind": "map",
+      "shows": "Dark street map, Jomtien",
+      "about": [
+        "conveniences"
+      ],
+      "text": "street names"
+    },
+    "map_nearby_restaurants": {
+      "ok": true,
+      "kind": "map",
+      "shows": "Dark street map along the coast",
+      "about": [
+        "conveniences"
+      ],
+      "text": "street names"
+    },
+    "mood_bathroom": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Unit bathroom (portrait)",
+      "about": [
+        "unit",
+        "units"
+      ],
+      "text": ""
+    },
+    "mood_bedroom": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Unit bedroom (portrait)",
+      "about": [
+        "bedroom"
+      ],
+      "text": ""
+    },
+    "mood_dining": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Unit dining corner (portrait)",
+      "about": [
+        "unit",
+        "units"
+      ],
+      "text": ""
+    },
+    "mood_living": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Unit living room (portrait)",
+      "about": [
+        "unit",
+        "units"
+      ],
+      "text": ""
+    },
+    "parking_plan": {
+      "ok": false,
+      "why": "no ceremony line is about parking or EV charging",
+      "kind": "plan",
+      "shows": "Underground parking plan with the EV charging bay",
+      "about": [],
+      "text": "EV, building letters"
+    },
+    "plan_1br": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "1-bedroom plan, line drawing, no dimensions (see-through)",
+      "about": [
+        "1-bedroom",
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "plan_2br": {
+      "ok": true,
+      "kind": "plan",
+      "shows": "2-bedroom plan, line drawing, no dimensions (see-through)",
+      "about": [
+        "2-bedroom",
+        "floor plans"
+      ],
+      "text": ""
+    },
+    "plan_ground_site": {
+      "ok": false,
+      "kind": "plan",
+      "shows": "Coloured ground site plan: six buildings round the lagoon",
+      "about": [],
+      "text": "unit numbers (E-120 ...), areas (33.5, 52.0 ...), SHOP-1..6, LOBBY, JUNIOR WORLD, SOUL SPACE, BIOGENESIS, BUILDING A-F",
+      "why": "carries every ground-floor unit's number and area, and shop / room names (seen at full size 17 Nov) -- figures no ceremony line says"
+    },
+    "prj_app": {
+      "ok": false,
+      "why": "its baked-in text names services no ceremony line says",
+      "kind": "other",
+      "shows": "The Embassy AI app on a phone",
+      "about": [],
+      "text": "24/7 AI SMART CONCIERGE, FACILITY RESERVATIONS, TRANSPORTATION ASSISTANCE, HOUSEKEEPING REQUESTS"
+    },
+    "prj_dev_awards": {
+      "ok": false,
+      "why": "no ceremony line is about the developer",
+      "kind": "other",
+      "shows": "The developer's awards / logo",
+      "about": [],
+      "text": "award names, EMPIRE GROUP"
+    },
+    "prj_dev_logo": {
+      "ok": false,
+      "why": "no ceremony line is about the developer",
+      "kind": "other",
+      "shows": "The developer's awards / logo",
+      "about": [],
+      "text": "award names, EMPIRE GROUP"
+    },
+    "prj_life_fitness": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Biogenesis gym under a glass-bottom pool, lagoon outside",
+      "about": [
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "prj_life_kids": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor Junior World: space-themed kids' room (CG children)",
+      "about": [
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "prj_life_lagoon": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Pools, trees and the buildings at eye level -- an establishing view",
+      "about": [
+        "swimming pool",
+        "pool"
+      ],
+      "text": ""
+    },
+    "prj_life_park": {
+      "ok": true,
+      "kind": "other",
+      "shows": "The public park next door at sunset (a photograph, no people)",
+      "about": [
+        "attractions",
+        "around the project"
+      ],
+      "text": ""
+    },
+    "prj_sec_lock": {
+      "ok": false,
+      "why": "too small for the event screen (about 200 px wide)",
+      "kind": "other",
+      "shows": "Digital door lock / phone app, very small files",
+      "about": [],
+      "text": ""
+    },
+    "prj_sec_phone": {
+      "ok": false,
+      "why": "too small for the event screen (about 200 px wide)",
+      "kind": "other",
+      "shows": "Digital door lock / phone app, very small files",
+      "about": [],
+      "text": ""
+    },
+    "prj_tech_ev": {
+      "ok": false,
+      "why": "no ceremony line is about parking or EV charging",
+      "kind": "plan",
+      "shows": "Underground parking plan with the EV charging bay",
+      "about": [],
+      "text": "EV, building letters"
+    },
+    "prj_tech_garden": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Garden path between the pools, buildings behind",
+      "about": [
+        "outdoors",
+        "relax",
+        "relaxing",
+        "common areas"
+      ],
+      "text": ""
+    },
+    "prj_tech_home": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Unit living and dining, wide",
+      "about": [
+        "unit",
+        "units"
+      ],
+      "text": ""
+    },
+    "rm_breeze": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Building E lit model on black",
+      "about": [
+        "storeys",
+        "units",
+        "buildings"
+      ],
+      "text": ""
+    },
+    "rm_corridor": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor corridor 'Journey to the Future': chrome arches, garden",
+      "about": [
+        "futuristic design",
+        "ground floor"
+      ],
+      "text": ""
+    },
+    "rm_lobby": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Ground floor lobby: round hall, chrome centrepiece",
+      "about": [
+        "lobby"
+      ],
+      "text": ""
+    },
+    "rm_parkside": {
+      "ok": true,
+      "kind": "other",
+      "shows": "The public park next door at sunset (a photograph, no people)",
+      "about": [
+        "attractions",
+        "around the project"
+      ],
+      "text": ""
+    },
+    "rm_playscape": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Space playground: rocket slide, kids' pool",
+      "about": [
+        "family",
+        "outdoors"
+      ],
+      "text": ""
+    },
+    "rm_playscape_aerial": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Playground and kids' pool from above",
+      "about": [
+        "family",
+        "outdoors"
+      ],
+      "text": ""
+    },
+    "rm_signature": {
+      "ok": true,
+      "kind": "render",
+      "shows": "The entrance front of the building from the road (a car in the drive)",
+      "about": [
+        "storeys",
+        "road level"
+      ],
+      "text": "",
+      "establishing": true
+    },
+    "room_1br_solid": {
+      "ok": true,
+      "kind": "model",
+      "shows": "1-bedroom unit, white cut-away model on black",
+      "about": [
+        "1-bedroom",
+        "unit types",
+        "visualisations"
+      ],
+      "text": ""
+    },
+    "room_1br_wire": {
+      "ok": true,
+      "kind": "model",
+      "shows": "1-bedroom unit, blue wire hologram on black",
+      "about": [
+        "1-bedroom",
+        "unit types",
+        "visualisations"
+      ],
+      "text": ""
+    },
+    "room_2br_solid": {
+      "ok": true,
+      "kind": "model",
+      "shows": "2-bedroom unit, white cut-away model on black",
+      "about": [
+        "2-bedroom",
+        "unit types",
+        "visualisations",
+        "this unit"
+      ],
+      "text": ""
+    },
+    "room_2br_wire": {
+      "ok": true,
+      "kind": "model",
+      "shows": "2-bedroom unit, blue wire hologram on black",
+      "about": [
+        "2-bedroom",
+        "unit types",
+        "visualisations",
+        "this unit"
+      ],
+      "text": ""
+    },
+    "room_studio_solid": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Studio unit, white cut-away model on black",
+      "about": [
+        "studios",
+        "unit types",
+        "visualisations"
+      ],
+      "text": ""
+    },
+    "room_studio_wire": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Studio unit, blue wire hologram on black",
+      "about": [
+        "studios",
+        "unit types",
+        "visualisations"
+      ],
+      "text": ""
+    },
+    "sh_aircon": {
+      "ok": true,
+      "kind": "model",
+      "shows": "Air-conditioner close-up in the unit model",
+      "about": [
+        "smart home",
+        "devices"
+      ],
+      "text": ""
+    },
+    "sh_curtain": {
+      "ok": true,
+      "kind": "render",
+      "shows": "Curtains at a unit window, closer crop",
+      "about": [
+        "curtains"
+      ],
+      "text": ""
+    },
+    "mood_1br_bath": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mood 1br bath",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "mood_1br_bed": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mood 1br bed",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "mood_1br_living": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mood 1br living",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "mood_2br_bath": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mood 2br bath",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "mood_2br_bed": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mood 2br bed",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "mood_2br_living": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mood 2br living",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "mood_st_bath": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mood st bath",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "mood_st_room": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mood st room",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_dev_timeline_early": {
+      "ok": false,
+      "kind": "render",
+      "shows": "The developer's earlier projects on a timeline (white page)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_dev_timeline_late": {
+      "ok": false,
+      "kind": "render",
+      "shows": "The developer's earlier projects on a timeline (white page)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_exec_ceo": {
+      "ok": false,
+      "kind": "render",
+      "shows": "An executive's portrait photo",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_exec_cfo": {
+      "ok": false,
+      "kind": "render",
+      "shows": "An executive's portrait photo",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_exec_coo": {
+      "ok": false,
+      "kind": "render",
+      "shows": "An executive's portrait photo",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_exec_gm": {
+      "ok": false,
+      "kind": "render",
+      "shows": "An executive's portrait photo",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_3_common_sphere": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Level 3 Common Sphere: round meeting lounge, blue chairs",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_3_coworking": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Level 3 Co-working Lounge: cream sofas, curved ceiling",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_3_sky_pool": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Level 3 Sky Pool at sunset with the bay behind (level 3 -- NOT a roof: never caption it as one)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_3_social": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Level 3 Social Lounge: bar under a moon dome (a robot bartender in the picture)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_b_aqua_cinema": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Basement Aqua Cinema: indoor pool with loungers under arches",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_b_crystal_sauna": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Basement Crystal Stone Sauna (a CG person lying down)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_b_hydro_capsule": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Basement Hydrotherapy Capsules",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_b_ice_bath": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Basement Ice Bath: blue room, water column",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_b_journey_mars": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Basement Journey to Mars: water tunnel under a projected dome",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_b_salt_sauna": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Basement Himalayan Salt Sauna: glowing orange salt wall",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_b_swing_sauna": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Basement Floating Swing Sauna: hanging seats",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_g_biogenesis": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Ground floor Biogenesis gym under a glass-bottom pool, lagoon outside",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_g_bungee": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Ground floor Bungee Gym & Yoga: a yoga class (CG people)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_g_junior": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Ground floor Junior World: space-themed kids' room (CG children)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_g_junior_ballpit": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Ground floor Junior World ball pit (CG children)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_g_pilates": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Ground floor Pilates Studio at sunset (CG people)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_fac_g_spinning": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Ground floor Spinning Class: bikes round a screen pillar (CG people)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_lagoon_islands_aerial": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Water Lagoon from above: islands, bridges, the egg pavilion",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_liv_courtyard_top": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Curved balconies above the lagoon, steep aerial",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_liv_garden": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Garden path between the pools, buildings behind",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_liv_kid_pool": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Kids' pool and space playground from above",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_liv_lagoon_night": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Water Lagoon at night from above",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_liv_lawn": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Lawn with chrome canopy sculptures and loungers",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_liv_park": {
+      "ok": false,
+      "kind": "render",
+      "shows": "The public park next door at sunset (a photograph, no people)",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_liv_playscape": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Space playground: rocket slide, kids' pool",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_liv_trees": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Pools, trees and the buildings at eye level -- an establishing view",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_prj_dev_awards": {
+      "ok": false,
+      "kind": "render",
+      "shows": "The developer's awards / logo",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_rm_corridor": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Ground floor corridor 'Journey to the Future': chrome arches, garden",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_rm_lobby": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Ground floor lobby: round hall, chrome centrepiece",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_rm_playscape": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Space playground: rocket slide, kids' pool",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_rm_playscape_aerial": {
+      "ok": false,
+      "kind": "render",
+      "shows": "Playground and kids' pool from above",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "site_plan_clean": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: site plan clean",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "units_campus": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: units campus",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_aqua1": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: aqua1",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_bio2": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: bio2",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_bio3": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: bio3",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_junior1b": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: junior1b",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_lobby2": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: lobby2",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_mars2": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: mars2",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    },
+    "n_back_front": {
+      "ok": false,
+      "kind": "render",
+      "shows": "the owner's final picture of 18 Nov: back front",
+      "about": [],
+      "text": "",
+      "why": "a story's picture only (18 Nov set, hall size): the film has its own files of the owner's pictures"
+    }
+  }
+}

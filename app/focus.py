@@ -104,6 +104,23 @@ NOT_MAIN = "not the main speaker"
 #: The robot is walking or gesturing: every voice is let through (see
 #: `_robot_moving`).
 ROBOT_MOVING = "robot moving"
+#: The ceremony's live window ("ตอบสด") is open and rule 2 had nothing against the voice (a face in
+#: front, her name just called, or a call rule 2 does not judge): rules 3-5 were NOT asked. The
+#: one voice she is meant to hear there is the host's, in a wireless mic clipped to him -- not a
+#: person in front of the robot's camera. Rules 3-5 judge faces and the direction of a voice the
+#: ARRAY heard; with the host's own mic a closed-mouthed guest in the lens made every sentence of
+#: his "faces in front are silent" (rehearsal harness 24 Nov).
+#: ONLY rules 3-5 stand down. Rule 2 is asked first and exactly as on any call, the window open or
+#: not: on a summoned call a voice with no face in the lens still needs her name, the reply window,
+#: the converse hold, the big screen or a voice at FOCUS_NEAR_RMS -- which is how the host's mic
+#: gets in ("near voice", not this reason). The first cut of 24 Nov sat above rule 2 and skipped it
+#: too: every voice over the far floor then opened a turn while the window was open (one guest
+#: talking near the host's mic = 7-8 turns a minute in that night's simulation).
+#: An open under this reason is a waiver, like rule 2's: it starts no converse hold (only an OK
+#: open does) and neither counts in nor clears the reply chain.
+#: The window is opened by staff and shut by them or its own clock; outside it the ceremony's mic
+#: is deaf anyway.
+CEREMONY_LIVE = "ceremony live window"
 #: Rule 2 waived: a conversation is under way (FOCUS_CONVERSE_HOLD_S), or the
 #: voice is loud enough to be standing at the robot (FOCUS_NEAR_RMS).
 CONVERSING = "in conversation"
@@ -114,6 +131,10 @@ REPLY = "reply to her"
 #: Rule 2 waived: the robot stands at a room's big screen (room_screens.
 #: at_screen) and the voice is clear (FOCUS_SCREEN_RMS) -- see `at_big_screen`.
 AT_SCREEN = "at the big screen"
+#: VOICE_NEAR_DOOR=on (app/near_voice.py): no face in view, and the lidar has
+#: somebody at the robot / nobody at the robot.
+NEAR_PERSON = "person near"
+NOBODY_NEAR = "nobody near"
 
 # ---- tunables (constants, not settings: tune from focus_* rows first) ----
 #: Rule 3's window: mouth samples this recent count for "is anybody in front
@@ -150,6 +171,10 @@ MAIN_MIN_SEGMENTS = 2
 ANOTHER_VOICE_HOLD_S = 4.0
 #: Labels below this confidence are not sent to the model (`context_note`).
 LABEL_MIN_CONF = 0.5
+#: VOICE_NEAR_DOOR: a face this recent stops the door refusing. The camera greets from a
+#: few metres and 28 of 29 arrivals on this lens were lost within seconds: somebody just
+#: greeted and answering from where they stand is the 31 Aug bug (greeted, never heard).
+NEAR_FACE_HOLD_S = 20.0
 #: Perception older than this is pruned on every append.
 HISTORY_S = 15.0
 #: Hard caps — memory is bounded however long the robot runs.
@@ -640,7 +665,7 @@ def may_open(t: float, rms: float | None = None) -> tuple[bool, str]:
             not _deny_burst or _deny_burst.get("reason") != reason
             or (t - _deny_burst.get("last", t)) > DENY_BURST_GAP_S)
         row = _row_for(allow, reason, t)
-        if new_utterance and reason == NO_FACE:
+        if new_utterance and reason in (NO_FACE, NOBODY_NEAR):
             # One entry per denied utterance, with where it came from:
             # `calling_out_of_view` reads these.
             _calls.append((t, _doa_bearing(t - DOA_WINDOW_S, t + 0.1)))
@@ -680,6 +705,42 @@ def at_big_screen() -> str | None:
         return room_screens.at_screen()
     except Exception:
         return None
+
+
+def _near_verdict(t: float, rms: float | None, state: str) -> tuple[bool, str] | None:
+    """What the near door (app/near_voice.py) says of a voice with no face in view,
+    or None: no opinion, the rules below decide as they do with the door off.
+
+    Called under _lock. Near = in, without the camera (983 of 983 "no face" refusals of
+    12 Oct had no face at all while people stood at the chest screen). Nobody near = out,
+    even inside the reply window or over FOCUS_NEAR_RMS: of what those let through, 36% and
+    13% asked anything. Three ways round that: a face within NEAR_FACE_HOLD_S, the big
+    screen (owner 29 Oct: people watch the TV, "ฟังจากเสียงที่ได้ยินชัดเอา"), and a voice so
+    loud the lidar must have missed them (VOICE_NEAR_LOUD_RMS; replay in the module)."""
+    from app import near_voice
+
+    if state == near_voice.NEAR:
+        return True, NEAR_PERSON
+    if state != near_voice.NOBODY:
+        return None
+    if _last_engaged_t is not None and t - _last_engaged_t <= NEAR_FACE_HOLD_S:
+        return None
+    if at_big_screen() is not None:
+        return None
+    if rms is not None and rms >= float(settings.voice_near_loud_rms):
+        return True, NEAR_VOICE
+    return False, NOBODY_NEAR
+
+
+def person_near(t: float | None = None) -> bool:
+    """VOICE_NEAR_DOOR=on and somebody stands at the robot: "no face" is then the lens
+    (a guest under it at the chest screen), not an empty room. For the session's two
+    face vetoes, as `at_big_screen`. Off and in shadow: False, one setting read."""
+    from app import near_voice
+
+    if near_voice.mode() != near_voice.ON:
+        return False
+    return near_voice.look(time.monotonic() if t is None else t)[0] == near_voice.NEAR
 
 
 def _robot_moving() -> bool:
@@ -756,12 +817,24 @@ def her_turn_ended(voice_end: float, epoch: int | None = None) -> None:
         since, _reply["since"] = _reply["since"], set()
         if since and since <= {REPLY}:
             _reply["chain"] += 1
-        elif since & {OK, NEAR_VOICE, CONVERSING, AT_SCREEN}:
+        elif since & {OK, NEAR_VOICE, CONVERSING, AT_SCREEN, NEAR_PERSON}:
             _reply["chain"] = 0
         if _reply["chain"] >= MAX_REPLY_CHAIN:
             _reply["until"] = float("-inf")
             return
         _reply["until"] = max(_reply["until"], float(voice_end) + window)
+
+
+def _ceremony_live_open() -> bool:
+    """The Emma Ceremony app's live window is open (app/ceremony.py live_state). Never raises: no
+    ceremony, any error = False, the rules as they were (the sales room never has a window).
+    `_decide` asks this once, after rule 2: an open window skips rules 3-5 and nothing else."""
+    try:
+        from app import ceremony
+
+        return ceremony.live_state() is not None
+    except Exception:                                    # noqa: BLE001
+        return False
 
 
 def _decide(t: float, rms: float | None = None) -> tuple[bool, str, dict]:
@@ -779,6 +852,31 @@ def _decide(t: float, rms: float | None = None) -> tuple[bool, str, dict]:
     if _robot_moving():
         return True, ROBOT_MOVING, inputs
 
+    # CEREMONY_MIC_ONLY (owner 24 Nov 11:27, rehearsal: "เอาเรื่องกล้องไม่เห็นหน้าออกเลย ฟังเสียงจากไมค์พอ"): in the
+    # ceremony's live window the camera has no say at all -- Khun Miki on the GCK collar mic (rms ~0.02-0.03, no face
+    # in the lens) was refused "no face in front" on every sentence. The call's own floors (VAD_MIN_RMS, Silero,
+    # NoiseReplyGate) still judge the sound. Off (default) = the rule-2-then-rules-3-5 order below.
+    if getattr(settings, "ceremony_mic_only", False) and _ceremony_live_open():
+        inputs["mic_only"] = True
+        return True, CEREMONY_LIVE, inputs
+
+    # (Otherwise the ceremony's live window is NOT asked here: it stands rules 3-5 down, never rule 2 --
+    # see the check above rule 3.)
+
+    # VOICE_NEAR_DOOR: on every row while it is not off, because the face-verified
+    # opens are what says how often the lidar sees a person who really is there.
+    near_door = str(settings.voice_near_door or "off")
+    near_state = None
+    if near_door != "off":
+        from app import near_voice
+
+        near_door = near_voice.mode()
+        if near_door != near_voice.OFF:
+            near_state, near_m, near_why = near_voice.look(t)
+            inputs["near_state"] = near_state
+            inputs["near_m"] = near_m
+            inputs["near_why"] = near_why
+
     # Rule 2 — a face in front. Only for calls the CAMERA opened (summoned):
     # a call somebody started on purpose (the button, the wake word) is
     # heard even from outside the lens -- owner, 9 Oct 2026, asked that a
@@ -792,6 +890,15 @@ def _decide(t: float, rms: float | None = None) -> tuple[bool, str, dict]:
         inputs["called"] = True
     if settings.focus_require_face and _origin["summoned"] and not called:
         if not camera or not engaged:
+            if near_state is not None:
+                verdict = _near_verdict(t, rms, near_state)
+                if near_door == "shadow":
+                    inputs["near_would"] = ("as_today" if verdict is None
+                                            else "open" if verdict[0] else "refuse")
+                elif verdict is not None:
+                    if verdict[1] == NEAR_VOICE:
+                        inputs["near"] = True
+                    return verdict[0], verdict[1], inputs
             # 13 Oct, robot logs of 12-13 Oct: 1,065 "no face in front" to 86
             # opens. Most were room voices (rms 0.02-0.04, the chatter this
             # rule exists for), but a guest standing right at the chest
@@ -836,6 +943,20 @@ def _decide(t: float, rms: float | None = None) -> tuple[bool, str, dict]:
         if lead is not None:
             inputs["main_person"] = lead["ordinal"]
     lead_tracks = [k for k in engaged if lead is not None and _track_person.get(k) is lead]
+
+    # The ceremony's live window: rules 3-5 below stand down, and nothing above does. Asked HERE,
+    # after rule 2, on purpose (24 Nov: asked above it, the window let every voice over the far
+    # floor open a turn -- the guests talking near the host's mic). On a summoned call a voice
+    # with no face in the lens never gets this far: rule 2 has already opened it under its own
+    # reason (the reply window, the converse hold, the big screen, or a voice at FOCUS_NEAR_RMS
+    # -- the host's wireless mic) or refused it, as on any other call. What reaches this line had
+    # a face in front, her name just called, or a call rule 2 does not judge; and what is skipped
+    # is only what a face in front says about the voice -- its mouth (3), its bearing (4), the
+    # main person and "another voice" (5): the host speaks into a mic on his own collar, not from
+    # where the lens looks. Known and kept: with a face in the lens rule 2 asks nothing of the
+    # voice, so while the window is open any voice the call's floor let through opens a turn.
+    if _ceremony_live_open():
+        return True, CEREMONY_LIVE, inputs
 
     # Rule 3 — a mouth in front moves. Only when mouth data exists for them,
     # and only for mouths the active speaker has proven it can see (`_proven`).

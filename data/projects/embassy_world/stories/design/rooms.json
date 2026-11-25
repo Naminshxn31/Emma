@@ -406,14 +406,14 @@
    "items": [
     {
      "label_en": "Garden",
-     "asset": "liv_garden",
+     "asset": "n_liv_garden",
      "at": null,
      "line": 0,
      "sub_en": "Ground-floor rooms by the garden · every inner-side room"
     },
     {
      "label_en": "Inner side",
-     "asset": "liv_courtyard_top",
+     "asset": "n_liv_courtyard_top",
      "at": [
       46.5,
       50.0
@@ -464,7 +464,7 @@
     },
     {
      "label_en": "Pool DEF",
-     "asset": "liv_lagoon_night",
+     "asset": "n_liv_lagoon_night",
      "at": [
       28.0,
       42.0
@@ -1036,7 +1036,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "rm_lobby",
+    "asset": "n_rm_lobby",
     "title_en": "LOBBY",
     "sub_en": "Ground floor · Building A",
     "chips_en": [
@@ -1055,7 +1055,12 @@
      "Faces the drop-off court"
     ],
     "line": 1
-   }
+   },
+   "shots": [
+    {
+     "asset": "n_lobby2"
+    }
+   ]
   },
   "taps": [
    {
@@ -1190,7 +1195,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "rm_corridor",
+    "asset": "n_rm_corridor",
     "title_en": "JOURNEY TO THE FUTURE",
     "sub_en": "Walkway to the facilities & residences",
     "chips_en": [
@@ -1307,7 +1312,7 @@
    }
   ],
   "params": {
-   "base_asset": "rm_playscape_aerial",
+   "base_asset": "n_rm_playscape_aerial",
    "zoom": {
     "x": 42.4,
     "y": 57.0,
@@ -1321,7 +1326,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "rm_playscape",
+    "asset": "n_rm_playscape",
     "title_en": "SPACE PLAYGROUND",
     "sub_en": "Outdoor play area · next to Junior World",
     "chips_en": [

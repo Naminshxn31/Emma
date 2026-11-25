@@ -307,6 +307,27 @@ def test_no_hand_out_while_the_event_host_walks(shell, monkeypatch):
     assert _native_greet(face) is True
 
 
+def test_the_base_moving_with_nobody_reporting_it_locks_the_arm_too(shell, monkeypatch):
+    """4 Nov: board_walk over adb (floor 1) and a joystick are walks the app
+    cannot see and the event host does not run -- the board's poses say the
+    base moves (walk_frames.base_moving): no gesture, no hand out, stop passes."""
+    from app import event_walk, walk_frames
+
+    monkeypatch.setattr(settings, "robot_greeting_arm_group", 6)
+    monkeypatch.setattr(event_walk, "walking", lambda: False)
+    monkeypatch.setattr(walk_frames, "base_moving", lambda: True)
+    assert link.server_walking() is True
+    face = Face(answer=True)
+    out = asyncio.run(link.request(face, "body", {"action": "nod"}, 0.5))
+    assert out["accepted"] is False and out["reason"] == "navigating"
+    out = asyncio.run(link.request(face, "body", {"action": "stop"}, 0.5))
+    assert out["accepted"] is True
+    greeter = Face(claim=False)
+    assert _native_greet(greeter) is False
+    monkeypatch.setattr(walk_frames, "base_moving", lambda: False)
+    assert link.server_walking() is False
+
+
 def test_the_event_hosts_walk_refuses_every_arm_command_but_stop(shell, monkeypatch):
     from app import event_walk
 

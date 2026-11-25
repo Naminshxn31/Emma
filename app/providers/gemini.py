@@ -24,9 +24,87 @@ from app import heard
 from app.config import settings
 from app.providers.base import ProviderError, ProviderEvent, VoiceProvider
 from app.providers.thai_spacing import ThaiSpacing
-from app.providers.transcript_filter import BareAckGate, NoiseReplyGate, TranscriptBudget, TranscriptFilter
+from app.providers.transcript_filter import BareAckGate, NoiseReplyGate, TranscriptBudget, TranscriptFilter, HER_NAME_ONLY, _ceremony_may_answer
 
 logger = logging.getLogger("condo_voice.gemini")
+
+
+def _walk_quiet() -> str | bool:
+    """Her voice is kept in: "clip" over an event's clip on the big screen (a TV
+    narrator is a voice too, and a robot talking over the film it just put up is
+    the worse of the two), True on WALK_QUIET's walk no guest is on (robot_face_link)."""
+    from app import event_clips
+
+    if event_clips.quiet():
+        return "clip"
+    if not settings.walk_quiet:
+        return False
+    from app import robot_face_link
+
+    return robot_face_link.walk_quiet()
+
+
+def _ceremony_named_only() -> bool:
+    """Only a reply asked for by her name is played -- in an opening ceremony, except in follow mode with
+    CEREMONY_FOLLOW_ANSWER_ALL while its live window is open (owner 24 Nov: she answers the host without her name;
+    `_follow_hold` still judges each reply)."""
+    from app import event_host
+
+    if not event_host.ceremony_now():
+        return False
+    return not _follow_answers_all()
+
+
+def _follow_answers_all() -> bool:
+    try:
+        from app import ceremony_follow
+
+        return ceremony_follow.answers_all()
+    except Exception:                                    # noqa: BLE001 -- the named-only door stays
+        return False
+
+
+def _follow_hold():
+    try:
+        from app import ceremony_follow
+
+        return ceremony_follow.reply_hold()
+    except Exception:                                    # noqa: BLE001
+        return None
+
+
+def _cue_only() -> bool:
+    """A cue-only ceremony is running, its live window open or shut (app/event_host.py
+    `cue_only`): what the reply watchdog asks before it does anything more than one
+    empty "your turn" (`_reply_stall_guard`). Never raises: a probe that fails is
+    "no ceremony", the watchdog every other call has."""
+    try:
+        from app import event_host
+
+        return bool(event_host.cue_only())
+    except Exception:                                    # noqa: BLE001 -- the ordinary watchdog
+        return False
+
+
+def _cue_only_closed() -> bool:
+    """A cue-only ceremony with no live window (app/event_host.py): only a server turn
+    is hers to say, and no tool but a stop runs. Never raises."""
+    try:
+        from app import event_host
+
+        return event_host.cue_only_closed()
+    except Exception:                                    # noqa: BLE001 -- the ordinary gate
+        return False
+
+
+def _mic_deaf() -> bool:
+    """...and the robot still: the mic goes up as silence (`send_audio`). Never raises."""
+    try:
+        from app import event_host
+
+        return event_host.mic_deaf()
+    except Exception:                                    # noqa: BLE001 -- a probe that fails hears
+        return False
 
 
 def _tracking_tools() -> bool:
@@ -240,6 +318,10 @@ def adaptation_phrases() -> list[str]:
     head = [settings.project_name]
     if settings.robot_name:
         head.append(settings.robot_name)
+    if getattr(settings, "ceremony_english_only", False) and _session_profile() == "ceremony":
+        # (rehearsal 24 Nov 17:48: the English-only call was still biased to the sales room's THAI words -- "What makes our
+        # project different?" came back "What's next are project different?" and no line played)
+        return [p for p in dict.fromkeys(["Emma"] + head + list(CEREMONY_PHRASES)) if p and not p.startswith("[")]
     facilities: list[str] = []
     try:
         facilities = facility_names()
@@ -298,6 +380,18 @@ def adaptation_phrases() -> list[str]:
         out = out[:_PHRASE_MAX]
     return out
 
+
+#: What Khun Miki says in the English ceremony: the words of his questions, not whole lines (a whole line would bend
+#: everything near it into it).
+CEREMONY_PHRASES = (
+    "Emma", "Hello Emma", "Khun Miki", "Embassy World", "how can you help us", "what can you do",
+    "what makes our project different", "our project", "where is our project located", "how many units",
+    "types of rooms", "our facilities", "you remember the details very well", "stay and help the sales team",
+    "a room for my family", "recommend", "sea view", "print the quotation", "quotation", "height of the building",
+    "depth of the swimming pool", "common areas", "you really do know the details", "technology video", "story video",
+    "dashboard", "what does this page show", "lobby lights", "turn off the lobby lights", "turn on the lobby lights",
+    "open the curtains", "lobby curtains",
+)
 
 #: Ceiling on the whole list once robot words are in. A choice, not an SDK
 #: quota (see _FACILITY_MAX): the wake word measured that biasing toward
@@ -384,6 +478,10 @@ def language_codes() -> list[str]:
 
     Empty list == omit the field == full auto-detection.
     """
+    if getattr(settings, "ceremony_english_only", False) and _session_profile() == "ceremony":
+        # (rehearsal 24 Nov: with th-TH,en-US,zh-CN the host's English came back as Thai-looking fragments, so the
+        # follow matcher rarely matched) the ceremony call speaks English only: its input is transcribed as en-US
+        return ["en-US"]
     value = (settings.transcribe_languages or "").strip().lower()
     if value in {"auto", "any", "all", ""}:
         return []
@@ -521,6 +619,45 @@ AFTER_TOOL_SETTLE_S = 0.3
 #: only a received message cleared the mark, so the next drop of an idle line
 #: ended the call however long after the first).
 REJOIN_SETTLE_S = 5.0
+#: A recorded ceremony line (`play_recorded`) goes out in pieces this long...
+RECORDED_CHUNK_S = 0.1
+#: ...kept at most this far ahead of real time. Gemini streams 4-6x faster
+#: than she speaks and the page queues it; a line pushed whole could not be
+#: stopped by a barge-in (the page drops what it holds, the rest would still
+#: arrive) -- paced, the pushing stops with it. Two seconds, not less: what is
+#: queued costs nothing on a barge-in (the page drops it all on speech_started),
+#: and a loop stalled for a moment on the robot must not leave a gap mid-word.
+RECORDED_LEAD_S = 2.0
+#: The model's own output stays off the speaker for at most the line's length
+#: plus this, whatever happens to the line: a hold nobody lowered must not
+#: leave a mute robot (event_clips' rule for the film).
+RECORDED_HOLD_SLACK_S = 25.0
+#: A cue the model asked for in a tool call starts after that call's result
+#: went back (`wait_tools`), bounded.
+RECORDED_TOOL_WAIT_S = 4.0
+#: One piece of the line onto a session queue nobody reads (the call ended).
+RECORDED_PUT_WAIT_S = 2.0
+#: A reply held for follow mode's decision about the host's words (`_follow_settle`): at most this long at its end.
+FOLLOW_SETTLE_MAX_S = 4.0
+#: A held model turn (or any model turn, for `model_streaming`) whose end never
+#: came -- the socket dropped under it -- is over after this long without output.
+#: Gemini streams a reply in a burst well under a second apart; without the bound
+#: a turn left open by a drop would hold every reply after it.
+RECORDED_HELD_GAP_S = 5.0
+#: `unquote_next_reply`: the « » of a read cue are kept out of her transcript
+#: until that reply ends, or this long at most (event_cues.READ_TURN_S).
+UNQUOTE_MAX_S = 90.0
+#: `queue_picture`: a read cue's picture waits for her reading's first words at most
+#: this long (event_cues.READ_START_S is 12 s; a reading that never came takes it back
+#: itself) -- never glued to an answer of a later turn.
+PICTURE_PENDING_S = 30.0
+#: A tap while a recorded line is up waits for the line (`_defer_text`) at most
+#: this long, then goes anyway: the hold itself is bounded by the line's length.
+RECORDED_TEXT_WAIT_S = 60.0
+
+
+async def _done(value):
+    return value
 
 
 def _compression_config(types):
@@ -701,8 +838,11 @@ class GeminiProvider(VoiceProvider):
     auto_resumes = True          # ...but we rejoin with a handle past it
 
     def __init__(self, voice: str, instructions: str, greeting: str | None = None,
-                 use_tools: bool = True, vad_floor: float | None = None) -> None:
+                 use_tools: bool = True, vad_floor: float | None = None,
+                 vad_silence_ms: int | None = None) -> None:
         super().__init__(voice, instructions)
+        #: This call's end-of-turn silence (live-first ceremony only, config.call_vad_silence_ms); None = VAD_SILENCE_MS.
+        self._vad_silence_ms = vad_silence_ms
         #: Spoken once, on the *initial* connect only. This parameter rode in
         #: from session.py since the beginning and was silently dropped here
         #: — only the OpenAI provider ever used it — so on Gemini the robot
@@ -740,7 +880,9 @@ class GeminiProvider(VoiceProvider):
         #: NOISE_REPLY_NEAR_RMS (robot): her reply to a quiet sound nobody could
         #: make out never reaches the speaker or the screen (owner 29 Oct,
         #: transcript_filter.NoiseReplyGate). Ahead of the "ค่ะ" gate.
-        self._noise_gate = NoiseReplyGate(settings.noise_reply_near_rms)
+        self._noise_gate = NoiseReplyGate(settings.noise_reply_near_rms, quiet=_walk_quiet,
+                                          named_only=_ceremony_named_only, cue_only=_cue_only_closed,
+                                          follow_hold=_follow_hold)
         #: Model reasoning once arrived as output transcript (2026-10-11):
         #: text with no audio behind it is cut here — see TranscriptBudget.
         self._out_budget = TranscriptBudget(self.output_sample_rate * 2)
@@ -755,7 +897,9 @@ class GeminiProvider(VoiceProvider):
 
         # The floor is the MODE's (settings.call_vad_floor): near modes keep
         # VAD_MIN_RMS, far-listening ones open with VAD_MIN_RMS_FAR.
-        self._vad_gate = vad_gate.for_session(min_rms=vad_floor)
+        self._vad_gate = (vad_gate.for_session(min_rms=vad_floor) if vad_silence_ms is None
+                          else vad_gate.for_session(min_rms=vad_floor, silence_ms=vad_silence_ms,
+                                                    prefix_padding_ms=settings.ceremony_prefix_padding_ms or None))
         #: When the gate last closed a segment, and whether reply audio has
         #: arrived since. Together they say whether the next segment is a new
         #: question or the guest carrying on — see `_note_reopen`.
@@ -783,6 +927,21 @@ class GeminiProvider(VoiceProvider):
         self._stall_stage: str | None = None
         #: The wait is for the words after a tool's result (`_watch_after_tool`).
         self._stall_after_tool = False
+        #: (words, came as a tap) of the question her VOICE had started to
+        #: answer, until that answer's turn_complete (`_reply_seen`). Robot
+        #: 6 Nov 09:13:57: a 1011 2.7 s into the fitness story, the resume
+        #: refused, a fresh session -- `session_fresh pending=false`, because
+        #: her first audio had already cleared the watch, and the question was
+        #: never answered (the next turn was the guest's one-syllable filler, on
+        #: a model that knew nothing). A fresh session asks it again
+        #: (`_ask_again_fresh`).
+        self._answer_open: tuple[str, bool] | None = None
+        #: The same, from her first words until a piece of that reply has
+        #: passed the noise and bare-"ค่ะ" gates to the speaker: a reply the
+        #: gates are holding (a sound nobody made out, staff talk) was never
+        #: heard, and asking it again on a fresh session is a text turn the
+        #: gates do not judge -- she would answer the noise aloud.
+        self._answer_owed: tuple[str, bool] | None = None
         self._reconnecting = False
         self._cut_over_from = None
         # The recogniser word-spaces Thai; undo that for display. Separate
@@ -823,6 +982,19 @@ class GeminiProvider(VoiceProvider):
         # and `__aexit__` must stop it too -- or it opens a session after the
         # call ended, and nobody closes it (review 27 Oct, 2nd pass).
         self._stall_guards: set[asyncio.Task] = set()
+        #: A recorded ceremony line on its way out as her reply (`play_recorded`,
+        #: app/event_cues.py), or None; when the model turn now streaming last
+        #: output under one (that whole turn stays off the speaker, to its end),
+        #: or None; when any model turn last output, None after its end; tool
+        #: batches finished (a cue from a tool call waits for its own result).
+        self._recorded: dict | None = None
+        self._model_held_at: float | None = None
+        self._model_out_at: float | None = None
+        self._tool_rounds = 0
+        #: `unquote_next_reply`: until when her transcript loses a read cue's « ».
+        self._unquote_until: float | None = None
+        #: `tap_output`: every event handed to the session, also to these.
+        self._output_taps: list = []
 
     def _build_config(self):
         from google.genai import types
@@ -864,7 +1036,8 @@ class GeminiProvider(VoiceProvider):
                     else types.AutomaticActivityDetection(
                         disabled=False,
                         prefix_padding_ms=settings.vad_prefix_padding_ms,
-                        silence_duration_ms=settings.vad_silence_ms,
+                        silence_duration_ms=(settings.vad_silence_ms if self._vad_silence_ms is None
+                                             else self._vad_silence_ms),
                         # HIGH = detect start of speech more often (the API's
                         # own default). LOW detects it *less* often — quiet or
                         # short utterances never picked up. See config.py.
@@ -967,6 +1140,11 @@ class GeminiProvider(VoiceProvider):
         Every dial goes through here -- the first, the model fallback, a
         resume, a fresh session, the stall cut-over -- so CONNECT_TIMEOUT_S
         bounds each of them (`_enter_within`)."""
+        # CEREMONY_ENGLISH_ONLY (owner 24 Nov rehearsal: "ทำไมยังพูดไทยเอาออกเลย"): the ceremony's call is held in
+        # English whatever language is heard -- the same pin the language menu sets, so every tool result's
+        # reply_language and every server line say English too. The Thai subtitle is the screen's job.
+        if getattr(settings, "ceremony_english_only", False) and _session_profile() == "ceremony":
+            self._talk.pin("en")
         from google import genai
 
         # Affective dialog / proactive audio are v1beta-only features.
@@ -1051,6 +1229,12 @@ class GeminiProvider(VoiceProvider):
         """
         if not self.greeting or self._session is None:
             return
+        if _cue_only_closed():
+            # A call that opens mid-ceremony (the server or the face restarted under
+            # it): the greeting is a server turn, so the cue-only gate would play it --
+            # "Hello everyone" over the host. Review 7 Nov: nothing but a pressed line.
+            logger.info("no greeting: a cue-only ceremony is on")
+            return
         try:
             await self.send_text(self.greeting)
         except Exception:
@@ -1112,6 +1296,10 @@ class GeminiProvider(VoiceProvider):
             self._reconnecting = False
             if fresh:
                 await self._ask_again_fresh()
+            else:
+                # resumed (or failed): not asked here -- and never later, by a
+                # fresh session minutes on, as if it were still the open answer
+                self._answer_open = self._answer_owed = None
 
     async def _connect_resumed_or_fresh(self, road: str) -> bool:
         """Rejoin with the handle; if the server no longer has the session,
@@ -1150,7 +1338,8 @@ class GeminiProvider(VoiceProvider):
 
             turnlog.record("session_fresh", road=road, reason=reason,
                            pending=bool(" ".join(self._stall_heard.split())
-                                        and self._stall_wait is not None))
+                                        and self._stall_wait is not None),
+                           cut=bool(getattr(self, "_answer_open", None)))
         except Exception:                                  # pragma: no cover - belt
             pass
         logger.info("opened a fresh Gemini Live session (%s) — the conversation goes on without "
@@ -1236,7 +1425,28 @@ class GeminiProvider(VoiceProvider):
         REPLY_STALL_S guard would wait out its timer first -- and watch the
         new ask with a new guard. Nothing pending: the next thing the guest
         says starts the new session's first turn (the recap then waits for
-        the next ask, if one comes)."""
+        the next ask, if one comes).
+
+        An answer the drop cut off is pending too (`_answer_open`): her first
+        words cleared the watch, but the guest heard half a sentence and the
+        new model knows nothing of it. Only the answer still open -- no
+        turn_complete, no guest speech since -- so a finished answer is never
+        given twice."""
+        cut, self._answer_open = getattr(self, "_answer_open", None), None
+        self._answer_owed = None
+        if _cue_only():
+            # A cue-only ceremony, its live window open or shut (24 Nov): nothing heard is
+            # asked back as text -- a server turn, which the cue-only gate plays whatever
+            # the window has done since (a question from minutes ago, answered live over the
+            # script). The fresh session starts idle and the watch ends; if she stays
+            # silent staff press "กลับเข้าบท" or the next cue (`_reply_stall_guard`).
+            self._stall_wait = None
+            return
+        if cut and self._stall_wait is None:
+            words, tapped = cut
+            self._stall_heard = " ".join(self._stall_heard.split()) or words
+            self._stall_text_turn = tapped
+            self._stall_wait = time.monotonic()
         heard = " ".join(self._stall_heard.split())
         if not heard or self._stall_wait is None or self._closing or self._session is None:
             return
@@ -1260,7 +1470,7 @@ class GeminiProvider(VoiceProvider):
     async def __aexit__(self, *exc) -> None:
         self._closing = True
         for guard in (getattr(self, "_note_guard", None), getattr(self, "_stall_guard", None),
-                      *list(getattr(self, "_stall_guards", ()))):
+                      *list(getattr(self, "_stall_guards", ())), *list(getattr(self, "_deferred_texts", ()))):
             if guard is not None and not guard.done():
                 guard.cancel()
         await self._stop_event_tasks()
@@ -1270,27 +1480,115 @@ class GeminiProvider(VoiceProvider):
             except Exception:
                 pass
 
+    #: RECONNECT_KEEPS_MIC: the mic is held this long at most while the socket is down.
+    MIC_DOWN_MAX_S = 8.0
+    _mic_down: list | None = None
+
+    def _hold_mic(self, pcm16: bytes) -> None:
+        """The socket is down and being rejoined: what the mic hears meanwhile waits for it.
+
+        The Live API closes a session nothing was sent to for two minutes (1008) -- on the robot's log of
+        24 Nov that was every quiet stretch, 184 times, the rejoin 1.2 s at the median and 4.4 s at worst --
+        and everything said in those seconds was dropped here: a host who breaks a long silence with her
+        name lost the name, and an unnamed question is nobody's (CEREMONY_NAME_FIRST). Only with the local
+        gate: the held frames go through it when the socket is back, so a sentence begun in the gap opens its
+        segment whole on the new one, and silence stays unsent."""
+        if not settings.reconnect_keeps_mic or self._vad_gate is None or self._closing:
+            return
+        now = time.monotonic()
+        held = self._mic_down
+        if held is None:
+            held = self._mic_down = []
+        held.append((now, bytes(len(pcm16)) if _mic_deaf() else bytes(pcm16)))
+        while now - held[0][0] > self.MIC_DOWN_MAX_S:
+            held.pop(0)
+
+    def _take_mic_down(self) -> list[bytes]:
+        held, self._mic_down = self._mic_down, None
+        if not held:
+            return []
+        now = time.monotonic()
+        deaf = _mic_deaf()                       # (turned deaf during the outage: none of it is heard)
+        # (an outage longer than that: what is left of it is not a sentence any more)
+        return [bytes(len(frame)) if deaf else frame for at, frame in held if now - at <= self.MIC_DOWN_MAX_S]
+
     async def send_audio(self, pcm16: bytes) -> None:
         from google.genai import types
 
         if self._session is None:
+            self._hold_mic(pcm16)
             return
+        # A cue-only ceremony with the robot still (app/event_host.py mic_deaf): nobody
+        # in the room is hers to answer -- a host's "เอ็มม่า" got a live answer AND then
+        # the pressed line, a live answer ran tools, applause cut her line as a barge-in
+        # (review 7 Nov). Silence instead of the frame: through the VAD gate, so a segment
+        # already open closes cleanly and the pre-roll holds nothing of the room.
+        deaf = _mic_deaf()
         if self._vad_gate is None:
+            if deaf:
+                return                   # server-side detection: silence sent is still a stream to judge
             await self._send_input(
                 audio=types.Blob(data=pcm16, mime_type=f"audio/pcm;rate={self.input_sample_rate}")
             )
             return
+        if deaf:
+            pcm16 = bytes(len(pcm16))
         # Local mode: the gate decides what upstream ever hears. Silence
         # produces no actions at all — no bytes, no signals — which is the
         # entire point: what is never sent cannot be hallucinated into
         # `我们走吧` or metered.
+        for frame in self._take_mic_down():
+            await self._feed_gate(frame)
+        await self._feed_gate(pcm16)
+
+    #: The segment open now: the socket its activity_start went to, and its audio so far (≤ SEG_KEEP_S) -- a socket that
+    #: died mid-segment took both with it, and the new one must hear the segment from its start (long-talk test 24 Nov
+    #: night: the rejoined socket got the rest of the question with no activity_start, then an activity_end).
+    SEG_KEEP_S = 12.0
+    _seg_on = None
+    _seg_audio: list | None = None
+
+    async def _reannounce(self) -> None:
+        from google.genai import types
+
+        session = self._session
+        if self._seg_on is None or session is None or self._seg_on is session or not self._vad_gate.in_speech:
+            return
+        self._seg_on = session
+        if not await self._send_input(activity_start=types.ActivityStart()):
+            return
+        for chunk in list(self._seg_audio or ()):
+            if not await self._send_input(audio=types.Blob(data=chunk, mime_type=f"audio/pcm;rate={self.input_sample_rate}")):
+                return
+
+    def _seg_note(self, data: bytes) -> None:
+        keep = self._seg_audio
+        if keep is None:
+            return
+        keep.append(data)
+        limit = int(self.SEG_KEEP_S * 2 * (self.input_sample_rate or 16000))
+        while len(keep) > 1 and sum(len(x) for x in keep) > limit:
+            keep.pop(0)
+
+    async def _feed_gate(self, pcm16: bytes) -> None:
+        from google.genai import types
+
         for kind, data in self._vad_gate.feed(pcm16):
+            if kind != "start":
+                await self._reannounce()
             if kind == "start":
+                self._seg_on, self._seg_audio = self._session, []
                 self._note_reopen()
                 self._stall_restart()
                 gate = getattr(self, "_noise_gate", None)
                 if gate is not None:
                     gate.segment(getattr(self._vad_gate, "open_rms", None))
+                recorded = getattr(self, "_recorded", None)
+                if recorded is not None and recorded.get("pushing"):
+                    # A voice over a recorded line is a barge-in like any over her
+                    # reply: the page stops her on the speech_started below, so the
+                    # rest of the line must not keep arriving after it.
+                    recorded["cut"] = True
                 await self._event_queue.put(ProviderEvent(kind="speech_started"))
                 # New speech begins: every caption already recorded belongs
                 # to an earlier utterance and may no longer authorise motion
@@ -1312,11 +1610,13 @@ class GeminiProvider(VoiceProvider):
                 # the open activity nothing is being generated.
                 noted = await self._report_segment()
                 await self._send_input(activity_end=types.ActivityEnd())
+                self._seg_on, self._seg_audio = None, None
                 if noted:
                     self._arm_note_guard()
                 if settings.reply_stall_s > 0:
                     self._arm_stall_guard()
             else:
+                self._seg_note(data)
                 await self._send_input(
                     audio=types.Blob(data=data,
                                      mime_type=f"audio/pcm;rate={self.input_sample_rate}")
@@ -1440,6 +1740,16 @@ class GeminiProvider(VoiceProvider):
             # during a reply interrupts it): that is the OLD turn ending, not
             # the tapped one starting (review 27 Oct, finding 3)
             return
+        if kind == "reply" and self._stall_wait is not None:
+            # her voice starts on the question being watched: that answer is
+            # open until its turn_complete -- a drop before it cut the answer
+            # off (`_answer_open`, `_ask_again_fresh`). Only a WATCHED question:
+            # her follow-up or an announcement is nobody's question to repeat.
+            words = " ".join(getattr(self, "_stall_heard", "").split())
+            self._answer_owed = (words, bool(getattr(self, "_stall_text_turn", False))) if words else None
+            self._answer_open = None
+        elif kind == "interrupted":
+            self._answer_open = self._answer_owed = None   # cut by the guest, not by the line
         if kind in ("reply", "interrupted"):
             # words (or a barge-in): the tapped turn is being answered. A
             # tool_call is not words -- the watch goes on to its result.
@@ -1482,6 +1792,7 @@ class GeminiProvider(VoiceProvider):
         self._stall_wait = None
         self._stall_after_tool = False
         self._silent_asks = 0              # a new question gets its own silent-turn ask
+        self._answer_open = self._answer_owed = None   # the guest moved on: not asked again
         if getattr(self, "_stall_text_turn", False):
             # an unanswered TAP stays owed until the guest's WORDS replace it
             # (`_input_event`): a cough or an "อืม" near the robot opens a
@@ -1583,6 +1894,54 @@ class GeminiProvider(VoiceProvider):
         return (self._stall_wait == since and not self._closing
                 and self._session is session and session is not None)
 
+    def _ceremony_silence_is_right(self, heard: str) -> bool:
+        """An opening ceremony: the host talks to the room and she was told not to
+        answer. Chasing that silence is the worst thing here: their speech asked
+        back to her as a question, then a rejoin, then the whole call moved to the
+        fallback model, on a good line, in the middle of a speech."""
+        if getattr(self, "_stall_text_turn", False):
+            return False
+        if _follow_answers_all():
+            # follow mode answers the host without her name. A fragment Gemini does not answer is silence that is
+            # right; a real sentence of his (3+ words) that gets nothing IS the bug (review 24 Nov: the watchdog
+            # was off for the whole window, the one mode where silence is the failure). It is chased, and only to
+            # step 1 -- one empty "your turn" -- because the ceremony is cue-only and `_reply_stall_guard` ends a
+            # cue-only chase there: never his speech asked back, never a rejoin, never the fallback model.
+            if settings.ceremony_answer_named and not _ceremony_may_answer(heard or ""):
+                return True                              # (named answers only: his unnamed talk is not hers to answer)
+            return len(heard.split()) < 3
+        if not _ceremony_named_only():
+            return False
+        if _cue_only_closed():
+            # a cue-only ceremony: no reply of hers to the room is played, named or not
+            # -- unless the robot moves, when the answer may be the stop she was asked for
+            from app import event_host
+
+            return not event_host.robot_moving()
+        gate = getattr(self, "_noise_gate", None)
+        return not (HER_NAME_ONLY.search(heard) or (gate is not None and gate.named_recently()))
+
+    def _stall_window_shut(self) -> bool:
+        """A cue-only ceremony's live window closed while the chase slept (review of "ตอบสด", 23 Nov):
+        step 1 found it open -- the host named her inside it -- and 8 s later staff had pressed
+        "กลับเข้าบท", a line, a walk or the red stop. Asking his words back NOW is a server text turn,
+        which the cue-only gate plays: her live answer to an old question in the middle of the script,
+        maybe while she walks, and then the whole ceremony call moved to the fallback model. Asked
+        before every later step of the chase, and after each rejoin (they take seconds); outside a
+        cue-only ceremony `_cue_only` is False and nothing changes.
+
+        Since 24 Nov a cue-only ceremony's chase ends at step 1 whatever the window
+        (`_reply_stall_guard`), so this is the belt behind that: a later step reached all the same
+        (the probe failed at step 1, a ceremony began while the chase slept) stops here with the
+        window open too -- "cue_only" in the row, "window_closed" when it is shut."""
+        if not _cue_only():
+            return False
+        self._stall_wait = None
+        self._stall_log("window_closed" if _cue_only_closed() else "cue_only",
+                        after=getattr(self, "_stall_stage", None))
+        self._stall_stage = None
+        return True
+
     async def _reply_stall_guard(self, session, since: float, wait: float | None = None,
                                  silent: bool = False) -> None:
         """Chase a heard question the server has not answered.
@@ -1620,7 +1979,26 @@ class GeminiProvider(VoiceProvider):
         if not self._stall_pending(session, since):
             return
         heard = " ".join(self._stall_heard.split())
-        if not heard:
+        if not heard or self._ceremony_silence_is_right(heard):
+            self._stall_wait = None
+            return
+        # A cue-only ceremony that gets this far is one where the robot moves (a spoken
+        # stop may be owed): one empty "your turn" at most. Asking the host's words back
+        # as TEXT is a server turn, which the cue-only gate plays -- her live answer over
+        # the ceremony -- and a rejoin or a fallback model mid-speech is worse (review
+        # 7 Nov, round 3: nudge, then a rejoin that asked the host's line back, played).
+        #
+        # ...and, since 24 Nov (decided the day before the ceremony), one whose live
+        # window ("ตอบสด") is OPEN -- the same one empty "your turn", nothing after it.
+        # Until then an open window got the whole chase: inside it anything within 30 s of
+        # her last word may be answered, so guests' chatter Gemini had rightly left alone
+        # was asked back to her as a question, and stage 3 moved the ceremony's call to
+        # GEMINI_MODEL_FALLBACK for the rest of the ceremony (2.5: never measured reading
+        # its lines, closes on an empty turn, compresses no context). No text ask of any
+        # form in here (the silent-turn ask and the fallback model's ask-form nudge are
+        # server turns too). If she stays silent, staff press "กลับเข้าบท" or the next cue.
+        cue_only = _cue_only()
+        if cue_only and (silent or not _takes_empty_turn(self.model)):
             self._stall_wait = None
             return
         if silent:
@@ -1652,7 +2030,7 @@ class GeminiProvider(VoiceProvider):
                 await session.send_client_content(turn_complete=True)
             except Exception:
                 logger.exception("could not nudge the stalled turn")
-        if settings.reply_stall_reconnect_s <= 0:
+        if settings.reply_stall_reconnect_s <= 0 or cue_only:
             return
         try:
             await asyncio.sleep(settings.reply_stall_reconnect_s)
@@ -1664,6 +2042,8 @@ class GeminiProvider(VoiceProvider):
             return
         if not self._stall_pending(session, since):
             return
+        if self._stall_window_shut():
+            return
         if not await self._cut_over():
             stage = "no_handle" if not self._resume_handle else "rejoin_failed"
             logger.warning("no reply after the nudge, and the session could not be rejoined (%s)", stage)
@@ -1671,6 +2051,8 @@ class GeminiProvider(VoiceProvider):
             self._stall_stage = None
             return
         if self._stall_wait != since:            # the reply came while we rejoined
+            return
+        if self._stall_window_shut():            # ...or the window closed while we did
             return
         self._stall_stage = "reconnect"
         self._stall_log("reconnect")
@@ -1701,7 +2083,11 @@ class GeminiProvider(VoiceProvider):
             await asyncio.sleep(0.05)
         if self._stall_wait != since or self._closing or self._session is None:
             return
+        if self._stall_window_shut():
+            return
         if not await self._cut_over_to_fallback(since):
+            return
+        if self._stall_window_shut():
             return
         self._stall_stage = "fallback"
         self._stall_log("fallback", model=self.model)
@@ -1837,7 +2223,10 @@ class GeminiProvider(VoiceProvider):
                 or self._session is None or self._session is session):
             return False
         heard = " ".join(self._stall_heard.split())
-        if not heard:
+        if not heard or _cue_only():
+            # ...or a cue-only ceremony, its window open or shut (24 Nov): asked again
+            # here it is a server text turn, which the cue-only gate plays whatever the
+            # window has done since. The watch just ends (`_reply_stall_guard`).
             self._stall_wait = None
             return True
         self._stall_stage = "rotated"
@@ -1999,7 +2388,7 @@ class GeminiProvider(VoiceProvider):
             return False
         return True
 
-    async def send_text(self, text: str) -> None:
+    async def send_text(self, text: str, *, _deferred: bool = False) -> None:
         """Push a server-side instruction in as its own turn.
 
         Gemini 3.1 uses realtime text; client content only seeds history and
@@ -2008,6 +2397,13 @@ class GeminiProvider(VoiceProvider):
         to act, not text to read aloud; events.announce handles turn timing.
         """
         from google.genai import types
+
+        if not _deferred and self._recording_now() is not None:
+            # A recorded ceremony line is up: its answer would be held. Later,
+            # not now -- and without waiting here: a tap arrives on the mic pump.
+            self._defer_text(text, bool(getattr(self, "_stall_text_turn", False)) and " ".join(
+                (text or "").split()) == " ".join(getattr(self, "_stall_heard", "").split()))
+            return
 
         # Her next reply answers this text (a greeting, an announcement, a tap,
         # a stall's ask) -- never judged as a reply to noise (NoiseReplyGate).
@@ -2167,11 +2563,28 @@ class GeminiProvider(VoiceProvider):
         delivered = set()
         for index, (_cid, name, result) in kept:
             delivered.add(index)
+            if name == "present_story" and isinstance(result, dict) and result.get("ok"):
+                self._hold_story(result)
             yield _with_call_id(ProviderEvent(kind="tool_result", text=name, data=result),
                                 announced.get(index))
         for index in announced:
             if index not in delivered and _tracking_tools():
                 yield self._dropped(calls[index][1], announced[index])
+
+    def _hold_story(self, result: dict) -> None:
+        """The ceremony's off-script story (app/ceremony_stories.py): its picture goes out with the reply that tells it --
+        held until the server has decided his words are no line of the script, gone with a reply that is dropped."""
+        try:
+            from app import ceremony_stories
+
+            gate = getattr(self, "_noise_gate", None)
+            if gate is None or result.get("screen") or not ceremony_stories.in_ceremony():
+                return                                   # (anywhere else the result itself carries the story to the page)
+            data = ceremony_stories.picture_event(result.get("topic"))
+            if data is not None:
+                gate.hold_picture(ProviderEvent(kind="story_picture", data=data))
+        except Exception:                                # noqa: BLE001 -- her words, never the picture
+            logger.exception("an off-script story's picture")
 
     def _local_call_id(self) -> str:
         self._local_call_serial = getattr(self, "_local_call_serial", 0) + 1
@@ -2193,6 +2606,24 @@ class GeminiProvider(VoiceProvider):
         passed = [event] if gate is None else gate.push(event)
         return [out for kept in passed for out in self._ack(kept)]
 
+    async def _follow_settle(self) -> None:
+        """turn_complete reached while her reply is held for follow's decision about the host's words (answer-all
+        mode, app/ceremony_follow.py): wait for the decision (a match drops the reply, no match releases it),
+        bounded -- the whole cost of the hold to an unmatched answer. Nothing when no reply is held."""
+        gate = getattr(self, "_noise_gate", None)
+        if gate is None or not gate.follow_waiting():
+            return
+        began = time.monotonic()
+        while gate.follow_waiting() and time.monotonic() - began < FOLLOW_SETTLE_MAX_S and not self._closing:
+            await asyncio.sleep(0.05)
+        waited = round(time.monotonic() - began, 2)
+        try:
+            from app import turnlog
+
+            turnlog.record("follow_reply_hold", waited_s=waited, still=bool(gate.follow_waiting()))
+        except Exception:                                  # pragma: no cover - belt
+            pass
+
     def _noise_reset(self) -> None:
         gate = getattr(self, "_noise_gate", None)
         if gate is not None:
@@ -2206,14 +2637,19 @@ class GeminiProvider(VoiceProvider):
             return []
         owed, dropped = gate.close()
         if dropped is not None:
-            logger.info("a reply to a sound nobody made out was not played "
-                        "(NOISE_REPLY_NEAR_RMS, rms=%s, %d letters heard)",
-                        dropped.get("rms"), dropped.get("letters", 0))
+            if dropped.get("why") == "walking":
+                logger.info("a reply during a walk was not played (WALK_QUIET)")
+            elif dropped.get("why") in ("clip", "not_named", "cue_only", "cue_matched"):
+                logger.info("a reply during the ceremony was not played (%s)", dropped.get("why"))
+            else:
+                logger.info("a reply to a sound nobody made out was not played "
+                            "(NOISE_REPLY_NEAR_RMS, rms=%s, %d letters heard)",
+                            dropped.get("rms"), dropped.get("letters", 0))
             try:
                 from app import turnlog
 
                 turnlog.record("noise_reply_dropped", rms=dropped.get("rms"),
-                               letters=dropped.get("letters"))
+                               letters=dropped.get("letters"), why=dropped.get("why"))
             except Exception:                              # pragma: no cover - belt
                 pass
         return [out for kept in owed for out in self._ack(kept)]
@@ -2239,6 +2675,491 @@ class GeminiProvider(VoiceProvider):
             except Exception:                              # pragma: no cover - belt
                 pass
         return owed
+
+    # ---- a recorded line as her reply (the ceremony cues, app/event_cues.py) ----
+    #
+    # Owner 6 Nov: staff press a cue and Emma says its approved line word for word.
+    # With a recording of her own live voice (app/event_voice.py) nothing is left
+    # to a model: the line goes out here as if it were her reply -- the words
+    # interleaved with the audio, then turn_complete -- through the same reply
+    # gates a server text turn's reply goes through (`text_turn` first), while
+    # the model's own output is held off the speaker (`_receive_events`).
+
+    plays_recorded = True
+
+    def _recording_now(self) -> dict | None:
+        """The recorded line's hold while it is up. One past its bound is over:
+        a hold nobody lowered must not leave a mute robot."""
+        rec = getattr(self, "_recorded", None)
+        if rec is not None and time.monotonic() >= rec["until"]:
+            if self._recorded is rec and not rec.get("pushing"):
+                rec["report"].setdefault("why", "hold_lapsed")     # honest: nobody replaced it
+                self._recorded = None
+            return None
+        return rec
+
+    def refresh_recorded(self, report: dict) -> bool:
+        """The caller is still waiting to start this line (her voice, the lock):
+        the hold stays up until the line starts -- bounded again from now, so a
+        caller that died lets it lapse. False = that hold is gone."""
+        rec = self._recording_now()              # a hold past its bound is over: not revived
+        if rec is None or rec["report"] is not report or rec["cut"]:
+            report.setdefault("why", "hold_lapsed" if rec is None and getattr(self, "_recorded", None) is None
+                              else "replaced")
+            return False
+        rec["until"] = max(rec["until"], time.monotonic() + rec["seconds"] + RECORDED_HOLD_SLACK_S)
+        return True
+
+    def tools_pending(self) -> bool:
+        """A tool call is running: its result would reach the face mid-line."""
+        return bool(getattr(self, "_pending_tool_ids", None))
+
+    def mark_named(self, at: float) -> None:
+        gate = getattr(self, "_noise_gate", None)
+        if gate is not None:
+            gate.mark_named(at)
+
+    def _note_held(self, *, audio_bytes: int = 0, chars: int = 0) -> None:
+        held = getattr(self, "_held_out", None) or {"audio_bytes": 0, "chars": 0}
+        held["audio_bytes"] += audio_bytes
+        held["chars"] += chars
+        self._held_out = held
+        rec = getattr(self, "_recorded", None)
+        if rec is not None and audio_bytes:
+            report = rec["report"]
+            report["model_held_ms"] = report.get("model_held_ms", 0) + round(
+                audio_bytes / 2 / self.output_sample_rate * 1000)
+
+    def model_streaming(self) -> bool:
+        """A model turn is coming in right now (output, no end yet). Bounded like
+        the hold: a turn whose end never came is not streaming for ever."""
+        at = getattr(self, "_model_out_at", None)
+        return at is not None and time.monotonic() - at < RECORDED_HELD_GAP_S
+
+    def _end_model_turn(self) -> None:
+        """A model turn ended (turn_complete or interrupted): the next one is
+        judged afresh, and what a held one lost is logged -- a count, no words."""
+        held = getattr(self, "_held_out", None)
+        if getattr(self, "_model_held_at", None) is not None and held and (held["audio_bytes"] or held["chars"]):
+            ms = round(held["audio_bytes"] / 2 / self.output_sample_rate * 1000)
+            logger.info("the model's own turn under a recorded line was not played "
+                        "(%d ms of audio, %d chars)", ms, held["chars"])
+            try:
+                from app import turnlog
+
+                turnlog.record("event_cue_model_held", audio_ms=ms, chars=held["chars"])
+            except Exception:                              # pragma: no cover - belt
+                pass
+        self._held_out = {"audio_bytes": 0, "chars": 0}
+        self._model_held_at = None
+        self._model_out_at = None
+
+    def unquote_next_reply(self, on: bool = True) -> None:
+        """Her next reply reads a cue line quoted in « » (`event_script.READ_RULE`,
+        app/event_cues.py read mode): the output transcript may carry the marks,
+        and that text is the caption bubble on the robot. Only that turn -- the
+        marks are taken out where her transcript enters the stream (`_unquoted`),
+        so the bubble, the turn log, the talk language and the cue's own score
+        all see the line as said; bounded, for a reply that never comes. `on=False`:
+        that turn is over (or its text never went out)."""
+        self._unquote_until = time.monotonic() + UNQUOTE_MAX_S if on else None
+
+    def _unquoted(self, text: str) -> str:
+        until = getattr(self, "_unquote_until", None)
+        if not text or until is None:
+            return text
+        if time.monotonic() > until:
+            self._unquote_until = None
+            return text
+        return text.replace("«", "").replace("»", "")
+
+    def _cue_answered(self) -> None:
+        """The recorded line answers whatever was waiting for an answer: the
+        reply watchdog must not chase the host's question past it -- its nudge
+        would get the model's own second answer, after the approved one."""
+        if getattr(self, "_stall_stage", None):
+            self._stall_log("answered")
+        self._stall_wait = None
+        self._stall_after_tool = False
+        self._stall_text_turn = False
+        self._answer_open = self._answer_owed = None
+        self._note_wait = None
+
+    def _defer_text(self, text: str, tap: bool) -> None:
+        """A text turn (a tap on the face: a topic, a story picture, a room card,
+        the language menu) while a recorded line is up: sent when the line is
+        over, bounded. Sent now, the model's answer would begin under the line and
+        be held to its end -- the guest would get nothing, and the watchdog would
+        count the held output as the answer. A watched tap is watched again from
+        the moment it really goes out (paused here: its guard must not nudge the
+        model mid-line either)."""
+        if tap:
+            self._stall_wait = None              # the tap's guard stops; re-armed on sending
+        from app import turnlog
+
+        turnlog.record("event_cue_text_deferred", tap=tap)
+
+        async def later() -> None:
+            started = time.monotonic()
+            while (self._recording_now() is not None and not self._closing
+                   and time.monotonic() - started < RECORDED_TEXT_WAIT_S):
+                await asyncio.sleep(0.1)
+            if self._closing:
+                return
+            turnlog.record("event_cue_text_sent", tap=tap, waited_s=round(time.monotonic() - started, 1))
+            if tap:
+                self.watch_text_turn(text)
+            try:
+                await self.send_text(text, _deferred=True)
+            except Exception:                      # noqa: BLE001 -- a tap never ends a call
+                logger.exception("a text held for a recorded line could not be sent")
+
+        task = asyncio.create_task(later())
+        tasks = getattr(self, "_deferred_texts", None)
+        if tasks is None:
+            tasks = self._deferred_texts = set()
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
+
+    shows_pictures = True
+
+    def play_recorded(self, text: str, pcm: bytes, *, lang: str = "th",
+                      wait_tools: bool = False, interrupt_first: bool = False,
+                      report: dict | None = None, picture: dict | None = None):
+        """Her recorded line as her reply. NOT an `async def` on purpose: the
+        hold on the model's own output goes up here, at the call -- a cue the
+        model asked for inside a tool call is covered before that call's result
+        can come back with the model's answer to it. Returns the coroutine that
+        plays the line (True = the whole line went out).
+
+        `wait_tools`: start after the running tool batch's results went back.
+        `interrupt_first`: her old reply is still audible (the caller's wait ran
+        out) -- stop it on the page first, as a barge-in would.
+        `picture`: a story to put up with the line (a `story_picture` event's
+        data), right before its first word -- see `_play_recorded`.
+        `report` (filled in): seconds, first_at, sent_s, cut, partial, closed, why,
+        model_held_ms, purged_ms, picture."""
+        report = {} if report is None else report
+        pcm = bytes(pcm or b"")
+        pcm = pcm[:len(pcm) // 2 * 2]
+        text = " ".join((text or "").split())
+        if not text or not pcm or self._closing:
+            report["why"] = "closing" if self._closing else "nothing"
+            return _done(False)
+        seconds = len(pcm) / 2 / self.output_sample_rate
+        # a read cue's picture waiting for the model's next words: this line is the
+        # next answer now, and the model's output under it is held -- never shown
+        self._picture_pending = None
+        old = getattr(self, "_recorded", None)
+        if old is not None:
+            old["cut"] = True                    # one line at a time: the newer one goes
+            old["report"].setdefault("why", "replaced")
+        rec = {"until": time.monotonic() + seconds + RECORDED_HOLD_SLACK_S
+               + (RECORDED_TOOL_WAIT_S if wait_tools else 0.0),
+               "seconds": seconds, "cut": False, "pushing": False,
+               "tools_at": getattr(self, "_tool_rounds", 0), "report": report}
+        report["seconds"] = round(seconds, 2)
+        self._recorded = rec
+        return self._play_recorded(rec, text, pcm, wait_tools, interrupt_first,
+                                   dict(picture) if isinstance(picture, dict) else None)
+
+    def end_recorded(self, report: dict | None = None) -> None:
+        rec = getattr(self, "_recorded", None)
+        if rec is None or (report is not None and rec["report"] is not report):
+            return
+        rec["cut"] = True
+        rec["report"].setdefault("why", "ended")
+        if not rec.get("pushing"):
+            self._recorded = None
+
+    def queue_picture(self, picture: dict) -> bool:
+        """The picture of a cue the model reads (app/event_cues.py read mode),
+        called right after its text was sent. It goes out RIGHT AHEAD OF HER
+        READING's first words (`_picture_first`, in `_receive_events`), as a
+        recorded line's goes ahead of its first word -- not into the queue at the
+        send. Review 7 Nov (A5): queued at the send it went ahead of Gemini's late
+        `interrupted` for the turn the text landed on, and on the page that
+        `interrupted` (stopPlayback -> storyHook('settle')) jumped the map to its
+        end before she said a word. Whatever is already on its way (an old reply's
+        tail, its `interrupted`) reaches the page first.
+        Refused when that reply is not the next thing out: a recorded line is up
+        (the text was deferred behind it, and its own first word would take the
+        picture), no socket or one a send just found closed (the text went
+        nowhere: `send_text` notes it and returns), the call closing.
+        `{"clear": True}`: the line's picture comes down -- or, never out yet, it
+        is simply not put up (a clear for it would take down whatever WAS up)."""
+        if isinstance(picture, dict) and picture.get("clear") is True:
+            pending, self._picture_pending = getattr(self, "_picture_pending", None), None
+            if pending is not None:
+                return True
+            try:
+                self._event_queue.put_nowait(ProviderEvent(kind="story_picture", data=dict(picture)))
+            except asyncio.QueueFull:
+                return False
+            return True
+        session = self._session
+        if (self._closing or session is None or getattr(self, "_closed_noted", None) is session
+                or self._recording_now() is not None):
+            return False
+        self._picture_pending = {"data": dict(picture), "until": time.monotonic() + PICTURE_PENDING_S}
+        return True
+
+    def _picture_first(self, out: list) -> list:
+        """Her output about to go to the session: a read cue's picture waiting for her
+        first words goes right ahead of them (`queue_picture`) -- after any
+        `interrupted` that came first. Bounded: a reading that never came does not
+        leave it to a later answer."""
+        pending = getattr(self, "_picture_pending", None)
+        if pending is None or not out:
+            return out
+        self._picture_pending = None
+        if time.monotonic() > pending["until"]:
+            return out
+        return [ProviderEvent(kind="story_picture", data=pending["data"]), *out]
+
+    def stop_line(self, *, hold_model: bool = False, clear: bool = False) -> dict:
+        """Staff stopped the ceremony line being said (app/event_cues.py `cut`: a
+        wrong line, the arm's emergency). All at once, nothing awaited:
+        * a recorded line is fed no further -- its loop sees `cut` as at a barge-in,
+          sends its own `interrupted` + `turn_complete` and lowers the hold; a hold
+          whose line had not started is lowered here;
+        * her audio and words queued for the session and not handed over yet are
+          dropped (`_purge_queued_model_output`, as a line's start does);
+        * a turn the model is generating -- a line it reads (`hold_model`), or any
+          turn streaming now -- is held off the speaker to its end, as one under a
+          recorded line is: the server cannot be made to stop it without a turn of
+          ours (that turn would get an answer), so it runs on, unheard, and the
+          model's context keeps it whole;
+        * an `interrupted` stops what the page already scheduled (voice-preview.html
+          stopPlayback, the TV's copy too) -- it goes ahead of anything the loop
+          still pushes, which its own `interrupted` then stops;
+        * `clear`: the line's picture comes down (a `story_picture` {"clear": True}).
+        What it did, by key."""
+        out: dict = {}
+        now = time.monotonic()
+        # a read line's picture still waiting for her first word never goes up -- and
+        # a clear for it would take down whatever WAS up instead
+        if getattr(self, "_picture_pending", None) is not None:
+            self._picture_pending = None
+            clear = False
+            out["picture_dropped"] = True
+        rec = getattr(self, "_recorded", None)
+        pushing = rec is not None and bool(rec.get("pushing"))
+        if rec is not None:
+            rec["cut"] = True
+            rec["report"].setdefault("why", "stopped")
+            out["recorded"] = True
+            if not pushing:
+                self._recorded = None
+        if hold_model or self.model_streaming():
+            self._model_held_at = now
+            out["held"] = True
+        self._unquote_until = None
+        purged = self._purge_queued_model_output()
+        if purged:
+            out["purged_ms"] = round(purged / 2 / self.output_sample_rate * 1000)
+        if not pushing:
+            # what the reply gates still hold is the stopped turn's (a pushing line's
+            # loop resets them itself when it sees the cut)
+            self._noise_reset()
+            self._ack_reset()
+        stops = [ProviderEvent(kind="interrupted")]
+        if clear:
+            stops.append(ProviderEvent(kind="story_picture", data={"clear": True}))
+        for event in stops:
+            try:
+                self._event_queue.put_nowait(event)
+            except asyncio.QueueFull:              # nobody is reading this call: nothing plays either
+                break
+            out["cleared" if event.kind == "story_picture" else "interrupted"] = True
+        return out
+
+    def tap_output(self, fn):
+        taps = self._output_taps
+
+        def untap() -> None:
+            try:
+                taps.remove(fn)
+            except ValueError:
+                pass
+
+        taps.append(fn)
+        return untap
+
+    async def _put_own(self, event: ProviderEvent) -> bool:
+        """Onto the session's queue -- bounded: a call that ended mid-line has
+        nobody reading it, and the cue holding the announcement lock must not
+        sit on a full queue forever."""
+        if self._closing:
+            return False
+        try:
+            await asyncio.wait_for(self._event_queue.put(event), RECORDED_PUT_WAIT_S)
+        except asyncio.TimeoutError:
+            logger.warning("a recorded line could not reach the page (nobody reading) -- stopped")
+            return False
+        return True
+
+    async def _push_own(self, event: ProviderEvent) -> bool:
+        """One piece of the line through the reply gates, as a server text
+        turn's reply goes (`_gated`)."""
+        for out in self._gated(event):
+            if not await self._put_own(out):
+                return False
+        return True
+
+    def _purge_queued_model_output(self) -> int:
+        """The model's audio and words already queued for the session but not yet
+        handed to it: the hold, reaching back into the queue -- a fragment of a
+        live answer must not play glued in front of the line. Everything else
+        queued (the guest's words, tool events, turn ends) keeps its order.
+        Bytes of audio dropped."""
+        queue = self._event_queue
+        kept, dropped = [], 0
+        while not queue.empty():
+            event = queue.get_nowait()
+            if event is not None and event.kind in ("audio", "assistant_transcript"):
+                dropped += len(event.audio or b"")
+                continue
+            kept.append(event)
+        for event in kept:
+            queue.put_nowait(event)              # fewer than were taken out: always fits
+        return dropped
+
+    def _close_line_now(self, report: dict) -> None:
+        """The line's own turn end, without waiting (a cancelled or failed push):
+        the page and the session must not be left inside a turn of hers."""
+        for kind in ("interrupted", "turn_complete"):
+            try:
+                self._event_queue.put_nowait(ProviderEvent(kind=kind))
+            except (asyncio.QueueFull, RuntimeError):
+                return
+        report["closed"] = True
+
+    async def _play_recorded(self, rec: dict, text: str, pcm: bytes,
+                             wait_tools: bool, interrupt_first: bool,
+                             picture: dict | None = None) -> bool:
+        report = rec["report"]
+        try:
+            if wait_tools:
+                deadline = time.monotonic() + RECORDED_TOOL_WAIT_S
+                while (getattr(self, "_tool_rounds", 0) == rec["tools_at"] and time.monotonic() < deadline
+                       and self._recording_now() is rec and not self._closing):
+                    await asyncio.sleep(0.05)
+            if self._recording_now() is not rec or self._closing or rec["cut"]:
+                report.setdefault("why", "closing" if self._closing else "replaced")
+                return False
+            try:
+                quiet = _walk_quiet()
+            except Exception:                    # noqa: BLE001 -- a probe that fails is "not quiet"
+                quiet = False
+            if quiet:
+                # the reply gate drops a text turn's reply now (a clip, a test
+                # walk): it would drop this too, so nothing goes out -- and the
+                # caller is told, never "said"
+                report["why"] = "quiet_" + (quiet if isinstance(quiet, str) else "walking")
+                return False
+            # Her reply begins, as a server text turn's would: the model's turn
+            # (if one was streaming) is cut from the gates and from the queue,
+            # the noise gate is told the server spoke (a ceremony's "only her
+            # name" and NOISE_REPLY's "quiet unclear sound" never judge it), the
+            # watchdog stops waiting.
+            purged = self._purge_queued_model_output()
+            if purged:
+                report["purged_ms"] = round(purged / 2 / self.output_sample_rate * 1000)
+                interrupt_first = True           # its start may be on the page already
+            self._out_filter.reset()
+            self._out_spacing.reset()
+            self._out_budget.reset()
+            self._ack_reset()
+            self._noise_reset()
+            gate = getattr(self, "_noise_gate", None)
+            if gate is not None:
+                gate.text_turn()
+            self._cue_answered()
+            self._replied_since_end = True
+            self._talk.emma(text)
+            self._remember("emma", text)
+            rec["pushing"] = True
+            ok = True
+            if interrupt_first:
+                ok = await self._put_own(ProviderEvent(kind="interrupted"))
+            if ok and picture is not None and not rec["cut"]:
+                # (not after a stop: `stop_line`'s clear is already queued, and a
+                # picture behind it would stand there with no line -- review 7 Nov, A4)
+                report["picture"] = True        # on its way: a stop from here takes it down
+                # The line's picture (a cue pressed with a story, app/event_cues.py
+                # `show`): AFTER the `interrupted` above -- on the page it stops the
+                # old reply and settles whatever story is up, a story drawn before
+                # it would jump to its end -- and BEFORE the first word: the page
+                # clears an answer's stage at its first sound unless something of
+                # that answer staged it already (voice-preview.html answerStaged),
+                # and the story's clock hears the line from its first word. Ours,
+                # past the reply gates: never held, never judged as her reply.
+                ok = await self._put_own(ProviderEvent(kind="story_picture", data=picture))
+                report["picture"] = ok
+            rate = self.output_sample_rate
+            size = max(2, int(rate * RECORDED_CHUNK_S) * 2)
+            chunks = [pcm[i:i + size] for i in range(0, len(pcm), size)]
+            # word-sized pieces, interleaved with the audio the way a live reply
+            # streams them (the offline provider's `_speak`): the bubble and the
+            # caption follow the voice instead of running a line ahead of it
+            pieces = re.findall(r"\S+\s*", text)
+            started = time.monotonic()
+            sent = 0.0
+            k = 0
+            for i, chunk in enumerate(chunks):
+                if not ok or rec["cut"] or self._recorded is not rec or self._closing:
+                    break
+                while ok and k < len(pieces) and k * len(chunks) // len(pieces) <= i:
+                    ok = await self._push_own(ProviderEvent(kind="assistant_transcript", text=pieces[k]))
+                    k += 1
+                ok = ok and await self._push_own(ProviderEvent(kind="audio", audio=chunk))
+                if not ok:
+                    break
+                if i == 0:
+                    report["first_at"] = time.monotonic()
+                sent += len(chunk) / 2 / rate
+                ahead = started + sent - RECORDED_LEAD_S - time.monotonic()
+                if ahead > 0:
+                    await asyncio.sleep(ahead)
+            report["sent_s"] = round(sent, 2)
+            if not ok:
+                # the page stopped taking it (nobody reading, or the call closing):
+                # what went out is a fragment -- said so, never "ok, cut"
+                report["why"] = "closing" if self._closing else "put_timeout"
+                report["partial"] = "first_at" in report
+                self._noise_reset()
+                self._ack_reset()
+                self._close_line_now(report)
+                return False
+            cut = bool(rec["cut"]) or self._recorded is not rec
+            if cut:
+                report["cut"] = True
+                report.setdefault("why", "barge_in")
+                # what the gates hold is the cut line's; the page drops its queue
+                self._noise_reset()
+                self._ack_reset()
+                ok = await self._put_own(ProviderEvent(kind="interrupted"))
+            else:
+                while ok and k < len(pieces):
+                    ok = await self._push_own(ProviderEvent(kind="assistant_transcript", text=pieces[k]))
+                    k += 1
+                for event in [*self._noise_close(), *self._ack_close()]:
+                    ok = ok and await self._put_own(event)
+            if ok and await self._put_own(ProviderEvent(kind="turn_complete")):
+                report["closed"] = True
+            else:
+                report["why"] = report.get("why") if cut else "put_timeout"
+                report["partial"] = True
+                self._close_line_now(report)
+                return False
+            return not cut
+        finally:
+            if rec["pushing"] and not report.get("closed"):
+                self._close_line_now(report)    # cancelled mid-line (the call ending, a reset)
+            rec["pushing"] = False
+            if self._recorded is rec:
+                self._recorded = None
 
     def note_guest(self, text: str) -> None:
         """What the guest said, when it did not come through the recogniser
@@ -2333,6 +3254,9 @@ class GeminiProvider(VoiceProvider):
                 finally:
                     self._pending_tool_ids.difference_update(ids)
                     self._cancelled_tool_ids.difference_update(ids)
+                    # the batch's results are on their way to the page and the
+                    # model: a cue the model called for may start now (`wait_tools`)
+                    self._tool_rounds = getattr(self, "_tool_rounds", 0) + 1
 
         self._event_tasks = [asyncio.create_task(receive()),
                              asyncio.create_task(run_tools())]
@@ -2341,6 +3265,11 @@ class GeminiProvider(VoiceProvider):
                 event = await self._event_queue.get()
                 if event is None:
                     return
+                for tap in list(getattr(self, "_output_taps", ())):
+                    try:
+                        tap(event)
+                    except Exception:                      # noqa: BLE001 -- a tap is a log, not the job
+                        logger.exception("an output tap failed")
                 yield event
         finally:
             await self._stop_event_tasks()
@@ -2466,7 +3395,7 @@ class GeminiProvider(VoiceProvider):
                     # the turn; that counted as her answer, nothing chased the
                     # silence, and the guest swore and asked again.
                     said = getattr(getattr(content, "output_transcription", None), "text", None)
-                    shown = self._out_filter.feed(said) if said else ""
+                    shown = self._unquoted(self._out_filter.feed(said) if said else "")
                     model_turn = getattr(content, "model_turn", None)
                     audio = [(blob.data, _voiced(blob.data))
                              for blob in (getattr(part, "inline_data", None)
@@ -2479,15 +3408,46 @@ class GeminiProvider(VoiceProvider):
                     elif getattr(content, "turn_complete", False):
                         self._reply_seen("turn_complete")
 
+                    # A recorded ceremony line is out as her reply (`play_recorded`):
+                    # a model turn that began under it stays off the speaker and the
+                    # screen to its end -- a cue the model asked for in a tool call
+                    # gets the model's own answer to that call too, and the room
+                    # must hear the approved line, not both voices in one queue.
+                    recorded = self._recording_now()
+                    now = time.monotonic()
+                    held_at = getattr(self, "_model_held_at", None)
+                    if held_at is not None and recorded is None and now - held_at > RECORDED_HELD_GAP_S:
+                        # a held turn that never ended (the socket dropped under it,
+                        # a rejoin): over, or every reply after it would be held too
+                        self._end_model_turn()
+                        held_at = None
+                    if said or audio:
+                        self._model_out_at = now
+                        if recorded is not None or held_at is not None:
+                            self._model_held_at = now
+                    held = getattr(self, "_model_held_at", None) is not None
+                    pushing = recorded is not None and bool(recorded.get("pushing"))
+
                     # Barge-in: Gemini already cancelled its own generation
                     # and dropped the unsent audio, so the client only stops.
                     if getattr(content, "interrupted", False):
                         self._out_filter.reset()
                         self._out_budget.reset()
                         self._out_spacing.reset()
-                        self._ack_reset()           # what it held was cut off anyway
-                        self._noise_reset()
-                        yield ProviderEvent(kind="interrupted")
+                        if not pushing:
+                            # (while a recorded line is pushing, these hold the
+                            # LINE's turn: reset, its next words would be judged anew)
+                            self._ack_reset()           # what it held was cut off anyway
+                            self._noise_reset()
+                        if not held and not pushing:
+                            yield ProviderEvent(kind="interrupted")
+                        # else: the model's own turn under (or begun under) the
+                        # recorded line ended -- a turn the page never heard. Passed
+                        # on it would stop what IS playing: the line. Only a voice
+                        # the local VAD let in cuts the line (`send_audio`); the
+                        # model being interrupted is not the room speaking (review 6 Nov).
+                        self._unquote_until = None         # a reading cut off is over too
+                        self._end_model_turn()
 
                     if getattr(content, "input_transcription", None):
                         finished = getattr(content.input_transcription, "finished", None)
@@ -2505,36 +3465,74 @@ class GeminiProvider(VoiceProvider):
                             self._input_turn_id = None
                             self._input_finished = None
 
-                    if said:
+                    if said and held:
+                        self._note_held(chars=len(shown))
+                    elif said:
                         if shown:
                             self._talk.emma(shown)      # her language from her words, not "<no speech>"
                         clean = self._out_spacing.feed(shown)
                         clean = self._out_budget.allow(clean)
                         if clean:
                             self._remember("emma", clean)
-                            for event in self._gated(ProviderEvent(kind="assistant_transcript", text=clean)):
+                            for event in self._picture_first(
+                                    self._gated(ProviderEvent(kind="assistant_transcript", text=clean))):
                                 yield event
 
                     for data, voiced in audio:
-                        self._out_budget.add_audio(len(data))
                         if voiced:
                             self._replied_since_end = True
                             self._stall_text_turn = False
-                        for event in self._gated(ProviderEvent(kind="audio", audio=data)):
+                        if held:
+                            self._note_held(audio_bytes=len(data))
+                            continue
+                        self._out_budget.add_audio(len(data))
+                        for event in self._picture_first(self._gated(ProviderEvent(kind="audio", audio=data))):
+                            if event.kind == "audio" and getattr(self, "_answer_owed", None):
+                                # the guest is hearing this answer now
+                                self._answer_open, self._answer_owed = self._answer_owed, None
                             yield event
 
-                    if getattr(content, "turn_complete", False):
+                    if getattr(content, "turn_complete", False) and (held or pushing):
+                        # The model's turn under (or begun under) a recorded line.
+                        # While the line is being pushed its turn_complete is the
+                        # line's own, sent by `play_recorded` when the line ends: one
+                        # here would end her turn on the page mid-sentence. After it,
+                        # an empty turn end is what 3.8 sends often enough anyway.
+                        self._answer_open = self._answer_owed = None
+                        self._out_filter.reset()
+                        self._out_spacing.reset()
+                        self._out_budget.reset()
+                        if self._input_finished is not False:
+                            user_tail = self._in_spacing.flush()
+                            if user_tail:
+                                yield self._input_event(user_tail)
+                            self._input_turn_id = None
+                        self._end_model_turn()
+                        if not pushing:
+                            # nothing of the line is in the reply gates now: what they
+                            # still hold is this cut turn's, never the next one's
+                            self._noise_reset()
+                            self._ack_reset()
+                            yield ProviderEvent(kind="turn_complete")
+                    elif getattr(content, "turn_complete", False):
+                        spoke = self._model_out_at is not None
+                        self._model_out_at = None
+                        self._answer_open = self._answer_owed = None   # the answer reached its end
                         # Release any text the filters were holding back —
                         # a possible marker prefix, and a possible word space.
-                        tail = self._out_spacing.feed(self._out_filter.flush())
+                        tail = self._out_spacing.feed(self._unquoted(self._out_filter.flush()))
+                        if spoke:
+                            self._unquote_until = None     # the reading turn has ended
                         tail += self._out_spacing.flush()
                         tail = self._out_budget.allow(tail)
                         if tail:
-                            for event in self._gated(ProviderEvent(kind="assistant_transcript", text=tail)):
+                            for event in self._picture_first(
+                                    self._gated(ProviderEvent(kind="assistant_transcript", text=tail))):
                                 yield event
-                        for event in self._noise_close():
+                        await self._follow_settle()
+                        for event in self._picture_first(self._noise_close()):
                             yield event
-                        for event in self._ack_close():
+                        for event in self._picture_first(self._ack_close()):
                             yield event
                         if self._out_budget.dropped:
                             logger.warning("output transcript ran %d chars ahead of its audio "

@@ -1,0 +1,43 @@
+{
+ "texts": {
+  "brand": "Embassy World",
+  "emma": "Emma",
+  "label": "Lobby lights",
+  "command": "The lobby lights are on",
+  "state": "On",
+  "giant": "On"
+ },
+ "pictures": {},
+ "beats": [
+  {
+   "at_en": "The lobby",
+   "do": "close",
+   "key": "command",
+   "span": 1.0
+  },
+  {
+   "at_en": "on.",
+   "do": "done",
+   "key": [
+    "state",
+    "giant"
+   ]
+  }
+ ],
+ "options": {
+  "mode": "console",
+  "device": "lights",
+  "light0": 0.15,
+  "light1": 1,
+  "knob0": "off",
+  "knob1": "on",
+  "lit0": false,
+  "lit1": true,
+  "working0": true,
+  "tilt": 5,
+  "giant_lit": true
+ },
+ "template": "act",
+ "act": "smarthome_brand",
+ "figures": {}
+}

@@ -2,13 +2,13 @@
  "source_id": "story_catalog",
  "project_id": "embassy_world",
  "schema": 1,
- "approval_status": "approved",
- "approved_by": "pete",
- "approved_at": "2026-10-28T09:29:48+07:00",
- "effective_at": "2026-10-28T09:29:48+07:00",
+ "approval_status": "draft",
+ "approved_by": "",
+ "approved_at": "",
+ "effective_at": "",
  "disclosure_scope": "customer",
  "content_state": "preliminary_concept",
- "approved_sha256": "3e9af4bb6ac2fa269ef90063fbc9b5269880c4824b773a69d4db41261850c708",
+ "approved_sha256": "",
  "stories": [
   {
    "id": "campus_buildings",
@@ -991,7 +991,10 @@
       ],
       "line": 1
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "n_liv_lagoon_night"
+    }
    },
    "taps": [
     {
@@ -1085,7 +1088,10 @@
       ],
       "line": 1
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "n_back_front"
+    }
    },
    "taps": [
     {
@@ -1319,7 +1325,7 @@
      {
       "label_en": "Water Lagoon",
       "sub_en": "Main pool · ≈ 155 m long · ≈ 1.3 m deep",
-      "asset": "liv_trees",
+      "asset": "n_liv_trees",
       "at": [
        56.0,
        52.0
@@ -1330,7 +1336,7 @@
      {
       "label_en": "Islands & bridges",
       "sub_en": "5 planted islands · 3 bridges, 1 glass · jacuzzis",
-      "asset": "lagoon_islands_aerial",
+      "asset": "n_lagoon_islands_aerial",
       "at": [
        28.1,
        44.8
@@ -1341,7 +1347,7 @@
      {
       "label_en": "Lobby",
       "sub_en": "Building A · ground floor",
-      "asset": "rm_lobby",
+      "asset": "n_rm_lobby",
       "at": [
        64.6,
        24.8
@@ -1352,7 +1358,7 @@
      {
       "label_en": "Biogenesis",
       "sub_en": "Fitness · curved glass wall to the lagoon",
-      "asset": "fac_g_biogenesis",
+      "asset": "n_fac_g_biogenesis",
       "at": [
        64.9,
        40.0
@@ -1363,7 +1369,7 @@
      {
       "label_en": "Junior World",
       "sub_en": "Kids' room · space theme",
-      "asset": "fac_g_junior",
+      "asset": "n_fac_g_junior",
       "at": [
        53.2,
        33.3
@@ -1374,7 +1380,7 @@
      {
       "label_en": "Playground & kids' pool",
       "sub_en": "Space playground by the water",
-      "asset": "rm_playscape_aerial",
+      "asset": "n_rm_playscape_aerial",
       "at": [
        55.9,
        41.3
@@ -1385,7 +1391,7 @@
      {
       "label_en": "Lawns & gardens",
       "sub_en": "Sun loungers · shady trees",
-      "asset": "liv_lawn",
+      "asset": "n_liv_lawn",
       "at": [
        84.5,
        31.5
@@ -1396,7 +1402,7 @@
      {
       "label_en": "Basement",
       "sub_en": "Aqua Cinema · saunas · ice bath",
-      "asset": "fac_b_aqua_cinema",
+      "asset": "n_fac_b_aqua_cinema",
       "at": null,
       "line": 9,
       "tap": "story_masterplan_lagoon_basement"
@@ -1404,7 +1410,7 @@
      {
       "label_en": "Level 3 · Building A",
       "sub_en": "Sky Pool · lounges",
-      "asset": "fac_3_sky_pool",
+      "asset": "n_fac_3_sky_pool",
       "at": null,
       "line": 10,
       "tap": "story_masterplan_lagoon_level3"
@@ -2004,7 +2010,7 @@
     }
    ],
    "params": {
-    "bg_asset": "plan_ground_site",
+    "bg_asset": "site_plan_clean",
     "value": {
      "to": 15556,
      "dec": 0,
@@ -2125,7 +2131,7 @@
     }
    ],
    "params": {
-    "bg_asset": "campus_holo_f2054",
+    "bg_asset": "units_campus",
     "value": {
      "to": 1066,
      "dec": 0,
@@ -2304,7 +2310,10 @@
       ],
       "line": 3
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "n_liv_garden"
+    }
    },
    "taps": [
     {
@@ -2602,7 +2611,7 @@
     "items": [
      {
       "label_en": "Biogenesis",
-      "asset": "fac_g_biogenesis",
+      "asset": "n_fac_g_biogenesis",
       "at": [
        50.0,
        82.3
@@ -2613,7 +2622,7 @@
      },
      {
       "label_en": "Spinning Class",
-      "asset": "fac_g_spinning",
+      "asset": "n_fac_g_spinning",
       "at": [
        42.6,
        59.8
@@ -2624,7 +2633,7 @@
      },
      {
       "label_en": "Pilates Studio",
-      "asset": "fac_g_pilates",
+      "asset": "n_fac_g_pilates",
       "at": [
        57.2,
        59.8
@@ -2635,7 +2644,7 @@
      },
      {
       "label_en": "Bungee Gym & Yoga",
-      "asset": "fac_g_bungee",
+      "asset": "n_fac_g_bungee",
       "at": [
        86.5,
        58.9
@@ -2646,7 +2655,7 @@
      },
      {
       "label_en": "Junior World",
-      "asset": "fac_g_junior",
+      "asset": "n_fac_g_junior",
       "at": [
        17.1,
        58.4
@@ -2870,7 +2879,7 @@
     "items": [
      {
       "label_en": "Aqua Cinema",
-      "asset": "fac_b_aqua_cinema",
+      "asset": "n_fac_b_aqua_cinema",
       "at": [
        57.0,
        79.4
@@ -2881,7 +2890,7 @@
      },
      {
       "label_en": "Journey to Mars",
-      "asset": "fac_b_journey_mars",
+      "asset": "n_fac_b_journey_mars",
       "at": [
        87.0,
        80.4
@@ -2892,7 +2901,7 @@
      },
      {
       "label_en": "Himalayan Salt Sauna",
-      "asset": "fac_b_salt_sauna",
+      "asset": "n_fac_b_salt_sauna",
       "at": [
        22.2,
        49.8
@@ -2903,7 +2912,7 @@
      },
      {
       "label_en": "Ice Bath",
-      "asset": "fac_b_ice_bath",
+      "asset": "n_fac_b_ice_bath",
       "at": [
        31.6,
        43.2
@@ -2914,7 +2923,7 @@
      },
      {
       "label_en": "Floating Swing Sauna",
-      "asset": "fac_b_swing_sauna",
+      "asset": "n_fac_b_swing_sauna",
       "at": [
        42.4,
        43.4
@@ -2925,7 +2934,7 @@
      },
      {
       "label_en": "Crystal Stone Sauna",
-      "asset": "fac_b_crystal_sauna",
+      "asset": "n_fac_b_crystal_sauna",
       "at": [
        53.5,
        43.2
@@ -2936,7 +2945,7 @@
      },
      {
       "label_en": "Hydrotherapy Capsule",
-      "asset": "fac_b_hydro_capsule",
+      "asset": "n_fac_b_hydro_capsule",
       "at": [
        65.2,
        43.6
@@ -2946,7 +2955,6 @@
       "sub_en": "Two white spa capsules"
      }
     ],
-    "more_en": "Also on this level: EV charging",
     "tap_label_en": "Tap for details"
    },
    "taps": [
@@ -3122,7 +3130,7 @@
     "items": [
      {
       "label_en": "Social Lounge",
-      "asset": "fac_3_social",
+      "asset": "n_fac_3_social",
       "at": [
        17.0,
        56.7
@@ -3133,7 +3141,7 @@
      },
      {
       "label_en": "Co-working Lounge",
-      "asset": "fac_3_coworking",
+      "asset": "n_fac_3_coworking",
       "at": [
        34.7,
        56.7
@@ -3144,7 +3152,7 @@
      },
      {
       "label_en": "Common Sphere",
-      "asset": "fac_3_common_sphere",
+      "asset": "n_fac_3_common_sphere",
       "at": [
        63.1,
        56.7
@@ -3155,7 +3163,7 @@
      },
      {
       "label_en": "Sky Pool",
-      "asset": "fac_3_sky_pool",
+      "asset": "n_fac_3_sky_pool",
       "at": [
        50.0,
        82.5
@@ -3324,7 +3332,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_3_sky_pool",
+     "asset": "n_fac_3_sky_pool",
      "title_en": "SKY POOL",
      "sub_en": "Level 3 · Building A",
      "chips_en": [
@@ -3499,7 +3507,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_g_biogenesis",
+     "asset": "n_fac_g_biogenesis",
      "title_en": "BIOGENESIS",
      "sub_en": "Fitness · 197 sq.m.",
      "chips_en": [
@@ -3509,7 +3517,15 @@
       "Your own workout & meal plan"
      ],
      "line": 1
-    }
+    },
+    "shots": [
+     {
+      "asset": "n_bio2"
+     },
+     {
+      "asset": "n_bio3"
+     }
+    ]
    },
    "taps": [
     {
@@ -3655,7 +3671,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_g_junior_ballpit",
+     "asset": "n_fac_g_junior_ballpit",
      "title_en": "JUNIOR WORLD",
      "sub_en": "Kids' room · Ground floor",
      "chips_en": [
@@ -3670,7 +3686,12 @@
       "Playground just outside"
      ],
      "line": 1
-    }
+    },
+    "shots": [
+     {
+      "asset": "n_junior1b"
+     }
+    ]
    },
    "taps": [
     {
@@ -3812,7 +3833,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_g_spinning",
+     "asset": "n_fac_g_spinning",
      "title_en": "SPINNING CLASS",
      "sub_en": "Cycling studio · Ground floor",
      "chips_en": [
@@ -3959,7 +3980,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_g_pilates",
+     "asset": "n_fac_g_pilates",
      "title_en": "PILATES STUDIO",
      "sub_en": "Reformer studio · Ground floor",
      "chips_en": [
@@ -4289,7 +4310,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_b_aqua_cinema",
+     "asset": "n_fac_b_aqua_cinema",
      "title_en": "AQUA CINEMA",
      "sub_en": "Indoor pool · Basement · Building A",
      "chips_en": [
@@ -4304,7 +4325,12 @@
       "Flows into Journey to Mars"
      ],
      "line": 1
-    }
+    },
+    "shots": [
+     {
+      "asset": "n_aqua1"
+     }
+    ]
    },
    "taps": [
     {
@@ -4438,7 +4464,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_b_journey_mars",
+     "asset": "n_fac_b_journey_mars",
      "title_en": "JOURNEY TO MARS",
      "sub_en": "Space-themed waterway · Basement",
      "chips_en": [
@@ -4453,7 +4479,12 @@
       "Linked to the Aqua Cinema pool"
      ],
      "line": 1
-    }
+    },
+    "shots": [
+     {
+      "asset": "n_mars2"
+     }
+    ]
    },
    "taps": [
     {
@@ -4552,7 +4583,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_b_salt_sauna",
+     "asset": "n_fac_b_salt_sauna",
      "title_en": "HIMALAYAN SALT SAUNA",
      "sub_en": "Basement · Building A",
      "chips_en": [
@@ -4685,7 +4716,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_b_ice_bath",
+     "asset": "n_fac_b_ice_bath",
      "title_en": "ICE BATH",
      "sub_en": "Basement · Building A",
      "chips_en": [
@@ -4827,7 +4858,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_b_swing_sauna",
+     "asset": "n_fac_b_swing_sauna",
      "title_en": "FLOATING SWING SAUNA",
      "sub_en": "Basement · Building A",
      "chips_en": [
@@ -4965,7 +4996,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_b_crystal_sauna",
+     "asset": "n_fac_b_crystal_sauna",
      "title_en": "CRYSTAL STONE SAUNA",
      "sub_en": "Basement · Building A",
      "chips_en": [
@@ -5109,7 +5140,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_b_hydro_capsule",
+     "asset": "n_fac_b_hydro_capsule",
      "title_en": "HYDROTHERAPY CAPSULE",
      "sub_en": "Basement · Building A",
      "chips_en": [
@@ -5248,7 +5279,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_3_social",
+     "asset": "n_fac_3_social",
      "title_en": "SOCIAL LOUNGE",
      "sub_en": "Level 3 · Building A",
      "chips_en": [
@@ -5391,7 +5422,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_3_coworking",
+     "asset": "n_fac_3_coworking",
      "title_en": "CO-WORKING LOUNGE",
      "sub_en": "Level 3 · Building A",
      "chips_en": [
@@ -5530,7 +5561,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "fac_3_common_sphere",
+     "asset": "n_fac_3_common_sphere",
      "title_en": "COMMON SPHERE",
      "sub_en": "Level 3 · Building A",
      "chips_en": [
@@ -5674,7 +5705,7 @@
     "items": [
      {
       "label_en": "Himalayan Salt Sauna",
-      "asset": "fac_b_salt_sauna",
+      "asset": "n_fac_b_salt_sauna",
       "at": [
        22.2,
        49.8
@@ -5685,7 +5716,7 @@
      },
      {
       "label_en": "Floating Swing Sauna",
-      "asset": "fac_b_swing_sauna",
+      "asset": "n_fac_b_swing_sauna",
       "at": [
        42.4,
        43.4
@@ -5696,7 +5727,7 @@
      },
      {
       "label_en": "Crystal Stone Sauna",
-      "asset": "fac_b_crystal_sauna",
+      "asset": "n_fac_b_crystal_sauna",
       "at": [
        53.5,
        43.2
@@ -5707,7 +5738,7 @@
      },
      {
       "label_en": "Ice Bath",
-      "asset": "fac_b_ice_bath",
+      "asset": "n_fac_b_ice_bath",
       "at": [
        31.6,
        43.2
@@ -5910,7 +5941,7 @@
      {
       "label_en": "Water Lagoon",
       "sub_en": "Main pool · ≈ 1.3 m deep",
-      "asset": "liv_lagoon_night",
+      "asset": "n_liv_lagoon_night",
       "asset_kind": "photo",
       "value": {
        "to": 155,
@@ -5922,7 +5953,7 @@
      {
       "label_en": "Pools by the wings",
       "sub_en": "Private Pools · beside the building wings",
-      "asset": "liv_courtyard_top",
+      "asset": "n_liv_courtyard_top",
       "asset_kind": "photo",
       "value": {
        "to": 3,
@@ -5933,7 +5964,7 @@
      {
       "label_en": "Kid Pool",
       "sub_en": "Beside the playground",
-      "asset": "liv_kid_pool",
+      "asset": "n_liv_kid_pool",
       "asset_kind": "photo",
       "value": null,
       "line": 3,
@@ -5942,7 +5973,7 @@
      {
       "label_en": "Sky Pool",
       "sub_en": "Level 3 · Building A · glass floor",
-      "asset": "fac_3_sky_pool",
+      "asset": "n_fac_3_sky_pool",
       "asset_kind": "photo",
       "value": null,
       "line": 4,
@@ -5951,7 +5982,7 @@
      {
       "label_en": "Aqua Cinema",
       "sub_en": "Indoor pool · Basement",
-      "asset": "fac_b_aqua_cinema",
+      "asset": "n_fac_b_aqua_cinema",
       "asset_kind": "photo",
       "value": null,
       "line": 5,
@@ -6114,25 +6145,25 @@
     "items": [
      {
       "label_en": "The Park next door",
-      "asset": "liv_park",
+      "asset": "n_liv_park",
       "note_en": "Nong Phrong Park: lake, jogging path",
       "line": 0
      },
      {
       "label_en": "Green area",
-      "asset": "liv_garden",
+      "asset": "n_liv_garden",
       "note_en": "4,256 sq.m. inside the project",
       "line": 1
      },
      {
       "label_en": "34 plant species",
-      "asset": "liv_trees",
+      "asset": "n_liv_trees",
       "note_en": "11 trees · 23 shrubs & groundcovers",
       "line": 2
      },
      {
       "label_en": "Stepped Garden",
-      "asset": "liv_lawn",
+      "asset": "n_liv_lawn",
       "note_en": "Lawn terraces · 53 sun loungers",
       "line": 3
      }
@@ -6290,7 +6321,7 @@
      {
       "label_en": "Junior World",
       "sub_en": "Indoor kids' room · ground floor",
-      "asset": "fac_g_junior_ballpit",
+      "asset": "n_fac_g_junior_ballpit",
       "asset_kind": "photo",
       "value": null,
       "line": 1,
@@ -6299,7 +6330,7 @@
      {
       "label_en": "Space Playground",
       "sub_en": "Outdoor · slides · swing",
-      "asset": "liv_playscape",
+      "asset": "n_liv_playscape",
       "asset_kind": "photo",
       "value": {
        "to": 137,
@@ -6311,7 +6342,7 @@
      {
       "label_en": "Kid Pool",
       "sub_en": "Beside the playground · water play",
-      "asset": "liv_kid_pool",
+      "asset": "n_liv_kid_pool",
       "asset_kind": "photo",
       "value": null,
       "line": 3,
@@ -6320,7 +6351,7 @@
      {
       "label_en": "The Park next door",
       "sub_en": "Nong Phrong Park · playground",
-      "asset": "liv_park",
+      "asset": "n_liv_park",
       "asset_kind": "photo",
       "value": null,
       "line": 4,
@@ -7186,6 +7217,9 @@
       ]
      }
     ],
+    "backdrop": {
+     "asset": "units_campus"
+    },
     "aspect": 1.0,
     "project": {
      "x": 52.09,
@@ -7521,6 +7555,9 @@
       ]
      }
     ],
+    "backdrop": {
+     "asset": "n_back_front"
+    },
     "aspect": 1.1502,
     "project": {
      "x": 42.87,
@@ -7732,7 +7769,10 @@
       ],
       "line": 5
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "n_liv_trees"
+    }
    },
    "taps": [
     {
@@ -8151,6 +8191,9 @@
       ]
      }
     ],
+    "backdrop": {
+     "asset": "n_liv_trees"
+    },
     "aspect": 1.2,
     "project": {
      "x": 46.21,
@@ -8587,6 +8630,9 @@
       ]
      }
     ],
+    "backdrop": {
+     "asset": "n_liv_courtyard_top"
+    },
     "aspect": 1.35,
     "project": {
      "x": 46.91,
@@ -8699,7 +8745,7 @@
     }
    ],
    "params": {
-    "bg_asset": "lagoon_islands_aerial",
+    "bg_asset": "n_lagoon_islands_aerial",
     "value": {
      "to": 5,
      "dec": 0,
@@ -8858,7 +8904,7 @@
      "prj_dev_logo"
     ],
     "frame_ms": 160,
-    "final_asset": "prj_dev_awards",
+    "final_asset": "n_prj_dev_awards",
     "final_mode": "fade",
     "rise_line": 5,
     "counters": [
@@ -9548,25 +9594,25 @@
     "items": [
      {
       "label_en": "Miki Haim",
-      "asset": "exec_ceo",
+      "asset": "n_exec_ceo",
       "note_en": "Chief Executive Officer",
       "line": 0
      },
      {
       "label_en": "Pudthachad Sucharitakul",
-      "asset": "exec_coo",
+      "asset": "n_exec_coo",
       "note_en": "Chief Operating Officer",
       "line": 1
      },
      {
       "label_en": "Dor Haim",
-      "asset": "exec_cfo",
+      "asset": "n_exec_cfo",
       "note_en": "Chief Financial Officer",
       "line": 2
      },
      {
       "label_en": "Moran S. Haim",
-      "asset": "exec_gm",
+      "asset": "n_exec_gm",
       "note_en": "General Manager",
       "line": 3
      }
@@ -9698,7 +9744,7 @@
      {
       "label_en": "Hyde Park → The Vision",
       "sub_en": "2006 – 2015 · Pattaya",
-      "asset": "dev_timeline_early",
+      "asset": "n_dev_timeline_early",
       "asset_kind": "photo",
       "value": {
        "to": 10,
@@ -9710,7 +9756,7 @@
      {
       "label_en": "Amazon → Embassy Life",
       "sub_en": "2013 – 2027 · Pattaya",
-      "asset": "dev_timeline_late",
+      "asset": "n_dev_timeline_late",
       "asset_kind": "photo",
       "value": {
        "to": 6,
@@ -10153,14 +10199,14 @@
     "items": [
      {
       "label_en": "Garden",
-      "asset": "liv_garden",
+      "asset": "n_liv_garden",
       "at": null,
       "line": 0,
       "sub_en": "Ground-floor rooms by the garden · every inner-side room"
      },
      {
       "label_en": "Inner side",
-      "asset": "liv_courtyard_top",
+      "asset": "n_liv_courtyard_top",
       "at": [
        46.5,
        50.0
@@ -10211,7 +10257,7 @@
      },
      {
       "label_en": "Pool DEF",
-      "asset": "liv_lagoon_night",
+      "asset": "n_liv_lagoon_night",
       "at": [
        28.0,
        42.0
@@ -10783,7 +10829,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "rm_lobby",
+     "asset": "n_rm_lobby",
      "title_en": "LOBBY",
      "sub_en": "Ground floor · Building A",
      "chips_en": [
@@ -10802,7 +10848,12 @@
       "Faces the drop-off court"
      ],
      "line": 1
-    }
+    },
+    "shots": [
+     {
+      "asset": "n_lobby2"
+     }
+    ]
    },
    "taps": [
     {
@@ -10937,7 +10988,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "rm_corridor",
+     "asset": "n_rm_corridor",
      "title_en": "JOURNEY TO THE FUTURE",
      "sub_en": "Walkway to the facilities & residences",
      "chips_en": [
@@ -11054,7 +11105,7 @@
     }
    ],
    "params": {
-    "base_asset": "rm_playscape_aerial",
+    "base_asset": "n_rm_playscape_aerial",
     "zoom": {
      "x": 42.4,
      "y": 57.0,
@@ -11068,7 +11119,7 @@
     },
     "spot_line": 0,
     "photo": {
-     "asset": "rm_playscape",
+     "asset": "n_rm_playscape",
      "title_en": "SPACE PLAYGROUND",
      "sub_en": "Outdoor play area · next to Junior World",
      "chips_en": [
@@ -11524,14 +11575,11 @@
     },
     "meta_en": [
      "Open plan · no separate bedroom",
-     "1 bathroom · 1 air-con",
-     "1 bathroom",
-     "117 units in the project",
-     "3D model: one studio layout"
+     "1 bathroom · 1 air-con"
     ],
     "mood_assets": [
-     "mood_dining",
-     "mood_bathroom"
+     "mood_st_room",
+     "mood_st_bath"
     ],
     "mood_tag_en": "Interior mood · design style",
     "lines": [
@@ -11691,15 +11739,12 @@
     },
     "meta_en": [
      "1 bedroom + living & kitchen",
-     "1 bathroom · 2 air-cons",
-     "1 bathroom",
-     "801 units · our most common type",
-     "3D model: one 1‑bedroom layout"
+     "1 bathroom · 2 air-cons"
     ],
     "mood_assets": [
-     "mood_living",
-     "mood_bedroom",
-     "mood_bathroom"
+     "mood_1br_living",
+     "mood_1br_bed",
+     "mood_1br_bath"
     ],
     "mood_tag_en": "Interior mood · design style",
     "lines": [
@@ -11864,14 +11909,12 @@
     },
     "meta_en": [
      "2 bedrooms + living & kitchen",
-     "2 bathrooms · 3 air-cons",
-     "148 units in the project",
-     "3D model: one 2‑bedroom layout"
+     "2 bathrooms · 3 air-cons"
     ],
     "mood_assets": [
-     "mood_dining",
-     "mood_bedroom",
-     "mood_bathroom"
+     "mood_2br_living",
+     "mood_2br_bed",
+     "mood_2br_bath"
     ],
     "mood_tag_en": "Interior mood · design style",
     "lines": [
@@ -13207,6 +13250,102 @@
    "crop": null,
    "alpha": false
   },
+  "mood_1br_bath": {
+   "file": "mood_1br_bath.webp",
+   "sha256": "a6b71d4841f7d9440efa150f053574499cf43cc554c2808d836314dce85b082d",
+   "bytes": 33904,
+   "w": 1000,
+   "h": 1150,
+   "format": "webp",
+   "source": "final1118/br1_bath.jpg",
+   "crop": [
+    700,
+    100,
+    4700,
+    4700
+   ],
+   "alpha": false
+  },
+  "mood_1br_bed": {
+   "file": "mood_1br_bed.webp",
+   "sha256": "499d0a4f186a455e22259afcf540db542b2604b427ccbfb71a7b76d0b1c66a91",
+   "bytes": 168048,
+   "w": 1200,
+   "h": 1380,
+   "format": "webp",
+   "source": "final1118/br1_bed.jpg",
+   "crop": [
+    300,
+    200,
+    2700,
+    2960
+   ],
+   "alpha": false
+  },
+  "mood_1br_living": {
+   "file": "mood_1br_living.webp",
+   "sha256": "6612a637781a9a73d59e219a7b3246361501188be7dd3549b48465b44e27545d",
+   "bytes": 138478,
+   "w": 1200,
+   "h": 1380,
+   "format": "webp",
+   "source": "final1118/br1_living.jpg",
+   "crop": [
+    500,
+    300,
+    4500,
+    4900
+   ],
+   "alpha": false
+  },
+  "mood_2br_bath": {
+   "file": "mood_2br_bath.webp",
+   "sha256": "1150805ee2474320c1e0278ac4aeba4878ffd6b5db609e05018a2950672dc7c7",
+   "bytes": 33972,
+   "w": 1000,
+   "h": 1150,
+   "format": "webp",
+   "source": "final1118/br2_bath.jpg",
+   "crop": [
+    300,
+    200,
+    2700,
+    2960
+   ],
+   "alpha": false
+  },
+  "mood_2br_bed": {
+   "file": "mood_2br_bed.webp",
+   "sha256": "bd4ac2755d863a7239a1cb8bfce5f900a5f3587f1b1d635453025a309163446c",
+   "bytes": 182730,
+   "w": 1200,
+   "h": 1227,
+   "format": "webp",
+   "source": "final1118/br2_bed.jpg",
+   "crop": [
+    400,
+    0,
+    2600,
+    2250
+   ],
+   "alpha": false
+  },
+  "mood_2br_living": {
+   "file": "mood_2br_living.webp",
+   "sha256": "c90d04c896630cc8dd31a1ef0eefc19a2205fcbe34135bbf6a390825e0a3c219",
+   "bytes": 138062,
+   "w": 1200,
+   "h": 1380,
+   "format": "webp",
+   "source": "final1118/br2_living.jpg",
+   "crop": [
+    300,
+    200,
+    2700,
+    2960
+   ],
+   "alpha": false
+  },
   "mood_bathroom": {
    "file": "mood_bathroom.webp",
    "sha256": "5ac033c7ce07a3e736f0fcc70c1303bc80e60f2f8951341dad0347708d1e7ca3",
@@ -13268,6 +13407,742 @@
     1000,
     3600,
     5000
+   ],
+   "alpha": false
+  },
+  "mood_st_bath": {
+   "file": "mood_st_bath.webp",
+   "sha256": "038b23fbab5a3bab38ad025d68a19939f76ee03a88852bf8168c2926e58a7bac",
+   "bytes": 29286,
+   "w": 1000,
+   "h": 1100,
+   "format": "webp",
+   "source": "final1118/st_bathroom.jpg",
+   "crop": [
+    0,
+    300,
+    2000,
+    2500
+   ],
+   "alpha": false
+  },
+  "mood_st_room": {
+   "file": "mood_st_room.webp",
+   "sha256": "5397fd109bd9bd1740ad9d2afcfc51b9b0561106c03096a28158160103b0d66a",
+   "bytes": 135036,
+   "w": 1400,
+   "h": 1050,
+   "format": "webp",
+   "source": "final1118/st_bedroom.jpg",
+   "crop": [
+    0,
+    0,
+    3000,
+    2250
+   ],
+   "alpha": false
+  },
+  "n_aqua1": {
+   "file": "n_aqua1.webp",
+   "sha256": "21189ad6937923c67877594b5892ecae637a8f1afdaec9d496d88840fb04321d",
+   "bytes": 175534,
+   "w": 1920,
+   "h": 1070,
+   "format": "webp",
+   "source": "final1118/aqua1.png",
+   "crop": [
+    150,
+    0,
+    2250,
+    1170
+   ],
+   "alpha": false
+  },
+  "n_back_front": {
+   "file": "n_back_front.webp",
+   "sha256": "24a285b10e46f0e9bd4cfab95195386a9eef8f2b739a5459113cbd380c6e5763",
+   "bytes": 270952,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/entrance.png",
+   "crop": [
+    0,
+    0,
+    2560,
+    1440
+   ],
+   "alpha": false
+  },
+  "n_bio2": {
+   "file": "n_bio2.webp",
+   "sha256": "7dca5061ebb47b6cd72b47a7cdb59ec96f7a6c34d7dd8f2edde4ce38afe26a40",
+   "bytes": 210640,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_bio2.jpg",
+   "crop": [
+    10,
+    0,
+    2741,
+    1536
+   ],
+   "alpha": false
+  },
+  "n_bio3": {
+   "file": "n_bio3.webp",
+   "sha256": "53c176c2becc60aae3d9a95cebfa00fb7fe68e56e0016a1f79b50f390e581bc1",
+   "bytes": 211086,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_bio3.jpg",
+   "crop": [
+    10,
+    0,
+    2741,
+    1536
+   ],
+   "alpha": false
+  },
+  "n_dev_timeline_early": {
+   "file": "n_dev_timeline_early.webp",
+   "sha256": "e4d343dd2261a535fc6ad649aba5c91f8d0bfffaac06f6aaaf8aa43ad8e976ad",
+   "bytes": 142150,
+   "w": 1800,
+   "h": 1270,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    780,
+    970,
+    3544,
+    2920
+   ],
+   "alpha": false
+  },
+  "n_dev_timeline_late": {
+   "file": "n_dev_timeline_late.webp",
+   "sha256": "0907edaafb5fecf2975988b0f6db843f5c828b9e07aa3f6471bf718573eb14c3",
+   "bytes": 124908,
+   "w": 1800,
+   "h": 1263,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    0,
+    970,
+    2780,
+    2920
+   ],
+   "alpha": false
+  },
+  "n_exec_ceo": {
+   "file": "n_exec_ceo.webp",
+   "sha256": "38557341a28435623a790ab2f320252d989385d1d0ac87a1791da0bd09e443ec",
+   "bytes": 66520,
+   "w": 900,
+   "h": 563,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    540,
+    495,
+    1920,
+    1359
+   ],
+   "alpha": false
+  },
+  "n_exec_cfo": {
+   "file": "n_exec_cfo.webp",
+   "sha256": "702dee40581e1c7cd5587dd81690d571d68208a6f926c1de20af581003e34d07",
+   "bytes": 70808,
+   "w": 900,
+   "h": 563,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    2490,
+    570,
+    3780,
+    1377
+   ],
+   "alpha": false
+  },
+  "n_exec_coo": {
+   "file": "n_exec_coo.webp",
+   "sha256": "c1a06637ba7867214ed46e2e1274bca77ca871fb5d1d0273356ecf04354f3629",
+   "bytes": 63932,
+   "w": 900,
+   "h": 561,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    2505,
+    1470,
+    3765,
+    2256
+   ],
+   "alpha": false
+  },
+  "n_exec_gm": {
+   "file": "n_exec_gm.webp",
+   "sha256": "63ab29e60ab548534c5050b296eb6485685b772e4f9f407e00acd72283b9bab0",
+   "bytes": 71350,
+   "w": 900,
+   "h": 562,
+   "format": "webp",
+   "source": "saleskit/embassy_life_sales_kit_2.0.pdf",
+   "crop": [
+    609,
+    1590,
+    1809,
+    2340
+   ],
+   "alpha": false
+  },
+  "n_fac_3_common_sphere": {
+   "file": "n_fac_3_common_sphere.webp",
+   "sha256": "889339b0d9a00dd7f5222459a1ba7449b6c221dd64163451cbc743b4e503d07a",
+   "bytes": 122242,
+   "w": 1920,
+   "h": 1079,
+   "format": "webp",
+   "source": "final1118/l3_10.png",
+   "crop": [
+    195,
+    0,
+    2205,
+    1130
+   ],
+   "alpha": false
+  },
+  "n_fac_3_coworking": {
+   "file": "n_fac_3_coworking.webp",
+   "sha256": "5a84d4a6f5ae5aae76a6e7aaae74ad4d0a26759a5582b77c6a19e584629ef987",
+   "bytes": 123416,
+   "w": 1920,
+   "h": 1079,
+   "format": "webp",
+   "source": "final1118/l3_9.png",
+   "crop": [
+    195,
+    0,
+    2205,
+    1130
+   ],
+   "alpha": false
+  },
+  "n_fac_3_sky_pool": {
+   "file": "n_fac_3_sky_pool.webp",
+   "sha256": "cbf6c937c41b15032589fb9ee041dfcf679b877da259be5cfb575b7c2f5b35c3",
+   "bytes": 207084,
+   "w": 1920,
+   "h": 1079,
+   "format": "webp",
+   "source": "final1118/l3_12.png",
+   "crop": [
+    390,
+    0,
+    2400,
+    1130
+   ],
+   "alpha": false
+  },
+  "n_fac_3_social": {
+   "file": "n_fac_3_social.webp",
+   "sha256": "2689e2a18db26193fdbd3c846d80ae15cfeac602b836ef1d817436c0aa55cf50",
+   "bytes": 168302,
+   "w": 1920,
+   "h": 1079,
+   "format": "webp",
+   "source": "final1118/l3_11.png",
+   "crop": [
+    195,
+    0,
+    2205,
+    1130
+   ],
+   "alpha": false
+  },
+  "n_fac_b_aqua_cinema": {
+   "file": "n_fac_b_aqua_cinema.webp",
+   "sha256": "a3cd309ec360a6f345fff57a9a40c3be01a6859ccbcfec5e9992741d3851cea9",
+   "bytes": 127584,
+   "w": 1778,
+   "h": 1000,
+   "format": "webp",
+   "source": "final1118/aqua2.jpg",
+   "crop": [
+    71,
+    0,
+    1849,
+    1000
+   ],
+   "alpha": false
+  },
+  "n_fac_b_crystal_sauna": {
+   "file": "n_fac_b_crystal_sauna.webp",
+   "sha256": "cb12f3a303571b8b2ed992ee3f41c8129ed9e97352714325cb5f59bed1b7c7dd",
+   "bytes": 98128,
+   "w": 1920,
+   "h": 1070,
+   "format": "webp",
+   "source": "final1118/crystal.png",
+   "crop": [
+    150,
+    0,
+    2250,
+    1170
+   ],
+   "alpha": false
+  },
+  "n_fac_b_hydro_capsule": {
+   "file": "n_fac_b_hydro_capsule.webp",
+   "sha256": "4d1f72d4d0a6f7d41c4e62f8d0b3b092411eefc110722ac26a43e71a325cdf86",
+   "bytes": 76254,
+   "w": 1920,
+   "h": 1070,
+   "format": "webp",
+   "source": "final1118/hydro.png",
+   "crop": [
+    150,
+    0,
+    2250,
+    1170
+   ],
+   "alpha": false
+  },
+  "n_fac_b_ice_bath": {
+   "file": "n_fac_b_ice_bath.webp",
+   "sha256": "4974c76b28621fcdb287f6bb90dd73df7d3c9b16370ed61802c321822b1c7549",
+   "bytes": 191788,
+   "w": 1920,
+   "h": 1070,
+   "format": "webp",
+   "source": "final1118/icebath.png",
+   "crop": [
+    150,
+    0,
+    2250,
+    1170
+   ],
+   "alpha": false
+  },
+  "n_fac_b_journey_mars": {
+   "file": "n_fac_b_journey_mars.webp",
+   "sha256": "708d800aa4594d13f54ad170293e01601f03c02371e9fbdb3d495e3987b87d0f",
+   "bytes": 255422,
+   "w": 1920,
+   "h": 1070,
+   "format": "webp",
+   "source": "final1118/mars.png",
+   "crop": [
+    150,
+    0,
+    2250,
+    1170
+   ],
+   "alpha": false
+  },
+  "n_fac_b_salt_sauna": {
+   "file": "n_fac_b_salt_sauna.webp",
+   "sha256": "4bdbd14530dbd7d7d8faaf0f774b5cfbd119f9ddfe7a1959477d4d8fc4e3bc27",
+   "bytes": 119432,
+   "w": 1920,
+   "h": 1070,
+   "format": "webp",
+   "source": "final1118/salt.png",
+   "crop": [
+    300,
+    0,
+    2400,
+    1170
+   ],
+   "alpha": false
+  },
+  "n_fac_b_swing_sauna": {
+   "file": "n_fac_b_swing_sauna.webp",
+   "sha256": "8da470ea518ae669759dcadedcec0d5c5e14bbff0e375b0a93b2d74c660ab8ab",
+   "bytes": 135920,
+   "w": 1920,
+   "h": 1070,
+   "format": "webp",
+   "source": "final1118/swing.png",
+   "crop": [
+    270,
+    0,
+    2370,
+    1170
+   ],
+   "alpha": false
+  },
+  "n_fac_g_biogenesis": {
+   "file": "n_fac_g_biogenesis.webp",
+   "sha256": "5bc8bd0b599c6739a69b9a7e75f32749821e1ccb4b97b130b0c1499873067c56",
+   "bytes": 279436,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_bio1.jpg",
+   "crop": [
+    352,
+    0,
+    2400,
+    1152
+   ],
+   "alpha": false
+  },
+  "n_fac_g_bungee": {
+   "file": "n_fac_g_bungee.webp",
+   "sha256": "960c0a69d718c4dd54dbeeb29601466d79ced9b736b7078ee498fbd12b60a4e9",
+   "bytes": 240834,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_bungee1.jpg",
+   "crop": [
+    10,
+    0,
+    2741,
+    1536
+   ],
+   "alpha": false
+  },
+  "n_fac_g_junior": {
+   "file": "n_fac_g_junior.webp",
+   "sha256": "20767fa917cf72b5415466c885bb449eb7d658c8c9001e8a625382c5d8f12e4f",
+   "bytes": 275394,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_junior1.jpg",
+   "crop": [
+    176,
+    0,
+    2576,
+    1350
+   ],
+   "alpha": false
+  },
+  "n_fac_g_junior_ballpit": {
+   "file": "n_fac_g_junior_ballpit.webp",
+   "sha256": "2a6efcbc2a57eefb358ee682d17d0d51efd9894e5f8e2fd88b9d93806780cb39",
+   "bytes": 220272,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_junior2.jpg",
+   "crop": [
+    10,
+    0,
+    2741,
+    1536
+   ],
+   "alpha": false
+  },
+  "n_fac_g_pilates": {
+   "file": "n_fac_g_pilates.webp",
+   "sha256": "cb17f8bba03858d1b1fa17b235a07dae6ab09a94ece20f42b42513b072cbe9b6",
+   "bytes": 132182,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_pilates.jpg",
+   "crop": [
+    10,
+    0,
+    2741,
+    1536
+   ],
+   "alpha": false
+  },
+  "n_fac_g_spinning": {
+   "file": "n_fac_g_spinning.webp",
+   "sha256": "d738622d89b08a597d0566b226309d20364d65cf30ab28b5d96a4442e453e253",
+   "bytes": 222108,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_cycling.jpg",
+   "crop": [
+    0,
+    0,
+    2696,
+    1517
+   ],
+   "alpha": false
+  },
+  "n_junior1b": {
+   "file": "n_junior1b.webp",
+   "sha256": "20767fa917cf72b5415466c885bb449eb7d658c8c9001e8a625382c5d8f12e4f",
+   "bytes": 275394,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_junior1.jpg",
+   "crop": [
+    176,
+    0,
+    2576,
+    1350
+   ],
+   "alpha": false
+  },
+  "n_lagoon_islands_aerial": {
+   "file": "n_lagoon_islands_aerial.webp",
+   "sha256": "dd5698d7b2c43e71eda68c7c4801a578a0009357d49e56d4090f2c2dccc93083",
+   "bytes": 370786,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/v2.jpg",
+   "crop": [
+    0,
+    0,
+    7680,
+    4320
+   ],
+   "alpha": false
+  },
+  "n_liv_courtyard_top": {
+   "file": "n_liv_courtyard_top.webp",
+   "sha256": "dd5698d7b2c43e71eda68c7c4801a578a0009357d49e56d4090f2c2dccc93083",
+   "bytes": 370786,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/v2.jpg",
+   "crop": [
+    0,
+    0,
+    7680,
+    4320
+   ],
+   "alpha": false
+  },
+  "n_liv_garden": {
+   "file": "n_liv_garden.webp",
+   "sha256": "501bbf7601f64f4aab12804ed21156a8ef3a1c4b5c13a616abf969d0ae4465f2",
+   "bytes": 393594,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/v4.jpg",
+   "crop": [
+    0,
+    0,
+    7680,
+    4320
+   ],
+   "alpha": false
+  },
+  "n_liv_kid_pool": {
+   "file": "n_liv_kid_pool.webp",
+   "sha256": "5223ac2a989837aee8085fc154b1eed6e67ed8fc4b1b71894387241dbd121193",
+   "bytes": 300162,
+   "w": 1600,
+   "h": 800,
+   "format": "webp",
+   "source": "web/6.gallery/exterior/Playscape/Scene 55.png",
+   "crop": [
+    700,
+    630,
+    2300,
+    1430
+   ],
+   "alpha": false
+  },
+  "n_liv_lagoon_night": {
+   "file": "n_liv_lagoon_night.webp",
+   "sha256": "ec7b930f9470d76a8050deb48dd49235f5a2806ff0fcce50185228c4bf7bac7e",
+   "bytes": 367002,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/v6.jpg",
+   "crop": [
+    0,
+    0,
+    7680,
+    4320
+   ],
+   "alpha": false
+  },
+  "n_liv_lawn": {
+   "file": "n_liv_lawn.webp",
+   "sha256": "a25222be26f698fef7831d95f19688290a73af69faf84d299fdbfd24739d11ad",
+   "bytes": 401476,
+   "w": 1920,
+   "h": 1200,
+   "format": "webp",
+   "source": "web/6.gallery/exterior/CD03/Scene 37.png",
+   "crop": [
+    0,
+    104,
+    2560,
+    1704
+   ],
+   "alpha": false
+  },
+  "n_liv_park": {
+   "file": "n_liv_park.webp",
+   "sha256": "811df4dea799aefba98c4897349a947eb72442196816ba7d0a835a63c34f658d",
+   "bytes": 297496,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/park.png",
+   "crop": [
+    0,
+    0,
+    2560,
+    1440
+   ],
+   "alpha": false
+  },
+  "n_liv_playscape": {
+   "file": "n_liv_playscape.webp",
+   "sha256": "828122dd0fa4e41989feacf1df90d5750af9c5782580f6a5797b784ca0e0a58e",
+   "bytes": 414872,
+   "w": 1920,
+   "h": 1280,
+   "format": "webp",
+   "source": "web/6.gallery/exterior/Playscape/Scene 50.png",
+   "crop": [
+    160,
+    104,
+    2560,
+    1704
+   ],
+   "alpha": false
+  },
+  "n_liv_trees": {
+   "file": "n_liv_trees.webp",
+   "sha256": "65c5920a3ec77eea827e5a12cf2cedca686a3bc51d76c5952f2f352c679fe2f9",
+   "bytes": 335938,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/v3.jpg",
+   "crop": [
+    0,
+    400,
+    7680,
+    4720
+   ],
+   "alpha": false
+  },
+  "n_lobby2": {
+   "file": "n_lobby2.webp",
+   "sha256": "3490f0209506a28c69fe7533ecf3bf50433a654fdf753d6c6568712e84969ed3",
+   "bytes": 213874,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_lobby2.jpg",
+   "crop": [
+    10,
+    0,
+    2741,
+    1536
+   ],
+   "alpha": false
+  },
+  "n_mars2": {
+   "file": "n_mars2.webp",
+   "sha256": "d7fbd16fdf89eb529df39384976f755b1623f4d6c77361b9c4a8e9438726ad5f",
+   "bytes": 111346,
+   "w": 1920,
+   "h": 1070,
+   "format": "webp",
+   "source": "final1118/mars2.png",
+   "crop": [
+    150,
+    0,
+    2250,
+    1170
+   ],
+   "alpha": false
+  },
+  "n_prj_dev_awards": {
+   "file": "n_prj_dev_awards.webp",
+   "sha256": "f2835393114e57e81a4d3ee26f4283d79689790fb5586b6e03e966762ce801cc",
+   "bytes": 101254,
+   "w": 1540,
+   "h": 822,
+   "format": "webp",
+   "source": "../../data/projects/embassy_world/presentations/slides/intro_003.jpg",
+   "crop": [
+    190,
+    198,
+    1730,
+    1020
+   ],
+   "alpha": false
+  },
+  "n_rm_corridor": {
+   "file": "n_rm_corridor.webp",
+   "sha256": "293c8d6cf277cc1ecc87c9f1eff479e3869cbb69eab8a4c0afcf3058930ffc89",
+   "bytes": 170620,
+   "w": 1792,
+   "h": 1008,
+   "format": "webp",
+   "source": "final1118/g_corridor.jpg",
+   "crop": [
+    0,
+    560,
+    1792,
+    1568
+   ],
+   "alpha": false
+  },
+  "n_rm_lobby": {
+   "file": "n_rm_lobby.webp",
+   "sha256": "9c8761bbc8f27564d8bdcf5b4fc42d55f7cc9321f6517104a59885a45595a9b3",
+   "bytes": 182808,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/g_lobby1.jpg",
+   "crop": [
+    10,
+    0,
+    2741,
+    1536
+   ],
+   "alpha": false
+  },
+  "n_rm_playscape": {
+   "file": "n_rm_playscape.webp",
+   "sha256": "050c61c3c2848419a22063d42446f01c466558b4bc07ef3e4b6eb26ac954af99",
+   "bytes": 416342,
+   "w": 1920,
+   "h": 1200,
+   "format": "webp",
+   "source": "web/6.gallery/exterior/Playscape/Scene 64(2).png",
+   "crop": [
+    0,
+    52,
+    2560,
+    1652
+   ],
+   "alpha": false
+  },
+  "n_rm_playscape_aerial": {
+   "file": "n_rm_playscape_aerial.webp",
+   "sha256": "f91c5eea571e3e4730c5a8af83c6fe836ccd22561be60d660e176ed5cba81d3c",
+   "bytes": 329786,
+   "w": 1920,
+   "h": 1200,
+   "format": "webp",
+   "source": "web/6.gallery/exterior/Playscape/Scene 55.png",
+   "crop": [
+    0,
+    0,
+    2560,
+    1600
    ],
    "alpha": false
   },
@@ -13749,6 +14624,33 @@
     1450,
     2260,
     2750
+   ],
+   "alpha": false
+  },
+  "site_plan_clean": {
+   "file": "site_plan_clean.webp",
+   "sha256": "bb7f097d91cfe3aee85473db7e34801ee5bc37765f10d418d0ea3cec2c9194f3",
+   "bytes": 205178,
+   "w": 1920,
+   "h": 734,
+   "format": "webp",
+   "source": "final1118/plan_ground_1123.webp",
+   "crop": null,
+   "alpha": true
+  },
+  "units_campus": {
+   "file": "units_campus.webp",
+   "sha256": "10c5d22f0d4a99ce085f8554c993b86a168ad8500c3363912345785becbece06",
+   "bytes": 354114,
+   "w": 1920,
+   "h": 1080,
+   "format": "webp",
+   "source": "final1118/v1.jpg",
+   "crop": [
+    0,
+    0,
+    7680,
+    4319
    ],
    "alpha": false
   }

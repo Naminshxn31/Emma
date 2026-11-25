@@ -356,13 +356,33 @@ SEARCH_STORIES_FIRST = (
 )
 
 
-def _stories_here() -> bool:
-    from app.prompts import _tool_visible
+SEARCH_CEREMONY_FIRST = ("Never for a topic of present_story (places in the building, the rooms, the neighbourhood, the developer, the "
+                         "executives, security): call present_story for those. ")
 
-    return _tool_visible("present_story")
+
+def _stories_here() -> bool:
+    from app.prompts import _stories_told
+
+    return _stories_told()
+
+
+def _ceremony_stories() -> dict:
+    """The stories this call tells off the ceremony's script (app/ceremony_stories.py); {} anywhere else."""
+    try:
+        from app import ceremony_stories
+
+        return ceremony_stories.topics() if ceremony_stories.in_ceremony() and ceremony_stories.on() else {}
+    except Exception:                                    # noqa: BLE001 -- the search, never its stories
+        logger.exception("the ceremony's stories")
+        return {}
 
 
 def _declare_search():
+    if _ceremony_stories():
+        # (live probe 24 Nov: "where is the sauna", "tell us about the security system" were searched -- the examples in
+        # this description win over a story, as on 14 Oct)
+        return (SEARCH_CEREMONY_FIRST + SEARCH_DESCRIPTION.replace(
+            SEARCH_STORY_EXAMPLES, "ของโครงการที่ไม่อยู่ในหัวข้อของ present_story "), SEARCH_PARAMETERS)
     if not _stories_here():
         return SEARCH_DESCRIPTION, SEARCH_PARAMETERS
     return (SEARCH_STORIES_FIRST + SEARCH_DESCRIPTION.replace(
@@ -379,14 +399,19 @@ STORY_REDIRECT = (
 )
 
 
+STORY_REDIRECT_EN = ("This is a topic with pictures: call present_story(topic=\"%s\") now and say its lines. Do not answer "
+                     "before calling it.")
+
+
 def _story_redirect(query: str) -> dict | None:
-    if not _stories_here():
+    ceremony = _ceremony_stories()
+    if not ceremony and not _stories_here():
         return None
     from app import stories
 
     via = "query"
     try:
-        offered = stories.available()
+        offered = ceremony or stories.available()
         topic = stories.story_for_query(query, offered)
         if topic is None:
             # The guest's own sentence, when the model's keyword list names no
@@ -415,7 +440,7 @@ def _story_redirect(query: str) -> dict | None:
     turnlog.record("lookup", query=query, showed=None, found=True, story=topic,
                    reason="story topic" if via == "query" else "story topic (guest's words)")
     return {"ok": True, "found": True, "results": [], "story_topic": topic,
-            "instruction": STORY_REDIRECT % (topic, asks)}
+            "instruction": (STORY_REDIRECT_EN % topic) if ceremony else STORY_REDIRECT % (topic, asks)}
 
 
 #: The executives' names as the recogniser spells them, to the report's

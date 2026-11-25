@@ -203,6 +203,20 @@ def focus(rows: list[dict]) -> None:
           % (len(opens), len(denies)))
     for reason, n in Counter(r.get("reason") for r in denies).most_common():
         print("    ไม่ฟังเพราะ %-28s %4d" % (reason, n))
+    near_rows = [r for r in opens + denies if r.get("near_state")]
+    if near_rows:
+        # VOICE_NEAR_DOOR: docs/near-voice-bench.md reads these. `ok` opens are voices with
+        # a face in front: what the lidar says of them is its coverage of real people.
+        ok = [r for r in opens if r.get("reason") == "ok" and r.get("near_state")]
+        print("  ประตูคนใกล้ (near_state near/nobody/unknown): เปิด %s · ไม่ฟัง %s" % (
+            dict(Counter(r["near_state"] for r in opens if r.get("near_state"))),
+            dict(Counter(r["near_state"] for r in denies if r.get("near_state")))))
+        print("    เสียงที่มีหน้าในกล้อง %d: ไลดาร์เห็นคนใกล้ %d · ไม่เห็น %d" % (
+            len(ok), sum(r["near_state"] == "near" for r in ok), sum(r["near_state"] == "nobody" for r in ok)))
+        would = Counter((r.get("event"), r.get("near_would")) for r in near_rows if r.get("near_would"))
+        if would:
+            print("    ถ้าเปิดประตูนี้: วันนี้เปิด→ปฏิเสธ %d · วันนี้ไม่ฟัง→เปิด %d" % (
+                would[("focus_open", "refuse")], would[("focus_deny", "open")]))
     hours = sorted({str(r.get("t", ""))[:2] for r in opens + denies if r.get("t")})
     if hours:
         print("  รายชั่วโมง (เปิด/ไม่ฟัง):")
@@ -276,7 +290,8 @@ def head(rows: list[dict]) -> None:
     looks = [r for r in rows if r.get("event") == "head_look"]
     fenced = [r for r in rows if r.get("event") == "face_link_refused" and r.get("why") == "event_walk"]
     lidar_rows = [r for r in rows if r.get("event") in ("head_lidar_check", "lidar_people")]
-    if not (cal or looks or fenced or lidar_rows):
+    locks = [r for r in rows if r.get("event") == "head_lock"]
+    if not (cal or looks or fenced or lidar_rows or locks):
         return
     section("Head follow (head_calibration / head_look)")
     for r in cal[-3:]:
@@ -287,9 +302,13 @@ def head(rows: list[dict]) -> None:
                 if (r.get("pan_deg_per_100") or 0) < 0 else ""))
         else:
             print("  sweep FAILED: %s  shifts %s" % (r.get("reason"), r.get("shifts")))
-    by = Counter(r.get("why") for r in looks)
-    if looks:
+    by = Counter(r.get("why") for r in looks if r.get("why") != "search_skipped")
+    if by:
         print("  looks by why: " + ", ".join(f"{k} {v}" for k, v in by.most_common()))
+    skipped = Counter(r.get("reason") for r in looks if r.get("why") == "search_skipped")
+    if skipped:
+        print("  looks down NOT made (HEAD_SEARCH_NEEDS_LIDAR, rows at most one per 20 s, not every skip): "
+              + ", ".join(f"{k} {v}" for k, v in skipped.most_common()))
     refused = Counter(r.get("reason") for r in looks if r.get("why") == "refused")
     if refused:
         print("  refused by the app: " + ", ".join(f"{k} {v}" for k, v in refused.most_common())
@@ -299,6 +318,18 @@ def head(rows: list[dict]) -> None:
         print("  stopped following: " + ", ".join(f"{k} {v}" for k, v in off.most_common()))
     if fenced:
         print("  arm commands refused during the event host's walk: %d" % len(fenced))
+    ends = [r for r in locks if r.get("state") == "off"]
+    if locks:
+        # HEAD_FOLLOW_FIRST (owner 10 Nov): the head stays with the first person until they are gone
+        held = sorted(float(r.get("followed_s") or 0) for r in ends)
+        print("  first-person locks %d · ended by: %s" % (
+            sum(1 for r in locks if r.get("state") == "on"),
+            ", ".join(f"{k} {v}" for k, v in Counter(r.get("why") for r in ends).most_common()) or "-"))
+        if held:
+            print("    followed p50 %.0f s, longest %.0f s · taken again by their spot %d · "
+                  "attention went to somebody else %d times (the head stayed)" % (
+                      _pct(held, 50), held[-1], sum(int(r.get("relocks") or 0) for r in ends),
+                      sum(int(r.get("elsewhere") or 0) for r in ends)))
     checks = [r for r in rows if r.get("event") == "head_lidar_check"]
     if checks:
         r = checks[-1]
@@ -314,6 +345,35 @@ def head(rows: list[dict]) -> None:
     turned = sum(1 for r in looks if r.get("why") == "lidar")
     if seen or turned:
         print("  lidar people rows %d · head turned toward a lidar person %d times" % (len(seen), turned))
+
+
+def face_speed(rows: list[dict]) -> None:
+    """How fast she scans (FACE_FAST_CONFIRM, 5 Nov): how long a frame takes on this machine,
+    from the first usable frame to the decision, and what the walk up to people did. Numbers
+    only. Before these rows, "where does the time go" had seconds from other rows and a guess."""
+    perf = [r for r in rows if r.get("event") == "face_perf"]
+    decided = [r["track_s"] for r in rows if r.get("event") == "face_seen" and isinstance(r.get("track_s"), (int, float))]
+    walk = [r for r in rows if r.get("event") == "face_approach"]
+    if not (perf or decided or walk):
+        return
+    section("Face scan speed and walking up to people (face_perf / face_approach)")
+    for key, label in (("empty_p50_ms", "no face"), ("face_p50_ms", "a face")):
+        values = sorted(r[key] for r in perf if isinstance(r.get(key), (int, float)))
+        if values:
+            print("  a frame with %s: median of the minutes %d ms, worst minute %d ms" % (label, values[len(values) // 2], values[-1]))
+    if decided:
+        decided.sort()
+        print("  first usable frame -> decision: median %.2f s, worst %.2f s (%d arrivals)" % (
+            decided[len(decided) // 2], decided[-1], len(decided)))
+    if walk:
+        said = Counter(str(r.get("phase")) for r in walk)
+        print("  walk ups:", ", ".join("%s %d" % kv for kv in said.most_common()))
+        why = Counter(str(r.get("why")) for r in walk if r.get("phase") in ("refused", "aborted"))
+        if why:
+            print("  why not:", ", ".join("%s %d" % kv for kv in why.most_common(10)))
+        via = Counter(str(r.get("via")) for r in walk if r.get("phase") == "greeted")
+        if via:
+            print("  greeted by:", ", ".join("%s %d" % kv for kv in via.most_common()))
 
 
 def array_mic(rows: list[dict]) -> None:
@@ -543,6 +603,7 @@ def main() -> int:
     focus(rows)
     stories(rows)
     head(rows)
+    face_speed(rows)
     array_mic(rows)
 
     # ---- mishearings ------------------------------------------------------

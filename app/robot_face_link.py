@@ -346,11 +346,14 @@ async def _send(session, kind: str, payload: dict):
     if kind not in KINDS or not isinstance(payload, dict):
         return _refusal("bad_request")
     action = payload.get("action")
-    if kind == "body" and action not in rc.BODY_ACTION_IDS:
-        return _refusal("bad_request")
     style = payload.get("style")
-    if style is not None and not (kind == "body" and style == "speech"
-                                  and action in rc.SPEECH_BODY_ACTIONS):
+    # The Emma Event debut's pageant (owner 9 Nov, app/event_pageant.py): its own two ids, its own
+    # style, never one of BODY_ACTIONS (so never move_body's) -- and never an id of those as "event".
+    event_style = kind == "body" and style == "event"
+    if kind == "body" and action not in (rc.EVENT_BODY_ACTIONS if event_style else rc.BODY_ACTION_IDS):
+        return _refusal("bad_request")
+    if style is not None and not event_style and not (kind == "body" and style == "speech"
+                                                      and action in rc.SPEECH_BODY_ACTIONS):
         return _refusal("bad_request")
     if kind == "nav":
         if action not in NAV_ACTIONS:
@@ -371,12 +374,24 @@ async def _send(session, kind: str, payload: dict):
         return _refusal("not_robot_face")
     if not is_robot_face(session):
         return _refusal("not_robot_face")
-    if kind == "body" and not stop and server_walking():
+    if event_style and (caps(session, "body") or {}).get("pageant") is not True:
+        # an APK from before the pageant, or not the Emma Event app: never asked (its page would
+        # answer bad_request; an older one still shows the prompt -- the EmmaBridge/1 lesson)
+        return _refusal("not_event_app")
+    if kind == "body" and not stop and not (action == "rest" and _walk_resting()) \
+            and not (event_style and _pageant_walk(action)) and server_walking():
         # The event host's walk is the server's own board_walk: the app's
         # nav poll (run.pid of emma_nav / drive_route) never sees it, so the
         # app's own "navigating" gate is OPEN -- her speech gestures, a voice
         # "ยกแขน", swung the arm between the tables (found 31 Oct, round 2, before
         # the first event walk). Refused here with the app's own word.
+        # ...but never the arm's REST before an event walk: event_walk asks for it with
+        # its run already taken ("starting", review 7 Nov -- so no gesture lands while
+        # she is about to walk). ONLY then (round 3): mid-walk a rest is still a move of
+        # the arm (and the head -- the app's resetHome), and a walk the app cannot see
+        # (board_walk over adb, a joystick) is no event walk resting its arm.
+        # The pageant is the one exception (owner 9 Nov: "โบกไปด้วยระหว่างเดิน ... ท่านี้จะใช้เฉพาะโหมดนี้
+        # แก้กฏได้"): its own start on the debut's own walk, and its end on any (`_pageant_walk`).
         _record("face_link_refused", command=kind, action=action, why="event_walk")
         return _refusal("navigating")
     ws = getattr(session, "ws", None)
@@ -399,6 +414,8 @@ async def _send(session, kind: str, payload: dict):
     message = {"type": "%s_command" % kind, "command_id": command_id, "action": action}
     if style == "speech":
         message["style"] = "speech"
+    elif event_style:
+        message["style"] = "event"
     if kind == "nav":
         if action == "go":
             message["place"] = payload["place"]
@@ -421,14 +438,78 @@ async def _send(session, kind: str, payload: dict):
     return pending
 
 
-def server_walking() -> bool:
-    """A walk this server runs itself (the event host's board_walk), which
-    the app cannot see. Never raises: a probe that fails is "not walking"
-    here, because the app's own gate still holds for every walk IT runs."""
+def _pageant_walk(action: str) -> bool:
+    """The pageant through a walk: its end always (the hand comes down -- the way a walk wants it),
+    its start only on the walk the debut scene asked it for (event_pageant.walk_is_mine: the event
+    host's own walk, under way). Never on a walk the server does not run (board_walk over adb, a
+    joystick: walk_frames' motion check) or one it runs for anything else. Never raises."""
+    if action == "pageant_end":
+        return True
+    try:
+        from app import event_pageant
+
+        return event_pageant.walk_is_mine()
+    except Exception:  # noqa: BLE001 -- a probe that fails is "no": the start is refused
+        return False
+
+
+def _walk_resting() -> bool:
+    """An event walk taken and asking for the arm's rest (state "starting"). Never raises."""
     try:
         from app import event_walk
 
-        return bool(event_walk.walking())
+        run = event_walk.current()
+        return run is not None and run.state == "starting"
+    except Exception:  # noqa: BLE001 -- a probe that fails is "no": the rest is refused
+        return False
+
+
+def server_walking() -> bool:
+    """A walk the app cannot see: one this server runs itself (the event
+    host's board_walk), or the base moving with nobody reporting it (board_walk
+    over adb on floor 1, a joystick -- walk_frames' pose check, 4 Nov: the arm
+    gestures and the camera's handshake were open through those). Never
+    raises: a probe that fails is "not walking" here, because the app's own
+    gate still holds for every walk IT runs."""
+    try:
+        from app import event_walk
+
+        if event_walk.walking():
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app import walk_frames
+
+        return bool(walk_frames.base_moving())
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def walk_quiet() -> bool:
+    """WALK_QUIET's question: is the base walking on a walk no guest is on --
+    a route run from the PC, board_walk over adb, a joystick (4 Nov, the dock
+    room: through the survey she answered the office's own talk two dozen
+    times, "ขออภัยค่ะ ดิฉันดูแลเฉพาะโครงการ Embassy World..."). The event
+    host's walks are with guests and keep her voice (event_walk). The motion
+    check holds 15 s past the last move (walk_frames.MOTION_STILL_S): the
+    reply to what was heard as the robot came to a stop stays quiet too."""
+    try:
+        from app import event_walk
+
+        if event_walk.walking():
+            return False
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        if nav_activity() in ("active", "stale"):
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app import walk_frames
+
+        return bool(walk_frames.base_moving())
     except Exception:  # noqa: BLE001
         return False
 
@@ -461,6 +542,10 @@ async def look(session, pan: int, tilt: int, *, seq: int | None = None) -> bool:
     ws = getattr(session, "ws", None)
     if ws is None:
         return False
+    # where the head is straight on this robot (HEAD_PAN_TRIM_PCT): every look the server asks is from there
+    from app.config import settings
+
+    pan = max(-100, min(100, pan + int(getattr(settings, "head_pan_trim_pct", 0) or 0)))
     frame = {"type": "head_look", "pan": pan, "tilt": tilt}
     if seq is not None:
         frame["seq"] = seq
@@ -657,7 +742,7 @@ def _issue(session, run_id: str) -> None:
 def _valid_frame(mtype: str, event: dict) -> bool:
     if mtype == "body_status":
         return (_int_or_none(event.get("seq")) is not None
-                and (event.get("action") in rc.BODY_ACTION_IDS)
+                and (event.get("action") in rc.BODY_ACTION_IDS or event.get("action") in rc.EVENT_BODY_ACTIONS)
                 and event.get("state") in rc.BODY_STATUS_STATES)
     if mtype == "body_caps":
         gestures = event.get("gestures")

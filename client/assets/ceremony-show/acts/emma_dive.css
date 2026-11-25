@@ -1,0 +1,289 @@
+/* emma_dive: Emma in the real pool -- she dives in (s04_l11), swims her laps (s04_l13) and
+   comes up at the near edge (s04_l15): one shot, three lines. Every selector under
+   .cs-act-emma_dive; sizes in --cu; only transform and opacity move. The splash, the rings,
+   her wake and the shimmer are drawn here on the picture of the pool; Emma is the transparent
+   clip. The words are the film's face (the core's): this file only places them.
+   Full screen (18 Nov): the pool runs to the bottom edge under the subtitle's box (.grade
+   takes its lowest part down a little); Emma, the splashes and the words stay above 43.8cu. */
+
+.cs-act-emma_dive { font-family: var(--cs-font, "Inter", "Segoe UI", system-ui, sans-serif); }
+
+.cs-act-emma_dive .scene { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_dive .world { position: absolute; isolation: isolate; }
+/* (isolate: anything the core lays inside the picture -- its paint-over of a person, z-index 1 --
+   stays inside the picture's own layer and can never be drawn over Emma, the splash or the rings) */
+.cs-act-emma_dive .emma { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+/* a clip cut to the part of the frame she is ever in: laid at its window of the box (the act sets
+   left / top / width / height from options.window; 23 Nov, the notebook decodes VP9 alpha on its CPU) */
+.cs-act-emma_dive .emma .cs-avid.cwin { position: absolute; }
+
+/* the opening: the pool fades up a breath before her, so she is seen arriving at its edge */
+.cs-act-emma_dive .world, .cs-act-emma_dive .emma { opacity: 0; transition: opacity .7s ease; }
+.cs-act-emma_dive .emma { transform: translate3d(calc(3 * var(--cu)), 0, 0); transition: opacity .6s ease .25s, transform 1s cubic-bezier(.16, .84, .24, 1) .2s; }
+.cs-act-emma_dive.cs-live .world, .cs-act-emma_dive.cs-live .emma { opacity: 1; transform: none; }
+/* (the lines after the dive are the same shot going on: the pool and Emma are simply there) */
+.cs-act-emma_dive.m-laps .world, .cs-act-emma_dive.m-laps .emma,
+.cs-act-emma_dive.m-edge .world, .cs-act-emma_dive.m-edge .emma { opacity: 1; transform: none; transition: none; }
+/* the picture's lowest part, under the subtitle's box: graded down softly, part of the shot */
+.cs-act-emma_dive .grade {
+  position: absolute; left: 0; bottom: 0; width: 100%; height: calc(18 * var(--cu));
+  background: linear-gradient(to top, rgba(3, 8, 22, .74) 0%, rgba(3, 8, 22, .58) 30%, rgba(3, 8, 22, .22) 66%, rgba(3, 8, 22, 0) 100%);
+}
+/* the swim clip, named a line early so it is in the browser when the laps begin: never seen */
+.cs-act-emma_dive .ahead { position: absolute; left: 0; top: 0; width: calc(2 * var(--cu)); height: calc(1.125 * var(--cu)); opacity: 0; }
+
+/* ---- the water's shimmer: light lying on the real water, drifting slowly ---- */
+.cs-act-emma_dive .glints { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_dive .glint {
+  position: absolute; height: calc(.32 * var(--cu)); border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, .62), rgba(200, 245, 255, .22) 45%, rgba(200, 245, 255, 0) 72%);
+  opacity: 0;
+  animation: emma_dive-glint 4.6s ease-in-out infinite;
+  /* (--age: how long the shot has been up -- a line that goes on from the one before starts
+     its shimmer as old as it was there) */
+  animation-delay: calc(var(--d) * 1s - var(--age, 0) * 1s);
+}
+@keyframes emma_dive-glint {
+  0%   { opacity: 0;   transform: translate3d(0, 0, 0) scaleX(.7); }
+  45%  { opacity: .85; transform: translate3d(calc(.9 * var(--cu)), 0, 0) scaleX(1); }
+  100% { opacity: 0;   transform: translate3d(calc(1.8 * var(--cu)), 0, 0) scaleX(.8); }
+}
+
+/* ---- anchors: a point on the water (left/top set by the act); children hang round it ---- */
+.cs-act-emma_dive .rings, .cs-act-emma_dive .crown, .cs-act-emma_dive .foam,
+.cs-act-emma_dive .rest, .cs-act-emma_dive .lid { position: absolute; width: 0; height: 0; transform: scale(var(--k, 1)); }
+/* the rig: all that is where she is on the water (moved, scaled and turned by the act) */
+.cs-act-emma_dive .rig, .cs-act-emma_dive .turn { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_dive .rest, .cs-act-emma_dive .lid { transition: opacity .16s ease; }
+
+/* rings: ellipses flattened by the water's angle (--flat = height / width) */
+.cs-act-emma_dive .ring, .cs-act-emma_dive .rest-ring {
+  position: absolute; border-radius: 50%;
+  border: calc(.24 * var(--cu)) solid rgba(235, 252, 255, .8);
+  opacity: 0;
+}
+.cs-act-emma_dive .ring {
+  width: calc(22 * var(--cu)); height: calc(22 * var(--flat) * var(--cu));
+  left: calc(-11 * var(--cu)); top: calc(-11 * var(--flat) * var(--cu));
+  transform: scale(.12);
+}
+.cs-act-emma_dive.splash .ring {
+  animation: emma_dive-ring 3.4s cubic-bezier(.12, .7, .3, 1) forwards;
+  animation-delay: calc(.12s + var(--i) * .42s);
+}
+@keyframes emma_dive-ring {
+  0%   { opacity: 0;   transform: scale(.12); }
+  10%  { opacity: .95; }
+  100% { opacity: 0;   transform: scale(1.75); }
+}
+
+/* the crown: jets fanned round the entry, rising from the water line and falling back */
+.cs-act-emma_dive .jet {
+  position: absolute; bottom: 0;
+  width: calc(var(--w) * var(--cu)); height: calc(var(--h) * var(--cu));
+  left: calc(var(--w) * -.5 * var(--cu));
+  border-radius: 50% 50% 42% 42% / 72% 72% 28% 28%;
+  background: linear-gradient(to top, rgba(255, 255, 255, .98), rgba(230, 250, 255, .85) 45%, rgba(190, 240, 255, .35) 80%, rgba(190, 240, 255, 0));
+  transform-origin: 50% 100%;
+  transform: rotate(calc(var(--a) * 1deg)) scaleY(0);
+  opacity: 0;
+}
+.cs-act-emma_dive.splash .crown .jet {
+  animation: emma_dive-jet 1.15s cubic-bezier(.2, .8, .3, 1) forwards;
+  animation-delay: calc(var(--d) * 1s);
+}
+@keyframes emma_dive-jet {
+  0%   { opacity: 1; transform: rotate(calc(var(--a) * 1deg)) scaleY(.05) scaleX(.6); }
+  32%  { opacity: 1; transform: rotate(calc(var(--a) * 1.1deg)) scaleY(1) scaleX(1); }
+  70%  { opacity: .7; transform: rotate(calc(var(--a) * 1.25deg)) scaleY(.55) scaleX(1.15); }
+  100% { opacity: 0; transform: rotate(calc(var(--a) * 1.3deg)) scaleY(.05) scaleX(1.3); }
+}
+
+/* drops: out along x at an even pace, up then down along y -- a parabola from two moves */
+.cs-act-emma_dive .drop-x, .cs-act-emma_dive .drop-y { position: absolute; left: 0; top: 0; }
+.cs-act-emma_dive .drop {
+  position: absolute; width: calc(var(--s) * var(--cu)); height: calc(var(--s) * 1.15 * var(--cu));
+  left: calc(var(--s) * -.5 * var(--cu)); top: calc(var(--s) * -.5 * var(--cu));
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, rgba(220, 248, 255, .9) 45%, rgba(150, 220, 245, .55) 75%, rgba(150, 220, 245, 0));
+  opacity: 0;
+}
+.cs-act-emma_dive.splash .drop-x { animation: emma_dive-dx calc(var(--t) * 1s) linear .05s forwards; }
+.cs-act-emma_dive.splash .drop-y { animation: emma_dive-dy calc(var(--t) * 1s) linear .05s forwards; }
+.cs-act-emma_dive.splash .drop { animation: emma_dive-drop calc(var(--t) * 1s) linear .05s forwards; }
+@keyframes emma_dive-dx {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(calc(var(--dx) * var(--cu)), 0, 0); }
+}
+@keyframes emma_dive-dy {
+  0%   { transform: translate3d(0, 0, 0); animation-timing-function: cubic-bezier(.3, .7, .55, 1); }
+  45%  { transform: translate3d(0, calc(var(--up) * -1 * var(--cu)), 0); animation-timing-function: cubic-bezier(.5, 0, .75, .4); }
+  100% { transform: translate3d(0, calc(.6 * var(--cu)), 0); }
+}
+@keyframes emma_dive-drop {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  85%  { opacity: .9; }
+  100% { opacity: 0; }
+}
+
+/* foam: the white patch where she went in, spreading and thinning */
+.cs-act-emma_dive .foam::before {
+  content: ""; position: absolute;
+  width: calc(15 * var(--cu)); height: calc(2.6 * var(--cu));
+  left: calc(-7.5 * var(--cu)); top: calc(-1.3 * var(--cu));
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, .95), rgba(225, 250, 255, .7) 40%, rgba(200, 240, 255, 0) 72%);
+  opacity: 0; transform: scale(.25);
+}
+.cs-act-emma_dive.splash .foam::before { animation: emma_dive-foam 3.2s ease-out forwards; }
+@keyframes emma_dive-foam {
+  0%   { opacity: 0;   transform: scale(.25); }
+  12%  { opacity: 1;   transform: scale(.75); }
+  55%  { opacity: .55; transform: scale(1.15); }
+  100% { opacity: 0;   transform: scale(1.5); }
+}
+
+/* up: the rings round her as she bobs (one breath = one bob), and the water's collar on her */
+.cs-act-emma_dive .rest-ring {
+  width: calc(14 * var(--cu)); height: calc(14 * var(--flat) * var(--cu));
+  left: calc(-7 * var(--cu)); top: calc(-7 * var(--flat) * var(--cu));
+  border-width: calc(.18 * var(--cu));
+}
+.cs-act-emma_dive.up .rest-ring {
+  animation: emma_dive-rest calc(var(--bob) * 1.5s) ease-out infinite;
+  animation-delay: calc(var(--i) * var(--bob) * .5s - var(--since, 0) * 1s);
+}
+@keyframes emma_dive-rest {
+  0%   { opacity: 0;   transform: scale(.55); }
+  15%  { opacity: .7; }
+  100% { opacity: 0;   transform: scale(1.7); }
+}
+.cs-act-emma_dive .collar {
+  position: absolute; width: calc(11.5 * var(--cu)); height: calc(1.9 * var(--cu));
+  left: calc(-5.75 * var(--cu)); top: calc(-1.05 * var(--cu));
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(120, 205, 230, .0) 30%, rgba(235, 252, 255, .85) 52%, rgba(200, 240, 255, .35) 66%, rgba(200, 240, 255, 0) 74%);
+  opacity: 0; transform: scale(.6);
+  transition: opacity .5s ease, transform .6s cubic-bezier(.2, 1.3, .4, 1);
+}
+.cs-act-emma_dive.up .collar { opacity: 1; transform: none; animation: emma_dive-collar calc(var(--bob) * 1s) ease-in-out calc(var(--since, 0) * -1s) infinite; }
+/* (a shot that is going on: the collar is on her from the first frame) */
+.cs-act-emma_dive.joined .collar { transition: none; }
+@keyframes emma_dive-collar {
+  0%, 100% { transform: scale(1, 1); }
+  25%      { transform: scale(1.05, 1.12); }
+  75%      { transform: scale(.96, .9); }
+}
+
+/* ---- the figure, top left over the buildings (the film's face; the core lights it, Playful) ---- */
+.cs-act-emma_dive .shade {
+  position: absolute; left: calc(-8 * var(--cu)); top: calc(-12 * var(--cu));
+  width: calc(66 * var(--cu)); height: calc(36 * var(--cu));
+  background: radial-gradient(ellipse at 30% 50%, rgba(3, 5, 13, .62), rgba(3, 5, 13, .3) 45%, rgba(3, 5, 13, 0) 70%);
+  opacity: 0; transition: opacity .7s ease;
+}
+.cs-act-emma_dive .shade.in { opacity: 1; }
+.cs-act-emma_dive .figbox { position: absolute; left: calc(4.6 * var(--cu)); top: calc(3.8 * var(--cu)); }
+.cs-act-emma_dive .cs-fig { font-size: calc(6.4 * var(--cu)); }
+/* the lines after the dive: one short phrase at a time, in the same place */
+.cs-act-emma_dive .cap { position: absolute; left: calc(4.6 * var(--cu)); top: calc(4.4 * var(--cu)); width: calc(70 * var(--cu)); height: calc(6 * var(--cu)); }
+.cs-act-emma_dive .phrase { position: absolute; left: 0; top: 0; white-space: nowrap; }
+/* (s04_l13: "A few laps" under "I'd love to show off" -- one phrase in two rows, built up) */
+.cs-act-emma_dive .phrase.row2 { top: calc(5.6 * var(--cu)); }
+.cs-act-emma_dive .cap.stack { display: flex; flex-direction: column; align-items: flex-start; gap: calc(.7 * var(--cu)); height: auto; }
+
+/* ---- follow-through: each drop's landing opens a small ring where it comes down ---- */
+.cs-act-emma_dive .plink {
+  position: absolute; width: calc(2.6 * var(--cu)); height: calc(.42 * var(--cu));
+  left: calc(-1.3 * var(--cu)); top: calc(.4 * var(--cu));
+  border-radius: 50%; border: calc(.14 * var(--cu)) solid rgba(235, 252, 255, .75);
+  opacity: 0; transform: scale(.2);
+}
+.cs-act-emma_dive.splash .plink {
+  animation: emma_dive-plink 1.1s cubic-bezier(.12, .7, .3, 1) forwards;
+  animation-delay: calc(.05s + var(--t) * 1s);
+}
+@keyframes emma_dive-plink {
+  0%   { opacity: 0;  transform: scale(.2); }
+  12%  { opacity: .9; }
+  100% { opacity: 0;  transform: scale(1.6); }
+}
+
+/* ---- secondary: the small splash as she pops up (the side jets of the lid; Playful overshoot) ---- */
+.cs-act-emma_dive.up .lid .jet {
+  animation: emma_dive-jet .85s cubic-bezier(.2, .8, .3, 1) forwards;
+  animation-delay: calc(.12s + var(--d) * 1s);
+}
+/* (a shot that is going on, or a state shown late: she is simply up -- no splash) */
+.cs-act-emma_dive.joined .lid .jet { animation: none; }
+
+/* ---- her laps (s04_l13, s04_l15) ---- */
+/* her wake: the water she leaves behind her (the clip faces left: behind her is to the right;
+   the act scales it with her speed, from her) */
+.cs-act-emma_dive .wake { position: absolute; width: 0; height: 0; opacity: 0; transform-origin: 0 50%; }
+.cs-act-emma_dive .wake-a, .cs-act-emma_dive .wake-b, .cs-act-emma_dive .wake-c { position: absolute; border-radius: 50%; }
+/* the foam she churns up, right behind her */
+.cs-act-emma_dive .wake-a {
+  left: calc(2.4 * var(--cu)); top: calc(-.6 * var(--cu)); width: calc(17 * var(--cu)); height: calc(1.6 * var(--cu));
+  background: linear-gradient(90deg, rgba(255, 255, 255, .95), rgba(236, 252, 255, .62) 34%, rgba(225, 250, 255, 0));
+}
+/* the V of her wake opening out behind her (two thin lines, flattened by the water's angle) */
+.cs-act-emma_dive .wake-b, .cs-act-emma_dive .wake-c {
+  left: calc(2 * var(--cu)); top: calc(-.1 * var(--cu)); width: calc(26 * var(--cu)); height: calc(.42 * var(--cu));
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, rgba(245, 254, 255, .9), rgba(235, 252, 255, .42) 46%, rgba(235, 252, 255, 0));
+}
+.cs-act-emma_dive .wake-b { transform: rotate(-2.6deg); }
+.cs-act-emma_dive .wake-c { transform: rotate(3.4deg); }
+/* the wave she pushes ahead of her: a bright arc on the water in front (she faces left) */
+.cs-act-emma_dive .bow {
+  position: absolute; left: calc(-9.5 * var(--cu)); top: calc(-.9 * var(--cu)); width: calc(7 * var(--cu)); height: calc(2.6 * var(--cu));
+  border-radius: 50%; border: calc(.22 * var(--cu)) solid rgba(240, 253, 255, 0); border-left-color: rgba(240, 253, 255, .85);
+}
+/* her paddling: a small splash where each hand comes down, one after the other (the stroke
+   of the clip is 1.2 s) -- whenever she strokes: on the spot getting ready, the lengths, the turns */
+.cs-act-emma_dive .strokes { position: absolute; width: 0; height: 0; opacity: 0; transition: opacity .35s var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-emma_dive.stroking .strokes { opacity: 1; }
+.cs-act-emma_dive .paddle {
+  position: absolute; left: calc(-6.4 * var(--cu)); top: calc(-.9 * var(--cu)); width: calc(2.6 * var(--cu)); height: calc(1.5 * var(--cu));
+  border-radius: 50% 50% 46% 46%;
+  background: radial-gradient(ellipse at 50% 70%, rgba(255, 255, 255, .95), rgba(232, 251, 255, .6) 46%, rgba(225, 250, 255, 0) 74%);
+  opacity: 0; transform-origin: 50% 100%;
+  animation: emma_dive-paddle 1.2s cubic-bezier(.2, .8, .3, 1) infinite;
+}
+.cs-act-emma_dive .paddle2 { left: calc(-4.2 * var(--cu)); top: calc(.1 * var(--cu)); animation-delay: -.6s; }
+@keyframes emma_dive-paddle {
+  0%   { opacity: 0;   transform: scale(.3, .2); }
+  16%  { opacity: .95; transform: scale(1, 1); }
+  46%  { opacity: 0;   transform: scale(1.3, .5); }
+  100% { opacity: 0;   transform: scale(1.3, .5); }
+}
+/* a turn at the end of a length, and where she ducks under and comes up: a small splash */
+.cs-act-emma_dive .tsplash { position: absolute; width: 0; height: 0; transform: scale(var(--k, 1)); }
+.cs-act-emma_dive .tsplash.go .jet {
+  animation: emma_dive-jet .8s cubic-bezier(.2, .8, .3, 1) forwards;
+  animation-delay: calc(var(--d) * 1s);
+}
+.cs-act-emma_dive .tring {
+  position: absolute; left: calc(-5 * var(--cu)); top: calc(-.8 * var(--cu)); width: calc(10 * var(--cu)); height: calc(1.6 * var(--cu));
+  border-radius: 50%; border: calc(.18 * var(--cu)) solid rgba(235, 252, 255, .8); opacity: 0; transform: scale(.15);
+}
+.cs-act-emma_dive .tsplash.go .tring { animation: emma_dive-ring 1.6s cubic-bezier(.12, .7, .3, 1) forwards; }
+.cs-act-emma_dive .tsplash.go .tring2 { animation-delay: .24s; }
+/* under the water she is not drawn: nothing of her on the surface either */
+.cs-act-emma_dive.under .rest, .cs-act-emma_dive.under .lid { opacity: 0; }
+/* her way under the water to the near edge: a line of light that runs ahead and fades */
+.cs-act-emma_dive .trail { position: absolute; left: 0; top: 0; height: 0; transform-origin: 0 0; }
+.cs-act-emma_dive .trail-in {
+  position: absolute; left: 0; top: calc(-.3 * var(--cu)); width: 100%; height: calc(.6 * var(--cu)); border-radius: 50%;
+  background: linear-gradient(90deg, rgba(200, 245, 255, 0), rgba(235, 252, 255, .7) 62%, rgba(255, 255, 255, .95));
+  opacity: 0; transform-origin: 0 50%; transform: scale(.05, 1);
+}
+.cs-act-emma_dive .trail.go .trail-in { animation: emma_dive-trail .62s cubic-bezier(.3, 0, .2, 1) forwards; }
+@keyframes emma_dive-trail {
+  0%   { opacity: 0;  transform: scale(.05, 1); }
+  25%  { opacity: .9; }
+  70%  { opacity: .8; transform: scale(1, 1); }
+  100% { opacity: 0;  transform: scale(1, 1); }
+}

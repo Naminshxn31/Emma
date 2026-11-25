@@ -73,6 +73,14 @@ if _slides_path.is_dir():
 if CLIENT_ASSETS.is_dir():
     app.mount("/assets", StaticFiles(directory=str(CLIENT_ASSETS)), name="assets")
 
+# The ceremony's film on the robot's own chest screen (CEREMONY_FACE_FILM, app/face_film.py): the room
+# screen's page and its socket, served from THIS origin behind a cookie of their own. Off = none of these
+# routes exist (this server answers exactly as it did).
+if settings.ceremony_face_film:
+    from app import face_film
+
+    app.include_router(face_film.router)
+
 _MODEL_FOR = {"gemini": lambda: settings.gemini_model, "openai": lambda: settings.openai_model}
 
 #: Hosts that mean "this machine only". Anything else is reachable from the
@@ -482,7 +490,7 @@ async def _watch_the_network() -> None:
     measured). The first offline call starts loading them in a thread the
     moment it opens -- on the robot that is the standing line, rung long
     before a guest speaks; a greeting or a tap never waits for them."""
-    if not settings.offline_fallback:
+    if not (settings.offline_fallback or settings.net_status):
         return
     from app import net_health
 
@@ -586,15 +594,17 @@ async def _stop_walk_frames() -> None:
 async def _start_lidar_people() -> None:
     """People round the base from the lidar, for the head (app/lidar_people.py).
     No task unless LIDAR_PEOPLE; reads the board only while HEAD_FOLLOW is on."""
-    from app import lidar_people
+    from app import lidar_people, near_voice
 
     lidar_people.start()
+    near_voice.start()                  # reads the above; no task with VOICE_NEAR_DOOR off
 
 
 @app.on_event("shutdown")
 async def _stop_lidar_people() -> None:
-    from app import lidar_people
+    from app import lidar_people, near_voice
 
+    await near_voice.stop()
     await lidar_people.stop()
 
 
@@ -645,7 +655,7 @@ async def _let_go_of_the_chassis() -> None:
 
 @app.on_event("shutdown")
 async def _stop_watching_the_network() -> None:
-    if not settings.offline_fallback:
+    if not (settings.offline_fallback or settings.net_status):     # the startup hook's own condition
         return
     from app import net_health
 
@@ -856,7 +866,7 @@ async def unit_plan(sha256: str, token: str | None = None):
 
 
 @app.get("/story-asset/{sha256}")
-async def story_asset(sha256: str, token: str | None = None):
+async def story_asset(sha256: str, request: Request, token: str | None = None):
     """A picture of a robot-face story (app/stories.py), by the hash its
     catalog pins. Same gate as /unit-plan: behind WS_TOKEN, re-hashed on
     every read, and only for an approved catalog with STORIES_ENABLED on --
@@ -868,7 +878,11 @@ async def story_asset(sha256: str, token: str | None = None):
 
     if settings.ws_token and not hmac.compare_digest(
             (token or "").encode(), settings.ws_token.encode()):
-        return Response(status_code=403)
+        # (the ceremony film's frame on the chest screen carries no WS_TOKEN: its own cookie, app/face_film.py)
+        from app import face_film
+
+        if not face_film.cookie_ok(request):
+            return Response(status_code=403)
     if not re.fullmatch(r"[0-9a-f]{64}", sha256):
         return Response(status_code=404)
     from app import stories
@@ -1020,6 +1034,13 @@ async def take_hardware_report(request: Request) -> dict:
 async def read_hardware_reports() -> dict:
     """What other devices have sent, newest first."""
     return {"reports": list(_HARDWARE_REPORTS)}
+
+
+# The page where a person records their voice so the mic hears only them (owner 19 Nov):
+# /voice-lock + /ws/voice-lock, the socket behind the same guard as every other socket.
+from app import one_voice_page as _one_voice_page  # noqa: E402
+
+_one_voice_page.register(app, _reject_unauthorized, _NO_CACHE)
 
 
 def _authorized(token: str | None) -> bool:
@@ -2326,7 +2347,7 @@ async def ws_wake(websocket: WebSocket, token: str | None = None) -> None:
             # — and only the first half needs a model. Hanging up here left
             # `events.announce(summon=True)` with nobody to call, so a face
             # at the door could be recognised and then reach nothing.
-            await websocket.send_text(json.dumps({"type": "standby_only"}))
+            await websocket.send_text(json.dumps({"type": "standby_only", **wake.hello()}))
             await _hold_standby(websocket, wake)
             return
         # Tell the browser why, then hang up. The Start button still works;
@@ -2340,7 +2361,7 @@ async def ws_wake(websocket: WebSocket, token: str | None = None) -> None:
 
     stream = wake.WakeStream()
     await websocket.send_text(json.dumps(
-        {"type": "wake_listening", "word": settings.wake_word}
+        {"type": "wake_listening", "word": settings.wake_word, **wake.hello()}
     ))
     # Registered so the server can ring the room itself — a reminder falling
     # due while the line is parked summons a session through this socket.

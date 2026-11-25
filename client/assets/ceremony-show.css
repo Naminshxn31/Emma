@@ -1,0 +1,1545 @@
+/* The ceremony's motion slides on the event screen (client/assets/ceremony-show.js;
+   owner 17 Nov 2026). Loaded only on /mirror, shown only in the ceremony's show mode
+   (html.mirror.mirror-show, client/voice-preview.html).
+
+   THE WHOLE SCREEN (owner 18 Nov: "อยากให้มันเต็มจอเลยไม่ต้องแบ่งพท้นที่ให้ซับ แต่ให้ซับมีกล่อง
+   ข้อความใสๆ ... แต่ก็อย่าให้อะไรมาทับหรือซ้อนตรงนี้"): the stage ran down to an opaque subtitle
+   band (the lowest 22% of the screen); now it IS the screen, and the Thai line sits over it
+   in a see-through box (the page's). The bottom zone -- below 43.8cu -- is SEEN: light,
+   floors and pictures run through it to the bottom edge, and nothing else may be there (no
+   word, figure, card, pin or credit), nothing bright or busy behind the box. The core's own
+   things are laid out for that below: the floor runs on towards us, dimmer; the credit and
+   the old text templates stay above 43.8cu.
+
+   One unit for everything: --cu = 1% of a 16:9 stage's width, held by the height on a
+   wider screen (the media room's TV is ~1.9:1) -- so the same slide is the same picture
+   on both and nothing is sized in px.
+
+   Motion rules of this project (CLAUDE.md): only transform and opacity animate; no
+   blurred box-shadow, no backdrop-filter, nothing scaled inside a frame. The colours are
+   the room screen's own sky: violet and cyan on deep navy. */
+.cs-stage { display: none; }
+html.mirror.mirror-show .cs-stage {
+  --cu: min(1vw, 1.7778vh);
+  /* (the launch-film look, 17 Nov evening: electric blue on near-black -- the names stay,
+     the violet sky they were named for is gone) */
+  --cs-violet: 78, 132, 255; --cs-cyan: 126, 196, 255; --cs-pink: 150, 170, 255; --cs-edge: 111, 162, 255;
+  /* (the content's floor: nothing but light, floors and pictures below it -- the subtitle box's zone) */
+  --cs-floor: calc(43.8 * var(--cu));
+  display: block; position: fixed; z-index: 5; left: 0; right: 0; top: 0; bottom: 0;
+  overflow: hidden; pointer-events: none; color: #f4f2ff;
+  /* (the glow under the horizon where it always was, measured from the top: the stage grew
+     downwards, the picture above 43.8cu did not move) */
+  background: radial-gradient(ellipse 85% calc(33 * var(--cu)) at 50% calc(49 * var(--cu)), #0b2170 0%, #050d33 42%, #01020a 100%);
+  opacity: 0; visibility: hidden; transition: opacity var(--cs-dur-quick) var(--cs-ease-out), visibility 0s linear var(--cs-dur-quick);
+}
+/* (up for a slide -- or for the debut on card 1: its countdown, its black, its hit) */
+html.mirror.mirror-show .cs-stage.cs-up, html.mirror.mirror-show .cs-stage.cs-dbt-on { opacity: 1; visibility: visible; transition: opacity var(--cs-dur-standard) var(--cs-ease-in), visibility 0s; }
+/* a slide is up: the story frame under it draws nothing (the slide wins on this screen) */
+html.mirror.mirror-show body.cs-on .mirror-stage { visibility: hidden !important; }
+/* ... and while the stage covers the screen (a slide, the logo, the debut: its background is opaque),
+   the page's own backdrop under it is not drawn either: the robot face's grain (a `soft-light` blend --
+   an offscreen pass and a copy of the screen every frame), its great circle and the drifting light
+   behind the project's name. Nobody sees them; on the event notebook's integrated GPU they cost two
+   offscreen passes a frame (23 Nov). They go once the stage has faded in over them (its 500 ms --
+   review: at once, they popped off under a stage still half clear) and are back the moment it is down. */
+html.mirror.mirror-show body:has(> .cs-stage.cs-up, > .cs-stage.cs-idle-on, > .cs-stage.cs-dbt-on)::before,
+html.mirror.mirror-show body:has(> .cs-stage.cs-up, > .cs-stage.cs-idle-on, > .cs-stage.cs-dbt-on)::after,
+html.mirror.mirror-show body:has(> .cs-stage.cs-up, > .cs-stage.cs-idle-on, > .cs-stage.cs-dbt-on) .mirror-back::before {
+  visibility: hidden; transition: visibility 0s linear .5s;
+}
+
+/* ---- the stage of a launch film (owner 17 Nov, two reference clips: "แบบนี้") ----
+   Near-black with electric-blue light: a beam down the middle, a glowing horizon arc, a
+   floor grid running to it (the dim ghost panels that stood in its sky are gone -- owner 20 Nov,
+   review PDF p.1: "ไม่ชอบ ดูแปลกๆเป็นกรอบๆ"). Painted once; moved by transform
+   and opacity only -- every glow is a drawn gradient, never a blur filter or a blurred
+   shadow (those were measured janky on a moving layer).
+   Every `infinite` animation of this file, and when it runs:
+     the background's two (cs-beam, cs-arc)  only while a slide is up
+         (.cs-up; paused below otherwise -- and outside the ceremony's show mode the
+         stage is display: none, so nothing here runs on any other call)
+     a slide's own (its slow sway, the picture drift, the caret, the waiting dots, the
+         device animations)  only while that slide's element is in the page: the engine
+         removes it 0.7 s after the slide goes down.
+   A slide that has settled stays up, moving, until the next line or picture. No
+   will-change: a permanent hint on layers larger than the screen holds that memory for
+   the whole ceremony. */
+.cs-stage:not(.cs-up):not(.cs-idle-on) .cs-bg > span { animation-play-state: paused; }
+.cs-bg, .cs-bg > span { position: absolute; display: block; }
+.cs-bg { inset: 0; }
+.cs-beam {
+  left: 50%; top: 0; width: calc(36 * var(--cu)); height: 100%; margin-left: calc(-18 * var(--cu));
+  animation: cs-beam 13s var(--cs-ease-sine) infinite alternate;
+}
+/* (the beam's light on a still child: the layer that moves has no mask of its own, so its mask is
+   painted into it once instead of an offscreen pass every frame -- 23 Nov, the event notebook) */
+.cs-beam > i {
+  left: 0; top: 0; width: 100%; height: 100%;
+  background: linear-gradient(90deg, rgba(46, 107, 255, 0), rgba(70, 130, 255, .5) 50%, rgba(46, 107, 255, 0));
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, .2), #000 55%, #000 100%);
+          mask-image: linear-gradient(180deg, rgba(0, 0, 0, .2), #000 55%, #000 100%);
+}
+/* (ambient: it breathes behind the hero, never pulls the eye -- 18 Nov, calmer and slower than it was) */
+@keyframes cs-beam { from { opacity: .76; transform: scale(.94, 1); } to { opacity: 1; transform: scale(1.05, 1); } }
+/* the horizon: the top of a great lit circle rising behind everything */
+.cs-arc {
+  left: 50%; top: calc(27 * var(--cu)); width: calc(96 * var(--cu)); height: calc(96 * var(--cu));
+  margin-left: calc(-48 * var(--cu)); border-radius: 50%;
+  border: calc(.3 * var(--cu)) solid rgb(120, 170, 255);
+  background: radial-gradient(closest-side, #020516 0%, #030a2a 80%, rgba(46, 107, 255, .7) 99%, rgba(46, 107, 255, 0) 100%);
+  animation: cs-arc 14s var(--cs-ease-sine) infinite alternate;
+}
+.cs-arc::before {
+  content: ""; position: absolute; inset: calc(-7 * var(--cu)); border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(46, 107, 255, 0) 84%, rgba(60, 120, 255, .55) 88%, rgba(46, 107, 255, 0) 100%);
+}
+@keyframes cs-arc { from { transform: translate3d(0, calc(1.2 * var(--cu)), 0) scale(1); } to { transform: translate3d(0, 0, 0) scale(1.035); } }
+/* The floor. It used to end at the subtitle band (its near edge the stage's bottom, 43.9cu);
+   the stage is the whole screen now, so the same plane -- same tilt, same horizon, hinged on
+   the same line -- runs on TOWARDS us for 18cu more and leaves the screen at its bottom edge.
+   That near part lies behind the subtitle box: it is the dimmest (the mask), its rows wide
+   apart -- a floor, not a pattern. */
+.cs-grid {
+  left: -40%; top: calc(28.875 * var(--cu)); width: 180%; height: calc(33 * var(--cu)); opacity: .55; overflow: hidden;
+  /* (its lines are on the layer inside, which flows towards us: "the living stage" below) */
+  transform-origin: 50% calc(15 * var(--cu)); transform: perspective(calc(38 * var(--cu))) rotateX(64deg);
+  -webkit-mask-image: linear-gradient(0deg, rgba(0, 0, 0, .22) 0%, rgba(0, 0, 0, .5) 30%, #000 59%, rgba(0, 0, 0, 0) 100%);
+          mask-image: linear-gradient(0deg, rgba(0, 0, 0, .22) 0%, rgba(0, 0, 0, .5) 30%, #000 59%, rgba(0, 0, 0, 0) 100%);
+}
+/* (no dim panels in the sky any more: owner 20 Nov, review PDF p.1, "ไม่ชอบ ดูแปลกๆเป็นกรอบๆ") */
+
+/* ---- a slide ---- */
+.cs-slide {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  font-family: inherit; opacity: 1; transition: opacity var(--cs-dur-quick) var(--cs-ease-out);
+}
+.cs-slide.cs-out { opacity: 0; }
+/* (the fixed templates are words in a panel: they keep the box above the subtitle's zone) */
+.cs-slide:not(.cs-t-act) { bottom: auto; height: var(--cs-floor); }
+.cs-slide > div { width: calc(90 * var(--cu)); max-height: 100%; }
+/* a part: down and clear until its beat, then up into place */
+.cs-el {
+  opacity: 0; transform: translate3d(0, calc(1.6 * var(--cu)), 0);
+  transition: opacity .55s ease, transform .8s cubic-bezier(.16, .84, .24, 1);
+  transition-delay: calc(var(--d, 0) * 1ms);
+}
+.cs-el.cs-in { opacity: 1; transform: none; }
+/* a screen that joined mid-line: the end state at once */
+.cs-instant .cs-el, .cs-instant .cs-w, .cs-instant .cs-span-fill, .cs-instant .cs-tick { transition: none !important; animation-duration: .01s !important; }
+
+.cs-kicker {
+  font-size: calc(1.45 * var(--cu)); font-weight: 600; letter-spacing: .42em; text-transform: uppercase;
+  color: rgb(var(--cs-cyan)); margin-bottom: calc(1.6 * var(--cu));
+}
+.cs-title {
+  font-size: calc(6.4 * var(--cu)); line-height: 1.12; font-weight: 700; letter-spacing: -.01em; color: #fff;
+  text-wrap: balance;
+}
+.cs-title-m { font-size: calc(4 * var(--cu)); }
+/* the words of a headline, one after another */
+.cs-words.cs-el { transform: none; }
+.cs-w {
+  display: inline-block; opacity: 0; transform: translate3d(0, .5em, 0);
+  transition: opacity .5s ease, transform .7s cubic-bezier(.16, .84, .24, 1);
+  transition-delay: calc(var(--w, 0) * 1ms);
+}
+.cs-in .cs-w { opacity: 1; transform: none; }
+.cs-sub { margin-top: calc(1.4 * var(--cu)); font-size: calc(3 * var(--cu)); font-weight: 500; color: rgba(244, 242, 255, .86); }
+.cs-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(1.4 * var(--cu)); margin-top: calc(3 * var(--cu)); }
+.cs-chip {
+  font-size: calc(2.1 * var(--cu)); font-weight: 600; padding: .5em 1.2em; border-radius: 99em; color: #fff;
+  border: 1px solid rgba(var(--cs-cyan), .7); background: rgba(var(--cs-cyan), .1);
+}
+.cs-ico { display: inline-block; line-height: 0; }
+.cs-ico svg { width: 100%; height: 100%; display: block; }
+.cs-nb { white-space: nowrap; }
+
+/* ---- hero ---- */
+.cs-hero { position: relative; }
+.cs-hero-ico { width: calc(6.5 * var(--cu)); height: calc(6.5 * var(--cu)); color: rgb(var(--cs-violet)); margin-bottom: calc(1.4 * var(--cu)); }
+.cs-rays {
+  position: absolute; left: 50%; top: 50%; width: calc(84 * var(--cu)); height: calc(84 * var(--cu));
+  margin: calc(-42 * var(--cu)) 0 0 calc(-42 * var(--cu)); border-radius: 50%; z-index: -1; opacity: .5;
+  background: repeating-conic-gradient(from 0deg, rgba(var(--cs-violet), .22) 0deg 2deg, transparent 2deg 15deg);
+  -webkit-mask-image: radial-gradient(closest-side, transparent 30%, #000 46%, transparent 100%);
+          mask-image: radial-gradient(closest-side, transparent 30%, #000 46%, transparent 100%);
+  animation: cs-turn 70s linear infinite;
+}
+.cs-closing .cs-title { font-size: calc(8.4 * var(--cu)); }
+.cs-closing .cs-hero-ico { color: rgb(var(--cs-pink)); }
+
+/* ---- one big figure ---- */
+.cs-figure { display: inline-flex; align-items: baseline; justify-content: center; gap: calc(1.2 * var(--cu)); }
+.cs-figure-big .cs-num { font-size: calc(15 * var(--cu)); }
+.cs-number .cs-title-m { font-size: calc(3.4 * var(--cu)); margin-bottom: calc(.6 * var(--cu)); }
+.cs-figure-big .cs-lead, .cs-figure-big .cs-unit { font-size: calc(3.4 * var(--cu)); }
+.cs-num {
+  font-size: calc(7 * var(--cu)); line-height: 1; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  color: #fff; background: linear-gradient(180deg, #ffffff 20%, rgb(var(--cs-cyan)) 120%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  display: inline-block; transform-origin: 50% 80%;
+}
+/* a figure lands on its own value (the engine never counts up to it) */
+.cs-num.cs-landed { animation: cs-land .6s cubic-bezier(.3, 1.5, .5, 1) both; }
+@keyframes cs-land { from { transform: scale(.9); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+.cs-lead, .cs-unit { font-size: calc(2 * var(--cu)); font-weight: 600; color: rgba(244, 242, 255, .9); }
+.cs-lead { color: rgb(var(--cs-cyan)); text-transform: lowercase; }
+.cs-label { margin-top: calc(1 * var(--cu)); font-size: calc(2.7 * var(--cu)); font-weight: 500; color: rgba(244, 242, 255, .88); }
+/* from the project to the beach: a line drawn from one end to the other */
+.cs-span { display: flex; align-items: center; justify-content: center; gap: calc(1.6 * var(--cu)); margin: calc(1.2 * var(--cu)) auto 0; width: calc(62 * var(--cu)); }
+.cs-span-end { flex: none; width: calc(4.4 * var(--cu)); height: calc(4.4 * var(--cu)); color: rgb(var(--cs-cyan)); }
+.cs-span-line { position: relative; flex: 1; height: calc(.5 * var(--cu)); border-radius: 99em; background: rgba(var(--cs-violet), .22); }
+.cs-span-fill {
+  position: absolute; inset: 0; border-radius: 99em; transform: scaleX(0); transform-origin: 0 50%;
+  background: linear-gradient(90deg, rgb(var(--cs-violet)), rgb(var(--cs-cyan)));
+  transition: transform 1.8s cubic-bezier(.3, .7, .2, 1) .2s;
+}
+.cs-in .cs-span-fill { transform: scaleX(1); }
+.cs-span-dot {
+  position: absolute; left: 0; top: 50%; width: calc(1.6 * var(--cu)); height: calc(1.6 * var(--cu)); border-radius: 50%;
+  margin: calc(-.8 * var(--cu)) 0 0 calc(-.8 * var(--cu)); background: #fff; opacity: 0;
+}
+.cs-in .cs-span-dot { animation: cs-travel 3.6s ease-in-out 2s infinite; }
+@keyframes cs-travel {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; }
+  100% { transform: translate3d(calc(52.4 * var(--cu)), 0, 0); opacity: 0; }
+}
+
+/* ---- a list of cards / the choices ---- */
+.cs-cards { display: grid; gap: calc(1.6 * var(--cu)); margin-top: calc(2.6 * var(--cu)); align-items: stretch; }
+.cs-cards-2 { grid-template-columns: repeat(2, 1fr); padding: 0 calc(14 * var(--cu)); }
+.cs-cards-3 { grid-template-columns: repeat(3, 1fr); padding: 0 calc(4 * var(--cu)); }
+.cs-cards-4 { grid-template-columns: repeat(4, 1fr); }
+.cs-cards-5 { grid-template-columns: repeat(5, 1fr); }
+.cs-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: calc(1.2 * var(--cu));
+  padding: calc(2 * var(--cu)) calc(1.4 * var(--cu)); border-radius: calc(1.6 * var(--cu));
+  background: rgba(20, 22, 66, .78); border: 1px solid rgba(var(--cs-violet), .5);
+}
+.cs-card-ico { width: calc(5.4 * var(--cu)); height: calc(5.4 * var(--cu)); color: rgb(var(--cs-cyan)); }
+.cs-card-text { font-size: calc(2.25 * var(--cu)); line-height: 1.25; font-weight: 600; color: #fff; text-wrap: balance; }
+.cs-highlight {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: calc(1.4 * var(--cu));
+  margin: calc(1.6 * var(--cu)) auto 0; width: calc(74 * var(--cu)); padding: calc(1.3 * var(--cu)) calc(2 * var(--cu));
+  border-radius: calc(1.6 * var(--cu)); overflow: hidden;
+  background: rgba(10, 44, 78, .82); border: 1px solid rgba(var(--cs-cyan), .75);
+}
+.cs-highlight-ico { position: relative; z-index: 1; width: calc(3.6 * var(--cu)); height: calc(3.6 * var(--cu)); color: rgb(var(--cs-cyan)); }
+.cs-highlight-text { position: relative; z-index: 1; font-size: calc(2.9 * var(--cu)); font-weight: 700; color: #fff; }
+.cs-highlight .cs-lane { position: absolute; inset: auto 0 0 0; height: 46%; border-radius: 0; border: 0; opacity: .5; }
+.cs-foot { margin-top: calc(1.8 * var(--cu)); font-size: calc(2.2 * var(--cu)); font-weight: 500; color: rgba(244, 242, 255, .8); }
+/* water: a strip of waves sliding one tile sideways (transform only) */
+.cs-lane-row { margin: calc(1.6 * var(--cu)) auto 0; width: calc(70 * var(--cu)); }
+.cs-lane {
+  display: block; position: relative; height: calc(3.4 * var(--cu)); border-radius: 99em; overflow: hidden;
+  border: 1px solid rgba(var(--cs-cyan), .7); background: rgba(8, 40, 72, .8);
+}
+.cs-lane-water {
+  position: absolute; left: 0; top: 0; width: 200%; height: 100%;
+  background-image:
+    radial-gradient(ellipse 50% 90% at 50% 120%, rgba(var(--cs-cyan), .55) 0 60%, transparent 62%),
+    radial-gradient(ellipse 50% 70% at 50% -30%, rgba(255, 255, 255, .22) 0 60%, transparent 62%);
+  background-size: calc(7 * var(--cu)) 100%, calc(5 * var(--cu)) 100%;
+  animation: cs-water 9s linear infinite;
+}
+@keyframes cs-water { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(-35 * var(--cu)), 0, 0); } }
+.cs-option { padding: calc(3 * var(--cu)) calc(2 * var(--cu)); gap: calc(1.8 * var(--cu)); transition: opacity .55s ease, transform .8s cubic-bezier(.16, .84, .24, 1); }
+.cs-option-ico { width: calc(9 * var(--cu)); height: calc(9 * var(--cu)); color: rgb(var(--cs-cyan)); }
+.cs-option .cs-card-text { font-size: calc(2.7 * var(--cu)); }
+.cs-picking .cs-option.cs-in { opacity: .4; }
+.cs-picking .cs-option.cs-in.cs-picked { opacity: 1; transform: scale(1.05); border-color: rgb(var(--cs-cyan)); }
+
+/* ---- working ... / done ---- */
+.cs-status { display: flex; align-items: center; justify-content: center; gap: calc(6 * var(--cu)); text-align: left; }
+.cs-status-words { max-width: calc(52 * var(--cu)); }
+.cs-status .cs-title-m { font-size: calc(5 * var(--cu)); }
+.cs-detail { margin-top: calc(1.2 * var(--cu)); font-size: calc(2.7 * var(--cu)); line-height: 1.3; font-weight: 500; color: rgba(244, 242, 255, .86); }
+.cs-device {
+  position: relative; flex: none; width: calc(24 * var(--cu)); height: calc(24 * var(--cu)); border-radius: 50%;
+  display: grid; place-items: center; border: 1px solid rgba(var(--cs-violet), .5); background: rgba(14, 15, 50, .7);
+}
+.cs-dots { display: flex; gap: calc(1 * var(--cu)); margin-top: calc(2.2 * var(--cu)); }
+.cs-dots i { width: calc(1.3 * var(--cu)); height: calc(1.3 * var(--cu)); border-radius: 50%; background: rgb(var(--cs-cyan)); animation: cs-dot 1.2s ease-in-out infinite; }
+.cs-dots i:nth-child(2) { animation-delay: .2s; }
+.cs-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes cs-dot { 0%, 100% { opacity: .25; transform: translate3d(0, 0, 0); } 40% { opacity: 1; transform: translate3d(0, calc(-.7 * var(--cu)), 0); } }
+.cs-tick {
+  display: grid; place-items: center; margin-top: calc(2 * var(--cu)); width: calc(6 * var(--cu)); height: calc(6 * var(--cu));
+  border-radius: 50%; color: #04121c; background: rgb(var(--cs-cyan));
+}
+.cs-tick svg { width: 62%; height: 62%; stroke-width: 2.6; }
+.cs-tick.cs-el { transform: scale(.3); transition: opacity .3s ease .35s, transform .6s cubic-bezier(.3, 1.6, .5, 1) .35s; }
+.cs-tick.cs-el.cs-in { transform: scale(1); }
+/* the lobby lights */
+.cs-device-ico { position: relative; width: 46%; height: 46%; color: #fff; }
+.cs-glow {
+  position: absolute; inset: 6%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 226, 150, .95), rgba(255, 196, 92, .45) 45%, rgba(255, 196, 92, 0));
+}
+.cs-bulb-rays {
+  position: absolute; inset: -14%; width: auto; height: auto; margin: 0; left: -14%; top: -14%; z-index: 0; opacity: 0;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 214, 120, .5) 0deg 3deg, transparent 3deg 30deg);
+  -webkit-mask-image: radial-gradient(closest-side, transparent 72%, #000 76%, transparent 100%);
+          mask-image: radial-gradient(closest-side, transparent 72%, #000 76%, transparent 100%);
+}
+.cs-d-lights_off.cs-s-working .cs-glow { animation: cs-dim 1.6s ease-in-out infinite alternate; }
+.cs-d-lights_off.cs-s-done .cs-glow { opacity: 0; }
+.cs-d-lights_off.cs-s-done .cs-device-ico { color: rgba(244, 242, 255, .45); }
+.cs-d-lights_on.cs-s-working .cs-glow { animation: cs-brighten 1.6s ease-in-out infinite alternate; }
+.cs-d-lights_on.cs-s-done .cs-glow { opacity: 1; }
+.cs-d-lights_on.cs-s-done .cs-bulb-rays { opacity: 1; }
+.cs-d-lights_on.cs-s-done .cs-device-ico { color: #1b1440; }
+@keyframes cs-dim { from { opacity: .6; } to { opacity: .1; } }
+@keyframes cs-brighten { from { opacity: .08; } to { opacity: .6; } }
+/* the lobby curtains: two drapes drawn back from the middle */
+.cs-window { position: relative; display: block; width: 66%; height: 58%; border-radius: calc(.8 * var(--cu)); overflow: hidden; border: 1px solid rgba(var(--cs-cyan), .7); }
+.cs-window-sky { position: absolute; inset: 0; background: linear-gradient(180deg, #8fd8ff 0%, #d9f3ff 62%, #7fd0c8 62%, #3aa3b8 100%); }
+.cs-drape {
+  position: absolute; top: 0; bottom: 0; width: 50%;
+  background: repeating-linear-gradient(90deg, #5b3fb8 0 8%, #7a5ee0 8% 16%);
+}
+.cs-drape-l { left: 0; transform-origin: 0 50%; }
+.cs-drape-r { right: 0; transform-origin: 100% 50%; }
+.cs-s-working .cs-drape { animation: cs-drape 2.6s ease-in-out infinite alternate; }
+.cs-s-done .cs-drape { transform: scaleX(.24); }
+@keyframes cs-drape { from { transform: scaleX(1); } to { transform: scaleX(.5); } }
+/* the quotation: a sheet whose lines are being written -- lines only, never a figure */
+.cs-paper {
+  position: relative; display: flex; flex-direction: column; justify-content: center; gap: 9%; width: 46%; height: 60%;
+  padding: 0 8%; border-radius: calc(.8 * var(--cu)); background: #f4f2ff;
+}
+.cs-paper-line { display: block; height: 5%; border-radius: 99em; background: #6b56d6; transform-origin: 0 50%; }
+.cs-paper-line:nth-child(2n) { width: 72%; background: #9fb4ff; }
+.cs-s-working .cs-paper-line { animation: cs-write 2.4s ease-in-out infinite; animation-delay: calc(var(--n, 0) * .28s); }
+@keyframes cs-write { 0% { transform: scaleX(0); opacity: 0; } 30%, 80% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+
+/* ---- a joke: the set-up waits, the punchline lands ---- */
+.cs-joke-ico { width: calc(8 * var(--cu)); height: calc(8 * var(--cu)); color: rgb(var(--cs-cyan)); margin-bottom: calc(1 * var(--cu)); }
+.cs-joke-title { font-size: calc(4 * var(--cu)); line-height: 1.2; font-weight: 600; color: rgba(244, 242, 255, .92); text-wrap: balance; }
+.cs-tail { display: inline-flex; gap: .22em; margin-left: .3em; vertical-align: baseline; }
+.cs-tail i { width: .2em; height: .2em; border-radius: 50%; background: rgb(var(--cs-cyan)); animation: cs-dot 1.2s ease-in-out infinite; }
+.cs-tail i:nth-child(2) { animation-delay: .2s; }
+.cs-tail i:nth-child(3) { animation-delay: .4s; }
+.cs-punch {
+  margin-top: calc(1.6 * var(--cu)); font-size: calc(6.6 * var(--cu)); line-height: 1.1; font-weight: 800; letter-spacing: -.01em;
+  color: #fff; text-wrap: balance;
+}
+.cs-punch.cs-el { transform: scale(.6); transition: opacity .3s ease, transform .7s cubic-bezier(.3, 1.7, .5, 1); }
+.cs-punch.cs-el.cs-in { transform: scale(1); }
+
+/* ---- several figures ---- */
+.cs-tiles { display: grid; gap: calc(1.6 * var(--cu)); margin-top: calc(2.6 * var(--cu)); }
+.cs-tiles-2 { grid-template-columns: repeat(2, 1fr); padding: 0 calc(14 * var(--cu)); }
+.cs-tiles-3 { grid-template-columns: repeat(3, 1fr); }
+.cs-tiles-4 { grid-template-columns: repeat(4, 1fr); }
+.cs-tiles-5 { grid-template-columns: repeat(5, 1fr); }
+.cs-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: calc(.9 * var(--cu));
+  padding: calc(2 * var(--cu)) calc(1.2 * var(--cu)) calc(2.2 * var(--cu)); border-radius: calc(1.6 * var(--cu));
+  background: rgba(20, 22, 66, .78); border: 1px solid rgba(var(--cs-violet), .5);
+}
+.cs-tile-label { font-size: calc(1.75 * var(--cu)); line-height: 1.25; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--cs-cyan)); height: 3.75em; text-wrap: balance; }
+.cs-tile .cs-num { font-size: calc(6.2 * var(--cu)); }
+.cs-tile .cs-figure { flex-direction: column; align-items: center; gap: 0; }
+.cs-tile .cs-lead { display: block; height: 1.5em; line-height: 1.5; font-size: calc(1.8 * var(--cu)); }
+.cs-tile-unit { font-size: calc(2 * var(--cu)); line-height: 1.25; font-weight: 600; color: rgba(244, 242, 255, .9); text-wrap: balance; }
+
+/* ---- pictures (owner 17 Nov: "โชว์รูปต่างๆให้คนเห็นภาพไม่ใช่แค่มีแค่โมชั่นหนังสือ") ----
+   The stories catalogue's own pictures (/story-asset/<sha256>), named by the slide. A
+   picture is never still while it is up: it is drawn a little larger than its frame and
+   drifts (cs-pan-a / cs-pan-b: translate and a gentle scale, both transforms -- measured
+   on this screen's kind of machine, scripts/perf_ceremony_show.py; the robot's rule
+   against scaling a picture in a frame was measured on the robot's WebView). The part
+   that carries a picture stays clear until the picture is decoded (.cs-needs /
+   .cs-loaded), then fades in: never an empty box. */
+.cs-needs:not(.cs-loaded) { opacity: 0 !important; }
+.cs-pic { position: absolute; inset: 0; display: block; overflow: hidden; }
+.cs-img {
+  position: absolute; left: -6%; top: -6%; width: 112%; height: 112%; max-width: none; display: block;
+  object-fit: cover; animation: cs-pan-a 20s ease-in-out infinite alternate;
+}
+.cs-shot:nth-child(2n) .cs-img, .cs-ptile:nth-child(2n) .cs-img { animation-name: cs-pan-b; }
+@keyframes cs-pan-a { from { transform: translate3d(-2.4%, 1.6%, 0) scale(1); } to { transform: translate3d(2.4%, -1.6%, 0) scale(1.06); } }
+@keyframes cs-pan-b { from { transform: translate3d(2.4%, -1.2%, 0) scale(1.06); } to { transform: translate3d(-2.4%, 1.2%, 0) scale(1); } }
+/* a plan, a map, a model on black: whole, never cropped, and only just moving. Its four
+   edges feather into the stage (a straight fade on each side -- an oval mask made a
+   porthole of a bright picture, and no mask left a model's black ground as a hard
+   rectangle on the navy; both seen 17 Nov). */
+.cs-fit .cs-img {
+  left: 3%; top: 3%; width: 94%; height: 94%; object-fit: contain; animation-duration: 28s;
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0), #000 9%, #000 91%, rgba(0, 0, 0, 0)), linear-gradient(0deg, rgba(0, 0, 0, 0), #000 9%, #000 91%, rgba(0, 0, 0, 0));
+          mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0), #000 9%, #000 91%, rgba(0, 0, 0, 0)), linear-gradient(0deg, rgba(0, 0, 0, 0), #000 9%, #000 91%, rgba(0, 0, 0, 0));
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+}
+/* a see-through line drawing: a lit panel behind it, its lines whole and unmasked */
+.cs-drawing { background: linear-gradient(180deg, #2c3270, #232859); }
+.cs-drawing .cs-img, .cs-fit.cs-drawing .cs-img {
+  left: 5%; top: 5%; width: 90%; height: 90%; object-fit: contain; animation-duration: 28s;
+  -webkit-mask-image: none; mask-image: none;
+}
+/* a caption on a picture: its own dark plate, so it reads on any picture */
+.cs-cap {
+  position: absolute; left: calc(2.4 * var(--cu)); bottom: calc(2.2 * var(--cu)); max-width: 80%;
+  padding: .38em .9em; border-radius: calc(.7 * var(--cu)); text-align: left;
+  font-size: calc(2.3 * var(--cu)); line-height: 1.25; font-weight: 700; color: #fff;
+  background: rgba(5, 6, 26, .78); border-left: calc(.35 * var(--cu)) solid rgb(var(--cs-cyan));
+}
+/* one picture of a sequence: the whole frame, cross-fading over the one before */
+.cs-shot { position: absolute; inset: 0; }
+/* (a cut, not a slow dissolve: a line may name four places in four seconds) */
+.cs-shot.cs-el { transform: none; transition: opacity .7s ease; }
+.cs-shot.cs-under { visibility: hidden; }
+/* the picture before's caption is out before the new one's is in */
+.cs-shot.cs-capoff .cs-cap { opacity: 0; transition: opacity .15s ease; }
+.cs-shot.cs-under .cs-img { animation-play-state: paused; }
+.cs-shot .cs-cap { opacity: 0; transform: translate3d(0, calc(1.2 * var(--cu)), 0); transition: opacity .45s ease .2s, transform .6s cubic-bezier(.16, .84, .24, 1) .2s; }
+.cs-shot.cs-in .cs-cap { opacity: 1; transform: none; }
+
+/* ---- film: full-bleed pictures, the words over a scrim ---- */
+.cs-slide > .cs-film { position: absolute; inset: 0; width: auto; max-height: none; }
+.cs-reel { position: absolute; inset: 0; }
+.cs-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(5, 6, 26, .9) 0%, rgba(5, 6, 26, .62) 30%, rgba(5, 6, 26, 0) 58%);
+}
+.cs-film-words {
+  position: absolute; left: calc(4 * var(--cu)); top: calc(3.4 * var(--cu)); width: calc(46 * var(--cu));
+  text-align: left;
+}
+.cs-film-words .cs-kicker { margin-bottom: calc(1 * var(--cu)); }
+.cs-film-words .cs-chips { justify-content: flex-start; margin-top: calc(1.6 * var(--cu)); }
+/* words over a picture stand on their own dark plate, whatever the picture (chips were lost on a bright hologram) */
+.cs-film-words .cs-chip, .cs-backdrop ~ div .cs-chip { background: rgba(5, 6, 26, .86); border-color: rgba(var(--cs-cyan), .85); }
+.cs-film .cs-shot .cs-cap { left: auto; right: calc(3 * var(--cu)); bottom: calc(2.6 * var(--cu)); max-width: 46%; }
+/* a figure laid over or beside a picture */
+.cs-over-figure { margin-top: calc(1.6 * var(--cu)); }
+/* (a long unit goes under the number whole -- it used to wrap one word a line beside it) */
+.cs-over-figure .cs-figure { justify-content: flex-start; flex-wrap: wrap; row-gap: 0; }
+.cs-over-figure .cs-unit, .cs-over-figure .cs-lead { white-space: nowrap; }
+/* a shot's own figure: where the film's figure sits, on the scrim, with its label above */
+.cs-shot-figures { position: relative; height: calc(21 * var(--cu)); margin-top: calc(1.6 * var(--cu)); }
+.cs-shot-figure { position: absolute; left: 0; top: 0; width: 100%; margin: 0; text-align: left; }
+.cs-shot-figure.cs-gone { opacity: 0 !important; transition: opacity .35s ease; }
+.cs-shot-figure .cs-over-label { margin: 0 0 calc(.6 * var(--cu)); font-size: calc(2.2 * var(--cu)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgb(var(--cs-cyan)); }
+.cs-shot-figure .cs-num { font-size: calc(12 * var(--cu)); }
+/* the last frame's title: large, centred, on its own dark ground; the side words give way */
+.cs-end {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  background: radial-gradient(ellipse at 50% 50%, rgba(5, 6, 26, .94) 0%, rgba(5, 6, 26, .82) 50%, rgba(5, 6, 26, .45) 100%);
+}
+.cs-end.cs-el { transform: none; transition: opacity 1.2s ease; }
+.cs-end .cs-title-m { font-size: calc(8.4 * var(--cu)); letter-spacing: .14em; text-transform: uppercase; }
+.cs-film-words, .cs-film .cs-scrim, .cs-film .cs-cap { transition: opacity .8s ease; }
+.cs-ended .cs-film-words, .cs-ended .cs-scrim, .cs-ended .cs-shot .cs-cap { opacity: 0; }
+.cs-over-figure .cs-num { font-size: calc(11 * var(--cu)); }
+.cs-over-figure .cs-lead, .cs-over-figure .cs-unit { font-size: calc(2.8 * var(--cu)); }
+.cs-over-label { margin-top: calc(.4 * var(--cu)); font-size: calc(2.3 * var(--cu)); font-weight: 600; color: rgba(244, 242, 255, .92); }
+
+/* ---- spotlight: one large picture, the words beside it ---- */
+.cs-slide > .cs-spot { width: calc(94 * var(--cu)); }
+.cs-spot { display: flex; align-items: center; gap: calc(3.4 * var(--cu)); text-align: left; }
+.cs-spot-right { flex-direction: row-reverse; }
+.cs-spot-frame {
+  position: relative; flex: none; width: calc(54 * var(--cu)); height: calc(36 * var(--cu));
+  border-radius: calc(1.8 * var(--cu)); overflow: hidden; border: 1px solid rgba(var(--cs-cyan), .55);
+  background: #05061a;
+}
+.cs-spot-words { flex: 1; min-width: 0; }
+.cs-spot-words .cs-kicker { margin-bottom: calc(1 * var(--cu)); }
+.cs-spot-words .cs-title-m { font-size: calc(3.6 * var(--cu)); }
+.cs-spot-words .cs-chips { justify-content: flex-start; gap: calc(.9 * var(--cu)); margin-top: calc(1.8 * var(--cu)); }
+.cs-spot-words .cs-chip { font-size: calc(1.75 * var(--cu)); padding: .4em 1em; }
+.cs-spot-words .cs-over-figure { margin-top: calc(1.2 * var(--cu)); }
+.cs-spot-words .cs-over-figure .cs-num { font-size: calc(8.6 * var(--cu)); }
+.cs-spot-words .cs-over-figure .cs-lead, .cs-spot-words .cs-over-figure .cs-unit { font-size: calc(2.3 * var(--cu)); }
+.cs-spot-words .cs-over-label { font-size: calc(2 * var(--cu)); }
+.cs-spot-words .cs-sub { font-size: calc(2.5 * var(--cu)); }
+
+/* ---- mosaic: picture tiles arriving one by one ---- */
+.cs-ptiles { display: grid; gap: calc(1.2 * var(--cu)); margin-top: calc(2 * var(--cu)); }
+.cs-ptiles-3 { grid-template-columns: repeat(3, 1fr); grid-auto-rows: calc(26 * var(--cu)); }
+.cs-ptiles-4 { grid-template-columns: repeat(4, 1fr); grid-auto-rows: calc(24 * var(--cu)); }
+.cs-ptiles-5, .cs-ptiles-6 { grid-template-columns: repeat(3, 1fr); grid-auto-rows: calc(13.6 * var(--cu)); }
+.cs-ptiles-5 .cs-ptile:nth-child(1) { grid-row: span 2; }
+.cs-ptile {
+  position: relative; border-radius: calc(1.4 * var(--cu)); overflow: hidden;
+  border: 1px solid rgba(var(--cs-violet), .55); background: #05061a;
+}
+.cs-ptile .cs-cap { left: calc(1 * var(--cu)); bottom: calc(1 * var(--cu)); font-size: calc(1.9 * var(--cu)); }
+
+/* ---- a dimmed picture behind any of the text slides ---- */
+.cs-slide > .cs-backdrop { position: absolute; inset: 0; width: auto; max-height: none; opacity: .34; transition: opacity 1.2s ease; }
+.cs-backdrop::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, rgba(5, 6, 26, .25), rgba(5, 6, 26, .86) 78%);
+}
+.cs-slide > .cs-backdrop + div { position: relative; }
+
+
+/* ==== the launch-film look (owner 17 Nov evening, two reference clips: "แบบนี้") ====
+   Everything above still lays the parts out; from here down is how they look and move:
+   content lives in GLASS PANELS with a lit blue edge, floating in a 3D space. A slide
+   flies in from depth and never stops moving; in a film each new picture is a panel that
+   swings in while the one before swings aside (a camera move, not a dissolve); words that
+   are not on a picture sit in a console panel; the last beat can put a giant backlit word
+   BEHIND the panel. The glow of a panel's edge is drawn (eight gradients round it), not
+   blurred. */
+.cs-slide { perspective: calc(120 * var(--cu)); }
+.cs-slide.cs-live { animation: cs-sway 18s ease-in-out infinite alternate; }
+@keyframes cs-sway { from { transform: translate3d(calc(-.8 * var(--cu)), calc(.35 * var(--cu)), 0) scale(1); } to { transform: translate3d(calc(.8 * var(--cu)), calc(-.35 * var(--cu)), 0) scale(1.03); } }
+/* the camera arrives: out of the depth, tilted, into place */
+.cs-slide > .cs-console, .cs-slide > .cs-film, .cs-slide > .cs-spot, .cs-slide > .cs-mosaic {
+  opacity: 0; transform: translate3d(0, calc(6 * var(--cu)), calc(-34 * var(--cu))) rotateX(16deg);
+  transition: opacity .7s ease, transform 1.15s cubic-bezier(.16, .84, .24, 1);
+}
+.cs-slide.cs-live > .cs-console, .cs-slide.cs-live > .cs-film, .cs-slide.cs-live > .cs-spot, .cs-slide.cs-live > .cs-mosaic { opacity: 1; transform: none; }
+.cs-slide.cs-out > .cs-console, .cs-slide.cs-out > .cs-film, .cs-slide.cs-out > .cs-spot, .cs-slide.cs-out > .cs-mosaic {
+  opacity: 0; transform: translate3d(0, calc(-3 * var(--cu)), calc(22 * var(--cu)));
+}
+.cs-instant > div { transition: none !important; }
+
+/* ---- glass: a panel with a lit edge ----
+   The glow is DRAWN round it (no blur): four straight strips, and at each corner a ring
+   round the corner's own centre -- clear inside the panel's radius, lit at its edge, gone
+   a glow's width out. --g = the glow's width, --r = the panel's radius: a smaller card
+   sets smaller ones (.cs-sat). */
+.cs-glass {
+  --g: calc(2.8 * var(--cu)); --r: calc(1.5 * var(--cu));
+  position: relative; border-radius: var(--r);
+  border: calc(.16 * var(--cu)) solid rgb(var(--cs-edge));
+  background: linear-gradient(160deg, rgba(20, 40, 128, .86) 0%, rgba(8, 16, 62, .92) 55%, rgba(4, 8, 34, .95) 100%);
+}
+.cs-glass::before {
+  --k: calc(var(--g) + var(--r)); --c: rgba(46, 107, 255, .62); --o: rgba(46, 107, 255, 0);
+  content: ""; position: absolute; inset: calc(-1 * var(--g)); pointer-events: none;
+  background:
+    linear-gradient(0deg, var(--c), var(--o)) 50% 0 / calc(100% - 2 * var(--k)) var(--g) no-repeat,
+    linear-gradient(180deg, var(--c), var(--o)) 50% 100% / calc(100% - 2 * var(--k)) var(--g) no-repeat,
+    linear-gradient(270deg, var(--c), var(--o)) 0 50% / var(--g) calc(100% - 2 * var(--k)) no-repeat,
+    linear-gradient(90deg, var(--c), var(--o)) 100% 50% / var(--g) calc(100% - 2 * var(--k)) no-repeat,
+    radial-gradient(circle var(--k) at 100% 100%, var(--o) calc(var(--r) - .1 * var(--cu)), var(--c) var(--r), var(--o) 100%) 0 0 / var(--k) var(--k) no-repeat,
+    radial-gradient(circle var(--k) at 0 100%, var(--o) calc(var(--r) - .1 * var(--cu)), var(--c) var(--r), var(--o) 100%) 100% 0 / var(--k) var(--k) no-repeat,
+    radial-gradient(circle var(--k) at 100% 0, var(--o) calc(var(--r) - .1 * var(--cu)), var(--c) var(--r), var(--o) 100%) 0 100% / var(--k) var(--k) no-repeat,
+    radial-gradient(circle var(--k) at 0 0, var(--o) calc(var(--r) - .1 * var(--cu)), var(--c) var(--r), var(--o) 100%) 100% 100% / var(--k) var(--k) no-repeat;
+}
+
+/* ---- the console: words in a glass panel ---- */
+.cs-slide > .cs-console { width: calc(78 * var(--cu)); max-height: none; padding: calc(3.4 * var(--cu)) calc(4 * var(--cu)) calc(3 * var(--cu)); }
+.cs-console-bar { position: absolute; left: calc(1.6 * var(--cu)); top: calc(1.3 * var(--cu)); display: flex; gap: calc(.6 * var(--cu)); }
+.cs-console-bar i { width: calc(.8 * var(--cu)); height: calc(.8 * var(--cu)); border-radius: 50%; background: rgba(var(--cs-edge), .55); }
+.cs-console-bar i:first-child { background: rgb(var(--cs-cyan)); }
+.cs-console > div:last-child { width: auto; }
+.cs-kicker { color: rgb(var(--cs-cyan)); }
+.cs-title { background: linear-gradient(180deg, #ffffff 30%, #b9d2ff 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.cs-title .cs-w { -webkit-text-fill-color: currentColor; color: #f2f6ff; }
+/* a caret after a console's headline: it is being typed */
+.cs-console .cs-title.cs-in::after {
+  content: ""; display: inline-block; width: .08em; height: .82em; margin-left: .12em; vertical-align: -.06em;
+  background: rgb(var(--cs-cyan)); animation: cs-caret 1.1s steps(1) infinite;
+}
+@keyframes cs-caret { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
+/* chips are satellite cards beside their panel */
+.cs-chip {
+  border-radius: calc(.9 * var(--cu)); border: 1px solid rgba(var(--cs-edge), .9);
+  background: linear-gradient(160deg, rgba(28, 56, 160, .9), rgba(8, 16, 62, .94)); color: #fff;
+}
+.cs-chip.cs-el { transform: translate3d(calc(4 * var(--cu)), 0, 0) scale(.92); }
+.cs-chip.cs-el.cs-in { transform: none; }
+.cs-film-words .cs-chip, .cs-backdrop ~ div .cs-chip { background: linear-gradient(160deg, rgba(28, 56, 160, .94), rgba(6, 12, 48, .96)); }
+/* cards in a console: small glass, fanned a little towards the middle */
+.cs-cards, .cs-tiles { perspective: calc(90 * var(--cu)); }
+.cs-card, .cs-tile {
+  border: 1px solid rgba(var(--cs-edge), .85);
+  background: linear-gradient(170deg, rgba(26, 52, 150, .7), rgba(6, 12, 48, .85));
+}
+.cs-card.cs-el, .cs-tile.cs-el { transform: translate3d(0, calc(3 * var(--cu)), calc(-14 * var(--cu))) rotateX(18deg); }
+.cs-card.cs-el.cs-in, .cs-tile.cs-el.cs-in { transform: none; }
+.cs-card.cs-el.cs-in:first-child, .cs-tile.cs-el.cs-in:first-child { transform: rotateY(9deg); }
+.cs-card.cs-el.cs-in:last-child, .cs-tile.cs-el.cs-in:last-child { transform: rotateY(-9deg); }
+.cs-picking .cs-option.cs-in.cs-picked { transform: scale(1.05) !important; }
+.cs-highlight { border: 1px solid rgb(var(--cs-edge)); background: linear-gradient(160deg, rgba(24, 60, 170, .8), rgba(6, 14, 56, .9)); }
+/* numerals glow: white running to blue */
+.cs-num { background: linear-gradient(180deg, #ffffff 18%, #9cc2ff 62%, #3f7dff 118%); -webkit-background-clip: text; background-clip: text; }
+.cs-lead { color: rgb(var(--cs-cyan)); }
+/* the state indicator of a status console */
+.cs-device { border: calc(.2 * var(--cu)) solid rgb(var(--cs-edge)); background: radial-gradient(closest-side, rgba(20, 44, 140, .8), rgba(4, 8, 34, .9)); }
+.cs-device::before {
+  content: ""; position: absolute; inset: calc(-2.4 * var(--cu)); border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(46, 107, 255, 0) 80%, rgba(46, 107, 255, .55) 84%, rgba(46, 107, 255, 0) 100%);
+}
+.cs-s-working .cs-device::before { animation: cs-pulse 1.6s ease-in-out infinite alternate; }
+@keyframes cs-pulse { from { opacity: .35; transform: scale(.96); } to { opacity: 1; transform: scale(1.04); } }
+.cs-tick { color: #02103a; background: rgb(var(--cs-cyan)); }
+.cs-drape { background: repeating-linear-gradient(90deg, #1f3fae 0 8%, #3a66e6 8% 16%); }
+.cs-paper { background: #eaf1ff; }
+.cs-paper-line { background: #2f5fe0; }
+.cs-paper-line:nth-child(2n) { background: #8fb3ff; }
+/* a console over a picture: the picture is a dim panel far behind it */
+.cs-slide > .cs-backdrop {
+  inset: auto; left: calc(8 * var(--cu)); top: calc(2 * var(--cu)); width: calc(84 * var(--cu)); height: calc(40 * var(--cu));
+  border-radius: calc(1.6 * var(--cu)); overflow: hidden; opacity: .3;
+  transform: translate3d(0, 0, calc(-18 * var(--cu)));
+}
+
+/* ---- film: a row of picture panels the camera moves along ---- */
+.cs-film .cs-scrim { display: none; }
+.cs-reel {
+  inset: auto; left: calc(33.5 * var(--cu)); top: calc(3.6 * var(--cu)); width: calc(62 * var(--cu)); height: calc(36 * var(--cu));
+  perspective: calc(110 * var(--cu)); z-index: 2;
+  transition: transform 1.3s cubic-bezier(.16, .84, .24, 1), opacity 1.2s ease;
+}
+.cs-pic { border-radius: calc(1.34 * var(--cu)); }
+.cs-shot.cs-glass { position: absolute; }
+/* waiting: far off to the right, turned away; in: facing us, a touch of tilt; past: swung
+   up and back into the dark, a dim panel that says there was one before */
+.cs-shot.cs-el {
+  opacity: 0; transform: translate3d(calc(44 * var(--cu)), calc(4 * var(--cu)), calc(-46 * var(--cu))) rotateY(-42deg);
+  transition: opacity .55s ease, transform 1.05s cubic-bezier(.16, .84, .24, 1);
+}
+.cs-shot.cs-el.cs-in { opacity: 1; transform: rotateY(-4deg); }
+.cs-shot.cs-el.cs-in.cs-past { opacity: .26; transform: translate3d(calc(30 * var(--cu)), calc(-15 * var(--cu)), calc(-70 * var(--cu))) rotateY(-28deg); }
+.cs-shot.cs-under { visibility: hidden; }
+/* a caption is a satellite card on its panel's lower left corner */
+.cs-shot .cs-cap, .cs-film .cs-shot .cs-cap {
+  left: calc(-2.6 * var(--cu)); right: auto; bottom: calc(2.6 * var(--cu)); max-width: 70%;
+  border: 1px solid rgb(var(--cs-edge)); border-left: calc(.35 * var(--cu)) solid rgb(var(--cs-cyan));
+  background: linear-gradient(160deg, rgba(28, 56, 160, .96), rgba(6, 12, 48, .97));
+}
+/* the words of a film: a column at the left, beside the panels */
+.cs-film-words { left: calc(3.6 * var(--cu)); top: calc(4.2 * var(--cu)); width: calc(27.5 * var(--cu)); z-index: 3; }
+.cs-film-words .cs-title-m { font-size: calc(3.1 * var(--cu)); }
+.cs-film-words .cs-chips { flex-direction: column; align-items: flex-start; gap: calc(.8 * var(--cu)); margin-top: calc(1.4 * var(--cu)); }
+.cs-film-words .cs-chip { font-size: calc(1.65 * var(--cu)); text-align: left; }
+.cs-film-words .cs-over-figure { margin-top: calc(1.3 * var(--cu)); }
+.cs-over-figure .cs-num { font-size: calc(8.4 * var(--cu)); }
+.cs-over-figure .cs-lead, .cs-over-figure .cs-unit { font-size: calc(2.3 * var(--cu)); }
+.cs-over-label { font-size: calc(2 * var(--cu)); }
+.cs-shot-figures { height: calc(18.5 * var(--cu)); margin-top: calc(1.3 * var(--cu)); }
+.cs-shot-figure .cs-num { font-size: calc(8.4 * var(--cu)); }
+.cs-shot-figure .cs-over-label { font-size: calc(1.7 * var(--cu)); margin-bottom: calc(.3 * var(--cu)); }
+/* the end: a giant backlit word BEHIND the last panel, which pulls back under it */
+.cs-end { z-index: 1; display: block; padding-top: calc(1.6 * var(--cu)); background: none; text-align: center; }
+.cs-end::before {
+  content: ""; position: absolute; left: 10%; right: 10%; top: calc(-6 * var(--cu)); height: calc(30 * var(--cu));
+  background: radial-gradient(closest-side, rgba(46, 107, 255, .5), rgba(46, 107, 255, 0));
+}
+.cs-end .cs-title-m {
+  position: relative; font-size: calc(var(--end, 9) * var(--cu)); line-height: 1.04; letter-spacing: .08em; text-transform: uppercase;
+  font-weight: 800; background: none; -webkit-text-fill-color: currentColor; text-wrap: balance;
+}
+.cs-end .cs-w { color: #dfeaff; -webkit-text-fill-color: currentColor; }
+.cs-ended .cs-reel { opacity: 1; transform: translate3d(calc(-13.5 * var(--cu)), calc(12.5 * var(--cu)), 0) scale(.5); }
+
+/* ---- spotlight: one panel turned towards the words ---- */
+.cs-spot { perspective: calc(110 * var(--cu)); }
+.cs-spot-frame { border: 0; background: none; overflow: visible; border-radius: 0; }
+.cs-spot .cs-shot.cs-el.cs-in { transform: rotateY(9deg); }
+.cs-spot-right .cs-shot.cs-el.cs-in { transform: rotateY(-9deg); }
+.cs-spot .cs-shot.cs-el.cs-in.cs-past { opacity: 0; transform: translate3d(calc(-24 * var(--cu)), 0, calc(-40 * var(--cu))) rotateY(40deg); }
+.cs-spot .cs-shot .cs-cap { left: calc(2 * var(--cu)); bottom: calc(-1.6 * var(--cu)); }
+.cs-spot-words .cs-over-figure .cs-num { font-size: calc(8.6 * var(--cu)); }
+
+/* ---- mosaic: a fan of picture cards ---- */
+.cs-ptiles { display: flex; justify-content: center; align-items: center; gap: 0; perspective: calc(100 * var(--cu)); height: calc(27 * var(--cu)); }
+.cs-ptile { flex: none; width: calc(21 * var(--cu)); height: calc(24 * var(--cu)); margin: 0 calc(-.6 * var(--cu)); overflow: visible; }
+.cs-ptiles-3 .cs-ptile { width: calc(27 * var(--cu)); }
+.cs-ptiles-5 .cs-ptile { width: calc(18 * var(--cu)); grid-row: auto; }
+.cs-ptiles-6 .cs-ptile { width: calc(15.5 * var(--cu)); }
+.cs-ptile.cs-el { transform: translate3d(0, calc(10 * var(--cu)), calc(-40 * var(--cu))) rotateX(-24deg); transition: opacity .5s ease, transform 1s cubic-bezier(.16, .84, .24, 1); }
+.cs-ptile.cs-el.cs-in { transform: rotateY(var(--ry, 0deg)) translate3d(0, 0, var(--tz, 0)); }
+.cs-ptiles-3 .cs-ptile:nth-child(1), .cs-ptiles-4 .cs-ptile:nth-child(2), .cs-ptiles-5 .cs-ptile:nth-child(2), .cs-ptiles-6 .cs-ptile:nth-child(3) { --ry: 14deg; --tz: calc(-2 * var(--cu)); }
+.cs-ptiles-3 .cs-ptile:nth-child(3), .cs-ptiles-4 .cs-ptile:nth-child(3), .cs-ptiles-5 .cs-ptile:nth-child(4), .cs-ptiles-6 .cs-ptile:nth-child(4) { --ry: -14deg; --tz: calc(-2 * var(--cu)); }
+.cs-ptiles-4 .cs-ptile:nth-child(1), .cs-ptiles-5 .cs-ptile:nth-child(1), .cs-ptiles-6 .cs-ptile:nth-child(2) { --ry: 30deg; --tz: calc(-7 * var(--cu)); }
+.cs-ptiles-4 .cs-ptile:nth-child(4), .cs-ptiles-5 .cs-ptile:nth-child(5), .cs-ptiles-6 .cs-ptile:nth-child(5) { --ry: -30deg; --tz: calc(-7 * var(--cu)); }
+.cs-ptiles-6 .cs-ptile:nth-child(1) { --ry: 42deg; --tz: calc(-13 * var(--cu)); }
+.cs-ptiles-6 .cs-ptile:nth-child(6) { --ry: -42deg; --tz: calc(-13 * var(--cu)); }
+.cs-ptile .cs-cap { left: calc(1 * var(--cu)); bottom: calc(1 * var(--cu)); }
+
+/* ==== acts: the shared look and the primitives (docs/emma-ceremony-slides.md 0.4) ====
+   Owner 17 Nov evening: "แยกเอเจนท์สำหรับออกแบบแต่ละส่วน แล้วก็ให้ทำ". Each part of the film is
+   an act in its own file (assets/ceremony-show/acts/<name>.js/.css, selectors under
+   .cs-act-<name>); what is here is what they share, so five designers make one film.
+   The same motion rules: transform and opacity only (a route's stroke-dashoffset is the
+   one exception, as in the story engine), every glow a drawn gradient, no blur, no
+   backdrop-filter, no will-change, every size in --cu or %. */
+/* THE FILM'S TYPE (owner 18 Nov, with Apple's MacBook Pro film as the reference: "ปรับพวกฟ้อน
+   กับการแสดงข้อความตัวหนังสือให้มันประมาณนี้"): one clean upright grotesque for every word of
+   the film -- Inter, the variable font (weight 100-900, optical size 14-32: large type gets
+   its display cut by itself), served by this screen's own listener beside the acts
+   (client/assets/ceremony-show/fonts/, SIL Open Font License 1.1 -- the licence is in the
+   file's own name table). `block`: a word is never drawn in another face and then swapped
+   (the engine asks for the font when the screen opens, long before the first line). Acts
+   use it as var(--cs-font, "Inter", "Segoe UI", system-ui, sans-serif).
+   THE FILM'S TYPE SINCE 22 NOV (owner: "เปลี่ยนทั้งหมดเลยนะ" -- the review PDF's page 1, "ใช้ font
+   นี้", its arrow ending on the Thai subtitle): Jipatype's Kantalad, four static faces (CFF OpenType,
+   upright; licensed by the owner for the event's presentation only -- the files are gitignored and
+   scripts/robot_server.py ships exactly these four by name). --cs-font names it first; Inter stays
+   behind it for anything it lacks. The film's weights were set on Inter's variable axis (450-800);
+   each lands on the face whose stroke is nearest (stem of "l" at 200 px -- Inter 450: 19, 470: 20,
+   500: 21, 560: 23, 600: 25, 700: 29; Kantalad Regular 12, Medium 18, SemiBold 23, Bold 29): the
+   small labels (450-480) Medium, the words and headings (500-600) SemiBold, 700 and up Bold;
+   Regular only below 350. `block` as Inter: the engine asks for every face when the screen opens. */
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: block;
+  src: url("ceremony-show/fonts/Inter.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Kantalad"; font-style: normal; font-weight: 100 349; font-display: block;
+  src: url("ceremony-show/fonts/Kantalad-Regular.otf") format("opentype");
+}
+@font-face {
+  font-family: "Kantalad"; font-style: normal; font-weight: 350 499; font-display: block;
+  src: url("ceremony-show/fonts/Kantalad-Medium.otf") format("opentype");
+}
+@font-face {
+  font-family: "Kantalad"; font-style: normal; font-weight: 500 649; font-display: block;
+  src: url("ceremony-show/fonts/Kantalad-SemiBold.otf") format("opentype");
+}
+@font-face {
+  font-family: "Kantalad"; font-style: normal; font-weight: 650 1000; font-display: block;
+  src: url("ceremony-show/fonts/Kantalad-Bold.otf") format("opentype");
+}
+html.mirror.mirror-show .cs-stage {
+  --cs-font: "Kantalad", "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--cs-font);
+  --cs-night: #03050d; --cs-night2: #070b1c;
+  --cs-blue: 47, 107, 255; --cs-sky: 77, 163, 255; --cs-cyan: 110, 231, 255;
+  --cs-ink: #f4f7ff; --cs-ink2: rgba(220, 232, 255, .72);
+  --cs-glass: rgba(18, 34, 96, .34); --cs-glass-edge: rgba(130, 175, 255, .75);
+  --cs-radius: calc(1.2 * var(--cu));
+  /* THE FILM'S MOTION (18 Nov, the motion-design pass: "Premium" -- smooth, controlled, no
+     overshoot; "Playful" only in the joke beats). One curve for most moves; a thing coming
+     in decelerates (fast, then lands soft), a thing going accelerates (starts soft, leaves
+     fast) and is 30-50% shorter than its entrance; an ambient loop is a sine. Acts use them
+     as var(--cs-ease, cubic-bezier(...)) so they also work without the stage.
+     (Named for the direction of the move, not CSS's ease-in/ease-out: --cs-ease-in is how a
+     thing comes IN.) */
+  --cs-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --cs-ease-in: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --cs-ease-out: cubic-bezier(0.3, 0, 1, 1);
+  --cs-ease-play: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --cs-ease-sine: cubic-bezier(0.37, 0, 0.63, 1);
+  --cs-dur-quick: 300ms; --cs-dur-standard: 500ms; --cs-dur-slow: 900ms;
+}
+/* the stage background under an act: all of it, dimmed, or off (under a full-bleed picture
+   it would be six layers moving for nobody) */
+.cs-bg { transition: opacity var(--cs-dur-standard) var(--cs-ease); }
+.cs-stage.cs-bg-dim .cs-bg { opacity: .35; }
+.cs-stage.cs-bg-off .cs-bg { opacity: 0; }
+.cs-stage.cs-bg-off .cs-bg > span { animation-play-state: paused; }
+
+/* an act's slide: its own 16:9 box, 100cu x 56.25cu, from the top of the screen -- the whole
+   screen (18 Nov). The Thai line's see-through box sits in its bottom 22%: below 43.8cu there
+   may be pictures, floors and light, never a word, a figure, a card or the credit
+   (tests/test_ceremony_acts.py, in a real page). No sway of the whole slide -- an act moves
+   its own camera. */
+.cs-slide.cs-t-act { display: block; perspective: none; text-align: left; }
+.cs-slide.cs-t-act.cs-live { animation: none; }
+/* ---- line to line: THE CUT (owner 18 Nov afternoon, on the scene videos: "ดูเรื่อง transition
+   ด้วย"). A cut used to be a 0.3 s dissolve into the next shot's first, still, frame: it read
+   as "a picture fades to another picture". Now the film has ONE cut, and it is a camera's:
+   a SHEET OF LIGHT crosses the stage left to right -- the way the film's words light up --
+   and carries the cut with it. The shot that is up is pushed on ahead of the light; the next
+   one is uncovered behind it, already moving (it drifts the last of its way in after the
+   light: the same direction), its first words lighting up in the sheet's wake. No cross-fade:
+   the new shot is whole behind the light from its first frame.
+     hold  a new slide is in the page, built and drawn once (so the cut uploads nothing), and
+           not seen: the frame before HOLDS until the new one's pictures are decoded
+           (ceremony-show.js warmed(), at most 480 ms; her voice and the beats never wait)
+     in    the sheet crosses in --cs-cut: the slide's root is a window that opens from the
+           left edge at the sheet's speed, the shot inside counter-moves so it stands still
+           but for its drift -- transform alone, no clip-path
+     out   the shot going down: ITS window closes from the left at the same speed (so behind
+           the sheet there is the new shot alone, ahead of it the old alone -- two shots of
+           glass panels never show through one another), and it is pushed on a little ahead
+           of the light
+     down  a line going down to the logo: the same, a third shorter (--cs-cut-down): an exit
+     join  the same act going on to its next line (ctx.prev, same view): the new frame is
+           there at once over the old, which only fades underneath -- nothing is seen to change
+     blend (19 Nov) the next line of the SAME scene, another act or another view: no sheet --
+           a one-second dissolve with the camera travelling (below). The sheet is a scene's.
+   A screen that joined late: no entrance. (`data-cut` is set by the engine: the root's
+   classes stay the act's own contract -- cs-live, cs-instant. The root is the act's own
+   100cu box, so its window and the shot in it move by the same 100%.) */
+.cs-slide.cs-t-act { left: 50%; right: auto; width: calc(100 * var(--cu)); margin-left: calc(-50 * var(--cu)); }
+.cs-slide.cs-t-act > .cs-act-stage { left: 0; margin-left: 0; }
+.cs-slide.cs-t-act[data-cut] { transition: none; }
+/* (not 0: a hold is the camera's, not a gate -- what an act shows before its beat must read
+   as shown from the first frame, so the acts' run in Chromium still catches it; and a layer
+   at 0 is not drawn at all, so it would be drawn for the first time in the cut) */
+.cs-slide.cs-t-act[data-cut="hold"] { opacity: .004; }
+/* (what was decoded while the slide was held -- cs-held, the engine's -- is simply there when
+   it comes up: its own fade would be a second, slower dissolve behind the sheet) */
+.cs-apic.cs-held > .cs-apic-in, .cs-plx-gl.cs-held { transition: none; }
+/* (review 19 Nov: the sheet was 0.56 s on the film's own curve -- ~2 screen widths a second,
+   the fastest thing in the film. It marks a SCENE change only now, 1.2 s on a sine: about one
+   width a second at its fastest, starting and landing soft) */
+.cs-slide.cs-t-act[data-cut="in"] { overflow: hidden; animation: cs-cut-in var(--cs-cut, 1200ms) var(--cs-ease-sine) backwards; }
+.cs-slide.cs-t-act[data-cut="in"] > .cs-act-stage { animation: cs-cut-in-shot var(--cs-cut, 1200ms) var(--cs-ease-sine) backwards; }
+/* ... and what it uncovers comes up GRADED: a veil of the stage's black over the opening window
+   that lifts as the light goes by -- a dark shot handing to a bright picture brightens across
+   the cut, never in a step at the seam (19 Nov: +80 luma in 0.3 s). (Its length is the
+   window's: while they run, the window and the shot in it are each their own stacking
+   context, so nothing of the act's paints over the veil.) */
+.cs-slide.cs-t-act[data-cut="in"]::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; background: rgb(3, 5, 13); opacity: 0;
+  animation: cs-cut-veil var(--cs-cut, 1200ms) linear;
+}
+@keyframes cs-cut-veil { from { opacity: .55; } to { opacity: 0; } }
+@keyframes cs-cut-in { from { transform: translate3d(-100%, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+@keyframes cs-cut-in-shot { from { transform: translate3d(calc(100% - 2.4 * var(--cu)), 0, 0); } to { transform: translate3d(0, 0, 0); } }
+.cs-slide.cs-t-act.cs-out[data-cut="out"], .cs-slide.cs-t-act.cs-out[data-cut="down"] {
+  opacity: 1; overflow: hidden; animation: cs-cut-out var(--cs-cut, 1200ms) var(--cs-ease-sine) forwards;
+}
+.cs-slide.cs-t-act.cs-out[data-cut="out"] > .cs-act-stage, .cs-slide.cs-t-act.cs-out[data-cut="down"] > .cs-act-stage {
+  animation: cs-cut-out-shot var(--cs-cut, 1200ms) var(--cs-ease-sine) forwards;
+}
+.cs-slide.cs-t-act.cs-out[data-cut="down"], .cs-slide.cs-t-act.cs-out[data-cut="down"] > .cs-act-stage { animation-duration: var(--cs-cut-down, 800ms); }
+@keyframes cs-cut-out { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(100%, 0, 0); } }
+@keyframes cs-cut-out-shot { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(1.4 * var(--cu) - 100%), 0, 0); } }
+.cs-slide.cs-t-act.cs-out[data-cut="join"], .cs-slide.cs-t-act.cs-out[data-cut="fade"] {
+  opacity: 0; transition: opacity var(--cs-dur-quick) var(--cs-ease-out);
+}
+/* ---- within a scene: the DISSOLVE (review 19 Nov, "ไม่อยากให้มีคั่น อยากให้มันสมูทไปเลย"). No
+   sheet and no hard edge: the next line's shot comes up over the one before on a sine, 1.2 s
+   long (measured at 1.0 s: only ~0.7 s of it is seen to change -- under 0.8 s), settling the
+   last 1.5% of a push as it comes; the shot going down stays whole under it for the first half
+   and then fades, pushing on (2.5%, accelerating: it is leaving),
+   so it is gone exactly as the new one covers it -- a new shot with see-through parts never
+   shows the old one through them, and nothing pops when the old leaves the page. Both scale
+   about the content's floor (43.8cu, 77.8% down), so no word moves towards the subtitle box. */
+/* (overflow: on a screen wider than 16:9 the box has margins of bare stage at its sides: the
+   push and the settle stay inside the box, its edges never move) */
+.cs-slide.cs-t-act[data-cut="blend"] { overflow: hidden; animation: cs-blend-in var(--cs-blend, 1200ms) var(--cs-ease-sine) backwards; }
+.cs-slide.cs-t-act[data-cut="blend"] > .cs-act-stage {
+  transform-origin: 50% 77.8%; animation: cs-blend-in-shot calc(var(--cs-blend, 1200ms) + 300ms) var(--cs-ease-in) backwards;
+}
+@keyframes cs-blend-in { from { opacity: .004; } to { opacity: 1; } }
+@keyframes cs-blend-in-shot { from { transform: scale(1.015); } to { transform: none; } }
+.cs-slide.cs-t-act.cs-out[data-cut="under"] { opacity: 1; overflow: hidden; animation: cs-blend-out var(--cs-blend, 1200ms) var(--cs-ease-sine) forwards; }
+.cs-slide.cs-t-act.cs-out[data-cut="under"] > .cs-act-stage {
+  transform-origin: 50% 77.8%; animation: cs-blend-out-shot var(--cs-blend, 1200ms) var(--cs-ease-out) forwards;
+}
+@keyframes cs-blend-out { 0%, 50% { opacity: 1; } 100% { opacity: 0; } }
+.cs-slide.cs-t-act.cs-out[data-cut="blend"] { opacity: 1; }     /* (still dissolving in when the next came: ceremony-show.js retire()) */
+@keyframes cs-blend-out-shot { from { transform: none; } to { transform: scale(1.025); } }
+/* the sheet of light: one element over the slides, the act's 100cu box, its right edge the
+   seam of the cut (it moves exactly as the window above does). A white-hot line in a cyan
+   flare, a wide haze trailing over the new shot, a short one ahead on the old, one thin
+   horizontal flare: plain gradients (no mask: a masked layer is drawn through an off-screen
+   pass), each brightest a little above the middle and gone towards the bottom -- the
+   subtitle box's zone -- drawn once, moved by transform. At rest it stands at the stage's
+   left edge at next to no opacity (not 0): it has been drawn before the first cut needs it. */
+.cs-gate {
+  position: absolute; top: 0; bottom: 0; left: 50%; width: calc(100 * var(--cu)); margin-left: calc(-50 * var(--cu));
+  z-index: 3; pointer-events: none; opacity: .004; transform: translate3d(-100%, 0, 0);
+}
+/* (the stage is the whole screen now, 18 Nov: each glow's vertical reach ends near the bottom
+   edge -- at the subtitle box's middle, ~89% down, the white line is at a tenth of itself; it
+   reached the bottom edge at a third before, a bright bar passing behind the box) */
+.cs-gate > i {
+  display: block; position: absolute; top: 0; bottom: 0; left: 100%; width: calc(34 * var(--cu)); margin-left: calc(-24 * var(--cu));
+  background:
+    radial-gradient(ellipse 50% 54% at 50% 38%, #ffffff 0%, #ffffff 46%, rgba(255, 255, 255, 0) 100%) calc(23.76 * var(--cu)) 0 / calc(.48 * var(--cu)) 100% no-repeat,
+    radial-gradient(ellipse 50% 52% at 50% 38%, rgba(var(--cs-cyan), .92) 0%, rgba(var(--cs-cyan), .5) 34%, rgba(var(--cs-cyan), 0) 100%) calc(21 * var(--cu)) 0 / calc(6 * var(--cu)) 100% no-repeat,
+    radial-gradient(ellipse 100% 50% at 100% 38%, rgba(var(--cs-sky), .46) 0%, rgba(var(--cs-sky), .16) 46%, rgba(var(--cs-sky), 0) 100%) 0 0 / calc(24 * var(--cu)) 100% no-repeat,
+    radial-gradient(ellipse 100% 46% at 0% 38%, rgba(var(--cs-sky), .3) 0%, rgba(var(--cs-sky), 0) 100%) calc(24 * var(--cu)) 0 / calc(10 * var(--cu)) 100% no-repeat;
+}
+.cs-gate > i::after {
+  content: ""; position: absolute; left: calc(2 * var(--cu)); width: calc(44 * var(--cu)); top: 36%; height: calc(.8 * var(--cu)); margin-top: calc(-.4 * var(--cu));
+  background: radial-gradient(ellipse closest-side, #ffffff 0%, rgba(var(--cs-cyan), .75) 20%, rgba(var(--cs-cyan), 0) 100%);
+}
+.cs-gate.cs-go { animation: cs-gate var(--cs-cut, 1200ms) var(--cs-ease-sine) backwards; }
+.cs-gate.cs-go.cs-down { animation-duration: var(--cs-cut-down, 800ms); }
+.cs-stage.cs-calm .cs-gate { display: none; }
+@keyframes cs-gate {
+  0% { transform: translate3d(-100%, 0, 0); opacity: .004; }
+  14% { opacity: 1; }
+  84% { opacity: 1; }
+  100% { transform: translate3d(0, 0, 0); opacity: .004; }
+}
+.cs-slide > .cs-act-stage {
+  position: absolute; left: 50%; top: 0; width: calc(100 * var(--cu)); height: calc(56.25 * var(--cu));
+  margin-left: calc(-50 * var(--cu)); max-height: none; overflow: hidden; color: var(--cs-ink);
+}
+/* a screen that joined mid-line (or an act whose code came late): the state, no entrances */
+.cs-t-act.cs-instant, .cs-t-act.cs-instant * { transition: none !important; }
+.cs-t-act.cs-instant *::before, .cs-t-act.cs-instant *::after { transition: none !important; }
+
+/* THE GATE: what a factory made for a key whose beat has not come is not on the screen.
+   (Opacity, so nothing inside it can show either; an act's file may not name this class.) */
+.cs-await { opacity: 0 !important; visibility: hidden !important; }
+
+/* ---- words: THE FILM'S TYPE (owner 18 Nov afternoon, with Apple's MacBook Pro film as the
+   reference -- .tmp/ceremony-show/reference/ref_g_*: "ปรับพวกฟ้อนกับการแสดงข้อความตัวหนังสือให้มัน
+   ประมาณนี้"). One face (--cs-font: Kantalad since 22 Nov), upright, in the case the slide gives it -- nothing
+   here forces capitals, italics, an extrusion or wide tracking -- at moderate sizes with air
+   round it; a white core running to pale teal, then ice blue, ACROSS the phrase; a soft glow
+   of the same hue behind a headline (drawn: a gradient under a soft mask, never a blurred
+   shadow). ---- */
+.cs-text { display: inline-block; font-family: var(--cs-font); font-weight: 560; font-style: normal; letter-spacing: -.006em; }
+.cs-tw { display: inline-block; white-space: nowrap; }
+.cs-tc { display: inline-block; }
+/* (a letter the core split for itself: plain inline, so its word is shaped as one run) */
+.cs-tl { display: inline; }
+/* The colour across the phrase: each piece (a letter; a word of a text split by words) mixes
+   the text's own colour -- white, unless the act gave it one -- towards pale teal and then
+   ice blue by its place --t (0 = the first piece, 1 = the last). An act tunes it on the text:
+   --cs-type-mid / --cs-type-end (the two colours), --cs-type-mix (0 = its own colour whole). */
+.cs-tg {
+  color: color-mix(in srgb,
+    color-mix(in srgb, currentColor, var(--cs-type-mid, #c8f1ea) calc(min(1, var(--t, 0) * 2) * var(--cs-type-mix, 1) * 100%)),
+    var(--cs-type-end, #a6d8f7) calc(max(0, var(--t, 0) * 2 - 1) * var(--cs-type-mix, 1) * 100%));
+}
+/* (a headline's letters stand about 3 to 4.5cu tall: a phrase, not a wall) */
+.cs-type-h1 { font-size: calc(4.4 * var(--cu)); font-weight: 600; line-height: 1.1; letter-spacing: -.022em; }
+.cs-type-h2 { font-size: calc(3.1 * var(--cu)); font-weight: 560; line-height: 1.16; letter-spacing: -.014em; }
+/* a supporting label: small and light, near what it names */
+.cs-type-label { font-size: calc(1.45 * var(--cu)); font-weight: 470; line-height: 1.3; letter-spacing: .004em; color: var(--cs-ink2); }
+/* words standing in a picture (fx.plane): the same face, flat on their plane */
+.cs-type-scene { font-weight: 600; letter-spacing: -.012em; line-height: 1.04; }
+/* a giant backlit word behind a panel: lit ink, a halo drawn behind it */
+.cs-type-giant {
+  position: relative; isolation: isolate; font-size: calc(15 * var(--cu)); font-weight: 600; letter-spacing: -.03em;
+  line-height: .96; white-space: nowrap;
+}
+.cs-type-giant .cs-tl { display: inline-block; }
+.cs-type-giant, .cs-type-giant .cs-tw, .cs-type-giant .cs-tc, .cs-type-giant .cs-tl {
+  background: linear-gradient(180deg, rgba(var(--cs-sky), .95) 10%, rgba(var(--cs-blue), .3) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.cs-type-giant::before {
+  content: ""; position: absolute; left: -8%; right: -8%; top: -45%; bottom: -45%; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(var(--cs-blue), .42), rgba(var(--cs-blue), 0));
+}
+/* the glow behind a lit phrase (ctx.text `glow`; on for cs-type-h1 / cs-type-h2) and behind
+   anything else an act lights (fx.halo): the phrase's own hues, left to right, drawn soft.
+   `shade`: a soft dark one, for words that stand on a bright picture. */
+.cs-text-glow, .cs-text-shade { position: relative; isolation: isolate; }
+.cs-halo { position: relative; isolation: isolate; display: inline-block; }
+.cs-text-glow::before, .cs-text-shade::before, .cs-halo-glow {
+  content: ""; display: block; position: absolute; left: -.8em; right: -.8em; top: -.62em; bottom: -.62em; z-index: -1; pointer-events: none;
+  /* (two plain glows side by side, pale teal then ice blue -- no mask: a masked layer is
+     drawn through an off-screen pass, and every headline has one of these). Each is sized by
+     `closest-side`, so it has faded to nothing BEFORE it reaches any edge of its box: review 18
+     Nov (units, smarthome, living photos frames) -- the glows were ellipses larger than the
+     box (62% x 100% round 30% / 70%), still at a sixth of their light where the box cut them,
+     and every headline sat on a pale rectangle. A soft light has no edges. */
+  background:
+    radial-gradient(closest-side at 32% 50%, rgba(204, 244, 240, .3) 0%, rgba(190, 240, 240, .19) 38%, rgba(176, 236, 240, .07) 72%, rgba(176, 236, 240, 0) 100%),
+    radial-gradient(closest-side at 68% 50%, rgba(140, 204, 250, .32) 0%, rgba(140, 204, 250, .2) 38%, rgba(140, 204, 250, .07) 72%, rgba(140, 204, 250, 0) 100%);
+}
+.cs-text-shade::before, .cs-halo-shade > .cs-halo-glow {
+  background: radial-gradient(ellipse closest-side, rgba(2, 6, 18, .62) 0%, rgba(2, 6, 18, .4) 55%, rgba(2, 6, 18, 0) 100%);
+}
+/* typed text: every letter is in the page from the start (the line never reflows) */
+.cs-typed .cs-tc { opacity: 0; }
+.cs-typed .cs-tc.cs-on { opacity: 1; }
+.cs-caret2 { display: inline-block; position: relative; width: 0; height: 1em; vertical-align: -.14em; }
+.cs-caret2::after {
+  content: ""; position: absolute; left: .07em; top: .06em; width: .075em; height: .9em; background: rgb(var(--cs-cyan));
+}
+.cs-typed-done .cs-caret2 { opacity: 0; transition: opacity var(--cs-dur-quick) var(--cs-ease-out) .7s; }
+
+/* ---- a figure: one piece. Its size is the font-size of .cs-fig (the numeral = 1em). The
+   film's type: the number at the headline weight, its lead / unit smaller and lighter beside
+   it, its label small beneath -- all in the case the slide gives them. ---- */
+.cs-fig { display: inline-flex; flex-direction: column; align-items: flex-start; font-family: var(--cs-font); font-size: calc(7 * var(--cu)); line-height: 1; }
+/* (its own stacking context: the halo stays behind the numeral and in front of whatever
+   picture or panel the figure stands on) */
+.cs-fig-row { position: relative; isolation: isolate; display: flex; align-items: baseline; gap: .1em; white-space: nowrap; }
+.cs-fig-value { font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.cs-fig-lead, .cs-fig-unit { font-size: .34em; font-weight: 450; letter-spacing: -.004em; color: var(--cs-ink2); }
+.cs-fig-label { margin-top: .5em; font-size: .2em; font-weight: 450; line-height: 1.3; letter-spacing: 0; color: var(--cs-ink2); }
+/* the glowing numeral: lit ink -- the phrase's white to pale teal to ice blue -- and a halo drawn behind it */
+.cs-fig-glow .cs-fig-value {
+  background: linear-gradient(90deg, #ffffff 0%, #c8f1ea 55%, #a6d8f7 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.cs-fig-glow .cs-fig-row::before {
+  content: ""; position: absolute; left: -16%; right: -16%; top: -42%; bottom: -42%; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(156, 228, 238, .38), rgba(156, 228, 238, 0));
+}
+
+/* ---- a picture, a clip: they fill the box you put them in ---- */
+.cs-apic, .cs-avid { display: block; position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; }
+/* (clear until it is decoded, then in: never an empty or half-painted box) */
+.cs-apic-in { position: absolute; inset: 0; opacity: 0; transition: opacity var(--cs-dur-standard) var(--cs-ease-in); }
+.cs-apic.cs-loaded > .cs-apic-in { opacity: 1; }
+.cs-aimg, .cs-avid video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.cs-apic.cs-fit .cs-aimg { object-fit: contain; }
+.cs-apic-in { container-type: size; }
+.cs-kof { position: absolute; z-index: 1; pointer-events: none; aspect-ratio: var(--kar, 1);
+  left: var(--kx, 50%); top: var(--ky, 50%); transform: translate(calc(-1 * var(--kx, 50%)), calc(-1 * var(--ky, 50%)));
+  width: max(100cqw, calc(100cqh * var(--kar, 1))); }
+.cs-kof.cs-kof-contain { width: min(100cqw, calc(100cqh * var(--kar, 1))); }
+.cs-keepout { position: absolute; z-index: 1; pointer-events: none;
+  background: radial-gradient(closest-side, rgb(var(--ko, 52, 62, 78)) 80%, rgba(var(--ko, 52, 62, 78), 0) 100%); }
+/* (filled: the picture's own surroundings flowed over the box, its rim feathered -- the oval
+   above was only the cover until the picture could be read) */
+.cs-keepout.cs-ko-filled { background: none; }
+.cs-ko-fill { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+.cs-apic.cs-drawing { background: linear-gradient(180deg, #2c3270, #232859); }
+/* (a picture's caption: the film's type -- a small light label, in the case the slide gives it) */
+.cs-acap {
+  display: inline-block; font-family: var(--cs-font); font-size: calc(1.5 * var(--cu)); font-weight: 480; letter-spacing: 0;
+  color: var(--cs-ink);
+}
+/* a picture with depth: the plain picture always under the WebGL canvas */
+.cs-plx { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; }
+.cs-plx > .cs-plx-pic { position: absolute; left: 0; top: 0; }
+.cs-plx-gl { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; }
+.cs-plx-gl.cs-on { opacity: 1; }
+
+/* ---- panels ---- */
+.cs-panel { background: var(--cs-glass); border: 1px solid var(--cs-glass-edge); --r: var(--cs-radius); }
+.cs-panel-console { padding: calc(3.6 * var(--cu)) calc(3 * var(--cu)) calc(2.6 * var(--cu)); background: linear-gradient(160deg, rgba(20, 40, 128, .8) 0%, rgba(8, 16, 62, .9) 60%, rgba(4, 8, 34, .94) 100%); }
+/* a satellite card: a small glass card beside a panel */
+.cs-sat {
+  --g: calc(1.2 * var(--cu)); --r: calc(.9 * var(--cu));
+  display: inline-flex; align-items: center; gap: calc(.8 * var(--cu)); padding: calc(.9 * var(--cu)) calc(1.5 * var(--cu));
+  font-size: calc(1.6 * var(--cu)); font-weight: 600; white-space: nowrap;
+  background: linear-gradient(160deg, rgba(20, 40, 128, .9), rgba(6, 12, 48, .95)); border: 1px solid var(--cs-glass-edge);
+}
+/* a fan of tilted cards: the outer ones turned in and set back (fx.fan sets the variables) */
+.cs-fan { display: flex; align-items: center; justify-content: center; gap: calc(1.2 * var(--cu)); perspective: calc(110 * var(--cu)); }
+.cs-fan-card { flex: 0 0 auto; transform: translate3d(0, 0, calc(var(--tz, 0) * var(--cu))) rotateY(var(--ry, 0deg)) rotateZ(var(--rz, 0deg)); }
+
+/* ---- the stage's light (ctx.light): this act's glass glows, and what it marks cs-lit, follow it ---- */
+.cs-act-stage .cs-glass::before, .cs-act-stage .cs-lit { opacity: var(--cs-light, 1); transition: opacity .9s ease; }
+
+/* ---- a wipe by transform: the clip box moves one way, what is in it the other ---- */
+.cs-wipe { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; }
+.cs-wipe-in { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-wipe-edge {
+  position: absolute; top: 0; right: 0; width: calc(.5 * var(--cu)); height: 100%; opacity: 0; transition: opacity var(--cs-dur-quick) var(--cs-ease);
+  background: linear-gradient(90deg, rgba(var(--cs-cyan), 0), rgb(var(--cs-cyan)));
+}
+.cs-wipe-left > .cs-wipe-edge { right: auto; left: 0; background: linear-gradient(270deg, rgba(var(--cs-cyan), 0), rgb(var(--cs-cyan))); }
+.cs-wipe-down > .cs-wipe-edge, .cs-wipe-up > .cs-wipe-edge { right: auto; left: 0; width: 100%; height: calc(.5 * var(--cu)); }
+.cs-wipe-down > .cs-wipe-edge { top: auto; bottom: 0; background: linear-gradient(180deg, rgba(var(--cs-cyan), 0), rgb(var(--cs-cyan))); }
+.cs-wipe-up > .cs-wipe-edge { background: linear-gradient(0deg, rgba(var(--cs-cyan), 0), rgb(var(--cs-cyan))); }
+.cs-wiping > .cs-wipe-edge { opacity: 1; }
+
+/* ---- a wheel of cards round a cylinder (fx.wheel sets each card's place and the ring's turn) ---- */
+.cs-wheel { position: relative; perspective: calc(110 * var(--cu)); }
+.cs-wheel-ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-style: preserve-3d; }
+.cs-wheel-card {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: grid; place-items: center;
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+}
+
+/* ---- in the picture's own space ---- */
+/* the camera's layer group: it fills the stage; fx.camera moves it by transform */
+.cs-cam { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; }
+/* the far side of a portal: the next picture in a rectangle of this one */
+.cs-inset { position: absolute; overflow: hidden; }
+/* words on a plane of the picture (matrix3d from four corners); unseen until placed.
+   (By opacity, here and for a route: a child that sets its visibility back on shows
+   through a hidden parent -- seen 17 Nov, a route of the layer that had been whipped
+   out, lit across the next scene.) */
+.cs-plane { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: grid; place-items: center; opacity: 0; }
+.cs-plane.cs-placed { opacity: 1; }
+/* a route, an outline: a lit line drawn along its length, a wide dim one under it as its glow */
+.cs-route { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; }
+.cs-route.cs-drawn { opacity: 1; }
+.cs-route path { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 1; }
+.cs-route-glow { stroke: rgba(var(--cs-blue), .42); }
+.cs-route-line { stroke: rgb(var(--cs-cyan)); }
+.cs-route .cs-route-fill { fill: rgba(var(--cs-blue), .22); stroke: none; stroke-dasharray: none; opacity: 0; transition: opacity var(--cs-dur-slow) var(--cs-ease); }
+.cs-route .cs-route-fill.cs-in { opacity: 1; }
+
+/* ---- the whip: one layer shoots out, the next shoots in, streaks between ---- */
+.cs-whipped { opacity: 0 !important; visibility: hidden !important; }
+.cs-whip-out { animation: cs-whip-out-l var(--whip, .42s) cubic-bezier(.7, 0, .84, 0) both; }
+.cs-whip-in { animation: cs-whip-in-l var(--whip, .42s) cubic-bezier(.16, 1, .3, 1) both; }
+.cs-whip-out.cs-whip-right { animation-name: cs-whip-out-r; }
+.cs-whip-in.cs-whip-right { animation-name: cs-whip-in-r; }
+.cs-whip-out.cs-whip-up { animation-name: cs-whip-out-u; }
+.cs-whip-in.cs-whip-up { animation-name: cs-whip-in-u; }
+.cs-whip-out.cs-whip-down { animation-name: cs-whip-out-d; }
+.cs-whip-in.cs-whip-down { animation-name: cs-whip-in-d; }
+@keyframes cs-whip-out-l { to { transform: translate3d(-130%, 0, 0) scale(1.6, 1); opacity: 0; } }
+@keyframes cs-whip-in-l { from { transform: translate3d(130%, 0, 0) scale(1.6, 1); opacity: 0; } }
+@keyframes cs-whip-out-r { to { transform: translate3d(130%, 0, 0) scale(1.6, 1); opacity: 0; } }
+@keyframes cs-whip-in-r { from { transform: translate3d(-130%, 0, 0) scale(1.6, 1); opacity: 0; } }
+@keyframes cs-whip-out-u { to { transform: translate3d(0, -130%, 0) scale(1, 1.6); opacity: 0; } }
+@keyframes cs-whip-in-u { from { transform: translate3d(0, 130%, 0) scale(1, 1.6); opacity: 0; } }
+@keyframes cs-whip-out-d { to { transform: translate3d(0, 130%, 0) scale(1, 1.6); opacity: 0; } }
+@keyframes cs-whip-in-d { from { transform: translate3d(0, -130%, 0) scale(1, 1.6); opacity: 0; } }
+/* (sparse speed lines of uneven length and light, not a regular grating -- 17 Nov evening:
+   the even 1.1cu lines read as a barcode of stripes, not as motion) */
+.cs-whip-streak {
+  position: absolute; left: -30%; top: 0; width: 160%; height: 100%; z-index: 9; pointer-events: none; opacity: 0;
+  --sl: rgba(var(--cs-sky), .55); --sc: rgba(var(--cs-cyan), .8); --so: rgba(var(--cs-sky), 0);
+  background:
+    linear-gradient(90deg, var(--so), var(--sc) 45%, var(--so)) 10% 14% / 38% calc(.16 * var(--cu)) no-repeat,
+    linear-gradient(90deg, var(--so), var(--sl) 55%, var(--so)) 70% 23% / 52% calc(.1 * var(--cu)) no-repeat,
+    linear-gradient(90deg, var(--so), var(--sl) 40%, var(--so)) 30% 37% / 28% calc(.22 * var(--cu)) no-repeat,
+    linear-gradient(90deg, var(--so), var(--sc) 60%, var(--so)) 85% 48% / 44% calc(.12 * var(--cu)) no-repeat,
+    linear-gradient(90deg, var(--so), var(--sl) 50%, var(--so)) 18% 59% / 60% calc(.1 * var(--cu)) no-repeat,
+    linear-gradient(90deg, var(--so), var(--sc) 35%, var(--so)) 60% 71% / 30% calc(.18 * var(--cu)) no-repeat,
+    linear-gradient(90deg, var(--so), var(--sl) 65%, var(--so)) 5% 82% / 46% calc(.1 * var(--cu)) no-repeat;
+  animation: cs-streak-l var(--whip, .42s) linear both;
+}
+.cs-whip-streak.cs-whip-right { animation-name: cs-streak-r; }
+.cs-whip-streak.cs-whip-up, .cs-whip-streak.cs-whip-down {
+  left: 0; top: -30%; width: 100%; height: 160%;
+  background:
+    linear-gradient(180deg, var(--so), var(--sc) 45%, var(--so)) 14% 10% / calc(.16 * var(--cu)) 38% no-repeat,
+    linear-gradient(180deg, var(--so), var(--sl) 55%, var(--so)) 23% 70% / calc(.1 * var(--cu)) 52% no-repeat,
+    linear-gradient(180deg, var(--so), var(--sl) 40%, var(--so)) 37% 30% / calc(.22 * var(--cu)) 28% no-repeat,
+    linear-gradient(180deg, var(--so), var(--sc) 60%, var(--so)) 48% 85% / calc(.12 * var(--cu)) 44% no-repeat,
+    linear-gradient(180deg, var(--so), var(--sl) 50%, var(--so)) 59% 18% / calc(.1 * var(--cu)) 60% no-repeat,
+    linear-gradient(180deg, var(--so), var(--sc) 35%, var(--so)) 71% 60% / calc(.18 * var(--cu)) 30% no-repeat,
+    linear-gradient(180deg, var(--so), var(--sl) 65%, var(--so)) 82% 5% / calc(.1 * var(--cu)) 46% no-repeat;
+  animation-name: cs-streak-u;
+}
+.cs-whip-streak.cs-whip-down { animation-name: cs-streak-d; }
+@keyframes cs-streak-l { 0% { opacity: 0; transform: translate3d(18%, 0, 0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate3d(-18%, 0, 0); } }
+@keyframes cs-streak-r { 0% { opacity: 0; transform: translate3d(-18%, 0, 0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate3d(18%, 0, 0); } }
+@keyframes cs-streak-u { 0% { opacity: 0; transform: translate3d(0, 18%, 0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate3d(0, -18%, 0); } }
+@keyframes cs-streak-d { 0% { opacity: 0; transform: translate3d(0, -18%, 0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate3d(0, 18%, 0); } }
+
+/* ---- integration, 17 Nov night: the portal, a keyed picture, the map's credit, the idle clip ---- */
+/* a slide is its own stacking context: nothing of an act lies above the core's credit line */
+.cs-slide { z-index: 1; }
+/* the far side of a portal: unseen until it opens (or `show`), a hairline of light round it */
+.cs-portal { opacity: 0; transition: opacity var(--cs-dur-quick) var(--cs-ease-in); }
+.cs-portal::after { content: ""; position: absolute; inset: 0; border: calc(.12 * var(--cu)) solid rgba(var(--cs-cyan), .55); pointer-events: none; }
+.cs-portal.cs-open { opacity: 1; }
+/* the credit of an OpenStreetMap picture: the core's, small, at the right, its foot on the
+   content's floor (43.8cu less a little) -- never in the subtitle box's zone */
+.cs-credit {
+  position: absolute; right: calc(1.2 * var(--cu)); top: calc(var(--cs-floor) - .7 * var(--cu)); transform: translate3d(0, -100%, 0);
+  z-index: 30; pointer-events: none;
+  padding: calc(.25 * var(--cu)) calc(.6 * var(--cu)); border-radius: calc(.3 * var(--cu));
+  background: rgba(3, 5, 13, .62); color: rgba(235, 242, 255, .9); font-size: calc(.95 * var(--cu)); font-weight: 600;
+  letter-spacing: .02em; white-space: nowrap; opacity: 0; transition: opacity var(--cs-dur-quick) var(--cs-ease);
+}
+.cs-credit.cs-on { opacity: 1 !important; visibility: visible !important; display: block !important; }
+/* between lines: the logo clip, part of the stage -- not a picture laid on it.
+   Owner 18 Nov, with a screenshot: "อันนี้ไม่สวยเลยเหมือนเอาภาพมาแปะ" -- a hard black 16:9 box
+   over the blue (in a ~1.95:1 window it was narrower than the screen and its edges showed).
+   Its `screen` blend never worked: .cs-idle had a z-index and an opacity of its own, so it
+   was a group of its own and the clip blended with nothing. Now .cs-idle makes no stacking
+   context (no z-index, no opacity; it is after the slides in the page, which have z-index 1
+   and so still come up over it), the clip covers the whole stage, its edges fade, and its
+   black really is the stage: the chrome logo and its floor light up the living stage behind
+   them; the stage's own sky dims and its horizon steps back while the logo is up. */
+html.mirror.mirror-show .cs-stage.cs-idle-on { opacity: 1; visibility: visible; transition: opacity var(--cs-dur-standard) var(--cs-ease-in), visibility 0s; }
+.cs-idle { position: absolute; inset: 0; pointer-events: none; }
+/* The clip's `screen` blend and its feathered edges are on a still wrapper; the video inside it
+   fades and moves (23 Nov, the event notebook: the held logo at 40 fps). On the video itself the
+   mask scaled with every breath and burst -- Chrome draws a mask again at each new scale: ~470
+   tiles a second, the whole clip's mask every frame. The wrapper never moves, so its mask is drawn
+   once. The picture is the same: the wrapper is the stage's size, as the video's box is. */
+.cs-idle-m {
+  position: absolute; display: block; left: 0; top: 0; width: 100%; height: 100%; mix-blend-mode: screen;
+  /* (the stage is the whole screen now: the clip's floor runs to the bottom edge, fading as it
+     goes -- its reflections are faint where the subtitle box sits, 18 Nov afternoon; the
+     mirrored "EMBASSY WORLD" of its floor still read as letters behind the box at the box's
+     middle (~a third): a fifth there now, the floor's light kept above it) */
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0), #000 16%, #000 84%, rgba(0, 0, 0, 0)), linear-gradient(0deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .2) 10%, rgba(0, 0, 0, .56) 22%, #000 36%, #000 88%, rgba(0, 0, 0, 0));
+          mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0), #000 16%, #000 84%, rgba(0, 0, 0, 0)), linear-gradient(0deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .2) 10%, rgba(0, 0, 0, .56) 22%, #000 36%, #000 88%, rgba(0, 0, 0, 0));
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+  /* (not drawn while the clip is not shown -- under every line of the ceremony: its blend made the
+     whole stage an offscreen pass of its own every frame although the clip was clear, 23 Nov. It goes
+     once the clip's own fade-out (--cs-dur-quick) is over, and is back the moment the clip is) */
+  visibility: hidden; transition: visibility 0s linear .35s;
+}
+.cs-stage.cs-idle-on .cs-idle-m, .cs-stage.cs-dbt-on .cs-idle-m, .cs-stage.cs-dbt-hit .cs-idle-m,
+.cs-stage.cs-dbt-settle .cs-idle-m, .cs-stage.cs-dbt-fade .cs-idle-m { visibility: visible; transition: none; }
+.cs-idle video {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 46%;
+  opacity: 0; transform: scale(1.06);
+  /* (quick: it has gone dark by the time the sheet of light that brings the line reaches it) */
+  transition: opacity var(--cs-dur-quick) var(--cs-ease-out), transform var(--cs-dur-quick) var(--cs-ease-out);
+}
+/* (in: out of the depth, settling, under the sheet of light that took the line away; out:
+   on past us under the sheet that brings the line -- it holds, whole, until that line's
+   pictures are in. 18 Nov: it was a fade of a frozen frame, both ways) */
+/* (.2s: it comes out of the light -- the sheet that takes a line away has passed the middle
+   of the stage by then; sooner, it showed through the glass of the line still going) */
+.cs-stage.cs-idle-on .cs-idle video {
+  opacity: 1; transform: none;
+  animation: cs-logo-in var(--cs-dur-slow) var(--cs-ease-in) .2s backwards, cs-logo-breathe 11s var(--cs-ease-sine) 1.2s infinite alternate;
+}
+@keyframes cs-logo-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+/* (the clip plays once and holds its last frame while Khun Miki speaks: the held logo breathes
+   -- a slow push, a sine -- with the living stage behind it, so the hold is never dead) */
+@keyframes cs-logo-breathe { from { transform: scale(1); } to { transform: scale(1.018); } }
+.cs-stage.cs-calm .cs-idle video { animation: none; }
+.cs-stage.cs-idle-on.cs-up .cs-idle video { opacity: 0; animation: none; }
+/* (while the logo is up the stage's own horizon and searchlights step back: one light source) */
+.cs-arc, .cs-search, .cs-arc-run { transition: opacity var(--cs-dur-slow) var(--cs-ease); }
+.cs-stage.cs-idle-on:not(.cs-up) .cs-arc { opacity: .3; }
+.cs-stage.cs-idle-on:not(.cs-up) .cs-bg { opacity: .8; }
+
+/* ==== the debut (owner 23 Nov: "อยากให้มันเล้าใจ ... ฟิวเหมือนคอนเสิร์ต" -> "ซาวน์นับถอยหลัง 10 9 8 ขึ้นจอด้วย
+   โดยเมื่อถึง 0 ก็ให้ทุกอย่างมืด แล้วก็มีซาวน์ แล้วหุ่นก็เปิดตัว" -> "แนวนอน.mp4 เพิ่มในตอนเปิดตัว";
+   then "เอาเวลานับออก"; ceremony-show.js revealStart, app/ceremony_reveal.py) ====
+   Card 1's press, the room already dark. The build: the music on the dark stage, a concert's light
+   rising with it -- beams up from the floor and in from the sides sweeping on sines of their own,
+   flaring on every beat, haze drifting low (the act sets the light's opacity as the build goes). A
+   counting mix would bring its numbers (kept, unused): each huge, a ring going out from it. At 0
+   everything is hidden at once: a black screen. The hit: a white flash, a burst of rays, a glow round
+   the logo, the logo (the opening clip) bursting in from a little closer, the owner's glitter wave
+   rising behind it with the beams over it; when the wave has drained away the dark lifts off the
+   living stage and the clip holds its last frame.
+   Transform and opacity only; every beam a wedge of gradient (a static clip-path), every glow a drawn
+   gradient -- no blur, no mask, no blend of its own (the clip's own `screen` is the stage's, above).
+   Nothing here runs unless the stage has .cs-dbt-on. */
+/* (hidden by opacity, as everything the core hides: the stage itself comes up with .cs-dbt-on, above) */
+.cs-dbt, .cs-dbt-flash { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; }
+.cs-stage.cs-dbt-on .cs-dbt { opacity: 1; }
+.cs-stage:not(.cs-dbt-on) .cs-dbt * { animation-play-state: paused; }
+.cs-dbt > span, .cs-dbt-build > span, .cs-dbt-count > span { position: absolute; display: block; }
+/* ---- the dark opening (reveal.json `dark`; owner 25 Nov ~02:15: "ตอนเปิดทุกอย่างจะดับ โลโก้ไม่ต้องขึ้นก็ได้
+   ถ้าจะขึ้นก็คือสปอร์ตไลท์หลังไฟดับ") ----
+   While no slide is up the stage is plain black with nothing on it: no living stage, no logo, no light
+   show, no wave -- the room is dark and only the spotlight lights the robot. The stage still covers the
+   screen (the project's name on the page under it must not show). A line's slide brings the living stage
+   back with it; the debut's timeline runs as ever (its music is heard, the robot walks out on the hit). */
+html.mirror.mirror-show .cs-stage.cs-black:not(.cs-up) { background: #000; }   /* (over the stage's own glow: its rule is html.mirror.mirror-show .cs-stage) */
+.cs-stage.cs-black:not(.cs-up) .cs-bg, .cs-stage.cs-black .cs-idle,
+.cs-stage.cs-black .cs-dbt, .cs-stage.cs-black .cs-dbt-flash { visibility: hidden !important; opacity: 0 !important; }
+/* (the opacity too: a child that says `visibility: visible` -- the held logo's .cs-idle-m -- shows through a
+   hidden parent; nothing shows through a parent at opacity 0) */
+.cs-stage.cs-black:not(.cs-up) .cs-bg *, .cs-stage.cs-black .cs-dbt * { animation-play-state: paused !important; }
+/* (a black debut from its press to its hit: a slide still up at the press goes without its exit or the cut's sheet of
+   light drawing over the black -- review 25 Nov, ~0.7 s of light at a rehearsal re-run) */
+.cs-stage.cs-black.cs-dbt-on:not(.cs-dbt-hit) .cs-slide, .cs-stage.cs-black.cs-dbt-on:not(.cs-dbt-hit) .cs-gate {
+  visibility: hidden !important; opacity: 0 !important; }
+/* (taken down: at once -- no fade of anything) */
+.cs-stage.cs-dbt-cut .cs-dbt, .cs-stage.cs-dbt-cut .cs-dbt *, .cs-stage.cs-dbt-cut .cs-dbt-flash { transition: none !important; animation: none !important; }
+/* (a slide coming up after the hit: the whole dissolves under it -- ceremony-show.js RV_DISSOLVE_MS) */
+.cs-stage.cs-dbt-fade .cs-dbt, .cs-stage.cs-dbt-fade .cs-dbt-flash { transition: opacity .65s var(--cs-ease); }
+/* the dark: over the living stage until the wave has gone, then it lifts off it */
+.cs-dbt-veil { left: 0; top: 0; width: 100%; height: 100%; background: #000; }
+.cs-stage.cs-dbt-settle .cs-dbt-veil { animation: cs-dbt-out 1.8s var(--cs-ease) forwards; }
+.cs-dbt-build { left: 0; top: 0; width: 100%; height: 100%; opacity: 0; }
+/* 0: everything dark, at once */
+.cs-stage.cs-dbt-dark .cs-dbt-build, .cs-stage.cs-dbt-dark .cs-dbt-count { visibility: hidden; }
+/* haze low over the floor, two layers drifting against each other */
+.cs-dbt-haze { left: -20%; width: 140%; bottom: -12%; height: 70%; }
+.cs-dbt-haze-a {
+  background: radial-gradient(ellipse 46% 42% at 40% 72%, rgba(160, 200, 255, .2), rgba(var(--cs-blue), .08) 55%, rgba(var(--cs-blue), 0) 80%);
+  animation: cs-dbt-haze-a 9s var(--cs-ease-sine) infinite alternate;
+}
+.cs-dbt-haze-b {
+  background: radial-gradient(ellipse 40% 36% at 62% 78%, rgba(var(--cs-sky), .16), rgba(var(--cs-sky), .05) 55%, rgba(var(--cs-sky), 0) 80%);
+  animation: cs-dbt-haze-b 11s var(--cs-ease-sine) -3s infinite alternate;
+}
+@keyframes cs-dbt-haze-a { from { transform: translate3d(-4%, 1%, 0); } to { transform: translate3d(4%, -2%, 0); } }
+@keyframes cs-dbt-haze-b { from { transform: translate3d(5%, -1%, 0); } to { transform: translate3d(-4%, 2%, 0); } }
+/* the stage's edge: light pooled on the floor where the beams come up */
+.cs-dbt-floor { left: 0; width: 100%; bottom: 0; height: 24%; background: linear-gradient(0deg, rgba(var(--cs-blue), .38), rgba(var(--cs-blue), .1) 45%, rgba(var(--cs-blue), 0)); }
+/* the beams: a wedge from its foot, swept between two angles on a sine (the act gives each its own) */
+.cs-dbt-beams { left: 0; top: 0; width: 100%; height: 100%; }
+.cs-dbt-beam {
+  position: absolute; bottom: calc(-4 * var(--cu)); width: calc(30 * var(--cu)); height: calc(74 * var(--cu)); margin-left: calc(-15 * var(--cu));
+  transform-origin: 50% 100%; transform: rotate(var(--a0, 0deg));
+  animation: cs-dbt-sweep var(--d, 3.2s) var(--cs-ease-sine) var(--w, 0s) infinite alternate;
+}
+.cs-dbt-beam.cs-dbt-side { bottom: calc(10 * var(--cu)); height: calc(84 * var(--cu)); }
+.cs-dbt-beam > i { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+.cs-dbt-wide {
+  clip-path: polygon(46% 100%, 54% 100%, 100% 0, 0 0); opacity: .32;
+  background: linear-gradient(0deg, rgba(var(--cs-cyan), .7) 0%, rgba(var(--cs-blue), .3) 22%, rgba(var(--cs-blue), .08) 62%, rgba(var(--cs-blue), 0) 96%);
+}
+.cs-dbt-core {
+  clip-path: polygon(49% 100%, 51% 100%, 66% 0, 34% 0); opacity: .7;
+  background: linear-gradient(0deg, rgba(210, 235, 255, .95) 0%, rgba(var(--cs-sky), .5) 18%, rgba(var(--cs-sky), .14) 60%, rgba(var(--cs-sky), 0) 96%);
+}
+.cs-dbt-white .cs-dbt-core { background: linear-gradient(0deg, #fff 0%, rgba(235, 245, 255, .7) 16%, rgba(200, 225, 255, .18) 60%, rgba(200, 225, 255, 0) 96%); }
+@keyframes cs-dbt-sweep { from { transform: rotate(var(--a0, 0deg)); } to { transform: rotate(var(--a1, 0deg)); } }
+.cs-stage.cs-calm .cs-dbt-beam { animation: none; }
+/* on every number the beams flare and fall back (two names: the act alternates them, so each number
+   starts the pulse over) */
+.cs-dbt-beams.cs-dbt-pulse-a { animation: cs-dbt-pulse-a .9s var(--cs-ease-out) both; }
+.cs-dbt-beams.cs-dbt-pulse-b { animation: cs-dbt-pulse-b .9s var(--cs-ease-out) both; }
+@keyframes cs-dbt-pulse-a { from { opacity: 1; } to { opacity: .45; } }
+@keyframes cs-dbt-pulse-b { from { opacity: 1; } to { opacity: .45; } }
+/* the number: huge, white, in the film's face; in from closer, held, out smaller as the next comes */
+.cs-dbt-count { left: 0; top: 0; width: 100%; height: 100%; }
+.cs-dbt-num {
+  left: 50%; top: 47%; font-family: var(--cs-font); font-weight: 700; font-size: calc(38 * var(--cu)); line-height: 1;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: #fff; white-space: nowrap;
+  transform: translate(-50%, -50%); animation: cs-dbt-num 1s var(--cs-ease-out) both;
+}
+@keyframes cs-dbt-num {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.45); }
+  9% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  84% { opacity: 1; transform: translate(-50%, -50%) scale(.95); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.86); }
+}
+/* the light behind it, and a ring going out from it */
+.cs-dbt-halo {
+  left: 50%; top: 47%; width: calc(80 * var(--cu)); height: calc(80 * var(--cu)); margin: calc(-40 * var(--cu)) 0 0 calc(-40 * var(--cu));
+  background: radial-gradient(circle closest-side, rgba(var(--cs-blue), .55), rgba(var(--cs-blue), .2) 45%, rgba(var(--cs-blue), 0) 100%);
+  animation: cs-dbt-halo 1s var(--cs-ease-out) both;
+}
+.cs-dbt-halo.cs-dbt-last { background: radial-gradient(circle closest-side, rgba(200, 225, 255, .5), rgba(var(--cs-sky), .22) 45%, rgba(var(--cs-sky), 0) 100%); }
+@keyframes cs-dbt-halo { 0% { opacity: 0; transform: scale(.75); } 10% { opacity: 1; transform: scale(1); } 100% { opacity: .2; transform: scale(1.06); } }
+.cs-dbt-ring {
+  left: 50%; top: 47%; width: calc(44 * var(--cu)); height: calc(44 * var(--cu)); margin: calc(-22 * var(--cu)) 0 0 calc(-22 * var(--cu));
+  border-radius: 50%; border: calc(.3 * var(--cu)) solid rgba(var(--cs-sky), .8);
+  animation: cs-dbt-ring .9s var(--cs-ease-out) both;
+}
+.cs-dbt-ring.cs-dbt-last { border-color: rgba(255, 255, 255, .9); border-width: calc(.45 * var(--cu)); }
+@keyframes cs-dbt-ring { from { opacity: .95; transform: scale(.55); } to { opacity: 0; transform: scale(1.75); } }
+/* the owner's wave (muted, from the hit): over the dark, under the light, the logo screened over it;
+   it goes with the dark once it has drained away */
+.cs-dbt-wave { left: 0; top: 0; width: 100%; height: 100%; opacity: 0; }
+.cs-dbt-wave.cs-on { opacity: .85; }
+.cs-dbt-wave video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; }
+.cs-stage.cs-dbt-settle .cs-dbt-wave.cs-on { animation: cs-dbt-out 1.8s var(--cs-ease) forwards; }
+/* the hit: the beams flare and dim, then go with the dark */
+.cs-stage.cs-dbt-hit .cs-dbt-beams { animation: cs-dbt-flare 1.4s var(--cs-ease) forwards; }
+.cs-stage.cs-dbt-settle .cs-dbt-beams { animation: cs-dbt-dim 1.6s var(--cs-ease) forwards; }
+@keyframes cs-dbt-flare { 0% { opacity: 1; } 8% { opacity: 1; } 100% { opacity: .42; } }
+@keyframes cs-dbt-dim { from { opacity: .42; } to { opacity: 0; } }
+/* the glow round the logo: it blooms on the hit, holds a little, goes as the dark lifts */
+.cs-dbt-glow {
+  left: 50%; top: 42%; width: calc(130 * var(--cu)); height: calc(130 * var(--cu)); margin: calc(-65 * var(--cu)) 0 0 calc(-65 * var(--cu));
+  background: radial-gradient(circle closest-side, rgba(255, 255, 255, .7), rgba(180, 215, 255, .34) 26%, rgba(var(--cs-blue), .12) 55%, rgba(var(--cs-blue), 0) 100%);
+  opacity: 0; transform: scale(.5);
+}
+.cs-stage.cs-dbt-hit .cs-dbt-glow { animation: cs-dbt-bloom 1.4s var(--cs-ease-in) forwards; }
+.cs-stage.cs-dbt-settle .cs-dbt-glow { animation: cs-dbt-unbloom 1.8s var(--cs-ease) forwards; }
+@keyframes cs-dbt-bloom { 0% { opacity: 0; transform: scale(.5); } 10% { opacity: 1; transform: scale(.95); } 100% { opacity: .3; transform: scale(1.12); } }
+@keyframes cs-dbt-unbloom { from { opacity: .3; transform: scale(1.12); } to { opacity: 0; transform: scale(1.2); } }
+/* the burst: sixteen streaks out of the logo, once */
+.cs-dbt-rays { left: 50%; top: 42%; width: 0; height: 0; opacity: 0; }
+.cs-dbt-rays > i {
+  position: absolute; display: block; left: calc(-.22 * var(--cu)); bottom: 0; width: calc(.44 * var(--cu)); height: calc(62 * var(--cu));
+  transform-origin: 50% 100%; transform: rotate(var(--r, 0deg));
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .95) 10%, rgba(200, 228, 255, .4) 45%, rgba(200, 228, 255, 0) 100%);
+}
+.cs-stage.cs-dbt-hit .cs-dbt-rays { animation: cs-dbt-burst 1.3s var(--cs-ease-out) forwards; }
+@keyframes cs-dbt-burst {
+  0% { opacity: 0; transform: scale(.25) rotate(0deg); }
+  7% { opacity: 1; transform: scale(.5) rotate(2deg); }
+  100% { opacity: 0; transform: scale(1.6) rotate(14deg); }
+}
+/* the flash: over the logo, the light it bursts in from */
+.cs-dbt-flash { background: radial-gradient(ellipse at 50% 42%, #fff 0%, rgba(240, 248, 255, .95) 32%, rgba(185, 215, 255, .78) 70%, rgba(140, 180, 255, .62) 100%); }
+.cs-stage.cs-dbt-on .cs-dbt-flash { opacity: 0; }
+.cs-stage.cs-dbt-hit .cs-dbt-flash { animation: cs-dbt-flash .95s var(--cs-ease-out) forwards; }
+@keyframes cs-dbt-flash { 0% { opacity: 0; } 6% { opacity: .96; } 100% { opacity: 0; } }
+@keyframes cs-dbt-out { from { opacity: 1; } to { opacity: 0; } }
+/* the logo: held back until the hit, then in from a little closer under the flash; after the debut
+   it stays on its last frame, breathing as the idle logo does (no second fade-in) */
+.cs-stage.cs-dbt-on:not(.cs-dbt-hit) .cs-idle video { opacity: 0 !important; animation: none !important; transition: none !important; }
+.cs-stage.cs-dbt-hit .cs-idle video { opacity: 1; transform: none; animation: cs-dbt-logo 1.6s var(--cs-ease-in) both; }
+.cs-stage.cs-dbt-done.cs-idle-on .cs-idle video { opacity: 1; transform: none; animation: cs-logo-breathe 11s var(--cs-ease-sine) infinite alternate; }
+@keyframes cs-dbt-logo { from { opacity: 0; transform: scale(1.16); } 12% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
+
+/* ==== the living stage (owner 18 Nov: "พื้นหลังก็แบบนั้นหรอ ไม่มีลูกเล่นอะไรใช่ไหม") ====
+   The background used to look painted. Now, behind everything and quieter than any
+   picture or word: an aurora drifting in the sky, two slow searchlights, a point of light
+   running round the horizon, the floor grid flowing towards us, dust in the light at two
+   depths. Each layer is painted once and moved by transform and opacity alone (no filter,
+   no blur: every glow is a gradient). Paused with the rest of the background when no
+   slide or clip is up, under a full-bleed picture (ctx.bg('off')) and for a viewer who
+   asked for less motion (.cs-calm, prefers-reduced-motion). */
+.cs-stage:not(.cs-up):not(.cs-idle-on) .cs-bg * { animation-play-state: paused; }
+.cs-stage.cs-bg-off .cs-bg *, .cs-stage.cs-calm .cs-bg, .cs-stage.cs-calm .cs-bg * { animation-play-state: paused; }
+.cs-bg i { position: absolute; display: block; }
+/* the aurora: soft clouds of blue, cyan and a touch of violet, slowly turning in the sky */
+.cs-aurora { left: -25%; width: 150%; top: calc(-16 * var(--cu)); height: calc(50 * var(--cu)); pointer-events: none; }
+.cs-aurora-a {
+  background:
+    radial-gradient(ellipse 30% 26% at 30% 55%, rgba(var(--cs-blue), .34), rgba(var(--cs-blue), 0) 100%),
+    radial-gradient(ellipse 20% 12% at 56% 44%, rgba(var(--cs-cyan), .16), rgba(var(--cs-cyan), 0) 100%),
+    radial-gradient(ellipse 14% 30% at 76% 60%, rgba(var(--cs-sky), .14), rgba(var(--cs-sky), 0) 100%);
+  animation: cs-aurora-a 23s var(--cs-ease-sine) infinite alternate;
+}
+.cs-aurora-b {
+  background:
+    radial-gradient(ellipse 26% 20% at 70% 50%, rgba(98, 84, 255, .24), rgba(98, 84, 255, 0) 100%),
+    radial-gradient(ellipse 34% 10% at 42% 66%, rgba(var(--cs-sky), .17), rgba(var(--cs-sky), 0) 100%);
+  animation: cs-aurora-b 31s var(--cs-ease-sine) infinite alternate;
+}
+@keyframes cs-aurora-a {
+  from { transform: translate3d(calc(-7 * var(--cu)), 0, 0) rotate(-4deg) scale(1); opacity: .65; }
+  to { transform: translate3d(calc(8 * var(--cu)), calc(2.5 * var(--cu)), 0) rotate(3deg) scale(1.14); opacity: 1; }
+}
+@keyframes cs-aurora-b {
+  from { transform: translate3d(calc(6 * var(--cu)), calc(1.5 * var(--cu)), 0) rotate(3deg) scale(1.1); opacity: 1; }
+  to { transform: translate3d(calc(-9 * var(--cu)), calc(-1 * var(--cu)), 0) rotate(-3deg) scale(.95); opacity: .55; }
+}
+/* searchlights: two long wedges of light from above, swinging slowly in and out */
+.cs-search {
+  top: calc(-6 * var(--cu)); width: calc(26 * var(--cu)); height: calc(84 * var(--cu)); margin-left: calc(-13 * var(--cu));
+  transform-origin: 50% 0; opacity: .8;
+}
+/* (the wedge, its light and its fade on a still child of the swinging layer: painted into it once --
+   a clip-path and a mask on the layer that swings were two offscreen passes a frame, 23 Nov) */
+.cs-search > i {
+  left: 0; top: 0; width: 100%; height: 100%;
+  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+  background: linear-gradient(90deg, rgba(var(--cs-sky), 0) 8%, rgba(var(--cs-sky), .13) 50%, rgba(var(--cs-sky), 0) 92%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, .55) 45%, rgba(0, 0, 0, 0) 85%);
+          mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, .55) 45%, rgba(0, 0, 0, 0) 85%);
+}
+.cs-search-a { left: 18%; animation: cs-search-a 27s var(--cs-ease-sine) infinite alternate; }
+.cs-search-b { left: 82%; animation: cs-search-b 33s var(--cs-ease-sine) infinite alternate; }
+/* (18 Nov, the 1/3 rule: a 24-degree swing carried the far end of a beam across a third of
+   the stage behind the act; 16 degrees, slower, keeps them alive at the edges) */
+@keyframes cs-search-a { from { transform: rotate(-24deg); } to { transform: rotate(-8deg); } }
+@keyframes cs-search-b { from { transform: rotate(9deg); } to { transform: rotate(25deg); } }
+/* a point of light running round the horizon's rim (two of them, half a turn apart) */
+.cs-arc-run {
+  inset: calc(-.55 * var(--cu)); border-radius: 50%;
+  animation: cs-arc-run 40s linear infinite;
+}
+/* (the ring of light on a still child of the turning layer -- its mask painted in once, 23 Nov) */
+.cs-arc-run > i {
+  left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(var(--cs-cyan), 0) 0deg 128deg, rgba(var(--cs-cyan), .85) 172deg, #ffffff 178deg, rgba(var(--cs-cyan), 0) 180deg 308deg, rgba(var(--cs-cyan), .85) 352deg, #ffffff 358deg, rgba(var(--cs-cyan), 0) 360deg);
+  -webkit-mask-image: radial-gradient(closest-side, rgba(0, 0, 0, 0) 97%, #000 98.6%, rgba(0, 0, 0, 0) 100%);
+          mask-image: radial-gradient(closest-side, rgba(0, 0, 0, 0) 97%, #000 98.6%, rgba(0, 0, 0, 0) 100%);
+}
+@keyframes cs-arc-run { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* while a line is up the stage's brightest movers step back (staging: the act is the hero,
+   the stage the ambient layer -- the 1/3 rule: of everything moving, the act's pieces are
+   what the eye follows). Between lines, under the logo, they come back. */
+.cs-stage.cs-up .cs-search { opacity: .5; }
+.cs-stage.cs-up .cs-arc-run { opacity: .6; }
+/* the floor grid flows towards us, one row every few seconds (the row's height is the loop) */
+.cs-grid-flow {
+  left: 0; right: 0; top: calc(-2.4 * var(--cu)); bottom: 0;
+  background-image: repeating-linear-gradient(90deg, rgba(90, 150, 255, .5) 0 1px, rgba(0, 0, 0, 0) 1px calc(5 * var(--cu))),
+                    repeating-linear-gradient(0deg, rgba(90, 150, 255, .4) 0 1px, rgba(0, 0, 0, 0) 1px calc(2.4 * var(--cu)));
+  animation: cs-grid-flow 5s linear infinite;
+}
+@keyframes cs-grid-flow { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, calc(2.4 * var(--cu)), 0); } }
+/* dust in the light: two depths of points rising slowly (each layer loops by a whole number
+   of its tiles, so the drift never jumps) */
+.cs-motes {
+  inset: 0; overflow: hidden; pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 22%, #000 72%, rgba(0, 0, 0, 0) 100%);
+          mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 22%, #000 72%, rgba(0, 0, 0, 0) 100%);
+}
+.cs-motes > i { left: 0; top: 0; width: 100%; }
+/* (both depths of dust under the ONE mask: one offscreen pass a frame, not two -- 23 Nov) */
+.cs-motes > .cs-motes-far {
+  height: calc(100% + 27 * var(--cu));
+  background-image:
+    radial-gradient(circle at 33.4% 17.2%, rgba(196, 222, 255, 0.38) 0, rgba(196, 222, 255, 0.38) calc(0.07 * var(--cu)), rgba(196, 222, 255, 0) calc(0.17 * var(--cu))),
+    radial-gradient(circle at 53.4% 37.4%, rgba(196, 222, 255, 0.55) 0, rgba(196, 222, 255, 0.55) calc(0.04 * var(--cu)), rgba(196, 222, 255, 0) calc(0.10 * var(--cu))),
+    radial-gradient(circle at 6.5% 43.8%, rgba(196, 222, 255, 0.39) 0, rgba(196, 222, 255, 0.39) calc(0.04 * var(--cu)), rgba(196, 222, 255, 0) calc(0.10 * var(--cu))),
+    radial-gradient(circle at 42.9% 80.7%, rgba(196, 222, 255, 0.44) 0, rgba(196, 222, 255, 0.44) calc(0.04 * var(--cu)), rgba(196, 222, 255, 0) calc(0.10 * var(--cu))),
+    radial-gradient(circle at 62.0% 92.1%, rgba(196, 222, 255, 0.51) 0, rgba(196, 222, 255, 0.51) calc(0.06 * var(--cu)), rgba(196, 222, 255, 0) calc(0.16 * var(--cu))),
+    radial-gradient(circle at 94.8% 7.4%, rgba(196, 222, 255, 0.47) 0, rgba(196, 222, 255, 0.47) calc(0.08 * var(--cu)), rgba(196, 222, 255, 0) calc(0.19 * var(--cu))),
+    radial-gradient(circle at 16.6% 14.1%, rgba(196, 222, 255, 0.68) 0, rgba(196, 222, 255, 0.68) calc(0.05 * var(--cu)), rgba(196, 222, 255, 0) calc(0.13 * var(--cu))),
+    radial-gradient(circle at 20.0% 57.7%, rgba(196, 222, 255, 0.50) 0, rgba(196, 222, 255, 0.50) calc(0.07 * var(--cu)), rgba(196, 222, 255, 0) calc(0.17 * var(--cu))),
+    radial-gradient(circle at 54.5% 8.9%, rgba(196, 222, 255, 0.43) 0, rgba(196, 222, 255, 0.43) calc(0.04 * var(--cu)), rgba(196, 222, 255, 0) calc(0.10 * var(--cu))),
+    radial-gradient(circle at 67.0% 43.2%, rgba(196, 222, 255, 0.58) 0, rgba(196, 222, 255, 0.58) calc(0.05 * var(--cu)), rgba(196, 222, 255, 0) calc(0.13 * var(--cu))),
+    radial-gradient(circle at 45.6% 31.2%, rgba(196, 222, 255, 0.63) 0, rgba(196, 222, 255, 0.63) calc(0.07 * var(--cu)), rgba(196, 222, 255, 0) calc(0.19 * var(--cu)));
+  background-size: calc(41 * var(--cu)) calc(27 * var(--cu));
+  animation: cs-motes-far 64s linear infinite;
+}
+.cs-motes > .cs-motes-near {
+  height: calc(100% + 46 * var(--cu));
+  background-image:
+    radial-gradient(circle at 25.9% 57.0%, rgba(150, 205, 255, 0.42) 0, rgba(150, 205, 255, 0.42) calc(0.12 * var(--cu)), rgba(150, 205, 255, 0) calc(0.41 * var(--cu))),
+    radial-gradient(circle at 71.6% 30.1%, rgba(150, 205, 255, 0.25) 0, rgba(150, 205, 255, 0.25) calc(0.17 * var(--cu)), rgba(150, 205, 255, 0) calc(0.55 * var(--cu))),
+    radial-gradient(circle at 42.3% 74.2%, rgba(150, 205, 255, 0.33) 0, rgba(150, 205, 255, 0.33) calc(0.09 * var(--cu)), rgba(150, 205, 255, 0) calc(0.29 * var(--cu))),
+    radial-gradient(circle at 6.7% 65.8%, rgba(150, 205, 255, 0.35) 0, rgba(150, 205, 255, 0.35) calc(0.15 * var(--cu)), rgba(150, 205, 255, 0) calc(0.48 * var(--cu))),
+    radial-gradient(circle at 85.3% 32.5%, rgba(150, 205, 255, 0.36) 0, rgba(150, 205, 255, 0.36) calc(0.14 * var(--cu)), rgba(150, 205, 255, 0) calc(0.46 * var(--cu)));
+  background-size: calc(57 * var(--cu)) calc(46 * var(--cu));
+  animation: cs-motes-near 46s linear infinite;
+}
+@keyframes cs-motes-far { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, calc(-27 * var(--cu)), 0); } }
+@keyframes cs-motes-near { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, calc(-46 * var(--cu)), 0); } }
+
+/* ==== words arrive: they LIGHT UP (owner 18 Nov afternoon; Apple's MacBook Pro film) ====
+   ctx.text's and ctx.figure's `reveal` (ceremony-show.js textReveal). The entrance plays
+   when the words can first be seen: the act goes live, or their beat lifts the gate (the
+   `:not(.cs-await *)` below starts it that very frame). `light` (the default): the letters
+   light up left to right -- each unseen, then dim, then bright, 30 ms apart (--rvs, closed
+   up by the engine so the whole phrase is lit inside 500 ms; a hero title 600) -- and the
+   halo blooms behind a headline as the second layer, then breathes slowly while the words
+   are up (a hold is never dead). Nothing flies, tilts or slams: opacity alone on the
+   letters, a scale on the halo. `pop` is the Playful one, for a joke's beat: the words pop
+   up one after another with a little overshoot. data-rv="off" = shown late, no entrance.
+   A figure lights up as ONE piece -- the value and the words that say what it is, the
+   owner's qualifier never a moment behind its number -- whole from its first frame (it
+   never counts). The morning's entrances (depth, tilt, rise, track, flare, the slam, the
+   crossing line of light) are gone; their names still work and mean `light`. */
+:where(.cs-text[data-rv]), :where(.cs-fig[data-rv] .cs-fig-value) { position: relative; }
+.cs-text[data-rv] { --rvs: 30ms; }
+.cs-text[data-rv="pop"] { --rvs: 80ms; }
+/* (the frame before the act goes live: its pieces wait, unseen) */
+.cs-t-act:not(.cs-live) .cs-text[data-rv="light"] .cs-tg, .cs-t-act:not(.cs-live) .cs-text[data-rv="pop"] .cs-tg,
+.cs-t-act:not(.cs-live) .cs-text[data-rv="light"]::before, .cs-t-act:not(.cs-live) .cs-text[data-rv="pop"]::before,
+.cs-t-act:not(.cs-live) .cs-fig[data-rv="light"] .cs-fig-row, .cs-t-act:not(.cs-live) .cs-fig[data-rv="light"] .cs-fig-label,
+.cs-t-act:not(.cs-live) .cs-fig[data-rv="pop"] .cs-fig-row, .cs-t-act:not(.cs-live) .cs-fig[data-rv="pop"] .cs-fig-label { opacity: 0; }
+.cs-t-act.cs-live .cs-text[data-rv="light"]:not(.cs-typed, .cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-tg {
+  animation: cs-rv-light 260ms linear backwards; animation-delay: calc(var(--i, 0) * var(--rvs) + 40ms);
+}
+.cs-t-act.cs-live .cs-text[data-rv="pop"]:not(.cs-typed, .cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-tg {
+  transform-origin: 50% 85%;
+  animation: cs-rv-pop 320ms var(--cs-ease-play) backwards; animation-delay: calc(var(--i, 0) * var(--rvs) + 40ms);
+}
+/* the halo: a light coming on behind the phrase (from small, one eased move, after the first
+   letters), then breathing slowly while the words are up */
+.cs-t-act.cs-live .cs-text-glow:not(.cs-leave)::before, .cs-t-act.cs-live .cs-halo > .cs-halo-glow {
+  animation: cs-halo-breathe 4.6s var(--cs-ease-sine) 1s infinite alternate;
+}
+.cs-t-act.cs-live .cs-text-glow[data-rv]:not([data-rv="off"], .cs-typed, .cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *)::before {
+  animation: cs-rv-halo 700ms var(--cs-ease-in) 120ms backwards, cs-halo-breathe 4.6s var(--cs-ease-sine) 1s infinite alternate;
+}
+.cs-t-act.cs-live .cs-text-shade[data-rv]:not([data-rv="off"], .cs-typed, .cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *)::before {
+  animation: cs-rv-halo 500ms var(--cs-ease-in) 40ms backwards;
+}
+/* (a letter: unseen, dim by a third of its time, then up to bright -- linear on purpose: the
+   two segments are the curve) */
+@keyframes cs-rv-light { 0% { opacity: 0; } 36% { opacity: .34; } 100% { opacity: 1; } }
+@keyframes cs-rv-pop {
+  0% { opacity: 0; transform: translate3d(0, .3em, 0) scale(.72); }
+  55% { opacity: 1; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes cs-rv-halo { 0% { opacity: 0; transform: scale(.62, .7); } 100% { opacity: 1; transform: scale(1, 1); } }
+@keyframes cs-halo-breathe { from { opacity: 1; transform: scale(1); } to { opacity: .68; transform: scale(.96); } }
+
+/* ---- a figure lights up: one piece, whole. The halo blooms behind a glowing numeral as the
+   second layer and breathes while it is up (`pulse`, a sine). ---- */
+.cs-t-act.cs-live .cs-fig[data-rv="light"]:not(.cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-fig-row,
+.cs-t-act.cs-live .cs-fig[data-rv="light"]:not(.cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-fig-label,
+.cs-t-act.cs-live .cs-fig[data-rv="pop"]:not(.cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-fig-label {
+  animation: cs-rv-light 340ms linear 40ms backwards;
+}
+.cs-t-act.cs-live .cs-fig[data-rv="pop"]:not(.cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-fig-row {
+  transform-origin: 50% 70%;
+  animation: cs-rv-pop 360ms var(--cs-ease-play) 40ms backwards;
+}
+.cs-t-act.cs-live .cs-fig-glow[data-pulse]:not(.cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-fig-row::before {
+  animation: cs-fig-breathe 4.6s var(--cs-ease-sine) 1.2s infinite alternate;
+}
+.cs-t-act.cs-live .cs-fig-glow[data-rv]:not([data-rv="off"], .cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-fig-row::before {
+  animation: cs-rv-halo 700ms var(--cs-ease-in) 120ms backwards;
+}
+.cs-t-act.cs-live .cs-fig-glow[data-rv][data-pulse]:not([data-rv="off"], .cs-leave, .cs-await, .cs-await *, .cs-whipped, .cs-whipped *) .cs-fig-row::before {
+  animation: cs-rv-halo 700ms var(--cs-ease-in) 120ms backwards, cs-fig-breathe 4.6s var(--cs-ease-sine) 1.2s infinite alternate;
+}
+@keyframes cs-fig-breathe { from { opacity: 1; transform: scale(1); } to { opacity: .64; transform: scale(.93); } }
+
+/* ==== words leave: the phrase cools and fades, left to right, shorter than it came (~280 ms).
+   The class cs-leave on a ctx.text or a ctx.figure (fx.depart); taking it off brings the
+   words back with their arrival. ==== */
+.cs-t-act .cs-text.cs-leave .cs-tg {
+  animation: cs-rv-cool 160ms var(--cs-ease-out) forwards; animation-delay: min(calc(var(--i, 0) * 10ms), 120ms);
+}
+/* (the halo is a light going off behind them: it draws in as it fades -- not opacity alone) */
+.cs-t-act .cs-text.cs-leave::before { animation: cs-rv-halo-out 240ms var(--cs-ease-out) forwards; }
+@keyframes cs-rv-halo-out { 0% { opacity: 1; transform: scale(1, 1); } 100% { opacity: 0; transform: scale(.9, .78); } }
+.cs-t-act .cs-fig.cs-leave .cs-fig-row, .cs-t-act .cs-fig.cs-leave .cs-fig-label { animation: cs-rv-cool 280ms var(--cs-ease-out) forwards; }
+.cs-t-act.cs-instant .cs-leave .cs-tg, .cs-t-act.cs-instant .cs-leave::before,
+.cs-t-act.cs-instant .cs-leave .cs-fig-row, .cs-t-act.cs-instant .cs-leave .cs-fig-label { animation-duration: 1ms; animation-delay: 0s; }
+@keyframes cs-rv-cool { 0% { opacity: 1; } 40% { opacity: .4; } 100% { opacity: 0; } }

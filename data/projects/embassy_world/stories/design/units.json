@@ -408,14 +408,11 @@
    },
    "meta_en": [
     "Open plan · no separate bedroom",
-    "1 bathroom · 1 air-con",
-    "1 bathroom",
-    "117 units in the project",
-    "3D model: one studio layout"
+    "1 bathroom · 1 air-con"
    ],
    "mood_assets": [
-    "mood_dining",
-    "mood_bathroom"
+    "mood_st_room",
+    "mood_st_bath"
    ],
    "mood_tag_en": "Interior mood · design style",
    "lines": [
@@ -575,15 +572,12 @@
    },
    "meta_en": [
     "1 bedroom + living & kitchen",
-    "1 bathroom · 2 air-cons",
-    "1 bathroom",
-    "801 units · our most common type",
-    "3D model: one 1‑bedroom layout"
+    "1 bathroom · 2 air-cons"
    ],
    "mood_assets": [
-    "mood_living",
-    "mood_bedroom",
-    "mood_bathroom"
+    "mood_1br_living",
+    "mood_1br_bed",
+    "mood_1br_bath"
    ],
    "mood_tag_en": "Interior mood · design style",
    "lines": [
@@ -748,14 +742,12 @@
    },
    "meta_en": [
     "2 bedrooms + living & kitchen",
-    "2 bathrooms · 3 air-cons",
-    "148 units in the project",
-    "3D model: one 2‑bedroom layout"
+    "2 bathrooms · 3 air-cons"
    ],
    "mood_assets": [
-    "mood_dining",
-    "mood_bedroom",
-    "mood_bathroom"
+    "mood_2br_living",
+    "mood_2br_bed",
+    "mood_2br_bath"
    ],
    "mood_tag_en": "Interior mood · design style",
    "lines": [

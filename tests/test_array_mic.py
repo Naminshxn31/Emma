@@ -735,7 +735,7 @@ const c = vm.createContext({
   performance: { now: () => now }, setTimeout: (fn, ms) => timers.push({ at: now + ms, fn }),
   WORKLET_SRC: 'W', SILENT_WORKLET_SRC: 'S', ARRAY_MIC_APP: scenario.app, ARRAY_RELEASE_WAIT_MS: 3000, ARRAY_CLOCK_CHECK_MS: 2000,
   arrayMicOffer: scenario.offer, arrayMicSilent: false, arrayMicHeld: false, mirror: false, audioCtx: null,
-  micStream: null, micSource: null, worklet: null, playing: false, inputRate: 16000, outputRate: 24000,
+  micStream: null, micSource: null, worklet: null, playing: false, muted: false, greetingOpensMic: false, inputRate: 16000, outputRate: 24000,
   micNS: false, micCallBoost: 1, callAGC: () => false, thaiUi: () => false,
   buildMicChain: (ctx, src) => src, handleMicAudio() {}, armAudioUnlock() {}, startMirrorAudio() {},
   stopFailedCall() { log.push('stopFailedCall'); }, setMicLabel() {}, show() {}, status() {},

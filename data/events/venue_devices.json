@@ -1,0 +1,33 @@
+{
+  "format": "emma-venue-devices-v1",
+  "about": "ไฟและม่านของสถานที่จัดงาน (ล็อบบี้ชั้น 1) ที่หุ่นสั่งได้ — app/venue_devices.py · เจ้าของ 20 พ.ย. 2026: 'เตรียมด้วยนะ หุ่นอาจจะต้องสั่งปิดไฟ ปิดม่านได้' · ยังไม่รู้ว่าอะไรคุมไฟ/ม่านของล็อบบี้ จึงเป็น adapter manual ทั้งคู่ (= ทีมงานทำเองแบบวันนี้ ขั้นหุ่นสั่งไม่อยู่ในลำดับพิธี) · พอรู้แล้ว: broadlink = รีโมต IR/RF ผ่านกล่อง Broadlink (สอนรหัส: python scripts/venue_devices.py learn <อุปกรณ์> <คำสั่ง> [--rf]) / http = webhook หรือ Home Assistant (URL และ token อยู่ใน .env เท่านั้น — ไฟล์นี้ห้ามมี URL หรือ secret) · และต้องเปิด VENUE_DEVICES=true บนเครื่องที่จะสั่ง · คู่มือ docs/emma-ceremony.md หัวข้อ 'ไฟและม่าน'",
+  "devices": {
+    "lobby_lights": {
+      "name_th": "ไฟล็อบบี้",
+      "kind": "lights",
+      "adapter": "manual",
+      "broadlink": {
+        "codes": {
+          "off": "lobby_lights_off",
+          "on": "lobby_lights_on"
+        },
+        "repeat": 1
+      },
+      "note_th": "ฉาก 8 ของพิธี: ปิดแล้วเปิดกลับ · รอเจ้าของบอกว่าอะไรคุมไฟชุดนี้"
+    },
+    "lobby_curtains": {
+      "name_th": "ผ้าม่านล็อบบี้",
+      "kind": "curtains",
+      "adapter": "manual",
+      "broadlink": {
+        "codes": {
+          "open": "lobby_curtains_open",
+          "close": "lobby_curtains_close",
+          "stop": "lobby_curtains_stop"
+        },
+        "repeat": 1
+      },
+      "note_th": "ฉาก 8 ของพิธี: เปิดม่าน · รีโมตม่านที่มีปุ่มเดียวสลับเปิด/หยุด/ปิด กดซ้ำ = หยุดม่าน — ต้องเป็นรีโมตที่แยกปุ่มเปิด ปิด หยุด"
+    }
+  }
+}

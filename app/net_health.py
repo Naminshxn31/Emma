@@ -30,8 +30,9 @@ request, no API key, no quota. Wi-Fi up but no internet -- the robot's likely
 failure -- is exactly what this sees and what navigator.onLine / Android's
 ConnectivityManager do not.
 
-Background probing runs only with OFFLINE_FALLBACK on (`start`); off, this
-module is never imported by the running server. The turn log gets one
+Background probing runs with OFFLINE_FALLBACK on, or NET_STATUS on (10 Nov: the staff pages'
+lamp -- shown only, every decision below still asks OFFLINE_FALLBACK); both off, this module is
+never imported by the running server. The turn log gets one
 `net_state` row per *transition* (state + a reason category, never an
 exception's text: a resolver message can carry hostnames and addresses that
 are nobody's business in a guest log).
@@ -93,6 +94,11 @@ class NetHealth:
         #: touch it (see DIAL_BACKOFF_S) -- and until when the next dial waits.
         self.dial_fails = 0
         self.dial_backoff_until = 0.0
+        #: The last probe, for the staff pages' lamp: when, how it went, how long the handshake took.
+        self.last_probe_at: float | None = None
+        self.last_probe_ok: bool | None = None
+        self.last_probe_ms: int | None = None
+        self.last_probe_reason: str | None = None
 
     def offline(self) -> bool:
         return self.state == "offline"
@@ -190,6 +196,17 @@ def dial_backoff_left() -> float:
     return health.dial_backoff_left()
 
 
+#: One TLS context for every probe (review 10 Nov: building it each time is ~5-7 ms on the event loop,
+#: every NET_PROBE_S). The default context -- what `websockets` uses for the dial.
+_SSL: dict = {"context": None}
+
+
+def _ssl_context() -> ssl.SSLContext:
+    if _SSL["context"] is None:
+        _SSL["context"] = ssl.create_default_context()
+    return _SSL["context"]
+
+
 async def probe(host: str = HOST, port: int = PORT,
                 timeout: float | None = None) -> tuple[bool, str]:
     """(ok, reason category): DNS + TCP + TLS handshake, whole thing bounded
@@ -207,7 +224,7 @@ async def probe(host: str = HOST, port: int = PORT,
                 return False, "dns"
             address = infos[0][4][0]
             stage = "connect"
-            context = ssl.create_default_context()
+            context = _ssl_context()
             # The resolved address, the name for SNI and the certificate: one
             # resolution per probe, the way the dial does it.
             _reader, writer = await asyncio.open_connection(
@@ -239,7 +256,12 @@ async def probe_now() -> bool:
     """One probe, recorded in the hysteresis; True = the link answered. For
     a dial that just failed with an unclassified error: "is it the network?"
     is asked of the network, not guessed from the exception's wording."""
+    started = time.monotonic()
     ok, reason = await probe()
+    health.last_probe_at = time.monotonic()
+    health.last_probe_ok = ok
+    health.last_probe_ms = round((health.last_probe_at - started) * 1000)
+    health.last_probe_reason = None if ok else reason
     if ok:
         health.probe_ok()
     else:
@@ -259,16 +281,23 @@ async def _run() -> None:
         await asyncio.sleep(max(1.0, every))
 
 
+def watched() -> bool:
+    """Something probes the link: OFFLINE_FALLBACK (it acts on it) or NET_STATUS (shown only)."""
+    return bool(settings.offline_fallback or settings.net_status) and settings.net_probe_s > 0
+
+
 def start() -> asyncio.Task | None:
-    """The background prober, from the server's startup hook. Only with
-    OFFLINE_FALLBACK on and NET_PROBE_S > 0; idempotent."""
+    """The background prober, from the server's startup hook. Only with OFFLINE_FALLBACK or
+    NET_STATUS on and NET_PROBE_S > 0; idempotent."""
     global _task
-    if not settings.offline_fallback or settings.net_probe_s <= 0:
+    if not watched():
         return None
     if _task is not None and not _task.done():
         return _task
     _task = asyncio.get_running_loop().create_task(_run(), name="net_health_probe")
-    logger.info("offline fallback on: probing %s:%d every %.0f s", HOST, PORT, settings.net_probe_s)
+    logger.info("%s: probing %s:%d every %.0f s",
+                "offline fallback on" if settings.offline_fallback else "network lamp on (shown only)",
+                HOST, PORT, settings.net_probe_s)
     return _task
 
 
@@ -277,6 +306,33 @@ def stop() -> None:
     if _task is not None and not _task.done():
         _task.cancel()
     _task = None
+
+
+#: A handshake slower than this reads "ช้า" on the lamp: DNS + TCP + TLS to Google is ~0.1-0.3 s
+#: on a healthy link; past a second, a Live session's audio is late too. A guess to tune on site.
+SLOW_MS = 1000
+
+
+def staff_view() -> dict | None:
+    """The staff pages' lamp: None when nothing probes. `level`: ok / slow / flaky (the last probe
+    failed, not yet two in a row) / down (OFFLINE, the hysteresis's word) / unknown (no probe yet).
+    Categories and numbers only, like every other view of it."""
+    if not watched():
+        return None
+    h = health
+    if h.last_probe_at is None:
+        level = "unknown"
+    elif h.offline():
+        level = "down"
+    elif h.last_probe_ok is False:
+        level = "flaky"
+    elif (h.last_probe_ms or 0) >= SLOW_MS:
+        level = "slow"
+    else:
+        level = "ok"
+    return {"level": level, "ms": h.last_probe_ms,
+            "ago_s": None if h.last_probe_at is None else round(time.monotonic() - h.last_probe_at),
+            "reason": h.last_reason if level == "down" else (h.last_probe_reason if level == "flaky" else None)}
 
 
 def snapshot() -> dict:

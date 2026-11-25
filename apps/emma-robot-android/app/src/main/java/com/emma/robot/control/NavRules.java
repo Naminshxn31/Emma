@@ -52,6 +52,32 @@ final class NavRules {
         return left <= 0 ? 0 : (int) Math.min(Integer.MAX_VALUE, (left + 999) / 1000);
     }
 
+    /** How long after the foreground was lost a sibling's "I am in front" still names the cause. */
+    static final long SIBLING_TAKEOVER_MS = 10_000L;
+
+    /** Did one of the other two Emma apps take the foreground straight from this one -- so the
+     *  pause's stop latch is lifted (the stop itself stands)? 24 Nov 2026: `am start` of Emma
+     *  Ceremony paused Emma Event, the pause latched arm and walk for 60 s, Event's status link
+     *  kept reporting it, and the server refused the ceremony's opening ("เพิ่งกดหยุด — หุ่นล็อก
+     *  แขนและการเดิน 60 วินาที") until Event was force-stopped by adb.
+     *  Only when ALL hold -- anything else is a real stop and keeps its 60 s:
+     *  the sender is one of `siblings` (verified by MainActivity: shared identity + same signature);
+     *  the loss is recent (SIBLING_TAKEOVER_MS) -- `lostAt` 0 = no loss pending (or already lifted);
+     *  this activity was not STOPPED since (Home / the launcher / Recents / any other app in
+     *  between stops it before a sibling can be tapped; straight from here the sibling's onStart
+     *  reaches us before our onStop); we are not back in front; and no other stop set a latch
+     *  since the loss (`otherStopSince`: B, the operator screen, the page's or the server's stop). */
+    static boolean siblingTakeover(String sender, String self, String[] siblings, long lostAt, long now,
+                                   boolean stoppedSince, boolean foregroundNow, boolean otherStopSince) {
+        if (sender == null || sender.equals(self) || siblings == null) return false;
+        boolean sibling = false;
+        for (String s : siblings) {
+            if (sender.equals(s)) sibling = true;
+        }
+        if (!sibling || lostAt <= 0L || now < lostAt || now - lostAt > SIBLING_TAKEOVER_MS) return false;
+        return !stoppedSince && !foregroundNow && !otherStopSince;
+    }
+
     // ---- auto-return to the dock (AutoReturn) ---------------------------------------
 
     /** The idle time, operator-adjustable on the robot in AUTO_IDLE_STEP_S

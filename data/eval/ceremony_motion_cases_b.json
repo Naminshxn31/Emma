@@ -1,0 +1,286 @@
+{
+ "format": "emma-ceremony-motion-cases-v1",
+ "about": "B: written blind by the same agent AFTER the tuning, never tuned on (23 Nov) -- the honest number. The host off-script inside ตอบสด; expect = the topic slide that may show, none = the logo loop (app/ceremony_motion.py).",
+ "cases": [
+  {
+   "id": "b01",
+   "lang": "en",
+   "text": "Emma, is it a long drive from here to Pattaya city center?",
+   "expect": "location",
+   "note": "getting around"
+  },
+  {
+   "id": "b02",
+   "lang": "en",
+   "text": "How close are we to the sea, would you say?",
+   "expect": "location",
+   "note": "sea distance"
+  },
+  {
+   "id": "b03",
+   "lang": "th",
+   "text": "จากโครงการไปหาดจอมเทียนไกลไหมครับ",
+   "expect": "location",
+   "note": "Jomtien beach distance"
+  },
+  {
+   "id": "b04",
+   "lang": "th",
+   "text": "แถวนี้มีห้างหรือร้านอาหารใกล้ๆ ไหมคะ",
+   "expect": "location",
+   "note": "nearby shopping/restaurants"
+  },
+  {
+   "id": "b05",
+   "lang": "en",
+   "text": "Are there any good schools around the project?",
+   "expect": "location",
+   "note": "nearby schools"
+  },
+  {
+   "id": "b06",
+   "lang": "th",
+   "text": "โรงบาลใกล้ๆ มีไหมครับ เผื่อฉุกเฉิน",
+   "expect": "location",
+   "note": "ASR/colloquial hospital"
+  },
+  {
+   "id": "b07",
+   "lang": "en",
+   "text": "Emma, how many bedrooms can I choose, one or two?",
+   "expect": "units",
+   "note": "bedrooms"
+  },
+  {
+   "id": "b08",
+   "lang": "th",
+   "text": "มีห้องสตูดิโอกี่แบบครับ",
+   "expect": "units",
+   "note": "studio types"
+  },
+  {
+   "id": "b09",
+   "lang": "en",
+   "text": "how many you-nit types do you have Emma",
+   "expect": "units",
+   "note": "ASR unit types"
+  },
+  {
+   "id": "b10",
+   "lang": "th",
+   "text": "ทั้งหมดมีกี่ยูนิทคะ",
+   "expect": "units",
+   "note": "spelling variant ยูนิท"
+  },
+  {
+   "id": "b11",
+   "lang": "en",
+   "text": "Is there a two bedroom option for a family?",
+   "expect": "units",
+   "note": "2BR"
+  },
+  {
+   "id": "b12",
+   "lang": "th",
+   "text": "ห้องแบบวันเบดรูมมีไหมครับ",
+   "expect": "units",
+   "note": "loanword one bedroom"
+  },
+  {
+   "id": "b13",
+   "lang": "en",
+   "text": "Emma, what are the common areas like here?",
+   "expect": "facilities",
+   "note": "common areas"
+  },
+  {
+   "id": "b14",
+   "lang": "th",
+   "text": "ที่นี่มีสระว่ายน้ำไหมคะ",
+   "expect": "facilities",
+   "note": "pool"
+  },
+  {
+   "id": "b15",
+   "lang": "en",
+   "text": "Is there a gym where we can work out?",
+   "expect": "facilities",
+   "note": "gym"
+  },
+  {
+   "id": "b16",
+   "lang": "th",
+   "text": "มีโคเวิร์คกิ้งสเปซไหมครับ",
+   "expect": "facilities",
+   "note": "coworking spelling variant"
+  },
+  {
+   "id": "b17",
+   "lang": "en",
+   "text": "does it have a sow na or a spar Emma",
+   "expect": "facilities",
+   "note": "ASR sauna/spa"
+  },
+  {
+   "id": "b18",
+   "lang": "th",
+   "text": "ส่วนกลางมีอะไรบ้างครับเอ็มม่า",
+   "expect": "facilities",
+   "note": "common areas"
+  },
+  {
+   "id": "b19",
+   "lang": "en",
+   "text": "Does the condo have smart home features, Emma?",
+   "expect": "technology",
+   "note": "smart home"
+  },
+  {
+   "id": "b20",
+   "lang": "th",
+   "text": "ห้องนี้ควบคุมผ่านแอพในมือถือได้ไหมครับ",
+   "expect": "technology",
+   "note": "app variant แอพ"
+  },
+  {
+   "id": "b21",
+   "lang": "en",
+   "text": "What's the innovation angle on this project?",
+   "expect": "technology",
+   "note": "innovation"
+  },
+  {
+   "id": "b22",
+   "lang": "th",
+   "text": "โครงการนี้ใช้เทคโนโลยีอะไรบ้างคะ",
+   "expect": "technology",
+   "note": "technology"
+  },
+  {
+   "id": "b23",
+   "lang": "en",
+   "text": "tell us about the smart hold app Emma",
+   "expect": "technology",
+   "note": "ASR smart home app"
+  },
+  {
+   "id": "b24",
+   "lang": "th",
+   "text": "จุดเด่นของโครงการนี้คืออะไรครับ ดูทันสมัยมากเลย",
+   "expect": "technology",
+   "note": "what is special, modern"
+  },
+  {
+   "id": "b25",
+   "lang": "en",
+   "text": "Time for the lucky draw! Emma, can you pick a number?",
+   "expect": "none",
+   "note": "lucky draw"
+  },
+  {
+   "id": "b26",
+   "lang": "en",
+   "text": "Everybody smile, photo time with Emma!",
+   "expect": "none",
+   "note": "photo time"
+  },
+  {
+   "id": "b27",
+   "lang": "en",
+   "text": "Let's thank Empire Group for building this wonderful project.",
+   "expect": "none",
+   "note": "thanking developer"
+  },
+  {
+   "id": "b28",
+   "lang": "en",
+   "text": "Emma, tell me a joke.",
+   "expect": "none",
+   "note": "banter"
+  },
+  {
+   "id": "b29",
+   "lang": "en",
+   "text": "That pool of prizes on the stage is huge tonight!",
+   "expect": "none",
+   "note": "pool unrelated sense"
+  },
+  {
+   "id": "b30",
+   "lang": "th",
+   "text": "ขอบคุณทางเอ็มไพร์กรุ๊ปที่จัดงานดีๆ แบบนี้ครับ",
+   "expect": "none",
+   "note": "thanking developer"
+  },
+  {
+   "id": "b31",
+   "lang": "th",
+   "text": "ถ่ายรูปหมู่กันหน่อยครับ ทุกคนมองกล้องนะ",
+   "expect": "none",
+   "note": "photo time"
+  },
+  {
+   "id": "b32",
+   "lang": "th",
+   "text": "เอ็มม่าอายุเท่าไหร่แล้วเนี่ย",
+   "expect": "none",
+   "note": "about Emma"
+  },
+  {
+   "id": "b33",
+   "lang": "th",
+   "text": "ผ่อนเดือนละเท่าไหร่ครับ",
+   "expect": "none",
+   "note": "payment"
+  },
+  {
+   "id": "b34",
+   "lang": "en",
+   "text": "Emma, what are the payment terms, and is there a down payment?",
+   "expect": "none",
+   "note": "payment"
+  },
+  {
+   "id": "b35",
+   "lang": "en",
+   "text": "I'd like a quotation for a two bedroom.",
+   "expect": "none",
+   "note": "quotation despite unit word"
+  },
+  {
+   "id": "b36",
+   "lang": "th",
+   "text": "ห้องประชุมนี้ร้อนจัง ช่วยเปิดแอร์ให้หน่อยครับ",
+   "expect": "none",
+   "note": "ห้อง unrelated sense, air con"
+  },
+  {
+   "id": "b37",
+   "lang": "en",
+   "text": "This smart crowd tonight, you're all so sharp!",
+   "expect": "none",
+   "note": "smart as praise"
+  },
+  {
+   "id": "b38",
+   "lang": "th",
+   "text": "ขอวิดีโอแนะนำโครงการหน่อยครับ",
+   "expect": "none",
+   "note": "video request"
+  },
+  {
+   "id": "b39",
+   "lang": "en",
+   "text": "Which is better, the gym or the sea view from the units?",
+   "expect": "none",
+   "note": "two topics"
+  },
+  {
+   "id": "b40",
+   "lang": "th",
+   "text": "สระว่ายน้ำกับสมาร์ทโฮมมีทั้งคู่ไหมครับ",
+   "expect": "none",
+   "note": "two topics, spelling variant"
+  }
+ ]
+}

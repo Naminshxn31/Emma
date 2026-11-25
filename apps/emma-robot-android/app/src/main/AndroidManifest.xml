@@ -20,6 +20,16 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
+    <!-- The three Emma apps see each other (24 Nov 2026, MainActivity.tellSiblingsInFront /
+         siblingInFront): the one coming in front tells the other two, and the paused one checks
+         the sender's signature; Android 11+ hides another package from both without this.
+         (No double hyphen inside an XML comment: it made the whole manifest unparseable.) -->
+    <queries>
+        <package android:name="com.emma.robot.control" />
+        <package android:name="com.emma.robot.event" />
+        <package android:name="com.emma.robot.ceremony" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:hardwareAccelerated="true"

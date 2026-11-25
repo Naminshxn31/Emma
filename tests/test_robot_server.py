@@ -188,6 +188,216 @@ def test_the_robot_env_turns_answer_pictures_on():
     assert values.get("ANSWER_IMAGES") == "true"
 
 
+def test_a_lowered_walk_up_quality_gate_only_ever_rides_with_a_dry_run():
+    """9 Nov: the floor-2 dry run lowered FACE_APPROACH_MIN_QUALITY (Q 52 at the dock, the walk-up wants
+    60) because nothing moves in a dry run. The day the dry run ends this must not still be low: a walk
+    on a map the robot is not sure of is the one thing the gate is for."""
+    values = dotenv_values(ROOT / "data" / "robot-server" / "robot.env")
+    gate = float(values.get("FACE_APPROACH_MIN_QUALITY") or 60)
+    if gate < 60:
+        assert (values.get("FACE_APPROACH_DRY_RUN") or "").lower() == "true", "a low gate without a dry run"
+        assert (values.get("EVENT_WALK_ENABLED") or "false").lower() != "true", "a low gate with walking on"
+
+
+def test_recorded_ceremony_lines_ship_only_what_their_index_names(tmp_path, monkeypatch):
+    """data/ceremony/voice/ (scripts/render_event_script.py; beside the ceremony app's file since
+    9 Nov): the index and the WAVs it names by a bare file name inside the folder -- not a stray
+    WAV beside them, not a name that walks out of the folder, not one this PC lacks."""
+    folder = tmp_path / "data" / "ceremony" / "voice"
+    (folder / "sub").mkdir(parents=True)
+    for name in ("a.wav", "stray.wav", "sub/x.wav", "notes.txt"):
+        (folder / name).write_bytes(b"RIFF")
+    (tmp_path / "data" / "ceremony" / "outside.wav").write_bytes(b"RIFF")
+    clips = {"1": {"file": "a.wav"}, "2": {"file": "../outside.wav"}, "3": {"file": "sub/x.wav"},
+             "4": {"file": "sub\\x.wav"}, "5": {"file": "notes.txt"}, "6": {"file": "gone.wav"}, "7": "x"}
+    (folder / "index.json").write_text(json.dumps({"clips": clips}), encoding="utf-8")
+    assert rs.event_voice_files(tmp_path) == {"data/ceremony/voice/index.json", "data/ceremony/voice/a.wav"}
+    assert rs.event_voice_files(tmp_path / "nowhere") == set()
+    files = sorted(rs.event_voice_files(tmp_path))
+    assert rs.event_voice_summary(files, files) == ("ceremony voice: 1 recorded line(s) in data/ceremony/voice, "
+                                                    "2 file(s) to push")
+    assert rs.event_voice_summary(["app/main.py"], []) is None
+    # deploy_files carries exactly those along (the folder is gitignored: nothing else ships it)
+    monkeypatch.setattr(rs, "tracked_files", lambda root=None: [])
+    shipped = {f for f in rs.deploy_files(tmp_path) if f.startswith("data/ceremony/voice/")}
+    assert shipped == {"data/ceremony/voice/index.json", "data/ceremony/voice/a.wav"}
+    # ...and nothing from the old place beside the event file any more
+    old = tmp_path / "data" / "events" / "voice"
+    old.mkdir(parents=True)
+    (old / "index.json").write_text(json.dumps({"clips": {"1": {"file": "b.wav"}}}), encoding="utf-8")
+    (old / "b.wav").write_bytes(b"RIFF")
+    assert not [f for f in rs.deploy_files(tmp_path) if f.startswith("data/events/voice/")]
+
+
+def test_deploy_ships_the_ceremony_file_even_before_it_is_tracked(tmp_path, monkeypatch):
+    """CEREMONY_FILE (the Emma Ceremony app's script and running order, 9 Nov) is data the server
+    reads: shipped by name -- without it the ceremony app on the robot has nothing to press. Only
+    the top level of data/ceremony/ (its voice/ goes by its index, above)."""
+    folder = tmp_path / "data" / "ceremony"
+    (folder / "voice").mkdir(parents=True)
+    (folder / "floor1_ceremony.json").write_text("{}", encoding="utf-8")
+    (folder / "voice" / "stray.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(rs, "tracked_files", lambda root=None: [])
+    shipped = {f for f in rs.deploy_files(tmp_path) if f.startswith("data/ceremony/")}
+    assert shipped == {"data/ceremony/floor1_ceremony.json"}
+    # the real one, from this repo (tracked or not yet)
+    assert "data/ceremony/floor1_ceremony.json" in set(rs.deploy_files())
+
+
+def test_the_ceremony_font_ships_by_name_though_it_is_gitignored(tmp_path, monkeypatch):
+    """The film's face, Jipatype Kantalad (owner 22 Nov, licensed for the event only), is gitignored:
+    `git ls-files --others --exclude-standard` never lists it, and the robot's ceremony-show.css would
+    point at nothing. deploy_files names exactly the four faces this PC has; a deploy that would leave
+    one out stops before anything is pushed (a dry run says so and goes on previewing)."""
+    folder = tmp_path / rs.CEREMONY_FONT_DIR
+    folder.mkdir(parents=True)
+    for name in rs.CEREMONY_FONT_FILES[:3] + ("Other.otf",):
+        (folder / name).write_bytes(b"OTTO")
+    monkeypatch.setattr(rs, "tracked_files", lambda root=None: [])
+    shipped = {f for f in rs.deploy_files(tmp_path) if f.startswith(rs.CEREMONY_FONT_DIR + "/")}
+    assert shipped == {"%s/%s" % (rs.CEREMONY_FONT_DIR, n) for n in rs.CEREMONY_FONT_FILES[:3]}
+    assert rs.ceremony_font_missing(shipped) == ["Kantalad-Bold.otf"]
+    assert "MISSING on this PC: Kantalad-Bold.otf" in rs.ceremony_font_summary(sorted(shipped), [])
+    (folder / rs.CEREMONY_FONT_FILES[3]).write_bytes(b"OTTO")
+    files = rs.deploy_files(tmp_path)
+    assert rs.ceremony_font_missing(files) == []
+    assert rs.ceremony_font_summary(files, files) == "ceremony font: 4 Kantalad face(s), 4 to push"
+    # the stylesheet's @font-face rules load exactly these files
+    css = (ROOT / "client" / "assets" / "ceremony-show.css").read_text(encoding="utf-8")
+    assert sorted(set(re.findall(r"ceremony-show/fonts/(Kantalad-\w+\.otf)", css))) == sorted(rs.CEREMONY_FONT_FILES)
+    # a deploy without them stops before it reads the robot; --without-ceremony-font / --dry-run go on
+    monkeypatch.setattr(rs, "refresh_faq_cache", lambda: "")
+    monkeypatch.setattr(rs, "offline_lines_warning", lambda: "")
+    monkeypatch.setattr(rs, "deploy_files", lambda root=None: ["app/main.py"])
+
+    def reached(robot):
+        raise RuntimeError("reached the robot")
+    monkeypatch.setattr(rs, "remote_manifest", reached)
+    with pytest.raises(rs.Fail, match="MISSING on this PC"):
+        rs.cmd_deploy(None)
+    with pytest.raises(RuntimeError, match="reached the robot"):
+        rs.cmd_deploy(None, without_font=True)
+    with pytest.raises(RuntimeError, match="reached the robot"):
+        rs.cmd_deploy(None, dry=True)
+    assert "--without-ceremony-font" in inspect.getsource(rs.main)
+
+
+def test_the_ceremony_font_is_never_in_the_repository_but_the_real_deploy_carries_it():
+    if shutil.which("git") is None:
+        pytest.skip("no git: the Kantalad ignore rule was NOT checked")
+    names = ["%s/%s" % (rs.CEREMONY_FONT_DIR, n) for n in rs.CEREMONY_FONT_FILES]
+    # (review 22 Nov night: the rule is the family's name, not four file names -- a web-font copy or a
+    # renamed one must not slip into a commit either; Inter, which is not licensed that way, is not ignored)
+    others = ["%s/%s" % (rs.CEREMONY_FONT_DIR, n) for n in
+              ("Kantalad-Bold.woff2", "Kantalad-Bold (1).otf", "Kantalad-SemiBold copy.otf", "Kantalad.ttf")]
+    r = subprocess.run(["git", "check-ignore", "--no-index"] + names + others, cwd=ROOT, capture_output=True,
+                       text=True)
+    assert sorted(r.stdout.splitlines()) == sorted(names + others)
+    inter = subprocess.run(["git", "check-ignore", "--no-index", rs.CEREMONY_FONT_DIR + "/Inter.ttf"], cwd=ROOT,
+                           capture_output=True, text=True)
+    assert inter.returncode == 1 and inter.stdout == ""
+    tracked = subprocess.run(["git", "ls-files", "--", rs.CEREMONY_FONT_DIR], cwd=ROOT, capture_output=True, text=True).stdout
+    assert "Kantalad" not in tracked
+    have = [n for n in names if (ROOT / n).is_file()]
+    if not have:
+        pytest.skip("this PC has no Kantalad faces: the real deploy list was NOT checked (deploy would stop)")
+    assert set(have) <= set(rs.deploy_files())
+
+
+def test_a_ceremony_face_that_is_not_a_font_is_never_shipped(tmp_path, monkeypatch):
+    """Review 22 Nov night: the deploy checked only that the four names existed. An empty file (a copy
+    that never finished), a web font renamed .otf or a saved error page would have shipped, and Chrome
+    drops a face it cannot read without a word. The four are CFF OpenType ("OTTO"): anything else is
+    named, never shipped, and the deploy stops (--without-ceremony-font then leaves the robot's as they are)."""
+    folder = tmp_path / rs.CEREMONY_FONT_DIR
+    folder.mkdir(parents=True)
+    regular, medium, semibold, bold = rs.CEREMONY_FONT_FILES
+    (folder / regular).write_bytes(b"OTTO" + bytes(60))
+    (folder / medium).write_bytes(b"")
+    (folder / semibold).write_bytes(b"wOF2" + bytes(60))
+    (folder / bold).write_bytes(b"<!doctype html><title>404</title>")
+    assert rs.ceremony_font_problems(tmp_path) == [
+        "Kantalad-Medium.otf is empty",
+        "Kantalad-SemiBold.otf is not a CFF OpenType font (it starts b'wOF2', not b'OTTO')",
+        "Kantalad-Bold.otf is not a CFF OpenType font (it starts b'<!do', not b'OTTO')"]
+    monkeypatch.setattr(rs, "tracked_files", lambda root=None: [])
+    shipped = {f for f in rs.deploy_files(tmp_path) if f.startswith(rs.CEREMONY_FONT_DIR + "/")}
+    assert shipped == {"%s/%s" % (rs.CEREMONY_FONT_DIR, regular)}
+    # the deploy stops before it reads the robot, and says which file and why
+    real_files = rs.deploy_files
+    monkeypatch.setattr(rs, "ROOT", tmp_path)
+    monkeypatch.setattr(rs, "deploy_files", lambda root=None: real_files(tmp_path))
+    monkeypatch.setattr(rs, "refresh_faq_cache", lambda: "")
+    monkeypatch.setattr(rs, "offline_lines_warning", lambda: "")
+
+    def reached(robot):
+        raise RuntimeError("reached the robot")
+    monkeypatch.setattr(rs, "remote_manifest", reached)
+    with pytest.raises(rs.Fail) as stopped:
+        rs.cmd_deploy(None)
+    said = str(stopped.value)
+    assert "MISSING on this PC: Kantalad-Medium.otf, Kantalad-SemiBold.otf, Kantalad-Bold.otf" in said
+    assert "Kantalad-Medium.otf is empty" in said and "it starts b'wOF2'" in said and "it starts b'<!do'" in said
+    with pytest.raises(RuntimeError, match="reached the robot"):
+        rs.cmd_deploy(None, without_font=True)
+
+
+def test_a_deploy_never_deletes_the_robots_kantalad_faces(monkeypatch, capsys):
+    """Review 22 Nov night: `deploy --without-ceremony-font` deleted the faces already on the robot --
+    every file in the robot's MANIFEST that this PC lacks is deleted, and the flag exists for a PC that
+    lacks them. With a robot whose MANIFEST names the four faces and a PC without them: the deploy goes
+    on, deletes the code file this PC dropped, never the faces (--force or not), and the new MANIFEST
+    still names them as what is on the robot."""
+    main = "app/main.py"
+    local = rs.manifest(ROOT, [main])
+    faces = ["%s/%s" % (rs.CEREMONY_FONT_DIR, n) for n in rs.CEREMONY_FONT_FILES]
+    previous = {main: local[main], "app/old_module.py": "o0", **{f: "k%d" % i for i, f in enumerate(faces)}}
+
+    class FakeRobot:
+        def __init__(self):
+            self.ran, self.fed = [], None
+
+        def hashes(self, base, files):
+            out = {f: previous[f] for f in files if f in previous}
+            if "MANIFEST.json.new" in files and self.fed is not None:
+                out["MANIFEST.json.new"] = rs.sha256(self.fed)
+            return out
+
+        def root(self, script, check=True):
+            self.ran.append(script)
+            return ""
+
+        def feed(self, script, data):
+            self.ran.append(script)
+            self.fed = data
+
+    monkeypatch.setattr(rs, "refresh_faq_cache", lambda: "")
+    monkeypatch.setattr(rs, "offline_lines_warning", lambda: "")
+    monkeypatch.setattr(rs, "deploy_files", lambda root=None: [main])
+    monkeypatch.setattr(rs, "remote_manifest", lambda robot: dict(previous))
+    monkeypatch.setattr(rs, "offline_asr_pins", lambda root=None: {})
+    monkeypatch.setattr(rs, "FETCH_ON_ROBOT", {})
+    monkeypatch.setattr(rs, "_permissions", lambda robot: None)
+    for force in (False, True):
+        robot = FakeRobot()
+        rs.cmd_deploy(robot, force=force, without_font=True)
+        deletes = [c for c in robot.ran if c.startswith("rm -f ") and "MANIFEST" not in c]
+        assert len(deletes) == 1 and "app/old_module.py" in deletes[0], deletes
+        written = json.loads(robot.fed)["files"]
+        assert {f: written.get(f) for f in faces} == {f: previous[f] for f in faces}
+        assert "app/old_module.py" not in written and written[main] == local[main]
+        out = capsys.readouterr().out
+        assert "keeping the 4 Kantalad face(s) already on the robot" in out and "deployed" in out
+    # a dry run (no flag: the real one would stop) shows the same: the faces are not on the delete list
+    rs.cmd_deploy(FakeRobot(), dry=True)
+    out = capsys.readouterr().out
+    assert "  delete app/old_module.py" in out and not any(line.startswith("  delete ") and "Kantalad" in line for line in out.splitlines())
+    # the flag's help and the MISSING message say what it does
+    help_text = re.sub(r"\s+", " ", inspect.getsource(rs.main))
+    assert "the faces already on the robot stay there" in help_text and "no deploy deletes them" in help_text
+    assert "the faces already on the robot stay there" in rs.ceremony_font_summary([main], [])
+
+
 def test_the_real_deploy_carries_every_module_the_server_imports_and_no_secret():
     files = set(rs.deploy_files())
     for f in files:
@@ -317,6 +527,53 @@ def test_forward_prints_the_address_not_adbs_port_echo(monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == "https://127.0.0.1:18001/ -> robot 127.0.0.1:8001"
 
 
+def test_secrets_dry_run_writes_nothing_and_names_keys_not_values(monkeypatch, capsys, tmp_path):
+    """3 Nov 2026: `secrets --dry-run` wrote the robot's real .env -- only
+    deploy read the flag. A preview reads the robot's .env and prints key
+    NAMES (added/removed/changed), never a value, and writes nothing."""
+    (tmp_path / ".env").write_text("GEMINI_API_KEY=pc-secret-1\nKEEP=1\nGONE=x\n", encoding="utf-8")
+    (tmp_path / "certs").mkdir()
+    (tmp_path / "certs" / "lan-key.pem").write_bytes(b"pem")
+    over = tmp_path / "robot.env"
+    over.write_text("NEW_ONE=en\nKEEP=2\n", encoding="utf-8")
+    monkeypatch.setattr(rs, "ROOT", tmp_path)
+    monkeypatch.setattr(rs, "OVERRIDES", over)
+    monkeypatch.setattr(rs, "OPTIONAL_SECRET_FILES", {})
+    monkeypatch.setattr(rs, "ENV_DROP", set())
+
+    class FakeRobot:
+        def __init__(self, serial):
+            self.wrote = []
+
+        def root(self, script, check=True):
+            assert script.startswith("cat ") and script.split()[1].endswith("/.env")
+            return "GEMINI_API_KEY=robot-secret-2\nKEEP=1\nGONE=x\nOLD=y\n"
+
+        def hashes(self, base, files):
+            return {"certs/lan-key.pem": rs.sha256(b"pem")}
+
+        def write_secret(self, rel, data):
+            raise AssertionError("a dry run wrote %s" % rel)
+
+    monkeypatch.setattr(rs, "Robot", FakeRobot)
+    assert rs.main(["secrets", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "added: NEW_ONE" in out and "removed: OLD" in out
+    assert "changed: GEMINI_API_KEY, KEEP" in out
+    assert "files that would change: -" in out and "nothing written" in out
+    assert "secret-1" not in out and "secret-2" not in out and "=en" not in out
+
+
+def test_dry_run_on_a_command_that_acts_does_nothing(monkeypatch, capsys):
+    def no_robot(serial):
+        raise AssertionError("reached the robot")
+
+    monkeypatch.setattr(rs, "Robot", no_robot)
+    for what in ("restart", "start", "stop", "install", "forward", "lock"):
+        assert rs.main([what, "--dry-run"]) == 2
+    assert "nothing done" in capsys.readouterr().err
+
+
 def test_every_root_script_starts_from_a_sane_umask(monkeypatch):
     """su hands its child umask 0: a `mkdir -p` in a root script made a
     world-writable directory (code/certs before the first deploy)."""
@@ -401,12 +658,169 @@ def test_a_pid_is_signalled_only_if_proc_says_it_is_our_server():
     assert "kill" not in _case(text, "start") and "kill" not in _case(text, "status")
 
 
+def test_an_untracked_server_is_found_never_a_shell_that_names_it():
+    """11 Nov: the pid file held a dead starter's pid while the real server ran on -- each watchdog
+    tick booted another. `untracked` finds the interpreter (its command line ENDS with the script);
+    start tracks it instead of starting one, stop stops it, status says so."""
+    text = _script()
+    fn = text[text.index("untracked() {"):text.index("\n}\n", text.index("untracked() {"))]
+    assert '*python*" scripts/emma_server.py "|*python*" scripts/emma_server.py")' in fn
+    start = _case(text, "start")
+    assert start.index('mkdir "$LOCK"') < start.index("p=$(untracked)") < start.index("nohup ")
+    assert 'echo "$p" > "$PIDF"' in start[start.index("p=$(untracked)"):start.index("nohup ")]
+    assert "p=$(ours) || p=$(untracked) ||" in _case(text, "stop")
+    assert "p=$(untracked)" in _case(text, "status")
+
+
+def test_one_server_process_for_its_whole_life_booting_or_serving():
+    """The port answers only once a server has booted: one started during the first's boot passed
+    the port check and ran its startup (review 11 Nov). A flock held for the process's life, taken
+    before anything is imported."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import emma_server
+
+    src = (ROOT / "scripts" / "emma_server.py").read_text(encoding="utf-8")
+    main = src[src.index('if __name__ == "__main__":'):]
+    assert main.index("hold_server_lock(") < main.index("from app.config import settings") \
+        < main.index("already_serving(") < main.index("runpy.run_path")
+    try:
+        import fcntl  # noqa: F401
+    except ImportError:
+        pytest.skip("no fcntl here (Windows): the server lock itself was NOT exercised -- only its place")
+    import tempfile
+
+    lock = Path(tempfile.mkdtemp()) / ".server.lock"
+    first = subprocess.Popen([sys.executable, "-c",
+                              "import sys, time; sys.path.insert(0, %r); import emma_server; "
+                              "print(emma_server.hold_server_lock(__import__('pathlib').Path(%r)), flush=True); "
+                              "time.sleep(5)" % (str(ROOT / "scripts"), str(lock))],
+                             stdout=subprocess.PIPE, encoding="utf-8")
+    try:
+        assert first.stdout.readline().strip() == "True"
+        assert emma_server.hold_server_lock(lock) is False      # another process holds it
+    finally:
+        first.kill()
+        first.wait()
+
+
+def test_stop_leaves_no_untracked_server_behind():
+    stop = _case(_script(), "stop")
+    after = stop[stop.index('rm -f "$PIDF"'):]
+    assert "q=$(untracked)" in after and 'kill -TERM "$q"' in after
+
+
+def test_a_second_server_exits_before_it_boots(monkeypatch):
+    """Its startup must not run while another server holds the port (11 Nov: each boot cleared the
+    walk in progress and cancelled the board's action)."""
+    import socket
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import emma_server
+
+    src = (ROOT / "scripts" / "emma_server.py").read_text(encoding="utf-8")
+    main = src[src.index('if __name__ == "__main__":'):]
+    assert main.index("already_serving(") < main.index("runpy.run_path")
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(8)
+    port = srv.getsockname()[1]
+    try:
+        assert emma_server.already_serving("127.0.0.1", port)
+        assert emma_server.already_serving("0.0.0.0", port)          # a 0.0.0.0 bind is asked on loopback
+    finally:
+        srv.close()
+    assert not emma_server.already_serving("127.0.0.1", port)
+
+
 def test_one_starter_at_a_time_and_off_the_apps_process_group():
     start = _case(_script(), "start")
     nohup = start.index("nohup ")
     assert start.index('mkdir "$LOCK"') < nohup
     assert start.index("trap 'rmdir \"$LOCK\"") < nohup
     assert start.index("/sys/fs/cgroup /acct") < nohup
+
+
+def _working_sh():
+    sh = shutil.which("sh") or shutil.which("bash")
+    if sh is not None and subprocess.run([sh, "-c", "exit 0"], capture_output=True).returncode != 0:
+        sh = None
+    return sh
+
+
+_NET_HEAD = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
+
+
+def _adb_tcp(tmp: Path, sh: str, *, port="5555", adbd="running", usb="adb", tcp="", tcp6="") -> list[str]:
+    """Run emma_server.sh's adb_tcp alone: getprop/setprop/stop/start stubbed (the calls land in
+    a file), /proc/net and run/ in tmp. Returns the calls it made."""
+    fn = _script()
+    fn = fn[fn.index("adb_tcp() {"):fn.index("\ncase \"$1\" in")]
+    (tmp / "net").mkdir(exist_ok=True)
+    (tmp / "net" / "tcp").write_text(_NET_HEAD + tcp, encoding="utf-8")
+    (tmp / "net" / "tcp6").write_text(_NET_HEAD + tcp6, encoding="utf-8")
+    calls = tmp / "calls"
+    harness = "\n".join([
+        f'B="{tmp.as_posix()}"; NETP="$B/net"; ADBSTAMP="$B/run/adb.restart"; ADBLOG="$B/run/adb.log"',
+        f'getprop() {{ case "$1" in persist.adb.tcp.port) echo "{port}";; init.svc.adbd) echo "{adbd}";; '
+        f'persist.sys.usb.config) echo "{usb}";; *) echo "";; esac; }}',
+        'setprop() { echo "setprop $*" >> "$B/calls"; }',
+        'stop() { echo "stop $*" >> "$B/calls"; }',
+        'start() { echo "start $*" >> "$B/calls"; }',
+        fn,
+        "adb_tcp",
+        "",
+    ])
+    r = subprocess.run([sh, "-c", harness], capture_output=True, encoding="utf-8", errors="replace")
+    assert r.returncode == 0 and r.stdout == "", (r.returncode, r.stdout, r.stderr)   # nothing on the app's line
+    return calls.read_text(encoding="utf-8").splitlines() if calls.exists() else []
+
+
+def test_adb_over_wifi_comes_back_when_nothing_listens_on_its_port(tmp_path):
+    """20 Nov: after a power cycle the robot answered ping but not adb :5555 for minutes (port set,
+    USB debugging on) and only somebody at its screen could bring it back. The app's watchdog runs
+    `start` as root every 30 s: adbd is restarted then -- and only then."""
+    sh = _working_sh()
+    if sh is None:
+        pytest.skip("no working sh: emma_server.sh's adb_tcp was NOT checked")
+    restart = ["setprop service.adb.tcp.port 5555", "stop adbd", "start adbd"]
+    a = tmp_path / "a"
+    a.mkdir()
+    assert _adb_tcp(a, sh) == restart                                   # nothing on :5555
+    assert "nothing on :5555" in (a / "run" / "adb.log").read_text(encoding="utf-8")
+    assert _adb_tcp(a, sh) == restart                                   # a minute has not passed: no second one
+    listen4 = "   0: 00000000:15B3 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1\n"
+    listen6 = ("   0: 00000000000000000000000000000000:15B3 00000000000000000000000000000000:0000 0A "
+               "00000000:00000000 00:00000000 00000000     0        0 1\n")
+    for case, kw in {"v4": {"tcp": listen4}, "v6": {"tcp6": listen6}, "no port": {"port": ""},
+                     "port 0": {"port": "0"}, "usb debugging off": {"adbd": "stopped", "usb": "mtp"},
+                     "usb config empty": {"adbd": "stopped", "usb": ""}}.items():
+        d = tmp_path / case.replace(" ", "_")
+        d.mkdir()
+        assert _adb_tcp(d, sh, **kw) == [], case                       # listening / not ours to touch
+    # adbd not running at all while USB debugging is still on: started again ("mtp,adb" too)
+    for usb in ("adb", "mtp,adb"):
+        d = tmp_path / ("dead_" + usb.replace(",", "_"))
+        d.mkdir()
+        assert _adb_tcp(d, sh, adbd="stopped", usb=usb) == restart, usb
+    # a connection on :5555 that is not a LISTEN (01 = established) is no listener
+    est = "   1: 0A000001:15B3 0A000002:C350 01 00000000:00000000 00:00000000 00000000     0        0 2\n"
+    d = tmp_path / "est"
+    d.mkdir()
+    assert _adb_tcp(d, sh, tcp=est) == restart
+    # another port the owner set is the one looked for (8555 = 0x216B)
+    d = tmp_path / "other"
+    d.mkdir()
+    assert _adb_tcp(d, sh, port="8555", tcp=listen4) == ["setprop service.adb.tcp.port 8555", "stop adbd", "start adbd"]
+
+
+def test_start_looks_after_adb_before_it_answers_running():
+    start = _case(_script(), "start")
+    assert start.index("adb_tcp") < start.index("if p=$(ours)")        # every tick, the server up or not
+    fn = _script()
+    fn = fn[fn.index("adb_tcp() {"):fn.index("\ncase \"$1\" in")]
+    for line in fn.splitlines():                                       # the app reads start's stdout
+        if "echo" in line and "$(" not in line.split("echo")[0]:
+            assert ">" in line.split("echo", 1)[1], line
+    assert "ADB_" not in fn.replace("ADBSTAMP", "").replace("ADBLOG", "")   # nothing taken from the environment
 
 
 def test_the_script_parses():
@@ -476,6 +890,14 @@ def test_start_is_idempotent_locked_and_strips_the_dns_string(tmp_path: Path):
         assert "py EMMA_DNS=192.168.1.1,8.8.8.8 umask=0027" in log
         assert go("start") == (0, "running " + pid)                     # idempotent: the watchdog's path
         assert go("status") == (0, "running " + pid)
+        # 11 Nov: a starter that lost the race left ITS pid in the file -- the winner ran untracked
+        # and every watchdog tick booted another server. Found and tracked again, nothing started:
+        (b / "run" / "server.pid").write_text("999999\n")
+        assert go("start") == (0, "running %s (was untracked)" % pid)
+        assert (b / "run" / "server.pid").read_text().strip() == pid
+        (b / "run" / "server.pid").write_text("999999\n")
+        assert go("status") == (0, "running %s (untracked)" % pid)
+        (b / "run" / "server.pid").write_text(pid + "\n")
         assert not (b / "run" / "start.lock").exists()                  # released on exit
         # another starter holds the lock: say so, start nothing
         (b / "run" / "start.lock").mkdir()

@@ -105,6 +105,29 @@ def test_off_by_default():
     assert face.ws.commands() == []
 
 
+def test_a_recorded_line_pushed_just_ahead_of_her_voice_still_moves_her_arms(on):
+    """The ceremony's lines go out RECORDED_LEAD_S ahead of her voice: the playback clock alone said ~2 s left all
+    through an 18.7 s line and no gesture passed MIN_LEFT (rehearsal 25 Nov 01:14). The line's own length counts."""
+    import types
+
+    face = Face()
+    caps(face)
+    rec = {"pushing": True, "cut": False, "seconds": 3.0, "report": {"first_at": time.monotonic()}}
+    face.provider = types.SimpleNamespace(_recorded=rec)
+
+    async def scenario():
+        for _ in range(12):                          # chunks arriving in real time, each ~0.2 s ahead
+            face.speaks_for(0.2)
+            speech_gestures.on_audio(face)
+            await asyncio.sleep(0.1)
+        speech_gestures.on_closed(face)
+
+    asyncio.run(scenario())
+    assert face.ws.commands()[:1] == ["raise_right_arm"]
+    rec["cut"] = True                                # (a cut line is over: the playback clock alone again)
+    assert speech_gestures._left_s(face) < 1.0
+
+
 def test_a_long_answer_moves_right_then_left(on):
     face = Face()
     caps(face)

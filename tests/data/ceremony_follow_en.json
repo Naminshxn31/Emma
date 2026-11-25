@@ -1,0 +1,155 @@
+{
+  "about": "ชุดวัดภาษาอังกฤษของโหมดตามคุณมิกิ (25 พ.ย. 2026) — ประโยคที่เราเขียนเองเป็นการถอดความของบทที่เราแปลเอง ไม่ใช่คำพูดของคุณมิกิจริง · hand = ถอดความสั้น/ปกติ/ยาว 3 แบบต่อบท · off_en/off_th = สิ่งที่พิธีกรพูดกับแขกที่ไม่ใช่บท (ต้องไม่เล่นคิวใดเลย)",
+  "hand": {
+    "s02_l03": [
+      "Emma, welcome. What can you do for us?",
+      "Hi Emma, nice to have you here. We're all wondering what you're able to do and how you can help us today.",
+      "Ladies and gentlemen, thank you for waiting. Hello Emma, welcome to the stage. I'm sure everybody here is curious about what you can do and how you could help our team, so please tell us."
+    ],
+    "s02_l09": [
+      "Emma, how is our project different from the others?",
+      "Before we get into the details, could you tell everyone, Emma, what makes our project different from other developments?",
+      "Thank you Emma, that was great. Now, before we dive into all the details, I'd love for you to tell our guests how our project is different from the other projects around here."
+    ],
+    "s03_l03": [
+      "Where is our project located, Emma?",
+      "Everyone has seen what makes Embassy World special, but I'd like to ask something else, Emma. Where exactly is the project located?",
+      "Wonderful, so I think everybody now sees what is special about Embassy World. There's just one more thing I'm curious about, and I'm sure our guests are too. Emma, where is our project located?"
+    ],
+    "s04_l03": [
+      "How many units are there, and what kinds of rooms?",
+      "Let's begin with the rooms, Emma. How many units does the project have altogether, and what room types do we have?",
+      "Okay, so let's go through it step by step. Starting with the residences, Emma, can you tell us how many units our project has in total and what types of rooms there are?"
+    ],
+    "s04_l06": [
+      "What facilities should everyone see, Emma?",
+      "What about our facilities? Emma, is there something you'd particularly like everybody to see?",
+      "Thank you Emma. Now moving on to the facilities of our project. Is there anything in particular that you'd like all of our guests to take a look at?"
+    ],
+    "s04_l09": [
+      "Wow Emma, you remember it all.",
+      "Wow, you remember the details so well, Emma.",
+      "Wow, that's impressive, ladies and gentlemen. Emma, you remember the details very well indeed."
+    ],
+    "s04_l15": [
+      "Sure, but stay and help the sales team first.",
+      "Of course Emma, but today you're staying here to help the sales team with me first.",
+      "Haha, of course you can, Emma. But for today, please stay here with me and help our sales team first, okay?"
+    ],
+    "s05_l03": [
+      "Imagine I'm a customer with a family. How would you advise me?",
+      "Let's try a realistic scenario. Say I'm a customer looking for a room for my family, my wife and my kids. How would you recommend something?",
+      "Alright, let's try something real. Pretend that I'm a customer who is looking for a home for the family, with my wife and our children. Emma, how would you help advise me?"
+    ],
+    "s05_l06": [
+      "I want a room with a sea view.",
+      "I'd like a room that looks out on the sea.",
+      "Well, I think what I'm looking for is a room where I can see the sea, please."
+    ],
+    "s05_l11": [
+      "Please print the quotation and pass it to my staff.",
+      "Excellent. Could you print out the quotation and hand it to the staff member looking after me?",
+      "That sounds perfect, thank you Emma. Please go ahead and print the quotation, and then pass it to the staff member who is taking care of me."
+    ],
+    "s06_l03": [
+      "Can you answer deeper questions, like building height or pool depth?",
+      "What if a customer asks for even more detail, like how tall the building is, how deep the pool is, or how big the common area is? Can you answer?",
+      "Impressive. But Emma, let's say a customer asks something deeper, for example the height of the building, the depth of the swimming pool, or the size of the common areas. Would you be able to answer those?"
+    ],
+    "s06_l05": [
+      "Correct Emma, you really know your stuff.",
+      "That's right, Emma. You know the details really well.",
+      "Exactly right, Emma, absolutely. You really know the details very well, everyone."
+    ],
+    "s07_l02": [
+      "Emma, please play the technology video.",
+      "Another thing I want you all to see is the technology we're bringing in. Emma, could you play the Embassy World technology video for everyone?",
+      "Now, something very important to us: the technology we plan to use for living in the project and for looking after it. Emma, would you please play the technology video of Embassy World for all our guests?"
+    ],
+    "s07_l07": [
+      "What does this page show, and how does it help the team?",
+      "What is this page showing, and how does it help the project management team?",
+      "So looking at the screen here, what exactly does this page show us, and in what way does it help the team who takes care of the project?"
+    ],
+    "s08_l06": [
+      "Let's start with the lobby lights. Emma, turn them off.",
+      "I'd like everyone to see the system for themselves. We'll begin with the lobby lights. Emma, please switch off the lobby lights.",
+      "Today I want you all to watch the system work with your own eyes. Let's start with the lights in the lobby, shall we? Emma, could you please turn the lobby lights off?"
+    ],
+    "s08_l10": [
+      "Emma, turn the lobby lights on again.",
+      "Emma, please switch the lobby lights on again.",
+      "Thank you everyone. Now Emma, please turn the lobby lights on again."
+    ],
+    "s08_l14": [
+      "Now the curtains, Emma. Please open them.",
+      "What about the curtains, Emma? Could you open the lobby curtains?",
+      "Wonderful. And now the curtains, Emma. Please open the lobby curtains for us as well."
+    ],
+    "s09_l02": [
+      "Emma, please play the Embassy World Story video.",
+      "Everything you saw today is part of the care we put into Embassy World. Before the official preview, enjoy the project's story. Emma, play the Embassy World Story video.",
+      "Ladies and gentlemen, all you have seen today reflects the care we have put into Embassy World. Before the official preview begins, I'd like you to see the images of the project and the story we want to tell through its design. Emma, please play the Embassy World Story video."
+    ]
+  },
+  "off_en": [
+    "Ladies and gentlemen, welcome to the Embassy World preview.",
+    "Thank you all for coming today.",
+    "Let's give a big hand for everyone who made this possible.",
+    "Please give Emma a round of applause.",
+    "Can everyone hear me at the back?",
+    "I hope you are enjoying the evening so far.",
+    "We have drinks and snacks waiting for you after the show.",
+    "Emma, can you tell us a joke?",
+    "Emma, what is the price of a studio?",
+    "How much is the maintenance fee per month?",
+    "How many parking spaces does the project have?",
+    "What time does the fitness room open?",
+    "Emma, where are you from?",
+    "Emma, how are you feeling today?",
+    "Please welcome the chairman of the company to the stage.",
+    "Let me introduce our guest of honor.",
+    "Could our staff please bring the paperwork to the front?",
+    "I want to thank the sales team for all their hard work.",
+    "The project is going to be completed in two years.",
+    "Emma can speak many languages, can't you Emma?",
+    "Is the pool big enough for the whole family?",
+    "Do the rooms have a balcony?",
+    "Which floor is the sky pool on?",
+    "Emma, can you open the door for me?",
+    "Emma, please turn on the music.",
+    "Let's turn the lights down a little for the video, please.",
+    "Can the technician switch on the lights at the back?",
+    "Could someone close the curtains over there? The sun is in our eyes.",
+    "That was amazing. Let's give her a hand.",
+    "What a clever robot, isn't it?",
+    "Right, thank you for that answer.",
+    "I'd like a coffee, please.",
+    "Let's take a short break and then continue.",
+    "Please take your seats, the program will start in a moment.",
+    "Does anyone have questions for Emma?",
+    "Sea view rooms are very popular with families.",
+    "My wife and children love the beach here.",
+    "Stay with me for a moment, everyone.",
+    "Of course, no problem at all.",
+    "Emma, please show us the video.",
+    "Can you tell us more about the developer?",
+    "Everyone, please look at the screen.",
+    "I think the lobby looks beautiful tonight.",
+    "How long did it take to design the building?",
+    "Who designed this project?",
+    "Are there any shops nearby?",
+    "Is this a good investment for a family?",
+    "Let's welcome our sales manager.",
+    "I will hand over to the next speaker in a moment.",
+    "Emma, do you get tired?"
+  ],
+  "off_th": [
+    "ขอบคุณทุกท่านที่มาร่วมงานครับ ผมดีใจมากที่เห็นทุกคนอยู่ที่นี่",
+    "ขอเสียงปรบมือให้เอ็มม่าหน่อยครับ",
+    "ผมขอเชิญแขกผู้มีเกียรติขึ้นบนเวทีครับ",
+    "ค่าส่วนกลางต่อเดือนประมาณเท่าไหร่ครับ",
+    "เอ็มม่าเล่าเรื่องตลกให้ฟังหน่อยครับ",
+    "ทุกคนได้ยินผมชัดไหมครับ"
+  ]
+}

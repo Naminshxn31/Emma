@@ -1,0 +1,12 @@
+{
+ "_about": "The debut on card 1 (app/ceremony_reveal.py; owner 23 Nov 2026: ดับไฟก่อน ปิดม่าน ... เมื่อถึง 0 ก็ให้ทุกอย่างมืด แล้วก็มีซาวน์ แล้วหุ่นก็เปิดตัว; แนวนอน.mp4 เพิ่มในตอนเปิดตัว; after listening: เอาเวลานับออก -- no countdown, no digits, no counting voice). `sound` and `video` are ids of data/ceremony/assets/index.json. The sound is one mix (scripts/ceremony_reveal_sound.py mix): its own entry says when the build's beats are (the light pulses on them), when the screen goes black (0) and when the hit is -- the robot walks out on the hit -- and `numbers` (empty: no digits are drawn). The video plays muted from the hit (+ video_at_s), the logo over it. count_from (0 = no countdown), lead_s, build_s, beat_s and blackout_s are the times when there is no usable sound (it then plays silent); count_from is also how many numbers the mix places (with a counting --voice). Swapping a sound or the video is that script and this file, nothing in code. `dark` (owner 25 Nov ~02:15: ตอนเปิดทุกอย่างจะดับ โลโก้ไม่ต้องขึ้นก็ได้ ถ้าจะขึ้นก็คือสปอร์ตไลท์หลังไฟดับ): true = the debut is heard on a plain black screen -- the music, its black and its hit, the robot out on the hit -- with no light show, no logo and no wave, before the press or after, until the first line's slide; false brings the lit debut back. 25 Nov ~03:20, after rehearsal 4, the owner chose the lit one: \"โลโก้เล่นจนจบ\" (false). ~04:25, after rehearsal 6: \"ฉากแรกตอนปิดไฟจอก็ควรดำ ถ้าจะขึ้นก็ต้องตรงสปอตไลท์นะ\" -> \"build\": black before the press, through the build and its black; the lit debut (light, logo clip to its end, wave) from the hit, the spotlight.",
+ "sound": "reveal_debut",
+ "dark": "build",
+ "video": "debut_wave",
+ "count_from": 0,
+ "lead_s": 1.0,
+ "build_s": 5.33,
+ "beat_s": 0.667,
+ "blackout_s": 1.5,
+ "video_at_s": 0.0
+}

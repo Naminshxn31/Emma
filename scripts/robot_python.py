@@ -488,7 +488,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("what", choices=["install", "deploy", "check", "run", "tail", "stop", "nav-status", "pull"])
     ap.add_argument("rest", nargs=argparse.REMAINDER)
-    ap.add_argument("--serial", default="192.168.1.197:5555")
+    ap.add_argument("--serial", default="192.168.0.2:5555")
     a = ap.parse_args()
     robot = Robot(a.serial)
     try:

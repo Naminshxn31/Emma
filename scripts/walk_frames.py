@@ -208,13 +208,12 @@ def lidar_strip(record: dict, width: int, camera: dict | None) -> list[tuple[int
     scan = record.get("scan") or []
     if not scan:
         return [None] * width
-    cam = camera or {}
-    hfov = float(cam.get("hfov_assumed") or 70.0)
-    a = cam.get("lidar_a")
-    b = cam.get("lidar_b")
-    a = float(a) if isinstance(a, (int, float)) and a else 1.0
-    b = float(b) if isinstance(b, (int, float)) else 0.0
-    head = (record.get("head") or [0.0, 0.0])[0] or 0.0
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from app import map_check
+
+    ln = map_check.lens(camera)       # the measured lens and the mirror (4 Nov), or the guess
+    hfov, a, b = ln["hfov"], ln["a"], ln["b"]
+    head = ln["head"]((record.get("head") or [0.0, 0.0])[0] or 0.0)
     focal = (width / 2.0) / math.tan(math.radians(hfov / 2.0))
     pts = [(math.degrees(ang), dist) for ang, dist in scan]
     out = []
@@ -234,8 +233,15 @@ def tile(folder: Path, record: dict, tag: str = "", camera: dict | None = None):
     from PIL import Image, ImageDraw
 
     img = Image.new("RGB", (TILE_W, PIC_H + RADAR + 44), (10, 11, 14))
+    pic = None
     if record.get("file"):
-        pic = Image.open(folder / record["file"]).convert("RGB")
+        # 4 Nov: Android cut out mid-walk and the last 9 pictures were empty files;
+        # the sheet of the whole walk died on the first. The lidar row still shows.
+        try:
+            pic = Image.open(folder / record["file"]).convert("RGB")
+        except OSError:
+            pic = None
+    if pic is not None:
         pic.thumbnail((TILE_W, PIC_H - STRIP_H))
         left = (TILE_W - pic.width) // 2
         img.paste(pic, (left, 0))
@@ -357,7 +363,7 @@ def main(argv=None) -> int:
     ap.add_argument("run", nargs="?")
     ap.add_argument("--last", nargs="?", const=1, default=0, type=int,
                     help="pull: the newest run, or the newest N (scripts/map_check.py needs 2 or more)")
-    ap.add_argument("--serial", default="192.168.1.197:5555")
+    ap.add_argument("--serial", default="192.168.0.2:5555")
     a = ap.parse_args(argv)
     try:
         if a.what == "sheet":

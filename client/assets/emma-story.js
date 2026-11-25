@@ -54,6 +54,16 @@
     // zh: not measured on the robot -- Mandarin runs ~4-6 chars/s, and the
     // generic 16 would put every Chinese picture 2-3x ahead (review 14 Oct).
     voiceRate: { th: 12.5, en: 15, zh: 5 },
+    // What an answer that teaches the floor may measure, per language. Her
+    // story answers on the robot (164, 14 Oct - 6 Nov): Thai p5 9.9, median
+    // 12.4, p95 14.4 chars/s. Outside it the answer is not her voice reading
+    // lines and is DISCARDED, not clamped: robot 6 Nov, a transcript that ran
+    // ahead of its audio (378 chars over 17.2 s = 22/s) took the floor from
+    // 11.3 to 15.6 -- every later picture ahead of her, the 14 Oct bug -- and
+    // one numeric line ("1.3 m ... 155 m", 9.2/s: digits are few characters
+    // and long words) took it from 11.7 to 10.5, the next story's pictures
+    // 1.2-2.4 s behind her. en/zh: not measured on the robot, clamped as before.
+    learnBand: { th: [10, 15] },
     noAudioS: 7.0,    // a story whose answer never plays rests on its overview
     stallS: 3.0,      // her audio played out and nothing new came: the answer is over
     blindS: 2.0,      // the page's audio clock gone (call closed) this long: rest
@@ -183,6 +193,8 @@
   // moved half-way each time (one odd answer does not swing the next one).
   function learnRate(lang, chars, seconds) {
     if (!lang || !(seconds >= 3) || !(chars > 0)) return;
+    var band = CLOCK.learnBand[lang];
+    if (band && (chars / seconds < band[0] || chars / seconds > band[1])) return;
     var r = Math.min(20, Math.max(lang === 'zh' ? 3 : 9, chars / seconds));
     // the first answer moves half-way from the measured default too: one odd
     // answer (a transcript that outran its audio) must not set the floor
@@ -201,6 +213,15 @@
     }
     return total > 0 ? this.sched * before / total : Infinity;
   };
+  // How much of the story her answer holds: its text against the lines'
+  // lengths in her language (Thai; English lines for Latin script). Chinese
+  // is not comparable by characters: counted as told.
+  BeatClock.prototype.toldShare = function () {
+    if (this.lang !== 'th' && this.lang !== 'en') return 1;
+    var total = 0;
+    for (var k = 0; k < this.n; k++) total += +(this.w[k] && this.w[k][this.lang]) || 0;
+    return total > 0 ? this.text.length / total : 1;
+  };
   BeatClock.prototype.due = function (i) {
     if (i === 0) return 0;                       // the scene opens with her voice
     if (this.cueAt[i] !== undefined) return this.charTime(this.cueAt[i]);
@@ -213,6 +234,19 @@
       }
     }
     return t;
+  };
+  // She read the story: at least half the lines that have cue words were
+  // heard. One line of it (robot 6 Nov, "how long is the pool": 1 of 11) or
+  // an answer of her own beside it (1 of 4) is not her voice reading lines,
+  // which is what the floor stands for.
+  BeatClock.prototype.told = function () {
+    var withCue = 0, heard = 0;
+    for (var i = 0; i < this.n; i++) {
+      if (!this.cues[i].length) continue;
+      withCue++;
+      if (this.cueAt[i] !== undefined) heard++;
+    }
+    return withCue > 0 && heard * 2 >= withCue;
   };
   BeatClock.prototype.played = function (now) {
     var t = 0;
@@ -238,7 +272,7 @@
     }
     if (this.complete && played >= this.sched - CLOCK.endEpsS) {
       while (this.fired < this.n) out.fire.push(this.fired++);
-      if (!this.learned) { this.learned = true; learnRate(this.lang, this.text.length, this.sched); }
+      if (!this.learned) { this.learned = true; if (this.told()) learnRate(this.lang, this.text.length, this.sched); }
       out.rest = true;
     }
     return out;
@@ -482,6 +516,8 @@
     catch (e) { return false; }
   }
   var TOP_VH = 14;       // below the status pill and her caption band
+  // wide: pictures shown whole (a timeline, a site plan, a drawing on black), never cropped to the screen
+  var WIDE_FIT = { developer_projects: 1, site_area: 1 };
   // The templates with a landscape layout (the room TV, Story.land). Each
   // one keeps its beats and its parts; only where things go changes. distance
   // and neighborhood (no story uses them) stay portrait: the page shows the
@@ -542,6 +578,7 @@
     // size a template computes from them is the robot's at that scale, as is
     // every CSS size: --es-vw/--es-vh, set here on the root), and LW/LH are
     // the stage the landscape branches (`S.land`) place things in.
+    this.noPlan = this.opts.noPlan === true;       // (the ceremony's screens: no plan with printed numbers, owner 24 Nov)
     this.land = this.opts.layout === 'land' && LAND[data.template] === 1 && this.W > this.H;
     if (this.land) {
       this.LW = this.W; this.LH = this.H;
@@ -552,6 +589,12 @@
       this.root.classList.add('es-land');
       this.M = Math.round(this.LH * 0.03);       // the stage's margin
       this.G = Math.round(this.LW * 0.028);      // between a picture and its words
+      // the event screen (opts.wide; owner 24 Nov: "อยากให้ภาพทั้งหมดโชว์แบบใหญ่ เอาตัวหนังสือลงมา ... ดูภาพได้เต็มซ้ายขวา
+      // ตอนนี้มันชิดซ้ายเกินไป"): the picture is the whole screen and its words a strip over it. `TF` is where words and
+      // figures end: above the subtitle's zone there, the stage's own margin everywhere else (the room TV is as it was)
+      this.wide = this.opts.wide === true;
+      this.TF = this.wide ? Math.round(this.LH * 0.77) : this.LH - this.M;
+      if (this.wide) this.root.classList.add('es-wide');
     }
     // The overview's chips are laid out now (still invisible), so the lowest
     // point content may reach is measured, not guessed: three chips can wrap
@@ -563,7 +606,21 @@
       this.floorY = top > this.H * 0.5 ? top - this.H * 0.015 : this.H * 0.885;
     }
     if (this.land) this.floorY = this.LH - this.M;
-    this.tpl = TEMPLATES[data.template](this, p);
+    // the event screen's film scenes (client/assets/story-wide/, loaded by its story frame alone): a template with one
+    // is drawn by it; one that fails, or none, keeps the engine's own layout
+    var scene = this.wide && root.StoryWide && root.StoryWide.scenes && root.StoryWide.scenes[data.template];
+    if (scene) {
+      try {
+        this.root.classList.add('es-film');
+        this.tpl = scene(this, p);
+      } catch (e) {
+        if (root.console) console.warn('story scene', data.template, e);
+        this.root.classList.remove('es-film');
+        this.root.textContent = '';
+        this.tpl = null;
+      }
+    }
+    if (!this.tpl) this.tpl = TEMPLATES[data.template](this, p);
     if (BALANCED[data.template] && !this.land) this.balance();
     if (this.tpl.layout) this.tpl.layout();
     this.t0 = Date.now();
@@ -1048,6 +1105,17 @@
     return g;
   };
   // A block in the words' column, centred on the picture's middle, inside the stage.
+  // wide: a row of chips kept on one line, the whole row smaller when it is long
+  Story.prototype.oneRow = function (node) {
+    var full = node.offsetWidth || 0;
+    node.style.flexWrap = 'nowrap';
+    node.style.width = 'max-content';
+    var need = node.offsetWidth || 0, k = need > full && full > 0 ? full / need : 1;
+    if (k < 0.72) { node.style.flexWrap = ''; node.style.width = full + 'px'; return; }
+    node.style.width = Math.ceil(Math.max(need, full)) + 'px';
+    node.style.left = Math.round((this.LW - Math.max(need, full)) / 2) + 'px';
+    if (k < 1) { node.style.transformOrigin = '50% 100%'; node.style.transform = 'scale(' + k.toFixed(4) + ')'; }
+  };
   Story.prototype.lmid = function (node, mid) {
     var h = node.offsetHeight || 0;
     var top = Math.max(this.M, Math.min(this.LH - this.M - h, mid - h / 2));
@@ -1242,12 +1310,19 @@
       S.place(dock, S.M, null, dw);
       // columns that never grow past their half (a long name wraps instead)
       if (two) { dock.classList.add('two'); dock.style.display = 'grid'; dock.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))'; }
+      if (S.wide) {
+        LD = { dw: S.LW - 2 * S.M, two: false, cardLeft: 0, cardW: S.LW, k: 1, wide: true };
+        dock.classList.remove('two');
+        dock.style.display = 'grid';
+        dock.style.gridTemplateColumns = 'repeat(' + Math.max(1, items.length) + ', minmax(0, 1fr))';
+        S.place(dock, S.M, null, LD.dw);
+      }
     }
     dock.style.top = Math.round(LIST_TOP) + 'px';
     // the big card may come down to just above Emma's head (it stopped at
     // 68% of the height: a third of the screen stood empty under every plan)
     var SMALL = 0.56, CARD_BOTTOM = S.contentBottom() - S.H * 0.008;
-    if (LD) CARD_BOTTOM = S.LH - S.M;
+    if (LD) CARD_BOTTOM = LD.wide ? S.LH : S.LH - S.M;
     var rows = items.map(function (it) {
       var tapId = it.tap && S.taps[it.tap] ? it.tap : null;
       var row = el(tapId ? 'button' : 'div', 'es-row');
@@ -1273,7 +1348,7 @@
     });
     var hint = p.end_hint_en ? S.add(el('p', 'es-hint es-fade', p.end_hint_en)) : null;
     if (hint) hint.style.bottom = Math.round(S.H - S.floorY + S.H * 0.01) + 'px';
-    if (hint && LD) { S.place(hint, S.M, null, LD.dw); hint.style.bottom = S.M + 'px'; }
+    if (hint && LD) { S.place(hint, S.M, null, LD.dw); hint.style.bottom = (LD.wide ? S.LH - S.TF : S.M) + 'px'; }
     // The list at rest fills the tall screen: each row's picture as large as
     // its share of the height allows (two layouts, measured once before
     // anything shows). Three room plans were 25vw thumbnails in a list that
@@ -1290,6 +1365,7 @@
       // 36vw at most: wider, a long size ("51.5–52.5 sq.m.") ran off the row
       var tw = Math.max(S.W * 0.22, Math.min(S.W * (n <= 3 ? 0.36 : 0.3), (each - pad * 2) * 4 / 3));
       if (LD) tw = Math.min(tw, LD.dw * (LD.two ? 0.14 : 0.4));
+      if (LD && LD.wide) tw = S.LW * 0.05;
       dock.style.gap = Math.round(gap) + 'px';
       rows.forEach(function (r) { var th = r.querySelector('.es-th'); if (th) th.style.width = Math.round(tw) + 'px'; });
       // while she talks the list is small under her caption: one row about
@@ -1300,7 +1376,12 @@
       // the last cards had 480 px for a title and a plan -- the combined
       // one-bedrooms' plan came up 49 x 29 px (audit 27 Oct)
       if (n > 5) SMALL = 0.36;
-      if (LD) {
+      if (LD && LD.wide) {
+        dock.style.top = S.M + 'px';
+        if (WIDE_FIT[S.data.id]) { dock.style.display = 'none'; if (hint) hint.style.display = 'none'; }
+        if (hint) { hint.style.bottom = 'auto'; hint.style.top = Math.round(S.M * 1.5 + (dock.offsetHeight || 0)) + 'px'; }
+      }
+      else if (LD) {
         // the whole list in its column: smaller when long, centred when short
         var room = limit - LIST_TOP, lh = dock.offsetHeight || 0;
         LD.k = lh > room ? room / lh : 1;
@@ -1319,7 +1400,7 @@
     function ghosts() { rows.forEach(function (r) { if (!r.classList.contains('on')) r.classList.add('ghost'); }); }
     // the next card's top: under the last row already in the list
     function cardTop() {
-      if (LD) return S.M;
+      if (LD) return LD.wide ? 0 : S.M;
       var top = LIST_TOP, base = S.root.getBoundingClientRect().top || 0;
       rows.forEach(function (r) {
         if (r.classList.contains('on') || r._docked) top = Math.max(top, r.getBoundingClientRect().bottom - base + S.H * 0.012);
@@ -1329,8 +1410,8 @@
     function present(k) {
       presented = true;
       var it = items[k];
-      var big = el('div', 'es-big' + planClass(it));
-      var top = S.instant ? LIST_TOP : cardTop();
+      var big = el('div', 'es-big' + planClass(it) + (LD && LD.wide && WIDE_FIT[S.data.id] ? ' es-fit' : ''));
+      var top = S.instant && !(LD && LD.wide) ? LIST_TOP : cardTop();
       big.style.top = Math.round(top) + 'px';
       big.style.height = Math.round(CARD_BOTTOM - top) + 'px';
       if (LD) S.place(big, LD.cardLeft, null, LD.cardW);
@@ -1345,6 +1426,13 @@
       big.appendChild(ph);
       big.appendChild(lab);
       S.add(big);
+      if (LD && LD.wide) {
+        lab.style.bottom = (S.LH - S.TF) + 'px';
+        if (big.classList.contains('plan') || big.classList.contains('es-fit')) {
+          ph.style.top = Math.round(S.M + (dock.offsetHeight ? dock.offsetHeight + S.M : 0)) + 'px';
+          ph.style.bottom = Math.round(S.LH - S.TF + (lab.offsetHeight || 0) + S.M * 0.4) + 'px';
+        }
+      }
       // the picture keeps a fifth of the screen under its title, over the
       // last docked rows if it must (they are back in the list at the end)
       var minH = (lab.offsetHeight || 0) + S.H * 0.2;
@@ -1537,14 +1625,18 @@
     var box = S.add(LR ? S.lbox(p.base_asset, LR.w, S.LH * 0.42, LR.left, S.M, 'es-fade')
       : S.box(p.base_asset, 92, 21, TOP_VH, 'es-fade'));
     box.appendChild(S.img(p.base_asset, 'es-fill'));
-    var spots = items.map(function (it) {
-      if (!Array.isArray(it.at) || it.at.length !== 2) return null;
-      var s = S.spot(it.at[0], it.at[1]);
-      box.appendChild(s);
-      return s;
-    });
+    function spotsIn(host) {
+      return items.map(function (it) {
+        if (!Array.isArray(it.at) || it.at.length !== 2) return null;
+        var s = S.spot(it.at[0], it.at[1]);
+        host.appendChild(s);
+        return s;
+      });
+    }
+    var spots = spotsIn(box);
     var y = S.floorY;
     var more = p.more_en ? S.add(el('p', 'es-more es-fade', tidy(p.more_en))) : null;
+    if (S.wide) { LR = { cw: S.LW, left: Math.round(S.LW * 0.74), w: Math.round(S.LW * 0.26 - S.M), wide: true }; S.root.removeChild(box); box = S.add(S.lbox(p.base_asset, LR.w, S.LH * 0.3, LR.left, S.M, 'es-fade')); box.appendChild(S.img(p.base_asset, 'es-fill')); spots = spotsIn(box); }
     if (more && LR) S.place(more, LR.left, null, LR.w);
     // by its own height: a two-line note ("Sea view depends on the room ...")
     // sat on the taps when this assumed one line (13 Oct recording)
@@ -1564,7 +1656,8 @@
     if (LR) { S.place(strip, LR.left, null, LR.w); strip.style.flexWrap = 'wrap'; strip.style.rowGap = Math.round(gap * 1.6) + 'px'; }
     var cardTop = box._top + box._h + S.H * 0.016;
     var cardBottom = Math.min(parseFloat(strip.style.top) - S.H * 0.014, S.H * 0.78);
-    if (LR) { cardTop = S.M; cardBottom = S.LH - S.M; }
+    if (S.noPlan && !LR) { box.style.display = 'none'; cardTop = box._top; }
+    if (LR) { cardTop = LR.wide ? 0 : S.M; cardBottom = LR.wide ? S.LH : S.LH - S.M; }
     var cur = -1;
     var cards = items.map(function (it, k) {
       // a place with a story of its own (the Sky Pool, the fitness) is a
@@ -1604,7 +1697,16 @@
       return t;
     });
     if (LR) {
-      cards.forEach(function (c) { S.place(c, S.M, null, LR.cw); });
+      cards.forEach(function (c) { S.place(c, LR.wide ? 0 : S.M, null, LR.cw); });
+      if (LR.wide) {
+        // the strip of places along the bottom right, the words of the place at the bottom left, above the subtitle
+        var sw = strip.style;
+        strip.style.top = 'auto'; sw.width = 'auto'; sw.left = 'auto';
+        sw.right = Math.round(S.M * 1.2) + 'px'; sw.bottom = (S.LH - S.TF) + 'px';
+        box.style.display = 'none';                // (no plan on the event screen: see the spotlight's)
+        cards.forEach(function (c) { var tx = c.querySelector('.es-fc-tx'); if (tx) tx.style.bottom = (S.LH - S.TF) + 'px'; });
+        if (more) { S.place(more, null, null, LR.w); more.style.left = 'auto'; more.style.right = S.M + 'px'; more.style.top = Math.round(S.M * 1.2) + 'px'; }
+      } else {
       // the plan, the strip and the note centred together in their column
       var g2 = Math.round(S.H * 0.03), sh = strip.offsetHeight || 0, mh2 = more ? more.offsetHeight || 0 : 0;
       var total = box._h + g2 + sh + (more ? g2 + mh2 : 0);
@@ -1613,6 +1715,7 @@
       box.style.top = t0 + 'px';
       strip.style.top = (t0 + box._h + g2) + 'px';
       if (more) more.style.top = (t0 + box._h + g2 + sh + g2) + 'px';
+      }
     }
     // the place on screen: cards before it wait (or leave) to the left, the
     // ones after it to the right -- forward slides left, a thumbnail back
@@ -1669,7 +1772,18 @@
         strip.classList.add('on');
         spots.forEach(function (s) { if (s) { s.classList.remove('on'); s.classList.add('done'); } });
         thumbs.forEach(function (t) { t.classList.add('on'); });
-        var last = !picked && queue.length ? queue[queue.length - 1] : cur;
+        // She answered with a line or two of it (robot 6 Nov, "how long is the
+        // pool": one line of eleven): the places she never reached fired with
+        // the rest at the end, and the newest of those is not what she talked
+        // about -- the last place she NAMED is. A story she told keeps the
+        // last place queued: its last cue can be missing from a transcript the
+        // budget cut (27 Oct) or from a language the cues do not cover
+        // (28 Oct, Vietnamese) while her voice did name it.
+        var named = -1;
+        if (S.clock && S.clock.toldShare() < 0.5) {
+          items.forEach(function (it, k) { if (S.clock.cueAt[it.line] !== undefined) named = k; });
+        }
+        var last = picked ? cur : (named >= 0 ? named : (queue.length ? queue[queue.length - 1] : cur));
         queue = [];
         show(last >= 0 ? last : 0);
         // a reveal cancelled mid-frame (the guest cut in) left no card up
@@ -1717,6 +1831,10 @@
       // one column beside the picture; two under a wide one
       if (rows) rows.classList.toggle('grid', gridOK && mode === 'stack');
     }) : null;
+    if (S.wide) {
+      L = { mode: 'wide', left: S.M, top: S.M, w: S.LW - 2 * S.M, maxH: S.TF - 2 * S.M };
+      if (rows) { rows.classList.remove('grid'); S.place(rows, Math.round(S.LW * 0.032), null, Math.round(S.LW * 0.936)); rows.style.top = 'auto'; rows.style.bottom = (S.LH - S.TF) + 'px'; S.oneRow(rows); }
+    }
     var rowsH = rows ? rows.offsetHeight || 0 : 0;
     var maxH = Math.max(30, Math.min(56, (S.room() - rowsH - S.H * 0.03) / S.H * 100));
     // the plan and the photo share one width, so the plan insets into the
@@ -1729,6 +1847,14 @@
     });
     var base = L ? S.lbox(p.base_asset, L.w, L.maxH, L.left, L.top, 'es-spbase')
       : S.box(p.base_asset, mw, maxH, TOP_VH, 'es-spbase');
+    if (S.wide) {
+      base._left = Math.round((S.LW - base._w) / 2); base._top = Math.round((S.TF + S.M - base._h) / 2);
+      base.style.left = base._left + 'px'; base.style.top = base._top + 'px';
+      // ...and where it goes when the photo comes: the top-right corner, a fifth of the screen wide
+      base.style.setProperty('--wide-dx', Math.round(S.LW - S.M - (base._left + base._w)) + 'px');
+      base.style.setProperty('--wide-dy', Math.round(S.M - base._top) + 'px');
+      base.style.setProperty('--wide-k', Math.min(0.34, S.LW * 0.2 / base._w, S.LH * 0.24 / base._h).toFixed(4));
+    }
     S.root.insertBefore(base, rows);
     base.style.opacity = '0';
     var zoom = el('div', 'es-zoom');
@@ -1752,13 +1878,14 @@
       // the photo in a frame of its OWN shape, sharing the picture's top and
       // width (so the zoomed picture insets into its top-right corner): in the
       // picture's frame a 2.5:1 site plan cut a 4:3 photo to a strip
-      photo = L ? S.lbox(ph.asset, L.w, L.maxH, L.left, L.top, 'es-photo es-fade')
+      photo = S.wide ? S.lbox({ w: S.LW, h: S.LH }, S.LW, S.LH, 0, 0, 'es-photo es-fade')
+        : L ? S.lbox(ph.asset, L.w, L.maxH, L.left, L.top, 'es-photo es-fade')
         : S.box(ph.asset, mw, maxH, TOP_VH, 'es-photo es-fade');
-      if (photo._w < base._w) {
+      if (photo._w < base._w && !S.wide) {
         photo._left = base._left + base._w - photo._w;
         photo.style.left = photo._left + 'px';
       }
-      if (L) {
+      if (L && !S.wide) {
         // landscape: each centred on the same middle line (the plan stood
         // at the photo's top, over an empty band, until the photo came);
         // the plan still lands in the photo's top-right corner
@@ -1785,6 +1912,9 @@
       }
     }
     var spotLine = num(p.spot_line) != null ? p.spot_line : 0, photoLine = num(ph.line);
+    // the ceremony's screens show no plan (owner 24 Nov: "ภาพผังห้องก็ห้ามโชว์เลข" -- they carry printed shop numbers): the
+    // photo is up from her first word
+    if ((S.wide || S.noPlan) && photo) { base.style.visibility = 'hidden'; photoLine = 0; spotLine = 0; scale = 1; }
     var zoomed = false, photoOn = false, ringAt = 0, gone = false;
     function showBase() { S.ready(base).then(function () { S.frame(function () { base.style.opacity = '1'; }); }); }
     function ringOn() {
@@ -1820,9 +1950,11 @@
       photo.classList.remove('on');
       photo.style.visibility = 'hidden';
       base.classList.remove('inset');
-      if (L && L.mode === 'stack') rows.style.top = Math.round(base._top + base._h + S.H * 0.025) + 'px';
+      if (S.wide) { /* the strip stays where it is, above the subtitle */ }
+      else if (L && L.mode === 'stack') rows.style.top = Math.round(base._top + base._h + S.H * 0.025) + 'px';
       else if (L) S.lmid(rows, base._top + base._h / 2);
       else rows.style.top = Math.round(base._top + base._h + S.H * 0.025) + 'px';
+      if (S.wide || S.noPlan) base.style.visibility = '';
       if (photoOn && zoomed) ringOn();
     }
     function showPhoto() {
@@ -1849,7 +1981,7 @@
           // It was 1.5 s after a 1.15 s zoom (1.8 s on one line): when her
           // photo line came quickly the photo trailed it by ~1 s (owner
           // 21 Oct: "ภาพยังไม่มา หรือมาช้า")
-          S.later(Math.max(i === spotLine ? 1300 : 0, ringAt + 1000 - Date.now()), showPhoto);
+          S.later(S.wide || S.noPlan ? 0 : Math.max(i === spotLine ? 1300 : 0, ringAt + 1000 - Date.now()), showPhoto);
         }
       },
       rest: function () {
@@ -1903,9 +2035,17 @@
         figEls.forEach(function (f, k) { f.fig.style.textAlign = mode === 'side' || !(k % 2) ? 'left' : 'right'; });
       });
     }
+    if (S.wide) {
+      LB = { w: S.LW, maxH: S.LH, left: 0, top: 0, wide: true };
+      figRow.style.gridTemplateColumns = 'repeat(' + Math.max(1, counters.length) + ', auto)';
+      figEls.forEach(function (f) { f.fig.style.textAlign = 'left'; });
+      S.place(below, Math.round(S.LW * 0.032), null, Math.round(S.LW * 0.936));
+      below.style.top = 'auto'; below.style.bottom = (S.LH - S.TF) + 'px';
+    }
     var belowH = below.offsetHeight || 0;
     var maxH = Math.max(30, Math.min(50, (S.room() - belowH - S.H * 0.035) / S.H * 100));
-    var box = LB ? S.lbox(fin || frames[frames.length - 1], LB.w, LB.maxH, LB.left, LB.top, 'es-fade')
+    var box = LB && LB.wide ? S.lbox({ w: S.LW, h: S.LH }, S.LW, S.LH, 0, 0, 'es-fade')
+      : LB ? S.lbox(fin || frames[frames.length - 1], LB.w, LB.maxH, LB.left, LB.top, 'es-fade')
       : S.box(fin || frames[frames.length - 1], 96, maxH, TOP_VH, 'es-fade');
     S.root.insertBefore(box, below);
     box.style.background = '#03050f';
@@ -1929,6 +2069,7 @@
     }
     // the light crosses the real render as it comes up, not the hologram
     if (rise) S.sheen(rise);
+    if (S.wide) box.appendChild(el('i', 'es-shade-wide'));
     var gy = num(p.ground_y), ry = num(p.roof_y), lines = gy != null && ry != null && gy > ry;
     var ground = null;
     if (gy != null) { ground = el('i', 'es-hline'); ground.style.top = gy + '%'; box.appendChild(ground); }
@@ -2045,7 +2186,15 @@
     // and the mood pictures in a column beside it, top to bottom
     var LT = S.land ? S.lpics([ref], 0.36) : null;
     var box = S.add(LT ? S.lbox(ref, LT.w, LT.maxH, LT.left, LT.top, 'es-fade') : S.box(ref, 94, 38, TOP_VH, 'es-fade'));
-    box.style.background = '#070a1f';
+    if (S.wide) {
+      var dw1 = ref && ref.w > 0 && ref.h > 0 ? Math.min(S.LW * 0.62, (S.TF - S.M) * ref.w / ref.h) : S.LW * 0.5;
+      S.root.removeChild(box);
+      box = S.add(S.lbox(ref, dw1, S.TF - S.M, (S.LW - dw1) / 2, S.M * 0.6, 'es-fade'));
+      box.style.setProperty('--wide-dx', Math.round(S.LW - S.M - (box._left + box._w)) + 'px');
+      box.style.setProperty('--wide-dy', Math.round(S.M - box._top) + 'px');
+      box.style.setProperty('--wide-k', Math.min(0.4, S.LW * 0.2 / box._w).toFixed(4));
+    }
+    box.style.background = S.wide ? 'none' : '#070a1f';
     if (p.wire_asset) box.appendChild(S.img(p.wire_asset, 'es-fill es-contain'));
     var solid = p.solid_asset ? S.img(p.solid_asset, 'es-fill es-contain es-solid') : null;
     if (solid) box.appendChild(solid);
@@ -2057,6 +2206,7 @@
       S.place(below, LT.infoLeft, Math.max(S.M, box._top), LT.infoW);
       below.style.bottom = Math.round(S.LH - Math.min(S.LH - S.M, box._top + box._h)) + 'px';
     }
+    if (S.wide) { S.place(below, 0, 0, S.LW, S.LH); below.style.bottom = 'auto'; below.style.setProperty('--wide-tf', (S.LH - S.TF) + 'px'); }
     var area = below.appendChild(el('div', 'es-area es-up'));
     var v = p.value ? S.valueNode(p.value, 'es-n') : null;
     if (v) area.appendChild(v.node);
@@ -2215,8 +2365,10 @@
     var box = S.add(L ? S.lbox(p.bg_asset, L.w, L.maxH, L.left, L.top, 'es-fade')
       : S.box(p.bg_asset, 96, 46, TOP_VH, 'es-fade'));
     var h = box._h, over = L ? lover : h >= S.H * 0.3;
-    if (p.bg_asset) box.appendChild(S.img(p.bg_asset, 'es-fill es-contain'));
-    if (over) box.appendChild(el('i', 'es-shade-all'));
+    var wfull = S.wide && !WIDE_FIT[S.data.id];
+    if (S.wide) over = wfull;
+    if (p.bg_asset) box.appendChild(S.img(p.bg_asset, 'es-fill ' + (wfull ? 'es-cover' : 'es-contain')));
+    if (over) box.appendChild(el('i', S.wide ? 'es-shade-wide' : 'es-shade-all'));
     S.sheen(box);
     var big = el('div', 'es-big-n es-up' + (over ? '' : ' under'));
     var v = p.value ? S.valueNode(p.value, 'es-n') : null;
@@ -2239,6 +2391,33 @@
     var parts = arr(p.parts), max = 0;
     parts.forEach(function (q) { if (num(q.to) > max) max = q.to; });
     var list = S.add(el('div', 'es-rows'));
+    // wide: the figure at the left of the strip above the subtitle, its parts in a row beside it; the picture above
+    // the strip (or behind it, a photo)
+    function wideStrip() {
+      var x0 = Math.round(S.LW * 0.032), full = S.LW - 2 * x0, bw = 0, bh = 0;
+      if (over) {
+        big.style.bottom = (S.LH - S.TF) + 'px';
+        big.classList.add('es-wide-n');
+        big.style.width = 'max-content';
+        bw = Math.max(big.offsetWidth || 0, full * 0.31);          // (it counts up: wider at its end)
+      } else {
+        big.style.width = 'max-content';
+        bw = Math.min(full * 0.5, big.offsetWidth || full * 0.3);
+        S.place(big, x0, null, bw);
+        big.style.top = 'auto'; big.style.bottom = (S.LH - S.TF) + 'px';
+        bh = big.offsetHeight || 0;
+      }
+      if (parts.length) {
+        list.style.display = 'grid';
+        list.style.gridTemplateColumns = 'repeat(' + parts.length + ', minmax(0, 1fr))';
+        var lw = Math.min(full - (bw ? bw + S.G : 0), parts.length * S.LW * (parts.length > 3 ? 0.115 : 0.2));
+        S.place(list, S.LW - x0 - lw, null, lw);
+        list.style.top = 'auto'; list.style.bottom = (S.LH - S.TF) + 'px';
+        bh = Math.max(bh, list.offsetHeight || 0);
+      }
+      if (over) return { left: 0, top: 0, w: S.LW, maxH: S.LH, full: true };
+      return { left: S.M, top: S.M, w: S.LW - 2 * S.M, maxH: S.TF - bh - S.M * 2.2, centre: true };
+    }
     if (!L) list.style.top = Math.round(below + S.H * 0.025) + 'px';
     var rows = parts.map(function (q) {
       var r = el('div', 'es-r es-part es-left');
@@ -2267,7 +2446,7 @@
       }
       var blocks = over ? [] : [big];
       if (parts.length) blocks.push(list);
-      var g = S.lplace([p.bg_asset], blocks, function () {
+      var g = S.wide ? wideStrip() : S.lplace([p.bg_asset], blocks, function () {
         if (over || !v) return;
         v.node.style.whiteSpace = 'nowrap';
         v.node.style.fontSize = '';
@@ -2281,6 +2460,8 @@
       var arB = p.bg_asset && p.bg_asset.w > 0 && p.bg_asset.h > 0 ? p.bg_asset.w / p.bg_asset.h : 4 / 3;
       var bw = g.w, bh0 = bw / arB;
       if (bh0 > g.maxH) { bh0 = g.maxH; bw = bh0 * arB; }
+      if (g.full) { bw = S.LW; bh0 = S.LH; }
+      if (g.centre) { g.left = Math.round((S.LW - bw) / 2); g.top = Math.round(S.M + (g.maxH - bh0) / 2); }
       box._w = Math.round(bw); box._h = Math.round(bh0); box._left = g.left; box._top = g.top;
       box.style.width = box._w + 'px'; box.style.height = box._h + 'px';
       box.style.left = box._left + 'px'; box.style.top = box._top + 'px';
@@ -2310,6 +2491,7 @@
       // clear of her head, or of the taps when it keeps to the left
       layout: function () {
         var narrow = list.classList.contains('narrow');
+        if (S.wide) return;
         var k = S.fitScale(list, L ? S.LH - S.M : narrow ? S.floorY - S.H * 0.015 : S.contentBottom());
         if (k < 1) {
           list.style.transformOrigin = '0 0';
@@ -2368,7 +2550,7 @@
       S.place(grid, S.M, null, S.LW - 2 * S.M);
       grid.classList.add('es-lgrid');
       grid.style.setProperty('--cols', String(cols));
-      if (foot) { S.place(foot, S.M, null, S.LW - 2 * S.M); foot.style.bottom = S.M + 'px'; }
+      if (foot) { S.place(foot, S.M, null, S.LW - 2 * S.M); foot.style.bottom = (S.LH - S.TF) + 'px'; }
     }
     // The pictures are as tall as the screen allows (two smart-home cards
     // were 300 px pictures with half the screen empty under them, 21 Oct),
@@ -2386,7 +2568,7 @@
       if (S.land) {
         // the stage's width shared by the cards of a row (each its own width,
         // so a short last row centres), the pictures as tall as the rows allow
-        limit = foot && foot.offsetTop ? foot.offsetTop - S.H * 0.015 : S.LH - S.M;
+        limit = foot && foot.offsetTop ? foot.offsetTop - S.H * 0.015 : S.TF;
         colW = (S.LW - 2 * S.M - gap * (cols - 1)) / cols;
         grid.style.gap = Math.round(gap) + 'px';
         cards.forEach(function (c) { c.style.width = Math.floor(colW) + 'px'; });
@@ -2394,8 +2576,19 @@
       var text = 0;
       cards.forEach(function (c) { text = Math.max(text, (c.offsetHeight || 0) - (c._ci.offsetHeight || 0)); });
       var each = (limit - top - gap * (rowsN - 1)) / rowsN - text;
+      // a stage so short that two rows of wide cards run past it (the event screen with its subtitle
+      // band, 24 Nov: the second row's names were under the edge, the faces cut): four in one row
+      if (S.land && n === 4 && each < colW / 2.6) {
+        cols = 4; rowsN = 1;
+        colW = (S.LW - 2 * S.M - gap * (cols - 1)) / cols;
+        cards.forEach(function (c) { c.style.width = Math.floor(colW) + 'px'; });
+        grid.style.setProperty('--cols', String(cols));
+        text = 0;
+        cards.forEach(function (c) { text = Math.max(text, (c.offsetHeight || 0) - (c._ci.offsetHeight || 0)); });
+        each = limit - top - text;
+      }
       var lo = colW / (cols === 1 ? 2.4 : 2), hi = colW / (cols === 1 ? 1.5 : 1.25);
-      if (S.land) { lo = colW / 2.6; hi = colW / 1.05; }
+      if (S.land) { lo = colW / 2.6; hi = colW / (n === 4 && rowsN === 1 ? 0.8 : 1.05); }
       var ih = Math.round(Math.max(lo, Math.min(hi, each)));
       cards.forEach(function (c) { c._ci.style.aspectRatio = 'auto'; c._ci.style.height = ih + 'px'; });
       if (S.land) {
@@ -2537,7 +2730,7 @@
       var h = wrap.offsetHeight || 0, n = items.length;
       if (!h || !n) return;
       var spare = S.room() - S.H * 0.01 - h;
-      if (S.land) spare = S.LH - 2 * S.M - h;
+      if (S.land) spare = S.TF - S.M - h;
       if (!(spare > 0)) return;
       var cs = root.getComputedStyle ? root.getComputedStyle(wrap) : null;
       var gap = cs ? parseFloat(cs.rowGap || cs.gap) || 0 : 0;
@@ -2579,12 +2772,13 @@
         spine.style.height = Math.max(0, Math.round(y1 - y0)) + 'px';
         items.forEach(function (x) { x.f = y1 > y0 ? Math.max(0, Math.min(1, (mid(x.row) - y0) / (y1 - y0))) : 1; });
         // six places (nearby_places) ran under Emma and pushed the taps off
-        var k = S.fitScale(wrap, S.land ? S.LH - S.M : S.contentBottom());
+        var k = S.fitScale(wrap, S.land ? S.TF : S.contentBottom());
+        if (S.wide && k < 1) wrap.style.width = Math.round((S.LW - 2 * (S.M + S.G)) / k) + 'px';
         if (k < 1) {
           wrap.style.transformOrigin = '0 0';
           wrap.style.transform = 'scale(' + k.toFixed(4) + ')';
         } else if (S.land) {
-          wrap.style.top = Math.round((S.LH - (wrap.offsetHeight || 0)) / 2) + 'px';
+          wrap.style.top = Math.round((S.TF + S.M - (wrap.offsetHeight || 0)) / 2) + 'px';
         }
       },
       beat: function (i) {
@@ -2688,7 +2882,7 @@
     // the robot it is the screen's)
     var MW = W, LA = null;
     if (S.land) {
-      var mw0 = Math.min(Math.round(S.LW * 0.56), S.LH - 2 * S.M);
+      var mw0 = Math.min(Math.round(S.LW * 0.56), S.TF - S.M);
       LA = { iw: Math.min(Math.round(S.LW * 0.42), S.LW - 2 * S.M - mw0 - S.G) };
       LA.left = Math.round((S.LW - (mw0 + S.G + LA.iw)) / 2);
       LA.ileft = LA.left + mw0 + S.G;
@@ -2702,17 +2896,17 @@
     var listH = n ? list.offsetHeight || 0 : 0;
     var Hb, mapTop;
     if (LA) {
-      var roomA = S.LH - 2 * S.M - headH - gap;
+      var roomA = S.TF - S.M - headH - gap;
       if (listH > roomA && size !== 'xl') { list.classList.add('tight'); listH = list.offsetHeight || 0; }
       var kA = listH > roomA ? roomA / Math.max(1, listH) : 1;
       if (kA < 1) {
         list.style.transformOrigin = '0 0';
         list.style.transform = 'scale(' + kA.toFixed(4) + ')';
       }
-      var gA = Math.max(S.M, Math.round(S.LH / 2 - (headH + gap + listH * kA) / 2));
+      var gA = Math.max(S.M, Math.round((S.TF + S.M) / 2 - (headH + gap + listH * kA) / 2));
       head.style.top = gA + 'px';
       list.style.top = (gA + headH + gap) + 'px';
-      Hb = S.LH - 2 * S.M;
+      Hb = S.TF - S.M;
       mapTop = S.M;
     } else {
       if (spare - listH < minH && size !== 'xl') {
@@ -3512,7 +3706,7 @@
     // the project's name and the list in a column beside it
     var LM = null;
     if (S.land) {
-      var cwL = Math.min(Math.round(S.LW * 0.6), Math.round((S.LH - 2 * S.M) * aspect));
+      var cwL = Math.min(Math.round(S.LW * 0.6), Math.round((S.TF - S.M) * aspect));
       LM = { cw: cwL, ch: Math.round(cwL / aspect), iw: Math.min(Math.round(S.LW * 0.42), S.LW - 2 * S.M - cwL - S.G) };
       LM.left = Math.round((S.LW - (cwL + S.G + LM.iw)) / 2);
       LM.ileft = LM.left + cwL + S.G;
@@ -3525,14 +3719,14 @@
     var listH = n ? list.offsetHeight || 0 : 0;
     if (LM) {
       cw = LM.cw; ch = LM.ch;
-      var roomL = S.LH - 2 * S.M - headH - gap;
+      var roomL = S.TF - S.M - headH - gap;
       if (listH > roomL && size !== 'xl') { list.classList.add('tight'); listH = list.offsetHeight || 0; }
       var kL = listH > roomL ? roomL / Math.max(1, listH) : 1;
       if (kL < 1) {
         list.style.transformOrigin = '0 0';
         list.style.transform = 'scale(' + kL.toFixed(4) + ')';
       }
-      var gTop = Math.max(S.M, Math.round(S.LH / 2 - (headH + gap + listH * kL) / 2));
+      var gTop = Math.max(S.M, Math.round((S.TF + S.M) / 2 - (headH + gap + listH * kL) / 2));
       head.style.top = gTop + 'px';
     } else {
       if (spare - listH < ch && size !== 'xl') {
@@ -3553,7 +3747,7 @@
       }
     }
     var cardTop = top0 + headH + gap;
-    if (LM) cardTop = Math.round((S.LH - ch) / 2);
+    if (LM) cardTop = Math.round((S.TF + S.M - ch) / 2);
     var card = el('div', 'es-ar es-mp es-fade ' + size);
     S.root.insertBefore(card, list);
     card.style.left = Math.round(LM ? LM.left : (W - cw) / 2) + 'px';

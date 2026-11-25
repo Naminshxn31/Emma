@@ -1568,6 +1568,25 @@ def test_auto_language_does_not_restrict_to_thai_and_english():
     assert "ตอบภาษาไทยเสมอ" not in text
 
 
+def test_auto_language_starts_in_the_default_language(monkeypatch):
+    """Owner, 3 Nov, on the robot: "ภาษาให้ตั้ง eng เป็น default". The rule's
+    last clause names TALK_DEFAULT_LANGUAGE; "th" (the code default, the
+    sales room) is the sentence it always was, and a code nobody can name
+    falls back to it rather than writing "ภาษาxx" into the prompt."""
+    from app.config import settings
+    from app.prompts import build_instructions
+
+    thai = "เริ่มต้นด้วยภาษาไทยจนกว่าลูกค้าจะพูดภาษาอื่น"
+    assert thai in build_instructions("X", languages="auto")
+    monkeypatch.setattr(settings, "talk_default_language", "en")
+    text = build_instructions("X", languages="auto")
+    assert "เริ่มต้นด้วยภาษาอังกฤษจนกว่าลูกค้าจะพูดภาษาอื่น" in text and thai not in text
+    # the guest's first sentence still decides: a default, not a pin
+    assert "ประโยคแรกของลูกค้ากำหนดภาษาทันที" in text
+    monkeypatch.setattr(settings, "talk_default_language", "english")
+    assert thai in build_instructions("X", languages="auto")
+
+
 def test_language_list_restricts_and_names_the_opening_language():
     from app.prompts import build_instructions
 

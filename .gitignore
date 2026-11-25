@@ -34,6 +34,9 @@ data/broadlink_device.json
 # (the undo), and the half-written file of an interrupted atomic save.
 data/ir_codes.json.bak
 data/ir_codes.json.tmp
+# scripts/venue_devices.py learn: the same two for the venue's lights/curtains codes
+data/events/venue_codes.json.bak
+data/events/venue_codes.json.tmp
 
 # Cached slide embeddings — rebuilt from the deck on first run
 data/slides/embeddings.npz
@@ -189,3 +192,27 @@ data/offline/voice/
 # page, and the route file each walk writes -- the robot's own, never history.
 data/events/*.spots.json
 data/events/.run/
+# the event's films (app/event_clips.py): big, and the owner's; deploy ships what the file names
+data/events/clips/
+# Emma's recorded ceremony lines (scripts/render_event_script.py): rendered audio, rebuilt, not
+# history; deploy ships the index and the WAVs it names. Beside the ceremony's own file since
+# 9 Nov (the Emma Ceremony app, app/ceremony.py) -- the old place stays ignored for a copy left there
+data/ceremony/voice/
+data/events/voice/
+# Voice prints + consent records from the removed voice lock (5 Nov): biometric, kept out of
+# git while any copy is still on a machine.
+data/voices/
+# The ceremony film's pictures, depth maps and clips (scripts/build_ceremony_hires.py,
+# scripts/build_ceremony_depth.py): the stories' pictures at source size and the checked
+# candidates -- big, and rebuilt from .tmp/story-sources like the stories' own (above).
+# index.json (what each file is, its sha256, what was checked) is text and is not ignored.
+data/ceremony/assets/*
+!data/ceremony/assets/index.json
+# The ceremony film's face (owner 22 Nov: Jipatype Kantalad, licensed for the event's presentation
+# only -- never in the repository). The family's name, not four file names (review 22 Nov night: a
+# web-font copy or a renamed one is ignored too). scripts/robot_server.py ships the four faces by
+# name (ceremony_font_files) and a deploy without them stops.
+client/assets/ceremony-show/fonts/Kantalad*
+# The PC bench for "listen to one enrolled voice" (scripts/voice_lock_try.py, 19 Nov): voice
+# prints and recordings of people -- biometric / personal data, never history.
+data/voice-lock/

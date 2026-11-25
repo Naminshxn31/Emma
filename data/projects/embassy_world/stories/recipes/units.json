@@ -1,355 +1,595 @@
 [
-  {
-    "id": "plan_studio",
-    "source": "../../data/projects/embassy_world/sales/unit-plans/A-316.webp",
-    "source_sha256": "6033d30e88aa3a5c19b059a0ebaff07cdd5cdaf99122a92a1ce91c21ba23b870",
-    "crop": null,
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Real per-unit plan of a standard Studio (title in the sales Furniture PDF: 'STUDIO 25.0 SQ.M.(A-316)'; data/projects/embassy_world/sales/unit-plans/index.json, label 'pete: ถูกต้องทั้งหมด'). Same room as the UE studio model below, so plan and 3D model agree. Black lines on white become light-blue lines on transparent (alpha = darkness), the look of the prototype's plans on the dark stage. Source is outside .tmp/story-sources on purpose: the unit-plan folder is gitignored, sha-pinned, and already shipped to the robot; no room number is printed on the plan."
-  },
-  {
-    "id": "plan_1br",
-    "source": "../../data/projects/embassy_world/sales/unit-plans/F-113.webp",
-    "source_sha256": "b21b39d120bfe2e0345458e132f76d536cb161e14f284f86593929b4ba7f38f1",
-    "crop": null,
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Real per-unit plan of a 1 Bedroom at the most common size (title '1 BEDROOM 34.0 SQ.M.(F-113)'). Same room as the UE 1-bedroom model (01_F-113_Room34)."
-  },
-  {
-    "id": "plan_2br",
-    "source": "../../data/projects/embassy_world/sales/unit-plans/C-309.webp",
-    "source_sha256": "0603ff3f6be3b429dec3b38bc136260c6ab4e35fec9119830cdd511bcdd6c8fb",
-    "crop": null,
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Real per-unit plan of a 2 Bedroom (title '2 BEDROOM 51.5 SQ.M.(C-309)'). Same room as the UE 2-bedroom model (08_C-309_TwoBed51), which is the only 2-bedroom layout the UE project renders with hologram + overview + interiors."
-  },
-  {
-    "id": "room_studio_wire",
-    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_hologram.png",
-    "crop": [
-      934,
-      621,
-      1839,
-      1345
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "why": "UE blue wireframe of the studio A-316 (appendix: Studio 25.0 sq.m.; UE calls it 'Studio24' from the design area 24.79). Crop removes the baked UE UI: room panel with 'A-316 STUDIO 24.83 SQ.M.' (x<746), readings bar with demo numbers (y<=619), phone panel (x>2039), view buttons (y>=1473). The top edge sits on the bar line: the tallest wall top is hidden behind the bar in the source. Fitted to the room's own bounding box (tools/ue_align.py) so it overlays room_studio_solid."
-  },
-  {
-    "id": "room_studio_solid",
-    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_overview.png",
-    "crop": [
-      958,
-      642,
-      1827,
-      1337
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "why": "UE white 3D model of the same studio, same camera as the wireframe; crop scaled/offset from the bounding boxes (scale 0.9605) so the crossfade wire -> solid lands on the same room."
-  },
-  {
-    "id": "room_1br_wire",
-    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_hologram.png",
-    "crop": [
-      850,
-      621,
-      1908,
-      1468
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "why": "UE wireframe of 1-bedroom F-113 (appendix: 1 ห้องนอน 34.0; UE 'Room34' = the sales '34 sq.m. room' = 1 Bedroom per report 14.8.1). Same UI cut-outs as the studio; bottom stops above the view buttons (y 1473)."
-  },
-  {
-    "id": "room_1br_solid",
-    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_overview.png",
-    "crop": [
-      858,
-      634,
-      1900,
-      1468
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "why": "UE white 3D model of the same 1-bedroom, aligned to room_1br_wire (scale 0.9848)."
-  },
-  {
-    "id": "room_2br_wire",
-    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_hologram.png",
-    "crop": [
-      912,
-      621,
-      1896,
-      1408
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "why": "UE wireframe of 2-bedroom C-309 (appendix: 2 ห้องนอน 51.5; UE 'TwoBed51'). NOT 09_C-309_OneBed51: that is a one-bedroom variant of the same footprint, matching the June-2026 '1BR 51 sq.m.' plan the report says is not a type that is sold."
-  },
-  {
-    "id": "room_2br_solid",
-    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_overview.png",
-    "crop": [
-      936,
-      638,
-      1886,
-      1398
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "why": "UE white 3D model of the same 2-bedroom, aligned to room_2br_wire (scale 0.9653)."
-  },
-  {
-    "id": "mood_living",
-    "source": "web/6.gallery/ีunit/Living view a ps_0.jpg",
-    "crop": [
-      400,
-      1000,
-      3600,
-      5000
-    ],
-    "max_w": 720,
-    "format": "webp",
-    "why": "Website unit render from the owner's web pack (6.gallery/unit, 'Living view a'): sofa, coffee table, kitchen, TV. NOT the same picture as the approved slide intro-045 - the web set is a newer render (whiter finishes, different furniture) than slides intro-044..047; the owner chooses which set is the customer one. 4:5 portrait for the mood strip, always under the 'Interior mood' tag."
-  },
-  {
-    "id": "mood_dining",
-    "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
-    "crop": [
-      1500,
-      750,
-      4900,
-      5000
-    ],
-    "max_w": 720,
-    "format": "webp",
-    "why": "Website unit render ('Living view b'): dining table, chair, window, chandelier; the sofa stays small in the background so the studio can use it too (the studio package has a dining table and 2 chairs, no sofa - report 14.2.5). Newer render than slide intro-044 (same room idea, different finishes)."
-  },
-  {
-    "id": "mood_bedroom",
-    "source": "web/6.gallery/ีunit/Bedroom PS_0.jpg",
-    "crop": [
-      480,
-      750,
-      2280,
-      3000
-    ],
-    "max_w": 720,
-    "format": "webp",
-    "why": "Website unit render ('Bedroom'), newer than slide intro-046. Cropped right of the walk-in closet so a brand-labelled box on the shelf is out of frame. Not used for the studio (a studio has no separate bedroom)."
-  },
-  {
-    "id": "mood_bathroom",
-    "source": "web/6.gallery/ีunit/Bathroom PS_0.jpg",
-    "crop": [
-      750,
-      0,
-      4750,
-      5000
-    ],
-    "max_w": 720,
-    "format": "webp",
-    "why": "Website unit render ('Bathroom'), newer than slide intro-047: shower, wall-hung toilet, freestanding basin."
-  },
-  {
-    "id": "sh_curtain",
-    "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
-    "source_sha256": "f458e50a2c1e7dd5fe2fea66a7ab1d587f5ba243eedab44ff859380425cb8c98",
-    "crop": [
-      460,
-      1450,
-      2260,
-      2750
-    ],
-    "max_w": 960,
-    "format": "webp",
-    "why": "Final render of a unit's living room (web pack 6.gallery/unit, Living view b): the window with its blue-gradient curtains drawn back on both sides and the sheer between them -- the curtain the Smart Home motor opens and closes. Owner 21 Oct 2026: every story picture a final render; replaces the UE white-model shot (RoomExperience curtain0_closed). Crop starts right of the wall TV (x>=460) and stops above the sofa cushions; no stand-alone air purifier in frame (report 13.8.2: purification is inside the air-con)."
-  },
-  {
-    "id": "sh_aircon",
-    "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_open.png",
-    "crop": [
-      60,
-      560,
-      1300,
-      1420
-    ],
-    "max_w": 960,
-    "format": "webp",
-    "why": "UE interior of the 1-bedroom (no UI in this shot): the wall air-con with blue airflow streaks running into the room, curtain open. Chosen over the *_ac_on shots, whose close-up hides the airflow and whose frame is ringed by baked UI with demo values ('24 C / 70% / 75%'). Taken from the curtain-OPEN shot so it does not repeat the sh_curtain picture."
-  },
-  {
-    "id": "layout_studio_24",
-    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
-    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
-    "page": 1,
-    "dpi": 200,
-    "crop": [
-      662,
-      794,
-      1134,
-      1500
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Main layout 1 of 5: STUDIO 24 SQ.M. (page 1 left). Balcony on the drawing 2.45 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
-    "strip_dimensions": true
-  },
-  {
-    "id": "layout_studio_b107",
-    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
-    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
-    "page": 4,
-    "dpi": 200,
-    "crop": [
-      530,
-      943,
-      1402,
-      1500
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Main layout 2 of 5: STUDIO B107, trapezoid where building B turns (page 4 left). The crop stops under 'STUDIO B107' and leaves out its '28.87 SQ.M.' line: two decimals on screen break the owner's one-decimal rule (21 Oct); the row says '≈ 29 sq.m.'. Balcony 2.55 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
-    "strip_dimensions": true
-  },
-  {
-    "id": "layout_1br_33",
-    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
-    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
-    "page": 2,
-    "dpi": 200,
-    "crop": [
-      508,
-      774,
-      1142,
-      1500
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Main layout 3 of 5: 1 - BEDROOM 33 SQ.M. (page 2 left). Balcony 2.55 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
-    "strip_dimensions": true
-  },
-  {
-    "id": "layout_1br_b113",
-    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
-    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
-    "page": 4,
-    "dpi": 200,
-    "crop": [
-      1871,
-      866,
-      2607,
-      1500
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Main layout 4 of 5: 1 - BEDROOM B113 33 SQ.M., slanted plan where building B turns (page 4 right). Balcony 2.55 (along the railing) x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
-    "strip_dimensions": true
-  },
-  {
-    "id": "layout_51_2br",
-    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
-    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
-    "page": 3,
-    "dpi": 200,
-    "crop": [
-      1922,
-      753,
-      2838,
-      1500
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Main layout 5 of 5: the 51 sq.m. unit as 2 - BEDROOM 51 SQ.M. (page 3 right), two bathrooms. Balcony 2.85 x 1.40 m (the 0.80 m box beside it is walled, not counted). Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
-    "strip_dimensions": true
-  },
-  {
-    "id": "layout_51_1br",
-    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
-    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
-    "page": 3,
-    "dpi": 200,
-    "crop": [
-      535,
-      753,
-      1451,
-      1500
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "The 51 sq.m. unit's other option: 1 - BEDROOM 51 SQ.M. (page 3 left) -- one large bedroom and a wider living room, one bathroom. Same balcony 2.85 x 1.40 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
-    "strip_dimensions": true
-  },
-  {
-    "id": "layout_combined_48",
-    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
-    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
-    "page": 1,
-    "dpi": 200,
-    "crop": [
-      1677,
-      794,
-      2593,
-      1500
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Combined layout 1 of 2: 2 - BEDROOM 48 SQ.M. (STUDIO COMBINED) (page 1 right), two bathrooms. Balcony 5.07 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
-    "strip_dimensions": true
-  },
-  {
-    "id": "layout_combined_66",
-    "source": "web/5.room types/260615_EMB3_UNIT.pdf",
-    "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
-    "page": 2,
-    "dpi": 200,
-    "crop": [
-      1588,
-      774,
-      2822,
-      1500
-    ],
-    "max_w": 1080,
-    "format": "webp",
-    "post": [
-      "lines_to_alpha:#bad6ff"
-    ],
-    "why": "Combined layout 2 of 2: 2 - BEDROOM 66 SQ.M. (1-BR COMBINED) (page 2 right), two bathrooms. Balcony 5.25 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
-    "strip_dimensions": true
-  }
+ {
+  "id": "plan_studio",
+  "source": "../../data/projects/embassy_world/sales/unit-plans/A-316.webp",
+  "source_sha256": "6033d30e88aa3a5c19b059a0ebaff07cdd5cdaf99122a92a1ce91c21ba23b870",
+  "crop": null,
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Real per-unit plan of a standard Studio (title in the sales Furniture PDF: 'STUDIO 25.0 SQ.M.(A-316)'; data/projects/embassy_world/sales/unit-plans/index.json, label 'pete: ถูกต้องทั้งหมด'). Same room as the UE studio model below, so plan and 3D model agree. Black lines on white become light-blue lines on transparent (alpha = darkness), the look of the prototype's plans on the dark stage. Source is outside .tmp/story-sources on purpose: the unit-plan folder is gitignored, sha-pinned, and already shipped to the robot; no room number is printed on the plan."
+ },
+ {
+  "id": "plan_1br",
+  "source": "../../data/projects/embassy_world/sales/unit-plans/F-113.webp",
+  "source_sha256": "b21b39d120bfe2e0345458e132f76d536cb161e14f284f86593929b4ba7f38f1",
+  "crop": null,
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Real per-unit plan of a 1 Bedroom at the most common size (title '1 BEDROOM 34.0 SQ.M.(F-113)'). Same room as the UE 1-bedroom model (01_F-113_Room34)."
+ },
+ {
+  "id": "plan_2br",
+  "source": "../../data/projects/embassy_world/sales/unit-plans/C-309.webp",
+  "source_sha256": "0603ff3f6be3b429dec3b38bc136260c6ab4e35fec9119830cdd511bcdd6c8fb",
+  "crop": null,
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Real per-unit plan of a 2 Bedroom (title '2 BEDROOM 51.5 SQ.M.(C-309)'). Same room as the UE 2-bedroom model (08_C-309_TwoBed51), which is the only 2-bedroom layout the UE project renders with hologram + overview + interiors."
+ },
+ {
+  "id": "room_studio_wire",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_hologram.png",
+  "crop": [
+   934,
+   621,
+   1839,
+   1345
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "UE blue wireframe of the studio A-316 (appendix: Studio 25.0 sq.m.; UE calls it 'Studio24' from the design area 24.79). Crop removes the baked UE UI: room panel with 'A-316 STUDIO 24.83 SQ.M.' (x<746), readings bar with demo numbers (y<=619), phone panel (x>2039), view buttons (y>=1473). The top edge sits on the bar line: the tallest wall top is hidden behind the bar in the source. Fitted to the room's own bounding box (tools/ue_align.py) so it overlays room_studio_solid."
+ },
+ {
+  "id": "room_studio_solid",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_overview.png",
+  "crop": [
+   958,
+   642,
+   1827,
+   1337
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "UE white 3D model of the same studio, same camera as the wireframe; crop scaled/offset from the bounding boxes (scale 0.9605) so the crossfade wire -> solid lands on the same room."
+ },
+ {
+  "id": "room_1br_wire",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_hologram.png",
+  "crop": [
+   850,
+   621,
+   1908,
+   1468
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "UE wireframe of 1-bedroom F-113 (appendix: 1 ห้องนอน 34.0; UE 'Room34' = the sales '34 sq.m. room' = 1 Bedroom per report 14.8.1). Same UI cut-outs as the studio; bottom stops above the view buttons (y 1473)."
+ },
+ {
+  "id": "room_1br_solid",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_overview.png",
+  "crop": [
+   858,
+   634,
+   1900,
+   1468
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "UE white 3D model of the same 1-bedroom, aligned to room_1br_wire (scale 0.9848)."
+ },
+ {
+  "id": "room_2br_wire",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_hologram.png",
+  "crop": [
+   912,
+   621,
+   1896,
+   1408
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "UE wireframe of 2-bedroom C-309 (appendix: 2 ห้องนอน 51.5; UE 'TwoBed51'). NOT 09_C-309_OneBed51: that is a one-bedroom variant of the same footprint, matching the June-2026 '1BR 51 sq.m.' plan the report says is not a type that is sold."
+ },
+ {
+  "id": "room_2br_solid",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_overview.png",
+  "crop": [
+   936,
+   638,
+   1886,
+   1398
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "why": "UE white 3D model of the same 2-bedroom, aligned to room_2br_wire (scale 0.9653)."
+ },
+ {
+  "id": "mood_living",
+  "source": "web/6.gallery/ีunit/Living view a ps_0.jpg",
+  "crop": [
+   400,
+   1000,
+   3600,
+   5000
+  ],
+  "max_w": 720,
+  "format": "webp",
+  "why": "Website unit render from the owner's web pack (6.gallery/unit, 'Living view a'): sofa, coffee table, kitchen, TV. NOT the same picture as the approved slide intro-045 - the web set is a newer render (whiter finishes, different furniture) than slides intro-044..047; the owner chooses which set is the customer one. 4:5 portrait for the mood strip, always under the 'Interior mood' tag."
+ },
+ {
+  "id": "mood_dining",
+  "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
+  "crop": [
+   1500,
+   750,
+   4900,
+   5000
+  ],
+  "max_w": 720,
+  "format": "webp",
+  "why": "Website unit render ('Living view b'): dining table, chair, window, chandelier; the sofa stays small in the background so the studio can use it too (the studio package has a dining table and 2 chairs, no sofa - report 14.2.5). Newer render than slide intro-044 (same room idea, different finishes)."
+ },
+ {
+  "id": "mood_bedroom",
+  "source": "web/6.gallery/ีunit/Bedroom PS_0.jpg",
+  "crop": [
+   480,
+   750,
+   2280,
+   3000
+  ],
+  "max_w": 720,
+  "format": "webp",
+  "why": "Website unit render ('Bedroom'), newer than slide intro-046. Cropped right of the walk-in closet so a brand-labelled box on the shelf is out of frame. Not used for the studio (a studio has no separate bedroom)."
+ },
+ {
+  "id": "mood_bathroom",
+  "source": "web/6.gallery/ีunit/Bathroom PS_0.jpg",
+  "crop": [
+   750,
+   0,
+   4750,
+   5000
+  ],
+  "max_w": 720,
+  "format": "webp",
+  "why": "Website unit render ('Bathroom'), newer than slide intro-047: shower, wall-hung toilet, freestanding basin."
+ },
+ {
+  "id": "sh_curtain",
+  "source": "web/6.gallery/ีunit/Living vew b ps_0.jpg",
+  "source_sha256": "f458e50a2c1e7dd5fe2fea66a7ab1d587f5ba243eedab44ff859380425cb8c98",
+  "crop": [
+   460,
+   1450,
+   2260,
+   2750
+  ],
+  "max_w": 960,
+  "format": "webp",
+  "why": "Final render of a unit's living room (web pack 6.gallery/unit, Living view b): the window with its blue-gradient curtains drawn back on both sides and the sheer between them -- the curtain the Smart Home motor opens and closes. Owner 21 Oct 2026: every story picture a final render; replaces the UE white-model shot (RoomExperience curtain0_closed). Crop starts right of the wall TV (x>=460) and stops above the sofa cushions; no stand-alone air purifier in frame (report 13.8.2: purification is inside the air-con)."
+ },
+ {
+  "id": "sh_aircon",
+  "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_open.png",
+  "crop": [
+   60,
+   560,
+   1300,
+   1420
+  ],
+  "max_w": 960,
+  "format": "webp",
+  "why": "UE interior of the 1-bedroom (no UI in this shot): the wall air-con with blue airflow streaks running into the room, curtain open. Chosen over the *_ac_on shots, whose close-up hides the airflow and whose frame is ringed by baked UI with demo values ('24 C / 70% / 75%'). Taken from the curtain-OPEN shot so it does not repeat the sh_curtain picture."
+ },
+ {
+  "id": "layout_studio_24",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+  "page": 1,
+  "dpi": 200,
+  "crop": [
+   662,
+   794,
+   1134,
+   1500
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Main layout 1 of 5: STUDIO 24 SQ.M. (page 1 left). Balcony on the drawing 2.45 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+  "strip_dimensions": true
+ },
+ {
+  "id": "layout_studio_b107",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+  "page": 4,
+  "dpi": 200,
+  "crop": [
+   530,
+   943,
+   1402,
+   1500
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Main layout 2 of 5: STUDIO B107, trapezoid where building B turns (page 4 left). The crop stops under 'STUDIO B107' and leaves out its '28.87 SQ.M.' line: two decimals on screen break the owner's one-decimal rule (21 Oct); the row says '≈ 29 sq.m.'. Balcony 2.55 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+  "strip_dimensions": true
+ },
+ {
+  "id": "layout_1br_33",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+  "page": 2,
+  "dpi": 200,
+  "crop": [
+   508,
+   774,
+   1142,
+   1500
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Main layout 3 of 5: 1 - BEDROOM 33 SQ.M. (page 2 left). Balcony 2.55 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+  "strip_dimensions": true
+ },
+ {
+  "id": "layout_1br_b113",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+  "page": 4,
+  "dpi": 200,
+  "crop": [
+   1871,
+   866,
+   2607,
+   1500
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Main layout 4 of 5: 1 - BEDROOM B113 33 SQ.M., slanted plan where building B turns (page 4 right). Balcony 2.55 (along the railing) x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+  "strip_dimensions": true
+ },
+ {
+  "id": "layout_51_2br",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+  "page": 3,
+  "dpi": 200,
+  "crop": [
+   1922,
+   753,
+   2838,
+   1500
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Main layout 5 of 5: the 51 sq.m. unit as 2 - BEDROOM 51 SQ.M. (page 3 right), two bathrooms. Balcony 2.85 x 1.40 m (the 0.80 m box beside it is walled, not counted). Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+  "strip_dimensions": true
+ },
+ {
+  "id": "layout_51_1br",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+  "page": 3,
+  "dpi": 200,
+  "crop": [
+   535,
+   753,
+   1451,
+   1500
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "The 51 sq.m. unit's other option: 1 - BEDROOM 51 SQ.M. (page 3 left) -- one large bedroom and a wider living room, one bathroom. Same balcony 2.85 x 1.40 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+  "strip_dimensions": true
+ },
+ {
+  "id": "layout_combined_48",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+  "page": 1,
+  "dpi": 200,
+  "crop": [
+   1677,
+   794,
+   2593,
+   1500
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Combined layout 1 of 2: 2 - BEDROOM 48 SQ.M. (STUDIO COMBINED) (page 1 right), two bathrooms. Balcony 5.07 x 1.10 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+  "strip_dimensions": true
+ },
+ {
+  "id": "layout_combined_66",
+  "source": "web/5.room types/260615_EMB3_UNIT.pdf",
+  "source_sha256": "c997f727994b6a5133b2e6c79f386d206108f2a19b8c285c9e57c7b31c1bbce0",
+  "page": 2,
+  "dpi": 200,
+  "crop": [
+   1588,
+   774,
+   2822,
+   1500
+  ],
+  "max_w": 1080,
+  "format": "webp",
+  "post": [
+   "lines_to_alpha:#bad6ff"
+  ],
+  "why": "Combined layout 2 of 2: 2 - BEDROOM 66 SQ.M. (1-BR COMBINED) (page 2 right), two bathrooms. Balcony 5.25 x 1.00 m. Owner 22 Oct 2026 (review page): \"260615_EMB3_UNIT.pdf เช็คไฟล์นี้รูปภาพให้ครบ\" -- every one of the 8 layouts has its plan on screen. QUBE drawing 05-04-26, rendered the way build_story_assets renders a PDF page (get_pixmap at this dpi); crop = drawings + dimension strings + the plan's own title (spans, not blocks: page 1's two titles are one text block), 10 pt margin, without the page frame, the QUBE logo and the THE EMBASSY WORLD / 05-04-26 title block. Black lines on white -> light-blue lines on transparent, like the other plan pictures. Owner 27 Oct 2026 (on the robot): \"รูปห้องไม่ต้องแสดง dimension และก็ภาพเล็ก ไม่ต้องแสดงไดเมนชั่น\" -- strip_dimensions redraws the plan without the dimension layers or the title (the row names it), cropped to the walls.",
+  "strip_dimensions": true
+ },
+ {
+  "id": "units_campus",
+  "source": "final1118/v1.jpg",
+  "source_sha256": "746ed87fb3bf535bedb338a86a6cac5d8ee75f67fe478eaa653a9972d6682c07",
+  "crop": [
+   0,
+   0,
+   7680,
+   4319
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "mood_st_room",
+  "source": "final1118/st_bedroom.jpg",
+  "source_sha256": "34d41585eeaa35f80841a6368cbf939f5c43188eb2712544be71c6082953acda",
+  "crop": [
+   0,
+   0,
+   3000,
+   2250
+  ],
+  "max_w": 1400,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "mood_st_bath",
+  "source": "final1118/st_bathroom.jpg",
+  "source_sha256": "6cbfafdb371c78196cba63847123bcf3ecd01fd0ea2d4878c142fe3d7c34184e",
+  "crop": [
+   0,
+   300,
+   2000,
+   2500
+  ],
+  "max_w": 1000,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "mood_1br_living",
+  "source": "final1118/br1_living.jpg",
+  "source_sha256": "f1abc4aa6e3fddb70e4cf70479edc05a82f60b6da2cbb83824b64ec1877bd90b",
+  "crop": [
+   500,
+   300,
+   4500,
+   4900
+  ],
+  "max_w": 1200,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "mood_1br_bed",
+  "source": "final1118/br1_bed.jpg",
+  "source_sha256": "6bc8ed3e4cd0a6eb65fb7cf1b60628372b6b6bff054be6d01b50d24a53b55606",
+  "crop": [
+   300,
+   200,
+   2700,
+   2960
+  ],
+  "max_w": 1200,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "mood_1br_bath",
+  "source": "final1118/br1_bath.jpg",
+  "source_sha256": "2e55ec39043902cfff75eee50ffd9329fb9747f915babf5e2f1da743348cdc53",
+  "crop": [
+   700,
+   100,
+   4700,
+   4700
+  ],
+  "max_w": 1000,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "mood_2br_living",
+  "source": "final1118/br2_living.jpg",
+  "source_sha256": "26bf8954a8c97378cf45fffd9cfedd367962781a53a0c206a675842b8510946f",
+  "crop": [
+   300,
+   200,
+   2700,
+   2960
+  ],
+  "max_w": 1200,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "mood_2br_bed",
+  "source": "final1118/br2_bed.jpg",
+  "source_sha256": "48063e3cb86a953dda06e438be21cb919dac0b8114a3f974641dda4f07fe8a2c",
+  "crop": [
+   400,
+   0,
+   2600,
+   2250
+  ],
+  "max_w": 1200,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "mood_2br_bath",
+  "source": "final1118/br2_bath.jpg",
+  "source_sha256": "1c1fbfbc36fabcc843add0f7d506bf5bcd90764178e52cbfb643b0e660508ba7",
+  "crop": [
+   300,
+   200,
+   2700,
+   2960
+  ],
+  "max_w": 1000,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_back_front",
+  "source": "final1118/entrance.png",
+  "source_sha256": "478aae94149a7d4398d0a62ec3d9d2005a8b6cfbd855b25d88a5a42372c19436",
+  "crop": [
+   0,
+   0,
+   2560,
+   1440
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_bio2",
+  "source": "final1118/g_bio2.jpg",
+  "source_sha256": "f438fa415b541f6febda0a0487f699267ec05a50fae93842baf6af28d69ad4a5",
+  "crop": [
+   10,
+   0,
+   2741,
+   1536
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_bio3",
+  "source": "final1118/g_bio3.jpg",
+  "source_sha256": "55c6f21d2877b9aacddfc2a1b69ed9392ba5655c434da5c9756a41836d11e2b8",
+  "crop": [
+   10,
+   0,
+   2741,
+   1536
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_lobby2",
+  "source": "final1118/g_lobby2.jpg",
+  "source_sha256": "873b7acd371ace407aa8476ba32bb76a8b4da9607170ce502d8ae280a88e0c01",
+  "crop": [
+   10,
+   0,
+   2741,
+   1536
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_aqua1",
+  "source": "final1118/aqua1.png",
+  "source_sha256": "71b2ba05b3a1f29e1a15d5650cc11b6898d9d8784bb020c50c5e4e67763c10c6",
+  "crop": [
+   150,
+   0,
+   2250,
+   1170
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_mars2",
+  "source": "final1118/mars2.png",
+  "source_sha256": "9f88f9f105cb35120be750d83decee1c2bf10dc5c4d750717166dd7d8a1cacca",
+  "crop": [
+   150,
+   0,
+   2250,
+   1170
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_junior1b",
+  "source": "final1118/g_junior1.jpg",
+  "source_sha256": "a7121af6d0bfd3671a0ae5d34e6c754b6b0868667be4c489aa24111bd27d68d0",
+  "crop": [
+   176,
+   0,
+   2576,
+   1350
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ }
 ]

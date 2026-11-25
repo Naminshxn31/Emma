@@ -1,0 +1,137 @@
+{
+ "template": "act",
+ "act": "living_photos",
+ "texts": {
+  "t_what": "What makes Embassy World distinctive",
+  "t_fut": "Futuristic design",
+  "t_rel_a": "An atmosphere made for",
+  "t_rel": "Relaxing",
+  "t_tech": "Technology that makes everyday living easier",
+  "t_single": "All in a single project",
+  "t_giant": "Embassy World",
+  "t_live": "The living experience",
+  "t_care": "How the project is looked after",
+  "t_smart": "Smart Home",
+  "t_ctrl": "Control their devices more easily",
+  "t_for": "For people who",
+  "t_in": "Welcome innovation",
+  "t_new": "Look for something new",
+  "t_mod": "A modern environment"
+ },
+ "pictures": {
+  "p_sig": {
+   "asset": "fin_front_1120"
+  },
+  "p_cor": {
+   "asset": "fin_lobby_01"
+  },
+  "p_lawn": {
+   "asset": "fin_relax_1120"
+  },
+  "p_ac": {
+   "asset": "c_app_home_phone"
+  },
+  "p_tech": {
+   "asset": "c_tech_overview"
+  },
+  "logo": {
+   "asset": "c_logo_end"
+  }
+ },
+ "beats": [
+  {
+   "at_en": "futuristic design",
+   "do": "scene",
+   "key": [
+    "p_cor",
+    "t_fut"
+   ],
+   "to": "cor"
+  },
+  {
+   "at_en": "an atmosphere made for relaxing",
+   "do": "scene",
+   "key": [
+    "p_lawn",
+    "t_rel_a",
+    "t_rel"
+   ],
+   "to": "lawn"
+  },
+  {
+   "at_en": "technology that makes",
+   "do": "scene",
+   "key": [
+    "t_tech",
+    "p_tech"
+   ],
+   "to": "board"
+  },
+  {
+   "at_en": "all in a single project",
+   "do": "together",
+   "key": [
+    "t_single",
+    "t_giant"
+   ]
+  },
+  {
+   "at_en": "We care about both",
+   "do": "labels",
+   "key": [
+    "t_live",
+    "t_care"
+   ]
+  },
+  {
+   "at_en": "a Smart Home concept",
+   "do": "smart",
+   "key": [
+    "p_ac",
+    "t_smart"
+   ]
+  },
+  {
+   "at_en": "control their devices",
+   "do": "words",
+   "key": [
+    "t_ctrl"
+   ]
+  },
+  {
+   "at_en": "people who welcome",
+   "do": "end",
+   "key": [
+    "t_for",
+    "t_in"
+   ]
+  },
+  {
+   "at_en": "look for something new",
+   "do": "words",
+   "key": [
+    "t_new"
+   ]
+  },
+  {
+   "at_en": "a modern environment",
+   "do": "words",
+   "key": [
+    "t_mod"
+   ]
+  }
+ ],
+ "options": {
+  "cue": "s02_l09",
+  "home": "phone",
+  "end": "logo",
+  "sig_cam": [
+   50,
+   47,
+   1.02,
+   50,
+   44,
+   1.12
+  ]
+ }
+}

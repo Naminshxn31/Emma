@@ -1,0 +1,59 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "texts": {
+    "kick1": "This page",
+    "title": "The water-quality dashboard",
+    "plate": "Water quality",
+    "kick2": "On a single screen",
+    "team": "The team looking after the project",
+    "can": "Can see",
+    "info": "The information the system shows",
+    "tag": "help monitor the project's water quality"
+  },
+  "beats": [
+    {
+      "at_en": "This page",
+      "do": "wake",
+      "key": "kick1"
+    },
+    {
+      "at_en": "the water-quality dashboard",
+      "do": "dash",
+      "key": [
+        "title",
+        "plate"
+      ]
+    },
+    {
+      "at_en": "On a single screen",
+      "do": "gauges",
+      "key": "kick2"
+    },
+    {
+      "at_en": "the team looking after the project",
+      "do": "team",
+      "key": "team"
+    },
+    {
+      "at_en": "can see the information",
+      "do": "rings",
+      "key": [
+        "can",
+        "info"
+      ]
+    },
+    {
+      "at_en": "and use it",
+      "do": "night"
+    },
+    {
+      "at_en": "help monitor the project's water quality",
+      "do": "tag",
+      "key": "tag"
+    }
+  ],
+  "options": {
+    "mode": "water"
+  }
+}

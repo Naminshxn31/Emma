@@ -1,0 +1,59 @@
+ให้ Emma จำคุณได้
+
+เมื่อลงทะเบียนที่นี่ Emma หุ่นต้อนรับของโครงการ Embassy World จะจำใบหน้าของคุณได้ เมื่อเห็นคุณในงานนี้ หรือในวันที่คุณกลับมาเยี่ยมชมโครงการ เธอจะทักทายคุณด้วยชื่อ และในงานนี้เธออาจเดินเข้ามาทักและยื่นมือจับมือกับคุณ
+
+สิ่งที่เราเก็บ
+• ข้อมูลใบหน้าของคุณ ในรูปตัวเลขที่ระบบคำนวณจากภาพ (ข้อมูลชีวภาพ ซึ่งเป็นข้อมูลส่วนบุคคลที่มีความอ่อนไหว)
+• ชื่อที่ Emma จะใช้เรียกคุณ
+• ภาพถ่ายใบหน้าใช้เพื่อคำนวณเท่านั้น และถูกลบทันทีเมื่อส่งข้อมูลถึงหุ่น
+
+ใช้ทำอะไร
+• ให้ Emma จำและทักทายคุณ ในงานนี้และที่สำนักงานขายของโครงการ Embassy World เท่านั้น
+• ไม่ใช้เพื่อการตลาด ไม่ขาย และไม่ส่งต่อให้ผู้อื่น นอกจากที่เขียนไว้ในหัวข้อ "สิ่งที่ออกไปนอกเครื่องของเรา"
+• ข้อมูลใบหน้าอยู่ในเครื่องของเราเท่านั้น (ตู้นี้และตัวหุ่น) ไม่ถูกส่งออกไปที่ใด
+
+สิ่งที่ออกไปนอกเครื่องของเรา
+• Emma พูดคุยกับทุกคนผ่านบริการ AI ของ Google (Gemini) เมื่อเธอทักทายคุณ ชื่อของคุณจะถูกส่งไปยัง Google พร้อมกับบทสนทนาเพื่อให้เธอตอบได้ และ Google อาจนำข้อมูลนั้นไปใช้ปรับปรุงบริการของ Google ตามเงื่อนไขของ Google
+• บทสนทนา (คำที่ระบบได้ยินและคำตอบของ Emma) ถูกบันทึกในเครื่องของเรา 30 วันเพื่อตรวจการทำงาน แล้วลบอัตโนมัติ
+
+เก็บนานแค่ไหน
+• ถึงวันที่ {until_th} แล้วลบอัตโนมัติ ทั้งที่ตู้นี้และที่ตัวหุ่น
+
+สิทธิของคุณ
+• การลงทะเบียนเป็นความสมัครใจ ไม่ลงทะเบียนก็ร่วมงานและเยี่ยมชมโครงการได้ตามปกติ
+• ขอถอนความยินยอมและให้ลบข้อมูลได้ทุกเมื่อ ที่ตู้นี้หรือกับเจ้าหน้าที่ของโครงการ โดยแจ้งชื่อที่คุณลงทะเบียนไว้
+• ผู้ควบคุมข้อมูล: {controller}
+• ติดต่อ: {contact}
+
+กด "ยินยอม" เมื่อคุณเป็นผู้ลงทะเบียนเอง อายุ 20 ปีขึ้นไป และตกลงตามข้อความนี้
+
+———— English ————
+
+Let Emma remember you
+
+When you register here, Emma, the welcome robot of Embassy World, will recognise your face. When she sees you at this event, or on a day you come back to visit the project, she will greet you by name, and at this event she may walk up to you and offer a handshake.
+
+What we keep
+• Your face, as numbers the system calculates from the pictures (biometric data, a sensitive kind of personal data)
+• The name Emma will call you by
+• The pictures are used only for that calculation and are deleted as soon as the data reaches the robot
+
+What it is used for
+• Only for Emma to recognise and greet you, at this event and at the Embassy World sales office
+• Not for marketing, not sold, and not passed on to anyone except as written under "What leaves our machines"
+• Your face data stays on our own machines (this booth and the robot) and is not sent anywhere
+
+What leaves our machines
+• Emma talks with everyone through Google's AI service (Gemini). When she greets you, your name goes to Google together with the conversation so that she can answer, and Google may use it to improve its services under Google's terms
+• Conversations (what the system heard and what Emma said) are kept on our machine for 30 days to check how she works, then deleted automatically
+
+How long
+• Until {until_en}, then deleted automatically, on this booth and on the robot
+
+Your rights
+• Registering is your choice. Without it you can join the event and visit the project as usual
+• You can withdraw and have your data deleted at any time, at this booth or with our staff, by telling them the name you registered
+• Data controller: {controller}
+• Contact: {contact}
+
+Press "ยินยอม · I agree" if you are registering yourself, are 20 or older, and agree to the above.

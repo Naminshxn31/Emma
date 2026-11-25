@@ -1,0 +1,427 @@
+/* living_photos: the project's own pictures brought to motion. Every selector starts with
+   .cs-act-living_photos; sizes in --cu; only transform and opacity move (a route's
+   stroke-dashoffset is the core's own, and the drawing's strokes are drawn the same way).
+
+   The film's motion identity (18 Nov): Premium -- the signature curve var(--cs-ease) for moves
+   on the screen, var(--cs-ease-in) for what arrives (it decelerates), var(--cs-ease-out) for
+   what leaves (it accelerates, and takes 30-50% less time than its entrance), sine for the
+   ambient loops; overshoot (var(--cs-ease-play)) only in the pool joke's set-up (s04_l09).
+
+   18 Nov: TYPE -- the film's one face (the core's), this file only places the words and sizes a
+   few; FULL SCREEN -- pictures run to the bottom edge, under the subtitle's see-through box,
+   graded down there (.lp-grade), no word, card or label below 43.8cu; NO DEAD HOLDS -- what has
+   landed keeps a slow life, what arrives is already moving; NO FLIPS -- the facilities gather
+   into one wall (s04_l06) and the panels gather over the entrance (s02_l09): no view under 2 s.
+   19 Nov (the owner's notes): Building A DRAWN in light (the landing site's sketch) instead of
+   the rising hologram, its floors lit as she names them; the wall goes on through s04_l09. */
+
+/* the film's curves, once (the stage defines --cs-ease*; the fallbacks keep this act right without it) */
+.cs-act-living_photos {
+  --lp-ease: var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1));
+  --lp-in: var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1));
+  --lp-out: var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1));
+  --lp-play: var(--cs-ease-play, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  --lp-sine: var(--cs-ease-sine, cubic-bezier(0.37, 0, 0.63, 1));
+  font-family: var(--cs-font, "Inter", "Segoe UI", system-ui, sans-serif);
+}
+.cs-act-living_photos .lp-scene {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden;
+  transition: opacity 1.1s var(--lp-ease), transform 1.3s var(--lp-ease);
+}
+.cs-act-living_photos .lp-world { position: absolute; left: 0; top: 0; width: calc(100 * var(--cu)); }
+.cs-act-living_photos .lp-pic { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+/* a picture's lowest part, under the subtitle's box: graded down softly, part of the shot */
+.cs-act-living_photos .lp-grade {
+  position: absolute; left: 0; bottom: 0; width: 100%; height: calc(21 * var(--cu));
+  background: linear-gradient(to top, rgba(3, 5, 13, .8) 0%, rgba(3, 5, 13, .7) 22%, rgba(3, 5, 13, .45) 48%, rgba(3, 5, 13, .16) 76%, rgba(3, 5, 13, 0) 100%);
+}
+
+/* ---- a scene's words: one small block, top left (clear of the subject and of the subtitle) ---- */
+.cs-act-living_photos .lp-cap {
+  position: absolute; left: calc(5 * var(--cu)); top: calc(4.6 * var(--cu)); max-width: calc(56 * var(--cu));
+  display: flex; flex-direction: column; align-items: flex-start; gap: calc(.6 * var(--cu));
+}
+/* a kicker (the small line over a headline): readable from the back of the hall (~2.3% of the height) */
+.cs-act-living_photos .lp-kick { font-size: calc(2.4 * var(--cu)); }
+.cs-act-living_photos .lp-wrap { max-width: calc(46 * var(--cu)); white-space: normal; }
+/* words on a picture: the shot's top-left corner is graded down under them */
+.cs-act-living_photos .lp-capshade {
+  position: absolute; left: 0; top: 0; width: 100%; height: calc(27 * var(--cu));
+  background:
+    radial-gradient(ellipse 66% 100% at 0% 0%, rgba(3, 5, 13, .72) 0%, rgba(3, 5, 13, .46) 46%, rgba(3, 5, 13, 0) 100%),
+    linear-gradient(180deg, rgba(3, 5, 13, .5) 0%, rgba(3, 5, 13, .26) 46%, rgba(3, 5, 13, 0) 100%);
+}
+/* (the entrance of s02_l09 under the board: a dark veil comes over it, and it keeps its slow push) */
+.cs-act-living_photos .lp-veil {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0;
+  background: linear-gradient(180deg, rgba(3, 5, 13, .7) 0%, rgba(3, 5, 13, .66) 60%, rgba(3, 5, 13, .8) 100%);
+  transition: opacity 1.1s var(--lp-ease);
+}
+.cs-act-living_photos .lp-scene.lp-dim .lp-veil { opacity: 1; }
+
+/* ---- what has landed keeps a slow life (ambient; sine, out of step by its place --i) ---- */
+.cs-act-living_photos .lp-slow {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  animation: living_photos-closer 10s var(--lp-sine) calc(var(--i, 0) * -2.3s) infinite alternate;
+}
+@keyframes living_photos-closer { from { transform: scale(1); } to { transform: translate3d(-1%, -1.2%, 0) scale(1.14); } }
+.cs-act-living_photos .lp-float { animation: living_photos-float 6.5s var(--lp-sine) infinite alternate; }
+@keyframes living_photos-float { from { transform: translate3d(0, calc(-.4 * var(--cu)), 0); } to { transform: translate3d(0, calc(.4 * var(--cu)), 0); } }
+
+/* ==== s04_l06 / s04_l09: Building A drawn in light ================================================ */
+/* The landing site's sketch in its 'glass' look: silver-blue strokes on a navy of their own (the
+   shot before dissolves straight into it: one subject, no stage arc or grid behind it). Each
+   stroke is drawn along its length (stroke-dashoffset, 0..1 of its own length), the pen a warm
+   point of light at its tip. The frame and the slabs bright, the windows softer, the drafting
+   grid faint; the garden, the water and the wind a layer of their own, lit on "outdoors". */
+.cs-act-living_photos .lp-draw {
+  background: radial-gradient(ellipse 78% 72% at 50% 40%, #0c1840 0%, #081029 46%, #03050d 100%);
+  transition: opacity 1.1s var(--lp-ease);
+}
+/* (once the floors are named, the drawing stays behind the wall, dimmer: the lines only, not its ground) */
+.cs-act-living_photos .lp-draw .lp-world { transition: opacity 2.6s var(--lp-sine); }
+.cs-act-living_photos .lp-draw.lp-behind .lp-world { opacity: .3; }
+.cs-act-living_photos .lp-sksvg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+.cs-act-living_photos .lp-sksvg path { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 1; }
+.cs-act-living_photos .lp-sksvg .k0 { stroke: rgba(214, 223, 238, .24); }
+.cs-act-living_photos .lp-sksvg .k1 { stroke: rgba(238, 244, 255, .95); }
+.cs-act-living_photos .lp-sksvg .k2 { stroke: rgba(184, 211, 246, .6); }
+.cs-act-living_photos .lp-sksvg .k3 { stroke: rgba(214, 223, 238, .5); }
+.cs-act-living_photos .lp-sksvg .k5 { stroke: rgba(196, 230, 214, .6); }
+.cs-act-living_photos .lp-sksvg .k6 { stroke: rgba(150, 206, 255, .5); }
+.cs-act-living_photos .lp-sksvg .k7 { stroke: rgba(214, 223, 238, .34); }
+.cs-act-living_photos .lp-sksvg .kg { stroke: rgba(140, 180, 255, .12); }
+.cs-act-living_photos .lp-sksvg .kb { stroke: rgba(150, 226, 255, .9); }
+.cs-act-living_photos .lp-sksvg .kb2 { stroke: rgba(150, 226, 255, .45); }
+/* the frame's glow: as the drawing closes it brightens once and settles (follow-through) */
+.cs-act-living_photos .lp-skglow { opacity: .7; transform: translate3d(0, 0, 0); }
+.cs-act-living_photos .lp-draw.lp-closed .lp-skglow { animation: living_photos-closed 1.8s var(--lp-sine) 1; }
+@keyframes living_photos-closed { 0% { opacity: .7; } 28% { opacity: 1; } 100% { opacity: .7; } }
+/* the garden, the water and the wind: quieter until "outdoors" (layers of their own: their light
+   changes without the frame's lines being drawn again) */
+.cs-act-living_photos .lp-skland { opacity: .62; transform: translate3d(0, 0, 0); transition: opacity 1.2s var(--lp-sine); }
+.cs-act-living_photos .lp-skland.lp-lit { opacity: 1; }
+.cs-act-living_photos .lp-skland.lp-off { opacity: 0; }
+/* the pen: a warm point of light at the tip of the stroke being drawn */
+.cs-act-living_photos .lp-pen {
+  position: absolute; left: calc(-1.4 * var(--cu)); top: calc(-1.4 * var(--cu)); width: calc(2.8 * var(--cu)); height: calc(2.8 * var(--cu));
+  border-radius: 50%; opacity: 0; transition: opacity .3s var(--lp-ease);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 242, 220, .95) 0%, rgba(255, 236, 205, .5) 12%, rgba(255, 236, 205, .14) 36%, rgba(255, 236, 205, 0) 68%);
+}
+.cs-act-living_photos .lp-pen.lp-on { opacity: 1; }
+/* a floor's band: light across the building at that floor, a sweep running along it once as
+   she names it; then it rests, lit a little (the floor stays marked behind the wall) */
+.cs-act-living_photos .lp-band {
+  position: absolute; overflow: hidden; opacity: 0; transform: translate3d(0, 0, 0); transition: opacity .6s var(--lp-sine);
+  background: linear-gradient(180deg, rgba(110, 231, 255, .06) 0%, rgba(110, 231, 255, .26) 22%, rgba(190, 244, 255, .5) 50%, rgba(110, 231, 255, .26) 78%, rgba(110, 231, 255, .06) 100%);
+  box-shadow: inset 0 1px 0 rgba(190, 242, 255, .9), inset 0 -1px 0 rgba(190, 242, 255, .9);
+}
+.cs-act-living_photos .lp-band.lp-on { opacity: 1; }
+.cs-act-living_photos .lp-band.lp-on.lp-rest { opacity: .42; transition: opacity 1.4s var(--lp-sine); }
+.cs-act-living_photos .lp-bandsweep {
+  position: absolute; left: 0; top: 0; width: 22%; height: 100%; opacity: 0; transform: translate3d(-100%, 0, 0);
+  background: linear-gradient(90deg, rgba(230, 252, 255, 0) 0%, rgba(230, 252, 255, .8) 50%, rgba(230, 252, 255, 0) 100%);
+}
+.cs-act-living_photos .lp-band.lp-on:not(.lp-rest) .lp-bandsweep { animation: living_photos-sweep 1.3s var(--lp-ease) 1 both; }
+@keyframes living_photos-sweep {
+  0% { opacity: 0; transform: translate3d(-100%, 0, 0); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(455%, 0, 0); }
+}
+.cs-act-living_photos .lp-mark { position: absolute; width: 0; height: 0; }
+/* (under the subtitle's box: the water's lines graded down, part of the shot) */
+.cs-act-living_photos .lp-skgrade {
+  position: absolute; left: 0; bottom: 0; width: 100%; height: calc(17 * var(--cu));
+  background: linear-gradient(to top, rgba(3, 5, 13, .82) 0%, rgba(3, 5, 13, .6) 34%, rgba(3, 5, 13, .2) 72%, rgba(3, 5, 13, 0) 100%);
+}
+
+/* the title: top left, on her words "Building A"; it stays as the wall's heading while the floors gather */
+.cs-act-living_photos .lp-title {
+  position: absolute; left: calc(5.55 * var(--cu)); top: calc(3 * var(--cu));
+  display: flex; flex-direction: row; align-items: baseline; gap: calc(1.1 * var(--cu)); white-space: nowrap;
+  transition: opacity .4s var(--lp-out);
+}
+.cs-act-living_photos .lp-title.lp-out { opacity: 0; }
+/* (words over the drawing's lines: a soft dark ground under them, part of the shot) */
+.cs-act-living_photos .lp-titleshade {
+  position: absolute; left: calc(-8 * var(--cu)); top: calc(-4.5 * var(--cu)); width: calc(96 * var(--cu)); height: calc(12.5 * var(--cu));
+  background: radial-gradient(ellipse 56% 62% at 38% 50%, rgba(3, 5, 13, .8) 0%, rgba(3, 5, 13, .52) 50%, rgba(3, 5, 13, 0) 100%);
+}
+
+/* the wall: a slow glide of its camera while the floors gather; it dims while the pool is the
+   whole screen; once the pool is back in its place it drifts, slowly */
+.cs-act-living_photos .lp-wall.lp-behind { opacity: .45; }
+.cs-act-living_photos .lp-drift { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-living_photos .lp-wall.lp-drifting .lp-drift { animation: living_photos-drift 16s var(--lp-sine) infinite alternate; }
+@keyframes living_photos-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(calc(-.5 * var(--cu)), calc(-.35 * var(--cu)), 0) scale(1.022); } }
+
+/* a tile: one picture of the wall. It gathers into its place (rising a little, coming forward,
+   lighting up -- staggered by --d) -- or, set by the act, rises out of its floor of the drawing:
+   the tile moves across and grows, .lp-fly moves up, on two curves (an arc) */
+.cs-act-living_photos .lp-tile {
+  position: absolute; opacity: 0; transform: translate3d(0, calc(1.4 * var(--cu)), 0) scale(.9);
+  transition: opacity .9s var(--lp-sine) var(--d, 0s), transform 1.1s var(--lp-in) var(--d, 0s);
+}
+.cs-act-living_photos .lp-tile.lp-on { opacity: 1; transform: none; }
+.cs-act-living_photos .lp-fly { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+/* (the tile's inner frame, and its light, are layers of their own from the start: the wall's
+   slow life later moves them -- measured: 67 ms at 2552 px when a picture became a layer late) */
+.cs-act-living_photos .lp-tin { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform: translate3d(0, 0, 0); }
+.cs-act-living_photos .lp-cell {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden;
+  border-radius: calc(.3 * var(--cu)); background: #05070f; box-shadow: 0 0 0 1px rgba(150, 190, 255, .22);
+}
+.cs-act-living_photos .lp-cell .cs-apic.lp-sheet { position: absolute; }
+.cs-act-living_photos .lp-sheen {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: calc(.3 * var(--cu)); opacity: 0; transform: translate3d(0, 0, 0);
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0) 32%, rgba(230, 246, 255, .26) 50%, rgba(255, 255, 255, 0) 68%);
+}
+/* the living wall: one picture after another comes forward a little and catches the light, in a
+   scattered order (--k), two or three at a time -- never all at once, never the pool's two
+   (.lp-still: in s04_l09 they would hint at the joke). --al = how far in it already is (a wall
+   that goes on from the line before: the same phase, nothing jumps) */
+.cs-act-living_photos .lp-wall.lp-alive .lp-tile:not(.lp-still) .lp-tin { animation: living_photos-spot 44s var(--lp-sine) calc(var(--k, 0) * 1.1s + .2s - var(--al, 0s)) infinite; }
+.cs-act-living_photos .lp-wall.lp-alive .lp-tile:not(.lp-still) .lp-sheen { animation: living_photos-sheen 44s var(--lp-sine) calc(var(--k, 0) * 1.1s + .2s - var(--al, 0s)) infinite; }
+/* (a lift and the light, no growth: a picture of a floor's sheet drawn again at 1.08 of its size cost a
+   50 ms frame at the first of these, ~1.4 s into the living wall -- measured at both sizes) */
+@keyframes living_photos-spot {
+  0% { transform: translate3d(0, 0, 0); }
+  2.8% { transform: translate3d(0, calc(-.42 * var(--cu)), 0); }
+  5.6% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes living_photos-sheen { 0% { opacity: 0; } 2.8% { opacity: 1; } 5.6% { opacity: 0; } 100% { opacity: 0; } }
+
+/* each place's name, above its pictures: small, light, sentence case (1.9cu, set tight in its 2.3cu row) */
+.cs-act-living_photos .lp-glabel { position: absolute; white-space: nowrap; }
+.cs-act-living_photos .lp-gword { font-size: calc(1.9 * var(--cu)); line-height: 1.12; font-weight: 540; color: var(--cs-ink, #f4f7ff); }
+/* "several more places to relax": a card in the last place of the outdoor pictures */
+.cs-act-living_photos .lp-relax {
+  position: absolute; box-sizing: border-box; padding: calc(.5 * var(--cu)) calc(.55 * var(--cu));
+  display: flex; align-items: center; opacity: 0; transform: translate3d(0, calc(1 * var(--cu)), 0) scale(.94);
+  transition: opacity .8s var(--lp-sine), transform 1s var(--lp-in);
+}
+.cs-act-living_photos .lp-relax.lp-in { opacity: 1; transform: none; }
+.cs-act-living_photos .lp-relaxword { font-size: calc(1.2 * var(--cu)); line-height: 1.25; white-space: normal; color: var(--cs-ink, #f4f7ff); }
+/* the pool's length, under its pictures */
+.cs-act-living_photos .lp-wallfigat { position: absolute; }
+.cs-act-living_photos .lp-wallfig { font-size: calc(2.1 * var(--cu)); color: #ffffff; }
+.cs-act-living_photos .lp-wallfig .cs-fig-unit { font-size: .5em; color: #eef8ff; }
+
+/* the pool, grown out of its tile: the act sets where it starts (its tile) and takes it to the
+   whole screen. Under the wall it waits all but invisible (a layer at 0 is not drawn at all) */
+.cs-act-living_photos .lp-hero { transform-origin: 0 0; opacity: .004; transition: none; }
+.cs-act-living_photos .lp-hero.lp-up { opacity: 1; }
+/* its card: the whole pool from above, the outline traced in light, the length under it -- on a
+   dark glass so the plan reads over the picture; it arrives in two slow steps (~1.8 s) */
+.cs-act-living_photos .lp-spec {
+  position: absolute; left: calc(62 * var(--cu)); top: calc(4.6 * var(--cu)); width: calc(33 * var(--cu));
+  box-sizing: border-box; padding: calc(1 * var(--cu)); background: rgba(4, 9, 28, .5);
+  display: flex; flex-direction: column; align-items: flex-start; gap: calc(.5 * var(--cu));
+  opacity: 0; transform: translate3d(0, calc(1.2 * var(--cu)), 0);
+  transition: opacity 1.2s var(--lp-sine), transform 1.4s var(--lp-in);
+}
+/* (it stays a layer of its own once landed: the outline drawn on it repaints this card alone) */
+.cs-act-living_photos .lp-spec.lp-in { opacity: 1; transform: translate3d(0, 0, 0); }
+.cs-act-living_photos .lp-spec .lp-plan { opacity: 0; transition: opacity 1s var(--lp-sine) .55s; }
+.cs-act-living_photos .lp-spec.lp-in .lp-plan { opacity: 1; }
+.cs-act-living_photos .lp-spec.lp-in.lp-out { opacity: 0; transform: translate3d(0, calc(-1 * var(--cu)), 0); transition: opacity .3s var(--lp-out), transform .35s var(--lp-out); }
+/* (its height is the picture's own shape: the act sets it from the plan's width and height -- this is the
+   owner's ground-floor plan of 23 Nov, 1984 x 758) */
+.cs-act-living_photos .lp-plan { position: relative; width: calc(31 * var(--cu)); height: calc(11.85 * var(--cu)); }
+.cs-act-living_photos .lp-plan .cs-apic.cs-drawing { background: none; }
+.cs-act-living_photos .lp-specfig { font-size: calc(3.8 * var(--cu)); color: #ffffff; }
+.cs-act-living_photos .lp-specfig .cs-fig-unit { font-size: .42em; color: #eef8ff; }
+
+.cs-act-living_photos .lp-centre .cs-route-line { stroke: rgba(244, 247, 255, .9); stroke-dasharray: .012 .02; }
+.cs-act-living_photos .lp-centre .cs-route-glow { stroke: rgba(var(--cs-cyan), .25); stroke-dasharray: none; }
+/* the outline's follow-through: a brighter copy flares once as it closes */
+.cs-act-living_photos svg.lp-flare { opacity: 0; }
+.cs-act-living_photos svg.lp-flare.lp-go { animation: living_photos-flare 1.1s both; }
+.cs-act-living_photos .lp-flare .cs-route-line { stroke: #ffffff; }
+.cs-act-living_photos .lp-flare .cs-route-glow { stroke: rgba(var(--cs-cyan), .6); }
+@keyframes living_photos-flare {
+  0% { opacity: 0; animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+  20% { opacity: .8; animation-timing-function: cubic-bezier(.37, 0, .63, 1); }
+  100% { opacity: 0; }
+}
+/* rings spread on the water as the figure lights (the act puts them on the water's middle line) */
+.cs-act-living_photos .lp-ripple { position: absolute; left: 43%; top: 47.5%; width: 0; height: 0; }
+.cs-act-living_photos .lp-rip {
+  position: absolute; left: calc(-2.4 * var(--cu)); top: calc(-2.4 * var(--cu)); width: calc(4.8 * var(--cu)); height: calc(4.8 * var(--cu));
+  border-radius: 50%; border: calc(.12 * var(--cu)) solid rgba(214, 246, 255, .9); box-sizing: border-box; opacity: 0; transform: scale(.2);
+}
+.cs-act-living_photos .lp-ripple.lp-go .lp-rip { animation: living_photos-rip 1.3s var(--lp-in) both; }
+.cs-act-living_photos .lp-ripple.lp-go .lp-rip2 { animation-delay: .16s; }
+@keyframes living_photos-rip { 0% { opacity: 0; transform: scale(.2); } 12% { opacity: .85; } 100% { opacity: 0; transform: scale(1.5); } }
+/* the water's ambient life: glints breathing along the lagoon (sine, out of step) */
+.cs-act-living_photos .lp-glints { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .9s var(--lp-sine); }
+.cs-act-living_photos .lp-glints.lp-on { opacity: 1; }
+.cs-act-living_photos .lp-glint { position: absolute; width: 0; height: 0; }
+.cs-act-living_photos .lp-gl {
+  position: absolute; left: calc(-1.3 * var(--cu)); top: calc(-.28 * var(--cu)); width: calc(2.6 * var(--cu)); height: calc(.56 * var(--cu)); border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, .95) 0%, rgba(200, 244, 255, .5) 34%, rgba(110, 231, 255, 0) 70%);
+  opacity: .15; animation: living_photos-glint var(--d, 3s) var(--lp-sine) var(--dl, 0s) infinite alternate;
+}
+@keyframes living_photos-glint { from { opacity: .1; transform: scale(.5, .8); } to { opacity: .95; transform: scale(1.15, 1); } }
+
+/* her question, top left over the living wall: one line, its name small before it (clear of the floor names) */
+.cs-act-living_photos .lp-asking {
+  position: absolute; left: calc(5.55 * var(--cu)); top: calc(3 * var(--cu));
+  display: flex; flex-direction: row; align-items: baseline; gap: calc(1.1 * var(--cu)); white-space: nowrap;
+}
+
+/* ==== s02_l09: the board -- three glass panels over the dimmed entrance =========================== */
+.cs-act-living_photos .lp-fan3 { position: absolute; left: 0; width: 100%; top: calc(7.5 * var(--cu)); transition: transform 1.2s var(--lp-ease); }
+.cs-act-living_photos .lp-pnl {
+  position: relative; width: calc(29.4 * var(--cu)); height: calc(17.4 * var(--cu)); opacity: 0; transform: translate3d(0, calc(4.5 * var(--cu)), 0) scale(.96);
+  transition: opacity .7s var(--lp-sine), transform 1s var(--lp-in);
+}
+.cs-act-living_photos .lp-pnl.lp-in { opacity: 1; transform: none; }
+.cs-act-living_photos .lp-s-together .lp-fan3 { transform: scale(.9) translate3d(0, calc(2 * var(--cu)), 0); }
+.cs-act-living_photos .lp-pnlpic { position: absolute; left: calc(.5 * var(--cu)); top: calc(.5 * var(--cu)); right: calc(.5 * var(--cu)); bottom: calc(.5 * var(--cu)); border-radius: calc(.8 * var(--cu)); overflow: hidden; }
+/* what the first two panels are, under them, as she says it */
+.cs-act-living_photos .lp-under {
+  position: absolute; top: calc(26.6 * var(--cu)); width: calc(30 * var(--cu));
+  display: flex; flex-direction: column; align-items: center; gap: calc(.3 * var(--cu)); text-align: center;
+}
+.cs-act-living_photos .lp-under-a { left: calc(4.4 * var(--cu)); }
+.cs-act-living_photos .lp-under-b { left: calc(35 * var(--cu)); }
+.cs-act-living_photos .lp-typed {
+  position: absolute; left: calc(2.4 * var(--cu)); right: calc(2.4 * var(--cu)); top: calc(3.4 * var(--cu));
+  font-size: calc(2.5 * var(--cu)); line-height: 1.24; white-space: normal;
+  transition: opacity .3s var(--lp-out), transform .35s var(--lp-out);
+}
+/* The Smart Home panel (owner 19 Nov, 27.png): the Smart Home app's own screen -- its Devices card
+   and its scenes -- in a panel the same size as the other two. It settles from a little close as
+   the typed words leave upward, then keeps coming in slowly; a light sweeps across it once as she
+   names it (it is the panel spoken of: marked by light, not by size), the other two stand back a
+   little; a ring of light answers on each device, one after another, on "control". */
+.cs-act-living_photos .lp-home { opacity: 0; transition: opacity .7s var(--lp-ease) .1s; background: #dcecff; }
+.cs-act-living_photos .lp-homecam {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  transform: scale(1.12); transition: transform 1.5s var(--lp-in) .1s;
+}
+.cs-act-living_photos .lp-homenear { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 50% 40%; }
+.cs-act-living_photos .lp-showhome .lp-home { opacity: 1; }
+.cs-act-living_photos .lp-showhome .lp-homecam { transform: none; }
+.cs-act-living_photos .lp-showhome .lp-homenear { animation: living_photos-homenear 11s var(--lp-sine) 1.6s infinite alternate; }
+@keyframes living_photos-homenear { from { transform: scale(1); } to { transform: scale(1.06); } }
+.cs-act-living_photos .lp-showhome .lp-typed { opacity: 0; transform: translate3d(0, calc(-1.2 * var(--cu)), 0); }
+.cs-act-living_photos .lp-pnlsweep {
+  position: absolute; left: 0; top: 0; width: 34%; height: 100%; opacity: 0; transform: translate3d(-110%, 0, 0);
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .42) 50%, rgba(255, 255, 255, 0) 100%);
+}
+.cs-act-living_photos .lp-showhome .lp-pnlsweep { animation: living_photos-pnlsweep 1.6s var(--lp-ease) .55s 1 both; }
+@keyframes living_photos-pnlsweep { 0% { opacity: 0; transform: translate3d(-110%, 0, 0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate3d(320%, 0, 0); } }
+.cs-act-living_photos .lp-s-smart .lp-pnl.lp-in:not(.lp-tech) { opacity: .74; }
+.cs-act-living_photos .lp-s-end .lp-pnl.lp-in:not(.lp-tech) { opacity: 1; }
+.cs-act-living_photos .lp-dev { position: absolute; width: 0; height: 0; opacity: 0; transition: opacity .4s var(--lp-ease) calc(1.2s + var(--i, 0) * .09s); }
+.cs-act-living_photos .lp-showhome .lp-dev { opacity: 1; }
+.cs-act-living_photos .lp-devring {
+  position: absolute; left: calc(-1.75 * var(--cu)); top: calc(-1.75 * var(--cu)); width: calc(3.5 * var(--cu)); height: calc(3.5 * var(--cu));
+  border-radius: 50%; border: calc(.14 * var(--cu)) solid rgba(22, 92, 236, .85); box-sizing: border-box; opacity: 0; transform: scale(.7);
+}
+.cs-act-living_photos .lp-showhome .lp-devring:not(.lp-devans) { animation: living_photos-ping 3.6s var(--lp-in) calc(1.4s + var(--i, 0) * .9s) infinite; }
+@keyframes living_photos-ping { 0% { opacity: .8; transform: scale(.8); } 62% { opacity: 0; transform: scale(1.45); } 100% { opacity: 0; transform: scale(1.45); } }
+.cs-act-living_photos .lp-devans { border-color: rgba(18, 84, 230, 1); border-width: calc(.24 * var(--cu)); }
+.cs-act-living_photos .lp-s-ctrl .lp-devans { animation: living_photos-answer 1.2s var(--lp-in) calc(var(--i, 0) * .18s) 1 both; }
+@keyframes living_photos-answer { 0% { opacity: 0; transform: scale(.7); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.4); } }
+
+/* the words of the board: the three panels' names, one size, one line, each under its own panel;
+   the project's name under all three; the list of who it is for on the left once the panels
+   have stepped aside */
+.cs-act-living_photos .lp-lbl { position: absolute; top: calc(27.2 * var(--cu)); width: calc(30 * var(--cu)); text-align: center; white-space: nowrap; font-size: calc(1.85 * var(--cu)); color: var(--cs-ink, #f4f7ff); }
+.cs-act-living_photos .lp-lbl-a { left: calc(7.5 * var(--cu)); }
+.cs-act-living_photos .lp-lbl-b { left: calc(35 * var(--cu)); }
+.cs-act-living_photos .lp-lbl-c { left: calc(62.5 * var(--cu)); }
+.cs-act-living_photos .lp-ctrl { position: absolute; left: calc(59.5 * var(--cu)); width: calc(36 * var(--cu)); top: calc(30.4 * var(--cu)); text-align: center; font-size: calc(1.9 * var(--cu)); }
+.cs-act-living_photos .lp-proj {
+  position: absolute; left: 0; width: 100%; top: calc(32.4 * var(--cu));
+  display: flex; flex-direction: column; align-items: center; gap: calc(.4 * var(--cu));
+}
+/* "people who welcome innovation": the panels step off to the right (an exit: 1.1 s), the
+   list comes on the left once that side is clear (staging: no words under moving panels) */
+.cs-act-living_photos .lp-s-end .lp-fan3 { transform: translate3d(calc(30.5 * var(--cu)), calc(1.5 * var(--cu)), 0) scale(.38); transition-duration: 1.1s; }
+.cs-act-living_photos .lp-list {
+  position: absolute; left: calc(6 * var(--cu)); top: calc(5.4 * var(--cu));
+  display: flex; flex-direction: column; align-items: flex-start; gap: calc(1.5 * var(--cu));
+  transform-origin: 0 50%; transition: transform 11s cubic-bezier(.25, .46, .45, .94);
+}
+.cs-act-living_photos .lp-s-end .lp-list { transform: translate3d(calc(1.8 * var(--cu)), 0, 0) scale(1.04); }
+.cs-act-living_photos .lp-line { font-size: calc(3.4 * var(--cu)); }
+
+/* ==== s04_l09: the dry set-up over the same wall, then the panel pops (Playful) ==================== */
+/* (the wall and its drawing as one rig: the slow look along the floors, then the lean-and-back --
+   both set by the act; the look scales about the basement and ground floor, away from the pool) */
+.cs-act-living_photos .lp-rig { overflow: visible; transform-origin: 34% 38%; transition: none; }
+.cs-act-living_photos .lp-thankcap { left: calc(5.55 * var(--cu)); top: calc(3 * var(--cu)); max-width: none; gap: calc(.35 * var(--cu)); }
+.cs-act-living_photos .lp-thankcap .cs-type-h2 { white-space: nowrap; }
+.cs-act-living_photos .lp-thanks { color: #ffffff; font-weight: 520; }
+.cs-act-living_photos .lp-thankshade { left: 0; top: 0; width: calc(78 * var(--cu)); height: calc(15 * var(--cu));
+  background: radial-gradient(ellipse 62% 78% at 22% 36%, rgba(3, 5, 13, .8) 0%, rgba(3, 5, 13, .5) 50%, rgba(3, 5, 13, 0) 100%); }
+.cs-act-living_photos .lp-panel {
+  position: absolute; left: calc(24 * var(--cu)); top: calc(7.4 * var(--cu)); width: calc(52 * var(--cu)); height: calc(29.25 * var(--cu));
+  opacity: 0; transform: translate3d(0, calc(1.6 * var(--cu)), 0) scale(.8);
+  transition: opacity .2s var(--lp-in) .3s, transform .56s var(--lp-play) .3s;
+}
+.cs-act-living_photos .lp-panel.lp-up { opacity: 1; transform: none; }
+.cs-act-living_photos .lp-typed2 {
+  position: absolute; left: calc(4 * var(--cu)); right: calc(4 * var(--cu)); top: calc(9.4 * var(--cu)); text-align: center;
+  font-size: calc(3.1 * var(--cu)); line-height: 1.25; white-space: normal;
+}
+.cs-act-living_photos .lp-dots { position: absolute; left: 0; width: 100%; bottom: calc(4 * var(--cu)); display: flex; justify-content: center; gap: calc(1.2 * var(--cu)); }
+.cs-act-living_photos .lp-dot { width: calc(.9 * var(--cu)); height: calc(.9 * var(--cu)); border-radius: 50%; background: rgb(var(--cs-cyan)); animation: living_photos-dot 1.4s var(--lp-sine) infinite; }
+.cs-act-living_photos .lp-dot:nth-child(2) { animation-delay: .17s; }
+.cs-act-living_photos .lp-dot:nth-child(3) { animation-delay: .34s; }
+@keyframes living_photos-dot { 0%, 55%, 100% { transform: translate3d(0, 0, 0); opacity: .45; } 25% { transform: translate3d(0, calc(-.8 * var(--cu)), 0); opacity: 1; } }
+
+/* s04_l09 opening on the logo (owner 23 Nov, "ให้เปลี่ยนเป็นโลโก้ ตอนแรก"): the opening clip's last frame,
+   keyed on black, on the stage's own light -- a little smaller than the ceremony's logo page, so the ring
+   stands clear under her words (its top ~15cu) and the wordmark clear of the subtitle's box (~41cu). It
+   arrives already moving (a slow push as the shot dissolves in), then breathes; the rig round it looks
+   closer on "I've studied" and backs away under the panel, as the drawing did (centred on the ring) */
+.cs-act-living_photos .lp-logorig { transform-origin: 50% 44%; }
+.cs-act-living_photos .lp-logoat {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform: scale(.74);
+  transition: transform 4.2s cubic-bezier(.25, .46, .45, .94);
+}
+.cs-act-living_photos.cs-live .lp-logoat { transform: scale(.8); }
+.cs-act-living_photos .lp-logobreathe {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  animation: living_photos-breathe 11s var(--lp-sine) 4.2s infinite alternate;
+}
+
+/* ==== the owner's review of 20 Nov (the PDF of his notes) ===================================== */
+/* p.6: the technology panel carries the landing page's technology overview, as the first two
+   carry theirs; its words stand under it as theirs do (typed in step with her voice) */
+.cs-act-living_photos .lp-techpic { background: #050b22; }
+.cs-act-living_photos .lp-under-c { left: calc(65.2 * var(--cu)); }
+.cs-act-living_photos .lp-typed.lp-typedc {
+  position: relative; left: auto; right: auto; top: auto; max-width: calc(27 * var(--cu));
+  font-size: calc(2.1 * var(--cu)); font-weight: 600; line-height: 1.22; text-align: center; color: var(--cs-ink, #f4f7ff);
+}
+/* p.7: the Smart Home app on a phone, whole in the panel on the night's blue; on "control" a
+   second light crosses it (the rings stood on the old screen's switches) */
+.cs-act-living_photos .lp-home.lp-phone { background: radial-gradient(120% 95% at 50% 62%, #163a96 0%, #0a1d55 52%, #040a24 100%); }
+/* (the core lays a flat panel under any picture with alpha -- the act's night blue is the ground
+   here, as under the plan above; fix 2 of the review, 20 Nov) */
+.cs-act-living_photos .lp-home.lp-phone .cs-apic.cs-drawing { background: none; }
+.cs-act-living_photos .lp-showhome .lp-pnlsweep.lp-sweep2 { animation: none; }
+.cs-act-living_photos .lp-s-ctrl .lp-showhome .lp-pnlsweep.lp-sweep2 { animation: living_photos-pnlsweep 1.6s var(--lp-ease) .1s 1 both; }
+/* p.8 / p.10: once the line is over, its layer fades and the logo page comes up -- out of the
+   depth as the opening brought it, then breathing (a held page is never a freeze) */
+.cs-act-living_photos .lp-all { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transition: opacity 1.2s var(--lp-out); }
+.cs-act-living_photos.lp-ending .lp-all { opacity: 0; }
+.cs-act-living_photos .lp-endlogo {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transform: scale(.94);
+  transition: opacity 1.6s var(--lp-ease) .45s, transform 2.4s var(--lp-in) .45s;
+}
+.cs-act-living_photos.lp-ending .lp-endlogo { opacity: 1; transform: none; }
+.cs-act-living_photos .lp-endbreathe { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-living_photos.lp-ending .lp-endbreathe { animation: living_photos-breathe 11s var(--lp-sine) 2.8s infinite alternate; }
+@keyframes living_photos-breathe { from { transform: scale(1); } to { transform: scale(1.018); } }
+
+/* a late beat jumps to its state (the act puts this on for a moment): last, so it wins */
+.cs-act-living_photos .lp-now, .cs-act-living_photos .lp-now .lp-cell, .cs-act-living_photos .lp-now .lp-veil, .cs-act-living_photos .lp-now .lp-plan,
+.cs-act-living_photos .lp-now .lp-world, .cs-act-living_photos .lp-now .lp-homecam, .cs-act-living_photos .lp-now.lp-home { transition: none; }

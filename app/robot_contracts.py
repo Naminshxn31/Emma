@@ -39,6 +39,12 @@ BODY_KINDS = {a[0]: a[2] for a in BODY_ACTIONS}
 #: BodyGestures.speechCapable and the page's SPEECH_BODY_IDS: no head (ch8
 #: burned 12 Sep), no vendor group, no rest, no stop.
 SPEECH_BODY_ACTIONS = ("raise_left_arm", "raise_right_arm", "wave", "hands_left", "hands_right")
+#: The Emma Event debut's pageant (ท่านางงาม, owner 9 Nov 2026; Pageant.java on the app,
+#: app/event_pageant.py here): start, and bring the hand down. `style: "event"` only, never in
+#: BODY_ACTIONS -- so never in move_body's enum, never from a guest's words -- relayed by the event
+#: app's page only (EVENT_BODY_IDS) and played by the Emma Event app only. The one arm motion the
+#: server lets through its own walk (robot_face_link._send).
+EVENT_BODY_ACTIONS = ("pageant", "pageant_end")
 
 # Heard guard (§2d): per action, the caption must contain one VERB token, and
 # for a sided action also the SIDE token — and, for the actions in
@@ -224,6 +230,9 @@ BODY_REASONS = {   # code -> Thai (UI text and tool instruction stem)
     # link level (robot_face_link), distinct from "busy" (= the ARM is busy,
     # decided on the robot): one word meaning two things was review point B10.
     "request_pending": "คำสั่งก่อนหน้ายังรอหุ่นตอบอยู่", "disconnected": "หน้าจอหุ่นหลุดการเชื่อมต่อ",
+    "not_event_app": "ท่านี้ใช้ได้เฉพาะแอป Emma Event และ Emma Ceremony",
+    # app/event_box.py (owner 23 Nov): she is in the box until a walk out got her out, or staff cleared it
+    "in_box": "หุ่นยังอยู่ในกล่อง — ไม่ขยับแขน (กด 'หุ่นออกจากกล่องแล้ว — ปลดล็อกแขน' ถ้าพาออกมาแล้ว)",
 }
 NAV_REASONS = {
     "disabled": "ฟังก์ชันนำทางปิดอยู่บนหุ่น",

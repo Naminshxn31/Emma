@@ -890,6 +890,14 @@ renderer.setAnimationLoop(() => {
   // while nobody is looking; the clock's delta is clamped so the animation
   // does not jump on return.
   if (document.hidden) { clock.getDelta(); return; }
+  // The ceremony's event screen (html.mirror-show, client/voice-preview.html: "no Emma" for
+  // the whole call) hides her with CSS -- which stops nothing here: the same six draws
+  // for nobody, on the GPU the film's pictures need (17 Nov; measured in CHANGELOG).
+  // Only that screen ever carries the class; she is drawn again the frame it goes.
+  if (document.documentElement.classList.contains('mirror-show')) { clock.getDelta(); return; }
+  // The robot's own face while the ceremony's film covers it (client/voice-preview.html face-film-on,
+  // CEREMONY_FACE_FILM, 24 Nov): the same six draws for nobody, on the GPU the film's pictures need.
+  if (document.documentElement.classList.contains('face-film-on')) { clock.getDelta(); return; }
   const dt = Math.min(clock.getDelta(), .05);
   renderStep(reduceMotion.matches ? 0 : dt, dt);
 });

@@ -187,8 +187,10 @@ robot_face_session: ContextVar[object | None] = ContextVar("robot_face_session",
 #: memory or control of his computer.
 _JOKE_DENIED = {"knowledge", "mydocs", "documents", "slides", "units", "calc",
                 "memory", "computer", "websearch", "stories"}
-#: The walking tools, by name, that the event profile never sees.
+#: The walking tools, by name, that the event and ceremony profiles never see.
 _EVENT_DENIED = {"go_to_place", "return_to_base"}
+#: The profiles staff walk (the Emma Event and Emma Ceremony apps).
+_STAFF_WALKED = ("event", "ceremony")
 
 
 def allowed(entry: Tool) -> bool:
@@ -225,6 +227,31 @@ def allowed(entry: Tool) -> bool:
         if robot_face_session.get() is None or not room_screens.offered():
             return False
     profile = session_profile.get() or settings.assistant_profile
+    # The ceremony shows only the script's own slides (CEREMONY_SCRIPT_SHOW_ONLY, owner 24 Nov ~13:50: "โหมดเก่าก็เอาออก
+    # ไปก่อน อันนั้นเอาไว้ใช้หลังคุยกับคุณมิกิเสร็จ"): no motion story in the ceremony app's call; the Event app keeps them.
+    if entry.group == "stories" and profile == "ceremony" and settings.ceremony_script_show_only:
+        # (+ the ones the script does not answer, CEREMONY_OFFSCRIPT_STORIES: app/ceremony_stories.py)
+        from app import ceremony_stories
+
+        if not ceremony_stories.offered():
+            return False
+    # The event's film by voice ("Emma เปิดคลิป", app/tools/screens.py): only inside the
+    # ceremony, where only the host's named words get in -- the ceremony app's profile since
+    # 9 Nov (owner "ไม่งั้นจะปนกัน"; at the Event app's party it only ever refused), with a clip
+    # that exists (app/event_clips.py).
+    if entry.name == "event_clip":
+        from app import event_clips
+
+        if profile != "ceremony" or not event_clips.offered():
+            return False
+    # The ceremony's approved lines (app/tools/ceremony.py): the Emma Ceremony app only (the
+    # event profile until 9 Nov), with EVENT_SCRIPT_TOOL on and at least one cue that may be
+    # said -- never a draft.
+    if entry.group == "ceremony":
+        from app.tools import ceremony
+
+        if profile != "ceremony" or not settings.event_script_tool or not ceremony.offered():
+            return False
     from app.prompts import SALES_PROFILES
 
     # The stories are the sales host's: the project's approved pictures.
@@ -237,10 +264,11 @@ def allowed(entry: Tool) -> bool:
             "memory", "mydocs", "websearch", "computer"}:
         return False
     # At an event only staff walk the robot (app/event_host.py, owner 30 Oct
-    # "ให้ทีมงานกดเปลี่ยนซีน"): a guest's "พาไป..." must not reach the wheels.
+    # "ให้ทีมงานกดเปลี่ยนซีน"): a guest's "พาไป..." must not reach the wheels --
+    # nor the host's in the ceremony app (its walks are steps staff press).
     # The stops stay -- stop_moving and move_body(stop) also stop the staff
     # walk (app/event_walk.py).
-    if profile == "event" and entry.name in _EVENT_DENIED:
+    if profile in _STAFF_WALKED and entry.name in _EVENT_DENIED:
         return False
     # EmmaJoke answers anything EXCEPT the project. Stated in its prompt and
     # enforced here, because a prompt is a request and this is a fact.
@@ -292,6 +320,36 @@ async def dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
                         elapsed_ms=round((observer.clock()-started)*1000, 3))
 
 
+#: What the model is told when a tool is refused in a cue-only ceremony. No sentence of
+#: hers is quoted (a quoted sentence is one she says, CLAUDE.md); her reply is dropped too.
+CUE_ONLY_REFUSAL = ("ช่วงพิธีเปิดนี้ Emma พูดเฉพาะบทที่ทีมงานกด ห้ามใช้เครื่องมือและห้ามตอบเอง "
+                    "ยกเว้นคำสั่งหยุด ไม่ต้องพูดอะไร")
+
+
+def _cue_only_refuses() -> bool:
+    """A cue-only ceremony with no live window open (app/event_host.py
+    cue_only_closed). Never raises: a probe that fails refuses nothing."""
+    try:
+        from app import event_host
+
+        return event_host.cue_only_closed()
+    except Exception:
+        logger.warning("the cue-only probe failed")
+        return False
+
+
+def _adhoc_refuses(name: str) -> bool:
+    """A room-driving tool while the ceremony page's "ตอบสด" window is open (app/ceremony.py
+    adhoc_refuses). Never raises: a probe that fails refuses nothing (the ordinary dispatch)."""
+    try:
+        from app import ceremony
+
+        return ceremony.adhoc_refuses(name)
+    except Exception:
+        logger.warning("the ตอบสด tool probe failed")
+        return False
+
+
 def _preempts(entry: Tool, args: dict[str, Any] | None) -> bool:
     if entry.preempt is None:
         return False
@@ -317,6 +375,25 @@ async def _dispatch(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
     scope = session_id.get()
     job_key = name if entry.exclusive or scope is None else (scope, name)
     preempting = _preempts(entry, args)
+    if not preempting and _cue_only_refuses():
+        # A cue-only ceremony with no live window (app/event_host.py): she speaks only
+        # the lines staff press, and a live answer of hers ran tools -- "เปิดวิดีโอ"
+        # rolled the film, present_story, move_body (review 7 Nov). One place for every
+        # tool. A stop is never refused (the `preempt` stops: stop_moving, move_body
+        # stop, which also stop the event's walk): hearing one is why the mic opens
+        # while the robot moves.
+        from app import turnlog
+
+        turnlog.record("tool_refused", name=name, why="cue_only")
+        return {"ok": False, "error": "cue_only", "instruction": CUE_ONLY_REFUSAL}
+    if not preempting and _adhoc_refuses(name):
+        # The ceremony page's "ตอบสด" (app/ceremony.py, 23 Nov): a window staff open at any moment for the
+        # host off-script -- "Emma, play the video" must not roll a film or switch the big screen under
+        # the screen team's show. Her words, a search, a picture and the stops stay.
+        from app import ceremony, turnlog
+
+        turnlog.record("tool_refused", name=name, why="adhoc")
+        return {"ok": False, "error": "adhoc", "instruction": ceremony.ADHOC_TOOL_REFUSAL}
     if (not preempting and job_key in _inflight
             and not _inflight[job_key].done()):
         return {"ok": False, "error": "busy",
@@ -463,14 +540,30 @@ def model_view(name: str, result: object) -> object:
 def _with_event_scene(result: object) -> object:
     """An event session's tool results carry the scene staff chose
     (app/event_host.py): an instruction beside a tool result reaches the model,
-    one at the end of the system prompt does not (CLAUDE.md). Every other
-    profile -- and an event with no scene picked -- gets the same object back."""
-    if not isinstance(result, dict) or session_profile.get() != "event":
+    one at the end of the system prompt does not (CLAUDE.md). A ceremony session's
+    carry the ceremony instead (its rule, a line just said -- event_host.ceremony_note)
+    and its open live window; never the other's (owner 9 Nov, "ไม่งั้นจะปนกัน"). Every
+    other profile -- and an event with no scene picked -- gets the same object back."""
+    profile = session_profile.get()
+    if not isinstance(result, dict) or profile not in _STAFF_WALKED:
         return result
     from app import event_host
 
-    note = event_host.scene_note()
-    return result if note is None else {**result, "event_scene": note}
+    if profile == "event":
+        note, live = event_host.scene_note(), None
+    else:
+        note = event_host.ceremony_note()
+        # the ceremony's live step staff opened (event_host.live_open): its brief, here --
+        # the channel known to reach the model
+        live = event_host.live_note()
+    if note is None and live is None:
+        return result
+    out = dict(result)
+    if note is not None:
+        out["event_scene"] = note
+    if live is not None:
+        out["event_live"] = live
+    return out
 
 
 async def dispatch_all(calls: list[tuple[str, str, dict]]) -> list[tuple[str, str, dict]]:

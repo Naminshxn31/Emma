@@ -143,7 +143,7 @@
      {
       "label_en": "Water Lagoon",
       "sub_en": "Main pool · ≈ 1.3 m deep",
-      "asset": "liv_lagoon_night",
+      "asset": "n_liv_lagoon_night",
       "asset_kind": "photo",
       "value": {
        "to": 155,
@@ -155,7 +155,7 @@
      {
       "label_en": "Pools by the wings",
       "sub_en": "Private Pools · beside the building wings",
-      "asset": "liv_courtyard_top",
+      "asset": "n_liv_courtyard_top",
       "asset_kind": "photo",
       "value": {
        "to": 3,
@@ -166,7 +166,7 @@
      {
       "label_en": "Kid Pool",
       "sub_en": "Beside the playground",
-      "asset": "liv_kid_pool",
+      "asset": "n_liv_kid_pool",
       "asset_kind": "photo",
       "value": null,
       "line": 3,
@@ -175,7 +175,7 @@
      {
       "label_en": "Sky Pool",
       "sub_en": "Level 3 · Building A · glass floor",
-      "asset": "fac_3_sky_pool",
+      "asset": "n_fac_3_sky_pool",
       "asset_kind": "photo",
       "value": null,
       "line": 4,
@@ -184,7 +184,7 @@
      {
       "label_en": "Aqua Cinema",
       "sub_en": "Indoor pool · Basement",
-      "asset": "fac_b_aqua_cinema",
+      "asset": "n_fac_b_aqua_cinema",
       "asset_kind": "photo",
       "value": null,
       "line": 5,
@@ -347,25 +347,25 @@
     "items": [
      {
       "label_en": "The Park next door",
-      "asset": "liv_park",
+      "asset": "n_liv_park",
       "note_en": "Nong Phrong Park: lake, jogging path",
       "line": 0
      },
      {
       "label_en": "Green area",
-      "asset": "liv_garden",
+      "asset": "n_liv_garden",
       "note_en": "4,256 sq.m. inside the project",
       "line": 1
      },
      {
       "label_en": "34 plant species",
-      "asset": "liv_trees",
+      "asset": "n_liv_trees",
       "note_en": "11 trees · 23 shrubs & groundcovers",
       "line": 2
      },
      {
       "label_en": "Stepped Garden",
-      "asset": "liv_lawn",
+      "asset": "n_liv_lawn",
       "note_en": "Lawn terraces · 53 sun loungers",
       "line": 3
      }
@@ -523,7 +523,7 @@
      {
       "label_en": "Junior World",
       "sub_en": "Indoor kids' room · ground floor",
-      "asset": "fac_g_junior_ballpit",
+      "asset": "n_fac_g_junior_ballpit",
       "asset_kind": "photo",
       "value": null,
       "line": 1,
@@ -532,7 +532,7 @@
      {
       "label_en": "Space Playground",
       "sub_en": "Outdoor · slides · swing",
-      "asset": "liv_playscape",
+      "asset": "n_liv_playscape",
       "asset_kind": "photo",
       "value": {
        "to": 137,
@@ -544,7 +544,7 @@
      {
       "label_en": "Kid Pool",
       "sub_en": "Beside the playground · water play",
-      "asset": "liv_kid_pool",
+      "asset": "n_liv_kid_pool",
       "asset_kind": "photo",
       "value": null,
       "line": 3,
@@ -553,7 +553,7 @@
      {
       "label_en": "The Park next door",
       "sub_en": "Nong Phrong Park · playground",
-      "asset": "liv_park",
+      "asset": "n_liv_park",
       "asset_kind": "photo",
       "value": null,
       "line": 4,
@@ -886,7 +886,10 @@
       "line": 2,
       "place": "familymart"
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "units_campus"
+    }
    },
    "taps": [
     {
@@ -1009,7 +1012,10 @@
       "line": 2,
       "place": "pattaya_city_hospital"
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "n_back_front"
+    }
    },
    "taps": [
     {
@@ -1215,7 +1221,10 @@
       ],
       "line": 5
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "n_liv_trees"
+    }
    },
    "taps": [
     {
@@ -1363,7 +1372,10 @@
       "line": 3,
       "place": "pupen"
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "n_liv_trees"
+    }
    },
    "taps": [
     {
@@ -1507,7 +1519,10 @@
       "line": 3,
       "place": "nong_nooch"
      }
-    ]
+    ],
+    "backdrop": {
+     "asset": "n_liv_courtyard_top"
+    }
    },
    "taps": [
     {
@@ -1614,7 +1629,7 @@
     }
    ],
    "params": {
-    "bg_asset": "lagoon_islands_aerial",
+    "bg_asset": "n_lagoon_islands_aerial",
     "value": {
      "to": 5,
      "dec": 0,

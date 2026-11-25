@@ -1,0 +1,50 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "texts": {
+    "emma": "Emma",
+    "k1": "I can share",
+    "t1": "Project information",
+    "k2": "Recommend",
+    "t2": "Unit types",
+    "tag2": "to match each customer's needs",
+    "k3": "Show",
+    "t3": "Floor plans and visualisations",
+    "lying": "Floor plans",
+    "call": "Visualisations",
+    "k4": "Help prepare",
+    "t4": "Quotation details",
+    "sales": "The sales team",
+    "after": "look after customers more easily",
+    "giant": "Emma",
+    "p1": "Get to know Embassy World better",
+    "p2": "Khun Miki, please go ahead and ask"
+  },
+  "pictures": {
+    "hero": {"asset": "fin_pool_v4b"},
+    "sigp": {"asset": "fin_pool_v1b"},
+    "studio": {"asset": "c_room_studio_solid"},
+    "one": {"asset": "c_room_1br_solid"},
+    "two": {"asset": "c_room_2br_solid"},
+    "plan": {"asset": "plan_2br"},
+    "wire": {"asset": "room_2br_wire"},
+    "tech": {"asset": "prj_tech_home"},
+    "facade": {"asset": "fin_building_a"}
+  },
+  "videos": {
+    "site": {"asset": "c_site_plan_holo_s"}
+  },
+  "beats": [
+    {"at_en": "I can share", "do": "s1", "key": ["k1", "t1"]},
+    {"at_en": "recommend unit types", "do": "s2", "key": ["k2", "t2", "studio", "one", "two"]},
+    {"at_en": "to match each customer's needs", "do": "match", "key": "tag2"},
+    {"at_en": "show floor plans", "do": "s3", "key": ["k3", "t3", "plan", "lying"]},
+    {"at_en": "and visualisations", "do": "vis", "key": ["wire", "tech", "call"]},
+    {"at_en": "help prepare quotation details", "do": "s4", "key": ["k4", "t4"]},
+    {"at_en": "so the sales team can look after", "do": "team", "key": ["sales", "after"]},
+    {"at_en": "I'd be glad", "do": "arc", "key": "giant"},
+    {"at_en": "get to know Embassy World better", "do": "ask1", "key": "p1"},
+    {"at_en": "Khun Miki, please go ahead and ask", "do": "ask2", "key": "p2"}
+  ],
+  "options": {"mode": "caps", "photo": true, "site_from": 3.8, "site_rate": 1.6}
+}

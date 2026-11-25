@@ -190,6 +190,33 @@ for (const lag of [0, 3, 6]) { // text trailing its audio: late by up to a piece
   resetRates();
 }
 
+{ // Robot 6 Nov: only her voice reading the lines teaches the floor. A
+  // transcript that ran ahead of its audio (lobby_where, 378 chars over
+  // 17.2 s = 22/s) took Thai from 11.3 to 15.6 -- every later picture ahead
+  // of her -- and one line of an 11-line story (masterplan_lagoon, 9.2/s) took
+  // it from 11.7 to 10.5, the next story's pictures 1.2-2.4 s behind her.
+  const { BeatClock: BC, norm: nm, CLOCK: K, leadRateFor, resetRates } = load(false).EmmaStory._clock;
+  function finished(cps, cueWords, said) {
+    const text = said + ' ' + 'กขคงจฉชซ'.repeat(40);
+    const n = nm(text).length, secs = n / cps;
+    const c = new BC(cueWords.map(w => ({ cues: w ? [w] : [] })));
+    for (let k = 0; k < Math.ceil(secs / 0.1); k++) c.audio(k * 0.1, 0.1);
+    c.addText(text); c.turnComplete();
+    for (let t = 0; t <= c.sched + 0.5; t += 0.05) c.poll(t);
+    return c;
+  }
+  resetRates();
+  finished(22, ['', 'อัลฟา', 'เบตา'], 'อัลฟา เบตา');                       // 22/s: no voice
+  assert.equal(leadRateFor('th'), K.voiceRate.th, 'a transcript ahead of its audio taught the floor');
+  finished(9.2, ['', 'อัลฟา', 'เบตา', 'แกมมา', 'เดลตา'], 'อัลฟา');             // one line of a story
+  assert.equal(leadRateFor('th'), K.voiceRate.th, 'one line of a story taught the floor');
+  finished(12, ['', 'อัลฟา', 'เบตา', 'แกมมา', 'เดลตา'], 'อัลฟา');              // her own answer beside a story
+  assert.equal(leadRateFor('th'), K.voiceRate.th, 'an answer that did not tell the story taught the floor');
+  finished(11.5, ['', 'อัลฟา', 'เบตา'], 'อัลฟา เบตา');                      // the story, read
+  assert.ok(Math.abs(leadRateFor('th') - (K.voiceRate.th + 11.5) / 2) < 0.3, 'read story learned: ' + leadRateFor('th'));
+  resetRates();
+}
+
 { // the turn_complete gemini-3.8 sends before its tool call is not this answer's
   const c = new BeatClock([{ cues: [] }]);
   c.turnComplete();
@@ -304,6 +331,49 @@ async function drillPickHolds(payload) {
   S.settle();
   assert.ok(cards[0].classList.contains('on'), 'drill: the overview keeps the pick');
   assert.equal(cards.filter(c => c.classList.contains('on')).length, 1);
+  S.teardown();
+}
+
+// Robot 6 Nov ("how long is the pool"): she said ONE line of a drill story.
+// The places she never named fired at the end with the rest, and the
+// overview rested on the last of them -- the Sky Pool card under an answer
+// about the Water Lagoon. The overview keeps the last place she named.
+async function drillRestsOnNamed(payload) {
+  const S = load(false).EmmaStory, mount = new El('div');
+  let now = null;
+  S.play(payload, { mount, clock: () => now, onTap: () => true });
+  const cards = mount.children[0].querySelectorAll('.es-fc');
+  const named = payload.params.items.findIndex(it => it.line === 1);
+  now = 0;
+  for (let k = 0; k < 40; k++) S.audio(k * 0.1, 0.1);        // 4 s of her voice
+  S.transcript('ห้องปั่นจักรยาน ' + payload.beats[1].cues[0] + ' ค่ะ');
+  for (let t = 0; t <= 4.2; t += 0.06) { now = t; if (t >= 3.8) S.turnComplete(); await sleep(61); }
+  await sleep(1500);
+  const on = cards.map((c, k) => (c.classList.contains('on') ? k : -1)).filter(k => k >= 0);
+  assert.deepEqual(on, [named], 'drill rested on ' + on + ', she named ' + named);
+  S.teardown();
+}
+
+// ...but a story she TOLD keeps the last place queued: its last cue can be
+// missing from her transcript (27 Oct: the transcript budget cut the BREEZE
+// line her voice said; 28 Oct: Vietnamese, two cues of seven matched) and
+// the place she ended on is still the last one.
+async function drillToldKeepsLast(payload) {
+  const S = load(false).EmmaStory, mount = new El('div');
+  let now = null;
+  S.play(payload, { mount, clock: () => now, onTap: () => true });
+  const cards = mount.children[0].querySelectorAll('.es-fc');
+  const n = payload.beats.length, lastItem = payload.params.items.length - 1;
+  const lastLine = payload.params.items[lastItem].line;
+  // as long as the lines, every cue but the last place's
+  const said = payload.beats.map((b, i) => (i === lastLine ? 'ก'.repeat(b.w.th) : (b.cues[0] || '') + 'ก'.repeat(Math.max(0, b.w.th - (b.cues[0] || '').length)))).join(' ');
+  now = 0;
+  for (let k = 0; k < 40; k++) S.audio(k * 0.1, 0.1);
+  S.transcript(said);
+  for (let t = 0; t <= 4.2; t += 0.06) { now = t; if (t >= 3.8) S.turnComplete(); await sleep(61); }
+  await sleep(1500);
+  const on = cards.map((c, k) => (c.classList.contains('on') ? k : -1)).filter(k => k >= 0);
+  assert.deepEqual(on, [lastItem], 'a told drill rested on ' + on + ', its last place is ' + lastItem);
   S.teardown();
 }
 
@@ -603,6 +673,8 @@ async function exits() {
   if (counting) await countsInRoundSteps(counting);
   const drill = payloads.find(p => p.template === 'drill' && p.params.items.length >= 3);
   if (drill) await drillPickHolds(drill);
+  if (drill) await drillRestsOnNamed(drill);
+  if (drill) await drillToldKeepsLast(drill);
   // one story at a time: a second play tears the first down
   if (payloads.length >= 2) {
     const S = load(false).EmmaStory, mount = new El('div');

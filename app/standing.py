@@ -80,6 +80,7 @@ async def run() -> None:
             await asyncio.sleep(CHECK_S)
             if session_module._active is not None:
                 said_nobody = False
+                await wake.push_hold_news()    # the morning reaches a page in a call too
                 continue
             rang = await wake.summon(reason="standing_line")
             if rang:

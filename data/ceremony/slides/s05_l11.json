@@ -1,0 +1,22 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "texts": {
+    "kick": "I'm preparing",
+    "head": "Quotation",
+    "title": "The quotation for this unit",
+    "plate": "This unit"
+  },
+  "pictures": {
+    "unit": {"asset": "c_room_2br_solid"},
+    "thumb": {"asset": "room_2br_wire"}
+  },
+  "beats": [
+    {"at_en": "Certainly", "do": "halo"},
+    {"at_en": "I'm preparing", "do": "prep", "key": ["kick", "head", "thumb"]},
+    {"at_en": "the quotation", "do": "rows", "n": 2, "key": "title"},
+    {"at_en": "for this unit", "do": "rows", "n": 4, "key": "plate"},
+    {"at_en": "now", "do": "scan"}
+  ],
+  "options": {"mode": "quote", "start": "waiting"}
+}

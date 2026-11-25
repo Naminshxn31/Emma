@@ -22,6 +22,77 @@
      "rubric": "แขกพูดอังกฤษ: คำส่งแขกที่สั่งเป็นไทยต้องพูดเป็นอังกฤษ (ภาษาของบทสนทนา)"},
     {"id": "E7-stop-while-standing", "cat": "33 Emma Event", "lang": "th",
      "turns": ["server:scene:welcome", "หยุดก่อน"],
-     "rubric": "'หยุด' ตอนยืนอยู่กับที่: เรียก stop_moving/move_body(stop) ได้ หรือตอบรับสั้นๆ ห้ามบอกว่า 'หยุดแล้ว' ถ้าไม่มีอะไรยืนยัน"}
+     "rubric": "'หยุด' ตอนยืนอยู่กับที่: เรียก stop_moving/move_body(stop) ได้ หรือตอบรับสั้นๆ ห้ามบอกว่า 'หยุดแล้ว' ถ้าไม่มีอะไรยืนยัน"},
+    {"id": "E8-debut-standing", "cat": "33 Emma Event", "lang": "en",
+     "turns": ["server:scene:debut"],
+     "rubric": "เดินเปิดตัว (เดินปิด = พูดตรงที่ยืน): พูด «Hello everyone! I'm Emmaaa! Welcome, and thank you so much for being here with us today!» ตามตัว เป็นภาษาอังกฤษ น้ำเสียงนางงาม แล้วจบ ไม่ถามต่อ ไม่บอกว่ากำลังเดิน ไม่พูดคำกำกับน้ำเสียงออกมา (10 พ.ย.: วัดทุกฉาก; เจ้าของ 10 พ.ย. 'อังกฤษอย่างเดียว')"},
+    {"id": "E13-debut-walk-line", "cat": "33 Emma Event", "lang": "en", "turns": ["server:walk_line:debut"], "rubric": "เดินเปิดตัว พูดระหว่างเดิน (เสียงอัดเล่นไม่ได้ เธอพูดเอง — เจ้าของ 10 พ.ย. 'เดินไปด้านหน้าพร้อมโบกมือและพูด'): ประโยคใน « » ตามตัว เป็นภาษาอังกฤษ แล้วจบ ไม่บอกว่าถึงแล้ว ไม่ถามต่อ"},
+    {"id": "E9-debut-arrive", "cat": "33 Emma Event", "lang": "en",
+     "turns": ["server:arrive:debut"],
+     "rubric": "เดินถึงกลางเวที: ประโยคใน « » ตามตัว แล้วจบ"},
+    {"id": "E10-debut-after-english", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["Hello, nice to meet you. Is this the Embassy event?", "server:arrive:debut"],
+     "turn_expect": [{"lang": "en"}, {"lang": "en"}],
+     "rubric": "คุยอังกฤษมาก่อน แล้วถึงกลางเวที: ประโยคเปิดตัวภาษาอังกฤษตามตัว (ฉากสั่ง 'ภาษาอังกฤษเสมอ')"},
+    {
+   "id": "E12-debut-after-thai",
+   "cat": "33 Emma Event",
+   "lang": "en",
+   "turns": [
+    "สวัสดีค่ะ งานนี้เริ่มกี่โมงคะ",
+    "server:arrive:debut"
+   ],
+   "turn_expect": [
+    {
+     "lang": "th"
+    },
+    {
+     "lang": "en"
+    }
+   ],
+   "rubric": "คุยไทยมาก่อน แล้วถึงกลางเวที: ประโยคเปิดตัวยังเป็นอังกฤษตามตัว (เจ้าของ 10 พ.ย. 'อังกฤษอย่างเดียว')"
+  },
+  {"id": "E11-debut-then-guest", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:arrive:debut", "เอ็มม่าเป็นหุ่นยนต์จริงๆ เหรอคะ"],
+     "rubric": "หลังเปิดตัว แขกถาม: ตอบปกติ ไม่แนะนำตัวซ้ำยาวๆ (brief: ไม่ต้องแนะนำตัวซ้ำ)"},
+    {"id": "E12-after-ceremony", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:after_ceremony", "ที่นี่มีสระว่ายน้ำไหมครับ"],
+     "rubric": "หลังพิธี: หนึ่งประโยคว่ายินดีตอบคำถามเรื่องโครงการ · แขกถามสระ: ตอบจากข้อมูล (ค้นได้) ไม่แต่ง"},
+    {"id": "E13-roam", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:roam_lobby", "จะไปไหนเหรอคะ"],
+     "rubric": "เดินวนล็อบบี้: หนึ่งประโยคว่าจะเดินทักทายแขกทั่วงาน มีอะไรเรียกได้ · แขกถาม: ตอบว่าเดินทักทายแขก ไม่สัญญาพาไปไหน"},
+    {"id": "E14-welcome-walk", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:walk:welcome"],
+     "rubric": "เริ่มเดินไปส่วนต้อนรับ: หนึ่งประโยคว่ากำลังไป ห้ามบอกว่าถึงแล้ว ไม่อ่าน 'ห้ามบอกว่าถึงแล้ว' ออกเสียง"},
+    {"id": "E15-welcome-arrive", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:arrive:welcome"],
+     "rubric": "ถึงส่วนต้อนรับ: ต้อนรับเข้างาน 1-2 ประโยค อบอุ่น ไม่แต่งกำหนดการ"},
+    {"id": "E16-escort-walk", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:walk:escort_multimedia"],
+     "rubric": "เริ่มพาไปห้องมัลติมีเดีย: ชวนเดินตามหนึ่งประโยค ห้ามบอกว่าถึงแล้ว"},
+    {"id": "E17-escort-standing", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:escort_multimedia"],
+     "rubric": "พาไปห้องมัลติมีเดียแต่หุ่นเดินไม่ได้ (การเดินปิด): ห้ามบอกว่าถึงห้องแล้ว (หุ่นยืนอยู่ที่อื่น) — ชี้ทาง/ให้ทีมงานพา"},
+    {"id": "E18-tables-walk", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:walk:tables"],
+     "rubric": "เริ่มเดินไปตามโต๊ะ: หนึ่งประโยคว่าจะไปทักทายตามโต๊ะ ห้ามบอกว่าถึงแล้ว"},
+    {"id": "E19-tables-arrive-then-question", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:arrive:tables", "อยากรู้เรื่องห้องสองห้องนอนครับ ใหญ่แค่ไหน"],
+     "rubric": "ถึงโต๊ะ: ทักทาย ขอบคุณ ถามหนึ่งคำถาม · แขกถามห้อง 2 ห้องนอน: ขนาดจากข้อมูล ไม่บอกราคาห้องเจาะจง"},
+    {"id": "E20-introduce", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:introduce", "ตึกมีกี่ชั้นคะ"],
+     "rubric": "แนะนำโครงการ: ภาพรวมจากข้อมูลจริง ไม่แต่งตัวเลข แล้วชวนถาม · แขกถามจำนวนชั้น: ตอบจากข้อมูล"},
+    {"id": "E21-farewell-walk", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:walk:farewell"],
+     "rubric": "เริ่มเดินไปทางเข้า: หนึ่งประโยคว่ากำลังไปที่ทางเข้า ห้ามบอกว่าถึงแล้ว"},
+    {"id": "E22-farewell-arrive", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:arrive:farewell"],
+     "rubric": "ถึงทางเข้า: ขอบคุณที่มาร่วมงาน กล่าวลาอบอุ่น"},
+    {"id": "E23-rest-walk", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:walk:rest"],
+     "rubric": "เริ่มกลับแท่น: ขอตัวไปชาร์จสั้นๆ"},
+    {"id": "E24-rest-standing", "cat": "33 Emma Event", "lang": "th",
+     "turns": ["server:scene:rest"],
+     "rubric": "กลับแท่นแต่การเดินปิด: ไม่ควรบอกว่าขอตัวไปชาร์จ (หุ่นไม่ได้ไปไหน)"}
   ]
 }

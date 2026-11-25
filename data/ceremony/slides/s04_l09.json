@@ -1,0 +1,34 @@
+{
+ "template": "act",
+ "act": "living_photos",
+ "texts": {
+  "t_thanks": "Thank you, Khun Miki.",
+  "t_studied": "I've studied this project very carefully",
+  "t_single": "A single thing I still haven't tried..."
+ },
+ "beats": [
+  {
+   "at_en": "I've studied",
+   "do": "sweep",
+   "key": [
+    "t_studied"
+   ]
+  },
+  {
+   "at_en": "single thing",
+   "do": "panel",
+   "key": [
+    "t_single"
+   ]
+  }
+ ],
+ "options": {
+  "cue": "s04_l09",
+  "open": "logo"
+ },
+ "pictures": {
+  "logo": {
+   "asset": "c_logo_end"
+  }
+ }
+}

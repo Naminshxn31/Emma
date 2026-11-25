@@ -1,0 +1,21 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "texts": {
+    "tag": "Sample",
+    "head": "Quotation",
+    "title": "A sample quotation",
+    "plate": "This unit",
+    "staff": "Our staff will explain the details"
+  },
+  "pictures": {
+    "unit": {"asset": "c_room_2br_solid"},
+    "thumb": {"asset": "room_2br_wire"}
+  },
+  "beats": [
+    {"at_en": "Here is a sample quotation", "do": "face", "key": ["tag", "title", "head", "thumb"]},
+    {"at_en": "for this unit", "do": "thread", "key": "plate"},
+    {"at_en": "Our staff", "do": "staff", "key": "staff"}
+  ],
+  "options": {"mode": "quote", "start": "done"}
+}

@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ลงทะเบียนใบหน้า</title>
+<!--
+  The launch event's scan booth (scripts/booth_app.py, app/booth.py). The guest
+  stands here: the notice, "ยินยอม", the poses, a name. No rule lives on this page;
+  the server says which step, whether the frame is the shot and what to say.
+  No guest's name or picture stays on it once they are done: it goes back to the
+  first screen and the next person sees nothing of the last.
+-->
+<style>
+  :root { --bg:#14161a; --card:#1e2127; --ink:#f4f1ea; --soft:#a8a59c; --accent:#3fb8a3; --accent-ink:#06231e;
+          --bad:#e5484d; --line:#343841; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+               font-family:system-ui,"Segoe UI",Tahoma,sans-serif; }
+  .screen { display:none; min-height:100%; padding:24px; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
+  .screen.on { display:flex; }
+  h1 { font-size:clamp(28px,5vw,48px); margin:0; text-align:center; }
+  p.lead { font-size:clamp(18px,3vw,26px); color:var(--soft); margin:0; text-align:center; max-width:40em; }
+  p.lead.en { font-size:clamp(15px,2.2vw,20px); margin-top:-8px; }
+  button { font:inherit; font-size:clamp(20px,3vw,28px); border-radius:14px; border:1px solid var(--line);
+           background:var(--card); color:var(--ink); padding:18px 34px; cursor:pointer; min-width:190px; }
+  button.go { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600; }
+  button:disabled { opacity:.45; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+  #noticeText { white-space:pre-wrap; background:var(--card); border:1px solid var(--line); border-radius:14px;
+                padding:22px; font-size:clamp(17px,2.4vw,22px); line-height:1.6; max-width:46em; max-height:58vh; overflow:auto; }
+  #stage { position:relative; width:min(92vw,880px); aspect-ratio:16/9; border-radius:18px; overflow:hidden;
+           background:#000; transform:scaleX(-1); }
+  #stage video, #stage canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  #prompt { font-size:clamp(24px,4vw,40px); font-weight:600; text-align:center; min-height:1.4em; }
+  #why { color:var(--soft); font-size:clamp(16px,2.2vw,22px); min-height:1.3em; text-align:center; }
+  #dots { display:flex; gap:10px; }
+  #dots i { width:18px; height:18px; border-radius:50%; background:var(--line); display:block; }
+  #dots i.done { background:var(--accent); }
+  #dots i.skip { opacity:.3; }
+  #hold { width:min(92vw,880px); height:10px; border-radius:6px; background:var(--line); overflow:hidden; }
+  #hold div { height:100%; width:0; background:var(--accent); }
+  input { font:inherit; font-size:clamp(22px,3.4vw,32px); padding:16px 20px; border-radius:14px; border:1px solid var(--line);
+          background:var(--card); color:var(--ink); width:min(90vw,560px); text-align:center; }
+  #corner { position:fixed; right:14px; bottom:10px; color:var(--soft); font-size:14px; display:flex; gap:14px; align-items:center; }
+  #corner button { font-size:14px; padding:6px 12px; min-width:0; }
+  #staff { position:fixed; inset:auto 14px 50px auto; background:var(--card); border:1px solid var(--line); border-radius:14px;
+           padding:16px; display:none; gap:10px; flex-direction:column; width:min(92vw,360px); }
+  #staff.on { display:flex; }
+  #staff input, #staff select { font-size:18px; padding:10px; width:100%; text-align:left; }
+  #staff select { font:inherit; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:10px; }
+  #staff button { font-size:16px; padding:10px; }
+  .bad { color:var(--bad); }
+  #langs { position:fixed; top:14px; right:14px; display:flex; gap:6px; z-index:5; }
+  #langs button { font-size:16px; padding:8px 14px; min-width:0; border-radius:10px; }
+  #langs button[aria-pressed="true"] { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600; }
+</style>
+</head>
+<body>
+<!-- The guest's language (owner 23 Nov: "เลือกภาษาได้ th en", "ค่าเริ่มต้น en"): English first, every new guest. -->
+<div id="langs"><button type="button" data-lang="en">EN</button><button type="button" data-lang="th">ไทย</button></div>
+<section class="screen on" id="sWelcome">
+  <h1 data-t="welcomeTitle"></h1>
+  <p class="lead" data-t="welcomeLead"></p>
+  <button class="go" id="begin" type="button" data-t="start"></button>
+  <p class="bad" id="welcomeWhy"></p>
+</section>
+
+<section class="screen" id="sNotice">
+  <h1 data-t="noticeTitle"></h1>
+  <div id="noticeText"></div>
+  <div class="row">
+    <button id="no" type="button" data-t="no"></button>
+    <button class="go" id="yes" type="button" data-t="yes"></button>
+  </div>
+</section>
+
+<section class="screen" id="sScan">
+  <div id="prompt">เตรียมตัว</div>
+  <div id="stage"><video id="video" autoplay playsinline muted></video><canvas id="ov"></canvas></div>
+  <div id="hold"><div></div></div>
+  <div id="dots"></div>
+  <div id="why"></div>
+  <button id="stopScan" type="button" data-t="cancel"></button>
+</section>
+
+<section class="screen" id="sName">
+  <h1 data-t="nameTitle"></h1>
+  <p class="lead" data-t="nameLead"></p>
+  <p class="lead" id="nameFrom" hidden data-t="nameFrom"></p>
+  <input id="name" maxlength="40" autocomplete="off">
+  <p class="bad" id="nameWhy"></p>
+  <div class="row">
+    <button id="dropName" type="button" data-t="cancel"></button>
+    <button class="go" id="save" type="button" data-t="save"></button>
+  </div>
+</section>
+
+<section class="screen" id="sDone">
+  <h1 id="doneTitle"></h1>
+  <p class="lead" id="doneText"></p>
+</section>
+
+<div id="corner"><span id="queue"></span><button id="staffBtn" type="button">ทีมงาน</button></div>
+<div id="staff">
+  <label for="camera">กล้อง</label><select id="camera"></select>
+  <label for="revokeName">ถอนความยินยอม: ชื่อที่ลงทะเบียน</label><input id="revokeName" autocomplete="off">
+  <label for="pin">PIN</label><input id="pin" type="password" autocomplete="off">
+  <button id="revoke" type="button">ถอนและลบข้อมูล</button>
+  <span id="staffSay"></span>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var video = $('video'), ov = $('ov'), stream = null, deviceId = null;
+  var scanning = false, busy = false, holdingSince = 0, playing = false, lastSaid = '', saidAt = 0;
+  // The check-in kiosk on this PC hands a guest over (owner, 23 Nov: check-in and the booth are one PC): it
+  // POSTs their registered name to /handoff (a form body: never a URL, which the browser keeps in its history)
+  // and lands here as /#handoff; the name is asked for once (/claim). Only a prefill: the guest still reads the
+  // notice, agrees, and may change it. Where the screen goes back to is the booth's own setting
+  // (BOOTH_RETURN_URL via /status), never from a link: a link that names its own way back is an open redirect.
+  var handoff = null, back = null, preferredCamera = null, lastTouch = Date.now(), IDLE_MS = 90000;
+  var handedOver = location.hash === '#handoff';
+  if (handedOver) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+  var player = new Audio();
+  player.onended = player.onerror = function () { playing = false; clearTimeout(sayGuard); };
+
+  var T = {
+    en: { welcomeTitle: 'Let Emma get to know you',
+          welcomeLead: 'Register your face here, and Emma will greet you by name at this event and whenever you come back to visit the project.',
+          start: 'Start', noticeTitle: 'Please read first', no: 'No thanks', yes: 'I agree', cancel: 'Cancel',
+          nameTitle: 'What should Emma call you?', nameLead: 'Emma will greet you with this name. If it is taken, add a surname or an initial.',
+          nameFrom: 'This is the name you registered with. Please check it is yours before you save.',
+          save: 'Save', ready: 'Get ready', hold: 'Hold still…', noCamera: "Can't open the camera. Please ask our staff",
+          noApp: "Can't reach the booth program", doneTitle: 'All done', doneOk: 'Emma knows you now and will greet you when she sees you.',
+          doneWait: 'Sending to Emma. She will know you in a moment.', doneNo: 'Not sent to Emma',
+          offline: "Can't reach the booth program. Please ask our staff" },
+    th: { welcomeTitle: 'ให้ Emma รู้จักคุณ',
+          welcomeLead: 'ลงทะเบียนใบหน้าที่นี่ แล้วเมื่อ Emma เห็นคุณ ทั้งในงานนี้และวันที่คุณกลับมาเยี่ยมชมโครงการ เธอจะทักทายคุณด้วยชื่อ',
+          start: 'เริ่ม', noticeTitle: 'ก่อนเริ่ม กรุณาอ่าน', no: 'ไม่ยินยอม', yes: 'ยินยอม', cancel: 'ยกเลิก',
+          nameTitle: 'เรียกคุณว่าอะไรดีคะ', nameLead: 'Emma จะใช้ชื่อนี้ทักคุณ ถ้าซ้ำกับคนอื่นให้เติมนามสกุลหรืออักษรย่อ',
+          nameFrom: 'นี่คือชื่อที่คุณลงทะเบียนไว้ ตรวจว่าเป็นชื่อของคุณก่อนบันทึก',
+          save: 'บันทึก', ready: 'เตรียมตัว', hold: 'ค้างไว้…', noCamera: 'เปิดกล้องไม่ได้ — แจ้งเจ้าหน้าที่',
+          noApp: 'ติดต่อโปรแกรมไม่ได้', doneTitle: 'เรียบร้อยแล้วค่ะ', doneOk: 'Emma รู้จักคุณแล้ว เจอกันเมื่อไหร่ เธอจะทักทายคุณค่ะ',
+          doneWait: 'กำลังส่งข้อมูลถึง Emma อีกสักครู่เธอจะรู้จักคุณค่ะ', doneNo: 'ยังส่งถึง Emma ไม่ได้',
+          offline: 'ติดต่อโปรแกรมตู้ไม่ได้ — แจ้งเจ้าหน้าที่' }
+  };
+  var lang = 'en';
+  function t(key) { return (T[lang] || T.en)[key] || T.en[key] || ''; }
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-t]').forEach(function (el) { el.textContent = t(el.getAttribute('data-t')); });
+    document.querySelectorAll('#langs button').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-lang') === lang));
+    });
+    if (!$('prompt').textContent || $('prompt').textContent === T.en.ready || $('prompt').textContent === T.th.ready) {
+      $('prompt').textContent = t('ready');
+    }
+  }
+  document.querySelectorAll('#langs button').forEach(function (b) {
+    b.onclick = async function () {
+      lang = b.getAttribute('data-lang'); applyLang();
+      var r = await post('/lang', { lang: lang });        // the notice and every sentence after it, in this language
+      if (r && r.consent_text && $('sNotice').classList.contains('on')) $('noticeText').textContent = r.consent_text;
+    };
+  });
+
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.toggle('on', s.id === id); });
+  }
+  async function post(path, body) {
+    // Never throws: a booth program that died, or answered with an error page, is a refusal the screen can
+    // leave by -- a handed-over guest used to stay on a screen that awaited a reply forever (review 23 Nov).
+    try {
+      var payload = Object.assign({ lang: lang }, body || {});   // the reply comes in the language on this screen
+      var r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      return await r.json();
+    } catch (e) { return { ok: false, reason: t('offline'), offline: true }; }
+  }
+  var speaking = null, sayGuard = 0;
+  function quiet() { playing = false; clearTimeout(sayGuard); }
+  function say(text) {
+    // The instruction once, not on every frame; a sentence with no clip is silence, not an error.
+    if (!text || (text === lastSaid && Date.now() - saidAt < 6000) || playing) return;
+    lastSaid = text; saidAt = Date.now(); playing = true;
+    // `playing` holds the pose until the sentence ends; an end event that never comes (Chromium's speech
+    // sometimes drops it) would hold it for good -- no shot ever taken (review 23 Nov). A guard lets go.
+    clearTimeout(sayGuard);
+    sayGuard = setTimeout(quiet, Math.max(3000, text.length * 90));
+    if (lang === 'en') {
+      // The rendered clips are Thai (app/voice.py): English is the browser's own voice (Windows/Edge has
+      // English voices offline). No voice at all = silence, as for a Thai sentence with no clip.
+      if (!window.speechSynthesis) { quiet(); return; }
+      speaking = new SpeechSynthesisUtterance(text); speaking.lang = 'en-US'; speaking.rate = 0.95;   // held: GC
+      speaking.onend = speaking.onerror = quiet;
+      try { speechSynthesis.cancel(); speechSynthesis.speak(speaking); } catch (e) { quiet(); }
+      return;
+    }
+    player.src = '/voice?text=' + encodeURIComponent(text);
+    player.play().catch(quiet);
+  }
+  async function openCamera() {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: (deviceId || preferredCamera) ? { deviceId: { exact: deviceId || preferredCamera }, width: 1280, height: 720 }
+                                           : { width: 1280, height: 720 } });
+    video.srcObject = stream;
+    var devices = (await navigator.mediaDevices.enumerateDevices()).filter(function (d) { return d.kind === 'videoinput'; });
+    $('camera').innerHTML = '';
+    devices.forEach(function (d) {
+      var o = document.createElement('option');
+      o.value = d.deviceId; o.textContent = d.label || 'กล้อง';
+      $('camera').appendChild(o);
+    });
+    $('camera').value = stream.getVideoTracks()[0].getSettings().deviceId;
+  }
+  function closeCamera() {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; video.srcObject = null;
+  }
+  function grab(full) {
+    var c = document.createElement('canvas');
+    var w = full ? video.videoWidth : Math.min(640, video.videoWidth);
+    c.width = w; c.height = Math.round(video.videoHeight * w / video.videoWidth);
+    c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', full ? 0.92 : 0.7);
+  }
+  function paint(look) {
+    var ctx = ov.getContext('2d');
+    ov.width = ov.clientWidth; ov.height = ov.clientHeight;
+    ctx.clearRect(0, 0, ov.width, ov.height);
+    if (!look.box || !look.frame) return;
+    var sx = ov.width / look.frame[0], sy = ov.height / look.frame[1], b = look.box;
+    ctx.lineWidth = 5; ctx.strokeStyle = look.ok ? '#3fb8a3' : '#f0b04a';
+    ctx.strokeRect(b[0] * sx, b[1] * sy, (b[2] - b[0]) * sx, (b[3] - b[1]) * sy);
+  }
+  function dots(steps) {
+    if (!steps) return;
+    var box = $('dots'); box.innerHTML = '';
+    steps.forEach(function (s) {
+      var i = document.createElement('i');
+      i.className = s.done ? 'done' : s.skipped ? 'skip' : '';
+      box.appendChild(i);
+    });
+  }
+  function hold(share) { $('hold').firstElementChild.style.width = Math.min(100, share * 100) + '%'; }
+
+  async function loop() {
+    if (!scanning) return;
+    if (stream && video.videoWidth && !busy) {
+      busy = true;
+      try {
+        var look = await post('/look', { image: grab(false), fullWidth: video.videoWidth });
+        if (!scanning) { busy = false; return; }
+        paint(look); dots(look.steps);
+        if (look.box) lastTouch = Date.now();          // somebody is still in front of the lens
+        if (look.step === null) { busy = false; toName(); return; }
+        $('prompt').textContent = look.prompt || '';
+        $('why').textContent = look.ok ? t('hold') : (look.reason || '');
+        if (look.say) say(look.say); else if (look.prompt) say(look.prompt);
+        if (look.ok && playing) {
+          // Counted from the end of the sentence: nobody can follow an instruction
+          // they have not heard yet (the smile clip outran its hold, enroll_app.html).
+          holdingSince = 0; hold(0);
+        } else if (look.ok) {
+          var need = look.hold_ms || 600;
+          if (!holdingSince) holdingSince = Date.now();
+          var held = Date.now() - holdingSince;
+          hold(held / need);
+          if (held >= need) {
+            holdingSince = 0; hold(0);
+            var shot = await post('/capture', { image: grab(true), fullWidth: video.videoWidth });
+            if (shot.steps) dots(shot.steps);
+            if (shot.ok && shot.step === null) { busy = false; toName(); return; }
+          }
+        } else { holdingSince = 0; hold(0); }
+      } catch (e) {
+        $('why').textContent = t('noApp');
+      }
+      busy = false;
+    }
+    setTimeout(loop, 200);
+  }
+  function toName() {
+    scanning = false; closeCamera();
+    $('name').value = handoff ? handoff.name.slice(0, 40) : ''; $('nameWhy').textContent = '';
+    $('nameFrom').hidden = !(handoff && handoff.name);
+    show('sName'); $('name').focus();
+    if (handoff && handoff.name) $('name').select();   // one keystroke replaces it with a nickname
+  }
+  function home(how) {
+    scanning = false; closeCamera(); hold(0); quiet();
+    try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
+    $('name').value = ''; $('nameWhy').textContent = ''; $('welcomeWhy').textContent = '';
+    if (handoff) {
+      // Back to the check-in kiosk: its address from this booth's setting, or else the page it came from.
+      // It is told how the guest left: "idle" = they walked off, and the kiosk must not show their pass to
+      // whoever stands there next (review 23 Nov). A fragment: nothing personal, never sent to a server.
+      handoff = null;
+      if (back) location.replace(back + '#booth=' + (how || 'cancel')); else history.back();
+      return;
+    }
+    lang = 'en'; applyLang();                          // the next guest starts in English (owner: "ค่าเริ่มต้น en")
+    show('sWelcome');
+  }
+  async function abandon(how) { await post('/cancel'); home(how === 'idle' ? 'idle' : 'cancel'); }
+
+  $('begin').onclick = async function () {
+    var r = await post('/start', { lang: lang });
+    if (!r.ok) {
+      $('welcomeWhy').textContent = r.reason || '';
+      if (handoff) setTimeout(function () { home('error'); }, 8000);   // said for the staff, then back to check-in
+      return;
+    }
+    $('noticeText').textContent = r.consent_text;
+    show('sNotice');
+  };
+  $('no').onclick = async function () { await post('/consent', { agree: false }); home('cancel'); };
+  $('yes').onclick = async function () {
+    var r = await post('/consent', { agree: true });
+    if (!r.ok || r.closed) { home('cancel'); return; }
+    show('sScan');
+    dots(r.steps); $('prompt').textContent = r.prompt || '';
+    try { await openCamera(); } catch (e) { $('why').textContent = t('noCamera'); return; }
+    scanning = true; loop();
+  };
+  $('stopScan').onclick = function () { abandon('cancel'); };
+  $('dropName').onclick = function () { abandon('cancel'); };
+  $('save').onclick = async function () {
+    var name = $('name').value;
+    $('save').disabled = true;
+    var r = await post('/save', { name: name });
+    $('save').disabled = false;
+    if (!r.ok) { $('nameWhy').textContent = r.reason || ''; return; }
+    $('name').value = '';
+    if (r.robot === 'accepted') {
+      $('doneTitle').textContent = t('doneTitle');
+      $('doneText').textContent = t('doneOk');
+    } else if (r.robot === 'refused') {
+      // The robot said no: the booth has already let this scan go (app/booth.py flush).
+      $('doneTitle').textContent = t('doneNo');
+      $('doneText').textContent = r.reason || '';
+    } else {
+      $('doneTitle').textContent = t('doneTitle');
+      $('doneText').textContent = t('doneWait');
+    }
+    show('sDone');
+    setTimeout(function () { home('done'); }, r.robot === 'refused' ? 15000 : 8000);
+  };
+  $('staffBtn').onclick = function () { $('staff').classList.toggle('on'); };
+  $('camera').onchange = function () {
+    deviceId = this.value; if (scanning) openCamera();
+    post('/camera', { id: this.value });             // kept by the booth program for the next page (an id only)
+  };
+  $('revoke').onclick = async function () {
+    var r = await post('/revoke', { name: $('revokeName').value, pin: $('pin').value });
+    $('staffSay').textContent = r.ok ? (r.had ? 'ถอนแล้ว ลบข้อมูลแล้ว' : 'ไม่พบชื่อนี้ — บันทึกการถอนไว้แล้ว')
+                                       + (r.robot_pending ? ' (รอส่งถึงหุ่น)' : '')
+                                     : (r.reason || 'ไม่สำเร็จ');
+    $('pin').value = ''; $('revokeName').value = '';
+  };
+  async function status() {
+    try {
+      var s = await (await fetch('/status', { cache: 'no-store' })).json();
+      back = s.return_url || null;
+      preferredCamera = s.camera || null;
+      // For the staff beside the booth: whether a scan will reach the robot. A
+      // number and a state, never anybody's name.
+      var parts = [];
+      if (s.pending) parts.push('รอส่งถึงหุ่น ' + s.pending + (s.push_error ? ' (' + s.push_error + ')' : ''));
+      if (s.late_refused) parts.push('หุ่นปฏิเสธ ' + s.late_refused + ' — ดูหน้าต่างคำสั่ง');
+      // The head of the sentence only: the fix is for check-scan-booth.cmd, not the guest's screen.
+      if (s.robot && s.robot !== 'ok') parts.push((s.robot_th || s.robot).split(' — ')[0]);
+      else if (s.robot === 'ok') parts.push('หุ่นพร้อม');
+      $('queue').textContent = parts.join(' · ');
+      $('queue').className = (s.robot && s.robot !== 'ok') || s.late_refused || s.push_error ? 'bad' : '';
+    } catch (e) { $('queue').textContent = 'ติดต่อโปรแกรมไม่ได้'; $('queue').className = 'bad'; }
+  }
+  // Nobody touching the notice or the name, and no face at the lens: they walked off. Their scan is
+  // let go (the server would drop it after 90 s anyway) and a handed-over screen goes back to check-in.
+  ['pointerdown', 'keydown', 'input'].forEach(function (ev) {
+    window.addEventListener(ev, function () { lastTouch = Date.now(); }, true);
+  });
+  // Typing the name keeps the scan alive on the server too (it forgets a scan 90 s after its last touch).
+  var aliveAt = 0;
+  $('name').addEventListener('input', function () {
+    if (Date.now() - aliveAt > 10000) { aliveAt = Date.now(); post('/alive'); }
+  });
+  setInterval(function () {
+    var on = document.querySelector('.screen.on');
+    if (!on || on.id === 'sWelcome' || on.id === 'sDone') return;
+    if (Date.now() - lastTouch > IDLE_MS) { lastTouch = Date.now(); abandon('idle'); }
+  }, 1000);
+  applyLang();
+  status().then(async function () {
+    // Only on its own first screen and never inside somebody else's frame (the server also says frame-ancestors
+    // 'none'): a hand-over opens the notice; anything already under way is left alone.
+    if (!handedOver || window.top !== window.self || !$('sWelcome').classList.contains('on')) return;
+    var c = await post('/claim');
+    handoff = { name: (c && c.name) || '' };
+    if (!c || !c.name) { $('welcomeWhy').textContent = c && c.reason ? c.reason : ''; }
+    $('begin').onclick();
+  });
+  setInterval(status, 5000);
+})();
+</script>
+</body>
+</html>

@@ -16,6 +16,10 @@ to the robot: uploading is a separate step, on the owner's go.
 
 With 2 x --min-runs walks or more it also checks ITSELF: the map is cleaned
 from half the walks and the lidar of the other half is scored on it.
+
+--profile: the robot the walks were made with (app/robot_profile.py: emma -- the
+default --, serving_example, or a JSON file): its lidar's trusted band, the floor
+its body stood on, its board's quality gate.
 """
 from __future__ import annotations
 
@@ -33,6 +37,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app import map_check as mc  # noqa: E402
+from app import robot_profile as rp  # noqa: E402
 
 WALKS = ROOT / ".tmp" / "walk-frames"
 OUT = ROOT / ".tmp" / "map-check"
@@ -83,7 +88,8 @@ def load_walk(path: Path) -> tuple[list[mc.Frame], dict]:
                 continue
             head = r.get("head") or [0.0, 0.0]
             frames.append(mc.Frame(name, int(r.get("n", len(frames))), pose, _points(r["scan"]), r.get("q"),
-                                   r.get("file"), float(head[0] or 0.0)))
+                                   r.get("file"), float(head[0] or 0.0),
+                                   tilt_deg=float((head[1] if len(head) > 1 else 0.0) or 0.0)))
         if (path / "map.bin").is_file():
             info["map"] = path / "map.bin"
         try:
@@ -113,6 +119,14 @@ def load_walk(path: Path) -> tuple[list[mc.Frame], dict]:
 
 
 def load_map(path: Path) -> tuple[mc.Grid, str]:
+    """A board .stcm, an explore .bin, a ROS map_server .yaml, or a map package's folder
+    (scripts/map_package.py): the map another robot's software keeps comes in as ours."""
+    from app import map_package as mp
+
+    if path.is_dir() and (path / "package.json").is_file():
+        return mp.read(path)["grid"], "ros"
+    if path.suffix.lower() in (".yaml", ".yml"):
+        return mp.load_map_yaml(path), "ros"
     blob = path.read_bytes()
     if blob[:4] == b"STCM":
         return mc.parse_stcm(blob), "stcm"
@@ -223,24 +237,27 @@ def pictures_jpg(found: list[dict], picks: dict[int, dict], folders: dict[str, P
 
 
 # -- the run -------------------------------------------------------------------
-def _check(grid: mc.Grid, frames: list[mc.Frame], min_runs: int):
-    ck = mc.Checker(grid)
+def _check(grid: mc.Grid, frames: list[mc.Frame], min_runs: int, profile=None):
+    ck = mc.Checker(grid, profile)
+    ck.align(frames)
     for f in frames:
         ck.add(f)
     found, masks = ck.findings(min_runs)
     return ck, found, masks
 
 
-def self_test(grid: mc.Grid, walks: list[list[mc.Frame]], min_runs: int) -> list[str]:
+def self_test(grid: mc.Grid, walks: list[list[mc.Frame]], min_runs: int, profile=None) -> list[str]:
     """Clean from every other walk, score the rest on it -- and the other way."""
     if len(walks) < 2 * min_runs:
         return ["self-check: needs %d walks or more (have %d) -- not run" % (2 * min_runs, len(walks))]
     lines = []
     halves = (walks[0::2], walks[1::2])
     for build, test in (halves, halves[::-1]):
-        _, found, _ = _check(grid, [f for w in build for f in w], min_runs)
+        _, found, _ = _check(grid, [f for w in build for f in w], min_runs, profile)
         clean, applied = mc.cleaned(grid, found)
-        before, after = mc.Checker(grid), mc.Checker(clean)
+        before, after = mc.Checker(grid, profile), mc.Checker(clean, profile)
+        before.align([f for w in test for f in w])
+        after.align([f for w in test for f in w])
         fb = [before.place(f)[2] for w in test for f in w]
         fa = [after.place(f)[2] for w in test for f in w]
         lines.append("self-check: cleaned from %d walks (%d changes), lidar of the other %d on it: "
@@ -249,8 +266,16 @@ def self_test(grid: mc.Grid, walks: list[list[mc.Frame]], min_runs: int) -> list
     return lines
 
 
+def _block(text: str) -> tuple[float, float, float]:
+    parts = [float(v) for v in text.split(",")]
+    if len(parts) not in (2, 3):
+        raise ValueError("--block takes X,Y or X,Y,R: %s" % text)
+    return parts[0], parts[1], parts[2] if len(parts) == 3 else 0.2
+
+
 def run(paths: list[Path], *, map_path: Path | None, stcm: Path | None, min_runs: int,
-        keep: list[int], clear: list[int], out: Path) -> dict:
+        keep: list[int], clear: list[int], out: Path, lens: dict | None = None,
+        block: list[tuple[float, float, float]] | None = None, profile=None) -> dict:
     walks, infos = [], []
     for p in paths:
         frames, info = load_walk(p)
@@ -271,9 +296,12 @@ def run(paths: list[Path], *, map_path: Path | None, stcm: Path | None, min_runs
         map_path = maps[0]
     grid, kind = load_map(map_path)
     frames = [f for w in walks for f in w]
-    ck, found, masks = _check(grid, frames, min_runs)
+    ck, found, masks = _check(grid, frames, min_runs, profile)
     placed = {(r["run"], r["n"]): tuple(r["pose"]) for r in ck.frames if r.get("pose")}
     cams = {i["name"]: i["camera"] for i in infos}
+    if lens:
+        # walks recorded before the robot knew its lens (4 Nov: 19 deg, mirrored)
+        cams = {n: dict(c or {}, **{k: v for k, v in lens.items() if not (c or {}).get(k)}) for n, c in cams.items()}
     folders = {i["name"]: i["folder"] for i in infos}
     picks = {}
     with_pictures = [fr for fr in frames if fr.picture]
@@ -283,6 +311,8 @@ def run(paths: list[Path], *, map_path: Path | None, stcm: Path | None, min_runs
             picks[f["id"]] = pick
             f["picture"] = pick
     clean, applied = mc.cleaned(grid, found, keep=keep, clear=clear)
+    if block:
+        clean = mc.blocked(clean, block)
     out.mkdir(parents=True, exist_ok=True)
     report_png(grid, masks, found, ck.frames, out / "report.png")
     has_pics = pictures_jpg(found, picks, folders, out / "pictures.jpg")
@@ -293,6 +323,12 @@ def run(paths: list[Path], *, map_path: Path | None, stcm: Path | None, min_runs
     else:
         (out / "clean_explore.bin").write_bytes(mc.explore_bytes(clean))
         written.append("clean_explore.bin")
+        if kind == "ros":
+            from app import map_package as mp
+
+            (out / "clean.pgm").write_bytes(mp.grid_pgm(clean))
+            (out / "clean.yaml").write_text(mp.grid_yaml(clean, "clean.pgm"), encoding="utf-8")
+            written.append("clean.pgm/.yaml")
         if stcm is not None:
             (out / "clean.stcm").write_bytes(mc.stcm_with(stcm.read_bytes(), clean))
             written.append("clean.stcm")
@@ -306,10 +342,16 @@ def run(paths: list[Path], *, map_path: Path | None, stcm: Path | None, min_runs
         fa = [r["fit"] for r in used]
         lines.append("lidar on the map: %.2f mean at the board's poses, %.2f after refining (worst %.2f)"
                      % (np.mean(fb), np.mean(fa), min(fa)))
+    moved = {run: s for run, s in ck.shift.items() if s != (0.0, 0.0, 0.0)}
+    if moved:
+        lines.append("walks laid on the map shifted first (their poses are in another frame): " + "; ".join(
+            "%s dx %+.2f dy %+.2f dyaw %+.1f deg" % (run, s[0], s[1], math.degrees(s[2])) for run, s in sorted(moved.items())))
     lines.append("findings: %d phantom, %d new, %d line, %d changing -- %d applied to the clean map"
                  % (counts["phantom"], counts["new"], counts["line"], counts["changing"], len(applied)))
     lines += notes
-    lines += self_test(grid, walks, min_runs)
+    if profile is not None and profile is not rp.EMMA:
+        lines += rp.describe(profile)
+    lines += self_test(grid, walks, min_runs, profile)
     lines.append("wrote: report.png%s, findings.json, %s -> %s"
                  % (", pictures.jpg" if has_pics else "", ", ".join(written), out))
     lines.append("nothing was sent to the robot")
@@ -328,12 +370,18 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("walks", nargs="*", type=Path, help="one per walk")
     ap.add_argument("--last", type=int, default=0, help="the newest N runs under .tmp/walk-frames")
-    ap.add_argument("--map", type=Path, help="the map to check (.stcm or explore .bin); default the walks' map.bin")
+    ap.add_argument("--map", type=Path, help="the map to check (.stcm, explore .bin, ROS .yaml or a map package folder); "
+                                            "default the walks' map.bin")
     ap.add_argument("--stcm", type=Path, help="with an explore map: write clean.stcm from this .stcm too")
     ap.add_argument("--min-runs", type=int, default=mc.MIN_RUNS, help="walks that must agree (default 2)")
     ap.add_argument("--keep", default="", help="finding ids to leave as they are (looked at, wrong)")
     ap.add_argument("--clear", default="", help="'line'/'changing' ids to apply anyway (looked at, right)")
+    ap.add_argument("--block", action="append", default=[], metavar="X,Y[,R]",
+                    help="mark a thing under the laser's plane as an obstacle in the clean map (R default 0.2 m)")
     ap.add_argument("--out", type=Path)
+    ap.add_argument("--hfov", type=float, help="the head camera's measured width, deg, for walks that do not say (19 on 4 Nov)")
+    ap.add_argument("--mirrored", action="store_true", help="the head camera's picture is mirrored, for walks that do not say")
+    ap.add_argument("--profile", help="the robot the walks were made with: emma (default), serving_example, or a JSON file")
     a = ap.parse_args(argv)
     paths = list(a.walks)
     if a.last:
@@ -345,8 +393,14 @@ def main(argv=None) -> int:
         if a.min_runs < 2:
             raise Fail("--min-runs below 2 would write one walk's passers-by into the map")
         out = a.out or OUT / _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        lens = {k: v for k, v in (("hfov_measured", a.hfov), ("mirrored", a.mirrored or None)) if v}
+        try:
+            profile = rp.load(a.profile)
+        except KeyError as exc:
+            raise Fail(str(exc)) from None
         res = run(paths, map_path=a.map, stcm=a.stcm, min_runs=a.min_runs,
-                  keep=_ids(a.keep), clear=_ids(a.clear), out=out)
+                  keep=_ids(a.keep), clear=_ids(a.clear), out=out, lens=lens or None,
+                  block=[_block(b) for b in a.block], profile=profile)
     except (Fail, ValueError, OSError) as exc:
         print("FAILED:", exc, file=sys.stderr)
         return 1

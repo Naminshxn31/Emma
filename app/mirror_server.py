@@ -28,6 +28,7 @@ import asyncio
 import contextlib
 import hashlib
 import hmac
+import json
 import logging
 import re
 import secrets
@@ -138,6 +139,44 @@ async def story_asset(sha256: str):
                     headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
 
 
+#: How long the screen keeps a ceremony file (its address is its hash): a week covers the rehearsal and the
+#: event's two days.
+ASSET_KEEP_S = 7 * 24 * 3600
+
+
+@app.get("/ceremony-asset/{sha256}")
+async def ceremony_asset(sha256: str):
+    """A file of the ceremony film's own index (app/ceremony_slides.py: a full-size
+    picture, its depth map, a checked candidate, a clip), by the hash the server itself
+    put in a slide -- nothing else in that folder, and only while its entry may be shown."""
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+        return Response(status_code=404)
+    from app import ceremony_slides
+
+    found = await asyncio.to_thread(ceremony_slides.asset_file, sha256)
+    if found is None:
+        return Response(status_code=404)
+    path, media_type = found
+    # (the address is the content's own hash: it can be kept -- for the event's days, not an hour: review
+    # 22 Nov, s06's opening became a 2.8 MB clip fetched at the moment her line starts over the hall's
+    # Wi-Fi; a run-through the day before now leaves every file on the screen for the ceremony. Nothing
+    # stale can come of it: a changed file is another address, and only a slide the server sends names one)
+    return FileResponse(path, media_type=media_type,
+                        headers={"Cache-Control": "private, max-age=%d, immutable" % ASSET_KEEP_S,
+                                 "X-Content-Type-Options": "nosniff"})
+
+
+@app.get("/ceremony-acts.json")
+async def ceremony_acts() -> Response:
+    """The acts of the ceremony film (client/assets/ceremony-show/acts/): the folder's own
+    listing with a tag of each one's bytes, so the screen preloads them and never runs a
+    stale copy."""
+    from app import ceremony_slides
+
+    body = await asyncio.to_thread(ceremony_slides.acts_manifest)
+    return Response(json.dumps(body), media_type="application/json", headers=_NO_CACHE)
+
+
 @app.get("/slides/{name}")
 async def slide_image(name: str):
     """An answer picture the robot's screen shows (face_mirror forwards its
@@ -165,6 +204,52 @@ async def slide_image(name: str):
                                        "X-Content-Type-Options": "nosniff"})
 
 
+@app.get("/event-clip/{sha256}")
+async def event_clip_file(sha256: str):
+    """A film of the event file's `clips`, by the hash the server itself told this
+    screen (app/event_clips.py): nothing else in that folder or anywhere."""
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+        return Response(status_code=404)
+    from app import event_clips
+
+    found = await asyncio.to_thread(event_clips.path_for, sha256)
+    if found is None:
+        return Response(status_code=404)
+    path, media_type = found
+    return FileResponse(path, media_type=media_type,
+                        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@app.get("/catwalk/{name}")
+async def catwalk_file(name: str):
+    """The walk's music (app/catwalk_music.py): one of its three names, only while CATWALK_MUSIC is on. The
+    address the server sent moves with the file, so the screen may keep it."""
+    from app import catwalk_music
+
+    found = await asyncio.to_thread(catwalk_music.body, name)
+    if found is None:
+        return Response(status_code=404)
+    path, media_type = found
+    return FileResponse(path, media_type=media_type,
+                        headers={"Cache-Control": "private, max-age=%d" % ASSET_KEEP_S, "X-Content-Type-Options": "nosniff"})
+
+
+@app.post("/event-clip-state")
+async def event_clip_state(request: Request) -> Response:
+    """The one thing a screen tells the robot: what became of a clip it was cued. Fixed
+    words about one cue (`event_clips.report`); the socket stays one-way."""
+    from app import event_clips
+
+    raw = await request.body()
+    if len(raw) > 2048:
+        return Response(status_code=413)
+    with contextlib.suppress(ValueError):
+        doc = json.loads(raw or b"{}")
+        if isinstance(doc, dict):
+            event_clips.report(doc.get("seq"), doc.get("clip"), doc.get("state"), doc.get("duration"))
+    return Response(status_code=204, headers=_NO_CACHE)
+
+
 if ASSETS.is_dir():
     app.mount("/assets", StaticFiles(directory=str(ASSETS)), name="assets")
 
@@ -175,7 +260,8 @@ async def ws_mirror(ws: WebSocket) -> None:
         await ws.close(code=4403)
         return
     await ws.accept()
-    await face_mirror.serve(ws)
+    # (what the screen says it is -- sound aloud, its size: app/ceremony_reveal.ready counts the hall's screens)
+    await face_mirror.serve(ws, face_mirror.kind_from_query(ws.query_params))
 
 
 def _server_class():

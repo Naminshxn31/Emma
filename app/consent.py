@@ -66,6 +66,19 @@ VERSION = "face-policy-v1"
 #: document nobody read.
 STAFF_ATTESTED = "staff-attested"
 
+#: Stamped by the launch event's scan booth (app/booth.py). Its own version
+#: because its own words: the notice a guest reads there, in
+#: data/policies/event-guest-v1.txt. Change those words = a new version here
+#: and a new file: a record must say which words the person agreed to.
+EVENT_GUEST = "event-guest-v1"
+
+#: The longest a witnessed guest record may run, days. Was 30 ("ends with the
+#: event"); owner, 23 Nov 2026: "เราจะเก็บข้อมูลนี้ไว้ เพราะจะให้หุ่นจำได้เวลาวันอื่น
+#: ที่ลูกค้ามาดูโครงการ" -- kept for the visits after it. The booth is told one end
+#: date (BOOTH_CONSENT_UNTIL, a year after the event); this is what a typo there
+#: cannot get past. A year and a month, not "forever": the notice names the date.
+MAX_GUEST_DAYS = 400.0
+
 OK, MISSING, REVOKED, EXPIRED = "ok", "missing", "revoked", "expired"
 
 #: The file is there and cannot be read. Never allowed to name anybody,
@@ -230,9 +243,90 @@ def record(name: str, by: str | None = None, version: str = VERSION,
     return entry
 
 
-def revoke(name: str, now: datetime | None = None) -> bool:
+def _when(value) -> datetime | None:
+    """An ISO time with its zone, or None. No zone is no time: nothing here
+    can compare it with the one a revocation was stamped with."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def record_witnessed(name: str, entry: dict, station: str = "") -> str:
+    """Keep a record the scan booth wrote, at the moment the guest pressed
+    "ยินยอม" there, on a machine that was not in the room (the robot).
+
+    'recorded', 'already' (this exact consent is here: a retry of a push whose
+    answer was lost), 'revoked' (they withdrew after this consent: the
+    booth's queue can hold a save for as long as the Wi-Fi is down, and a stale
+    push must not undo a withdrawal), or 'taken' (a colleague's record is here
+    under that name -- review 23 Nov: the guest's withdrawal, or their year
+    running out, used to revoke or delete the colleague's record). ValueError
+    for anything that is not a
+    well-formed guest record. Nothing is invented here: the times, the version
+    and who consented are the booth's, copied; `witnessed_by` says which booth.
+    """
+    if not isinstance(entry, dict):
+        raise ValueError("no consent record")
+    at, until = _when(entry.get("consent_at")), _when(entry.get("expires_at"))
+    if at is None or until is None:
+        raise ValueError("consent times missing or without a zone")
+    if entry.get("consent_by") != name or entry.get("consent_version") != EVENT_GUEST:
+        raise ValueError("not this guest's own consent")
+    if entry.get("revoked_at"):
+        raise ValueError("a withdrawn record")
+    if until <= at or (until - at) > timedelta(days=MAX_GUEST_DAYS):
+        raise ValueError("expiry out of range")
+    with _write_lock, _locked():
+        people = load()
+        old = people.get(name) or {}
+        withdrawn = _when(old.get("revoked_at"))
+        if withdrawn is not None and withdrawn >= at:
+            return "revoked"
+        if old.get("consent_at") == entry["consent_at"] and not old.get("revoked_at"):
+            return "already"
+        if old and old.get("consent_version") != EVENT_GUEST:
+            # A colleague's record, or a bare revocation from revoke_face.py: never
+            # a guest's to rewrite (it would also erase that revocation). Another
+            # guest under the same name is app/guests.py's call: it has the faces.
+            return "taken"
+        people[name] = {"consent_at": entry["consent_at"], "consent_by": name,
+                        "consent_version": EVENT_GUEST, "expires_at": entry["expires_at"],
+                        "revoked_at": None, "witnessed_by": str(station)[:40]}
+        save(people)
+    logger.info("witnessed guest consent kept (until %s)", entry["expires_at"])
+    return "recorded"
+
+
+def forget(names) -> int:
+    """Remove these people's records altogether. For guests whose consent ran
+    out (app/guests.py purge): a record is itself a name kept, and the notice
+    names the date it is deleted. How many were removed."""
+    names = set(names)
+    if not names:
+        return 0
+    with _write_lock, _locked():
+        people = load()
+        gone = [n for n in people if n in names]
+        for name in gone:
+            del people[name]
+        if gone:
+            save(people)
+    return len(gone)
+
+
+def revoke(name: str, now: datetime | None = None, version: str | None = None,
+           log_name: bool = True) -> bool:
     """Mark `name` as withdrawn. Returns False if there was no record —
     which is still a revocation in effect: see `status`.
+
+    `version` stamps a record this creates (none was here): the booth's
+    withdrawal of a name that never arrived is a guest's record, and only
+    guests' records are ever purged -- unstamped it would stay for good.
+    `log_name` False for a guest (server.log keeps no guest's name).
 
     Refuses on an unreadable file exactly like `record`: rewriting it from
     `{}` would drop every *other* revocation to add this one."""
@@ -240,10 +334,12 @@ def revoke(name: str, now: datetime | None = None) -> bool:
         people = load()
         entry = people.get(name) or {}
         had = bool(entry)
+        if not had and version:
+            entry["consent_version"] = version
         entry["revoked_at"] = _now(now).isoformat(timespec="seconds")
         people[name] = entry
         save(people)
-    logger.info("consent revoked for %s", name)
+    logger.info("consent revoked for %s", name if log_name else "a guest")
     return had
 
 

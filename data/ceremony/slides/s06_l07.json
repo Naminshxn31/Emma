@@ -1,0 +1,59 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "continues": "s06_l05",
+  "texts": {
+    "kick": "If there's ever an Embassy World superfan quiz",
+    "plate": "I'm sure I'd take first place!",
+    "giant": "First place"
+  },
+  "pictures": {
+    "study": {
+      "asset": "fin_study_wall"
+    }
+  },
+  "videos": {
+    "emma": {
+      "asset": "c_emma_stage_crop"
+    }
+  },
+  "beats": [
+    {
+      "at_en": "Embassy World superfan quiz",
+      "do": "flip",
+      "key": "kick"
+    },
+    {
+      "at_en": "I'm sure",
+      "do": "part",
+      "key": "plate"
+    },
+    {
+      "at_en": "first place",
+      "do": "podium",
+      "key": "giant"
+    }
+  ],
+  "options": {
+    "mode": "wall",
+    "start": "wall",
+    "emma": {
+      "x": 20,
+      "y": 42.4,
+      "fh": 30.6,
+      "base": 0.919,
+      "window": [48, 120, 624, 792, 720, 960]
+    },
+    "podium": {
+      "x": 50,
+      "top": 34
+    },
+    "sheet": [
+      7,
+      3,
+      512,
+      320,
+      8
+    ]
+  }
+}

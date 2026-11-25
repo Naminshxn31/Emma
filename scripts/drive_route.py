@@ -1078,6 +1078,29 @@ class Runner:
         self.say("  heading %+.0f°, off by %.1f°" % (math.degrees(heading), math.degrees(err)))
         return err
 
+    def dock_marker(self) -> tuple[float, float, float]:
+        """The charger's marker: the route's own when it names one (floor 2
+        since 4 Nov), else the board's home pose."""
+        if self.route.dock_marker is not None:
+            return self.route.dock_marker
+        return self.b.home_pose()
+
+    def look(self, step: rl.Step) -> None:
+        """Turn on the spot and measure nothing (a survey's look round, 4 Nov):
+        the turn's own space check (`rotate_to` -> turn_space_clear) still
+        stops it where there is no room to turn; the pose is odometry's."""
+        self.rotate_to(math.radians(step.heading_deg))
+        if step.dwell_s > 0:
+            # the head's walk scan (server, HEAD_WALK_SCAN) sweeps eye level /
+            # desk / floor on both sides; standing still for a whole round
+            # gives every pose sharp pictures at a known pose (4 Nov afternoon:
+            # "ไม่เห็นก้มมองดูวัดพื้น หรือโต๊ะเลย ต้องเช็คให้ทั่วเลยนะ")
+            self.say("  holding %.0f s for the head's look round" % step.dwell_s)
+            time.sleep(step.dwell_s)
+        x, y, yaw = self.b.pose()
+        self.say("  looked %s: (%.2f, %.2f, %.1f°)" % (step.label or "round", x, y, math.degrees(yaw)))
+        self.log(kind="look", label=step.label, pose=[x, y, yaw], dwell_s=step.dwell_s)
+
     def checkpoint(self, step: rl.Step) -> rl.Fix:
         if step.heading_deg is not None:
             self.rotate_to(math.radians(step.heading_deg))
@@ -2661,7 +2684,7 @@ class Runner:
         to do but reverse. Driven straight at the spot from wherever the last
         lane ended — which must be short of it: there is no reversing here."""
         try:
-            hx, hy, hyaw = self.b.home_pose()
+            hx, hy, hyaw = self.dock_marker()
         except (httpx.HTTPError, KeyError, TypeError, ValueError, Stop) as e:
             self.say("  (no dock marker from the board: %s — GoHome finds its own way in)" % e)
             if self.route.dock_pose is not None:
@@ -2838,7 +2861,7 @@ class Runner:
 
     def _back_in_once(self, out_first: bool) -> tuple[bool, str | None]:
         from app import slamware_sdk as sw
-        hx, hy, hyaw = self.b.home_pose()
+        hx, hy, hyaw = self.dock_marker()
         self.dock_started = True                    # from here on a failure is not handed to GoHome
         ux, uy = math.cos(hyaw), math.sin(hyaw)
         nx, ny = -uy, ux
@@ -3077,7 +3100,7 @@ class Runner:
                 # ~63° and called it done. Charging, still, and facing the dock's way.
                 time.sleep(2.0)
                 pw = self.b.power()
-                _, _, hyaw_now = self.b.home_pose()
+                _, _, hyaw_now = self.dock_marker()
                 twist = abs(rl.wrap_pi(self.b.pose()[2] - hyaw_now))
                 if (pw.get("dockingStatus") != "on_dock" or not pw.get("isCharging")
                         or twist > math.radians(15)):
@@ -3160,7 +3183,7 @@ class Runner:
         first = self.route.steps[0] if self.route.steps else None
         if first is not None and first.do == "checkpoint":
             self.checkpoint(first)                  # the dock's own: the heading it starts from
-        hx, hy, hyaw = self.b.home_pose()
+        hx, hy, hyaw = self.dock_marker()
         pre = (hx + (DOCKED_M + PREDOCK_M) * math.cos(hyaw), hy + (DOCKED_M + PREDOCK_M) * math.sin(hyaw))
         self.undock()
         self.drive_velocity(rl.Step(do="drive", to=pre, label="out to the pre-dock spot"), direct=True)
@@ -3215,7 +3238,7 @@ class Runner:
         review #3). Without it the whole route runs and ends `route_done`, as
         it always has."""
         handlers = {"checkpoint": self.checkpoint, "move": self.move, "drive": self.drive,
-                    "door": self.door, "dock": self.dock}
+                    "door": self.door, "dock": self.dock, "look": self.look}
         if to_step is not None:
             self.to_step = to_step
         leg = getattr(self, "to_step", None) is not None
@@ -4035,7 +4058,7 @@ def main(argv: list[str] | None = None) -> int:
                          "direct steps, doorways and docking keep their own speeds")
     ap.add_argument("--sdk", default="127.0.0.1:11445",
                     help="SDK port relay (velocity control); 'off' to drive with the old MoveBy bursts")
-    ap.add_argument("--adb-serial", default="192.168.1.197:5555",
+    ap.add_argument("--adb-serial", default="192.168.0.2:5555",
                     help="robot's adb serial, used to put the relay's port forward back if it drops")
     ap.add_argument("--door-width", type=float, default=rl.ROBOT_WIDTH,
                     help="robot width counted in doorways, m (default the owner's padded 0.78; he said the "

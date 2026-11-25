@@ -25,7 +25,9 @@ don't share decoder state.
 """
 from __future__ import annotations
 
+import json
 import logging
+import time
 from pathlib import Path
 
 from app.config import settings
@@ -258,6 +260,7 @@ def mic_level() -> dict:
         "speech_floor": WakeStream.SPEECH,
         "quiet_floor": WakeStream.QUIET,
         "streaming": age is not None and age < 2.0,
+        **hello(),       # the cockpit reads the mute hold beside the level
     }
 
 
@@ -619,6 +622,166 @@ _STANDBY: set = set()
 _HELD: set = set()
 HOLD_SKIPS = frozenset({"standing_line"})
 
+#: The Emma Ceremony app's bells (its page says `"ceremony": true` on every hold message; the URL's
+#: ceremony=1, app/ceremony.py). The stored hold below is the at-rest state of the Event and sales
+#: faces, and it is not this app's: the ceremony's mode IS its call (app/ceremony.py `claim`), and in
+#: that mode the mic is deaf anyway except while she moves (event_host `mic_deaf`, cue_only). Robot,
+#: 23 Nov: a tap at 19:55 held the mic to 06:00, the ceremony app opened with no call (the standing
+#: line skipped its muted page), the opening refused "เปิดแอป Emma Ceremony บนหุ่นก่อน" until the mic
+#: was tapped on the robot at 22:25:19 (`mic_hold on:false why:pressed`) -- and that tap had cleared
+#: the hold, so after the hand-back the Event call came up live and was re-muted by hand at 22:47:52.
+#: So a ceremony bell neither answers to the stored hold (`_page_held`) nor writes it (`note`): only
+#: its own page's word (its own tap, in `_HELD`) holds its line.
+_CEREMONY: set = set()
+
+#: The hold itself, on this machine's disk (MIC_HOLD_PERSIST; owner, 5 Nov:
+#: "ปิดไมค์ แต่เหมือนรีแล้วก็กลับมาพูด"). `_HELD` dies with its socket and the
+#: page's copy lives in sessionStorage, which dies with the WebView: an app
+#: restart, a renderer crash or Android rebooting itself (3x on 4 Nov) came
+#: back with no hold, and the next standing ring opened the mic (server.log of
+#: 26-27 Oct: a muted page, a server restart with a fresh page, the standing
+#: line ringing 6 s later with nobody having touched the mic). So the server is
+#: the authority and the page adopts its word on every bell.
+#:
+#: Two things end it. A tap on the mic: the person at the screen asked to be
+#: heard. And the morning, MIC_HOLD_RESET_HOUR on this machine's clock, fixed
+#: when the hold is pressed: a hold left over from last night is a robot
+#: silently deaf at an event, and a fixed length would instead end at 3 a.m. in
+#: an empty building and ring the mic open for the cleaners.
+_hold: dict | None = None
+_hold_loaded = False
+_hold_news = False     # ended by the clock; the open bells have not been told
+#: The camera opening a line through a hold, in the turn log: the one way a muted robot hears
+#: on purpose (MUTE_CAMERA_GREETS), and until now it could only be inferred from gaps (owner,
+#: 5 Nov: "ปิดไมค์ ... อยู่หุ่นก็สามารถได้ยิน"). One row for a face that keeps ringing.
+CAMERA_RANG_LOG_S = 30.0
+_camera_rang_at = -1e12
+#: ...and the ceremony app's line rung through it (`_CEREMONY`): the hold stood, on purpose.
+_ceremony_rang_at = -1e12
+
+
+def _next_reset(now: float) -> float:
+    """The next MIC_HOLD_RESET_HOUR:00 on this machine's clock, after `now`."""
+    hour = max(0, min(23, int(settings.mic_hold_reset_hour)))
+    t = time.localtime(now)
+    at = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, hour, 0, 0, 0, 0, -1))
+    if at <= now:
+        # mktime normalises day 32: the month and the year take care of themselves
+        at = time.mktime((t.tm_year, t.tm_mon, t.tm_mday + 1, hour, 0, 0, 0, 0, -1))
+    return at
+
+
+def _load_hold() -> None:
+    """Once per process. A file that cannot be read is no hold, said out loud:
+    the screen then says she is listening, which is true."""
+    global _hold, _hold_loaded
+    if _hold_loaded:
+        return
+    _hold_loaded = True
+    path = Path(settings.mic_hold_file).expanduser()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        _hold = {"since": float(raw["since"]), "until": float(raw["until"])}
+    except FileNotFoundError:
+        return
+    except (OSError, ValueError, KeyError, TypeError):
+        logger.warning("mic hold: cannot read %s -- treating the mic as not "
+                       "held", path, exc_info=True)
+        return
+    from app import turnlog
+
+    logger.warning("mic hold restored from %s: muted since %s until %s",
+                   path, time.strftime("%H:%M", time.localtime(_hold["since"])),
+                   time.strftime("%m-%d %H:%M", time.localtime(_hold["until"])))
+    turnlog.record("mic_hold", on=True, why="restored")
+
+
+def _set_hold(on: bool, why: str) -> None:
+    global _hold, _hold_news
+    from app import turnlog
+
+    if on:
+        # An expiry nobody was told about yet is over: a new press. Left set, the next summon told
+        # the page "on: false" while this hold stood (review 6 Nov).
+        _hold_news = False
+
+    path = Path(settings.mic_hold_file).expanduser()
+    now = time.time()
+    _hold = {"since": now, "until": _next_reset(now)} if on else None
+    try:
+        if on:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(_hold), encoding="utf-8")
+            tmp.replace(path)        # never half a file for the next boot to read
+        else:
+            path.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("mic hold: could not write %s -- it will not outlive "
+                       "this server", path, exc_info=True)
+    logger.info("mic hold %s (%s)", "on" if on else "off", why)
+    turnlog.record("mic_hold", on=on, why=why)
+
+
+def mic_held() -> bool:
+    """Is the mic closed by a tap at the robot, on any socket or durably?"""
+    return bool(_HELD) or _durably_held()
+
+
+def hold_state() -> dict | None:
+    """What the screen and the staff are told; None = MIC_HOLD_PERSIST is off.
+    Runs the clock, so nobody can read a hold that has already ended."""
+    global _hold_news
+    if not settings.mic_hold_persist:
+        return None
+    _load_hold()
+    if _hold is not None:
+        now = time.time()
+        # A clock that went backwards (a reset RTC) would otherwise leave
+        # `until` years away: the deaf robot this rule exists to prevent.
+        why = ("expired" if now >= _hold["until"]
+               else "clock_moved" if now < _hold["since"] - 60 else None)
+        if why:
+            _HELD.clear()
+            _hold_news = True
+            _set_hold(False, why)
+    if _hold is None:
+        return {"on": False}
+    return {"on": True, "since": int(_hold["since"]), "until": int(_hold["until"])}
+
+
+def hello() -> dict:
+    """The hold, for a frame a page reads. Empty with the switch off, so the
+    wire stays what it was on every other machine."""
+    state = hold_state()
+    return {} if state is None else {"hold": state}
+
+
+def _durably_held() -> bool:
+    state = hold_state()
+    return bool(state and state["on"])
+
+
+def camera_refused() -> bool:
+    """MUTE_CAMERA_GREETS=false, and the mic is held: a face opens nothing and
+    she says nothing to it. `mic_held`, not `held_only` (review 6 Nov): that needs a
+    registered bell, and between bell reconnects a held robot still greeted."""
+    return not settings.mute_camera_greets and mic_held()
+
+
+def _page_held(ws) -> bool:
+    """This bell's line is held: its page said so, or the stored hold -- which the ceremony app's
+    bell does not answer to (`_CEREMONY`)."""
+    return ws in _HELD or (ws not in _CEREMONY and _durably_held())
+
+
+def _refuses(ws, reason: str) -> bool:
+    if not _page_held(ws):
+        return False
+    if reason in HOLD_SKIPS:
+        return True
+    return str(reason).startswith("face_") and not settings.mute_camera_greets
+
 
 def register(ws) -> None:
     _STANDBY.add(ws)
@@ -627,6 +790,7 @@ def register(ws) -> None:
 def unregister(ws) -> None:
     _STANDBY.discard(ws)
     _HELD.discard(ws)
+    _CEREMONY.discard(ws)
 
 
 def note(ws, text: object) -> None:
@@ -639,15 +803,52 @@ def note(ws, text: object) -> None:
     except ValueError:
         return
     if isinstance(msg, dict) and msg.get("type") == "hold":
+        # Every hold message says whose page it is: the ceremony app's carries `ceremony: true`.
+        if msg.get("ceremony") is True:
+            _CEREMONY.add(ws)
+        else:
+            _CEREMONY.discard(ws)
         if msg.get("on") is True:
             _HELD.add(ws)
         else:
             _HELD.discard(ws)
+        # `press`: a person tapped. The sync every bell sends on connect is not
+        # one -- yesterday's JS after a server restart, or a fresh page, must
+        # not be able to clear what somebody pressed.
+        if msg.get("press") is True and settings.mic_hold_persist:
+            if ws in _CEREMONY:
+                # The ceremony app's own mic (`_CEREMONY`): its tap holds its own line, never the
+                # stored hold the Event face comes back to after the hand-back (23 Nov, 22:25:19).
+                logger.info("mic hold: a tap in the ceremony app (%s) -- its own line only, the "
+                            "stored hold is left as it was", "on" if msg.get("on") is True else "off")
+                return
+            _load_hold()
+            _set_hold(msg.get("on") is True, "pressed")
 
 
 def held_only() -> bool:
-    """Every standby page is muted (the standing line says so once)."""
-    return bool(_STANDBY) and _STANDBY <= _HELD
+    """Every standby page is muted (the standing line says so once). The same thing as
+    `_durably_held() or _STANDBY <= _HELD` while no ceremony bell is open."""
+    return bool(_STANDBY) and all(_page_held(ws) for ws in list(_STANDBY))
+
+
+async def push_hold_news() -> None:
+    """A hold the clock ended (06:00), told to every open bell now. From `summon` and from the
+    standing line's loop while a call is up (review 6 Nov: summon was the only push, and it does
+    not run while a line is open -- a page in a camera's held call stayed "Muted" past morning)."""
+    import json
+
+    global _hold_news
+    hold_state()            # the morning may have come since the last look
+    if not _hold_news:
+        return
+    _hold_news = False
+    frame = json.dumps({"type": "hold_state", "on": False, "why": "expired"})
+    for ws in list(_STANDBY):
+        try:
+            await ws.send_text(frame)
+        except Exception:
+            _STANDBY.discard(ws)
 
 
 async def summon(reason: str = "server") -> int:
@@ -659,25 +860,51 @@ async def summon(reason: str = "server") -> int:
     import json
 
     delivered = 0
+    through_hold = False
+    await push_hold_news()
     for ws in list(_STANDBY):
-        if reason in HOLD_SKIPS and ws in _HELD:
+        if _refuses(ws, reason):
             continue
         try:
             await ws.send_text(json.dumps(
                 {"type": "wake", "word": settings.wake_word, "reason": reason}
             ))
             delivered += 1
+            through_hold = through_hold or (ws in _CEREMONY and _durably_held())
         except Exception:
             _STANDBY.discard(ws)
+    if through_hold:
+        # The ceremony app's line rung under the stored hold (`_CEREMONY`), on the record: the hold
+        # stood, and the next row of the Event face's day should still read it.
+        global _ceremony_rang_at
+        now = time.monotonic()
+        if now - _ceremony_rang_at >= CAMERA_RANG_LOG_S:
+            _ceremony_rang_at = now
+            from app import turnlog
+
+            turnlog.record("mic_hold", on=True, why="ceremony_rang", reason=reason)
+    if delivered and str(reason).startswith("face_") and mic_held():
+        global _camera_rang_at
+        now = time.monotonic()
+        if now - _camera_rang_at >= CAMERA_RANG_LOG_S:
+            _camera_rang_at = now
+            from app import turnlog
+
+            turnlog.record("mic_hold", on=True, why="camera_rang", reason=reason)
     return delivered
 
 
 def reset() -> None:
     """Tests swap models and settings; the singleton must not outlive them."""
     global _spotter, _load_failed, _shadow_spotter, _shadow_failed
+    global _hold, _hold_loaded, _hold_news, _camera_rang_at, _ceremony_rang_at
+    _hold, _hold_loaded, _hold_news = None, False, False
+    _camera_rang_at = -1e12
+    _ceremony_rang_at = -1e12
     _spotter = None
     _load_failed = False
     _shadow_spotter = None
     _shadow_failed = False
     _STANDBY.clear()
     _HELD.clear()
+    _CEREMONY.clear()

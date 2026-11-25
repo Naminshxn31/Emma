@@ -216,7 +216,8 @@ def test_the_room_screens_page_never_dials_listens_or_sends():
     boot = html.split("// ---- boot: mirror index.html's /voices + /health handshake ----", 1)[1]
     assert boot.index("if (mirror) {") < boot.index("fetch('/voices')")
     # the story frame is loaded at boot (live 28 Oct: the first story's opening beat was an empty frame)
-    assert "if (mirror) { forwardStoryEngine(); mirrorStage(); mirrorIdle(); startMirror(); return; }" in boot
+    # (+ the keep-awake tone, 16 Nov: from the load too -- the amplifier sleeps between calls)
+    assert "if (mirror) { forwardStoryEngine(); mirrorStage(); mirrorIdle(); startMirror(); startMirrorKeep(); return; }" in boot
 
 
 def test_the_story_frame_is_laid_out_for_the_tv():

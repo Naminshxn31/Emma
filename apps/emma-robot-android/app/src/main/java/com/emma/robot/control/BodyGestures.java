@@ -55,6 +55,12 @@ final class BodyGestures {
      *  a written measurement cited here (docs/robot-servo-limits-*.md). */
     static final int HEAD_LIMIT_MIN = 1460;
     static final int HEAD_LIMIT_MAX = 1540;
+    /** ch8's minus side stops short of 1460: the 4 Nov dock ladder found the head
+     *  stops going UP at ~1468 (HeadLook.TILT_LIMIT_MIN) -- a studio pose at 1460
+     *  would push ch8 on a stopped head. Its plus side keeps 1540 (stop ~1545).
+     *  The same number as HeadLook.TILT_LIMIT_MIN (a test compares the two; this
+     *  file compiles on its own in tests). */
+    static final int HEAD_TILT_LIMIT_MIN = 1472;
     /** Every other channel: the same ±200 as the server's ROBOT_ARM_SPAN. */
     static final int ARM_LIMIT_MIN = 1300;
     static final int ARM_LIMIT_MAX = 1700;
@@ -80,8 +86,169 @@ final class BodyGestures {
      *  rest-return ends on its #AGF or on this. */
     static final int REST_AGF_TIMEOUT_MS = 15000;
     /** Measured: 11x #CC then #AGF inside 13 s for group 6 (30 Sep). Group 3
-     *  and group 99 have no measured length, so they report none. */
+     *  and group 99 have no measured length, so they report none. Kept as the
+     *  handshake's estimate with HANDSHAKE_OWN_FRAMES too: the offer 1.5 s + the
+     *  hold 5 s + the lowering 3 s + 1 s + group 99's short finish is about the
+     *  same 13 s (the server only reports it; app/robot_body.py est_s). */
     static final int HANDSHAKE_EST_MS = 13000;
+
+    // ---- bringing the arm down slowly (owner 6 Nov: "แขนจะกลับท่าพักเองหลังจับมือ
+    // 5 วิ ให้เอาลงช้าๆแทน", after a guest still holding the hand said it pulled
+    // hard; and for her talking arm "ให้ขยับลงช้าๆแทน", not "stop the gestures") ----
+    /** Group 99 runs at the vendor's own speed, which nobody can slow down or
+     *  read back (#Read gives the group count only). So after the handshake's
+     *  hold the arm first comes most of the way down in one slow frame of ours,
+     *  and group 99 only finishes it. */
+    static final int HANDSHAKE_LOWER_MS = 3000;
+    /** The last frame of a recorded arm pose is at least this long. For the
+     *  poses recorded so far (raise_right_arm / raise_left_arm, 15 Oct) it is
+     *  the move back down -- elbow straight, wrist and upper arm centred -- and
+     *  was recorded at 1000 ms. */
+    static final int ARM_LOWER_MIN_MS = 2000;
+
+    /** The handshake's way down: only joints whose rest the 15 Oct sweep
+     *  pictures show (data/robot-inspection/arm-channel-sweep-20261015/zoom_chNN):
+     *  ch2 / ch4 / ch6 look the same at 1500 as at rest, ch3 at 1300 is all but
+     *  the straight elbow of rest. Not ch5 (rest "far below 1300", outside the
+     *  clamps -- 1300 there is the arm raised ~45 deg), not the fingers (rest and
+     *  1500 differ, which way they close is unknown), not the left arm: which
+     *  joints group 6 moves was never recorded, and a handshake is offered with
+     *  the right hand. A joint group 6 left at rest moves only by the gap between
+     *  its rest and these values, slowly, and group 99 takes it back. Inside the
+     *  arm clamps; not the operator's voice-channel list, which says what a
+     *  RECORDED pose may drive -- this one is compiled in, like headPrefix().
+     *  With HANDSHAKE_OWN_FRAMES (25 Nov) it lowers from handshakeOffer(): the
+     *  elbow straightens 1700 -> 1300 while the shoulder swings back 1380 ->
+     *  1500, both only ever toward rest, so the hand only goes down
+     *  (handshakeProblem checks it). */
+    static Frame handshakeLowering() {
+        return frame(HANDSHAKE_LOWER_MS, 2, 1500, 3, 1300, 4, 1500, 6, 1500);
+    }
+
+    // ---- our own handshake (owner 25 Nov 2026, the morning of the opening ceremony: "ทำเลยแต่ยัง
+    // ไม่ต้องอัพ ก็ไปดูจากของเขาก่อนได้ไหม ว่ามีคำสั่งอะไรบ้าง แล้วเช็คดูดีๆ") ----
+    /** true: "handshake" plays OUR frames -- handshakeOffer(), HANDSHAKE_HOLD_MS with the hand out
+     *  for the guest, handshakeLowering(), then group 99 only for what the clamps cannot reach (the
+     *  elbow's last bit below 1300, the fingers). false: the vendor's group 6 exactly as before
+     *  (#AGF, the hold, the lowering, group 99). This is the ONE line to revert.
+     *
+     *  Why: the owner's video of a handshake (filmed from behind): group 6 put the right hand out at
+     *  ~3.5 s, brought it almost down, then bent the elbow back UP at ~9.75-10.25 s and was down by
+     *  ~11.5 s -- all inside group 6 (its #AGF came ~13 s after the request; our hold and lowering
+     *  frame ran at +14.6 s on an arm already down -- and its elbow 1300, on an elbow that rests
+     *  below 1300, can only bend it up a little). Group 6's keyframes live in the Torobot board's flash:
+     *  #Read answers the group count only (#R+OK+026), the vendor app (com.aobo.robot.ai3, read
+     *  25 Nov: same APK sha as the Sep reference, packed, no frame strings in its files or private
+     *  data) only ever sends #6GC1, so group 6 cannot be trimmed -- only replaced.
+     *
+     *  OFF since 25 Nov: the owner kept the vendor's handshake ("ใช้ท่าจับมือเดิมไปก่อน", then
+     *  "ใช้ท่าของผู้ผลิตอย่างเดียว"); our frames stay here, tested, for a later day. */
+    static final boolean HANDSHAKE_OWN_FRAMES = false;
+    /** true (owner 25 Nov, the opening day: "ใช้ท่าของผู้ผลิตอย่างเดียว"): group 6's #AGF is followed at
+     *  once by the vendor's rest group 99 -- no hold, no slow lowering frame of ours. Group 6 offers
+     *  the hand, holds it and brings it down by itself (round 8's clip, 25 Nov: down ~5.5 s after the
+     *  command); after its #AGF our 5 s hold held nothing, and our lowering frame (elbow 1300) on an
+     *  elbow already resting below 1300 bent it back UP -- with group 99 after it, the two small
+     *  outward moves the owner saw after the handshake. Group 99 stays: the vendor's own rest, and a
+     *  second group 6 played from group 6's end pose did not raise the hand (30 Sep). false = the
+     *  6 Nov hold + slow lowering + group 99. */
+    static final boolean HANDSHAKE_VENDOR_ONLY = true;
+    /** The hand going out: the vendor's took ~1.5 s on the video. The owner's recorded
+     *  raise_right_arm moves the same elbow from rest to 1700 in 1000 ms (played on the robot as
+     *  her talking arm since 15 Oct), so this is slower than anything the elbow already does. */
+    static final int HANDSHAKE_OFFER_MS = 1500;
+    /** The right-arm joints our handshake may drive -- never ch5 (rest far below 1300: every
+     *  allowed value is the arm out sideways >= ~45 deg), not the fingers (which way they close is
+     *  unknown), not the head (ch8 burned on 12 Sep), not the left arm (a handshake is offered with
+     *  the right hand; the video shows the left arm at rest throughout). */
+    static final int[] HANDSHAKE_CHANNELS = {2, 3, 4, 6};
+
+    /** The rest each handshake joint comes DOWN toward (15 Oct sweep,
+     *  data/robot-inspection/arm-channel-sweep-20261015): ch2 / ch4 / ch6 look the same at 1500 as
+     *  at rest; ch3's rest is below 1300, the lowest the clamps allow (1300 = all but straight).
+     *  -1 = not a handshake joint. */
+    static int handshakeRest(int channel) {
+        switch (channel) {
+            case 2:
+            case 4:
+            case 6:
+                return CENTRE;
+            case 3:
+                return ARM_LIMIT_MIN;
+            default:
+                return -1;
+        }
+    }
+
+    /** The hand offered: the right forearm out in front at the waist, palm sideways. Not new to the
+     *  robot -- the 9 Nov pageant's first pose (2=1350 3=1700 4=1500 6=1380), played from the app on
+     *  10 Nov, was on camera "the forearm held out at the waist like a handshake -- the hand never
+     *  came above the belt" (docs/emma-event-host.md, Pageant.java); this is that pose with the
+     *  wrist at its rest instead of turned:
+     *   ch2 wrist turn 1500 = its rest: with the arm hanging the hand is edge-on to the front (1300
+     *       turns the palm to the front, 1700 the back of the hand), so with the forearm bent forward
+     *       the palm faces in, thumb up -- a handshake's hand (on camera with the forearm forward:
+     *       not yet seen);
+     *   ch3 elbow 1700 = bent, the forearm forward (the sweep's top; raise_right_arm's 1700 too);
+     *   ch4 upper-arm turn 1500 = its rest: the forearm straight ahead, not swung in or out;
+     *   ch6 shoulder swing 1380 = the upper arm a little forward (10 Nov with the elbow at 1700:
+     *       1380 = the hand at the waist, 1300 the chest -- this joint is sensitive, ~80 us ~ 45 deg
+     *       near the top, so it stays at the measured 1380).
+     *  ch5 is not in it: it stays where group 99 left it, at rest. */
+    static Frame handshakeOffer() {
+        return frame(HANDSHAKE_OFFER_MS, 2, 1500, 3, 1700, 4, 1500, 6, 1380);
+    }
+
+    /** null when our handshake is inside every rule, else which one it breaks. Checked by the tests
+     *  AND at every play (BodyController.playOwnHandshake: a bad edit plays nothing, "needs_mapping"),
+     *  like Pageant.check: both frames inside MIN..MAX_FRAME_MS and MAX_TOTAL_MS, only
+     *  HANDSHAKE_CHANNELS, inside the arm clamps; and the way down only goes DOWN -- every joint the
+     *  offer moved is in the lowering, each moving toward its rest from where the offer left it and
+     *  never past it, and no joint the offer left alone (the owner's complaint was a joint going
+     *  back up on the way down). */
+    static String handshakeProblem() {
+        Frame offer = handshakeOffer();
+        Frame down = handshakeLowering();
+        for (Frame each : new Frame[] {offer, down}) {
+            if (each.durationMs < MIN_FRAME_MS || each.durationMs > MAX_FRAME_MS) return "frame_ms";
+            for (Map.Entry<Integer, Integer> target : each.targets.entrySet()) {
+                int channel = target.getKey();
+                int pulse = target.getValue();
+                if (handshakeRest(channel) < 0) return "channel_" + channel;
+                if (pulse < limitMin(channel) || pulse > limitMax(channel)) return "arm_range_" + channel;
+            }
+        }
+        if (offer.durationMs + down.durationMs > MAX_TOTAL_MS) return "too_long";
+        for (Map.Entry<Integer, Integer> target : offer.targets.entrySet()) {
+            int channel = target.getKey();
+            Integer to = down.targets.get(channel);
+            if (to == null) return "not_lowered_" + channel;
+            int from = target.getValue();
+            int rest = handshakeRest(channel);
+            if (Math.abs(to - rest) > Math.abs(from - rest) || (long) (to - rest) * (from - rest) < 0) {
+                return "lowering_up_" + channel;
+            }
+        }
+        for (int channel : down.targets.keySet()) {
+            if (!offer.targets.containsKey(channel)) return "lowering_moves_" + channel;
+        }
+        return null;
+    }
+
+    /** A recorded arm pose with its last frame stretched to ARM_LOWER_MIN_MS,
+     *  inside MAX_FRAME_MS and MAX_TOTAL_MS (a pose near the total cap is
+     *  stretched as far as the cap allows). Head-only poses come back as they
+     *  are: the head keeps its own timings (HEAD_PREFIX_MS, HEAD_RETURN_MS). */
+    static List<Frame> lowerLastSlowly(List<Frame> frames) {
+        if (frames == null || frames.isEmpty() || !restAfter(frames)) return frames;
+        Frame last = frames.get(frames.size() - 1);
+        int room = Math.max(0, MAX_TOTAL_MS - totalMs(frames));
+        int ms = Math.min(Math.min(ARM_LOWER_MIN_MS, MAX_FRAME_MS), last.durationMs + room);
+        if (ms <= last.durationMs) return frames;
+        ArrayList<Frame> out = new ArrayList<>(frames);
+        out.set(out.size() - 1, new Frame(ms, last.targets));
+        return Collections.unmodifiableList(out);
+    }
 
     // ---- her arm while she talks (owner 15 Oct: "ขยับซ้ายขวาสลับกันตอนคุย") ----
     /** A speech gesture's frames end with the arm still out; it waits this
@@ -201,7 +368,8 @@ final class BodyGestures {
     }
 
     static int limitMin(int channel) {
-        return channel == HEAD_TURN || channel == HEAD_TILT ? HEAD_LIMIT_MIN : ARM_LIMIT_MIN;
+        if (channel == HEAD_TILT) return HEAD_TILT_LIMIT_MIN;
+        return channel == HEAD_TURN ? HEAD_LIMIT_MIN : ARM_LIMIT_MIN;
     }
 
     static int limitMax(int channel) {

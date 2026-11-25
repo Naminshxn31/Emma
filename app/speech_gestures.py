@@ -115,7 +115,21 @@ def _record(**fields) -> None:
 
 
 def _left_s(session) -> float:
-    return float(getattr(session, "_play_until", 0.0) or 0.0) - time.monotonic()
+    """How long she still speaks. A recorded line (the whole ceremony is recorded lines) is pushed only RECORDED_LEAD_S
+    ahead of her voice, so the playback clock never read more than ~2 s left and no gesture ever passed MIN_LEFT --
+    rehearsal 25 Nov 01:14, s10_l05 18.7 s standing, not one arm (owner: "การ์ดสองตอนคุยต้องขยับมือด้วยนะ"). The
+    line's own length from its first word says the rest."""
+    now = time.monotonic()
+    left = float(getattr(session, "_play_until", 0.0) or 0.0) - now
+    try:
+        rec = getattr(getattr(session, "provider", None), "_recorded", None)
+        if isinstance(rec, dict) and rec.get("pushing") and not rec.get("cut"):
+            first = (rec.get("report") or {}).get("first_at")
+            if isinstance(first, (int, float)):
+                left = max(left, float(first) + float(rec.get("seconds") or 0.0) - now)
+    except Exception:  # noqa: BLE001 -- the playback clock alone, as before
+        pass
+    return left
 
 
 def _why_not(session, action: str) -> str | None:
@@ -124,6 +138,34 @@ def _why_not(session, action: str) -> str | None:
 
     if not robot_body._server_gate(action):
         return "server_disabled"
+    try:
+        from app import event_pageant
+
+        if event_pageant.claims_arm():
+            # the debut's pageant has the arm, or is about to: a beat held out when it takes the arm
+            # would stay out under it until group 99 (review 9 Nov)
+            return "pageant"
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app import event_tour
+
+        if event_tour.holds_arm():
+            # card 1's tour (owner 23 Nov): its handshakes have the arm between its walks, each waited out to
+            # the app's own `done` -- a beat in between is refused busy there, or holds the arm out over the
+            # next walk's rest
+            return "tour"
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app import event_box
+
+        if event_box.holds(session):
+            # in the box (owner 23 Nov: "เดินออกมาก่อน จึงค่อยยกมือ"): a beat of a line said in the box -- the recorded
+            # one too, ~0.8 s into it -- would swing an arm into its wall (review 23 Nov)
+            return "in_box"
+    except Exception:  # noqa: BLE001 -- not knowing: keep the arm down
+        return "in_box"
     if not robot_arm.armed():
         return "latched"
     avail = robot_body.available(session)

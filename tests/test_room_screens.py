@@ -724,3 +724,233 @@ def test_the_table_of_pc_keys_never_ships_as_code_or_reaches_the_repo():
         assert r.returncode == 0, name
     env = (ROOT / "data" / "robot-server" / "robot.env").read_text(encoding="utf-8")
     assert "ROOM_SCREENS_FILE=room-screens.json" in env     # the root-owned copy, not data/
+
+
+def test_the_keep_awake_tone_rides_the_screen_url_only_with_sound_and_only_a_quiet_one(monkeypatch):
+    """Owner 16 Nov: the lobby's amplifier goes to standby when nothing plays ("พอไม่มีเสียงก็จะพัก
+    เสียงไปเองเลย"). ROOM_SCREEN_KEEP_TONE "<hz>,<dB>" asks the screen page for one quiet tone --
+    never without the screen's sound, and never a level a typo could make loud."""
+    from urllib.parse import parse_qs, urlparse
+
+    from app import mirror_server, room_screens
+    from app.config import settings
+
+    monkeypatch.setattr(mirror_server, "issue_ticket", lambda: "t")
+    monkeypatch.setattr(room_screens, "_robot_ip_toward", lambda host: "10.0.0.2")
+    screen = {"name": "lobby", "agent": "http://10.0.0.9:8777"}
+
+    def query():
+        return parse_qs(urlparse(room_screens.mirror_url(screen)).query)
+
+    monkeypatch.setattr(settings, "room_screen_keep_tone", "25,-40")
+    monkeypatch.setattr(settings, "room_screen_sound", False)
+    assert "keep" not in query() and "sound" not in query()
+    monkeypatch.setattr(settings, "room_screen_sound", True)
+    assert query()["keep"] == ["25,-40"] and query()["sound"] == ["1"]
+    for bad in ("", "25", "25,-10", "25,0", "5,-40", "30000,-40", "x,y", "25,-40,1", "nan,-40", "25,-inf"):
+        monkeypatch.setattr(settings, "room_screen_keep_tone", bad)
+        assert "keep" not in query(), bad
+    # what goes out is what the page's own reader takes: plain decimals, the bounds themselves
+    for raw, sent in (("19500,-36.5", "19500,-36.5"), ("22000,-20", "22000,-20"), ("10,-80", "10,-80"),
+                      ("1e4,-40", "10000,-40"), (" 25 , -40 ", "25,-40")):
+        monkeypatch.setattr(settings, "room_screen_keep_tone", raw)
+        assert query()["keep"] == [sent], raw
+
+
+def _mirror_keep(cases: dict) -> dict:
+    """The page's keep-awake tone code, cut out of voice-preview.html and run in node against a
+    fake AudioContext (tests/client_mirror_keep.cjs)."""
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required: NOT checked here -- the room-screen page's own bounds on the "
+                    "keep-awake tone (never loud, never without sound=1) and its one-tone guard")
+    result = subprocess.run([node, "tests/client_mirror_keep.cjs", json.dumps(cases)], cwd=ROOT,
+                            capture_output=True, text=True, encoding="utf-8", timeout=20)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return json.loads(result.stdout)
+
+
+def test_the_screen_page_plays_one_quiet_tone_only_with_sound_and_refuses_a_loud_one():
+    """The page reads ?keep= itself (a URL is typed by hand too): only on the room screen with
+    sound=1, only 10-22000 Hz at -80..-20 dB, plain decimals. One context and one oscillator
+    however often a call starts (startMirrorAudio calls it every call)."""
+    got = _mirror_keep({
+        "quiet": {"query": "sound=1&keep=25,-40", "calls": 3},
+        "high": {"query": "sound=1&keep=19500,-36.5"},
+        "edge_loud": {"query": "sound=1&keep=22000,-20"},
+        "edge_soft": {"query": "sound=1&keep=10,-80"},
+        "no_sound": {"query": "keep=25,-40"},
+        "sound_0": {"query": "sound=0&keep=25,-40"},
+        "not_the_screen": {"query": "sound=1&keep=25,-40", "mirror": False},
+        "loud": {"query": "sound=1&keep=1000,-5"},
+        "just_too_loud": {"query": "sound=1&keep=1000,-19.9"},
+        "exponent": {"query": "sound=1&keep=1e3,-40"},
+        "plus_db": {"query": "sound=1&keep=25,40"},
+        "too_low": {"query": "sound=1&keep=5,-40"},
+        "too_high": {"query": "sound=1&keep=30000,-40"},
+        "three": {"query": "sound=1&keep=25,-40,1"},
+    })
+    quiet = got["quiet"]
+    assert quiet["keep"] == {"hz": 25, "gain": pytest.approx(0.01)}
+    assert quiet["contexts"] == 1 and quiet["sounding"] == 1, quiet           # three calls, one tone
+    assert quiet["gains"] == [[pytest.approx(0.01)]] and quiet["hz"] == [[25]]
+    assert got["high"]["hz"] == [[19500]] and got["high"]["gains"][0][0] == pytest.approx(10 ** (-36.5 / 20))
+    assert got["edge_loud"]["gains"] == [[pytest.approx(0.1)]]                # the loudest there is
+    assert got["edge_soft"]["sounding"] == 1
+    for name in ("no_sound", "sound_0", "not_the_screen", "loud", "just_too_loud", "exponent", "plus_db",
+                 "too_low", "too_high", "three"):
+        assert got[name]["keep"] is None and got[name]["contexts"] == 0, (name, got[name])
+    for case in got.values():
+        assert all(g <= 0.1 + 1e-9 for row in case.get("gains", []) for g in row), case
+
+
+def test_the_tone_never_stacks_and_survives_a_browser_that_holds_audio_back():
+    """Review 16 Nov: a throw after the oscillator started left that context sounding with the
+    guard cleared -- the next call put a second tone on top. Now what was opened is closed. And a
+    context the browser has not let start is resumed on a tap, whatever resume() returns."""
+    got = _mirror_keep({
+        "start_throws_once": {"query": "sound=1&keep=25,-40", "startThrows": True, "calls": 3},
+        "held_back": {"query": "sound=1&keep=25,-40", "suspended": True},
+        "old_resume": {"query": "sound=1&keep=25,-40", "suspended": True, "resumeNoPromise": True, "calls": 3},
+    })
+    first = got["start_throws_once"]
+    assert first["contexts"] == 2 and first["open"] == 1 and first["sounding"] == 1, first
+    assert got["held_back"]["listeners"] == ["pointerdown"] and got["held_back"]["sounding"] == 1
+    old = got["old_resume"]
+    assert "threw" not in old and old["contexts"] == 1 and old["sounding"] == 1 and old["guard"], old
+
+
+def test_the_tone_starts_with_the_page_not_with_her_first_call():
+    """The amplifier sleeps between calls too: the boot line starts the tone (a source pin -- the
+    boot block needs the whole page to run; test_face_mirror pins the same line)."""
+    src = (ROOT / "client" / "voice-preview.html").read_text(encoding="utf-8")
+    assert "startMirror(); startMirrorKeep(); return; }" in src
+    audio = src.split("function startMirrorAudio() {", 1)[1][:80]
+    assert "startMirrorKeep();" in audio
+
+
+def test_the_room_echo_tail_exists_only_while_a_screen_is_up_with_its_sound(monkeypatch):
+    """Owner 17 Nov: the host wears the mic, her voice comes out of the room's speakers. The
+    tail after her voice is for THAT room copy: no screen up, or a silent screen, = no guard
+    (every other machine as it was), and a typo cannot make her deaf for a minute."""
+    from app import room_screens
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "room_screens_enabled", True)
+    monkeypatch.setattr(settings, "room_screen_sound", True)
+    monkeypatch.setattr(settings, "room_screen_echo_tail_s", 0.8)
+    assert room_screens.echo_tail_s() == 0.0                       # nothing open
+    monkeypatch.setitem(room_screens.STATE, "open", "lobby")
+    assert room_screens.echo_tail_s() == 0.8
+    monkeypatch.setattr(settings, "room_screen_sound", False)
+    assert room_screens.echo_tail_s() == 0.0
+    monkeypatch.setattr(settings, "room_screen_sound", True)
+    monkeypatch.setattr(settings, "room_screens_enabled", False)
+    assert room_screens.echo_tail_s() == 0.0
+    monkeypatch.setattr(settings, "room_screens_enabled", True)
+    monkeypatch.setattr(settings, "room_screen_echo_tail_s", 60.0)
+    assert room_screens.echo_tail_s() == 3.0
+    monkeypatch.setattr(settings, "room_screen_echo_tail_s", -1.0)
+    assert room_screens.echo_tail_s() == 0.0
+
+
+def _echo_rig(monkeypatch, gate=True):
+    import struct
+    import types
+
+    from app import room_screens, session, turnlog
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "room_screens_enabled", True)
+    monkeypatch.setattr(settings, "room_screen_sound", True)
+    monkeypatch.setattr(settings, "room_screen_echo_tail_s", 0.8)
+    monkeypatch.setitem(room_screens.STATE, "open", "lobby")
+    now = [100.0]
+    monkeypatch.setattr(session.time, "monotonic", lambda: now[0])
+    rows = []
+    monkeypatch.setattr(turnlog, "record", lambda event, **kw: rows.append((event, kw)))
+    me = types.SimpleNamespace(_play_until=0.0, provider=types.SimpleNamespace(_vad_gate=object() if gate else None),
+                               ROOM_ECHO_WATCH_S=session.VoiceSession.ROOM_ECHO_WATCH_S)
+    me._room_echo_row = lambda held: session.VoiceSession._room_echo_row(me, held)
+    guard = lambda frame: session.VoiceSession._room_echo_guard(me, frame)   # noqa: E731
+    frame = lambda amp: struct.pack("<320h", *([amp, -amp] * 160))           # noqa: E731
+    return me, guard, frame, now, rows
+
+
+def test_mic_frames_go_up_as_silence_until_the_rooms_copy_of_her_voice_is_over(monkeypatch):
+    """While she is audible by the server's clock and for the tail after, the frame is zeros of
+    the same length (the VAD gate still gets a frame); after it, the frame as it came. One row
+    of numbers a stretch: the loudest it kept out, the loudest inside the tail, and the
+    loudest in the 0.6 s AFTER the tail (the number the tail is set from)."""
+    me, guard, frame, now, rows = _echo_rig(monkeypatch)
+    loud, mid, soft = frame(8000), frame(4000), frame(1000)
+    assert guard(loud) is loud                                       # she has not spoken on this call
+    me._play_until = 101.0
+    assert guard(loud) == bytes(len(loud))                           # her voice is playing
+    now[0] = 101.5
+    assert guard(mid) == bytes(len(mid))                             # the room's copy, inside the tail
+    now[0] = 101.81
+    assert guard(soft) is soft and rows == []                        # past the tail: heard, still watched
+    now[0] = 102.3
+    assert guard(soft) is soft and rows == []
+    now[0] = 102.45
+    assert guard(loud) is loud                                       # the watch is over: not counted
+    assert rows == [("room_echo_guard", {"frames": 2, "peak": 0.2441, "after": 0.1221, "post": 0.0305, "tail_s": 0.8})]
+    assert guard(loud) is loud and len(rows) == 1                    # one row a stretch
+
+
+def test_the_room_echo_guard_follows_her_voice_being_cut_and_the_screen_coming_down(monkeypatch):
+    """An interruption cuts `_play_until` back to now: the guard ends the tail after THAT, not
+    after the reply's old end. The screen taken down mid-stretch ends it at once and the row
+    still says which tail it was. With the setting at 0 the frame object itself comes back."""
+    from app import room_screens
+    from app.config import settings
+
+    me, guard, frame, now, rows = _echo_rig(monkeypatch)
+    loud = frame(8000)
+    me._play_until = 130.0                                           # a long answer queued
+    assert guard(loud) == bytes(len(loud))
+    now[0], me._play_until = 105.0, 105.0                            # barged in: cut back
+    assert guard(loud) == bytes(len(loud))
+    now[0] = 105.9
+    assert guard(loud) is loud                                       # 0.8 s after the cut, not at 130.8
+    me._play_until = 200.0
+    now[0] = 107.0                                                   # (the watch of the first stretch is over)
+    guard(loud)
+    rows.clear()
+    assert guard(loud) == bytes(len(loud))                           # a new reply: guarded again
+    monkeypatch.setitem(room_screens.STATE, "open", None)            # staff took the screen down
+    assert guard(loud) is loud
+    now[0] = 108.0
+    assert guard(loud) is loud
+    assert rows and rows[-1][1]["tail_s"] == 0.8
+    monkeypatch.setitem(room_screens.STATE, "open", "lobby")
+    monkeypatch.setattr(settings, "room_screen_echo_tail_s", 0.0)
+    assert guard(loud) is loud
+
+
+def test_with_server_side_detection_the_guarded_frame_is_not_sent_at_all(monkeypatch):
+    """gemini.send_audio's own rule for a deaf mic without the local gate: silence sent upstream
+    is still a stream to judge (review 17 Nov) -- nothing goes."""
+    me, guard, frame, now, rows = _echo_rig(monkeypatch, gate=False)
+    me._play_until = 101.0
+    assert guard(frame(8000)) is None
+    now[0] = 102.0
+    f = frame(8000)
+    assert guard(f) is f
+
+
+def test_the_room_echo_guard_sits_on_the_mic_path_before_the_name_ears_and_the_provider():
+    """After the mic report (it judges the real frame), before the name ears (her own "Emma" out
+    of the room's speakers is not a call -- review 17 Nov) and the provider; a None is not sent."""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "app" / "session.py").read_text(encoding="utf-8")
+    pump = src.split("async def _browser_to_provider(self)", 1)[1].split("if (text := message.get(\"text\"))", 1)[0]
+    order = [pump.index(part) for part in ("self._mic_report(data)", "data = self._room_echo_guard(data)",
+                                           "if data is None:\n                        continue",
+                                           "self._hear_name(data)", "await self.provider.send_audio(data)")]
+    assert order == sorted(order)

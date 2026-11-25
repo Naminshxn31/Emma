@@ -635,6 +635,13 @@ def merge(root: Path, *, write: bool = True, project_id: str = ACTIVE_PROJECT_ID
     for story in designs:
         if isinstance(story, dict) and isinstance(story.get("params"), dict):
             used.update(stories.asset_refs(story["params"]))
+    # pictures no story uses any more that the ceremony's signed film (data/ceremony/slides) still names: its
+    # signature covers their bytes and it takes them from THIS catalogue (24 Nov: the stories moved to the pictures
+    # of 18 Nov under new ids; dropping or re-cutting the old ones would have taken slides off the stage)
+    try:
+        used.update(json.loads((root / "keep_pins.json").read_text(encoding="utf-8"))["assets"])
+    except (OSError, ValueError, KeyError):
+        pass
     assets = {k: pins[k] for k in sorted(used) if k in pins}
     catalog = {"source_id": stories.SOURCE_ID, "project_id": project_id, "schema": stories.SCHEMA}
     catalog.update(DRAFT)

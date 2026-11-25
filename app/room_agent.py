@@ -869,10 +869,55 @@ def _bring_to_front(pid: int, wait_s: float = 12.0, display: dict | None = None)
             else:
                 user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW)
             user32.SetForegroundWindow(hwnd)
+            _hide_pointer(hwnd)
             return True
         time.sleep(0.25)
     logger.warning("the Emma screen window did not appear within %.0fs", wait_s)
     return False
+
+
+#: After the window is up: long enough for the page and its `cursor: none` to be in.
+POINTER_PARK_AFTER_S = 4.0
+#: ... and again this much later, twice (~12 s, ~30 s), while the pointer is still on the window: at 4 s the page may not
+#: have painted yet (slow Wi-Fi to the robot) and the move then lands on Chrome's blank page (review 25 Nov).
+POINTER_PARK_AGAIN_S = (8.0, 18.0)
+
+
+def _hide_pointer(hwnd, after_s: float = POINTER_PARK_AFTER_S, again: tuple = POINTER_PARK_AGAIN_S) -> bool:
+    """The hall's screen shows no mouse pointer (owner 25 Nov: "จอด้านข้างตอนเปิดตัวยังมีเมาท์"). The page says
+    `cursor: none`, but Windows only asks a window for its cursor when the mouse moves -- a kiosk window opened under a
+    pointer nobody touches keeps the arrow for ever. Only when the pointer is ON this window (somebody working on another
+    screen of the PC keeps theirs): it goes to the window's bottom-right corner in two steps, each a mouse move over the
+    page, so Chrome applies the page's cursor. No click, no key. True = moved (at least once)."""
+    moved = False
+    for wait in (after_s, *again):
+        time.sleep(max(0.0, wait))
+        moved = _park_pointer(hwnd) or moved
+    return moved
+
+
+def _park_pointer(hwnd) -> bool:
+    """One parking of `_hide_pointer`, in physical pixels (per-monitor v2, as `_bring_to_front` places the window): an
+    agent that is DPI-unaware reads a scaled rect and a scaled pointer on a mixed-DPI notebook (review 25 Nov)."""
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    set_ctx = getattr(user32, "SetThreadDpiAwarenessContext", None)
+    old = set_ctx(ctypes.c_void_p(-4)) if set_ctx else None
+    try:
+        rect, here = wintypes.RECT(), wintypes.POINT()
+        if not user32.GetWindowRect(hwnd, ctypes.byref(rect)) or not user32.GetCursorPos(ctypes.byref(here)):
+            return False
+        if not (rect.left <= here.x < rect.right and rect.top <= here.y < rect.bottom):
+            return False
+        user32.SetCursorPos(rect.right - 3, rect.bottom - 3)
+        time.sleep(0.05)
+        user32.SetCursorPos(rect.right - 2, rect.bottom - 2)
+        return True
+    finally:
+        if set_ctx and old:
+            set_ctx(ctypes.c_void_p(old))
 
 
 def emma_screen_open(url: str, display: str = "") -> dict:

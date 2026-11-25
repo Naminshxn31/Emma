@@ -1,8 +1,13 @@
 package com.emma.robot.control;
 
 import android.app.Activity;
+import android.app.BroadcastOptions;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.input.InputManager;
 import android.os.Build;
@@ -166,6 +171,18 @@ public final class MainActivity extends Activity
     private TextView arrayText;
     private Button arrayButton;
     private volatile boolean windowFocused = false;
+    // ---- sibling takeover (24 Nov 2026, NavRules.siblingTakeover) -- main thread only ----
+    /** Sent at onStart by whichever of the three Emma apps comes in front, to the other two. */
+    static final String SIBLING_IN_FRONT = "com.emma.robot.SIBLING_IN_FRONT";
+    /** elapsedRealtime of the first foreground loss (pause / focus) of a run of them; 0 = none pending. */
+    private long foregroundLostAt = 0L;
+    private long bodyLatchBeforeLoss = 0L;
+    private long navLatchBeforeLoss = 0L;
+    private int bodyLatchSetsAtLoss = 0;
+    private int navLatchSetsAtLoss = 0;
+    private boolean otherStopSinceLoss = false;
+    private boolean stoppedSinceLoss = false;
+    private BroadcastReceiver siblingReceiver;
     private Button bodyEnabledButton;
     private Button directionKnownButton;
     private Button navEnabledButton;
@@ -261,6 +278,7 @@ public final class MainActivity extends Activity
                 upperBodyArmed = false;
             }
             @Override public void changed() { bodyOrNavChanged(true); }
+            @Override public boolean pageantApp() { return EmmaFace.playsPageant(MainActivity.this); }
         });
         nav = new NavLauncher(this, new NavLauncher.Host() {
             @Override public boolean foreground() { return faceForeground && windowFocused; }
@@ -323,6 +341,7 @@ public final class MainActivity extends Activity
         showState("ยังไม่เปิดควบคุม", 0xFFFFC857);
         emmaFace.start(getIntent());
         autoReturn.start();
+        registerSiblingReceiver();
     }
 
     private View buildUi() {
@@ -528,6 +547,94 @@ public final class MainActivity extends Activity
         return navWasActive;
     }
 
+    // ---- sibling takeover (24 Nov 2026) ------------------------------------------
+    // Tonight `am start` of Emma Ceremony paused Emma Event; the pause latched Event's arm and
+    // walk for 60 s (a loss of control, as it should be), Event's status link stayed open in the
+    // background and kept reporting stop_latch_s, and the server's _app_latched refused the
+    // ceremony's opening until Event was force-stopped by adb. Every pause still stops and still
+    // latches at once; when the app that came in front straight from this one is a sibling Emma
+    // app (it says so at its onStart, with its identity shared and our signature), the latch
+    // THAT pause set is lowered back to what it was before -- a B pressed earlier keeps its own
+    // 60 s, and any other stop since keeps the latch (NavRules.siblingTakeover has every rule).
+
+    /** Before a foreground-loss stop: the first of a run of them keeps the latches as they were;
+     *  a later one checks that no other stop set a latch in between. */
+    private void noteForegroundLoss() {
+        if (body == null || nav == null) return;
+        if (foregroundLostAt == 0L) {
+            foregroundLostAt = SystemClock.elapsedRealtime();
+            bodyLatchBeforeLoss = body.latchUntil();
+            navLatchBeforeLoss = nav.latchUntil();
+            otherStopSinceLoss = false;
+            stoppedSinceLoss = false;
+        } else if (body.latchSets() != bodyLatchSetsAtLoss || nav.latchSets() != navLatchSetsAtLoss) {
+            otherStopSinceLoss = true;
+        }
+    }
+
+    /** After it: the latches this loss set, counted. */
+    private void noteLossLatched() {
+        if (foregroundLostAt == 0L || body == null || nav == null) return;
+        bodyLatchSetsAtLoss = body.latchSets();
+        navLatchSetsAtLoss = nav.latchSets();
+    }
+
+    private void registerSiblingReceiver() {
+        // Android 14+ only: before it a broadcast cannot say who sent it, and the latch stays
+        if (Build.VERSION.SDK_INT < 34) return;
+        siblingReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                if (intent == null || !SIBLING_IN_FRONT.equals(intent.getAction())) return;
+                siblingInFront(Build.VERSION.SDK_INT >= 34 ? getSentFromPackage() : null);
+            }
+        };
+        try {
+            registerReceiver(siblingReceiver, new IntentFilter(SIBLING_IN_FRONT), Context.RECEIVER_EXPORTED);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "sibling receiver not registered: a sibling taking over keeps this app's pause latch", e);
+            siblingReceiver = null;
+        }
+    }
+
+    /** onStart: this app is coming in front. FLAG_RECEIVER_FOREGROUND so it reaches the paused
+     *  sibling before that sibling's onStop (which comes after this app has drawn). */
+    private void tellSiblingsInFront() {
+        if (Build.VERSION.SDK_INT < 34) return;
+        Bundle options = BroadcastOptions.makeBasic().setShareIdentityEnabled(true).toBundle();
+        for (String sibling : siblingPackages()) {
+            Intent front = new Intent(SIBLING_IN_FRONT).setPackage(sibling)
+                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+            try {
+                sendBroadcast(front, null, options);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "could not tell " + sibling + " this app is in front", e);
+            }
+        }
+    }
+
+    private void siblingInFront(String sender) {
+        boolean signed;
+        try {
+            signed = sender != null && getPackageManager().checkSignatures(getPackageName(), sender)
+                    == PackageManager.SIGNATURE_MATCH;
+        } catch (RuntimeException e) {
+            signed = false;
+        }
+        boolean otherStop = otherStopSinceLoss || body == null || nav == null
+                || body.latchSets() != bodyLatchSetsAtLoss || nav.latchSets() != navLatchSetsAtLoss;
+        if (!signed || !NavRules.siblingTakeover(sender, getPackageName(), siblingPackages(), foregroundLostAt,
+                SystemClock.elapsedRealtime(), stoppedSinceLoss, faceForeground, otherStop)) {
+            Log.i(TAG, "sibling in front (" + sender + "): this app's stop latch stays");
+            return;
+        }
+        foregroundLostAt = 0L;                 // one takeover, one lift
+        body.liftLatchTo(bodyLatchBeforeLoss);
+        nav.liftLatchTo(navLatchBeforeLoss);
+        Log.i(TAG, sender + " took the foreground from this app: its pause's stop latch lifted (the stop stands)");
+        bodyOrNavChanged(true);                // the page re-reads: stop_latch_s reaches the server
+        bodyOrNavChanged(false);
+    }
+
     // ---- EmmaFace.Bridge (UI thread, cached state only) ----------------------
 
     @Override public void armGreeting() {
@@ -557,6 +664,10 @@ public final class MainActivity extends Activity
 
     @Override public String bodyLook(int pan, int tilt) {
         return body.look(pan, tilt);
+    }
+
+    @Override public String bodyPageant(boolean start) {
+        return start ? body.requestPageant() : body.endPageant();
     }
 
     @Override public String navPlaces() {
@@ -643,6 +754,43 @@ public final class MainActivity extends Activity
     /** ARRAY_MIC: the page's call mic is stopped (or a page loaded): the app may capture again. */
     @Override public String micFree() {
         return array == null ? ArrayListener.NO_ARRAY_STATE : array.micFree();
+    }
+
+    /** The end of the ceremony (owner 9 Nov 2026: "อันนี้ทำแยกกับอันเดิมนะ ไม่งั้นจะปนกัน"): the
+     *  server's open_app, relayed by the ceremony app's own page, opens Emma Event. Through
+     *  the PackageManager's launch intent, no su: this app is the one on screen, and a
+     *  foreground activity may start another's (BootReceiver needs su only because a
+     *  receiver is background). The ceremony app alone -- the sales and event builds answer
+     *  not_ceremony_app -- and Emma Event alone (EmmaFace passes its own literal). This app
+     *  then finishes itself (the call, the mic, the array, its status link go with it --
+     *  see below), and Emma Event would stop it with its other sibling before it takes the arm
+     *  anyway (stopConflictingVendorApp). Not installed -- or not visible to this package: the
+     *  ceremony build's manifest declares the <queries> that makes it so. */
+    @Override public String openApp(String app) {
+        if (!EmmaFace.isCeremonyApp(this)) return openRefusal("not_ceremony_app");
+        if (!"event".equals(app)) return openRefusal("unknown_app");
+        Intent launch = getPackageManager().getLaunchIntentForPackage(EmmaFace.EVENT_PACKAGE);
+        if (launch == null) return openRefusal("not_installed");
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(launch);
+        } catch (RuntimeException e) {          // ActivityNotFoundException, SecurityException
+            Log.w(TAG, "could not open " + EmmaFace.EVENT_PACKAGE, e);
+            return openRefusal("launch_failed");
+        }
+        Log.i(TAG, "opened " + EmmaFace.EVENT_PACKAGE + ": the ceremony handed the robot over");
+        // ...and this app LEAVES, not just pauses (review of the split, 9 Nov): paused, its face
+        // page kept its status link and kept reporting the 60 s latch a pause sets
+        // (NavLauncher.stop, BodyController.stop) -- the server's _app_latched reads every live
+        // face, so Emma Event's first walk and its walk-up-to-guests were refused for a minute,
+        // or for as long as Android froze the background WebView. Finished, the WebView and its
+        // link go. Posted: this runs inside the page's prompt, which must answer first.
+        ui.post(this::finishAndRemoveTask);
+        return "{\"accepted\":true}";
+    }
+
+    private static String openRefusal(String reason) {
+        return "{\"accepted\":false,\"reason\":\"" + reason + "\"}";
     }
 
     // ---- operator screen: voice body + navigation --------------------------------
@@ -877,10 +1025,17 @@ public final class MainActivity extends Activity
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        tellSiblingsInFront();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         hideSystemBars();
         faceForeground = true;
+        if (windowFocused) foregroundLostAt = 0L;   // fully in front again
         if (nav != null) nav.resume();     // the poller sees a PC run while we are in front
         // back in front: whoever brought it back is here -- the count restarts
         if (autoReturn != null) autoReturn.activity("resume");
@@ -896,7 +1051,9 @@ public final class MainActivity extends Activity
     protected void onPause() {
         faceForeground = false;
         startHeld = false;
+        noteForegroundLoss();
         stopBodyAndNav("not_foreground", "not_foreground", false);
+        noteLossLatched();
         if (nav != null) nav.pause();
         stopAndDisarm("แอปไม่ได้อยู่ด้านหน้า — หยุดแล้ว");
         inputManager.unregisterInputDeviceListener(this);
@@ -914,11 +1071,22 @@ public final class MainActivity extends Activity
         // app is actually left while the dialog is up, this is where the page
         // finally hears it.
         if (emmaFace != null) emmaFace.onActivityStop();
+        // Home, the launcher, Recents or any other app came in between: a sibling tapped after
+        // that is not the cause of the pause, and the pause's latch stays (NavRules.siblingTakeover)
+        stoppedSinceLoss = true;
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        if (siblingReceiver != null) {
+            try {
+                unregisterReceiver(siblingReceiver);
+            } catch (RuntimeException ignored) {
+                // never registered after all: nothing to undo
+            }
+            siblingReceiver = null;
+        }
         if (autoReturn != null) autoReturn.stop();
         stopBodyAndNav("not_foreground", "app_lost", false);
         stopAndDisarm("ปิดแอป — หยุดแล้ว");
@@ -941,9 +1109,12 @@ public final class MainActivity extends Activity
         super.onWindowFocusChanged(hasFocus);
         windowFocused = hasFocus;
         if (hasFocus) hideSystemBars();     // a dialog or the shade brought them back
+        if (hasFocus && faceForeground) foregroundLostAt = 0L;   // fully in front again
         if (!hasFocus) {
             startHeld = false;   // a missed START key-up must not latch the staff toggle open
+            noteForegroundLoss();
             stopBodyAndNav("not_foreground", "not_foreground", false);
+            noteLossLatched();
             stopAndDisarm("หน้าจอเสียโฟกัส — หยุดแล้ว");
         }
     }
@@ -1089,16 +1260,23 @@ public final class MainActivity extends Activity
             throw new IllegalStateException("ปิด Aobo ไม่สำเร็จ (exit " + result.exit + ")");
         }
         Log.i(TAG, "vendor app force-stopped before exclusive SDK connection");
-        // "Emma Robot" and "Emma Event" are one app built twice (build.gradle):
+        // "Emma Robot", "Emma Event" and "Emma Ceremony" are one app built three
+        // times (build.gradle; the ceremony became the third, owner 9 Nov 2026):
         // a backgrounded sibling still holds the arm's serial port (closed only
-        // in onDestroy) and the SDK link. Not fatal -- it may not be installed,
-        // and a sibling that never ran holds nothing.
-        RootShell.Result sibling = RootShell.run("am force-stop " + siblingPackage(), RootShell.TIMEOUT_MS);
-        if (sibling.exit != 0) Log.w(TAG, "could not stop " + siblingPackage() + " (exit " + sibling.exit + ")");
+        // in onDestroy) and the SDK link -- so BOTH others go, whichever this is.
+        // Not fatal -- either may not be installed, and a sibling that never ran
+        // holds nothing.
+        for (String sibling : siblingPackages()) {
+            RootShell.Result stopped = RootShell.run("am force-stop " + sibling, RootShell.TIMEOUT_MS);
+            if (stopped.exit != 0) Log.w(TAG, "could not stop " + sibling + " (exit " + stopped.exit + ")");
+        }
     }
 
-    private String siblingPackage() {
-        return EmmaFace.isEventApp(this) ? EmmaFace.ROBOT_PACKAGE : EmmaFace.EVENT_PACKAGE;
+    /** The two apps this one is not. */
+    private String[] siblingPackages() {
+        if (EmmaFace.isCeremonyApp(this)) return new String[] {EmmaFace.ROBOT_PACKAGE, EmmaFace.EVENT_PACKAGE};
+        if (EmmaFace.isEventApp(this)) return new String[] {EmmaFace.ROBOT_PACKAGE, EmmaFace.CEREMONY_PACKAGE};
+        return new String[] {EmmaFace.EVENT_PACKAGE, EmmaFace.CEREMONY_PACKAGE};
     }
 
     private void publishBaseStatus(String model, JSONObject power) {

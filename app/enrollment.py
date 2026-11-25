@@ -231,7 +231,9 @@ def usable_face(image: np.ndarray, min_px: int | None = None) -> tuple[faces.Fac
     lens, so the strings are the user interface, not debug output.
     """
     min_px = portrait_min_px() if min_px is None else min_px
-    found = faces.locate(image)
+    # 640 whatever FACE_DET_SIZE says: this frame's landmarks align the vector
+    # the gallery keeps. The preview's `judge` needs only a box and may be quick.
+    found = faces.locate(image, det_size=640)
     if not found:
         return None, "no face"
     if len(found) > 1:
@@ -1092,6 +1094,12 @@ class Session:
             if add_to_gallery:
                 result.update(_join_gallery(name, vecs, written))
             return result
+
+    def vectors(self, keys=None) -> list[np.ndarray]:
+        """The batch's vectors, of these poses (None = all). For a front end
+        that sends vectors on: the booth, to the robot."""
+        with self._lock:
+            return [p["vec"] for p in self._pending if keys is None or p.get("step") in keys]
 
     def discard(self) -> dict:
         with self._lock:

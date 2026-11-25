@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from app import faces, facewatch
+from app import consent, enrollment, faces, facewatch
 
 
 FRAME = np.zeros((480, 640, 3), np.uint8)
@@ -70,6 +70,67 @@ def test_one_good_frame_is_not_enough(monkeypatch):
     assert w.see(FRAME, now=0) is None
     assert w.see(FRAME, now=1) is None
     assert w.see(FRAME, now=2).name == "ต้า"
+
+
+def _at_score(score: float, other: int = 7) -> np.ndarray:
+    v = np.zeros(512, np.float32)
+    v[0], v[other] = score, (1 - score ** 2) ** 0.5
+    return v
+
+
+def _guest_gallery() -> faces.Gallery:
+    return faces.Gallery(["แขก"], np.stack([ALICE]), [{"group": "แขกงาน", "source": "booth"}])
+
+
+@pytest.fixture
+def guest_record(monkeypatch, tmp_path):
+    """The booth's guest with their own record, in a store of the test's own: a
+    guest row is named only on its record (Watcher._guest_unrecorded), and this
+    machine's real people.json must neither decide nor take a write."""
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    from datetime import datetime, timedelta, timezone
+
+    at = datetime.now(timezone.utc).astimezone()
+    consent.save({"แขก": {"consent_at": at.isoformat(timespec="seconds"), "consent_by": "แขก",
+                          "consent_version": consent.EVENT_GUEST, "revoked_at": None,
+                          "expires_at": (at + timedelta(days=300)).isoformat(timespec="seconds")}})
+    return tmp_path
+
+
+def test_a_booth_guest_is_not_named_at_the_door_under_the_events_bar(monkeypatch, guest_record):
+    """0.55 clears the door's bar and not the event's: with hundreds of guests
+    that is where somebody who never scanned gets a stranger's name."""
+    _sees(monkeypatch, _at_score(0.55))
+    w = _watcher(gallery=_guest_gallery(), threshold=0.50)
+    seen = [w.see(FRAME, now=i) for i in range(6)]
+    assert not any(s is not None and s.name for s in seen)
+
+
+def test_a_booth_guest_over_the_events_bar_is_named_at_the_door(monkeypatch, guest_record):
+    _sees(monkeypatch, _at_score(0.65))
+    w = _watcher(gallery=_guest_gallery(), threshold=0.50)
+    assert [w.see(FRAME, now=i) for i in range(3)][-1].name == "แขก"
+
+
+def test_a_booth_guest_whose_record_is_gone_is_not_named_whatever_the_score(monkeypatch, tmp_path):
+    """Kept a year now (owner 23 Nov): a guest row whose record a forced deploy
+    took away is a face kept with nothing saying it may be named. FACE_REQUIRE_
+    CONSENT off tolerates that for staff, never for a guest."""
+    monkeypatch.setattr(enrollment, "ENROLLED", tmp_path / "enrolled")
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "face_require_consent", False)
+    _sees(monkeypatch, _at_score(0.90))
+    w = _watcher(gallery=_guest_gallery(), threshold=0.50)
+    seen = [w.see(FRAME, now=i) for i in range(6)]
+    assert not any(s is not None and s.name for s in seen)
+
+
+def test_staff_keep_the_doors_own_bar_with_guests_on_the_same_gallery(monkeypatch):
+    """The machine with no guests decides exactly as before."""
+    _sees(monkeypatch, _at_score(0.55))
+    w = _watcher(threshold=0.50)
+    assert [w.see(FRAME, now=i) for i in range(3)][-1].name == "ต้า"
 
 
 def test_a_face_that_changes_its_mind_never_confirms(monkeypatch):

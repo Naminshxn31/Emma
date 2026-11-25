@@ -1,0 +1,691 @@
+/* smarthome_brand -- the console of scene 8, the story title and the closing (no mark since the
+   owner's 23 Nov: "เอาโลโก้ออกไปเลย").
+   Every selector under .cs-act-smarthome_brand; sizes in --cu; only transform and opacity move
+   (the window and the frame are tweened by transform from the act's own frame loop).
+   Curves: the film's own (--cs-ease on the screen, --cs-ease-in entering, --cs-ease-out
+   leaving), each with its value as the fallback, named once here (a list of transitions
+   reads them as var(--sb-...)). Premium: nothing overshoots.
+
+   Type (owner 18 Nov, Apple's MacBook Pro film as the reference): the film's one face and its
+   look are the core's (Inter, upright, the case the slide gives, white running to pale teal
+   across the phrase); this file only sizes and places the words. The giant backlit words
+   (OFF / ON / OPEN behind the glass, THANK YOU and THE STORY OF across the stage) are gone:
+   the console says its state in its own panel, the two titles are short headlines
+   (cs-type-h1). How a phrase arrives and leaves is the core's.
+   Held shots (owner 18 Nov: "เหมือนบางช่วงกระตุก ค้างด้วย" -- the "Off" card in the dark stood
+   completely still for 2.5 s and read as a hang): every shot keeps an ambient layer alive --
+   the console's own glow breathing under it, dust in its light, a slow sheen on the glass, the
+   switch's rim light; the mark floating, the title's halo breathing. Sine loops, transform and
+   opacity only.
+   Full screen: nothing of the console, no card and no word stands below 43.8cu; the room's
+   curtains, its dark and its light run on to the bottom edge, graded down behind the
+   subtitle's box. */
+.cs-act-smarthome_brand {
+  --sb-ease: var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1));
+  --sb-in: var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1));
+  --sb-out: var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1));
+}
+
+.cs-act-smarthome_brand .scene, .cs-act-smarthome_brand .world { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+
+/* ======================= CONSOLE ======================= */
+/* the room floats: one slow sine loop on the layer that holds it all (a drift of a few tenths
+   of a cu, a turn of a tenth of a degree, a breath of 1%), so that no held frame of scene 8 is
+   a still -- the "Off" card in the dark stood 2.5 s without a pixel moving (owner 18 Nov,
+   "ค้าง"). It goes on --age into itself, like every loop here: a join does not jump */
+.cs-act-smarthome_brand .drift {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: calc(50 * var(--cu)) calc(24 * var(--cu));
+}
+.cs-act-smarthome_brand.cs-live .drift { animation: smarthome_brand-float 7.2s ease-in-out infinite alternate; animation-delay: calc(0s - var(--age, 0s)); }
+.cs-act-smarthome_brand .rig {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: calc(50 * var(--cu)) calc(24 * var(--cu));
+}
+.cs-act-smarthome_brand .rig.flying { opacity: .004; }
+
+/* ---- the room: darkness falls over the whole stage from above, and lifts again ---- */
+.cs-act-smarthome_brand .veil {
+  position: absolute; left: -25%; top: -35%; width: 150%; height: 170%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(1, 3, 14, .74) 0%, rgba(1, 3, 14, .74) 80%, rgba(1, 3, 14, 0) 100%);
+  transform: translate3d(0, -101%, 0);
+}
+.cs-act-smarthome_brand .veil.down { transform: translate3d(0, 0, 0); }
+.cs-act-smarthome_brand .veil.down.anim { animation: smarthome_brand-fall 1100ms both; }
+.cs-act-smarthome_brand .veil.lift { animation: smarthome_brand-lift 1000ms both; }
+/* ... and the light comes back: a bloom behind the glass that swells and settles, then breathes */
+.cs-act-smarthome_brand .bloom {
+  position: absolute; left: calc(4 * var(--cu)); top: calc(-16 * var(--cu)); width: calc(92 * var(--cu)); height: calc(66 * var(--cu));
+  pointer-events: none; opacity: 0;
+}
+/* (the glow on a child, its slow life the child's own animation: the bloom and its life were two
+   animations on one element, which cannot run on the compositor -- the 1766 x 1267 glow was rastered
+   again at every frame's scale through every held console, 23 Nov. Nested, the same light: the life's
+   opacity is the old one's over the bloom's end (.3), its scale the same) */
+.cs-act-smarthome_brand .bloomi {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  background: radial-gradient(closest-side, rgba(var(--cs-sky), .55), rgba(var(--cs-blue), .22) 52%, rgba(var(--cs-blue), 0) 100%);
+}
+.cs-act-smarthome_brand .bloom.on { opacity: .3; }
+.cs-act-smarthome_brand .bloom.on .bloomi { animation: smarthome_brand-bloomlife 6.5s ease-in-out infinite alternate; }
+.cs-act-smarthome_brand .bloom.on.anim { animation: smarthome_brand-bloom 1500ms both; }
+.cs-act-smarthome_brand .bloom.on.anim .bloomi { animation-delay: 1500ms; }
+
+/* ---- the life of a held shot (ambient; each on its own slow period, never in step).
+   A console goes on from line to line (six lines, each joined to the one before: the new
+   frame over the old at once), so every loop starts --age into itself (the act sets it: how
+   long the console has been up) -- the dust does not jump and the glow does not dip at a
+   join. ---- */
+/* the console's own light on the room: a glow under the card that breathes -- it is the one
+   light left when the lobby's are off */
+.cs-act-smarthome_brand .aura {
+  position: absolute; left: calc(9 * var(--cu)); top: calc(23.5 * var(--cu)); width: calc(82 * var(--cu)); height: calc(23 * var(--cu));
+  pointer-events: none; opacity: .5;
+  background: radial-gradient(closest-side, rgba(var(--cs-sky), .36), rgba(var(--cs-blue), .16) 52%, rgba(var(--cs-blue), 0) 100%);
+}
+.cs-act-smarthome_brand.cs-live .aura { animation: smarthome_brand-aura 4.8s ease-in-out infinite alternate; animation-delay: calc(0s - var(--age, 0s)); }
+/* dust in that light: two sparse layers painted once, drifting against each other */
+.cs-act-smarthome_brand .motes {
+  position: absolute; left: -8%; top: -8%; width: 116%; height: 116%; pointer-events: none; opacity: .5;
+}
+/* (each mote is a small tile of its own -- background-size -- not a gradient the size of the
+   whole layer: fourteen full-screen gradients were painted every time the console was built,
+   and the raster of a fresh console was the 50-80 ms hitch at its cut, handover 18 Nov) */
+.cs-act-smarthome_brand .motes {
+  background-repeat: no-repeat;
+}
+.cs-act-smarthome_brand .motes.m1 {
+  --m: radial-gradient(closest-side, rgba(190, 222, 255, .85), rgba(190, 222, 255, 0));
+  background-image: var(--m), var(--m), var(--m), var(--m), var(--m), var(--m), var(--m), var(--m);
+  background-position: 13% 24%, 27% 61%, 38% 17%, 52% 72%, 66% 28%, 79% 55%, 88% 19%, 8% 68%;
+  background-size: calc(.4 * var(--cu)) calc(.4 * var(--cu)), calc(.28 * var(--cu)) calc(.28 * var(--cu)), calc(.48 * var(--cu)) calc(.48 * var(--cu)),
+    calc(.32 * var(--cu)) calc(.32 * var(--cu)), calc(.4 * var(--cu)) calc(.4 * var(--cu)), calc(.28 * var(--cu)) calc(.28 * var(--cu)),
+    calc(.44 * var(--cu)) calc(.44 * var(--cu)), calc(.32 * var(--cu)) calc(.32 * var(--cu));
+}
+.cs-act-smarthome_brand .motes.m2 {
+  opacity: .38;
+  --m: radial-gradient(closest-side, rgba(150, 200, 255, .75), rgba(150, 200, 255, 0));
+  background-image: var(--m), var(--m), var(--m), var(--m), var(--m), var(--m);
+  background-position: 19% 43%, 33% 78%, 47% 11%, 61% 64%, 74% 36%, 92% 70%;
+  background-size: calc(.6 * var(--cu)) calc(.6 * var(--cu)), calc(.4 * var(--cu)) calc(.4 * var(--cu)), calc(.68 * var(--cu)) calc(.68 * var(--cu)),
+    calc(.44 * var(--cu)) calc(.44 * var(--cu)), calc(.6 * var(--cu)) calc(.6 * var(--cu)), calc(.4 * var(--cu)) calc(.4 * var(--cu));
+}
+.cs-act-smarthome_brand.cs-live .motes.m1 { animation: smarthome_brand-dust-a 13s ease-in-out infinite alternate; animation-delay: calc(0s - var(--age, 0s)); }
+.cs-act-smarthome_brand.cs-live .motes.m2 { animation: smarthome_brand-dust-b 17s ease-in-out infinite alternate; animation-delay: calc(-6s - var(--age, 0s)); }
+/* the bottom of the shot graded down: the curtains' folds, the dust and the glow never stand
+   bright behind the subtitle (under the panel, which ends well above it) */
+.cs-act-smarthome_brand .floorgrade {
+  position: absolute; left: -10%; width: 120%; top: calc(40 * var(--cu)); height: calc(22 * var(--cu)); pointer-events: none;
+  background: linear-gradient(180deg, rgba(2, 4, 14, 0) 0%, rgba(2, 4, 14, .5) 40%, rgba(2, 4, 14, .8) 100%);
+}
+/* a slow sheen crossing the glass of the panel (clipped to its corners), then a long rest */
+.cs-act-smarthome_brand .sclip { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: var(--r); overflow: hidden; pointer-events: none; }
+.cs-act-smarthome_brand .sheen {
+  position: absolute; left: -45%; top: -20%; width: 36%; height: 140%; opacity: 0;
+  /* (a band that is clear at both its edges, leaning by a skew in its keyframes: an angled
+     gradient was cut off square by the band's own side) */
+  background: linear-gradient(90deg, rgba(200, 228, 255, 0) 0%, rgba(200, 228, 255, .11) 50%, rgba(200, 228, 255, 0) 100%);
+}
+.cs-act-smarthome_brand.cs-live .sheen { animation: smarthome_brand-sheen 6.2s ease-in-out infinite; animation-delay: calc(1.6s - var(--age, 0s)); }
+
+/* ---- the curtains: six folds a side; on "open." the hem goes first and the folds bunch
+   behind it at the edge (overlapping action), fast off the mark, slow into the gather ---- */
+.cs-act-smarthome_brand .drapes {
+  position: absolute; left: -8%; top: -14%; width: 116%; height: 128%; pointer-events: none;
+  opacity: 0; transform: translate3d(0, calc(-2 * var(--cu)), 0);
+}
+.cs-act-smarthome_brand.cs-live .drapes {
+  opacity: 1; transform: translate3d(0, 0, 0);
+  transition: opacity 900ms var(--sb-ease), transform 1100ms var(--sb-in);
+}
+.cs-act-smarthome_brand .drapes.still { opacity: 1; transform: translate3d(0, 0, 0); transition: none; }
+.cs-act-smarthome_brand .drape { position: absolute; top: 0; width: 50%; height: 100%; }
+.cs-act-smarthome_brand .drape-l { left: 0; }
+.cs-act-smarthome_brand .drape-r { right: 0; transform: scaleX(-1); }
+.cs-act-smarthome_brand .fold {
+  position: absolute; top: 0; height: 100%; left: calc(var(--f, 0) * 16.6667%); width: 17.4%; transform-origin: 0 50%;
+  background: linear-gradient(90deg, rgba(4, 9, 38, .95) 0%, rgba(20, 40, 116, .93) 40%, rgba(30, 58, 152, .9) 56%, rgba(6, 12, 46, .96) 100%);
+  border-right: 1px solid rgba(130, 175, 255, .12);
+}
+.cs-act-smarthome_brand .fold-5 { box-shadow: inset calc(-.18 * var(--cu)) 0 0 rgba(var(--cs-cyan), .55); }
+.cs-act-smarthome_brand .drapes.open .fold { transform: translate3d(calc(var(--f, 0) * -84%), 0, 0) scaleX(.36); }
+.cs-act-smarthome_brand .drapes.open.anim .fold { animation: smarthome_brand-gather 1150ms both; animation-delay: calc((5 - var(--f, 0)) * 70ms); }
+
+/* ---- the panel ---- */
+.cs-act-smarthome_brand .panel {
+  position: absolute; left: calc(17.7 * var(--cu)); top: calc(10.7 * var(--cu)); width: calc(64.6 * var(--cu)); height: calc(25.3 * var(--cu));
+  background: linear-gradient(160deg, rgba(22, 44, 140, .86) 0%, rgba(8, 16, 66, .92) 60%, rgba(4, 8, 36, .95) 100%);
+  --r: calc(1.3 * var(--cu)); --g: calc(3.4 * var(--cu));
+}
+.cs-act-smarthome_brand .head {
+  position: absolute; left: 0; top: 0; width: 100%; height: calc(4.4 * var(--cu)); display: flex; align-items: center; justify-content: space-between;
+  padding: 0 calc(1.8 * var(--cu)); box-sizing: border-box; border-bottom: 1px solid rgba(130, 175, 255, .25);
+}
+.cs-act-smarthome_brand .logo { display: flex; align-items: center; gap: calc(.9 * var(--cu)); color: rgba(210, 225, 255, .85); }
+.cs-act-smarthome_brand .logo-ring { width: calc(2.1 * var(--cu)); height: calc(2.1 * var(--cu)); }
+.cs-act-smarthome_brand .wmark { color: rgba(206, 220, 242, .78); font-size: calc(1.9 * var(--cu)); font-weight: 500; }
+.cs-act-smarthome_brand .who { display: flex; align-items: center; gap: calc(1 * var(--cu)); }
+.cs-act-smarthome_brand .emma { font-size: calc(1.9 * var(--cu)); font-weight: 600; color: rgb(var(--cs-cyan)); }
+.cs-act-smarthome_brand .meter { display: flex; align-items: center; gap: calc(.28 * var(--cu)); height: calc(2.2 * var(--cu)); }
+.cs-act-smarthome_brand .meter > div { width: calc(.24 * var(--cu)); height: 100%; border-radius: calc(.2 * var(--cu)); background: rgb(var(--cs-sky)); transform: scaleY(.3); }
+
+.cs-act-smarthome_brand .tile { position: absolute; left: calc(2.4 * var(--cu)); top: calc(6.4 * var(--cu)); right: calc(2.4 * var(--cu)); height: calc(9.6 * var(--cu)); }
+.cs-act-smarthome_brand .disc { position: absolute; left: 0; top: 0; width: calc(9.6 * var(--cu)); height: calc(9.6 * var(--cu)); }
+/* the device's disc: the lit face is a layer that fades and grows in behind the glyph (a colour
+   change would snap), a beat after the knob -- the lamp answers the switch */
+.cs-act-smarthome_brand .core {
+  position: absolute; left: calc(1.1 * var(--cu)); top: calc(1.1 * var(--cu)); width: calc(7.4 * var(--cu)); height: calc(7.4 * var(--cu)); border-radius: 50%;
+  display: grid; place-items: center; color: #fff;
+  background: radial-gradient(circle at 40% 30%, rgba(60, 80, 170, .55), rgba(16, 26, 80, .9));
+  box-shadow: 0 0 0 calc(.12 * var(--cu)) rgba(130, 175, 255, .3);
+}
+.cs-act-smarthome_brand .core::before {
+  content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 40% 30%, #5aa2ff, #2f6bff 70%, #2450c8);
+  box-shadow: 0 0 0 calc(.12 * var(--cu)) rgba(180, 215, 255, .8), 0 0 0 calc(.5 * var(--cu)) rgba(47, 107, 255, .3);
+  opacity: 0; transform: scale(.82);
+  transition: opacity 420ms var(--sb-ease) 160ms, transform 560ms var(--sb-in) 160ms;
+}
+.cs-act-smarthome_brand .disc.lit .core::before { opacity: 1; transform: scale(1); }
+.cs-act-smarthome_brand .glyph { width: calc(3.8 * var(--cu)); height: calc(3.8 * var(--cu)); }
+.cs-act-smarthome_brand .core .dev { position: relative; opacity: .5; transition: opacity 420ms var(--sb-ease) 160ms; }
+.cs-act-smarthome_brand .disc.lit .core .dev { opacity: 1; }
+.cs-act-smarthome_brand .arcspin { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .4s var(--sb-ease); }
+.cs-act-smarthome_brand .arcspin.on { opacity: 1; animation: smarthome_brand-spin 2.6s linear infinite; }
+.cs-act-smarthome_brand .arc { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 50% 50%; }
+.cs-act-smarthome_brand .arc-track { stroke: rgba(130, 175, 255, .28); stroke-width: 1.4; }
+.cs-act-smarthome_brand .arc-run { stroke: rgb(var(--cs-cyan)); stroke-width: 3.2; stroke-linecap: round; }
+/* the ring closes: it turns into place as it comes up (the spinning arc's motion, resolved) */
+.cs-act-smarthome_brand .arc.full {
+  opacity: 0; transform: rotate(-60deg);
+  transition: opacity 500ms var(--sb-ease), transform 800ms var(--sb-in);
+}
+.cs-act-smarthome_brand .arc.full.on { opacity: 1; transform: rotate(0deg); }
+.cs-act-smarthome_brand .arc-full { stroke: rgba(150, 195, 255, .85); stroke-width: 1.8; }
+.cs-act-smarthome_brand .badge {
+  position: absolute; right: calc(-.6 * var(--cu)); bottom: calc(-.2 * var(--cu)); width: calc(3.2 * var(--cu)); height: calc(3.2 * var(--cu)); border-radius: 50%;
+  display: grid; place-items: center; color: #fff; background: linear-gradient(160deg, #5aa2ff, #2f6bff); box-shadow: 0 0 0 calc(.2 * var(--cu)) rgba(10, 20, 70, .9);
+  opacity: 0; transform: scale(.4);
+  transition: opacity 300ms var(--sb-ease), transform 520ms var(--sb-in);
+}
+.cs-act-smarthome_brand .badge.on { opacity: 1; transform: scale(1); }
+.cs-act-smarthome_brand .badge .glyph {
+  width: calc(1.9 * var(--cu)); height: calc(1.9 * var(--cu)); stroke-width: 3; opacity: 0; transform: scale(.4) rotate(-25deg);
+  transition: opacity 300ms var(--sb-ease) 140ms, transform 440ms var(--sb-in) 140ms;
+}
+.cs-act-smarthome_brand .badge.on .glyph { opacity: 1; transform: scale(1) rotate(0deg); }
+
+/* the device's name (small, light) over its state (one short phrase at the headline weight) */
+.cs-act-smarthome_brand .words { position: absolute; left: calc(11.8 * var(--cu)); top: calc(1 * var(--cu)); display: flex; flex-direction: column; align-items: flex-start; gap: calc(.7 * var(--cu)); }
+.cs-act-smarthome_brand .devlabel { font-size: calc(2.2 * var(--cu)); font-weight: 500; color: rgba(190, 226, 250, .9); }
+.cs-act-smarthome_brand .state { font-size: calc(4.6 * var(--cu)); font-weight: 600; letter-spacing: -.018em; line-height: 1.05; }
+/* each word in a slot that keeps the after-glow of the word the line before left there (fix
+   round 19 Nov: the state stood blank 0.3-2.2 s at every join of scene 8). The bar comes up as
+   the old word fades out under this frame (a cross-fade in place), a sheen runs through it the
+   way the film's words light up, and it cools away as this line's word lights up in it */
+.cs-act-smarthome_brand .slot { position: relative; }
+.cs-act-smarthome_brand .aglow {
+  position: absolute; left: 0; top: 22%; height: 56%; border-radius: calc(3 * var(--cu)); overflow: hidden; pointer-events: none;
+  opacity: 0; transform-origin: 0 50%;
+  background: linear-gradient(90deg, rgba(200, 241, 234, 0), rgba(200, 241, 234, .17) 16%, rgba(166, 216, 247, .17) 84%, rgba(166, 216, 247, 0));
+  transition: opacity 320ms var(--sb-ease);
+}
+.cs-act-smarthome_brand.cs-live .aglow { opacity: 1; }
+.cs-act-smarthome_brand .aglow::after {
+  content: ""; position: absolute; left: 0; top: 0; width: 38%; height: 100%; transform: translate3d(-100%, 0, 0);
+  background: linear-gradient(90deg, rgba(220, 248, 255, 0), rgba(220, 248, 255, .32) 50%, rgba(220, 248, 255, 0));
+}
+.cs-act-smarthome_brand.cs-live .aglow::after { animation: smarthome_brand-await 2.1s var(--sb-ease) infinite; }
+.cs-act-smarthome_brand.cs-live .aglow.out { opacity: 0; transform: scale(.72, 1); transition: opacity 450ms var(--sb-out), transform 450ms var(--sb-out); }
+@keyframes smarthome_brand-await { from { transform: translate3d(-100%, 0, 0); } to { transform: translate3d(265%, 0, 0); } }
+.cs-act-smarthome_brand .dots {
+  position: absolute; left: calc(32 * var(--cu)); top: calc(6.3 * var(--cu)); display: flex; gap: calc(.7 * var(--cu));
+  opacity: 0; transform: translate3d(calc(-1 * var(--cu)), 0, 0);
+  transition: opacity 400ms var(--sb-ease), transform 500ms var(--sb-in);
+}
+.cs-act-smarthome_brand .dots.on { opacity: 1; transform: translate3d(0, 0, 0); }
+.cs-act-smarthome_brand .dots > div { width: calc(.9 * var(--cu)); height: calc(.9 * var(--cu)); border-radius: 50%; background: rgb(var(--cs-cyan)); }
+.cs-act-smarthome_brand .dots.on > div { animation: smarthome_brand-dot 1.2s ease-in-out infinite; }
+.cs-act-smarthome_brand .dots.on > div:nth-child(2) { animation-delay: .2s; }
+.cs-act-smarthome_brand .dots.on > div:nth-child(3) { animation-delay: .4s; }
+
+/* ---- the switch: pressed (anticipation), the knob travels on the signature curve, the
+   track lights behind it, then the glow follows (follow-through); off = the glow goes out ---- */
+.cs-act-smarthome_brand .toggle {
+  position: absolute; right: 0; top: calc(2.6 * var(--cu)); width: calc(8.6 * var(--cu)); height: calc(4.6 * var(--cu)); border-radius: calc(2.3 * var(--cu));
+  isolation: isolate; background: linear-gradient(180deg, #121b52, #0a1033); box-shadow: 0 0 0 calc(.12 * var(--cu)) rgba(160, 200, 255, .6);
+}
+.cs-act-smarthome_brand .tglow {
+  position: absolute; left: calc(-2.4 * var(--cu)); right: calc(-2.4 * var(--cu)); top: calc(-2.4 * var(--cu)); bottom: calc(-2.4 * var(--cu));
+  z-index: -1; border-radius: calc(4.7 * var(--cu)); pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side, rgba(var(--cs-sky), .6), rgba(var(--cs-blue), .24) 60%, rgba(var(--cs-blue), 0) 100%);
+}
+.cs-act-smarthome_brand .toggle.pos-on .tglow { opacity: .85; }
+.cs-act-smarthome_brand .toggle.flip.pos-on .tglow { animation: smarthome_brand-glow-on 1000ms 380ms both; }
+.cs-act-smarthome_brand .toggle.flip.pos-off .tglow { animation: smarthome_brand-glow-off 520ms both; }
+.cs-act-smarthome_brand .trackon {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: inherit; opacity: 0;
+  background: linear-gradient(180deg, #3f7dff, #2a58d8);
+  transition: opacity 380ms var(--sb-ease) 200ms;
+}
+.cs-act-smarthome_brand .toggle.pos-on .trackon { opacity: 1; }
+.cs-act-smarthome_brand .toggle.flip.pos-off .trackon { transition-delay: 120ms; }
+.cs-act-smarthome_brand .knob {
+  position: absolute; left: calc(.6 * var(--cu)); top: calc(.6 * var(--cu)); width: calc(3.4 * var(--cu)); height: calc(3.4 * var(--cu)); border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #b9cdf6); box-shadow: 0 0 0 1px rgba(255, 255, 255, .55);
+  transform: translate3d(0, 0, 0);
+}
+.cs-act-smarthome_brand .toggle.pos-on .knob { transform: translate3d(calc(4 * var(--cu)), 0, 0); }
+.cs-act-smarthome_brand .toggle.pos-mid .knob { transform: translate3d(calc(2 * var(--cu)), 0, 0); }
+.cs-act-smarthome_brand .toggle.flip.pos-on .knob { animation: smarthome_brand-knob-on 640ms both; }
+.cs-act-smarthome_brand .toggle.flip.pos-off .knob { animation: smarthome_brand-knob-off 640ms both; }
+/* ambient: the switch's rim catches the light, slowly (in either position: it says nothing
+   about the state -- the knob and the track do) */
+.cs-act-smarthome_brand .trim {
+  position: absolute; left: calc(-.34 * var(--cu)); top: calc(-.34 * var(--cu)); right: calc(-.34 * var(--cu)); bottom: calc(-.34 * var(--cu));
+  border-radius: calc(2.7 * var(--cu)); pointer-events: none; opacity: .25;
+  box-shadow: 0 0 0 calc(.1 * var(--cu)) rgba(190, 222, 255, .9);
+}
+.cs-act-smarthome_brand.cs-live .trim { animation: smarthome_brand-rim 3.4s ease-in-out infinite alternate; animation-delay: calc(0s - var(--age, 0s)); }
+
+.cs-act-smarthome_brand .cmd {
+  position: absolute; left: calc(2.4 * var(--cu)); right: calc(2.4 * var(--cu)); bottom: calc(2 * var(--cu)); height: calc(4.4 * var(--cu));
+  display: flex; align-items: center; gap: calc(1.2 * var(--cu)); padding: 0 calc(1.2 * var(--cu)); box-sizing: border-box;
+  border-radius: calc(1 * var(--cu)); background: rgba(3, 7, 34, .8); border: 1px solid rgba(130, 175, 255, .35);
+}
+.cs-act-smarthome_brand .prompt { width: calc(1.6 * var(--cu)); height: calc(1.6 * var(--cu)); color: rgb(var(--cs-cyan)); flex: none; }
+.cs-act-smarthome_brand .cmdtext { font-size: calc(2.1 * var(--cu)); font-weight: 450; color: var(--cs-ink); white-space: nowrap; }
+/* send: pressed and released when she says "now", a ring goes out; on the done line the arrow
+   leaves and the check comes in (each a layer: a colour change would snap) */
+.cs-act-smarthome_brand .send {
+  position: absolute; right: calc(.7 * var(--cu)); top: calc(.6 * var(--cu)); width: calc(3.2 * var(--cu)); height: calc(3.2 * var(--cu)); border-radius: 50%;
+  display: grid; place-items: center; color: #fff; background: linear-gradient(160deg, #5aa2ff, #2f6bff);
+}
+.cs-act-smarthome_brand .send::before {
+  content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; pointer-events: none;
+  background: rgb(12, 24, 80); box-shadow: 0 0 0 1px rgba(150, 195, 255, .6); opacity: 0;
+  transition: opacity 400ms var(--sb-ease);
+}
+.cs-act-smarthome_brand .send.ok::before { opacity: 1; }
+.cs-act-smarthome_brand .send::after {
+  content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 calc(.16 * var(--cu)) rgba(var(--cs-cyan), .85); opacity: 0;
+}
+.cs-act-smarthome_brand .send.pulse { animation: smarthome_brand-press 420ms 1; }
+.cs-act-smarthome_brand .send.pulse::after { animation: smarthome_brand-ripple 800ms 60ms 1 both; }
+.cs-act-smarthome_brand .send .glyph {
+  position: relative; width: calc(1.6 * var(--cu)); height: calc(1.6 * var(--cu)); grid-area: 1 / 1;
+  transition: opacity 260ms var(--sb-ease), transform 420ms var(--sb-in);
+}
+.cs-act-smarthome_brand .send .g-check { opacity: 0; transform: scale(.5) rotate(-20deg); }
+.cs-act-smarthome_brand .send.ok .g-send {
+  opacity: 0; transform: translate3d(.3em, -.3em, 0) scale(.6);
+  transition: opacity 200ms var(--sb-out), transform 260ms var(--sb-out);
+}
+.cs-act-smarthome_brand .send.ok .g-check { opacity: 1; transform: scale(1) rotate(0deg); transition-delay: 140ms; }
+.cs-act-smarthome_brand .streak {
+  position: absolute; left: 0; bottom: calc(-.3 * var(--cu)); width: calc(14 * var(--cu)); height: calc(.3 * var(--cu)); opacity: 0;
+  background: linear-gradient(90deg, rgba(var(--cs-cyan), 0), rgb(var(--cs-cyan)), rgba(var(--cs-cyan), 0));
+}
+.cs-act-smarthome_brand .streak.go { animation: smarthome_brand-streak 1100ms 1 both; }
+
+/* her courtesy words: the lane carries the chip across (decelerating), the chip settles the last
+   bit on the slower signature curve -- two curves, one arc; its glyph lands a beat later */
+.cs-act-smarthome_brand .chiplane {
+  position: absolute; top: calc(34.4 * var(--cu));
+  transition: transform 700ms var(--sb-in);
+}
+.cs-act-smarthome_brand .chiplane-left { left: calc(11 * var(--cu)); transform: translate3d(calc(-5 * var(--cu)), 0, 0); }
+.cs-act-smarthome_brand .chiplane-right { right: calc(11 * var(--cu)); transform: translate3d(calc(5 * var(--cu)), 0, 0); }
+.cs-act-smarthome_brand .chiplane.in { transform: translate3d(0, 0, 0); }
+.cs-act-smarthome_brand .chip {
+  font-size: calc(2 * var(--cu)); font-weight: 500; padding: calc(1 * var(--cu)) calc(1.9 * var(--cu));
+  opacity: 0; transform: translate3d(0, calc(1.6 * var(--cu)), 0);
+  transition: opacity 420ms var(--sb-ease), transform 700ms var(--sb-ease);
+}
+.cs-act-smarthome_brand .chip.in { opacity: 1; transform: translate3d(0, 0, 0); }
+.cs-act-smarthome_brand .chipin { display: flex; align-items: center; gap: calc(1 * var(--cu)); }
+.cs-act-smarthome_brand .chipin .glyph {
+  width: calc(2.1 * var(--cu)); height: calc(2.1 * var(--cu)); color: rgb(var(--cs-cyan));
+  opacity: 0; transform: scale(.5) rotate(-18deg);
+  transition: opacity 300ms var(--sb-ease) 180ms, transform 500ms var(--sb-in) 180ms;
+}
+.cs-act-smarthome_brand .chip.in .chipin .glyph { opacity: 1; transform: scale(1) rotate(0deg); }
+
+/* ======================= BRAND ======================= */
+/* the title: one short headline (s09's in two lines, "The story of" over the name). Its face, its
+   light, the halo that blooms behind it and breathes, its way in (it lights up left to right) and out
+   (it cools and fades) are all the core's (cs-type-h1, fx.depart); this is only where it stands */
+.cs-act-smarthome_brand .titlebox { position: absolute; left: 0; top: calc(3.2 * var(--cu)); width: 100%; text-align: center; pointer-events: none; }
+.cs-act-smarthome_brand .titlebox.named { top: calc(2.6 * var(--cu)); }
+.cs-act-smarthome_brand .titlebox.named .tline + .tline { margin-top: calc(.2 * var(--cu)); }
+.cs-act-smarthome_brand .sbname { line-height: 1.08; letter-spacing: .02em; }
+
+/* the window (s09): the project's frame itself -- the act scales its box about the stage's middle
+   (the whole dive is one transform). Square: at the end it IS the screen. Its edge (a line of light,
+   outside the box) and its glow are off the screen once it fills it, and go as it dives. Hidden by the
+   core until "the story of" */
+.cs-act-smarthome_brand .sbwinwrap {
+  position: absolute; left: 0; top: 0; width: calc(100 * var(--cu)); height: calc(56.25 * var(--cu)); transform-origin: 50% 50%;
+  pointer-events: none; opacity: 0; transition: opacity 700ms var(--sb-ease);
+}
+.cs-act-smarthome_brand .sbwinwrap.in { opacity: 1; }
+.cs-act-smarthome_brand .sbwin {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background: var(--cs-night2, #070b1c);
+  box-shadow: 0 0 0 calc(.4 * var(--cu)) rgba(150, 195, 255, .72);
+}
+/* (its light on the stage round it: a drawn glow, breathing a little; brighter as the name lands) */
+.cs-act-smarthome_brand .sbwinglow {
+  position: absolute; left: -14%; top: -20%; width: 128%; height: 140%; pointer-events: none; opacity: .55;
+  background: radial-gradient(closest-side, rgba(var(--cs-sky), .5), rgba(var(--cs-blue), .2) 62%, rgba(var(--cs-blue), 0) 100%);
+  transition: opacity 900ms var(--sb-ease);
+}
+.cs-act-smarthome_brand.cs-live .sbwinwrap.in .sbwinglow { animation: smarthome_brand-winglow 4.6s ease-in-out infinite alternate; }
+.cs-act-smarthome_brand .sbwinwrap.lit .sbwinglow { opacity: .9; }
+.cs-act-smarthome_brand .sbwinwrap.diving .sbwinglow { opacity: 0; animation: none; transition: opacity 600ms var(--sb-out); }
+.cs-act-smarthome_brand .sbwinwrap.landed .sbwin { box-shadow: none; }
+
+/* the reel (s09): it rises into place; the act runs the strip, up to speed and down to a drift */
+.cs-act-smarthome_brand .reel {
+  position: absolute; left: 0; top: calc(22 * var(--cu)); width: 100%; height: calc(8.4 * var(--cu)); overflow: hidden;
+  opacity: 0; transform: translate3d(0, calc(1.6 * var(--cu)), 0);
+  transition: opacity 900ms var(--sb-ease), transform 1100ms var(--sb-in);
+}
+.cs-act-smarthome_brand .reel.in { opacity: .9; transform: translate3d(0, 0, 0); }
+.cs-act-smarthome_brand .reel::after {
+  content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;
+  background: linear-gradient(90deg, rgba(3, 5, 13, 1) 0%, rgba(3, 5, 13, 0) 22%, rgba(3, 5, 13, 0) 78%, rgba(3, 5, 13, 1) 100%);
+}
+.cs-act-smarthome_brand .strip { position: absolute; left: calc(-10 * var(--cu)); top: 0; height: 100%; display: flex; gap: calc(1.2 * var(--cu)); }
+.cs-act-smarthome_brand .reelcard { flex: none; width: calc(14 * var(--cu)); height: 100%; border-radius: calc(.8 * var(--cu)); overflow: hidden; box-shadow: 0 0 0 1px rgba(130, 175, 255, .4); }
+.cs-act-smarthome_brand .reelcard:nth-child(even) .cs-aimg { object-position: 80% 50%; }
+/* (s09: see-through over the window's place and a margin either side -- the act sets --gap0..3, in % of
+   the reel, which is the stage's width: no card is ever seen cut by the window or tucked behind it) */
+.cs-act-smarthome_brand .reel.gapped {
+  -webkit-mask-image: linear-gradient(90deg, #000 var(--gap0), transparent var(--gap1), transparent var(--gap2), #000 var(--gap3));
+  mask-image: linear-gradient(90deg, #000 var(--gap0), transparent var(--gap1), transparent var(--gap2), #000 var(--gap3));
+}
+
+/* shot B/C (s10): the project full-bleed, then a card. (.sbhero, not .hero: the mirror page's own
+   `html.mirror .hero` -- position: fixed, inset: 0 -- took this box until 23 Nov) */
+.cs-act-smarthome_brand .sbhero {
+  position: absolute; left: 0; top: 0; width: calc(100 * var(--cu)); height: calc(56.25 * var(--cu)); overflow: hidden; opacity: 0; transform-origin: 50% 50%;
+  transition: opacity 300ms var(--sb-ease), transform 1000ms var(--sb-ease);
+}
+.cs-act-smarthome_brand .sbhero.on { opacity: 1; }
+/* (the slow push while she speaks over the picture: eased at both ends, never linear) */
+.cs-act-smarthome_brand .sbhero.near { transform: scale(1.05); transition: opacity 300ms var(--sb-ease), transform 14s var(--sb-ease); }
+.cs-act-smarthome_brand .sbhero.gone2 {
+  opacity: 0; transform: translate3d(0, calc(-8.6 * var(--cu)), 0) scale(.22);
+  transition: opacity 350ms var(--sb-out), transform 420ms var(--sb-out);
+}
+.cs-act-smarthome_brand .heropic { position: absolute; }
+/* (pulled back into the wheel's front card: the act tweens its transform; landed, it fades
+   over the wheel's own card -- the same picture -- that has just come up under it) */
+.cs-act-smarthome_brand .sbhero.faded { opacity: 0; }
+/* (the picture runs to the bottom edge of the screen; its foot is graded down, so nothing
+   bright or busy stands behind the subtitle's box) */
+.cs-act-smarthome_brand .grade {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(3, 6, 20, 0) 62%, rgba(3, 6, 20, .5) 84%, rgba(3, 6, 20, .74) 100%),
+    linear-gradient(90deg, rgba(3, 6, 20, .72) 0%, rgba(3, 6, 20, .25) 42%, rgba(3, 6, 20, 0) 62%), radial-gradient(ellipse at 50% 45%, rgba(3, 6, 20, 0) 55%, rgba(3, 6, 20, .5) 100%);
+}
+/* the same grade in s09's window while the camera dives into it: its light is set by the act from the
+   camera's number every frame -- it ends as s10's own grade, the first frame of the join */
+.cs-act-smarthome_brand .pgrade {
+  position: absolute; left: 0; top: 0; width: calc(100 * var(--cu)); height: calc(56.25 * var(--cu)); opacity: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(3, 6, 20, 0) 62%, rgba(3, 6, 20, .5) 84%, rgba(3, 6, 20, .74) 100%),
+    linear-gradient(90deg, rgba(3, 6, 20, .72) 0%, rgba(3, 6, 20, .25) 42%, rgba(3, 6, 20, 0) 62%), radial-gradient(ellipse at 50% 45%, rgba(3, 6, 20, 0) 55%, rgba(3, 6, 20, .5) 100%);
+}
+
+/* the bleed (owner 23 Nov, "ทำไมไม่เต็มจอ"): while the project's frame is the whole shot, its picture
+   goes on past the 16:9 box to the screen's edges. A layer fixed to the screen (held in the box, and
+   its wings 0 wide, while the core moves the line with a transform; 0 wide on a 16:9 screen); each
+   wing a copy of the frame on the frame's own box, cut to the margin, under the grade the box has at
+   that edge (left: the panel's dark side; the three gradients of .grade composed at x = 0 and 100%).
+   Lit up once they are there, gone (faster) before the frame becomes a card */
+.cs-act-smarthome_brand .sbwings {
+  position: fixed; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none;
+  opacity: 0; transition: opacity 420ms var(--sb-out);
+}
+.cs-act-smarthome_brand .sbwings.on { opacity: 1; transition: opacity 900ms var(--sb-ease); }
+.cs-act-smarthome_brand .sbwings.now { transition: none; }
+.cs-act-smarthome_brand .sbwing { position: absolute; top: 0; height: calc(56.25 * var(--cu)); width: calc(50% - 50 * var(--cu)); overflow: hidden; }
+.cs-act-smarthome_brand .sbwing-l { left: 0; }
+.cs-act-smarthome_brand .sbwing-r { right: 0; }
+.cs-act-smarthome_brand .sbframe {
+  position: absolute; top: 0; width: calc(100 * var(--cu)); height: calc(56.25 * var(--cu)); transform-origin: 50% 50%;
+  transition: transform 1000ms var(--sb-ease);
+}
+.cs-act-smarthome_brand .sbwing-l .sbframe { left: 100%; }
+.cs-act-smarthome_brand .sbwing-r .sbframe { left: calc(-100 * var(--cu)); }
+.cs-act-smarthome_brand .sbframe.near { transform: scale(1.05); transition: transform 14s var(--sb-ease); }
+.cs-act-smarthome_brand .sbwgrade, .cs-act-smarthome_brand .sbwtitle { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.cs-act-smarthome_brand .sbwing-l .sbwgrade {
+  background: linear-gradient(180deg, rgba(3, 6, 20, .83) 0%, rgba(3, 6, 20, .79) 15%, rgba(3, 6, 20, .76) 30%, rgba(3, 6, 20, .75) 45%,
+    rgba(3, 6, 20, .76) 62%, rgba(3, 6, 20, .84) 73%, rgba(3, 6, 20, .91) 84%, rgba(3, 6, 20, .94) 92%, rgba(3, 6, 20, .96) 100%);
+}
+.cs-act-smarthome_brand .sbwing-r .sbwgrade {
+  background: linear-gradient(180deg, rgba(3, 6, 20, .38) 0%, rgba(3, 6, 20, .24) 15%, rgba(3, 6, 20, .13) 30%, rgba(3, 6, 20, .09) 45%,
+    rgba(3, 6, 20, .14) 62%, rgba(3, 6, 20, .41) 73%, rgba(3, 6, 20, .66) 84%, rgba(3, 6, 20, .77) 92%, rgba(3, 6, 20, .87) 100%);
+}
+/* (the sky's shade of the land title, as on the frame itself: it comes with the title) */
+.cs-act-smarthome_brand .sbwtitle {
+  background: linear-gradient(180deg, rgba(3, 6, 20, .66) 0%, rgba(3, 6, 20, .2) 22%, rgba(3, 6, 20, 0) 34%);
+  opacity: 0; transition: opacity 1.4s var(--sb-ease);
+}
+.cs-act-smarthome_brand .sbwings.titled .sbwtitle { opacity: 1; }
+
+/* (it comes in from where it stands, never from past the stage's left edge -- review 18 Nov;
+   it leaves faster than it came, so it is gone before the picture becomes a card) */
+/* (36.6cu, was 35: Kantalad, 22 Nov night -- "And all of our agents" at 3.1cu is 598px in
+   Kantalad, 535 in Inter; the panel's 30.6cu inside was 588 and the line broke before
+   "agents". 32.2cu inside = 618: one line again, 20px to spare) */
+.cs-act-smarthome_brand .speak {
+  position: absolute; left: calc(6 * var(--cu)); top: calc(10.5 * var(--cu)); width: calc(36.6 * var(--cu)); padding: calc(1.8 * var(--cu)) calc(2.2 * var(--cu)); box-sizing: border-box;
+  --r: calc(1.2 * var(--cu)); opacity: 0; transform: perspective(calc(90 * var(--cu))) translate3d(0, calc(2 * var(--cu)), calc(-8 * var(--cu))) rotateY(14deg);
+  transition: opacity 340ms var(--sb-out), transform 420ms var(--sb-out);
+}
+/* (its glass is up in a third of a second, so the line lighting up inside it is seen) */
+.cs-act-smarthome_brand .speak.in {
+  opacity: 1; transform: perspective(calc(90 * var(--cu))) rotateY(8deg);
+  transition: opacity 340ms var(--sb-ease), transform 900ms var(--sb-in);
+}
+.cs-act-smarthome_brand .phead { margin-bottom: calc(1.1 * var(--cu)); }
+.cs-act-smarthome_brand .phead .cs-text { font-size: calc(2 * var(--cu)); font-weight: 600; color: rgb(var(--cs-cyan)); }
+.cs-act-smarthome_brand .pline { display: block; font-size: calc(3.1 * var(--cu)); font-weight: 600; letter-spacing: -.014em; line-height: 1.18; margin-bottom: calc(.9 * var(--cu)); }
+
+.cs-act-smarthome_brand .wheelbox {
+  position: absolute; left: calc(37 * var(--cu)); top: calc(11.35 * var(--cu)); width: calc(26 * var(--cu)); height: calc(16.3 * var(--cu));
+  opacity: 0; transition: opacity 1200ms var(--sb-ease);
+}
+.cs-act-smarthome_brand .wheelbox.on { opacity: 1; }
+.cs-act-smarthome_brand .wheelbox.far { opacity: 0; transition: opacity 700ms var(--sb-ease); }
+.cs-act-smarthome_brand .wcard {
+  width: 100%; height: 100%; border-radius: calc(1.2 * var(--cu)); overflow: hidden; opacity: 0; box-shadow: 0 0 0 1px rgba(130, 175, 255, .6);
+  transform: scale(.9);
+  /* (pacing pass 18 Nov night: slower, so the row building up round the card reads as the same
+     view -- a whole new view 2.0 s after the card and 2.0 s before the invitations, measured) */
+  transition: opacity 1400ms var(--sb-ease), transform 1400ms var(--sb-in);
+}
+.cs-act-smarthome_brand .cs-wheel-card.in .wcard { opacity: 1; transform: scale(1); }
+/* (the front card takes over from the picture that was pulled back into its place: at once,
+   in its place -- no scale of its own) */
+.cs-act-smarthome_brand .cs-wheel-card.fast .wcard { transform: scale(1); transition: opacity 300ms var(--sb-ease); }
+/* (ambient: the wheel's pictures drift inside their cards while the row is held) */
+.cs-act-smarthome_brand .wcard .cs-apic { animation: smarthome_brand-drift 9s ease-in-out infinite alternate; }
+/* the headline of shot C: it lights up on its beat and cools away on the next shot's, both
+   the core's (it used to be typed in with a caret and slid up in a box of its own) */
+.cs-act-smarthome_brand .gk { position: absolute; left: 0; top: calc(3.4 * var(--cu)); width: 100%; text-align: center; pointer-events: none; }
+.cs-act-smarthome_brand .gktitle { font-size: calc(3.9 * var(--cu)); font-weight: 600; letter-spacing: -.016em; }
+/* a headline's own glow (the brand's titles, this one): drawn so that it fades out inside its
+   box on every side -- the shared one, two ellipses as tall as the box, stopped at the box's
+   edge at ~15% and stood as a pale rectangle round "Thank you" (handover 18 Nov) */
+.cs-act-smarthome_brand .cs-text-glow::before {
+  background:
+    radial-gradient(ellipse closest-side at 34% 50%, rgba(204, 244, 240, .24) 0%, rgba(176, 236, 240, .11) 55%, rgba(176, 236, 240, 0) 100%),
+    radial-gradient(ellipse closest-side at 66% 50%, rgba(140, 204, 250, .26) 0%, rgba(140, 204, 250, .12) 55%, rgba(140, 204, 250, 0) 100%);
+}
+
+/* the invitations: each card comes up and turns towards the middle as she names it; its icon
+   lands 140 ms after the card (the whole card inside 500 ms). They end at 42cu: clear of the
+   bottom of the shot, where the subtitle's box is. (Kantalad, 22 Nov night: "The project
+   details" at 2.3cu is 397px in Kantalad, 361 in Inter; the words' column was 365 and the
+   heading broke before "details". The cards are 30.2cu, not 28.8 -- the same 0.8cu between
+   them, 3.9cu from the screen's edges, not 6 -- the icon's gap 1.2cu, not 1.6, and the right
+   padding 1.4cu, not 2: a column of 411px, 14 to spare; the type keeps its size) */
+.cs-act-smarthome_brand .inv {
+  position: absolute; top: calc(30.4 * var(--cu)); width: calc(30.2 * var(--cu)); height: calc(11.6 * var(--cu)); display: flex; align-items: center; gap: calc(1.2 * var(--cu));
+  padding: 0 calc(1.4 * var(--cu)) 0 calc(2 * var(--cu)); box-sizing: border-box; --r: calc(1.2 * var(--cu)); --g: calc(2.2 * var(--cu));
+  /* (it rises 1.5cu, not 6: the screen is the whole film now, and a card coming up from 6cu
+     below its place crossed the subtitle box's zone on its way in. The glass is up in a third
+     of a second: its two lines light up in it, left to right) */
+  opacity: 0; transform: perspective(calc(90 * var(--cu))) translate3d(0, calc(1.5 * var(--cu)), 0) rotateY(var(--ry0, 13deg));
+  transition: opacity 320ms var(--sb-ease), transform 760ms var(--sb-in);
+}
+.cs-act-smarthome_brand .inv-1 { left: calc(3.9 * var(--cu)); --ry0: 18deg; --ry: 12deg; }
+.cs-act-smarthome_brand .inv-2 { left: calc(34.9 * var(--cu)); --ry0: 0deg; --ry: 0deg; }
+.cs-act-smarthome_brand .inv-3 { left: calc(65.9 * var(--cu)); --ry0: -18deg; --ry: -12deg; }
+.cs-act-smarthome_brand .inv.in { opacity: 1; transform: perspective(calc(90 * var(--cu))) translate3d(0, 0, 0) rotateY(var(--ry, 0deg)); }
+/* (once all three are up: the outer cards ease a little towards the room) */
+.cs-act-smarthome_brand .inv.relax { transition: opacity 500ms var(--sb-ease), transform 1600ms var(--sb-ease); }
+.cs-act-smarthome_brand .inv.relax.inv-1 { --ry: 9deg; }
+.cs-act-smarthome_brand .inv.relax.inv-3 { --ry: -9deg; }
+.cs-act-smarthome_brand .ico {
+  position: relative; flex: none; width: calc(4.2 * var(--cu)); height: calc(4.2 * var(--cu)); border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: radial-gradient(circle at 40% 30%, rgba(90, 150, 255, .8), rgba(30, 60, 180, .9)); box-shadow: 0 0 0 1px rgba(160, 200, 255, .6);
+  opacity: 0; transform: scale(.5);
+  transition: opacity 320ms var(--sb-ease) 140ms, transform 520ms var(--sb-in) 140ms;
+}
+.cs-act-smarthome_brand .inv.in .ico { opacity: 1; transform: scale(1); }
+/* ambient: a ring of light breathes round each invitation's icon, one after another */
+.cs-act-smarthome_brand .ico::after {
+  content: ""; position: absolute; left: calc(-.7 * var(--cu)); top: calc(-.7 * var(--cu)); right: calc(-.7 * var(--cu)); bottom: calc(-.7 * var(--cu));
+  border-radius: 50%; pointer-events: none; opacity: 0;
+  box-shadow: 0 0 0 calc(.1 * var(--cu)) rgba(166, 216, 247, .8);
+}
+.cs-act-smarthome_brand .inv.in .ico::after { animation: smarthome_brand-ring 3.6s ease-in-out 900ms infinite alternate; }
+.cs-act-smarthome_brand .inv-2.in .ico::after { animation-delay: 2100ms; }
+.cs-act-smarthome_brand .inv-3.in .ico::after { animation-delay: 3300ms; }
+.cs-act-smarthome_brand .ico .glyph { width: calc(2.4 * var(--cu)); height: calc(2.4 * var(--cu)); }
+.cs-act-smarthome_brand .icol { display: flex; flex-direction: column; gap: calc(.5 * var(--cu)); min-width: 0; }
+.cs-act-smarthome_brand .invtag { font-size: calc(2 * var(--cu)); font-weight: 500; color: rgba(190, 226, 250, .9); }
+.cs-act-smarthome_brand .invh { font-size: calc(2.3 * var(--cu)); font-weight: 600; letter-spacing: -.012em; line-height: 1.15; white-space: normal; }
+
+/* the story chips (s09): from their own side, on the same arc as the console's -- either side of the
+   window's foot, under the reel (they stood at the mark's height before 23 Nov: under the name now) */
+.cs-act-smarthome_brand .chiplane-bleft { top: calc(33.2 * var(--cu)); left: calc(7 * var(--cu)); transform: translate3d(calc(-5 * var(--cu)), 0, 0); }
+.cs-act-smarthome_brand .chiplane-bright { top: calc(33.2 * var(--cu)); right: calc(7 * var(--cu)); transform: translate3d(calc(5 * var(--cu)), 0, 0); }
+.cs-act-smarthome_brand .bchip { font-size: calc(2.1 * var(--cu)); }
+
+@keyframes smarthome_brand-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes smarthome_brand-dot { 0%, 100% { transform: scale(.55); opacity: .45; } 50% { transform: scale(1); opacity: 1; } }
+/* the knob: pressed (scaled, nudged back), then across on the signature curve */
+@keyframes smarthome_brand-knob-on {
+  0% { transform: translate3d(0, 0, 0) scale(1); animation-timing-function: cubic-bezier(.2, 0, .4, 1); }
+  22% { transform: translate3d(calc(-.3 * var(--cu)), 0, 0) scale(.84); animation-timing-function: var(--sb-ease); }
+  100% { transform: translate3d(calc(4 * var(--cu)), 0, 0) scale(1); }
+}
+@keyframes smarthome_brand-knob-off {
+  0% { transform: translate3d(calc(4 * var(--cu)), 0, 0) scale(1); animation-timing-function: cubic-bezier(.2, 0, .4, 1); }
+  22% { transform: translate3d(calc(4.3 * var(--cu)), 0, 0) scale(.84); animation-timing-function: var(--sb-ease); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes smarthome_brand-glow-on {
+  0% { opacity: 0; transform: scale(.7); animation-timing-function: var(--sb-in); }
+  40% { opacity: 1; transform: scale(1); animation-timing-function: var(--sb-ease); }
+  100% { opacity: .85; transform: scale(1); }
+}
+@keyframes smarthome_brand-glow-off {
+  0% { opacity: .85; transform: scale(1); animation-timing-function: var(--sb-out); }
+  100% { opacity: 0; transform: scale(.75); }
+}
+/* the dark comes down fast off the top, then settles slowly over the floor; and lifts the same way */
+@keyframes smarthome_brand-fall {
+  0% { transform: translate3d(0, -101%, 0); animation-timing-function: cubic-bezier(.45, 0, .85, .55); }
+  42% { transform: translate3d(0, -50%, 0); animation-timing-function: var(--sb-in); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes smarthome_brand-lift {
+  0% { transform: translate3d(0, 0, 0); animation-timing-function: cubic-bezier(.45, 0, .85, .55); }
+  45% { transform: translate3d(0, -48%, 0); animation-timing-function: var(--sb-in); }
+  100% { transform: translate3d(0, -101%, 0); }
+}
+@keyframes smarthome_brand-bloom {
+  0% { opacity: 0; transform: scale(.6); animation-timing-function: var(--sb-in); }
+  38% { opacity: 1; transform: scale(.97); animation-timing-function: var(--sb-ease); }
+  100% { opacity: .3; transform: scale(1); }
+}
+@keyframes smarthome_brand-bloomlife {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: .66667; transform: scale(1.04); }
+}
+/* a fold: off the mark fast, into the gather slowly (a speed change halfway, not one long slide) */
+@keyframes smarthome_brand-gather {
+  0% { transform: translate3d(0, 0, 0) scaleX(1); animation-timing-function: cubic-bezier(.45, 0, .85, .55); }
+  50% { transform: translate3d(calc(var(--f, 0) * -50%), 0, 0) scaleX(.68); animation-timing-function: var(--sb-in); }
+  100% { transform: translate3d(calc(var(--f, 0) * -84%), 0, 0) scaleX(.36); }
+}
+@keyframes smarthome_brand-press {
+  0% { transform: scale(1); animation-timing-function: cubic-bezier(.2, 0, .4, 1); }
+  30% { transform: scale(.86); animation-timing-function: var(--sb-ease); }
+  100% { transform: scale(1); }
+}
+@keyframes smarthome_brand-ripple {
+  0% { opacity: .9; transform: scale(1); animation-timing-function: var(--sb-in); }
+  100% { opacity: 0; transform: scale(2.3); }
+}
+/* the command goes out along the panel's edge: three legs, faster in the middle */
+@keyframes smarthome_brand-streak {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; animation-timing-function: cubic-bezier(.45, 0, .85, .55); }
+  30% { transform: translate3d(calc(22 * var(--cu)), 0, 0); opacity: 1; animation-timing-function: var(--sb-ease); }
+  65% { transform: translate3d(calc(48 * var(--cu)), 0, 0); opacity: 1; animation-timing-function: var(--sb-in); }
+  100% { transform: translate3d(calc(70 * var(--cu)), 0, 0); opacity: 0; }
+}
+@keyframes smarthome_brand-drift {
+  from { transform: scale(1.1) translate3d(-2.2%, .9%, 0); }
+  to { transform: scale(1.1) translate3d(2.2%, -.9%, 0); }
+}
+/* ---- ambient loops (sine, alternate; transform and opacity) ---- */
+@keyframes smarthome_brand-aura { from { opacity: .4; transform: scale(.95); } to { opacity: .85; transform: scale(1.06); } }
+@keyframes smarthome_brand-dust-a { from { transform: translate3d(-1.3%, 1.8%, 0); } to { transform: translate3d(1.5%, -2.4%, 0); } }
+@keyframes smarthome_brand-dust-b { from { transform: translate3d(1.9%, 1.2%, 0); } to { transform: translate3d(-1.7%, -2%, 0); } }
+@keyframes smarthome_brand-sheen {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) skewX(-14deg); }
+  7% { opacity: 1; }
+  40% { opacity: 1; }
+  48% { opacity: 0; transform: translate3d(410%, 0, 0) skewX(-14deg); }
+  100% { opacity: 0; transform: translate3d(410%, 0, 0) skewX(-14deg); }
+}
+@keyframes smarthome_brand-rim { from { opacity: .16; transform: scale(1); } to { opacity: .8; transform: scale(1.04); } }
+@keyframes smarthome_brand-float {
+  from { transform: translate3d(calc(-.45 * var(--cu)), calc(.22 * var(--cu)), 0) rotate(-.18deg) scale(.992); }
+  to { transform: translate3d(calc(.45 * var(--cu)), calc(-.24 * var(--cu)), 0) rotate(.18deg) scale(1.01); }
+}
+@keyframes smarthome_brand-ring { from { opacity: 0; transform: scale(.9); } to { opacity: .7; transform: scale(1.12); } }
+/* (s09's window: its glow breathes while it is up -- by scale; how bright it is, is the classes') */
+@keyframes smarthome_brand-winglow { from { transform: scale(.97); } to { transform: scale(1.03); } }
+
+/* ==== the owner's review of 20 Nov (PDF p.17, s10_l05, look 'land'): the closing as a landing
+   page's hero -- the project across the screen, no ring mark ("โลโก้แปลกๆไม่สวย"), a wide-tracked
+   title over the picture's sky (the agent-preview invitation's type), the glass invitations over
+   its foot; the picture's sky and foot graded down so the words read and the subtitle's box is calm */
+.cs-act-smarthome_brand.sb-land .titlebox { z-index: 2; }
+.cs-act-smarthome_brand.sb-land .titlebox .cs-text { letter-spacing: .12em; font-weight: 500; }
+.cs-act-smarthome_brand.sb-land .sbhero::after {
+  content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(3, 6, 20, .66) 0%, rgba(3, 6, 20, .2) 22%, rgba(3, 6, 20, 0) 34%);
+  opacity: 0; transition: opacity 1.4s var(--sb-ease);
+}
+/* (fix 2: the sky's shade comes with the title, not in the first frame -- that frame is the story
+   line's last, the picture under the grade only) */
+.cs-act-smarthome_brand.sb-land .sbhero.titled::after { opacity: 1; }
+.cs-act-smarthome_brand .landbg {
+  position: absolute; left: 0; top: 0; width: calc(100 * var(--cu)); height: calc(56.25 * var(--cu)); overflow: hidden;
+  opacity: 0; transform: scale(1.06); transition: opacity 1.4s var(--sb-ease), transform 9s var(--sb-ease);
+}
+.cs-act-smarthome_brand .landbg.on { opacity: 1; transform: scale(1); }
+.cs-act-smarthome_brand .landpic { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-smarthome_brand .landgrade {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(3, 6, 20, .72) 0%, rgba(3, 6, 20, .14) 26%, rgba(3, 6, 20, .08) 50%, rgba(3, 6, 20, .6) 78%, rgba(3, 6, 20, .86) 100%),
+    radial-gradient(ellipse at 50% 50%, rgba(3, 6, 20, 0) 55%, rgba(3, 6, 20, .45) 100%);
+}

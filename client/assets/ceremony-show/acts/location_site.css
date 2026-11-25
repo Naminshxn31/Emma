@@ -1,0 +1,346 @@
+/* location_site: the ground, the camera, the things standing on it, and the 2D panes of s06.
+   Only transform and opacity move (and a line's stroke-dashoffset). Sizes in cu, % or em.
+   Motion (SKILL_PASS 18 Nov, the film's identity -- Premium, no overshoot): moves on the
+   signature curve, arrivals decelerate, departures accelerate and are shorter than arrivals,
+   a stagger is 60-100 ms a piece and never more than 500 ms in all.
+   Type (owner 18 Nov afternoon, Apple's MacBook Pro film as the reference): every word is the
+   core's -- its face (Inter, upright), its case (the slide's own: sentence case), its colour
+   across the phrase, its arrival (the letters light up) and its way out. This file only
+   sizes and places words: no italics, capitals, tracking or stacked extrusion of its own,
+   and nothing here moves a word in.
+   The whole screen (the same day): the map and the pictures run to the bottom edge; below
+   43.8cu there is nothing else, and they step down under the subtitle's box (.grade). */
+
+.cs-act-location_site .sky { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+/* the closing words: one calm phrase over the map -- a small line, the city's name under it */
+.cs-act-location_site .skywords { position: absolute; left: 0; right: 0; top: calc(5.6 * var(--cu)); display: flex; flex-direction: column; align-items: center; }
+/* (its small line a kicker read from the back of a hall: 2.4cu, review 19 Nov -- it was 1.9) */
+.cs-act-location_site .skywords .cs-type-label { font-size: calc(2.4 * var(--cu)); color: var(--cs-ink); margin-bottom: calc(.7 * var(--cu)); }
+.cs-act-location_site .skywords .cs-type-h1 { font-size: calc(6 * var(--cu)); }
+/* staging for the closing words: the map under them steps back (one shade, its opacity only) */
+.cs-act-location_site .hush { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse 72% 62% at 50% 20%, rgba(3, 5, 13, .7), rgba(3, 5, 13, .34) 55%, rgba(3, 5, 13, 0) 100%);
+  transition: opacity 900ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .hush.on { opacity: 1; }
+/* the grade: under the subtitle's see-through box the map and the pictures step down gently
+   (a street's name, a glowing road, a bright deck are not read through her words); painted once */
+.cs-act-location_site .grade { position: absolute; left: 0; right: 0; bottom: 0; height: calc(18 * var(--cu)); pointer-events: none;
+  background: linear-gradient(180deg, rgba(3, 5, 13, 0) 0%, rgba(3, 5, 13, .32) 30%, rgba(3, 5, 13, .66) 58%, rgba(3, 5, 13, .8) 100%); }
+.cs-act-location_site .hglow { position: absolute; left: 6%; right: 6%; top: 0; height: calc(18 * var(--cu)); opacity: 0;
+  background: radial-gradient(closest-side, rgba(110, 231, 255, .5), rgba(47, 107, 255, .18) 55%, rgba(47, 107, 255, 0)); }
+.cs-act-location_site .view { position: absolute; left: 0; top: 0; width: 100%; height: 100%; perspective: calc(50 * var(--cu)); }
+.cs-act-location_site .ground { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; transform-style: preserve-3d; }
+.cs-act-location_site .fog { position: absolute; left: 0; top: 0; width: 100%; height: calc(60 * var(--cu)); pointer-events: none;
+  background: linear-gradient(180deg, rgba(3, 5, 13, .97) 0%, rgba(3, 5, 13, .97) 47%, rgba(9, 20, 62, .8) 50%, rgba(3, 5, 13, 0) 100%); }
+
+.cs-act-location_site .gmap, .cs-act-location_site .gbox, .cs-act-location_site .gs,
+.cs-act-location_site .lie, .cs-act-location_site .ripple { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cs-act-location_site .gs { overflow: visible; pointer-events: none; }
+.cs-act-location_site .gmap { overflow: hidden; }
+.cs-act-location_site .gmap .cs-apic { filter: none; }
+.cs-act-location_site .grid { fill: none; stroke: rgba(110, 160, 255, .12); stroke-width: 1.2; }
+
+/* the close shot's lines go as the camera pulls away, the far box of lines and marks comes up
+   as it settles (their opacity alone) */
+.cs-act-location_site .gbox.far { opacity: 0; }
+.cs-act-location_site .gbox.far.on { opacity: 1; transition: opacity 380ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .gbox.near.gone { opacity: 0; transition: opacity 380ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+/* lines: white-hot core */
+.cs-act-location_site .hot .cs-route-line { stroke: #eaf2ff; }
+.cs-act-location_site .hot .cs-route-glow { stroke: rgba(77, 163, 255, .5); }
+/* the routes out of the project: one layer, painted once, long before its beat (it waits a
+   thousandth of the way in -- unseen, but a layer Chrome paints: see the act) and brought up
+   by its opacity alone, the compositor's work: nothing is painted while they come */
+.cs-act-location_site .routegrow { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: .001; }
+/* (19 Nov: they come up behind the lights that shoot out along them -- over the comets' time,
+   not at once) */
+.cs-act-location_site .routegrow.on { opacity: 1; transition: opacity 2600ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) 250ms; }
+/* light running along the roads (owner 19 Nov: "อยากให้มันมีแสงตามถนนเลย ค่อยๆยิงจนจบ"): a comet's
+   head (a white core in a cyan glow) and its tail of light along the road behind it; each a
+   small layer of its own, moved and faded by the act (transform, opacity) */
+.cs-act-location_site .comet, .cs-act-location_site .ctail { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; }
+.cs-act-location_site .comet { border-radius: 50%;
+  background: radial-gradient(closest-side, #fff 0, rgba(246, 252, 255, .98) 13%, rgba(160, 238, 255, .72) 26%, rgba(77, 163, 255, .26) 54%, rgba(77, 163, 255, 0) 100%); }
+/* (the tail in two pieces along the road: the one at the head bright to its end, the one behind
+   it fading out -- one light, end to end) */
+.cs-act-location_site .ctail { transform-origin: 100% 50%; }
+.cs-act-location_site .ctail.ct0 { background: linear-gradient(90deg, rgba(110, 231, 255, .42), rgba(170, 238, 255, .72) 60%, rgba(245, 252, 255, .98) 100%); }
+.cs-act-location_site .ctail.ct1 { background: linear-gradient(90deg, rgba(110, 231, 255, 0), rgba(110, 231, 255, .14) 45%, rgba(110, 231, 255, .42) 100%); }
+/* the whole street network lit (owner 19 Nov, version 6: "อันนี้ให้มีแสงไปทั่วถนนเลย"): four layers,
+   near to far by travel distance from the project, each painted once (a thousandth of the way in
+   until its beat), their opacity alone moving. They light up one after another out from the
+   project (550 ms apart: the light runs out through the streets) and settle; then a brighter wave
+   keeps running out through them every 3.2 s, sine. Main roads the brightest and widest, minor
+   roads finer, service roads finest -- all under the routes and their comets. Widths in metres
+   (the layers are rastered soft -- see the act -- so no line is narrower than ~a raster pixel). */
+.cs-act-location_site .rband { opacity: .001; }
+.cs-act-location_site .rband.on { animation: location_site-rin 1600ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) calc(var(--i, 0) * 550ms) both; }
+@keyframes location_site-rin { 0% { opacity: .001; } 35% { opacity: 1; } 100% { opacity: .7; } }
+.cs-act-location_site .rband.on.live { opacity: .7; animation: location_site-rlive 3200ms ease-in-out calc(var(--i, 0) * 700ms) infinite; }
+@keyframes location_site-rlive { 0% { opacity: .7; } 20% { opacity: 1; } 45% { opacity: .7; } 100% { opacity: .7; } }
+.cs-act-location_site .rbg, .cs-act-location_site .rbc { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+/* (19 Nov, first look: at the map's own widths the light lay ON the map's grey lines and read as
+   the same lines a shade lighter -- the lit street is wider than the drawn one, cyan-white, with a
+   glow of its own) */
+.cs-act-location_site .rbc.rb0 { stroke: rgba(236, 250, 255, .96); stroke-width: 12; }
+.cs-act-location_site .rbg.rb0 { stroke: rgba(90, 210, 255, .34); stroke-width: 40; }
+.cs-act-location_site .rbc.rb1 { stroke: rgba(196, 242, 255, .9); stroke-width: 7; }
+.cs-act-location_site .rbg.rb1 { stroke: rgba(90, 205, 255, .24); stroke-width: 22; }
+.cs-act-location_site .rbc.rb2 { stroke: rgba(170, 226, 255, .74); stroke-width: 5.5; }
+.cs-act-location_site .rbg.rb2 { stroke: rgba(90, 190, 255, .16); stroke-width: 15; }
+
+/* marks, rings, lights. The rings round the project spread out from it as the camera lands,
+   the near one first (90 ms apart): each a round edge in a box of its own (see the act) */
+.cs-act-location_site .ringd { position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%;
+  border-style: solid; border-color: rgba(110, 231, 255, .3); opacity: 0; transform: scale(.82);
+  transition: opacity 300ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)), transform 300ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .ringd.on { opacity: 1; transform: none;
+  transition: opacity 700ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) calc(var(--i, 0) * 90ms), transform 1100ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)) calc(var(--i, 0) * 90ms); }
+/* a category's places land one after another, each dot growing out of its point */
+.cs-act-location_site .mark .pm { opacity: 0; transform: scale(.25); transform-box: fill-box; transform-origin: center;
+  transition: opacity 250ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)), transform 250ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .mark.on .pm { opacity: 1; transform: none;
+  transition: opacity 350ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) calc(var(--i, 0) * 70ms), transform 500ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)) calc(var(--i, 0) * 70ms); }
+/* (a place below the floor of the film -- under the subtitle -- steps out) */
+.cs-act-location_site .mark.on .pm.low { opacity: 0; transform: scale(.25);
+  transition: opacity 250ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)), transform 250ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .end, .cs-act-location_site .endring, .cs-act-location_site .runner { opacity: 0; transform-box: fill-box; transform-origin: center;
+  transition: opacity 250ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .end, .cs-act-location_site .endring { transform: scale(.3); }
+.cs-act-location_site .end.on, .cs-act-location_site .endring.on, .cs-act-location_site .runner.on { opacity: 1; transform: none;
+  transition: opacity 400ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)), transform 600ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)); }
+.cs-act-location_site .endring.on { transition-delay: 100ms; }
+.cs-act-location_site .mdot, .cs-act-location_site .end, .cs-act-location_site .runner { fill: #fff; }
+.cs-act-location_site .mring, .cs-act-location_site .endring { stroke: rgba(110, 231, 255, .85); }
+
+/* a ring of light spreading once where something lands (a layer of its own: scale + opacity) */
+.cs-act-location_site .ripple { pointer-events: none; }
+.cs-act-location_site .rip { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; opacity: 0; transform: scale(.12);
+  background: radial-gradient(closest-side, rgba(110, 231, 255, 0) 0, rgba(110, 231, 255, 0) 80%, rgba(110, 231, 255, .35) 90%, rgba(240, 248, 255, .9) 95.5%, rgba(110, 231, 255, 0) 99%);
+  animation: location_site-ripple var(--rip, 1300ms) var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)) both; }
+@keyframes location_site-ripple {
+  0% { opacity: 0; transform: scale(.12); }
+  14% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* the plot's wall and the campus */
+.cs-act-location_site .pwall polygon { fill: none; stroke: rgba(120, 175, 255, .6); stroke-width: 1.2; stroke-linejoin: round; }
+.cs-act-location_site .pwtop polygon { stroke: #fff; stroke-width: 1.6; }
+.cs-act-location_site .cwall polygon { fill: #1b3a9c; stroke: rgba(120, 175, 255, .45); stroke-width: .5; }
+.cs-act-location_site .cband polygon { fill: #2f5bd0; stroke: rgba(150, 195, 255, .5); stroke-width: .5; }
+.cs-act-location_site .ctop polygon { fill: #dfe9ff; stroke: #fff; stroke-width: .8; }
+
+/* tags on stalks: flat on the screen, placed each frame where their ground point lands. The
+   stalk grows up out of its point, the card comes up onto it (a short rise, no scale: its
+   words light up inside it, the core's arrival); a tag that is not the one she names steps
+   back; leaving, the card sinks and the stalk draws in. */
+.cs-act-location_site .tags { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.cs-act-location_site .stalk { position: absolute; left: 0; top: 0; width: calc(.3 * var(--cu)); transform-origin: 0 0; }
+.cs-act-location_site .stem { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 50% 100%; opacity: 0; transform: scaleY(0);
+  background: linear-gradient(0deg, #fff, rgba(110, 231, 255, .9) 60%, rgba(110, 231, 255, .3));
+  transition: opacity 260ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)) 60ms, transform 260ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)) 60ms; }
+.cs-act-location_site .stalk.on .stem { opacity: 1; transform: none;
+  transition: opacity 200ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)), transform 500ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)); }
+.cs-act-location_site .stalk.on.dim .stem { opacity: .45; transition: opacity 500ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .bb { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.cs-act-location_site .bbrise { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0;
+  transform: translate3d(0, calc(.9 * var(--cu)), 0);
+  transition: opacity 240ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)), transform 280ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .bb.on .bbrise { opacity: 1; transform: none;
+  transition: opacity 200ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) 80ms, transform 520ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)) 80ms; }
+/* (dim = opacity alone: a card scaled down is a card rastered again -- 18 Nov, the three that
+   dimmed at "getting" went undrawn for half a second while the routes were being painted) */
+.cs-act-location_site .bb.on.dim .bbrise { opacity: .55; transition: opacity 500ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .bbcol { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: calc(.6 * var(--cu)); white-space: nowrap; }
+.cs-act-location_site .bb .cs-type-label { font-size: calc(1.55 * var(--cu)); color: var(--cs-ink); }
+.cs-act-location_site .bb .tg { padding: calc(.65 * var(--cu)) calc(1.3 * var(--cu)); }
+/* the project's name over its roof: lit words, no card -- the headline of its shot; a soft
+   dark ground under it keeps the map's streets out of its letters */
+.cs-act-location_site .bbname .bbcol { padding: calc(.5 * var(--cu)) calc(1.6 * var(--cu));
+  background: radial-gradient(ellipse closest-side, rgba(3, 5, 13, .62), rgba(3, 5, 13, .4) 55%, rgba(3, 5, 13, 0) 100%); }
+.cs-act-location_site .bbname .cs-type-h2 { font-size: calc(3.3 * var(--cu)); }
+/* the lit words' halo, its two hues each fading out INSIDE the halo's box (closest-side): the
+   stage's own reaches past its box and is cut at the edges -- over this dark map, and over
+   the shade the closing words stand in, it read as a pale rectangle round "Pattaya" and round
+   the project's name (frames of 18 Nov afternoon) */
+.cs-act-location_site .cs-text-glow::before {
+  background:
+    radial-gradient(closest-side at 32% 50%, rgba(204, 244, 240, .3) 0%, rgba(176, 236, 240, .14) 55%, rgba(176, 236, 240, 0) 100%),
+    radial-gradient(closest-side at 68% 50%, rgba(140, 204, 250, .32) 0%, rgba(140, 204, 250, .15) 55%, rgba(140, 204, 250, 0) 100%);
+}
+.cs-act-location_site .pcard { padding: calc(.4 * var(--cu)); transform-origin: 50% 100%;
+  transition: opacity 400ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)), transform 400ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .bb.nocard .pcard { opacity: 0; transform: translate3d(0, calc(1 * var(--cu)), 0) scale(.85); }
+
+/* words lying on the ground: the map's own annotation, flat on its plane, in the film's face
+   (their size is the act's, in metres of ground; the core lights and cools them) */
+.cs-act-location_site .lieup { position: absolute; left: 0; top: 0; white-space: nowrap; transform: translate(-50%, -50%); }
+.cs-act-location_site .lie.edgeA { opacity: 0; transition: opacity 500ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .lie.edgeA.on { opacity: 1; }
+.cs-act-location_site .edgearrow { display: block; width: 3.4em; height: 1.36em; stroke: rgb(var(--cs-cyan)); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round;
+  transform: translate3d(-.9em, 0, 0); transition: transform 900ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)); }
+/* the arrow points on: it slides in along its own way, then keeps nudging that way (slow life) */
+.cs-act-location_site .lie.edgeA.on .edgearrow { transform: none; animation: location_site-nudge 2.4s ease-in-out 1s infinite alternate; }
+@keyframes location_site-nudge { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(.3em, 0, 0); } }
+/* the measured figure, upright just under the span it measures (owner 18 Nov, "อันนี้หดให้หน่อย";
+   19 Nov, the span made short on the screen): the number, its "about" and "metres" beside it,
+   the rest of what it says in two short lines under it -- one piece, on a soft dark ground
+   of its own that keeps the map's street names out of its letters */
+.cs-act-location_site .bbdist .bbcol { padding: calc(1.1 * var(--cu)) calc(2.6 * var(--cu));
+  background: radial-gradient(ellipse closest-side, rgba(3, 5, 13, .8), rgba(3, 5, 13, .62) 50%, rgba(3, 5, 13, .26) 80%, rgba(3, 5, 13, 0) 100%); }
+.cs-act-location_site .bbdist .distfig { font-size: calc(4.8 * var(--cu)); align-items: center; }
+.cs-act-location_site .distfig .cs-fig-row { gap: .13em; }
+.cs-act-location_site .distfig .cs-fig-lead, .cs-act-location_site .distfig .cs-fig-unit { font-size: .4em; font-weight: 500; color: #eef7ff; }
+/* (the qualifier a size up from the first cut, .29em -> .33em: read from the back of a hall it was
+   the smallest line on the screen; it still ends ~70 px short of the road at 1080p)
+   (review 19 Nov: still ~1.5% of the height and lying over "Soi Jomtien 12": a size up again,
+   .33em -> .43em -- as tall as "about" and "metres" -- and in two balanced lines, "from Jomtien
+   Beach / in a straight line", so the figure is narrower than before, inside the owner's span
+   from the beach's pin to the Second Road) */
+.cs-act-location_site .distfig .cs-fig-label { font-size: .43em; font-weight: 500; color: #e6f1fc; margin-top: .2em; line-height: 1.18;
+  white-space: normal; text-wrap: balance; max-width: 10.2em; text-align: center; }
+
+/* ---- s06: the panes ---- */
+.cs-act-location_site .pane { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; }
+/* a picture coming in fades up while its own camera moves it; one going out pushes past the
+   viewer (forward, the way the camera travels), quicker than it came */
+.cs-act-location_site .panel { opacity: 0; }
+.cs-act-location_site .panel.on { opacity: 1; transition: opacity 900ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .panel.gone { opacity: 0; transform: scale(1.06);
+  transition: opacity 450ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)), transform 450ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+/* (the pool, its depth on its water, stays whole under the building while that comes up over
+   it, pushing on as it goes: the depth is read 0.4 s longer, and the frame never thins to the
+   dark between two half-seen pictures) */
+.cs-act-location_site .panel.gone.under { transform: scale(1.05);
+  transition: opacity 500ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)) 450ms, transform 950ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .pbox { position: absolute; left: 0; }
+/* the building rises into its place (its top edge stays above the stage's: nothing uncovered) */
+.cs-act-location_site .fac { transform: translate3d(0, calc(1.5 * var(--cu)), 0); }
+.cs-act-location_site .panel.on .fac { transform: none; transition: transform 1100ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)); }
+/* (going out, what came in stays where it landed: the pane moves as one) */
+.cs-act-location_site .panel.gone .fac, .cs-act-location_site .panel.gone .tgpool { transform: none; }
+.cs-act-location_site .nightwrap { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 3s ease-in-out; }
+.cs-act-location_site .nightwrap.on { opacity: 1; }
+.cs-act-location_site .tgpool { position: absolute; left: calc(3 * var(--cu)); top: calc(10 * var(--cu)); transform: translate3d(calc(-2 * var(--cu)), 0, 0); }
+.cs-act-location_site .panel.on .tgpool { transform: none; transition: transform 700ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)) 350ms; }
+.cs-act-location_site .tgpool .cs-type-label { font-size: calc(1.8 * var(--cu)); color: var(--cs-ink); }
+/* (6.4cu in its 34 x 8 box: lying on the owner's pool render's water -- 19 Nov) */
+.cs-act-location_site .depplane .cs-fig { font-size: calc(6.4 * var(--cu)); }
+.cs-act-location_site .depplane .cs-fig-unit { color: #f2f8ff; font-weight: 500; }
+/* (the figure lies on the pale water of the owner's pool render: a soft dark ground lies under
+   it, in the same plane -- an ellipse seen at the water's angle) */
+.cs-act-location_site .dwrap { position: relative; display: grid; place-items: center; }
+.cs-act-location_site .dplate { position: absolute; left: -18%; right: -18%; top: -80%; bottom: -80%; pointer-events: none; opacity: 0; transform: scale(.85);
+  background: radial-gradient(closest-side, rgba(3, 12, 44, .86), rgba(3, 12, 44, .7) 45%, rgba(3, 12, 44, .3) 75%, rgba(3, 12, 44, 0)); }
+.cs-act-location_site .dplate.on { opacity: 1; transform: none;
+  transition: opacity 500ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)), transform 900ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)); }
+
+.cs-act-location_site .fsvg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+/* the floors come up from the ground one after another (60 ms apart: 420 ms for the eight),
+   their marks on the left a beat behind */
+.cs-act-location_site .sband { fill: rgba(77, 163, 255, .3); stroke: rgba(160, 210, 255, .9); stroke-width: .08; opacity: 0;
+  transform: scaleY(.15); transform-box: fill-box; transform-origin: 50% 100%; }
+.cs-act-location_site .step { fill: rgb(var(--cs-cyan)); opacity: 0; transform: scaleY(0); transform-box: fill-box; transform-origin: 50% 100%; }
+.cs-act-location_site .sband.on { opacity: 1; transform: none;
+  transition: opacity 400ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) calc(var(--i, 0) * 60ms), transform 550ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)) calc(var(--i, 0) * 60ms); }
+.cs-act-location_site .step.on { opacity: 1; transform: none;
+  transition: opacity 300ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) calc(var(--i, 0) * 60ms + 80ms), transform 450ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)) calc(var(--i, 0) * 60ms + 80ms); }
+/* the level lines draw across from the building's edge; the measuring line draws down from the
+   roof, its lower arrow arriving with it */
+.cs-act-location_site .lvl { stroke: #fff; stroke-width: .12; opacity: 0; transform: scaleX(0); transform-box: fill-box; transform-origin: 0 50%; }
+.cs-act-location_site .lvl.on { opacity: 1; transform: none;
+  transition: opacity 250ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)), transform 750ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .dimline { stroke: #fff; stroke-width: .14; opacity: 0; transform: scaleY(0); transform-box: fill-box; transform-origin: 50% 0; }
+.cs-act-location_site .dimline.on { opacity: 1; transform: none;
+  transition: opacity 200ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)), transform 800ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .dimar { fill: #fff; opacity: 0; transform: scale(.2); transform-box: fill-box; }
+.cs-act-location_site .dimtop { transform-origin: 50% 0; }
+.cs-act-location_site .dimbot { transform-origin: 50% 100%; }
+.cs-act-location_site .dimar.on { opacity: 1; transform: none;
+  transition: opacity 250ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)), transform 400ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)); }
+.cs-act-location_site .dimbot.on { transition-delay: 650ms; }
+/* the two figures of the building, in the margins beside what they measure: the number, and
+   under it the words that say what it is (the margin is narrow: "about" stays beside its 23).
+   Their places (and the level tags') are set by the act from the lines on the picture. */
+.cs-act-location_site .fig8 { position: absolute; font-size: calc(6.4 * var(--cu)); }
+.cs-act-location_site .fig8 .cs-fig-row { flex-wrap: wrap; width: min-content; row-gap: .08em; }
+.cs-act-location_site .fig23 { position: absolute; font-size: calc(5.8 * var(--cu)); align-items: flex-end; }
+.cs-act-location_site .fig23 .cs-fig-row { flex-wrap: wrap; width: min-content; justify-content: flex-end; row-gap: .08em; }
+.cs-act-location_site .fig8 .cs-fig-unit, .cs-act-location_site .fig23 .cs-fig-unit { flex-basis: 100%; color: #f2f8ff; }
+.cs-act-location_site .fig23 .cs-fig-unit { text-align: right; }
+.cs-act-location_site .fig23 .cs-fig-lead { color: #f2f8ff; }
+/* the level tags slide in after their line has started across (follow-through) */
+.cs-act-location_site .tgroof, .cs-act-location_site .tgroad { position: absolute; transform: translate3d(calc(1.6 * var(--cu)), 0, 0); }
+.cs-act-location_site .fac.roof .tgroof, .cs-act-location_site .fac.road .tgroad { transform: none;
+  transition: transform 650ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)) 220ms; }
+.cs-act-location_site .tgroof .cs-type-label, .cs-act-location_site .tgroad .cs-type-label { font-size: calc(1.7 * var(--cu)); color: var(--cs-ink); }
+
+.cs-act-location_site .fanwrap { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; }
+.cs-act-location_site .fanwrap.on { opacity: 1; transition: opacity 300ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+/* the indoor wall (owner 19 Nov, "อยากให้โชว์ภาพ facility เยอะๆ"): three rows of the owner's
+   indoor renders, each longer than the stage is wide. They slide in from alternate sides (the
+   facade pushing past at the same moment: overlapping action), each row 90 ms after the one
+   above, and never stop: the rows drift on past each other (counter-motion, sine, slow), so the
+   screen always holds more pictures than it can show. All of it transform and opacity. */
+.cs-act-location_site .iwall { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 50% 38%;
+  transition: opacity 650ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)), transform 1000ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .irow { position: absolute; left: 0; width: 100%; opacity: 0; transform: translate3d(calc(18 * var(--cu)), 0, 0); }
+.cs-act-location_site .irow.ir { transform: translate3d(calc(-18 * var(--cu)), 0, 0); }
+/* (they come in 120 ms after the building starts to go: its words under the arriving pictures
+   were a busy frame, and 220 ms dipped to the dark between them -- 19 Nov. On the film's own
+   curve, 18cu over 1.3 s: on the entrance curve the rows covered 24cu in a quarter second, a
+   whip of the whole frame) */
+.cs-act-location_site .fanwrap.on .irow { opacity: 1; transform: none;
+  transition: opacity 600ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) calc(var(--r, 0) * 90ms + 120ms), transform 1300ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)) calc(var(--r, 0) * 90ms + 120ms); }
+.cs-act-location_site .itrack { position: absolute; top: 0; height: 100%; }
+/* (begun 9 s into its sweep: the rows are already gliding the way they came in, so the slide
+   in hands its speed to the drift -- no stop, no start again) */
+.cs-act-location_site .fanwrap.on .irow.il .itrack { animation: location_site-left 34s ease-in-out -9s infinite alternate; }
+.cs-act-location_site .fanwrap.on .irow.ir .itrack { animation: location_site-right 34s ease-in-out -9s infinite alternate; }
+@keyframes location_site-left { from { transform: translate3d(calc(14 * var(--cu)), 0, 0); } to { transform: translate3d(calc(-14 * var(--cu)), 0, 0); } }
+@keyframes location_site-right { from { transform: translate3d(calc(-14 * var(--cu)), 0, 0); } to { transform: translate3d(calc(14 * var(--cu)), 0, 0); } }
+.cs-act-location_site .itile { position: absolute; top: 0; }
+.cs-act-location_site .icell { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden;
+  border-radius: calc(.35 * var(--cu)); background: #05070f; box-shadow: 0 0 0 1px rgba(150, 190, 255, .22); }
+/* (the whole sheet, placed by the act so that one cell fills the tile) */
+.cs-act-location_site .icell .cs-apic.isheet { position: absolute; }
+/* the figure lands: the wall steps back behind it (scale + opacity), the middle row the most, and
+   a soft dark ground opens under the figure */
+.cs-act-location_site .fanwrap.on.hold .iwall { opacity: .62; transform: scale(.965); }
+.cs-act-location_site .fanwrap.on.hold .irow:nth-child(2) { opacity: .5;
+  transition: opacity 650ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .iplate { position: absolute; left: 14%; right: 14%; top: calc(12.6 * var(--cu)); height: calc(17.6 * var(--cu)); opacity: 0; transform: scale(.92);
+  background: radial-gradient(closest-side, rgba(3, 5, 13, .86), rgba(3, 5, 13, .7) 45%, rgba(3, 5, 13, .32) 75%, rgba(3, 5, 13, 0));
+  transition: opacity 300ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)), transform 300ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .fanwrap.on.hold .iplate { opacity: 1; transform: none;
+  transition: opacity 600ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)), transform 900ms var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1)); }
+.cs-act-location_site .fanwrap > .cs-fig.ifig { position: absolute; left: 50%; top: calc(16.2 * var(--cu)); transform: translateX(-50%); font-size: calc(6.4 * var(--cu)); align-items: center; }
+/* (its qualifier read from the back of a hall: 2cu -- it was the core's .2em, 1.3cu) */
+.cs-act-location_site .ifig .cs-fig-label { font-size: .32em; color: #e6f1fc; }
+
+.cs-act-location_site .facveil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: linear-gradient(180deg, rgba(4, 10, 44, .45), rgba(4, 10, 44, .3)); }
+.cs-act-location_site .fig8 .cs-fig-row::before, .cs-act-location_site .fig23 .cs-fig-row::before {
+  left: -35%; right: -35%; top: -55%; bottom: -55%; background: radial-gradient(closest-side, rgba(3, 8, 40, .8), rgba(3, 8, 40, 0)); }
+/* s06's opening as the owner's clip (22 Nov, review page 13): the site plan drawing itself on
+   black. Its box is 16:9 (the file is a 16:9 window of the owner's 2.56:1 frame, only black left
+   out: nothing stretched); the plot stands in the upper stage, above the subtitle's box; its
+   black is the stage's night (the background is off, the ground not drawn) and its edges fade
+   into it -- one mask, painted once. It comes in with her voice and goes with the dive into the
+   pool picture: pushed past (transform) and out (opacity), accelerating. */
+.cs-act-location_site .sitev { position: absolute; left: calc(12 * var(--cu)); top: calc(.6 * var(--cu)); width: calc(76 * var(--cu)); height: calc(42.75 * var(--cu));
+  opacity: 0; transform-origin: 50% 52%; pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0), #000 9%, #000 91%, rgba(0, 0, 0, 0)), linear-gradient(180deg, rgba(0, 0, 0, 0), #000 4%, #000 97%, rgba(0, 0, 0, 0));
+          mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0), #000 9%, #000 91%, rgba(0, 0, 0, 0)), linear-gradient(180deg, rgba(0, 0, 0, 0), #000 4%, #000 97%, rgba(0, 0, 0, 0));
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+  transition: opacity 500ms var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+.cs-act-location_site .sitev.on { opacity: 1; }
+.cs-act-location_site .sitev .cs-avid { border-radius: 0; background: #000; }
+.cs-act-location_site .sitev.gone { opacity: 0; transform: scale(1.35);
+  transition: opacity 1200ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)), transform 1400ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .sitev.now { transition: none; }
+/* the clip's black, over the whole stage while it is up (the shot is black, as the owner's clip is):
+   there from the opening's first frame, gone with the clip into the pool picture */
+.cs-act-location_site .sitebk { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: #000; pointer-events: none; }
+.cs-act-location_site .sitebk.gone { opacity: 0; transition: opacity 900ms var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1)); }
+.cs-act-location_site .sitebk.now { transition: none; }

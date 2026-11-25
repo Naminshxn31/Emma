@@ -240,6 +240,47 @@ def test_the_picture_is_the_frame_that_looked_at_it_and_says_where():
     assert mirrored["column"] < 0.4
 
 
+def test_the_measured_narrow_mirrored_lens_puts_the_finding_where_the_picture_has_it():
+    """4 Nov, the robot: the head camera is ~19 deg wide (the base's spot turns
+    against board odometry), not the 70 assumed, and its picture is mirrored.
+    A finding 5 deg to the robot's left is off a 70-deg picture's middle by a
+    little; on the real lens it is a quarter of the picture away -- on the
+    RIGHT, the mirror -- and 26.6 deg to the right is outside it."""
+    placed = {("m", 0): (3.0, 2.0, 0.0)}
+    fr = [mc.Frame("m", 0, placed[("m", 0)], np.zeros((0, 2)), picture="0000.jpg")]
+    left5 = {"centre": [3.0 + 2.0 * math.cos(math.radians(5)), 2.0 + 2.0 * math.sin(math.radians(5))]}
+    cam = {"hfov_assumed": 70.0, "hfov_measured": 19.0, "mirrored": True}
+    pick = mc.picture_for(left5, fr, placed, {"m": cam})
+    expect = 0.5 + math.tan(math.radians(5)) / (2 * math.tan(math.radians(9.5)))
+    assert pick["column"] == pytest.approx(expect, abs=0.01) and pick["column"] > 0.7
+    assumed = mc.picture_for(left5, fr, placed, {"m": {"hfov_assumed": 70.0}})
+    assert assumed["column"] < 0.5, "the old guess: left of the middle, a little"
+    far = {"centre": [3.0 + 2.0 * math.cos(math.radians(-26.6)), 2.0 + 2.0 * math.sin(math.radians(-26.6))]}
+    assert mc.picture_for(far, fr, placed, {"m": cam}) is None
+    # a head turned 33 deg in the loop's (assumed) units is ~8 deg of real turn,
+    # and 70.8 (the 75 % scan) ~17 -- linear with the pulse, not tan's 34
+    ln = mc.lens(cam)
+    assert ln["head"](33.0) == pytest.approx(7.9, abs=0.3) and ln["a"] == -1.0
+    assert ln["head"](70.8) == pytest.approx(16.9, abs=0.4)
+    assert ln["tilt"](145.4) == pytest.approx(34.8, abs=0.5)
+
+
+def test_a_picture_of_a_finding_is_not_the_floor_in_front():
+    """4 Nov afternoon: the walk scan nods to ~36 deg for the floor. A frame that
+    steep shows the floor 1-2 m out -- it is never a finding's picture; a
+    desk-height nod is one only where no level frame saw the finding."""
+    cam = {"hfov_assumed": 70.0, "hfov_measured": 19.0, "mirrored": True}
+    pose = (3.0, 2.0, 0.0)
+    ahead = {"centre": [5.0, 2.0]}
+    floor = mc.Frame("m", 0, pose, np.zeros((0, 2)), picture="0000.jpg", tilt_deg=145.4)   # 80 %
+    desk = mc.Frame("m", 1, pose, np.zeros((0, 2)), picture="0001.jpg", tilt_deg=72.7)     # 40 %
+    level = mc.Frame("m", 2, pose, np.zeros((0, 2)), picture="0002.jpg")
+    placed = {("m", 0): pose, ("m", 1): pose, ("m", 2): pose}
+    assert mc.picture_for(ahead, [floor], placed, {"m": cam}) is None
+    assert mc.picture_for(ahead, [floor, desk], placed, {"m": cam})["n"] == 1
+    assert mc.picture_for(ahead, [floor, desk, level], placed, {"m": cam})["n"] == 2
+
+
 def _walk_folder(root: Path, name: str, frames: list[mc.Frame], grid: mc.Grid, pictures: bool = False) -> Path:
     folder = root / name
     folder.mkdir(parents=True)
@@ -324,3 +365,48 @@ def test_a_wall_drawn_10_cm_off_is_not_reported(noise_m):
     _, found, _ = _check(grid, *walks)
     east = [f for f in found if f["kind"] in ("phantom", "line") and f["box"][2] > W_M - 0.5]
     assert not east, east
+
+
+def test_a_walk_in_another_frame_is_shifted_onto_the_map_first():
+    """4 Nov, floor 2: drive_route's poses (its own measured walls) and the
+    board's plan map sat ~25 cm / 2 deg apart -- past the per-frame search, so
+    every frame stopped at the edge of it and the furniture was drawn off."""
+    walks = (_walk("w1", person=False, error=(0.26, -0.18, 2.0)), _walk("w2", person=False, error=(0.24, -0.2, 2.0)))
+    ck = mc.Checker(_map())
+    ck.align([f for w in walks for f in w])
+    for w in walks:
+        for f in w:
+            ck.add(f)
+    for run in ("w1", "w2"):
+        dx, dy, dyaw = ck.shift[run]
+        assert abs(dx + 0.25) <= 0.06 and abs(dy - 0.19) <= 0.06 and abs(math.degrees(dyaw) + 2.0) <= 1.01, ck.shift
+    found, _ = ck.findings(2)
+    assert _near(found, "phantom", GHOST) and _near(found, "new", TABLE)
+    walls = [f for f in found if f["kind"] in ("phantom", "line", "new")
+             and (f["box"][0] < 0.3 or f["box"][1] < 0.3 or f["box"][2] > W_M - 0.3 or f["box"][3] > H_M - 0.3)]
+    assert not walls, walls
+    rows = [r for r in ck.frames if r.get("pose")]
+    assert np.mean([r["fit"] for r in rows]) > 0.8 > np.mean([r["fit_board"] for r in rows])
+
+
+def test_walks_from_one_dock_share_one_shift_and_a_walk_elsewhere_keeps_its_own():
+    """4 Nov afternoon, floor 2: the board's map lays a walk about as well 32 cm
+    away in y; each walk chose alone, two afternoon surveys landed 32 cm off the
+    morning's. Walks in one frame get ONE shift -- a walk only gets its own when
+    it lies better there by WALK_SHIFT_GAIN (it really is in another frame)."""
+    same = (_walk("w1", person=False, error=(0.26, -0.18, 2.0)), _walk("w2", person=False, error=(0.22, -0.22, 2.0)))
+    ck = mc.Checker(_map())
+    ck.align([f for w in same for f in w])
+    assert ck.shift["w1"] == ck.shift["w2"], ck.shift
+    other = (_walk("w1", person=False), _walk("w2", person=False, error=(0.3, -0.2, 2.0)))
+    ck = mc.Checker(_map())
+    ck.align([f for w in other for f in w])
+    assert ck.shift["w1"] == (0.0, 0.0, 0.0)
+    dx, dy, dyaw = ck.shift["w2"]
+    assert abs(dx + 0.3) <= 0.06 and abs(dy - 0.2) <= 0.06 and abs(math.degrees(dyaw) + 2.0) <= 1.01, ck.shift
+
+
+def test_a_walk_already_on_the_map_is_not_shifted(two_walks):
+    ck = mc.Checker(_map())
+    ck.align([f for w in two_walks for f in w])
+    assert ck.shift == {"w1": (0.0, 0.0, 0.0), "w2": (0.0, 0.0, 0.0)}

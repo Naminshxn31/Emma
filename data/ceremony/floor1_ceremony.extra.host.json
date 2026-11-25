@@ -1,0 +1,402 @@
+{
+ "format": "emma-ceremony-extra-host-v1",
+ "about": "คำถามของคุณมิกิที่บทเพิ่มตอบ (รูปแบบคำ, app/ceremony_call.by_meaning) · never = คำที่บทเพิ่มไม่ตอบเลย (ราคา เวลาเปิด วันเสร็จ ...)",
+ "never": [
+  "\\bhow much (?:is|are|does|do|for|would|will|money|to)\\b",
+  "\\b(?:price|prices|pricing|cost|costs|expensive|cheap|baht|discount|promotion|rent|rental|yield|invest\\w*|loan|mortgage|instal\\w*|booking|book a|reserve|reservation|sold|buy|purchase|deposit|ownership)\\b",
+  "\\b(?:what time|opening hours?|open(?:s|ing)? (?:at|hours?)|when (?:does|do|is|will)|hours|fee|fees|free of charge|membership|completed?|completion|finish\\w*)\\b",
+  "\\b(?:ready|under construction|are you|do you like|your favou?rite|have you been|will you go|do you go)\\b",
+  "\\b(?:how many people|capacity|how many guests)\\b"
+ ],
+ "lines": {
+  "x_aqua_cinema_where": {
+   "means": [
+    "\\baqua cinema\\b",
+    "\\bindoor (?:swimming )?pools?\\b",
+    "\\bpool\\b.{0,30}\\b(?:movies?|screen|cinema|indoors?|out of the sun|shade)\\b",
+    "\\b(?:movies?|cinema)\\b.{0,20}\\bpool\\b",
+    "\\bcinema\\b"
+   ],
+   "not": []
+  },
+  "x_common_sphere_where": {
+   "means": [
+    "\\bcommon sphere\\b",
+    "\\bmeeting rooms?\\b",
+    "\\bsound ?proof\\b"
+   ],
+   "not": []
+  },
+  "x_coworking_where": {
+   "means": [
+    "\\bco ?working(?: (?:space|lounge|area))?\\b",
+    "\\b(?:work|working) (?:space|area|lounge|place)s?\\b",
+    "\\bmeet (?:business |my |our )?clients?\\b",
+    "\\b(?:place|somewhere|space) to work\\b",
+    "\\bwhere (?:can|do|could) (?:i|we|you|people|residents) work\\b(?! ?out)"
+   ],
+   "not": [
+    "\\bmeeting room\\b"
+   ]
+  },
+  "x_developer": {
+   "means": [
+    "\\bwho (?:is|are|was) (?:the |your |our |this )?(?:project'?s? )?(?:developer|builder)\\b",
+    "\\bdevelopers?\\b",
+    "\\bempire group\\b",
+    "\\bdeveloped by\\b",
+    "\\bawards?\\b",
+    "\\bwho (?:built|develops?|developed|is building)\\b"
+   ],
+   "not": [
+    "\\b(?:projects|past|previous|before|executives?|ceo|runs)\\b"
+   ]
+  },
+  "x_developer_projects": {
+   "means": [
+    "\\b(?:past|previous|other|earlier|former|finished) (?:projects|developments|works)\\b",
+    "\\b(?:built|developed|build|done)\\b.{0,30}\\b(?:before|already|in the past)\\b",
+    "\\bwhich projects\\b.{0,30}\\b(?:built|developed|done)\\b",
+    "\\b(?:16|sixteen) projects\\b",
+    "\\btrack record\\b"
+   ],
+   "not": [
+    "\\bdifferent\\b"
+   ]
+  },
+  "x_executives": {
+   "means": [
+    "\\bexecutives?\\b",
+    "\\b(?:ceo|coo|cfo|chairman|founders?|directors?)\\b",
+    "\\bwho (?:runs|leads|manages)\\b.{0,30}\\b(?:company|empire|group|it)\\b",
+    "\\bmanagement team of\\b"
+   ],
+   "not": [
+    "\\b(?:page|dashboard|screen)\\b"
+   ]
+  },
+  "x_facilities_basement": {
+   "means": [
+    "\\b(?:in|on|at|about) the (?:basement|underground)(?: (?:floor|level))?\\b",
+    "\\b(?:basement|underground)\\b",
+    "\\b(?:the|a|any) spa\\b"
+   ],
+   "not": [
+    "\\b(?:parking|park|car|aqua|mars|capsule)\\b"
+   ]
+  },
+  "x_facilities_ground": {
+   "means": [
+    "\\b(?:on|at|about) the (?:ground|first|entrance|lobby) (?:floor|level)\\b",
+    "\\b(?:ground|entrance) (?:floor|level)\\b",
+    "\\bfloor g\\b"
+   ],
+   "not": []
+  },
+  "x_facilities_level3": {
+   "means": [
+    "\\b(?:on|at|about) (?:the )?(?:third|3rd) floor\\b",
+    "\\b(?:on |at |about )?(?:level|floor) (?:3|three)\\b",
+    "\\b(?:third|3rd) floor\\b"
+   ],
+   "not": []
+  },
+  "x_fitness_where": {
+   "means": [
+    "\\b(?:the |a |our |your )?(?:gym|gymnasium|fitness(?: (?:centre|center|room|area))?|biogenesis)\\b",
+    "\\b(?:work ?out|working out|exercise|exercising|treadmills?|dumb ?bells?)\\b",
+    "\\bbio genesis\\b"
+   ],
+   "not": [
+    "\\b(?:pilates|spinning|cycling|yoga|bungee)\\b"
+   ]
+  },
+  "x_for_families": {
+   "means": [
+    "\\b(?:kids?|children|child|families|family|little ones)\\b.{0,40}\\b(?:facilit\\w+|play|area|areas|activit\\w+|enjoy|do|pool|place|places|something|anything)\\b",
+    "\\b(?:something|anything|places?|area|what|facilit\\w+|activit\\w+)\\b.{0,40}\\bfor (?:the )?(?:kids?|children|families|little ones)\\b",
+    "\\bgood for (?:the )?(?:kids?|children|families)\\b",
+    "\\b(?:family|kid|child) friendly\\b",
+    "\\bkids?'? pool\\b"
+   ],
+   "not": [
+    "\\b(?:looking for|recommend|suggest|room for my|schools?|junior world|playground|kids? room|kids? club|customer)\\b"
+   ]
+  },
+  "x_hydro_capsule_where": {
+   "means": [
+    "\\bhydro ?therapy(?: capsules?)?\\b",
+    "\\b(?:spa|hydro\\w*|water) capsules?\\b",
+    "\\bcapsules?\\b"
+   ],
+   "not": []
+  },
+  "x_ice_bath_where": {
+   "means": [
+    "\\bice (?:bath|plunge|room|pool)s?\\b",
+    "\\b(?:cold|ice) (?:plunge|bath|water)\\b"
+   ],
+   "not": []
+  },
+  "x_journey_future_where": {
+   "means": [
+    "\\bjourney to (?:the )?future\\b",
+    "\\bwalk ?way\\b"
+   ],
+   "not": []
+  },
+  "x_journey_mars_where": {
+   "means": [
+    "\\bjourney to mars\\b",
+    "\\bmars\\b"
+   ],
+   "not": []
+  },
+  "x_kids_room_where": {
+   "means": [
+    "\\bjunior world\\b",
+    "\\b(?:kids?|kid's|children'?s?)'? (?:room|club|zone)\\b"
+   ],
+   "not": []
+  },
+  "x_lagoon_islands": {
+   "means": [
+    "\\bislands?\\b"
+   ],
+   "not": []
+  },
+  "x_lobby_where": {
+   "means": [
+    "\\b(?:the|our|your|about) lobby\\b",
+    "\\blobby\\b.{0,20}\\b(?:like|big|size|ceiling|design\\w*|look)\\b"
+   ],
+   "not": [
+    "\\b(?:lights?|curtains?|turn|switch|open|floor|level|lamps?|bright|dark|wi ?fi|internet|air con\\w*|cold|hot|music|noise|people|show you)\\b"
+   ]
+  },
+  "x_nearby_7eleven": {
+   "means": [
+    "\\b(?:7|seven) (?:11|eleven)\\b",
+    "\\bconvenience stores?\\b",
+    "\\b(?:petrol|gas) stations?\\b",
+    "\\b(?:mini|family) ?marts?\\b",
+    "\\bbuy (?:groceries|water|snacks)\\b"
+   ],
+   "not": []
+  },
+  "x_nearby_attractions": {
+   "means": [
+    "\\b(?:tourist |any )?attractions?\\b",
+    "\\bsight ?seeing\\b",
+    "\\b(?:nong nooch|floating market|sanctuary of truth|big buddha|underwater world)\\b",
+    "\\b(?:places?|things|what) to (?:visit|see)\\b",
+    "\\bsee around here\\b",
+    "\\bplaces of interest\\b",
+    "\\binteresting places\\b",
+    "\\bwhere can (?:tourists?|visitors?|guests?|we|i|people) (?:visit|travel)\\b"
+   ],
+   "not": []
+  },
+  "x_nearby_hospitals": {
+   "means": [
+    "\\bhospitals?\\b",
+    "\\bclinics?\\b",
+    "\\b(?:see|find) a doctor\\b",
+    "\\bmedical (?:care|centre|center|services?)\\b"
+   ],
+   "not": []
+  },
+  "x_nearby_restaurants": {
+   "means": [
+    "\\brestaurants?\\b",
+    "\\bcaf(?:e|es|é|és)\\b",
+    "\\bcoffee shops?\\b",
+    "\\b(?:where|somewhere|place|places)\\b.{0,25}\\b(?:eat|eating|dine|dining|have dinner|have lunch)\\b",
+    "\\bsea ?food\\b",
+    "\\bfood (?:around|near|nearby)\\b"
+   ],
+   "not": [
+    "\\b(?:in|inside) the (?:building|project)\\b",
+    "\\b(?:bangkok|in town|downtown|chiang mai|phuket)\\b"
+   ]
+  },
+  "x_nearby_schools": {
+   "means": [
+    "\\b(?:international )?schools?\\b",
+    "\\b(?:rugby|regents?)\\b"
+   ],
+   "not": [
+    "\\bwhich school did\\b",
+    "\\bswimming school\\b",
+    "\\b(?:did|do) you\\b"
+   ]
+  },
+  "x_park_green": {
+   "means": [
+    "\\b(?:the|a|any|next to a|near a|public) park\\b",
+    "\\bgreen (?:spaces?|areas?)\\b",
+    "\\b(?:trees?|gardens?|landscap\\w+)\\b"
+   ],
+   "not": [
+    "\\b(?:car|cars|parking|water park|theme park|where can (?:i|we) park)\\b"
+   ]
+  },
+  "x_pilates_where": {
+   "means": [
+    "\\bpilates(?: (?:studio|room|class))?\\b",
+    "\\breformers?\\b"
+   ],
+   "not": []
+  },
+  "x_playground_where": {
+   "means": [
+    "\\b(?:outdoor )?play ?grounds?\\b"
+   ],
+   "not": []
+  },
+  "x_pools_all": {
+   "means": [
+    "\\b(?:how many|what|which|all|all the|all of the|tell us about the|about the|about our|any other) (?:\\w+ )?pools\\b",
+    "\\b(?:swimming )?pools\\b"
+   ],
+   "not": [
+    "\\b(?:deep|depth|indoor|sky|private)\\b"
+   ]
+  },
+  "x_salt_sauna_where": {
+   "means": [
+    "\\b(?:himalayan|salt) (?:salt )?(?:sauna|room)\\b",
+    "\\bhimalayan\\b"
+   ],
+   "not": []
+  },
+  "x_saunas_where": {
+   "means": [
+    "\\b(?:the |a |any |what |which )?(?:saunas?|steam rooms?)\\b",
+    "\\b(?:sonars?|sonas?|sannas?|sawnas?)\\b"
+   ],
+   "not": [
+    "\\b(?:salt|swing|floating|himalayan|crystal)\\b"
+   ]
+  },
+  "x_site_area": {
+   "means": [
+    "\\b(?:how (?:big|large)|size|area)\\b.{0,30}\\b(?:land|plot|site)\\b",
+    "\\b(?:land|plot|site)\\b.{0,20}\\b(?:size|area|big|large)\\b",
+    "\\b(?:how many )?rai\\b"
+   ],
+   "not": []
+  },
+  "x_sky_pool_where": {
+   "means": [
+    "\\bsky (?:swimming )?pool\\b",
+    "\\bpool\\b.{0,25}\\bglass\\b",
+    "\\bglass (?:floor|bottom)\\w*\\b.{0,15}\\bpool\\b",
+    "\\bglass (?:swimming )?pool\\b"
+   ],
+   "not": []
+  },
+  "x_social_lounge_where": {
+   "means": [
+    "\\bsocial (?:lounge|club)\\b",
+    "\\brobots?\\b.{0,25}\\b(?:drinks?|serve|serves|serving|bar)\\b",
+    "\\b(?:the|a|any) bar\\b"
+   ],
+   "not": []
+  },
+  "x_spinning_class_where": {
+   "means": [
+    "\\bgames? on the bikes\\b",
+    "\\bspinning(?: (?:class|room|studio))?\\b",
+    "\\b(?:cycling|bike|bikes|bicycle) (?:studio|room|class)\\b",
+    "\\bhow many bikes\\b"
+   ],
+   "not": []
+  },
+  "x_swing_sauna_where": {
+   "means": [
+    "\\b(?:floating )?swing saunas?\\b",
+    "\\bfloating (?:swing )?sauna\\b"
+   ],
+   "not": []
+  },
+  "x_travel_airports": {
+   "means": [
+    "\\b(?:the )?airports?\\b",
+    "\\b(?:suvarnabhumi|u ?tapao)\\b"
+   ],
+   "not": [
+    "\\bbangkok\\b(?!.{0,12}airport)"
+   ]
+  },
+  "x_travel_bangkok": {
+   "means": [
+    "\\b(?:to|from|how far is|reach) bangkok\\b",
+    "\\bbangkok\\b",
+    "\\b(?:motorway|highway|express ?way)\\b"
+   ],
+   "not": [
+    "\\bairports?\\b",
+    "\\b(?:restaurants?|eat|eating|dinner|lunch|food|caf(?:e|es|é)|coffee|shopping|hotels?|weather)\\b"
+   ]
+  },
+  "x_travel_malls": {
+   "means": [
+    "\\b(?:shopping )?malls?\\b",
+    "\\b(?:central pattaya|central festival|terminal (?:21|twenty one))\\b",
+    "\\bshopping (?:centre|center)s?\\b",
+    "\\bdepartment stores?\\b",
+    "\\bgo shopping\\b"
+   ],
+   "not": []
+  },
+  "x_unit_compare_1br_2br": {
+   "means": [
+    "\\b(?:difference|compare|compared|different|versus|or)\\b.{0,50}\\b(?:one|two|1|2) (?:bed ?rooms?|br)\\b.{0,40}\\b(?:one|two|1|2)(?: (?:bed ?rooms?|br))?\\b",
+    "\\b(?:difference|different|compare|compared)\\b.{0,60}\\b(?:bed ?rooms?|br)\\b",
+    "\\b(?:one|1)(?: (?:bed ?rooms?|br))? (?:and|or|versus) (?:the )?(?:two|2) (?:bed ?rooms?|br)\\b"
+   ],
+   "not": []
+  },
+  "x_unit_one_bedroom": {
+   "means": [
+    "\\b(?:the |a |our )?(?:one|1|single) (?:bed ?rooms?|br)(?: (?:unit|room|type))?\\b"
+   ],
+   "not": [
+    "\\b(?:two|2|compare|difference)\\b",
+    "\\bhow many\\b"
+   ]
+  },
+  "x_unit_studio": {
+   "means": [
+    "\\b(?:the |a |our )?studios?(?: (?:unit|room|type))?\\b",
+    "\\bsmallest (?:unit|room)\\b"
+   ],
+   "not": [
+    "\\b(?:pilates|cycling|yoga|spinning|how many)\\b"
+   ]
+  },
+  "x_unit_two_bedroom": {
+   "means": [
+    "\\b(?:the |a |our )?(?:two|2) (?:bed ?rooms?|br)(?: (?:unit|room|type))?\\b",
+    "\\b(?:biggest|largest) (?:unit|room)\\b"
+   ],
+   "not": [
+    "\\b(?:one|1|compare|difference|how many)\\b"
+   ]
+  },
+  "x_units_by_building": {
+   "means": [
+    "\\bwhich building\\b.{0,30}\\b(?:most|units)\\b",
+    "\\bunits\\b.{0,25}\\b(?:each|every|per|by) building\\b",
+    "\\b(?:each|every) building\\b.{0,25}\\bunits\\b",
+    "\\bhow many (?:\\w+ ){0,3}(?:units?|rooms?|apartments?|residences?)\\b.{0,30}\\bbuildings? [a-f]\\b",
+    "\\bbuildings? [a-f]\\b.{0,30}\\bhow many\\b",
+    "\\b(?:units?|rooms?|apartments?|residences?)\\b.{0,20}\\b(?:in|per|for) (?:each|every)(?: of the)? buildings?\\b",
+    "\\bhow many (?:\\w+ ){0,2}buildings?\\b",
+    "\\b(?:rooms?|units?) does building [a-f]\\b"
+   ],
+   "not": []
+  }
+ }
+}

@@ -579,3 +579,86 @@ def test_guard_something_in_front_of_the_edges_hides_them():
     line_y = _min_line()
     pts = _lidar(PRE_DOCK, _dock_scene(1.0) + [(-4.30, 1.415, -4.30, 1.475)])
     assert rl.dock_gap_fix(pts, PRE_DOCK, MIN_GAP, line_y) is None
+
+
+def test_a_look_turns_without_naming_walls_but_needs_a_heading():
+    """4 Nov, the dock room survey: a look round where no wall is mapped --
+    a checkpoint there needs walls and would stop the run."""
+    base = {"steps": [{"do": "look", "label": "north end, look west", "heading": 180}]}
+    route = rl.parse_route(base)
+    assert route.steps[0].do == "look" and route.steps[0].heading_deg == 180
+    with pytest.raises(ValueError, match="a look needs 'heading'"):
+        rl.parse_route({"steps": [{"do": "look", "label": "x"}]})
+    assert route.steps[0].dwell_s == 0.0
+
+
+def test_a_look_may_face_between_the_lanes_and_a_lane_may_not():
+    """4 Nov afternoon: the head does not pan on a walk, the base turns for the
+    sides -- every 20 deg. A lane stays on the four headings."""
+    route = rl.parse_route({"steps": [{"do": "look", "heading": h} for h in (160, -20, 0, 180, 5)]})
+    assert [s.heading_deg for s in route.steps] == [160.0, -20.0, 0.0, 180.0, 5.0]
+    for bad in (-180, 181, 7, True, "90"):
+        with pytest.raises(ValueError, match="a look's heading"):
+            rl.parse_route({"steps": [{"do": "look", "heading": bad}]})
+    with pytest.raises(ValueError, match="straight lanes only"):
+        rl.parse_route({"steps": [{"do": "drive", "to": [0, 0], "heading": 20}]})
+
+
+def test_a_look_may_stand_still_for_the_head_s_round_and_nothing_else_may():
+    """4 Nov afternoon (owner: "ไม่เห็นก้มมองดูวัดพื้น หรือโต๊ะเลย"): a look holds
+    still while the head sweeps eye level / desk / floor -- a whole round."""
+    held = rl.parse_route({"steps": [{"do": "look", "heading": 90, "dwell": 15}]})
+    assert held.steps[0].dwell_s == 15.0
+    for bad in (0, -1, 61, True, "15"):
+        with pytest.raises(ValueError, match="'dwell' is seconds"):
+            rl.parse_route({"steps": [{"do": "look", "heading": 90, "dwell": bad}]})
+    with pytest.raises(ValueError, match="only a look dwells"):
+        rl.parse_route({"steps": [{"do": "drive", "to": [0, 0], "dwell": 5}]})
+
+
+def test_the_room_survey_route_parses():
+    root = __import__("pathlib").Path(__file__).resolve().parents[1]
+    route = rl.load_route(root / "data" / "robot" / "routes" / "floor2_room_survey.json")
+    kinds = [s.do for s in route.steps]
+    assert kinds[0] == "checkpoint" and kinds[-1] == "dock" and kinds.count("look") == 20   # every 20 deg at each end
+
+
+def test_a_route_may_name_its_own_dock_marker():
+    """4 Nov, floor 2: the board's home pose was a stray dock after a map
+    upload, and on the dock the board answers 200 to a new one and keeps the
+    old -- the dock room's routes carry the charger's marker themselves."""
+    route = rl.parse_route({"dock_marker": [-4.419, 1.496, -0.089], "steps": [{"do": "dock"}]})
+    assert route.dock_marker == (-4.419, 1.496, -0.089)
+    assert rl.parse_route({"steps": [{"do": "dock"}]}).dock_marker is None
+    with pytest.raises(ValueError, match="dock_marker"):
+        rl.parse_route({"dock_marker": [1, 2], "steps": [{"do": "dock"}]})
+    root = __import__("pathlib").Path(__file__).resolve().parents[1]
+    for name in ("floor2_room_survey", "floor2_room_test", "floor2_straight_test"):
+        r = rl.load_route(root / "data" / "robot" / "routes" / (name + ".json"))
+        assert r.dock_marker == (-4.419, 1.496, -0.089), name
+        # the docked pose sits DOCKED_M out along the marker's heading
+        x, y, yaw = r.dock_marker
+        assert abs(x + 0.25 * __import__("math").cos(yaw) - r.dock_pose[0]) < 0.01, name
+
+
+def test_drive_route_docks_by_the_routes_marker_before_the_boards(monkeypatch):
+    import sys
+    root = __import__("pathlib").Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    import drive_route
+
+    class Board:
+        def home_pose(self):
+            return (0.3645, 0.5058, -0.0286)          # the stray dock of 2 Oct
+    own = type("R", (), {"route": rl.parse_route({"dock_marker": [-4.419, 1.496, -0.089], "steps": [{"do": "dock"}]}),
+                         "b": Board()})()
+    assert drive_route.Runner.dock_marker(own) == (-4.419, 1.496, -0.089)
+    board = type("R", (), {"route": rl.parse_route({"steps": [{"do": "dock"}]}), "b": Board()})()
+    assert drive_route.Runner.dock_marker(board) == (0.3645, 0.5058, -0.0286)
+
+
+def test_every_docking_step_asks_the_marker_not_the_board_directly():
+    root = __import__("pathlib").Path(__file__).resolve().parents[1]
+    src = (root / "scripts" / "drive_route.py").read_text(encoding="utf-8")
+    assert src.count("self.b.home_pose()") == 1, "only Runner.dock_marker may read the board's home pose"
+    assert src.count("self.dock_marker()") >= 4

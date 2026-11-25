@@ -1,0 +1,45 @@
+{
+ "texts": {
+  "brand": "Embassy World",
+  "emma": "Emma",
+  "chip": "Of course, Khun Miki",
+  "label": "Lobby curtains",
+  "state": "Opening",
+  "command": "Opening the lobby curtains now"
+ },
+ "pictures": {},
+ "beats": [
+  {
+   "at_en": "Of course",
+   "do": "chip",
+   "key": "chip"
+  },
+  {
+   "at_en": "Opening",
+   "do": "work",
+   "key": [
+    "label",
+    "state",
+    "command"
+   ],
+   "span": 0.55
+  },
+  {
+   "at_en": "now",
+   "do": "sent"
+  }
+ ],
+ "options": {
+  "mode": "console",
+  "device": "curtains",
+  "light0": 1,
+  "knob0": "off",
+  "lit0": true,
+  "working0": false,
+  "tilt": -5,
+  "chip_side": "left"
+ },
+ "template": "act",
+ "act": "smarthome_brand",
+ "figures": {}
+}

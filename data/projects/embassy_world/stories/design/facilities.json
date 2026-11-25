@@ -271,7 +271,7 @@
    "items": [
     {
      "label_en": "Biogenesis",
-     "asset": "fac_g_biogenesis",
+     "asset": "n_fac_g_biogenesis",
      "at": [
       50.0,
       82.3
@@ -282,7 +282,7 @@
     },
     {
      "label_en": "Spinning Class",
-     "asset": "fac_g_spinning",
+     "asset": "n_fac_g_spinning",
      "at": [
       42.6,
       59.8
@@ -293,7 +293,7 @@
     },
     {
      "label_en": "Pilates Studio",
-     "asset": "fac_g_pilates",
+     "asset": "n_fac_g_pilates",
      "at": [
       57.2,
       59.8
@@ -304,7 +304,7 @@
     },
     {
      "label_en": "Bungee Gym & Yoga",
-     "asset": "fac_g_bungee",
+     "asset": "n_fac_g_bungee",
      "at": [
       86.5,
       58.9
@@ -315,7 +315,7 @@
     },
     {
      "label_en": "Junior World",
-     "asset": "fac_g_junior",
+     "asset": "n_fac_g_junior",
      "at": [
       17.1,
       58.4
@@ -539,7 +539,7 @@
    "items": [
     {
      "label_en": "Aqua Cinema",
-     "asset": "fac_b_aqua_cinema",
+     "asset": "n_fac_b_aqua_cinema",
      "at": [
       57.0,
       79.4
@@ -550,7 +550,7 @@
     },
     {
      "label_en": "Journey to Mars",
-     "asset": "fac_b_journey_mars",
+     "asset": "n_fac_b_journey_mars",
      "at": [
       87.0,
       80.4
@@ -561,7 +561,7 @@
     },
     {
      "label_en": "Himalayan Salt Sauna",
-     "asset": "fac_b_salt_sauna",
+     "asset": "n_fac_b_salt_sauna",
      "at": [
       22.2,
       49.8
@@ -572,7 +572,7 @@
     },
     {
      "label_en": "Ice Bath",
-     "asset": "fac_b_ice_bath",
+     "asset": "n_fac_b_ice_bath",
      "at": [
       31.6,
       43.2
@@ -583,7 +583,7 @@
     },
     {
      "label_en": "Floating Swing Sauna",
-     "asset": "fac_b_swing_sauna",
+     "asset": "n_fac_b_swing_sauna",
      "at": [
       42.4,
       43.4
@@ -594,7 +594,7 @@
     },
     {
      "label_en": "Crystal Stone Sauna",
-     "asset": "fac_b_crystal_sauna",
+     "asset": "n_fac_b_crystal_sauna",
      "at": [
       53.5,
       43.2
@@ -605,7 +605,7 @@
     },
     {
      "label_en": "Hydrotherapy Capsule",
-     "asset": "fac_b_hydro_capsule",
+     "asset": "n_fac_b_hydro_capsule",
      "at": [
       65.2,
       43.6
@@ -615,7 +615,6 @@
      "sub_en": "Two white spa capsules"
     }
    ],
-   "more_en": "Also on this level: EV charging",
    "tap_label_en": "Tap for details"
   },
   "taps": [
@@ -791,7 +790,7 @@
    "items": [
     {
      "label_en": "Social Lounge",
-     "asset": "fac_3_social",
+     "asset": "n_fac_3_social",
      "at": [
       17.0,
       56.7
@@ -802,7 +801,7 @@
     },
     {
      "label_en": "Co-working Lounge",
-     "asset": "fac_3_coworking",
+     "asset": "n_fac_3_coworking",
      "at": [
       34.7,
       56.7
@@ -813,7 +812,7 @@
     },
     {
      "label_en": "Common Sphere",
-     "asset": "fac_3_common_sphere",
+     "asset": "n_fac_3_common_sphere",
      "at": [
       63.1,
       56.7
@@ -824,7 +823,7 @@
     },
     {
      "label_en": "Sky Pool",
-     "asset": "fac_3_sky_pool",
+     "asset": "n_fac_3_sky_pool",
      "at": [
       50.0,
       82.5
@@ -993,7 +992,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_3_sky_pool",
+    "asset": "n_fac_3_sky_pool",
     "title_en": "SKY POOL",
     "sub_en": "Level 3 · Building A",
     "chips_en": [
@@ -1168,7 +1167,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_g_biogenesis",
+    "asset": "n_fac_g_biogenesis",
     "title_en": "BIOGENESIS",
     "sub_en": "Fitness · 197 sq.m.",
     "chips_en": [
@@ -1178,7 +1177,15 @@
      "Your own workout & meal plan"
     ],
     "line": 1
-   }
+   },
+   "shots": [
+    {
+     "asset": "n_bio2"
+    },
+    {
+     "asset": "n_bio3"
+    }
+   ]
   },
   "taps": [
    {
@@ -1324,7 +1331,7 @@
    },
    "spot_line": 0,
    "photo": {
-    "asset": "fac_g_junior_ballpit",
+    "asset": "n_fac_g_junior_ballpit",
     "title_en": "JUNIOR WORLD",
     "sub_en": "Kids' room · Ground floor",
     "chips_en": [
@@ -1339,7 +1346,12 @@
      "Playground just outside"
     ],
     "line": 1
-   }
+   },
+   "shots": [
+    {
+     "asset": "n_junior1b"
+    }
+   ]
   },
   "taps": [
    {

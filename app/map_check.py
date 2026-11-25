@@ -40,6 +40,11 @@ uploading is a separate step on the owner's go -- PUT maps/stcm resets the
 pose and renumbers the map's artifacts.
 
 numpy only: the robot has no scipy (scan_match's rule).
+
+The robot's own numbers (the lidar's trusted band, the floor its body stood on, the board's
+quality gate) come from a robot profile (app/robot_profile.py; owner 20 Nov: our maps may
+serve a serving robot too). Emma is the default and the constants below are hers -- the
+same bytes out as before the profile existed (CHANGELOG 20 Nov).
 """
 from __future__ import annotations
 
@@ -75,6 +80,19 @@ FIT_TOL_M = 0.08
 #: it -- the doorway of 28 Oct read 0.53 on the broken map, so this is lower.
 FIT_MIN = 0.40
 MIN_QUALITY = 40
+#: A walk whose poses sit in another frame than the map's: floor 2's
+#: drive_route sets its own pose against walls it measured, the board's map
+#: there is the plan -- 4 Nov, ~25 cm and ~2 deg apart, past REFINE_M, so every
+#: frame of the dock room stopped at the edge of its search (fit 0.63) and the
+#: furniture was drawn that far off. One shift for the whole walk first, from
+#: a sample of its frames; then each frame's own REFINE_M around it. Taken
+#: only for a clear gain (a corridor would slide along itself for nothing).
+WALK_SHIFT_M = 0.8
+WALK_SHIFT_STEP_M = 0.04
+WALK_SHIFT_DEG = 6.0
+WALK_SHIFT_STEP_DEG = 1.0
+WALK_SHIFT_SAMPLE = 24
+WALK_SHIFT_GAIN = 0.05
 
 #: Agreement: separate walks that must agree, and how many beams a walk must
 #: put through a cell before it counts as seen through there.
@@ -205,6 +223,8 @@ class Frame:
     picture: str | None = None
     head_deg: float = 0.0
     extra: dict = field(default_factory=dict)
+    # the head's nod, in the same recorded units as head_deg (+ = down)
+    tilt_deg: float = 0.0
 
 
 def _dilate(mask: np.ndarray, r: int) -> np.ndarray:
@@ -222,22 +242,32 @@ def _dilate(mask: np.ndarray, r: int) -> np.ndarray:
     return out
 
 
-def _beams(frame: Frame) -> np.ndarray:
+def _beams(frame: Frame, lidar=None) -> np.ndarray:
+    """`lidar`: a robot profile's (its trusted band); None = Emma's (MIN/MAX_RANGE_M)."""
+    lo, hi = (MIN_RANGE_M, MAX_RANGE_M) if lidar is None else (lidar.trust_min_m, lidar.trust_max_m)
     s = np.asarray(frame.scan, dtype=float).reshape(-1, 2)
-    s = s[(s[:, 1] > MIN_RANGE_M) & (s[:, 1] < MAX_RANGE_M) & np.isfinite(s).all(axis=1)]
+    s = s[(s[:, 1] > lo) & (s[:, 1] < hi) & np.isfinite(s).all(axis=1)]
     return s[:: max(1, len(s) // MAX_BEAMS)] if len(s) else s
 
 
 class Checker:
-    """Lay frames on one map, walk by walk; `findings()` when done."""
+    """Lay frames on one map, walk by walk; `findings()` when done. `profile`: the robot the
+    walks were made with (app/robot_profile.py); None = Emma."""
 
-    def __init__(self, grid: Grid) -> None:
+    def __init__(self, grid: Grid, profile=None) -> None:
+        from app import robot_profile
+
         self.grid = grid
+        self.profile = profile or robot_profile.EMMA
+        # Emma's are this module's constants (the same floats); another robot's come with it
+        self.min_quality = self.profile.min_quality
+        self.body_r = self.profile.body.stood_floor_r_m
         self.near = _dilate(grid.occ(), max(1, int(round(FIT_TOL_M / grid.res))))
         self.passed: dict[str, np.ndarray] = {}
         self.hit: dict[str, np.ndarray] = {}
         self.frames: list[dict] = []        # per frame: run, n, pose used, fits, why skipped
         self.body: dict[str, list[tuple[int, int]]] = {}   # per walk: cells the robot stood on
+        self.shift: dict[str, tuple[float, float, float]] = {}   # per walk: (dx, dy, dyaw) laid on first
 
     # -- placing a frame -------------------------------------------------
     def _fit(self, xs, ys, yaws, pts) -> np.ndarray:
@@ -258,14 +288,79 @@ class Checker:
             out[i] = hits.mean(axis=2)
         return out
 
+    def align(self, frames: Iterable[Frame]) -> dict[str, tuple[float, float, float]]:
+        """The shift (WALK_SHIFT_*) that lays the walks in `frames` not aligned
+        yet best on this map: ONE shift for all of them -- walks from the same
+        dock are in the same frame -- unless a walk lies better by
+        WALK_SHIFT_GAIN somewhere else (a walk that really is in another frame).
+        4 Nov afternoon, floor 2: the map lays a walk about as well 32 cm away
+        in y (0.50-0.53 at both, every walk); four morning walks all picked one,
+        the two afternoon surveys (mostly spot turns at the room's ends) the
+        other, each walk by 0.01 -- and their findings would have stood 32 cm
+        off the rest, agreeing with each other."""
+        by_run: dict[str, list[Frame]] = {}
+        for f in frames:
+            by_run.setdefault(f.run, []).append(f)
+        scores = {run: self._shift_scores(fs) for run, fs in by_run.items() if run not in self.shift}
+        scores = {run: s for run, s in scores.items() if s is not None}
+        for run in by_run:
+            if run not in self.shift and run not in scores:
+                self.shift[run] = (0.0, 0.0, 0.0)
+        if not scores:
+            return dict(self.shift)
+        ds, ts = _shift_axes()
+        pooled = sum(scores.values()) / len(scores)
+        common = _best_shift(pooled, ds, ts)
+        for run, total in scores.items():
+            own = _best_shift(total, ds, ts)
+            if _score_at(total, own, ds, ts) - _score_at(total, common, ds, ts) >= WALK_SHIFT_GAIN:
+                self.shift[run] = own
+            else:
+                self.shift[run] = common
+        return dict(self.shift)
+
+    def _walk_shift(self, frames: list[Frame]) -> tuple[float, float, float]:
+        """One walk alone (the old rule; align() pools walks)."""
+        total = self._shift_scores(frames)
+        if total is None:
+            return (0.0, 0.0, 0.0)
+        ds, ts = _shift_axes()
+        return _best_shift(total, ds, ts)
+
+    def _shift_scores(self, frames: list[Frame]) -> np.ndarray | None:
+        """Mean fit of a sample of the walk's frames at every shift on the
+        WALK_SHIFT_* grid, shape (yaws, dys, dxs); None without usable frames."""
+        usable = [f for f in frames if f.q is None or self.min_quality is None or f.q >= self.min_quality]
+        sample = usable[:: max(1, len(usable) // WALK_SHIFT_SAMPLE)][:WALK_SHIFT_SAMPLE]
+        n_m = int(round(WALK_SHIFT_M / WALK_SHIFT_STEP_M))
+        n_d = int(round(WALK_SHIFT_DEG / WALK_SHIFT_STEP_DEG))
+        ds = np.arange(-n_m, n_m + 1) * WALK_SHIFT_STEP_M
+        ts = np.radians(np.arange(-n_d, n_d + 1) * WALK_SHIFT_STEP_DEG)
+        total, n = np.zeros((len(ts), len(ds), len(ds))), 0
+        for f in sample:
+            beams = _beams(f, self.profile.lidar)
+            if len(beams) < 20:
+                continue
+            pts = np.stack([beams[:, 1] * np.cos(beams[:, 0]), beams[:, 1] * np.sin(beams[:, 0])], axis=1)
+            pts = pts[:: max(1, len(pts) // 200)]
+            x, y, yaw = f.pose
+            total += self._fit(x + ds, y + ds, yaw + ts, pts)
+            n += 1
+        if not n:
+            return None
+        return total / n
+
     def place(self, frame: Frame) -> tuple[tuple[float, float, float] | None, float, float]:
-        """(refined pose or None, fit at the board's pose, fit after)."""
-        beams = _beams(frame)
+        """(refined pose or None, fit at the board's pose, fit after) -- the
+        search is round the board's pose moved by its walk's shift (`align`)."""
+        beams = _beams(frame, self.profile.lidar)
         if len(beams) < 20:
             return None, 0.0, 0.0
         pts = np.stack([beams[:, 1] * np.cos(beams[:, 0]), beams[:, 1] * np.sin(beams[:, 0])], axis=1)
         pts = pts[:: max(1, len(pts) // 400)]
-        x, y, yaw = frame.pose
+        bx, by, byaw = frame.pose
+        sx, sy, syaw = self.shift.get(frame.run, (0.0, 0.0, 0.0))
+        x, y, yaw = bx + sx, by + sy, byaw + syaw
         n_m = int(round(REFINE_M / REFINE_STEP_M))
         n_d = int(round(REFINE_DEG / REFINE_STEP_DEG))
         dxs = np.arange(-n_m, n_m + 1) * REFINE_STEP_M
@@ -273,6 +368,8 @@ class Checker:
         dyaws = np.radians(np.arange(-n_d, n_d + 1) * REFINE_STEP_DEG)
         fits = self._fit(x + dxs, y + dys, yaw + dyaws, pts)
         before = float(fits[n_d, n_m, n_m])
+        if (sx, sy, syaw) != (0.0, 0.0, 0.0):        # "before" is the board's own pose
+            before = float(self._fit(np.array([bx]), np.array([by]), np.array([byaw]), pts)[0, 0, 0])
         # Best fit; ties go to the smallest move (a flat corridor must not slide).
         best = fits.max()
         k, j, i = np.nonzero(fits >= best - 1e-9)
@@ -316,7 +413,7 @@ class Checker:
         """One frame. Returns its row (also kept in `frames`)."""
         row = {"run": frame.run, "n": frame.n, "board": [round(v, 3) for v in frame.pose],
                "q": frame.q, "picture": frame.picture}
-        if frame.q is not None and frame.q < MIN_QUALITY:
+        if frame.q is not None and self.min_quality is not None and frame.q < self.min_quality:
             row["skipped"] = "quality %d" % frame.q
             self.frames.append(row)
             return row
@@ -327,7 +424,7 @@ class Checker:
             self.frames.append(row)
             return row
         row["pose"] = [round(v, 3) for v in pose]
-        passed, hit = self._trace(pose, _beams(frame))
+        passed, hit = self._trace(pose, _beams(frame, self.profile.lidar))
         size = self.grid.h * self.grid.w
         p = self.passed.setdefault(frame.run, np.zeros(size, dtype=np.uint16))
         h = self.hit.setdefault(frame.run, np.zeros(size, dtype=np.uint16))
@@ -397,7 +494,7 @@ class Checker:
         for r, c in self.body.get(run, []):
             if 0 <= r < g.h and 0 <= c < g.w:
                 mask[r, c] = True
-        return _dilate(mask, max(1, int(round(BODY_R_M / g.res))))
+        return _dilate(mask, max(1, int(round(self.body_r / g.res))))
 
     def coverage(self) -> int:
         """Cells some walk saw (through or at) -- how much of the map was checked."""
@@ -405,6 +502,32 @@ class Checker:
         for r in self.passed:
             seen |= (self.passed[r] > 0) | (self.hit[r] > 0)
         return int(seen.sum())
+
+
+def _shift_axes() -> tuple[np.ndarray, np.ndarray]:
+    n_m = int(round(WALK_SHIFT_M / WALK_SHIFT_STEP_M))
+    n_d = int(round(WALK_SHIFT_DEG / WALK_SHIFT_STEP_DEG))
+    return (np.arange(-n_m, n_m + 1) * WALK_SHIFT_STEP_M,
+            np.radians(np.arange(-n_d, n_d + 1) * WALK_SHIFT_STEP_DEG))
+
+
+def _best_shift(total: np.ndarray, ds: np.ndarray, ts: np.ndarray) -> tuple[float, float, float]:
+    """The best (dx, dy, dyaw) of a score grid -- none unless it beats no
+    shift by WALK_SHIFT_GAIN; ties go to the smallest."""
+    n_d, n_m = len(ts) // 2, len(ds) // 2
+    best = total.max()
+    if best - total[n_d, n_m, n_m] < WALK_SHIFT_GAIN:
+        return (0.0, 0.0, 0.0)
+    k, j, i = np.nonzero(total >= best - 1e-9)
+    b = int(np.argmin(ds[i] ** 2 + ds[j] ** 2 + (ts[k] * 0.5) ** 2))
+    return (float(ds[i[b]]), float(ds[j[b]]), float(ts[k[b]]))
+
+
+def _score_at(total: np.ndarray, shift: tuple[float, float, float], ds: np.ndarray, ts: np.ndarray) -> float:
+    i = int(np.argmin(np.abs(ds - shift[0])))
+    j = int(np.argmin(np.abs(ds - shift[1])))
+    k = int(np.argmin(np.abs(ts - shift[2])))
+    return float(total[k, j, i])
 
 
 def _components(mask: np.ndarray) -> Iterable[list[tuple[int, int]]]:
@@ -460,17 +583,53 @@ def cleaned(grid: Grid, findings: list[dict], *, keep: Iterable[int] = (),
     return Grid(cells, grid.ox, grid.oy, grid.res, grid.header), applied
 
 
-def _lens(camera: dict | None) -> tuple[float, float, float]:
-    """(field of view deg, lidar_a, lidar_b) -- the walk sheet's lidar strip's
-    reading of run.json's camera: assumed 70 deg until the head's lidar check
-    held, then what it measured."""
+def blocked(grid: Grid, spots: Iterable[tuple[float, float, float]]) -> Grid:
+    """Mark (x, y, radius) as an obstacle: a thing under the laser's plane, which no walk
+    can ever find, so the board's planner keeps off it. A few cells the lidar does not see
+    cost the fit nothing against the thousands it does."""
+    cells = grid.cells.copy()
+    rows, cols = np.mgrid[0:grid.h, 0:grid.w]
+    wx, wy = grid.world(rows, cols)
+    for x, y, radius in spots:
+        cells[np.hypot(wx - x, wy - y) <= radius] = OCC_VALUE
+    return Grid(cells, grid.ox, grid.oy, grid.res, grid.header)
+
+
+def lens(camera: dict | None) -> dict:
+    """How a walk's picture columns map to the lidar's bearings, from
+    run.json's camera: {"hfov", "a", "b", "head"} -- lidar = a * (picture
+    bearing + head) + b, the picture bearing from `hfov`, `head(deg)` the
+    recorded head angle in those same units.
+
+    The head's lidar check, once it held, is fitted in the units the head loop
+    uses (the ASSUMED field of view) and carries any mirroring in `a`: then
+    everything stays in those units. Without it: the field of view measured on
+    the robot (`hfov_measured` -- 4 Nov, 19 deg from the base's spot turns, not
+    the 70 assumed) and `mirrored` (the head camera's picture is left-right
+    flipped: a = -1); the head angles were recorded in the assumed units and
+    are carried over to the measured ones by the small-angle ratio `k`, LINEARLY:
+    the recorded angle is the sweep's small step scaled up with the pulse, and
+    the servo turns linearly with the pulse. (4 Nov afternoon: `atan(tan(h) k)`
+    held for the 35 % scan but reads a 75 % pan, 70.8 recorded, as 34 deg --
+    the head turns ~17.) `tilt` is the nod in real degrees, + = down.
+    Old walks with neither: the assumed lens, a = 1, as before."""
     cam = camera or {}
-    hfov = float(cam.get("hfov_from_lidar") or cam.get("hfov_assumed") or 70.0)
-    a = cam.get("lidar_a")
-    b = cam.get("lidar_b")
-    a = float(a) if isinstance(a, (int, float)) and a else 1.0
-    b = float(b) if isinstance(b, (int, float)) else 0.0
-    return hfov, a, b
+    assumed = float(cam.get("hfov_assumed") or 70.0)
+    a, b = cam.get("lidar_a"), cam.get("lidar_b")
+    hfov = float(cam.get("hfov_measured") or assumed)
+    k = math.tan(math.radians(hfov / 2.0)) / math.tan(math.radians(assumed / 2.0))
+    if isinstance(a, (int, float)) and not isinstance(a, bool) and a:
+        return {"hfov": assumed, "a": float(a), "b": float(b) if isinstance(b, (int, float)) else 0.0,
+                "head": lambda h: float(h), "tilt": lambda t: float(t) * k}
+    return {"hfov": hfov, "a": -1.0 if cam.get("mirrored") else 1.0, "b": 0.0,
+            "head": lambda h: float(h) * k, "tilt": lambda t: float(t) * k}
+
+
+#: A picture for a finding (a wall, a cabinet at the lidar's height) comes
+#: from a frame that looks across the room, not at the floor in front: the
+#: walk scan nods to ~36 deg for the floor (4 Nov afternoon), and a frame that
+#: steep shows the floor 1-2 m out, whatever the finding's bearing.
+PICTURE_MAX_TILT_DEG = 25.0
 
 
 def picture_for(finding: dict, frames: list[Frame], placed: dict[tuple[str, int], tuple],
@@ -484,7 +643,8 @@ def picture_for(finding: dict, frames: list[Frame], placed: dict[tuple[str, int]
     for fr in frames:
         if not fr.picture:
             continue
-        hfov, a, b = _lens(cameras.get(fr.run))
+        ln = lens(cameras.get(fr.run))
+        hfov, a, b = ln["hfov"], ln["a"], ln["b"]
         pose = placed.get((fr.run, fr.n))
         if pose is None:
             continue
@@ -492,11 +652,15 @@ def picture_for(finding: dict, frames: list[Frame], placed: dict[tuple[str, int]
         d = math.hypot(cx - x, cy - y)
         if d > max_m or d < 0.3:
             continue
+        tilt = ln["tilt"](fr.tilt_deg)
+        if tilt > PICTURE_MAX_TILT_DEG:
+            continue
         lidar = math.degrees((math.atan2(cy - y, cx - x) - yaw + math.pi) % (2 * math.pi) - math.pi)
-        bearing = (lidar - b) / a - fr.head_deg          # + = left of the picture's middle
+        bearing = (lidar - b) / a - ln["head"](fr.head_deg)   # + = left of the picture's middle
         if abs(bearing) > hfov / 2 * 0.9:
             continue
-        cost = d + abs(bearing) / 20.0
+        # level first: a desk-height nod (~18 deg) only where nothing level saw it
+        cost = d + abs(bearing) / 20.0 + max(tilt, 0.0) / 20.0
         if best is None or cost < best[0]:
             half = math.tan(math.radians(hfov / 2))
             best = (cost, {"run": fr.run, "n": fr.n, "picture": fr.picture, "distance_m": round(d, 2),

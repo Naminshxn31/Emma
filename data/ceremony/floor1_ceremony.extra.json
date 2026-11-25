@@ -1,0 +1,1137 @@
+{
+  "format": "emma-event-script-v1",
+  "speak": "en",
+  "about": "บทเพิ่มของพิธี: ตอบเรื่องที่บทหลักไม่มี (เจ้าของ 24 พ.ย.) — สร้างจากเรื่องเล่าที่อนุมัติแล้วด้วย scripts/build_ceremony_extra.py ไม่อยู่ในลำดับพิธี ทุกบทเป็นร่างจนกว่าคนจะเซ็น (approve_event_script.py --file data/ceremony/floor1_ceremony.extra.json)",
+  "cues": [
+    {
+      "id": "x_aqua_cinema_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "aqua_cinema_where",
+      "host_th": null,
+      "th": "Aqua Cinema คือสระว่ายน้ำในร่มที่ชั้นใต้ดิน ใต้อาคาร A ค่ะ เหมาะกับคนที่อยากว่ายน้ำ แต่ไม่อยากโดนแดดค่ะ ริมสระมีจอภาพยนตร์ขนาดใหญ่ ว่ายน้ำไปดูหนังไป บรรยากาศโรแมนติก เพลินจนไม่อยากขึ้นจากน้ำเลยค่ะ สระยาวประมาณ 33 เมตร ต่อเนื่องไปถึง Journey to Mars ค่ะ",
+      "en": "Aqua Cinema is our indoor pool, in the basement under Building A, perfect if you love to swim but would rather stay out of the sun. A big movie screen runs along the pool, so you can watch a film as you swim. It's romantic, and so relaxing you won't want to get out. The pool is about 33 metres long and flows on into Journey to Mars.",
+      "numbers": [
+        {
+          "say": "สระยาวประมาณ 33 เมตร ต่อเนื่องไปถึง Journey to Mars ค่ะ",
+          "source": "story:aqua_cinema_where",
+          "as": "สระยาวประมาณ 33 เมตร ต่อเนื่องไปถึง Journey to Mars ค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: aqua_cinema_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_common_sphere_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "common_sphere_where",
+      "host_th": null,
+      "th": "Common Sphere อยู่ชั้น 3 อาคาร A ค่ะ เป็นโถงส่วนกลางโทนครีม มีโต๊ะวงรีไว้นั่งพบปะ และห้องประชุมผนังกระจกโค้งค่ะ ห้องประชุมเก็บเสียงได้ดี คุยงานกันได้เต็มที่ โดยไม่รบกวนคนข้างนอกเลยค่ะ ห้องประมาณ 101 ตารางเมตรค่ะ",
+      "en": "The Common Sphere is on level 3 of Building A. It's a cream-toned shared hall with oval tables for meeting up, and curved-glass meeting rooms, made for meetings that need quiet: they keep the sound in, so you can talk freely without disturbing anyone. The room is about 101 square metres.",
+      "numbers": [
+        {
+          "say": "Common Sphere อยู่ชั้น 3 อาคาร A ค่ะ",
+          "source": "story:common_sphere_where",
+          "as": "Common Sphere อยู่ชั้น 3 อาคาร A ค่ะ"
+        },
+        {
+          "say": "ห้องประมาณ 101 ตารางเมตรค่ะ",
+          "source": "story:common_sphere_where",
+          "as": "ห้องประมาณ 101 ตารางเมตรค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: common_sphere_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_coworking_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "coworking_where",
+      "host_th": null,
+      "th": "Co-working Lounge อยู่ชั้น 3 อาคาร A ถัดจาก Social Lounge ค่ะ เป็นที่นั่งทำงานนอกห้อง จะนัดเพื่อนหรือนัดคุยธุรกิจก็ได้ มีทั้งบูธส่วนตัวและโซฟาโทนครีมค่ะ ตกแต่งหรูหรามีระดับ พาใครมาคุยงานที่นี่ เขาจะรู้ได้ทันทีว่าเจ้าของห้องมีรสนิยมและประสบความสำเร็จแค่ไหนค่ะ ห้องประมาณ 81.5 ตารางเมตรค่ะ",
+      "en": "The Co-working Lounge is on level 3 of Building A, next to the Social Lounge. It's a place to work outside your apartment, or meet friends and business contacts, with private booths and cream sofas. The design is luxurious and refined, so anyone you bring here sees your taste and your success right away. The room is about 81.5 square metres.",
+      "numbers": [
+        {
+          "say": "Co-working Lounge อยู่ชั้น 3 อาคาร A ถัดจาก Social Lounge ค่ะ",
+          "source": "story:coworking_where",
+          "as": "Co-working Lounge อยู่ชั้น 3 อาคาร A ถัดจาก Social Lounge ค่ะ"
+        },
+        {
+          "say": "ห้องประมาณ 81.5 ตารางเมตรค่ะ",
+          "source": "story:coworking_where",
+          "as": "ห้องประมาณ 81.5 ตารางเมตรค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: coworking_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_developer",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "developer",
+      "host_th": null,
+      "th": "โครงการของเราพัฒนาโดย Empire Group ค่ะ มีประสบการณ์มากกว่า 20 ปี ส่งมอบที่อยู่อาศัยแล้วมากกว่า 6,000 ยูนิต และพัฒนาโครงการสำเร็จมาแล้ว 16 โครงการ ผลงานที่ผ่านมาของเรา เช่น Empire Tower, The Orient Resort & Spa และ The Vision และได้รับรางวัลด้านอสังหาริมทรัพย์หลายรายการ ตั้งแต่ปี 2011 ถึง 2025 ค่ะ",
+      "en": "Our project is developed by Empire Group, with more than 20 years of experience, more than 6,000 homes delivered, and 16 successful developments. Our past projects include Empire Tower, The Orient Resort & Spa and The Vision, and our work has received many property awards from 2011 to 2025.",
+      "numbers": [
+        {
+          "say": "มีประสบการณ์มากกว่า 20 ปี",
+          "source": "story:developer",
+          "as": "มีประสบการณ์มากกว่า 20 ปี"
+        },
+        {
+          "say": "ส่งมอบที่อยู่อาศัยแล้วมากกว่า 6,000 ยูนิต",
+          "source": "story:developer",
+          "as": "ส่งมอบที่อยู่อาศัยแล้วมากกว่า 6,000 ยูนิต"
+        },
+        {
+          "say": "และพัฒนาโครงการสำเร็จมาแล้ว 16 โครงการ",
+          "source": "story:developer",
+          "as": "และพัฒนาโครงการสำเร็จมาแล้ว 16 โครงการ"
+        },
+        {
+          "say": "และได้รับรางวัลด้านอสังหาริมทรัพย์หลายรายการ ตั้งแต่ปี 2011 ถึง 2025 ค่ะ",
+          "source": "story:developer",
+          "as": "และได้รับรางวัลด้านอสังหาริมทรัพย์หลายรายการ ตั้งแต่ปี 2011 ถึง 2025 ค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: developer) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_developer_projects",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "developer_projects",
+      "host_th": null,
+      "th": "ตั้งแต่ปี 2006 Empire Group พัฒนามาแล้ว 16 โครงการในพัทยาค่ะ เริ่มจาก Hyde Park I และ II, Sunset Boulevard I, Pattaya Heights และ Park Lane Jomtien ตามด้วย Sunset Boulevard II, View, Paradise Park, Art on the Hill และ The Vision แล้วก็ Amazon Residence, City Center Residence, The Orient Resort & Spa และ The Empire Tower ล่าสุดคือ Embassy กับ Embassy Life และ Embassy World ของเราคือโครงการถัดไปค่ะ",
+      "en": "Since 2006, Empire Group has developed 16 projects in Pattaya, starting with Hyde Park I and II, Sunset Boulevard I, Pattaya Heights and Park Lane Jomtien, then Sunset Boulevard II, View, Paradise Park, Art on the Hill and The Vision, then Amazon Residence, City Center Residence, The Orient Resort & Spa and The Empire Tower, and most recently Embassy and Embassy Life, with our Embassy World as the next one.",
+      "numbers": [
+        {
+          "say": "ตั้งแต่ปี 2006 Empire Group พัฒนามาแล้ว 16 โครงการในพัทยาค่ะ",
+          "source": "story:developer_projects",
+          "as": "ตั้งแต่ปี 2006 Empire Group พัฒนามาแล้ว 16 โครงการในพัทยาค่ะ"
+        }
+      ],
+      "words_ok": [
+        "as the next one"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: developer_projects) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_executives",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "executives",
+      "host_th": null,
+      "th": "ผู้บริหารของ Empire Group นำโดย CEO คุณ Miki Haim ค่ะ Chief Operating Officer คือคุณพุทธชาด สุจริตกุล Chief Financial Officer คือคุณ Dor Haim และ General Manager คือคุณ Moran S. Haim ค่ะ",
+      "en": "Empire Group is led by its CEO, Miki Haim, with Pudthachad Sucharitakul as Chief Operating Officer, Dor Haim as Chief Financial Officer, and Moran S. Haim as General Manager.",
+      "numbers": [],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: executives) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_facilities_basement",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "facilities_basement",
+      "host_th": null,
+      "th": "ชั้นใต้ดินมีสระในร่ม Aqua Cinema ต่อด้วย Journey to Mars ซาวน่าเกลือหิมาลัย ห้องแช่น้ำแข็ง ซาวน่าเตียงแขวน ซาวน่าคริสตัล และแคปซูลไฮโดรเทอราพีค่ะ",
+      "en": "Down in the basement there's Aqua Cinema, an indoor pool, flowing into Journey to Mars, a Himalayan Salt Sauna, an Ice Bath, a Floating Swing Sauna, a Crystal Stone Sauna, and the Hydrotherapy Capsule.",
+      "numbers": [],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: facilities_basement) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_facilities_ground",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "facilities_ground",
+      "host_th": null,
+      "th": "ชั้น G มีฟิตเนส Biogenesis ริมสระค่ะ ห้องปั่นจักรยาน Spinning Class พิลาทิสสตูดิโอ บันจี้ยิมและโยคะ และห้องเด็ก Junior World ค่ะ",
+      "en": "On the ground floor there's Biogenesis, our fitness centre by the pool, a Spinning Class studio, a Pilates Studio, Bungee Gym & Yoga, and Junior World for the kids.",
+      "numbers": [],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: facilities_ground) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_facilities_level3",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "facilities_level3",
+      "host_th": null,
+      "th": "ชั้น 3 อาคาร A มี Social Lounge Co-working Lounge ไว้นั่งทำงาน โถงส่วนกลาง Common Sphere และ Sky Pool ค่ะ",
+      "en": "Level 3 of Building A has the Social Lounge, a Co-working Lounge to work in, the Common Sphere, and the Sky Pool.",
+      "numbers": [
+        {
+          "say": "ชั้น 3 อาคาร A มี Social Lounge",
+          "source": "story:facilities_level3",
+          "as": "ชั้น 3 อาคาร A มี Social Lounge"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: facilities_level3) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_fitness_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "fitness_where",
+      "host_th": null,
+      "th": "ฟิตเนส Biogenesis อยู่ชั้น G อาคาร A พื้นที่ประมาณ 197 ตารางเมตรค่ะ ออกกำลังกายไปพร้อมวิวสระผ่านผนังกระจกโค้ง เงยหน้าขึ้นไปก็เห็นท้องสระกระจกของ Sky Pool อยู่ด้านบนเลยค่ะ ใครเข้ายิมแล้วยังเลือกไม่ถูกว่าจะเล่นท่าไหน ที่นี่มีเทคโนโลยีทันสมัยช่วยได้ค่ะ เครื่องวิเคราะห์ร่างกายจะเช็กตัวเรา แนะนำท่าที่เหมาะ แล้วจัดตารางออกกำลังกายกับตารางการกินให้เลยค่ะ ข้างในมีลู่วิ่ง 8 เครื่อง ครึ่งหนึ่งเป็นแบบสายพานโค้ง พร้อมเครื่องเวทและดัมเบลค่ะ",
+      "en": "Our fitness centre, Biogenesis, is on the ground floor of Building A, about 197 square metres, where you work out with a view of the pool through curved glass, and the Sky Pool right above your head. And if you've ever walked into a gym not knowing which exercises to do, our modern technology is here to help. A body-analysis machine checks you over, picks the right exercises for you and builds your workout and meal plan. Inside there are eight treadmills, half of them curved, plus weight machines and dumbbells.",
+      "numbers": [
+        {
+          "say": "ฟิตเนส Biogenesis อยู่ชั้น G อาคาร A พื้นที่ประมาณ 197 ตารางเมตรค่ะ",
+          "source": "story:fitness_where",
+          "as": "ฟิตเนส Biogenesis อยู่ชั้น G อาคาร A พื้นที่ประมาณ 197 ตารางเมตรค่ะ"
+        },
+        {
+          "say": "ข้างในมีลู่วิ่ง 8 เครื่อง ครึ่งหนึ่งเป็นแบบสายพานโค้ง พร้อมเครื่องเวทและดัมเบลค่ะ",
+          "source": "story:fitness_where",
+          "as": "ข้างในมีลู่วิ่ง 8 เครื่อง ครึ่งหนึ่งเป็นแบบสายพานโค้ง พร้อมเครื่องเวทและดัมเบลค่ะ"
+        }
+      ],
+      "words_ok": [
+        "half of them curved",
+        "ครึ่งหนึ่งเป็นแบบสายพานโค้ง"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: fitness_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_for_families",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "for_families",
+      "host_th": null,
+      "th": "ที่นี่มีที่เล่นให้น้องๆ ทั้งในร่มและกลางแจ้งค่ะ ในร่มมีห้องเด็ก Junior World ธีมอวกาศ มีบ่อบอลด้วย ข้างนอกมีลานเด็กเล่นธีมอวกาศ 137 ตารางเมตร มีสไลเดอร์ ชิงช้า และแทรมโพลีน ติดกันมีสระเด็ก Kid Pool และบ่อน้ำตื้นพร้อมน้ำพุ และสวนสาธารณะข้างโครงการก็มีสนามเด็กเล่นค่ะ",
+      "en": "We have places for children to play, indoors and out. Indoors, Junior World is a space-themed kids' room with a ball pit. Outside, there's a 137-square-metre space playground with slides, a swing and trampolines, with a Kid Pool and a shallow pond with water jets right beside it, and the public park next door has a playground too.",
+      "numbers": [
+        {
+          "say": "ข้างนอกมีลานเด็กเล่นธีมอวกาศ 137 ตารางเมตร มีสไลเดอร์ ชิงช้า และแทรมโพลีน",
+          "source": "story:for_families",
+          "as": "ข้างนอกมีลานเด็กเล่นธีมอวกาศ 137 ตารางเมตร มีสไลเดอร์ ชิงช้า และแทรมโพลีน"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: for_families) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_hydro_capsule_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "hydro_capsule_where",
+      "host_th": null,
+      "th": "แคปซูลไฮโดรเทอราพีอยู่ชั้นใต้ดิน ห้องสุดท้ายของแถวซาวน่าค่ะ ในห้องกระจกสไตล์ล้ำยุค มีแคปซูลสปาสีขาวสองเครื่องค่ะ เป็นแคปซูลอบผิวค่ะ เข้าไปนอนให้ตัวอยู่ข้างใน ตั้งแต่คอลงไป แล้วระบบทันสมัยจะทำสปาผิวให้ทั่วทั้งตัว ผ่อนคลายเหมือนมีสปาส่วนตัวเลยค่ะ",
+      "en": "The Hydrotherapy Capsule room is in the basement, the last room in the sauna row. In a futuristic glass room there are two white spa capsules. It's a skin spa capsule: you lie inside, with your body in the capsule from the neck down, and modern technology gives your skin a full spa treatment, like having your own private spa.",
+      "numbers": [
+        {
+          "say": "ในห้องกระจกสไตล์ล้ำยุค มีแคปซูลสปาสีขาวสองเครื่องค่ะ",
+          "source": "story:hydro_capsule_where",
+          "as": "ในห้องกระจกสไตล์ล้ำยุค มีแคปซูลสปาสีขาวสองเครื่องค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: hydro_capsule_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_ice_bath_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "ice_bath_where",
+      "host_th": null,
+      "th": "Ice Bath ห้องแช่น้ำแข็ง อยู่ชั้นใต้ดิน ถัดจากซาวน่าเกลือหิมาลัยค่ะ หลังออกกำลังกายหนักๆ หลายคนนิยมมาแช่น้ำเย็นจัด เพื่อคลายอาการปวดเมื่อย และให้ร่างกายฟื้นตัวเร็วขึ้นค่ะ มีระบบควบคุมอุณหภูมิ ไม่ให้น้ำเย็นจนเป็นอันตราย มือใหม่หรือคนที่แช่เป็นประจำก็ใช้ได้อย่างอุ่นใจค่ะ เป็นห้องโทนขาวฟ้า มีอ่างแช่ทรงกลม พื้นที่ไม่เกินราว 31 ตารางเมตรค่ะ",
+      "en": "The Ice Bath is in the basement, next to the Himalayan Salt Sauna. After a hard workout, many people come for an icy soak to ease sore muscles and help the body recover faster. The temperature is controlled so it never gets dangerously cold, letting beginners and regulars alike use it with peace of mind. It's a white-and-blue room with round plunge tubs, up to about 31 square metres.",
+      "numbers": [
+        {
+          "say": "เป็นห้องโทนขาวฟ้า มีอ่างแช่ทรงกลม พื้นที่ไม่เกินราว 31 ตารางเมตรค่ะ",
+          "source": "story:ice_bath_where",
+          "as": "เป็นห้องโทนขาวฟ้า มีอ่างแช่ทรงกลม พื้นที่ไม่เกินราว 31 ตารางเมตรค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: ice_bath_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_journey_future_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "journey_future_where",
+      "host_th": null,
+      "th": "Journey to the Future คือทางเดินจากล็อบบี้ ก่อนเข้าสู่ส่วนกลางและห้องพักของโครงการค่ะ ทั้งเส้นออกแบบเป็นสวนจำลองสไตล์โลกอนาคต เพดานประดับแสงดาวระยิบ ผนังด้านหนึ่งเป็นกระจกโค้งโชว์สวนในร่ม ผ่านตรงนี้ทีไรก็เหมือนได้ก้าวสู่อนาคตจริงๆ ค่ะ ส่วน Journey to Mars เป็นคนละที่กันนะคะ อยู่โซนสระชั้นใต้ดินค่ะ",
+      "en": "Journey to the Future is the walkway from the lobby that leads you into the facilities and the residences. It's designed as a garden from a future world, with a ceiling of twinkling stars and a curved glass wall around an indoor garden; every walk feels like a trip into the future. Journey to Mars is a different place, down in the basement pool zone.",
+      "numbers": [
+        {
+          "say": "เพดานประดับแสงดาวระยิบ ผนังด้านหนึ่งเป็นกระจกโค้งโชว์สวนในร่ม ผ่านตรงนี้ทีไรก็เหมือนได้ก้าวสู่อนาคตจริงๆ ค่ะ",
+          "source": "story:journey_future_where",
+          "as": "เพดานประดับแสงดาวระยิบ ผนังด้านหนึ่งเป็นกระจกโค้งโชว์สวนในร่ม ผ่านตรงนี้ทีไรก็เหมือนได้ก้าวสู่อนาคตจริงๆ ค่ะ"
+        }
+      ],
+      "words_ok": [
+        "ผนังด้านหนึ่ง"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: journey_future_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_journey_mars_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "journey_mars_where",
+      "host_th": null,
+      "th": "Journey to Mars อยู่ชั้นใต้ดิน ต่อจากสระ Aqua Cinema ค่ะ เป็นทางน้ำธีมอวกาศ ที่พาเราเข้าไปในอุโมงค์ลายกาแล็กซี ใช้เทคโนโลยีจากญี่ปุ่นสร้างบรรยากาศ ให้รู้สึกเหมือนหลุดเข้าไปในอวกาศจริงๆ แบบที่หาที่ไหนในพัทยาไม่ได้เลยค่ะ โถงยาวประมาณ 16 เมตรค่ะ",
+      "en": "Journey to Mars is in the basement, carrying on from the Aqua Cinema pool. It's a space-themed waterway leading into a galaxy tunnel, with technology from Japan that makes it feel like drifting into space, an atmosphere you won't find anywhere else in Pattaya. The hall is about 16 metres long.",
+      "numbers": [
+        {
+          "say": "โถงยาวประมาณ 16 เมตรค่ะ",
+          "source": "story:journey_mars_where",
+          "as": "โถงยาวประมาณ 16 เมตรค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: journey_mars_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_kids_room_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "kids_room_where",
+      "host_th": null,
+      "th": "ห้องเด็ก Junior World อยู่ชั้น G อาคาร A ค่ะ เป็นห้องเล่นธีมสถานีอวกาศ น้องๆ เข้ามาแล้วจะสนุกเหมือนได้ออกไปผจญภัยนอกโลก มีบ่อบอล และกำแพงเกมโยนบอลให้แข่งกันทำคะแนนด้วยค่ะ ห้องขนาดประมาณ 75 ตารางเมตร แล้วพอออกไปด้านนอก Junior World ก็มี Playground สนามเด็กเล่นกลางแจ้ง ให้วิ่งเล่นกันต่อได้อีกค่ะ",
+      "en": "Junior World, our kids' room, is on the ground floor of Building A. It's a space-station playroom where the little ones feel like they're off on a space adventure, with a ball pit and a ball-throwing game wall where they compete for points. The room is about 75 square metres, and right outside Junior World there's the Playground, an outdoor play area where they can keep the fun going.",
+      "numbers": [
+        {
+          "say": "ห้องขนาดประมาณ 75 ตารางเมตร",
+          "source": "story:kids_room_where",
+          "as": "ห้องขนาดประมาณ 75 ตารางเมตร"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: kids_room_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_lagoon_islands",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "lagoon_islands",
+      "host_th": null,
+      "th": "ในลากูนของเรามีเกาะกลางน้ำ 5 เกาะค่ะ รวมพื้นที่ 180 ตารางเมตร มีที่นั่งพักผ่อนแบบลดระดับกลางน้ำ และเกาะจากุซซี่ค่ะ",
+      "en": "Our Water Lagoon has five islands, 180 square metres in all, with sunken seating out on the water, and a jacuzzi island.",
+      "numbers": [
+        {
+          "say": "ในลากูนของเรามีเกาะกลางน้ำ 5 เกาะค่ะ",
+          "source": "story:lagoon_islands",
+          "as": "ในลากูนของเรามีเกาะกลางน้ำ 5 เกาะค่ะ"
+        },
+        {
+          "say": "รวมพื้นที่ 180 ตารางเมตร",
+          "source": "story:lagoon_islands",
+          "as": "รวมพื้นที่ 180 ตารางเมตร"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: lagoon_islands) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_lobby_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "lobby_where",
+      "host_th": null,
+      "th": "ล็อบบี้ของเราอยู่ชั้น G กลางอาคาร A ค่ะ ตรงหน้าเป็นลานรถรับส่ง เพดานสูงโปร่งถึง 6 เมตร เดินเข้ามาก็รู้สึกโอ่อ่าเหมือนโรงแรมห้าดาว เป็นหน้าเป็นตาให้เจ้าของห้อง ใครมาเยี่ยมก็รู้ได้ตั้งแต่ก้าวแรกว่าเราอยู่ระดับไหนค่ะ ข้างในตกแต่งโทนขาวเงิน เคาน์เตอร์ต้อนรับเป็นโลหะเงาทรงพลิ้ว และเพดานเป็นวงแหวนซ้อนกันหลายชั้น พื้นที่ 130.5 ตารางเมตร และต่อตรงเข้าทางเดิน Journey to the Future ที่พาไปยังส่วนกลางค่ะ",
+      "en": "Our lobby sits in the middle of Building A's ground floor, right by the drop-off court. With a 6-metre ceiling, it feels grand the moment you walk in, like a five-star hotel, and from the very first step, it shows every visitor the standard our residents enjoy. Inside, it's white and silver, with a liquid-metal reception counter and a ceiling of layered rings. It's 130.5 square metres and opens onto the Journey to the Future walkway, which leads to the facilities.",
+      "numbers": [
+        {
+          "say": "เพดานสูงโปร่งถึง 6 เมตร เดินเข้ามาก็รู้สึกโอ่อ่าเหมือนโรงแรมห้าดาว",
+          "source": "story:lobby_where",
+          "as": "เพดานสูงโปร่งถึง 6 เมตร เดินเข้ามาก็รู้สึกโอ่อ่าเหมือนโรงแรมห้าดาว"
+        },
+        {
+          "say": "พื้นที่ 130.5 ตารางเมตร และต่อตรงเข้าทางเดิน Journey to the Future ที่พาไปยังส่วนกลางค่ะ",
+          "source": "story:lobby_where",
+          "as": "พื้นที่ 130.5 ตารางเมตร และต่อตรงเข้าทางเดิน Journey to the Future ที่พาไปยังส่วนกลางค่ะ"
+        }
+      ],
+      "words_ok": [
+        "the very first step"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: lobby_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_nearby_7eleven",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "nearby_7eleven",
+      "host_th": null,
+      "th": "เซเว่นที่ใกล้ที่สุดอยู่ในปั๊มน้ำมัน PTT ขับรถไปแค่ประมาณ 3 นาที แวะเติมน้ำมันแล้วซื้อของใช้ได้ในที่เดียวเลยค่ะ ส่วน FamilyMart ก็ห่างประมาณ 4 นาทีค่ะ",
+      "en": "The nearest 7-Eleven is at the PTT petrol station, just a 3-minute drive from the project, so you can fill up and pick up your daily needs in one stop. A FamilyMart is about 4 minutes away.",
+      "numbers": [
+        {
+          "say": "เซเว่นที่ใกล้ที่สุดอยู่ในปั๊มน้ำมัน PTT ขับรถไปแค่ประมาณ 3 นาที",
+          "source": "story:nearby_7eleven",
+          "as": "เซเว่นที่ใกล้ที่สุดอยู่ในปั๊มน้ำมัน PTT ขับรถไปแค่ประมาณ 3 นาที"
+        },
+        {
+          "say": "ส่วน FamilyMart ก็ห่างประมาณ 4 นาทีค่ะ",
+          "source": "story:nearby_7eleven",
+          "as": "ส่วน FamilyMart ก็ห่างประมาณ 4 นาทีค่ะ"
+        }
+      ],
+      "words_ok": [
+        "7-Eleven",
+        "in one stop"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: nearby_7eleven) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_nearby_attractions",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "nearby_attractions",
+      "host_th": null,
+      "th": "ที่เที่ยวที่ใกล้ที่สุดคือ Underwater World พัทยา ขับรถประมาณ 6 นาทีค่ะ ตลาดน้ำสี่ภาคก็ใกล้เคียงกัน พระใหญ่บนเขาพระตำหนักประมาณ 12 นาที ส่วนปราสาทสัจธรรมกับสวนนงนุชประมาณ 19 นาทีค่ะ",
+      "en": "The closest attraction is Underwater World Pattaya, about 6 minutes by car, the Pattaya Floating Market about the same, the Big Buddha on Pratumnak Hill about 12 minutes, and the Sanctuary of Truth and Nong Nooch Tropical Garden about 19 minutes.",
+      "numbers": [
+        {
+          "say": "ที่เที่ยวที่ใกล้ที่สุดคือ Underwater World พัทยา ขับรถประมาณ 6 นาทีค่ะ",
+          "source": "story:nearby_attractions",
+          "as": "ที่เที่ยวที่ใกล้ที่สุดคือ Underwater World พัทยา ขับรถประมาณ 6 นาทีค่ะ"
+        },
+        {
+          "say": "ประมาณ 6 นาที",
+          "source": "story:nearby_attractions",
+          "as": "ประมาณ 6 นาที"
+        },
+        {
+          "say": "พระใหญ่บนเขาพระตำหนักประมาณ 12 นาที",
+          "source": "story:nearby_attractions",
+          "as": "พระใหญ่บนเขาพระตำหนักประมาณ 12 นาที"
+        },
+        {
+          "say": "ส่วนปราสาทสัจธรรมกับสวนนงนุชประมาณ 19 นาทีค่ะ",
+          "source": "story:nearby_attractions",
+          "as": "ส่วนปราสาทสัจธรรมกับสวนนงนุชประมาณ 19 นาทีค่ะ"
+        }
+      ],
+      "words_ok": [
+        "ตลาดน้ำสี่ภาค"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: nearby_attractions) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_nearby_hospitals",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "nearby_hospitals",
+      "host_th": null,
+      "th": "ถ้าต้องไปหาหมอ แนะนำโรงพยาบาลจอมเทียนค่ะ เป็นโรงพยาบาลที่ใกล้ที่สุด ห่างประมาณ 8 นาที อยู่ในเครือเดียวกับโรงพยาบาลกรุงเทพพัทยา ที่ห่างประมาณ 11 นาทีค่ะ แล้วก็มีโรงพยาบาลเมืองพัทยา ห่างประมาณ 10 นาทีค่ะ",
+      "en": "If you need to see a doctor, we recommend Jomtien Hospital, the nearest hospital, about 8 minutes away. It's in the same group as Bangkok Hospital Pattaya, which is about 11 minutes away. There is also Pattaya City Hospital, about 10 minutes away.",
+      "numbers": [
+        {
+          "say": "ถ้าต้องไปหาหมอ แนะนำโรงพยาบาลจอมเทียนค่ะ เป็นโรงพยาบาลที่ใกล้ที่สุด ห่างประมาณ 8 นาที",
+          "source": "story:nearby_hospitals",
+          "as": "ถ้าต้องไปหาหมอ แนะนำโรงพยาบาลจอมเทียนค่ะ เป็นโรงพยาบาลที่ใกล้ที่สุด ห่างประมาณ 8 นาที"
+        },
+        {
+          "say": "อยู่ในเครือเดียวกับโรงพยาบาลกรุงเทพพัทยา ที่ห่างประมาณ 11 นาทีค่ะ",
+          "source": "story:nearby_hospitals",
+          "as": "อยู่ในเครือเดียวกับโรงพยาบาลกรุงเทพพัทยา ที่ห่างประมาณ 11 นาทีค่ะ"
+        },
+        {
+          "say": "แล้วก็มีโรงพยาบาลเมืองพัทยา ห่างประมาณ 10 นาทีค่ะ",
+          "source": "story:nearby_hospitals",
+          "as": "แล้วก็มีโรงพยาบาลเมืองพัทยา ห่างประมาณ 10 นาทีค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: nearby_hospitals) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_nearby_restaurants",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "nearby_restaurants",
+      "host_th": null,
+      "th": "ร้านอาหารที่ใกล้ที่สุดคือ Big Whale Seafood บุฟเฟต์ซีฟู้ดปิ้งย่าง ขับรถประมาณ 3 นาทีค่ะ ถ้าเดินไปประมาณ 11 นาที ริมหาดจอมเทียนมีคาเฟ่และร้านอาหาร อย่าง Apple Bee Cafe กับ Toy Seafood ขับรถประมาณ 4 นาที และร้านซีฟู้ดชื่อดังอย่างปูเป็น ซีฟู้ด ประมาณ 6 นาทีค่ะ",
+      "en": "The nearest restaurant is Big Whale Seafood, a seafood barbecue buffet, about 3 minutes by car, or about 11 minutes on foot. On the Jomtien beach road there are cafes and restaurants like Apple Bee Cafe and Toy Seafood, about 4 minutes by car, and the well-known Pupen Seafood about 6 minutes.",
+      "numbers": [
+        {
+          "say": "ร้านอาหารที่ใกล้ที่สุดคือ Big Whale Seafood บุฟเฟต์ซีฟู้ดปิ้งย่าง ขับรถประมาณ 3 นาทีค่ะ",
+          "source": "story:nearby_restaurants",
+          "as": "ร้านอาหารที่ใกล้ที่สุดคือ Big Whale Seafood บุฟเฟต์ซีฟู้ดปิ้งย่าง ขับรถประมาณ 3 นาทีค่ะ"
+        },
+        {
+          "say": "ถ้าเดินไปประมาณ 11 นาที",
+          "source": "story:nearby_restaurants",
+          "as": "ถ้าเดินไปประมาณ 11 นาที"
+        },
+        {
+          "say": "ริมหาดจอมเทียนมีคาเฟ่และร้านอาหาร อย่าง Apple Bee Cafe กับ Toy Seafood ขับรถประมาณ 4 นาที",
+          "source": "story:nearby_restaurants",
+          "as": "ริมหาดจอมเทียนมีคาเฟ่และร้านอาหาร อย่าง Apple Bee Cafe กับ Toy Seafood ขับรถประมาณ 4 นาที"
+        },
+        {
+          "say": "และร้านซีฟู้ดชื่อดังอย่างปูเป็น ซีฟู้ด ประมาณ 6 นาทีค่ะ",
+          "source": "story:nearby_restaurants",
+          "as": "และร้านซีฟู้ดชื่อดังอย่างปูเป็น ซีฟู้ด ประมาณ 6 นาทีค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: nearby_restaurants) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_nearby_schools",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "nearby_schools",
+      "host_th": null,
+      "th": "รอบพัทยามีโรงเรียนนานาชาติชื่อดังให้เลือกหลายแห่ง เดินทางจากที่นี่สะดวกค่ะ อย่างโรงเรียนธาราพัฒนา ห่างประมาณ 13 นาที มูลตรีภักดีประมาณ 16 นาที รีเจ้นท์ประมาณ 18 นาที รักบี้สคูลประมาณ 29 นาที และเซนต์แอนดรูว์ส กรีนวัลเลย์ ประมาณ 41 นาทีค่ะ มูลตรีภักดี รีเจ้นท์ และรักบี้ เป็นโรงเรียนใหญ่ แต่ละที่มีนักเรียนกว่าพันคนเลยค่ะ",
+      "en": "Several of Pattaya's best-known international schools are an easy drive from here. Tara Pattana is about 13 minutes away, Mooltripakdee about 16, Regents about 18, Rugby School about 29, and St Andrews Green Valley about 41 minutes. Mooltripakdee, Regents and Rugby are the big ones, each with more than a thousand students.",
+      "numbers": [
+        {
+          "say": "อย่างโรงเรียนธาราพัฒนา ห่างประมาณ 13 นาที",
+          "source": "story:nearby_schools",
+          "as": "อย่างโรงเรียนธาราพัฒนา ห่างประมาณ 13 นาที"
+        },
+        {
+          "say": "มูลตรีภักดีประมาณ 16 นาที",
+          "source": "story:nearby_schools",
+          "as": "มูลตรีภักดีประมาณ 16 นาที"
+        },
+        {
+          "say": "รีเจ้นท์ประมาณ 18 นาที",
+          "source": "story:nearby_schools",
+          "as": "รีเจ้นท์ประมาณ 18 นาที"
+        },
+        {
+          "say": "รักบี้สคูลประมาณ 29 นาที",
+          "source": "story:nearby_schools",
+          "as": "รักบี้สคูลประมาณ 29 นาที"
+        },
+        {
+          "say": "และเซนต์แอนดรูว์ส กรีนวัลเลย์ ประมาณ 41 นาทีค่ะ",
+          "source": "story:nearby_schools",
+          "as": "และเซนต์แอนดรูว์ส กรีนวัลเลย์ ประมาณ 41 นาทีค่ะ"
+        },
+        {
+          "say": "มูลตรีภักดี รีเจ้นท์ และรักบี้ เป็นโรงเรียนใหญ่ แต่ละที่มีนักเรียนกว่าพันคนเลยค่ะ",
+          "source": "story:nearby_schools",
+          "as": "มูลตรีภักดี รีเจ้นท์ และรักบี้ เป็นโรงเรียนใหญ่ แต่ละที่มีนักเรียนกว่าพันคนเลยค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: nearby_schools) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_park_green",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "park_green",
+      "host_th": null,
+      "th": "เราอยู่ติดสวนสาธารณะหนองโพรง ในสวนมีบึงน้ำและทางวิ่งค่ะ ในโครงการเองมีพื้นที่สีเขียว 4,256 ตารางเมตร ปลูกต้นไม้และไม้พุ่มรวม 34 ชนิด อย่างจิกน้ำ โมกมัน และมะฮอกกานี และสวนขั้นบันได Stepped Garden ริมสระ มีเตียงอาบแดดค่ะ",
+      "en": "We're right next to Nong Phrong public park, with its lake and jogging path. Inside the project there are 4,256 square metres of green space, planted with 34 kinds of trees and shrubs, like Indian oak, water jasmine and mahogany, and a Stepped Garden of lawns by the pool, with sun loungers.",
+      "numbers": [
+        {
+          "say": "ในโครงการเองมีพื้นที่สีเขียว 4,256 ตารางเมตร",
+          "source": "story:park_green",
+          "as": "ในโครงการเองมีพื้นที่สีเขียว 4,256 ตารางเมตร"
+        },
+        {
+          "say": "ปลูกต้นไม้และไม้พุ่มรวม 34 ชนิด อย่างจิกน้ำ โมกมัน และมะฮอกกานี",
+          "source": "story:park_green",
+          "as": "ปลูกต้นไม้และไม้พุ่มรวม 34 ชนิด อย่างจิกน้ำ โมกมัน และมะฮอกกานี"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: park_green) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_pilates_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "pilates_where",
+      "host_th": null,
+      "th": "Pilates Studio อยู่ชั้น G อาคาร A ค่ะ มีเตียง Reformer 4 เครื่อง เป็นรุ่นทันสมัยที่มีจอติดมากับตัวเตียง จอจะบอกท่าและสอนวิธีเล่น ฝึกตามได้อย่างมั่นใจ ท่ามกลางบรรยากาศท้องฟ้ายามพระอาทิตย์ตกค่ะ ห้องขนาด 33.7 ตารางเมตร ผนังกระจกมองเห็นฟิตเนส Biogenesis ค่ะ",
+      "en": "The Pilates Studio is on the ground floor of Building A, with four modern Reformer machines, each with its own screen. The screen shows each move and how to do it, so you can follow along with confidence, surrounded by sunset-sky panels. The room is 33.7 square metres, with a glass wall onto the Biogenesis gym.",
+      "numbers": [
+        {
+          "say": "มีเตียง Reformer 4 เครื่อง เป็นรุ่นทันสมัยที่มีจอติดมากับตัวเตียง",
+          "source": "story:pilates_where",
+          "as": "มีเตียง Reformer 4 เครื่อง เป็นรุ่นทันสมัยที่มีจอติดมากับตัวเตียง"
+        },
+        {
+          "say": "ห้องขนาด 33.7 ตารางเมตร ผนังกระจกมองเห็นฟิตเนส Biogenesis ค่ะ",
+          "source": "story:pilates_where",
+          "as": "ห้องขนาด 33.7 ตารางเมตร ผนังกระจกมองเห็นฟิตเนส Biogenesis ค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: pilates_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_playground_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "playground_where",
+      "host_th": null,
+      "th": "Playground เป็นลานเล่นกลางแจ้งริมสระ ถัดจาก Junior World ค่ะ ธีมอวกาศ มียานอวกาศให้ปีนพร้อมสไลเดอร์ ชิงช้า และแทรมโพลีน มีบ่อน้ำตื้นพร้อมน้ำพุ และอยู่ติดสระเด็กค่ะ",
+      "en": "The Playground is an outdoor play area by the pool, next to Junior World. It's space-themed, with a spaceship to climb, slides, swings and trampolines, plus a splash pond with fountains, right by the Kid Pool.",
+      "numbers": [],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: playground_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_pools_all",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "pools_all",
+      "host_th": null,
+      "th": "ที่นี่มีสระทั้งกลางแจ้ง บนชั้น 3 และใต้ดินค่ะ สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ลึกประมาณ 1.3 เมตร ข้างปีกอาคารมี Private Pool อีก 3 สระ ข้างลานเด็กเล่นมี Kid Pool สระเด็กสำหรับน้องๆ ชั้น 3 อาคาร A มี Sky Pool พื้นสระบางส่วนเป็นกระจก และชั้นใต้ดินมีสระในร่ม Aqua Cinema ต่อไปถึง Journey to Mars สระหลักกับ Private Pool รวมกันราว 2,157 ตารางเมตรค่ะ",
+      "en": "We have pools outdoors, up on level 3 and underground. The main one is the Water Lagoon in the middle of the project, about 1.3 metres deep. Then there are three Private Pools beside the building wings, a Kid Pool for the little ones beside the playground, the Sky Pool on level 3 of Building A, with a partly glass floor, and in the basement the indoor Aqua Cinema pool, flowing on into Journey to Mars. The lagoon and private pools together come to about 2,157 square metres.",
+      "numbers": [
+        {
+          "say": "ที่นี่มีสระทั้งกลางแจ้ง บนชั้น 3 และใต้ดินค่ะ",
+          "source": "story:pools_all",
+          "as": "ที่นี่มีสระทั้งกลางแจ้ง บนชั้น 3 และใต้ดินค่ะ"
+        },
+        {
+          "say": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ลึกประมาณ 1.3 เมตร",
+          "source": "story:pools_all",
+          "as": "สระหลักคือ Water Lagoon สระลากูนกลางโครงการ ลึกประมาณ 1.3 เมตร"
+        },
+        {
+          "say": "ข้างปีกอาคารมี Private Pool อีก 3 สระ",
+          "source": "story:pools_all",
+          "as": "ข้างปีกอาคารมี Private Pool อีก 3 สระ"
+        },
+        {
+          "say": "ชั้น 3 อาคาร A มี Sky Pool พื้นสระบางส่วนเป็นกระจก",
+          "source": "story:pools_all",
+          "as": "ชั้น 3 อาคาร A มี Sky Pool พื้นสระบางส่วนเป็นกระจก"
+        },
+        {
+          "say": "สระหลักกับ Private Pool รวมกันราว 2,157 ตารางเมตรค่ะ",
+          "source": "story:pools_all",
+          "as": "สระหลักกับ Private Pool รวมกันราว 2,157 ตารางเมตรค่ะ"
+        }
+      ],
+      "words_ok": [
+        "The main one"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: pools_all) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_salt_sauna_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "salt_sauna_where",
+      "host_th": null,
+      "th": "ซาวน่าเกลือหิมาลัยอยู่ชั้นใต้ดิน เป็นห้องแรกติดโถงลิฟต์ค่ะ ผนังเป็นหินเกลือเรืองแสงโทนส้มอบอุ่นค่ะ",
+      "en": "The Himalayan Salt Sauna is in the basement, the first room by the lift lobby. Its walls are glowing, warm-orange salt stone.",
+      "numbers": [],
+      "words_ok": [
+        "the first room"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: salt_sauna_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_saunas_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "saunas_where",
+      "host_th": null,
+      "th": "ชั้นใต้ดินอาคาร A มีซาวน่าสามแบบค่ะ ซาวน่าเกลือหิมาลัย Floating Swing Sauna ซาวน่าเตียงแขวน และซาวน่าหินคริสตัล ในแถวเดียวกันมีห้องแช่น้ำแข็งด้วยค่ะ",
+      "en": "The basement of Building A has three kinds of sauna: a Himalayan Salt Sauna, a Floating Swing Sauna, and a Crystal Stone Sauna, with an Ice Bath in the same row.",
+      "numbers": [
+        {
+          "say": "ชั้นใต้ดินอาคาร A มีซาวน่าสามแบบค่ะ",
+          "source": "story:saunas_where",
+          "as": "ชั้นใต้ดินอาคาร A มีซาวน่าสามแบบค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: saunas_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_site_area",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "site_area",
+      "host_th": null,
+      "th": "ที่ดินของโครงการมีประมาณ 15,556 ตารางเมตร หรือราว 9 ไร่ 2 งานค่ะ เป็นโครงการโลว์ไรส์ที่มีที่ดินกว้างที่สุดในพัทยา แถมสระว่ายน้ำของเรายังยาวที่สุดด้วย ราว 155 เมตรเลยค่ะ",
+      "en": "Our land is about 15,556 square metres, or roughly 9 rai 2 ngan in Thai land units. It's the largest plot of any low-rise project in Pattaya, and our swimming pool is the longest too, about 155 metres.",
+      "numbers": [
+        {
+          "say": "ที่ดินของโครงการมีประมาณ 15,556 ตารางเมตร",
+          "source": "story:site_area",
+          "as": "ที่ดินของโครงการมีประมาณ 15,556 ตารางเมตร"
+        },
+        {
+          "say": "หรือราว 9 ไร่ 2 งานค่ะ",
+          "source": "story:site_area",
+          "as": "หรือราว 9 ไร่ 2 งานค่ะ"
+        },
+        {
+          "say": "แถมสระว่ายน้ำของเรายังยาวที่สุดด้วย ราว 155 เมตรเลยค่ะ",
+          "source": "story:site_area",
+          "as": "แถมสระว่ายน้ำของเรายังยาวที่สุดด้วย ราว 155 เมตรเลยค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: site_area) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_sky_pool_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "sky_pool_where",
+      "host_th": null,
+      "th": "Sky Pool อยู่ชั้น 3 อาคาร A ค่ะ อยู่เหนือฟิตเนสพอดี พื้นสระบางส่วนเป็นกระจกค่ะ ผิวน้ำประมาณ 143 ตารางเมตรค่ะ",
+      "en": "The Sky Pool is on level 3 of Building A, right above the fitness centre, and part of the pool floor is glass. It has about 143 square metres of water.",
+      "numbers": [
+        {
+          "say": "Sky Pool อยู่ชั้น 3 อาคาร A ค่ะ",
+          "source": "story:sky_pool_where",
+          "as": "Sky Pool อยู่ชั้น 3 อาคาร A ค่ะ"
+        },
+        {
+          "say": "ผิวน้ำประมาณ 143 ตารางเมตรค่ะ",
+          "source": "story:sky_pool_where",
+          "as": "ผิวน้ำประมาณ 143 ตารางเมตรค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: sky_pool_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_social_lounge_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "social_lounge_where",
+      "host_th": null,
+      "th": "Social Lounge อยู่ชั้น 3 อาคาร A ค่ะ เป็นเลานจ์โทนดำน้ำเงินสุดหรู ไว้นั่งพบปะสังสรรค์กัน และมีหุ่นยนต์ฮิวแมนนอยด์คอยชงเครื่องดื่มและเสิร์ฟให้ลูกบ้าน เหมือนได้ใช้ชีวิตในโลกอนาคตจริงๆ ค่ะ ห้องประมาณ 74.3 ตารางเมตร อยู่ติดโถงลิฟต์ค่ะ",
+      "en": "The Social Lounge is on level 3 of Building A. It's a sleek dark-blue lounge for getting together, where humanoid robots make and serve drinks for residents, a real taste of future living. The room is about 74.3 square metres, next to the lift lobby.",
+      "numbers": [
+        {
+          "say": "Social Lounge อยู่ชั้น 3 อาคาร A ค่ะ",
+          "source": "story:social_lounge_where",
+          "as": "Social Lounge อยู่ชั้น 3 อาคาร A ค่ะ"
+        },
+        {
+          "say": "ห้องประมาณ 74.3 ตารางเมตร อยู่ติดโถงลิฟต์ค่ะ",
+          "source": "story:social_lounge_where",
+          "as": "ห้องประมาณ 74.3 ตารางเมตร อยู่ติดโถงลิฟต์ค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: social_lounge_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_spinning_class_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "spinning_class_where",
+      "host_th": null,
+      "th": "ห้องปั่นจักรยาน Spinning Class อยู่ชั้น G อาคาร A ค่ะ มีจักรยาน 3 คัน แต่ละคันหันเข้าหาจอโค้ง LED ขนาดใหญ่ค่ะ ระหว่างปั่น จอจะขึ้นเกมหรือวิวสวยๆ ให้เพลิน เหมือนได้ปั่นออกไปเที่ยวจริงๆ จนลืมเหนื่อยเลยค่ะ ห้องขนาด 33.7 ตารางเมตร ถัดไปเป็น Pilates Studio ค่ะ",
+      "en": "The Spinning Class cycling studio is on the ground floor of Building A. There are three bikes, each facing big curved LED screens, and as you ride, they show games or beautiful scenery, so it feels like a real ride outdoors and you forget how hard you're working. The room is 33.7 square metres, with the Pilates Studio next door.",
+      "numbers": [
+        {
+          "say": "มีจักรยาน 3 คัน แต่ละคันหันเข้าหาจอโค้ง LED ขนาดใหญ่ค่ะ",
+          "source": "story:spinning_class_where",
+          "as": "มีจักรยาน 3 คัน แต่ละคันหันเข้าหาจอโค้ง LED ขนาดใหญ่ค่ะ"
+        },
+        {
+          "say": "ห้องขนาด 33.7 ตารางเมตร ถัดไปเป็น Pilates Studio ค่ะ",
+          "source": "story:spinning_class_where",
+          "as": "ห้องขนาด 33.7 ตารางเมตร ถัดไปเป็น Pilates Studio ค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: spinning_class_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_swing_sauna_where",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "swing_sauna_where",
+      "host_th": null,
+      "th": "Floating Swing Sauna อยู่ชั้นใต้ดิน ถัดจาก Ice Bath ค่ะ ในห้องมีเก้าอี้นอนแขวนจากเพดาน ได้อบซาวน่าแบบตัวลอยๆ เหมือนหลุดจากแรงโน้มถ่วง รู้สึกตัวเบา สบาย ไม่เหมือนซาวน่าแบบไหนที่เคยลองมาเลยค่ะ ห้องประมาณ 20 ตารางเมตรค่ะ",
+      "en": "The Floating Swing Sauna is in the basement, next to the Ice Bath. Its loungers hang from the ceiling, so you relax in the heat as if you were floating, free of gravity. You feel light and completely at ease, unlike any sauna you've tried before. The room is about 20 square metres.",
+      "numbers": [
+        {
+          "say": "ห้องประมาณ 20 ตารางเมตรค่ะ",
+          "source": "story:swing_sauna_where",
+          "as": "ห้องประมาณ 20 ตารางเมตรค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: swing_sauna_where) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_travel_airports",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "travel_airports",
+      "host_th": null,
+      "th": "สนามบินอู่ตะเภาขับรถประมาณ 30 นาที และสุวรรณภูมิประมาณชั่วโมงครึ่งค่ะ",
+      "en": "U-Tapao Airport is about 30 minutes by car, and Suvarnabhumi about an hour and a half.",
+      "numbers": [
+        {
+          "say": "สนามบินอู่ตะเภาขับรถประมาณ 30 นาที",
+          "source": "story:travel_airports",
+          "as": "สนามบินอู่ตะเภาขับรถประมาณ 30 นาที"
+        }
+      ],
+      "words_ok": [
+        "an hour and a half",
+        "ชั่วโมงครึ่ง"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: travel_airports) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_travel_bangkok",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "travel_bangkok",
+      "host_th": null,
+      "th": "จากโครงการขับไปขึ้นมอเตอร์เวย์ได้ภายใน 15 นาที เดินทางสะดวกมากค่ะ เข้ากรุงเทพขับรถประมาณ 1 ชั่วโมงครึ่ง สนามบินสุวรรณภูมิก็ใช้เวลาใกล้เคียงกัน ส่วนดอนเมืองประมาณ 2 ชั่วโมงค่ะ",
+      "en": "From here you can be on the motorway within 15 minutes, so getting around is easy. Bangkok is about an hour and a half by car, Suvarnabhumi Airport about the same, and Don Mueang Airport about two hours.",
+      "numbers": [
+        {
+          "say": "จากโครงการขับไปขึ้นมอเตอร์เวย์ได้ภายใน 15 นาที เดินทางสะดวกมากค่ะ",
+          "source": "story:travel_bangkok",
+          "as": "จากโครงการขับไปขึ้นมอเตอร์เวย์ได้ภายใน 15 นาที เดินทางสะดวกมากค่ะ"
+        },
+        {
+          "say": "เข้ากรุงเทพขับรถประมาณ 1 ชั่วโมงครึ่ง",
+          "source": "story:travel_bangkok",
+          "as": "เข้ากรุงเทพขับรถประมาณ 1 ชั่วโมงครึ่ง"
+        },
+        {
+          "say": "ส่วนดอนเมืองประมาณ 2 ชั่วโมงค่ะ",
+          "source": "story:travel_bangkok",
+          "as": "ส่วนดอนเมืองประมาณ 2 ชั่วโมงค่ะ"
+        }
+      ],
+      "words_ok": [
+        "an hour and a half",
+        "1 ชั่วโมงครึ่ง"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: travel_bangkok) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_travel_malls",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "travel_malls",
+      "host_th": null,
+      "th": "เซ็นทรัล พัทยา ขับรถประมาณ 12 นาที ระยะทางราว 9.9 กิโลเมตรค่ะ ส่วนเทอร์มินอล 21 ใช้เวลาใกล้เคียงกันค่ะ",
+      "en": "Central Pattaya is about 12 minutes by car, about 9.9 kilometres by road, and Terminal 21 takes about the same.",
+      "numbers": [
+        {
+          "say": "เซ็นทรัล พัทยา ขับรถประมาณ 12 นาที ระยะทางราว 9.9 กิโลเมตรค่ะ",
+          "source": "story:travel_malls",
+          "as": "เซ็นทรัล พัทยา ขับรถประมาณ 12 นาที ระยะทางราว 9.9 กิโลเมตรค่ะ"
+        },
+        {
+          "say": "ส่วนเทอร์มินอล 21 ใช้เวลาใกล้เคียงกันค่ะ",
+          "source": "story:travel_malls",
+          "as": "ส่วนเทอร์มินอล 21 ใช้เวลาใกล้เคียงกันค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: travel_malls) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_unit_compare_1br_2br",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "unit_compare_1br_2br",
+      "host_th": null,
+      "th": "ต่างกันหลักๆ ที่ขนาดกับจำนวนห้องนอนค่ะ หนึ่งห้องนอน 33 ถึง 35 ตารางเมตร สองห้องนอน 51.5 ถึง 52.5 ตารางเมตร และสองห้องนอนมีสองห้องน้ำค่ะ",
+      "en": "The main differences are size and the number of bedrooms. The one-bedroom is 33 to 35 square metres, the two-bedroom 51.5 to 52.5, and the two-bedroom has two bathrooms.",
+      "numbers": [
+        {
+          "say": "หนึ่งห้องนอน 33 ถึง 35 ตารางเมตร",
+          "source": "story:unit_compare_1br_2br",
+          "as": "หนึ่งห้องนอน 33 ถึง 35 ตารางเมตร"
+        },
+        {
+          "say": "สองห้องนอน 51.5 ถึง 52.5 ตารางเมตร",
+          "source": "story:unit_compare_1br_2br",
+          "as": "สองห้องนอน 51.5 ถึง 52.5 ตารางเมตร"
+        },
+        {
+          "say": "และสองห้องนอนมีสองห้องน้ำค่ะ",
+          "source": "story:unit_compare_1br_2br",
+          "as": "และสองห้องนอนมีสองห้องน้ำค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: unit_compare_1br_2br) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_unit_one_bedroom",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "unit_one_bedroom",
+      "host_th": null,
+      "th": "นี่คือห้องหนึ่งห้องนอนค่ะ มีห้องนอนแยก กับมุมนั่งเล่นและครัว ห้องน้ำ 1 ห้อง แอร์ 2 เครื่อง ขนาด 33 ถึง 35 ตารางเมตร บรรยากาศภายในเป็นแบบนี้ค่ะ ถ้าอยากได้หนึ่งห้องนอนที่กว้างกว่านี้ แบบ 51 ตารางเมตรก็ทำเป็นห้องนอนเดียวห้องใหญ่ได้ค่ะ",
+      "en": "This is the one-bedroom. It has a separate bedroom, plus a living area and kitchen, one bathroom and two air-cons. It's 33 to 35 square metres, and this is the interior mood. If you'd like a roomier one-bedroom, the 51-square-metre layout can be a one-bedroom too.",
+      "numbers": [
+        {
+          "say": "นี่คือห้องหนึ่งห้องนอนค่ะ",
+          "source": "story:unit_one_bedroom",
+          "as": "นี่คือห้องหนึ่งห้องนอนค่ะ"
+        },
+        {
+          "say": "มีห้องนอนแยก กับมุมนั่งเล่นและครัว ห้องน้ำ 1 ห้อง แอร์ 2 เครื่อง",
+          "source": "story:unit_one_bedroom",
+          "as": "มีห้องนอนแยก กับมุมนั่งเล่นและครัว ห้องน้ำ 1 ห้อง แอร์ 2 เครื่อง"
+        },
+        {
+          "say": "ขนาด 33 ถึง 35 ตารางเมตร",
+          "source": "story:unit_one_bedroom",
+          "as": "ขนาด 33 ถึง 35 ตารางเมตร"
+        },
+        {
+          "say": "ถ้าอยากได้หนึ่งห้องนอนที่กว้างกว่านี้ แบบ 51 ตารางเมตรก็ทำเป็นห้องนอนเดียวห้องใหญ่ได้ค่ะ",
+          "source": "story:unit_one_bedroom",
+          "as": "ถ้าอยากได้หนึ่งห้องนอนที่กว้างกว่านี้ แบบ 51 ตารางเมตรก็ทำเป็นห้องนอนเดียวห้องใหญ่ได้ค่ะ"
+        }
+      ],
+      "words_ok": [
+        "roomier one-bedroom",
+        "ห้องนอนเดียว"
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: unit_one_bedroom) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_unit_studio",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "unit_studio",
+      "host_th": null,
+      "th": "นี่คือห้องสตูดิโอของเราค่ะ เป็นห้องโล่ง ไม่มีห้องนอนแยก มีห้องน้ำ 1 ห้อง แอร์ 1 เครื่อง ขนาด 24 ถึง 29 ตารางเมตรค่ะ บรรยากาศการตกแต่งเป็นแบบนี้ค่ะ",
+      "en": "This is our studio. It's open plan, with no separate bedroom, one bathroom and one air-con. It's 24 to 29 square metres, and this is the interior mood.",
+      "numbers": [
+        {
+          "say": "เป็นห้องโล่ง ไม่มีห้องนอนแยก มีห้องน้ำ 1 ห้อง แอร์ 1 เครื่อง",
+          "source": "story:unit_studio",
+          "as": "เป็นห้องโล่ง ไม่มีห้องนอนแยก มีห้องน้ำ 1 ห้อง แอร์ 1 เครื่อง"
+        },
+        {
+          "say": "ขนาด 24 ถึง 29 ตารางเมตรค่ะ",
+          "source": "story:unit_studio",
+          "as": "ขนาด 24 ถึง 29 ตารางเมตรค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: unit_studio) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_unit_two_bedroom",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "unit_two_bedroom",
+      "host_th": null,
+      "th": "นี่คือห้องสองห้องนอนค่ะ มีสองห้องนอน เตียงคิงไซซ์ 6 ฟุตกับควีนไซซ์ 5 ฟุต สองห้องน้ำ และแอร์ 3 เครื่อง ขนาด 51.5 ถึง 52.5 ตารางเมตร บรรยากาศภายในเป็นแบบนี้ค่ะ ถ้าอยากได้กว้างกว่านี้ ยังมีแบบห้องรวมเป็นสองห้องนอน 66 ตารางเมตรด้วยค่ะ",
+      "en": "This is the two-bedroom. It has two bedrooms, a 6-foot king and a 5-foot queen bed, two bathrooms and three air-cons. It's 51.5 to 52.5 square metres, and this is the interior mood. And if you'd like more room, there's a combined two-bedroom of 66 square metres.",
+      "numbers": [
+        {
+          "say": "นี่คือห้องสองห้องนอนค่ะ",
+          "source": "story:unit_two_bedroom",
+          "as": "นี่คือห้องสองห้องนอนค่ะ"
+        },
+        {
+          "say": "มีสองห้องนอน เตียงคิงไซซ์ 6 ฟุตกับควีนไซซ์ 5 ฟุต สองห้องน้ำ และแอร์ 3 เครื่อง",
+          "source": "story:unit_two_bedroom",
+          "as": "มีสองห้องนอน เตียงคิงไซซ์ 6 ฟุตกับควีนไซซ์ 5 ฟุต สองห้องน้ำ และแอร์ 3 เครื่อง"
+        },
+        {
+          "say": "ขนาด 51.5 ถึง 52.5 ตารางเมตร",
+          "source": "story:unit_two_bedroom",
+          "as": "ขนาด 51.5 ถึง 52.5 ตารางเมตร"
+        },
+        {
+          "say": "ถ้าอยากได้กว้างกว่านี้ ยังมีแบบห้องรวมเป็นสองห้องนอน 66 ตารางเมตรด้วยค่ะ",
+          "source": "story:unit_two_bedroom",
+          "as": "ถ้าอยากได้กว้างกว่านี้ ยังมีแบบห้องรวมเป็นสองห้องนอน 66 ตารางเมตรด้วยค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: unit_two_bedroom) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    },
+    {
+      "id": "x_units_by_building",
+      "scene": null,
+      "scene_th": "คุณมิกิถามเรื่องนอกบท",
+      "show": "units_by_building",
+      "host_th": null,
+      "th": "ทั้ง 1,066 ยูนิตอยู่ใน 6 อาคารค่ะ อาคาร A 146 ห้อง อาคาร B 200 ห้อง อาคาร C 176 ห้อง อาคาร D 168 ห้อง อาคาร E 184 ห้อง และอาคาร F 192 ห้องค่ะ",
+      "en": "Our 1,066 residences are in six buildings: Building A has 146, Building B 200, Building C 176, Building D 168, Building E 184 and Building F 192.",
+      "numbers": [
+        {
+          "say": "ทั้ง 1,066 ยูนิตอยู่ใน 6 อาคารค่ะ",
+          "source": "story:units_by_building",
+          "as": "ทั้ง 1,066 ยูนิตอยู่ใน 6 อาคารค่ะ"
+        },
+        {
+          "say": "อาคาร A 146 ห้อง อาคาร B 200 ห้อง",
+          "source": "story:units_by_building",
+          "as": "อาคาร A 146 ห้อง อาคาร B 200 ห้อง"
+        },
+        {
+          "say": "อาคาร C 176 ห้อง อาคาร D 168 ห้อง",
+          "source": "story:units_by_building",
+          "as": "อาคาร C 176 ห้อง อาคาร D 168 ห้อง"
+        },
+        {
+          "say": "อาคาร E 184 ห้อง และอาคาร F 192 ห้องค่ะ",
+          "source": "story:units_by_building",
+          "as": "อาคาร E 184 ห้อง และอาคาร F 192 ห้องค่ะ"
+        }
+      ],
+      "note_th": "บรรทัดของเรื่องเล่าที่อนุมัติแล้ว (stories.json: units_by_building) — ภาพบนจอคือเรื่องเดียวกัน",
+      "approved_by": null,
+      "approved_at": null,
+      "approved_sha256": null,
+      "approved_voice_sha256": null
+    }
+  ]
+}

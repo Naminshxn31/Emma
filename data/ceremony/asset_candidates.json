@@ -1,0 +1,1943 @@
+{
+ "format": "emma-ceremony-asset-candidates-v1",
+ "about": "The owner's material that is NOT in the stories catalogue, as surveyed for the ceremony film on 17 Nov 2026 (scripts/build_ceremony_hires.py reads this; the survey itself is .tmp/ceremony-show/assets/candidates.md + cand_sheet_*.png). `candidates` = what may be shown, each LOOKED at (`checked`), pinned to the bytes that were looked at (`source_sha256`) and cut by the same recipe steps the stories use (crop in source pixels, post). `excluded` = why every other surveyed file is not shown (first matching rule). `surveyed` = the folders. A candidate is the picture's permission to be CONSIDERED: whether a slide may show it on a given cue is the slide validator's rule (the cue's own line must back its `about` and its baked-in `text`).",
+ "people_about": "`people` (every candidate, 18 Nov review): where a real person is in the picture -- a box [left, top, right, bottom] as fractions of the file, with what is there -- or [] when looked at and nobody is. No `people` = not checked = the screen never gets the picture. A box is a keep-out: no slide may show it (the acts' run in Chromium checks every frame). [] where the note above already said no people; for the 33 whose note said nothing about people: 20 pictures looked at again at up to 960 px on 18 Nov, and the 8 glyphs, the two logo files, the logo clip and the clean site plan are shapes or the mark only by their own checked note. The boxes were measured at 3x-6x. `keep_out` = the same for catalogue pictures shown at full size. 18 Nov, second pass: the repo's person detector (YOLOX-nano, tiles at 1x and 2x of the full-size file) over every picture a slide names, each hit looked at by eye: c_lagoon_path (its note said no people) and the catalogue's rm_signature, liv_garden, liv_lawn and fac_g_biogenesis carry real people too -- boxed here. The detector missed the 14 px standing figure in the pavilion (found by eye): a box list is what was found, not a proof that nobody else is there.",
+ "depth": {
+  "also": [
+   "liv_park",
+   "rm_parkside",
+   "prj_life_park"
+  ],
+  "never": []
+ },
+ "at_full_size": {
+  "mood_living": "a prop book on the coffee table reads 'Texture to Paint' on its spine and cover (about 66% across, 71% down) -- too small to read at the pin's 720 px, readable once the camera pushes in; the fridge's small display shows a digit",
+  "mood_bedroom": "two boxes on the wardrobe's top shelves carry a clasp emblem that looks like a fashion house's (about 2-25% across, 15-24% down) -- no letters readable, but keep a push-in off that corner",
+  "lagoon_scene58": "a seated woman inside the egg pavilion is a photo cut-out of a real person (about 45 px tall at this size, face about 6 px) -- invisible at the pin's size; keep a push-in off the pavilion's seat",
+  "lagoon_islands_aerial": "the same seated figure inside the egg pavilion (a photo cut-out, about 45 px tall): keep a push-in off the pavilion's seat",
+  "liv_lagoon_night": "the same seated figure inside the egg pavilion (a photo cut-out, about 45 px tall, dim): keep a push-in off the pavilion's seat",
+  "mood_bathroom": "two soap bottles on the shower shelf are labelled 'NATURAL' (about 8% across, 62% down) -- unreadable at the pin's size, readable at this one"
+ },
+ "keep_out": {
+  "lagoon_scene58": [
+   {
+    "box": [
+     0.509,
+     0.5279,
+     0.5442,
+     0.566
+    ],
+    "what": "a seated woman: a photo cut-out of a real person (inside the egg pavilion)"
+   },
+   {
+    "box": [
+     0.5407,
+     0.4622,
+     0.553,
+     0.4798
+    ],
+    "what": "a small standing figure: a photo cut-out of a real person (at the pavilion's counter)"
+   }
+  ],
+  "lagoon_islands_aerial": [
+   {
+    "box": [
+     0.5078,
+     0.5333,
+     0.5391,
+     0.5785
+    ],
+    "what": "a seated woman: a photo cut-out of a real person (inside the egg pavilion)"
+   },
+   {
+    "box": [
+     0.5359,
+     0.4556,
+     0.5469,
+     0.4764
+    ],
+    "what": "a small standing figure: a photo cut-out of a real person (at the pavilion's counter)"
+   }
+  ],
+  "liv_lagoon_night": [
+   {
+    "box": [
+     0.469,
+     0.5279,
+     0.5044,
+     0.566
+    ],
+    "what": "a seated woman: a photo cut-out of a real person (inside the egg pavilion)"
+   },
+   {
+    "box": [
+     0.5009,
+     0.4622,
+     0.5133,
+     0.4798
+    ],
+    "what": "a small standing figure: a photo cut-out of a real person (at the pavilion's counter)"
+   }
+  ],
+  "rm_signature": [
+   {
+    "box": [
+     0.5472,
+     0.6622,
+     0.563,
+     0.7278
+    ],
+    "what": "a woman at the entrance beside the sign: a photo cut-out of a real person"
+   }
+  ],
+  "liv_garden": [
+   {
+    "box": [
+     0.4907,
+     0.5338,
+     0.5058,
+     0.5577
+    ],
+    "what": "a person in a blue coat beside the ring pavilion: a photo cut-out of a real person"
+   },
+   {
+    "box": [
+     0.7056,
+     0.5435,
+     0.7192,
+     0.5612
+    ],
+    "what": "a woman in the ring pavilion: a photo cut-out of a real person"
+   }
+  ],
+  "liv_lawn": [
+   {
+    "box": [
+     0.3396,
+     0.5969,
+     0.3636,
+     0.6306
+    ],
+    "what": "a woman sitting at the pool's edge: a photo cut-out of a real person"
+   },
+   {
+    "box": [
+     0.7019,
+     0.5808,
+     0.7173,
+     0.6173
+    ],
+    "what": "a woman in the pavilion: a photo cut-out of a real person"
+   }
+  ],
+  "fac_g_biogenesis": [
+   {
+    "box": [
+     0.2298,
+     0.1124,
+     0.3421,
+     0.3338
+    ],
+    "what": "a swimmer in the glass-bottomed pool above: a photographic person"
+   },
+   {
+    "box": [
+     0.8372,
+     0.0853,
+     0.8925,
+     0.222
+    ],
+    "what": "a swimmer in the glass-bottomed pool above: a photographic person"
+   },
+   {
+    "box": [
+     0.4239,
+     0.2276,
+     0.5907,
+     0.4919
+    ],
+    "what": "a swimmer in the glass-bottomed pool above: a photographic person"
+   },
+   {
+    "box": [
+     0.6104,
+     0.1526,
+     0.7035,
+     0.2919
+    ],
+    "what": "a swimmer in the glass-bottomed pool above: a photographic person"
+   },
+   {
+    "box": [
+     0.0514,
+     0.1256,
+     0.0783,
+     0.1634
+    ],
+    "what": "a swimmer in the glass-bottomed pool above: a photographic person"
+   }
+  ],
+  "prj_life_lagoon": [
+   {
+    "box": [
+     0.2922,
+     0.6226,
+     0.3264,
+     0.6708
+    ],
+    "what": "a woman sitting in the pool: a photo cut-out of a real person"
+   }
+  ]
+ },
+ "surveyed": [
+  {
+   "folder": "ue/embassyworld3/Saved/BuildingExperience/Screenshots"
+  },
+  {
+   "folder": "ue/embassyworld3/Saved/HologramTransition/ViewportCapture_20260924_115211"
+  },
+  {
+   "folder": "ue/embassyworld3/Saved/SunMotion/Screenshots"
+  },
+  {
+   "folder": "ue/embassyworld3/Saved/RoomExperience/AllLayouts"
+  },
+  {
+   "folder": "ue/embassyworld3/Saved/FacadeRooms/after"
+  },
+  {
+   "folder": "ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots"
+  },
+  {
+   "folder": "ue/embassyworld3/Saved/CondoHologram",
+   "deep": true
+  },
+  {
+   "folder": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png"
+  },
+  {
+   "folder": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)",
+   "pattern": "*.png"
+  },
+  {
+   "folder": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets",
+   "pattern": "*.png"
+  },
+  {
+   "folder": "ue/embassyworld3/Content/Movies",
+   "pattern": "*.mp4"
+  },
+  {
+   "folder": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons",
+   "pattern": "*.svg"
+  },
+  {
+   "folder": "ue/embassyworld3/Saved/PoolAnimation",
+   "pattern": "*.png"
+  },
+  {
+   "folder": "web",
+   "deep": true
+  }
+ ],
+ "candidates": [
+  {
+   "id": "c_bld_b_holo",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/B_01_hologram_overview.png",
+   "source_sha256": "c8b49dc5bf025b0f4023c6faeac996aa2535dfaae61d6078b6a6b85f6b6eac14",
+   "crop": [
+    930,
+    380,
+    2160,
+    1200
+   ],
+   "format": "webp",
+   "shows": "Building B as a blue wire hologram, elevation, on black",
+   "about": [
+    "storeys",
+    "buildings",
+    "units"
+   ],
+   "text": "",
+   "checked": "contact sheet at 320 px and a 960 px view, 17 Nov; crop measured on the full-size file: the app's floor panel (x >= 2359) and the REALISTIC / WIREFRAME buttons (y >= 1252) are outside it; no roof lettering from this camera; nothing but the building on black",
+   "ok": true,
+   "picked_by": [
+    "units_views"
+   ],
+   "registers_with": "c_bld_b_real",
+   "people": []
+  },
+  {
+   "id": "c_bld_b_real",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/B_02_realistic_overview.png",
+   "source_sha256": "a177464458999180dbb1c61a94da89b26217b7c2bd30b2505e78cf02c09298ea",
+   "crop": [
+    930,
+    380,
+    2160,
+    1200
+   ],
+   "format": "webp",
+   "shows": "Building B lit model, elevation, on black (same camera and crop as c_bld_b_holo)",
+   "about": [
+    "storeys",
+    "buildings",
+    "units"
+   ],
+   "text": "",
+   "checked": "contact sheet at 320 px and a 960 px view, 17 Nov; crop measured on the full-size file: the app's floor panel (x >= 2359) and the REALISTIC / WIREFRAME buttons (y >= 1252) are outside it; no roof lettering from this camera; nothing but the building on black",
+   "ok": true,
+   "registers_with": "c_bld_b_holo",
+   "people": []
+  },
+  {
+   "id": "c_bld_d_holo",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/D_01_hologram_overview.png",
+   "source_sha256": "2aecb5ff1d2bd21a52234da050ad8655f9300bd575be1f8107fbfbcdcc52375b",
+   "crop": [
+    700,
+    370,
+    2290,
+    1180
+   ],
+   "format": "webp",
+   "shows": "Building D as a blue wire hologram, elevation, on black",
+   "about": [
+    "storeys",
+    "buildings",
+    "units"
+   ],
+   "text": "",
+   "checked": "contact sheet at 320 px and a 960 px view, 17 Nov; crop measured on the full-size file: the app's floor panel (x >= 2359) and the REALISTIC / WIREFRAME buttons (y >= 1252) are outside it; no roof lettering from this camera; nothing but the building on black",
+   "ok": true,
+   "picked_by": [
+    "units_views"
+   ],
+   "registers_with": "c_bld_d_real",
+   "people": []
+  },
+  {
+   "id": "c_bld_d_real",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/D_02_realistic_overview.png",
+   "source_sha256": "25adf93790e55ed949feae32649bf8dce5489321eb2b6376494dfcfd4aa34bea",
+   "crop": [
+    700,
+    370,
+    2290,
+    1180
+   ],
+   "format": "webp",
+   "shows": "Building D lit model, elevation, on black (same camera and crop as c_bld_d_holo)",
+   "about": [
+    "storeys",
+    "buildings",
+    "units"
+   ],
+   "text": "",
+   "checked": "contact sheet at 320 px and a 960 px view, 17 Nov; crop measured on the full-size file: the app's floor panel (x >= 2359) and the REALISTIC / WIREFRAME buttons (y >= 1252) are outside it; no roof lettering from this camera; nothing but the building on black",
+   "ok": true,
+   "registers_with": "c_bld_d_holo",
+   "people": []
+  },
+  {
+   "id": "c_bld_e_holo",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/E_01_hologram_overview.png",
+   "source_sha256": "7cf8db826d0ce83c2e7677e7226c07e3cec6862b511f8a370107f7c7ea82935c",
+   "crop": [
+    800,
+    400,
+    2300,
+    1150
+   ],
+   "format": "webp",
+   "shows": "Building E as a blue wire hologram, on black (same camera and crop as the catalogue's rm_breeze)",
+   "about": [
+    "storeys",
+    "buildings",
+    "units"
+   ],
+   "text": "",
+   "checked": "contact sheet at 320 px and a 960 px view, 17 Nov; crop measured on the full-size file: the app's floor panel (x >= 2359) and the REALISTIC / WIREFRAME buttons (y >= 1252) are outside it; no roof lettering from this camera; nothing but the building on black",
+   "ok": true,
+   "picked_by": [
+    "units_views"
+   ],
+   "registers_with": "rm_breeze",
+   "people": []
+  },
+  {
+   "id": "c_bld_f_holo",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/F_01_hologram_overview.png",
+   "source_sha256": "520f0df84e8c2683b5707443a1f42d2c6ff88f5dc3080be575782e9c0195a9e1",
+   "crop": [
+    860,
+    410,
+    2220,
+    1190
+   ],
+   "format": "webp",
+   "shows": "Building F as a blue wire hologram, elevation, on black",
+   "about": [
+    "storeys",
+    "buildings",
+    "units"
+   ],
+   "text": "",
+   "checked": "contact sheet at 320 px and a 960 px view, 17 Nov; crop measured on the full-size file: the app's floor panel (x >= 2359) and the REALISTIC / WIREFRAME buttons (y >= 1252) are outside it; no roof lettering from this camera; nothing but the building on black",
+   "ok": true,
+   "picked_by": [
+    "units_views"
+   ],
+   "registers_with": "c_bld_f_real",
+   "people": []
+  },
+  {
+   "id": "c_bld_f_real",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/F_02_realistic_overview.png",
+   "source_sha256": "525cc616bfe86d759d29ac9fbb44738bff4b6d6d0a7ff15889623b8b0dae9c66",
+   "crop": [
+    860,
+    410,
+    2220,
+    1190
+   ],
+   "format": "webp",
+   "shows": "Building F lit model, elevation, on black (same camera and crop as c_bld_f_holo)",
+   "about": [
+    "storeys",
+    "buildings",
+    "units"
+   ],
+   "text": "",
+   "checked": "contact sheet at 320 px and a 960 px view, 17 Nov; crop measured on the full-size file: the app's floor panel (x >= 2359) and the REALISTIC / WIREFRAME buttons (y >= 1252) are outside it; no roof lettering from this camera; nothing but the building on black",
+   "ok": true,
+   "registers_with": "c_bld_f_holo",
+   "people": []
+  },
+  {
+   "id": "c_campus_holo",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/CondoHologram/Preview_Overview.png",
+   "source_sha256": "466d25d9c7423628a627c7947260e183d7d081e596fe564148e003533ed0708c",
+   "crop": [
+    0,
+    280,
+    1600,
+    900
+   ],
+   "format": "webp",
+   "shows": "The whole campus as a blue wire hologram with lit windows, from above the road side, on black -- an earlier preview of the hologram, NO roof lettering",
+   "about": [
+    "buildings",
+    "units"
+   ],
+   "text": "",
+   "checked": "960 px view and the roofs at full size, 17 Nov: no 'BUILDING ...' lettering (the later frames carry it mirrored), no UI; crop keeps the model and its ground lines",
+   "ok": true,
+   "establishing": true,
+   "people": []
+  },
+  {
+   "id": "c_holo_facade",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/CondoHologram/Preview_Close.png",
+   "source_sha256": "a62fdb616d0e2ec618bbd227cdf4128c3859ac5ebbf83aa19ded35513e79c7e2",
+   "crop": null,
+   "format": "webp",
+   "shows": "Close view of the hologram: two wings' balconies in blue wire, windows lit orange, on black",
+   "about": [
+    "buildings",
+    "storeys",
+    "units"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov: no roofs in frame, no lettering, no UI",
+   "ok": true,
+   "establishing": true,
+   "people": []
+  },
+  {
+   "id": "c_site_top",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/01_collapsed.png",
+   "source_sha256": "7237469b68e5b7e505b37507fcb4135e5e64f4b59c55f28467f0acea35b36893",
+   "crop": [
+    170,
+    150,
+    1705,
+    848
+   ],
+   "format": "webp",
+   "shows": "The site model from straight above: six buildings round the Water Lagoon, roof lettering BUILDING A-F reading the right way, on a lawn",
+   "about": [
+    "buildings",
+    "swimming pool",
+    "pool",
+    "common areas"
+   ],
+   "text": "BUILDING A, BUILDING B, BUILDING C, BUILDING D, BUILDING E, BUILDING F (on the roofs)",
+   "checked": "looked at full size, 17 Nov: the lettering is NOT mirrored; crop keeps the lawn rectangle -- the app's three round buttons (top, right, bottom edge) and the box walls are outside it",
+   "ok": true,
+   "picked_by": [
+    "emma_console",
+    "location_site"
+   ],
+   "note": "its roof lettering BUILDING A..F reads the right way but is no word of most lines; there is no capture with the labels off -- for a top view with nothing written on it use c_site_lagoon_clean",
+   "people": []
+  },
+  {
+   "id": "c_site_sun_am",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/SunMotion/Screenshots/held_08_left.png",
+   "source_sha256": "9012ee6130997eea93bb74f67ff5d85dbdb12f0208746e497ac8bacc58e96cc5",
+   "crop": [
+    170,
+    150,
+    1705,
+    848
+   ],
+   "format": "webp",
+   "shows": "The same top view with the sun low on one side: long shadows fall to the left (the app's slider at 8:00 AM)",
+   "about": [
+    "buildings",
+    "swimming pool",
+    "pool",
+    "common areas"
+   ],
+   "text": "BUILDING A-F on the roofs",
+   "checked": "960 px view, 17 Nov; same camera and crop as c_site_top (they register); the time bar (y >= 940) and the round buttons are outside the crop",
+   "ok": true,
+   "registers_with": "c_site_top",
+   "people": []
+  },
+  {
+   "id": "c_site_sun_noon",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/SunMotion/Screenshots/month_06_start.png",
+   "source_sha256": "c7298ab894cafadd5c57fc23b9d99df68d05749a1301792c7ef2409e324c5489",
+   "crop": [
+    170,
+    150,
+    1705,
+    848
+   ],
+   "format": "webp",
+   "shows": "The same top view with the sun overhead: almost no shadows (slider at 12:00 PM, June)",
+   "about": [
+    "buildings",
+    "swimming pool",
+    "pool",
+    "common areas"
+   ],
+   "text": "BUILDING A-F on the roofs",
+   "checked": "960 px view, 17 Nov; same camera and crop as c_site_top; the time bar and buttons are outside the crop",
+   "ok": true,
+   "registers_with": "c_site_top",
+   "people": []
+  },
+  {
+   "id": "c_site_sun_pm",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/SunMotion/Screenshots/held_15_right.png",
+   "source_sha256": "929c6682bbf3d9969704af0e7c23a81a77bf9c7042766ecd61075664450db28d",
+   "crop": [
+    170,
+    150,
+    1705,
+    848
+   ],
+   "format": "webp",
+   "shows": "The same top view in the afternoon: shadows fall to the right and down (slider near 3:00 PM)",
+   "about": [
+    "buildings",
+    "swimming pool",
+    "pool",
+    "common areas"
+   ],
+   "text": "BUILDING A-F on the roofs",
+   "checked": "960 px view, 17 Nov; same camera and crop as c_site_top; the time bar and buttons are outside the crop",
+   "ok": true,
+   "registers_with": "c_site_top",
+   "people": []
+  },
+  {
+   "id": "c_curtain_closed",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_closed.png",
+   "source_sha256": "10f3f5bd6e305dc51895add45716f6c237484ba7140c68ff54ef246976674dd1",
+   "crop": [
+    0,
+    158,
+    2804,
+    1735
+   ],
+   "format": "webp",
+   "shows": "White model of a unit's living room: the blue-gradient curtain CLOSED over the window, track light, air-conditioner with airflow streaks",
+   "about": [
+    "curtains",
+    "smart home",
+    "devices"
+   ],
+   "text": "",
+   "checked": "960 px view beside its pair, 17 Nov: no app panels in this shot, no text; 16:9 crop of the frame",
+   "ok": true,
+   "note": "a unit's model, not the lobby: the lobby's curtain is switched live in the room and the screen must not pretend to show it",
+   "registers_with": "c_curtain_open",
+   "people": []
+  },
+  {
+   "id": "c_curtain_open",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_curtain0_open.png",
+   "source_sha256": "c516912311f3320f630f20099924c0bc219a228992c3811301714e62735a1aa2",
+   "crop": [
+    0,
+    158,
+    2804,
+    1735
+   ],
+   "format": "webp",
+   "shows": "The same room and camera with the curtain OPEN: the window's three panes, curtain gathered at both sides",
+   "about": [
+    "curtains",
+    "smart home",
+    "devices"
+   ],
+   "text": "",
+   "checked": "960 px view beside its pair, 17 Nov: same camera as c_curtain_closed (they register), no app panels, no text",
+   "ok": true,
+   "note": "a unit's model, not the lobby (see c_curtain_closed)",
+   "registers_with": "c_curtain_closed",
+   "people": []
+  },
+  {
+   "id": "c_fac_3_hall",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/13.jpg",
+   "source_sha256": "29d1a30c1ded52a14aa4bc24420e3d18b6d7d350a177148e85731b9e7c906595",
+   "crop": [
+    0,
+    100,
+    1180,
+    1000
+   ],
+   "format": "webp",
+   "shows": "Level 3 Hall: a white ribbon sculpture on a round plinth under ring lights, chrome arches",
+   "about": [
+    "floor 3",
+    "indoor facilities",
+    "futuristic design"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov; crop drops the top band (title pill, 'EMBASSY WORLD' / 'JOMTIEN' corners, y < 100) and the bottom band ('BEYOND MODELS' credit, y > 1000) as the stories' recipes do; no price, no real people; the crop also stops left of the right-hand arch, which opens on a pool terrace and city skyline level 3 does not have",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_fac_b_aqua_stair",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/15.jpg",
+   "source_sha256": "32637d1c03ab9dd95b8daf4908d3a467edeca5d13a8aa538bcf66f19b3cd2208",
+   "crop": [
+    0,
+    100,
+    1920,
+    1000
+   ],
+   "format": "webp",
+   "shows": "Basement Aqua Cinema entrance: chrome spiral stair, a moon lamp in planting, the pool hall through the arch (the cinema's wall screens show a sea horizon and a sunset: screens in a basement, never a view)",
+   "about": [
+    "basement",
+    "indoor facilities",
+    "futuristic design"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov (title pill read: AQUA CINEMA); crop drops the top band (title pill, 'EMBASSY WORLD' / 'JOMTIEN' corners, y < 100) and the bottom band ('BEYOND MODELS' credit, y > 1000) as the stories' recipes do; no price, no real people",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_fac_b_aqua_wide",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/17.jpg",
+   "source_sha256": "07fbb3db175cd4368e42649dbac159d544ce42010400a5de496e93dded7645a6",
+   "crop": [
+    0,
+    100,
+    1920,
+    1000
+   ],
+   "format": "webp",
+   "shows": "Basement Aqua Cinema, front view: the pool under a star ceiling, five arched alcoves with loungers (a CG person lying in one)",
+   "about": [
+    "basement",
+    "indoor facilities",
+    "pool"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov (title pill read: AQUA CINEMA); crop drops the top band (title pill, 'EMBASSY WORLD' / 'JOMTIEN' corners, y < 100) and the bottom band ('BEYOND MODELS' credit, y > 1000) as the stories' recipes do; no price, no real people",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_fac_b_mars_arch",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/20.jpg",
+   "source_sha256": "5aa24bcb02b0d35b5fb7cac1c7a8e645f6a4977d60c5726f8b685dd33639f521",
+   "crop": [
+    0,
+    100,
+    1920,
+    1000
+   ],
+   "format": "webp",
+   "shows": "Basement Journey to Mars: the tunnel pool seen through its round arch, loungers and planting",
+   "about": [
+    "basement",
+    "indoor facilities",
+    "pool"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov (title pill read: JOURNEY TO THE MARS -- misspelt, cropped away); crop drops the top band (title pill, 'EMBASSY WORLD' / 'JOMTIEN' corners, y < 100) and the bottom band ('BEYOND MODELS' credit, y > 1000) as the stories' recipes do; no price, no real people",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_fac_b_mars_falls",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/22.jpg",
+   "source_sha256": "d2c865076a3548ca146f7adeb2dfc682c019aa93d155b264cd1b27e078a71b5e",
+   "crop": [
+    0,
+    100,
+    1920,
+    1000
+   ],
+   "format": "webp",
+   "shows": "Basement Journey to Mars: a water curtain round a column, rain showers, glowing pool with jellyfish projections",
+   "about": [
+    "basement",
+    "indoor facilities",
+    "pool"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov (title pill read: JOURNEY TO THE MARS -- cropped away); crop drops the top band (title pill, 'EMBASSY WORLD' / 'JOMTIEN' corners, y < 100) and the bottom band ('BEYOND MODELS' credit, y > 1000) as the stories' recipes do; no price, no real people",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_fac_b_salt_front",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/28.jpg",
+   "source_sha256": "f1a20745b328f729bd1cb021bc8f6792f59c462a1cc93d9bb8063a45119219b7",
+   "crop": [
+    420,
+    100,
+    1920,
+    1000
+   ],
+   "format": "webp",
+   "shows": "Basement Himalayan Salt Sauna, front view: the glowing orange salt wall behind glass",
+   "about": [
+    "basement",
+    "indoor facilities"
+   ],
+   "text": "the room's own narrow sign by the door (small stacked letters ending 'SALT')",
+   "checked": "960 px view, 17 Nov (title pill read: HIMALAYAN SALT SAUNA); crop drops the top band (title pill, 'EMBASSY WORLD' / 'JOMTIEN' corners, y < 100) and the bottom band ('BEYOND MODELS' credit, y > 1000) as the stories' recipes do; no price, no real people; the crop starts right of the engraved text panel on the left wall (x < 400)",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_fac_b_crystal_2",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/Basement/EMBASSY WORLD - Basement/38.jpg",
+   "source_sha256": "e882611e0f0c2c2001d5241a4f916c6b92e302855c69a051bab020cbab045b35",
+   "crop": [
+    0,
+    100,
+    1920,
+    1000
+   ],
+   "format": "webp",
+   "shows": "Basement Crystal Stone Sauna, second view: round crystal beds under ring ceilings (two CG people lying down)",
+   "about": [
+    "basement",
+    "indoor facilities"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov (title pill read: CYSTAL STONE SAUNA SAUNA -- misspelt, cropped away); crop drops the top band (title pill, 'EMBASSY WORLD' / 'JOMTIEN' corners, y < 100) and the bottom band ('BEYOND MODELS' credit, y > 1000) as the stories' recipes do; no price, no real people",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_fac_g_gym_night",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/G FLOOR/G FLOOR - Biogenesis 02.jpg",
+   "source_sha256": "f438fa415b541f6febda0a0487f699267ec05a50fae93842baf6af28d69ad4a5",
+   "crop": null,
+   "format": "webp",
+   "shows": "Ground floor Biogenesis gym at night: blue light lines, the glass-bottom pool overhead with CG swimmers",
+   "about": [
+    "ground floor",
+    "indoor facilities",
+    "futuristic design"
+   ],
+   "text": "'POWER THE FUTURE' in light on the wall",
+   "checked": "960 px view, 17 Nov: no title pill or credit on the G-floor finals; no price, no real people",
+   "ok": true,
+   "people_note": "18 Nov: swimmers seen from below in the glass ceiling look photographic -- not boxed one by one, so this has no `people` and is not used"
+  },
+  {
+   "id": "c_fac_g_gym_run",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/G FLOOR/G FLOOR - Biogenesis 03.jpg",
+   "source_sha256": "55c6f21d2877b9aacddfc2a1b69ed9392ba5655c434da5c9756a41836d11e2b8",
+   "crop": null,
+   "format": "webp",
+   "shows": "Ground floor Biogenesis gym at dusk: a treadmill under the glass-bottom pool (CG swimmers), sunset in the window",
+   "about": [
+    "ground floor",
+    "indoor facilities",
+    "futuristic design"
+   ],
+   "text": "'MOVE WITH PURPOSE LIVE WITH BALANCE' in light on the wall",
+   "checked": "960 px view, 17 Nov: no title pill or credit; no price, no real people",
+   "ok": true,
+   "people_note": "18 Nov: swimmers seen from below in the glass ceiling look photographic -- not boxed one by one, so this has no `people` and is not used"
+  },
+  {
+   "id": "c_fac_g_gym_front",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/G FLOOR/G FLOOR - Biogenesis 04.jpg",
+   "source_sha256": "e37f033538c032caa11355dd70e801f71fe5db283c2d451570ae1623f51450a7",
+   "crop": [
+    0,
+    0,
+    2658,
+    950
+   ],
+   "format": "webp",
+   "shows": "Ground floor Biogenesis gym from outside, wide: two glass-bottom pools overhead (CG swimmers), rows of machines",
+   "about": [
+    "ground floor",
+    "indoor facilities"
+   ],
+   "text": "gym slogans in light on the walls (MOVE WITH PURPOSE ..., SWEAT ..., BETTER EVERY DAY ..., POWER THE ...)",
+   "checked": "960 px view, 17 Nov; crop drops the strip of lawn pasted under the render (y > 950); no price, no real people",
+   "ok": true,
+   "people_note": "18 Nov: swimmers seen from below in the glass ceiling look photographic -- not boxed one by one, so this has no `people` and is not used"
+  },
+  {
+   "id": "c_lobby_side",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/G FLOOR/G FLOOR - LOBBY 02.jpg",
+   "source_sha256": "873b7acd371ace407aa8476ba32bb76a8b4da9607170ce502d8ae280a88e0c01",
+   "crop": null,
+   "format": "webp",
+   "shows": "Ground floor lobby from the side: tall glass onto the drop-off, the chrome counter and logo wall, an arch to the garden",
+   "about": [
+    "lobby",
+    "ground floor",
+    "futuristic design"
+   ],
+   "text": "the project's own logo and EMBASSY WORLD on the lobby wall",
+   "checked": "960 px view, 17 Nov: no title pill or credit; a car stands in the drop-off outside; no people",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_lobby_gallery",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/4.facilities/G FLOOR/G FLOOR - LOBBY 03.jpg",
+   "source_sha256": "71ae158992abf7319dbbfffe0503db44fe3e23fd8d2513d67f28aad1b4230fbc",
+   "crop": null,
+   "format": "webp",
+   "shows": "The gallery beside the lobby: star ceiling, marble floor, the lobby's sofa below (square picture)",
+   "about": [
+    "lobby",
+    "ground floor"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov: no text, no people",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_pavilion_day",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/6.gallery/exterior/CD03/Scene 56.png",
+   "source_sha256": "2186eae4832659debe2a9508bff71d6c2e1c11c3b548ec1472b5633d3a86e3c6",
+   "crop": [
+    0,
+    0,
+    2180,
+    1704
+   ],
+   "format": "webp",
+   "shows": "The shell pavilion on the Water Lagoon, close, by day",
+   "about": [
+    "swimming pool",
+    "pool",
+    "outdoors",
+    "common areas"
+   ],
+   "text": "",
+   "checked": "960 px view, then the right edge at 3x, 17 Nov: the walking woman at the right (a photo cut-out of a real person, about 250 px tall) is OUTSIDE the crop, which stops at x 2180; no text; nobody else in the picture",
+   "ok": true,
+   "people": [
+    {
+     "box": [
+      0.615,
+      0.5571,
+      0.6432,
+      0.5914
+     ],
+     "what": "a woman behind the pavilion's bar: a photo cut-out of a real person"
+    }
+   ]
+  },
+  {
+   "id": "c_lagoon_path",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/6.gallery/exterior/CD03/Scene 59.png",
+   "source_sha256": "91a5979bda4d4dacab96d0131ec52f21f5af06020e986f7e89d7ffd113eca653",
+   "crop": null,
+   "format": "webp",
+   "shows": "A path through shrub beds beside the Water Lagoon, the ring pavilion and a wing of the building behind",
+   "about": [
+    "swimming pool",
+    "pool",
+    "outdoors",
+    "common areas",
+    "relax",
+    "relaxing"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov: no text, no people",
+   "ok": true,
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": [
+    {
+     "box": [
+      0.4944,
+      0.5674,
+      0.5108,
+      0.5956
+     ],
+     "what": "a person in a blue coat beside the ring pavilion: a photo cut-out of a real person"
+    },
+    {
+     "box": [
+      0.7087,
+      0.5755,
+      0.7224,
+      0.5931
+     ],
+     "what": "a woman's head and shoulders in the ring pavilion: a photo cut-out of a real person"
+    }
+   ]
+  },
+  {
+   "id": "c_entrance_aerial",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/6.gallery/exterior/Entrance/Scene 62(1).png",
+   "source_sha256": "3104f964ab983d96fe5e3a79a688ad5482aa449fd97302ab9369bdcf7e735a68",
+   "crop": null,
+   "format": "webp",
+   "shows": "The entrance court from above: ringed paving round a fountain, the building's front (a car in the court, one on the road)",
+   "about": [
+    "road level",
+    "storeys",
+    "futuristic design"
+   ],
+   "text": "",
+   "checked": "960 px view and the door at 3x, 17 Nov: a drop-off court, not parking; no text; one small figure at the door seen from above and behind (a photo cut-out, about 70 px tall of 1665, no face visible)",
+   "ok": true,
+   "establishing": true,
+   "people": [
+    {
+     "box": [
+      0.5547,
+      0.3604,
+      0.5734,
+      0.418
+     ],
+     "what": "a woman at the door seen from above and behind: a photo cut-out of a real person"
+    }
+   ]
+  },
+  {
+   "id": "c_playscape_falls",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/6.gallery/exterior/Playscape/Scene 63.png",
+   "source_sha256": "a25f426c46f63051e45261e11c2b270015192be8f6eb532b0782c776f56537f8",
+   "crop": null,
+   "format": "webp",
+   "shows": "Space playground by day: the dome, the mirror slide into the pool, fountains and a water curtain",
+   "about": [
+    "family",
+    "outdoors",
+    "pool"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov: no text, no people",
+   "ok": true,
+   "people": [
+    {
+     "box": [
+      0.0512,
+      0.6627,
+      0.0793,
+      0.7127
+     ],
+     "what": "a woman at the pool's edge, left: a photo cut-out of a real person"
+    },
+    {
+     "box": [
+      0.7791,
+      0.6626,
+      0.8084,
+      0.8022
+     ],
+     "what": "a figure behind the water curtain: a photo cut-out of a real person"
+    }
+   ]
+  },
+  {
+   "id": "c_playscape_night",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/6.gallery/exterior/Playscape/Scene 65.png",
+   "source_sha256": "e4a63b7ce0d846ede21e9dad44ae0c6ba51d55f86e5212d48c1efc716c9079d4",
+   "crop": null,
+   "format": "webp",
+   "shows": "Space playground at night: the dome lit blue, light rings on the ground",
+   "about": [
+    "family",
+    "outdoors"
+   ],
+   "text": "",
+   "checked": "960 px view, 17 Nov: no text, no people",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_logo",
+   "kind": "picture",
+   "class": "other",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/brand-logo.png",
+   "source_sha256": "214f460926386dbdca3782af2b7eafef9e35143edfa08412789d8ea08dbac3c7",
+   "crop": null,
+   "format": "png",
+   "shows": "The project's chrome ring logo above the EMBASSY WORLD wordmark, on transparent (the wordmark is dark chrome: it reads on a light ground and is weak on the film's near-black stage)",
+   "about": [
+    "embassy world"
+   ],
+   "text": "EMBASSY WORLD",
+   "checked": "640 px view on grey, 17 Nov: the project's own mark, nothing else",
+   "ok": true,
+   "picked_by": [
+    "emma_console",
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_logo_on_white",
+   "kind": "picture",
+   "class": "other",
+   "source": "web/1.home/logo.png",
+   "source_sha256": "42891d91732387da2117f4f45c62082956bef39fdd2c30b38c0e0ae6c4fb415e",
+   "crop": null,
+   "format": "webp",
+   "shows": "The same logo and wordmark, large, on a WHITE ground",
+   "about": [
+    "embassy world"
+   ],
+   "text": "EMBASSY WORLD",
+   "checked": "960 px view, 17 Nov: the project's own mark on plain white",
+   "ok": true,
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_app_emma",
+   "kind": "picture",
+   "class": "other",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/emma.png",
+   "source_sha256": "00d7fba41cb7d0779172457ad49b6dc2493def20c1556ca59a40b21592742313",
+   "crop": null,
+   "format": "png",
+   "shows": "The Smart Home app's Emma mascot: a round white-and-blue robot head with a leaf, on transparent (a drawing -- not the robot on stage)",
+   "about": [
+    "emma",
+    "smart home"
+   ],
+   "text": "",
+   "checked": "640 px view on grey, 17 Nov: no text",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_glass_ribbon",
+   "kind": "picture",
+   "class": "other",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/glass-ribbon.png",
+   "source_sha256": "1bf4f5e0f816c965193d26e60ae0d0706bcafb167cba1dd167b45c6737626026",
+   "crop": null,
+   "format": "webp",
+   "shows": "The Smart Home app's backdrop: a glass ribbon and ring on pale blue (abstract -- shows nothing of the project)",
+   "about": [
+    "smart home"
+   ],
+   "text": "",
+   "checked": "640 px view, 17 Nov: no text",
+   "ok": true,
+   "people": []
+  },
+  {
+   "id": "c_lagoon_aerial_day",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/6.gallery/exterior/CD03/Scene 58.png",
+   "source_sha256": "d538efeb1a7bc05d1b890c50acc3144fdb9375eedc829cbc8d854b22beceb016",
+   "crop": null,
+   "format": "webp",
+   "shows": "The Water Lagoon from above, the WHOLE frame, by day: the channel between two wings from the far bridge to the near pool, the egg pavilion, lawns with loungers (same camera in both: day and night lie on each other)",
+   "about": [
+    "swimming pool",
+    "pool",
+    "common areas",
+    "outdoors"
+   ],
+   "text": "",
+   "checked": "half size, then the pavilion at 3x, 17 Nov: no text, no price; ONE seated woman inside the pavilion is a photo cut-out of a real person, about 45 px tall of 1705 (face about 6 px: not recognisable) -- she is in the catalogue's own crops of this frame too",
+   "ok": true,
+   "picked_by": [
+    "living_photos"
+   ],
+   "note": "keep any push-in off the pavilion's seat (about 50-55% across, 60-64% down): the figure there is a photo cut-out",
+   "registers_with": "c_lagoon_aerial_night",
+   "people": [
+    {
+     "box": [
+      0.5078,
+      0.5279,
+      0.5391,
+      0.566
+     ],
+     "what": "a seated woman: a photo cut-out of a real person (inside the egg pavilion)"
+    },
+    {
+     "box": [
+      0.5359,
+      0.4622,
+      0.5469,
+      0.4798
+     ],
+     "what": "a small standing figure: a photo cut-out of a real person (at the pavilion's counter)"
+    }
+   ]
+  },
+  {
+   "id": "c_lagoon_aerial_night",
+   "kind": "picture",
+   "class": "render",
+   "source": "web/6.gallery/exterior/CD03/Scene 40.png",
+   "source_sha256": "43c86f3e7507312129d477bdf34980c77ad0bdeed91ce29d43e4038f4d076d75",
+   "crop": null,
+   "format": "webp",
+   "shows": "The Water Lagoon from above, the WHOLE frame, at night, path and pool lights on: the channel between two wings from the far bridge to the near pool, the egg pavilion, lawns with loungers (same camera in both: day and night lie on each other)",
+   "about": [
+    "swimming pool",
+    "pool",
+    "common areas",
+    "outdoors"
+   ],
+   "text": "",
+   "checked": "half size, then the pavilion at 3x, 17 Nov: no text, no price; ONE seated woman inside the pavilion is a photo cut-out of a real person, about 45 px tall of 1705 (face about 6 px: not recognisable) -- she is in the catalogue's own crops of this frame too",
+   "ok": true,
+   "picked_by": [
+    "living_photos",
+    "location_site"
+   ],
+   "note": "keep any push-in off the pavilion's seat (about 50-55% across, 60-64% down): the figure there is a photo cut-out",
+   "registers_with": "c_lagoon_aerial_day",
+   "people": [
+    {
+     "box": [
+      0.5078,
+      0.5279,
+      0.5391,
+      0.566
+     ],
+     "what": "a seated woman: a photo cut-out of a real person (inside the egg pavilion)"
+    },
+    {
+     "box": [
+      0.5359,
+      0.4622,
+      0.5469,
+      0.4798
+     ],
+     "what": "a small standing figure: a photo cut-out of a real person (at the pavilion's counter)"
+    }
+   ]
+  },
+  {
+   "id": "c_site_lagoon_clean",
+   "kind": "picture",
+   "class": "plan",
+   "source": "web/3.project details/master plan/_Embassy World  Floor Plan/3.png",
+   "source_sha256": "f61659541924dfb29f00cb957b781db295391f9ce1c28d297578c1c05e17d853",
+   "crop": null,
+   "format": "png",
+   "shows": "The ground-floor site plan from straight above with the WHOLE Water Lagoon: water, islands, bridges, gardens, paths and the drive as drawn; every building block is one flat dark navy shape with a light edge; the page is see-through",
+   "about": [
+    "swimming pool",
+    "pool",
+    "common areas",
+    "outdoors"
+   ],
+   "text": "none. Six flat hedge-coloured patches on the top and bottom edges are where the white BUILDING A..F tags sat (filled flat, nothing painted in); the drive behind Building A still shows its drawn bays (lines only)",
+   "checked": "the result looked at 1:1 on the stage colour in two halves and the six tag places at 3x, 17 Nov: ZERO letters and ZERO digits left -- no unit number, area, SHOP / LOBBY / room label or BUILDING tag; mechanically: 0 px of the tags' lettering and 0 px of ink inside the blocks still show, and no pale patch that still shows carries strokes. The drawing's own pixels everywhere else",
+   "ok": true,
+   "derive": "site_lagoon_clean",
+   "picked_by": [
+    "coordinator (owner 17 Nov: a top view that shows the whole pool)"
+   ],
+   "note": "2000 px is the largest copy of this plan in the owner's material (the stories' excluded plan_ground_site is cut from the same file): this IS the full size, nothing is enlarged. `geometry.lagoon` = the water's edge as one closed path, `geometry.centre` = a line down the middle of the water, both in % of the picture",
+   "people": []
+  },
+  {
+   "id": "c_pool_ripple_00",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/PoolAnimation/pool_00.png",
+   "source_sha256": "2c21cee561c782a7fd0aad0985f38b852f6694b769de40821453ec38adccdd50",
+   "crop": [
+    0,
+    122,
+    1440,
+    810
+   ],
+   "format": "png",
+   "shows": "The campus as a blue wire hologram from above at a slant, on black; frame of one ripple cycle on the lagoon's water -- calm: the lagoon as an outline",
+   "about": [
+    "swimming pool",
+    "pool",
+    "water"
+   ],
+   "text": "",
+   "checked": "all seven frames looked at 960 px wide, 17 Nov: no roof lettering in this view, no UI, no people, no figures; the four frames share one camera and crop (they register); pool_29 / pool_36 repeat 00 / 06",
+   "ok": true,
+   "picked_by": [
+    "emma_console"
+   ],
+   "note": "a hologram of the pool with a ripple effect: it shows water, not a water-quality reading or the dashboard the line speaks of -- whether it may stand under that line is the slide rule's decision",
+   "people": []
+  },
+  {
+   "id": "c_pool_ripple_06",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/PoolAnimation/pool_06.png",
+   "source_sha256": "12ed553777f8c978c902fae8ce28a19b6e088947fabb3e6ce6978579908704af",
+   "crop": [
+    0,
+    122,
+    1440,
+    810
+   ],
+   "format": "png",
+   "shows": "The campus as a blue wire hologram from above at a slant, on black; frame of one ripple cycle on the lagoon's water -- a ring of light starts in the middle of the lagoon",
+   "about": [
+    "swimming pool",
+    "pool",
+    "water"
+   ],
+   "text": "",
+   "checked": "all seven frames looked at 960 px wide, 17 Nov: no roof lettering in this view, no UI, no people, no figures; the four frames share one camera and crop (they register); pool_29 / pool_36 repeat 00 / 06",
+   "ok": true,
+   "picked_by": [
+    "emma_console"
+   ],
+   "note": "a hologram of the pool with a ripple effect: it shows water, not a water-quality reading or the dashboard the line speaks of -- whether it may stand under that line is the slide rule's decision",
+   "people": []
+  },
+  {
+   "id": "c_pool_ripple_14",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/PoolAnimation/pool_14.png",
+   "source_sha256": "7ed7edc255dd639a353c098c409622dfc7adbcbccdd39b3168a3d88b8445bc0c",
+   "crop": [
+    0,
+    122,
+    1440,
+    810
+   ],
+   "format": "png",
+   "shows": "The campus as a blue wire hologram from above at a slant, on black; frame of one ripple cycle on the lagoon's water -- the ripple spreading along the lagoon",
+   "about": [
+    "swimming pool",
+    "pool",
+    "water"
+   ],
+   "text": "",
+   "checked": "all seven frames looked at 960 px wide, 17 Nov: no roof lettering in this view, no UI, no people, no figures; the four frames share one camera and crop (they register); pool_29 / pool_36 repeat 00 / 06",
+   "ok": true,
+   "picked_by": [
+    "emma_console"
+   ],
+   "note": "a hologram of the pool with a ripple effect: it shows water, not a water-quality reading or the dashboard the line speaks of -- whether it may stand under that line is the slide rule's decision",
+   "people": []
+  },
+  {
+   "id": "c_pool_ripple_23",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/PoolAnimation/pool_23.png",
+   "source_sha256": "62cdb6c0d2de2795b599724e46ca133f0394343eb408d7009aa34e95592c190c",
+   "crop": [
+    0,
+    122,
+    1440,
+    810
+   ],
+   "format": "png",
+   "shows": "The campus as a blue wire hologram from above at a slant, on black; frame of one ripple cycle on the lagoon's water -- the ripple over the whole lagoon",
+   "about": [
+    "swimming pool",
+    "pool",
+    "water"
+   ],
+   "text": "",
+   "checked": "all seven frames looked at 960 px wide, 17 Nov: no roof lettering in this view, no UI, no people, no figures; the four frames share one camera and crop (they register); pool_29 / pool_36 repeat 00 / 06",
+   "ok": true,
+   "picked_by": [
+    "emma_console"
+   ],
+   "note": "a hologram of the pool with a ripple effect: it shows water, not a water-quality reading or the dashboard the line speaks of -- whether it may stand under that line is the slide rule's decision",
+   "people": []
+  },
+  {
+   "id": "c_room_studio_solid",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/03_A-316_Studio24_overview.png",
+   "source_sha256": "80bb78f27d666ba81e58f33ffa7d9dc866f259631c27e4766a002cd20b8bc806",
+   "crop": [
+    934,
+    621,
+    1839,
+    1345
+   ],
+   "format": "webp",
+   "shows": "Studio unit, white cut-away model on black -- cut with the SAME crop box as the catalogue's room_studio_wire, so the two lie exactly on each other",
+   "about": [
+    "studios",
+    "unit types",
+    "visualisations"
+   ],
+   "text": "",
+   "checked": "overlaid half-and-half on room_studio_wire and looked at, 17 Nov: walls and furniture coincide (the catalogue's room_*_solid, cut 4% tighter, do not when both fill one box); the crop is the wire recipe's, clear of the app's unit panel (x < 746), readings bar (y <= 619), phone panel (x > 2039) and buttons (y >= 1473)",
+   "ok": true,
+   "picked_by": [
+    "units_views"
+   ],
+   "registers_with": "room_studio_wire",
+   "people": []
+  },
+  {
+   "id": "c_room_1br_solid",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/01_F-113_Room34_overview.png",
+   "source_sha256": "f153aae7eced79f8c296a896d29ab373a9eeecebe556a2bcacd41f912c542797",
+   "crop": [
+    850,
+    621,
+    1908,
+    1468
+   ],
+   "format": "webp",
+   "shows": "1-bedroom unit, white cut-away model on black -- cut with the SAME crop box as the catalogue's room_1br_wire, so the two lie exactly on each other",
+   "about": [
+    "1-bedroom",
+    "unit types",
+    "visualisations"
+   ],
+   "text": "",
+   "checked": "overlaid half-and-half on room_1br_wire and looked at, 17 Nov: walls and furniture coincide (the catalogue's room_*_solid, cut 4% tighter, do not when both fill one box); the crop is the wire recipe's, clear of the app's unit panel (x < 746), readings bar (y <= 619), phone panel (x > 2039) and buttons (y >= 1473)",
+   "ok": true,
+   "picked_by": [
+    "units_views"
+   ],
+   "registers_with": "room_1br_wire",
+   "people": []
+  },
+  {
+   "id": "c_room_2br_solid",
+   "kind": "picture",
+   "class": "model",
+   "source": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/08_C-309_TwoBed51_overview.png",
+   "source_sha256": "c61ce73a3f60273370a47175eb38596424da3b6ef5621315c1a939b544a2255b",
+   "crop": [
+    912,
+    621,
+    1896,
+    1408
+   ],
+   "format": "webp",
+   "shows": "2-bedroom unit, white cut-away model on black -- cut with the SAME crop box as the catalogue's room_2br_wire, so the two lie exactly on each other",
+   "about": [
+    "2-bedroom",
+    "unit types",
+    "visualisations",
+    "this unit"
+   ],
+   "text": "",
+   "checked": "overlaid half-and-half on room_2br_wire and looked at, 17 Nov: walls and furniture coincide (the catalogue's room_*_solid, cut 4% tighter, do not when both fill one box); the crop is the wire recipe's, clear of the app's unit panel (x < 746), readings bar (y <= 619), phone panel (x > 2039) and buttons (y >= 1473)",
+   "ok": true,
+   "picked_by": [
+    "units_views"
+   ],
+   "registers_with": "room_2br_wire",
+   "people": []
+  },
+  {
+   "id": "c_icon_lights",
+   "kind": "picture",
+   "class": "drawn",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/Lightbulb.svg",
+   "source_sha256": "14bc523ba2ec67b257c5c3eb5145bc56abd5804fbf28fd32d725474807f37172",
+   "crop": null,
+   "format": "svg",
+   "shows": "the Smart Home app's glyph for Lights: a light bulb, blue line",
+   "about": [
+    "lights"
+   ],
+   "text": "",
+   "checked": "the SVG's text read in full, 17 Nov: one 24x24 glyph of paths, stroke #0098FF, no words, no links, no script",
+   "ok": true,
+   "licence": {
+    "name": "ISC (Lucide Icons and Contributors)",
+    "files": [
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Lucide-ISC-MIT.txt",
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Icon-Sources.txt"
+    ]
+   },
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_icon_curtains",
+   "kind": "picture",
+   "class": "drawn",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/Curtains.svg",
+   "source_sha256": "a08711697c662581f2a98e48ee6f6d505cdeb07bf8533774d6d74963912938e9",
+   "crop": null,
+   "format": "svg",
+   "shows": "the Smart Home app's glyph for Curtains: a pair of drawn curtains under a rail, blue",
+   "about": [
+    "curtains"
+   ],
+   "text": "",
+   "checked": "the SVG's text read in full, 17 Nov: one 24x24 glyph of paths, stroke #0098FF, no words, no links, no script",
+   "ok": true,
+   "licence": {
+    "name": "Apache-2.0 (Material Design Icons / Pictogrammers)",
+    "files": [
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Apache-2.0.txt",
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Icon-Sources.txt"
+    ]
+   },
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_icon_check",
+   "kind": "picture",
+   "class": "drawn",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/Check.svg",
+   "source_sha256": "a43e73145f4e3ecbe6bbcef51957adb619fe9c09d7dc89eee362bd06f86d9c85",
+   "crop": null,
+   "format": "svg",
+   "shows": "a check mark, blue line",
+   "about": [
+    "check mark"
+   ],
+   "text": "",
+   "checked": "the SVG's text read in full, 17 Nov: one 24x24 glyph of paths, stroke #0098FF, no words, no links, no script",
+   "ok": true,
+   "licence": {
+    "name": "ISC (Lucide Icons and Contributors)",
+    "files": [
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Lucide-ISC-MIT.txt",
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Icon-Sources.txt"
+    ]
+   },
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_icon_send",
+   "kind": "picture",
+   "class": "drawn",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/Send.svg",
+   "source_sha256": "48054f124dc99bb485e9ccda17687ecd4aa3e8fe710025888fee466a2475a910",
+   "crop": null,
+   "format": "svg",
+   "shows": "a paper-plane 'send' glyph, blue line",
+   "about": [
+    "command"
+   ],
+   "text": "",
+   "checked": "the SVG's text read in full, 17 Nov: one 24x24 glyph of paths, stroke #0098FF, no words, no links, no script",
+   "ok": true,
+   "licence": {
+    "name": "ISC (Lucide Icons and Contributors)",
+    "files": [
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Lucide-ISC-MIT.txt",
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Icon-Sources.txt"
+    ]
+   },
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_icon_message",
+   "kind": "picture",
+   "class": "drawn",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/MessageCircle.svg",
+   "source_sha256": "669e22611a50d4aaecc92b9515c4547fd20fca4f220f7219530d1cf45a70fc3f",
+   "crop": null,
+   "format": "svg",
+   "shows": "a round speech bubble, blue line",
+   "about": [
+    "emma"
+   ],
+   "text": "",
+   "checked": "the SVG's text read in full, 17 Nov: one 24x24 glyph of paths, stroke #0098FF, no words, no links, no script",
+   "ok": true,
+   "licence": {
+    "name": "ISC (Lucide Icons and Contributors)",
+    "files": [
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Lucide-ISC-MIT.txt",
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Icon-Sources.txt"
+    ]
+   },
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_icon_house",
+   "kind": "picture",
+   "class": "drawn",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/House.svg",
+   "source_sha256": "b8a1a035410a9011251aca42d95accec981b461bbe916241cf27f4fc033655d1",
+   "crop": null,
+   "format": "svg",
+   "shows": "a house outline, blue line",
+   "about": [
+    "smart home"
+   ],
+   "text": "",
+   "checked": "the SVG's text read in full, 17 Nov: one 24x24 glyph of paths, stroke #0098FF, no words, no links, no script",
+   "ok": true,
+   "licence": {
+    "name": "ISC (Lucide Icons and Contributors)",
+    "files": [
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Lucide-ISC-MIT.txt",
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Icon-Sources.txt"
+    ]
+   },
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_icon_search",
+   "kind": "picture",
+   "class": "drawn",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/Search.svg",
+   "source_sha256": "9cf86b133afac63f2c70e183b2b484d84e1469991cb0d5b9e488e409933a329a",
+   "crop": null,
+   "format": "svg",
+   "shows": "a magnifying glass, blue line",
+   "about": [
+    "look"
+   ],
+   "text": "",
+   "checked": "the SVG's text read in full, 17 Nov: one 24x24 glyph of paths, stroke #0098FF, no words, no links, no script",
+   "ok": true,
+   "licence": {
+    "name": "ISC (Lucide Icons and Contributors)",
+    "files": [
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Lucide-ISC-MIT.txt",
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Icon-Sources.txt"
+    ]
+   },
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_icon_chevron",
+   "kind": "picture",
+   "class": "drawn",
+   "source": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/ChevronRight.svg",
+   "source_sha256": "3b55d1a98d1a1c12f1147ee4ce476225382b107d848689857ebb6df2dde11875",
+   "crop": null,
+   "format": "svg",
+   "shows": "a chevron pointing right, blue line",
+   "about": [
+    "prompt"
+   ],
+   "text": "",
+   "checked": "the SVG's text read in full, 17 Nov: one 24x24 glyph of paths, stroke #0098FF, no words, no links, no script",
+   "ok": true,
+   "licence": {
+    "name": "ISC (Lucide Icons and Contributors)",
+    "files": [
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Lucide-ISC-MIT.txt",
+     "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/licenses/Icon-Sources.txt"
+    ]
+   },
+   "picked_by": [
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "logo_chrome",
+   "kind": "video",
+   "class": "other",
+   "source": "ue/embassyworld3/Content/Movies/magnific_create-a-10second-169-lux_yiYBxfnPW9.mp4",
+   "source_sha256": "f37a70ce2c54ded769e43e78bc1a7ba80b4a19ca425feb50d797b22eed87c413",
+   "shows": "The project's own 10 s clip: the chrome ring logo and EMBASSY WORLD wordmark on a black mirror floor; it holds, turns edge-on at about 4.5 s and comes back to the front by 7 s",
+   "about": [
+    "embassy world"
+   ],
+   "text": "EMBASSY WORLD",
+   "checked": "20 frames (2 per second) looked at, 17 Nov: nothing but the logo; the picture stream is copied untouched (H.264 yuv420p already); the source's sound track (music, mean -12.8 dB) is left out; its AIGC metadata label is kept",
+   "ok": true,
+   "picked_by": [
+    "emma_console",
+    "smarthome_brand"
+   ],
+   "people": []
+  },
+  {
+   "id": "c_logo_reveal",
+   "kind": "video",
+   "class": "other",
+   "source": "ceremony/logo_reveal_1118.mp4",
+   "source_sha256": "f614ba68f775f0517bbd16eeac8e7b851fffdd521bf1f2b2667d61d4890eee95",
+   "shows": "The owner's new 6.7 s opening clip (18 Nov): the chrome ring logo lights up out of black, a flare runs round it, the EMBASSY WORLD wordmark comes up beneath and it holds",
+   "about": [
+    "embassy world"
+   ],
+   "text": "EMBASSY WORLD",
+   "checked": "13 frames (2 per second) looked at, 18 Nov night: nothing but the logo on black -- the ring lights up from its top, a warm then blue flare, EMBASSY WORLD comes up under it, it settles; the picture stream is copied untouched (H.264 yuv420p 24 fps); the source's sound track is left out",
+   "ok": true,
+   "people": [],
+   "picked_by": [
+    "owner 18 Nov night: the new opening clip (1118 (3).mp4)"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "glob": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/*_05_hologram_return.png",
+   "why": "same view as the building's 01 hologram overview (a return test)"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/*_06_drawer_closed.png",
+   "why": "same view as the building's 01 overview; a test of the app's drawer"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/*_07_drawer_open.png",
+   "why": "same view as the building's 01 overview; a test of the app's drawer"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/*_floor_4.png",
+   "why": "one floor's layout lifted out of the building: the app's floor panel and buttons lie over it, and it is a plan of the units"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/BuildingExperience/Screenshots/Review_EF.png",
+   "why": "a review collage of six screenshots"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/HologramTransition/ViewportCapture_*/*.png",
+   "why": "NOT one continuous move: nine uneven samples (0.99, 0.975, 0.96, 0.5, 0) of a collapse / reveal test per phase, camera fixed; the hologram of cycle 1 and the lit model carry mirrored roof lettering, cycle 2 shows the logo from behind and is cut by the frame; the 'hidden' frames are black"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/SunMotion/Screenshots/*.png",
+   "why": "same top view at another sun position (three positions kept: c_site_sun_am / noon / pm); twelve stills of a sun-slider test are not a time-lapse"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/*quotation*.png",
+   "why": "a quotation preview"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/*_ac_o*.png",
+   "why": "close-up ringed by the app's panels: unit number, area and demo readings ('24 C') baked in"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/*purifier*.png",
+   "why": "close-up ringed by the app's panels: unit number, area and demo readings baked in"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/*_hologram.png",
+   "why": "the room model ringed by the app's panels (unit number, area, demo readings); the three unit types are in the catalogue as room_*_wire crops, and the combined / '1-bedroom 51' variants are not types a slide may name"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/*_overview.png",
+   "why": "the room model ringed by the app's panels (unit number, area, demo readings); the three unit types are in the catalogue as room_*_solid crops, and the combined / '1-bedroom 51' variants are not types a slide may name"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/*_radar.png",
+   "why": "a transition test frame: the room is about 400 px wide in a black frame"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/*curtain*.png",
+   "why": "same kind of shot as c_curtain_closed / c_curtain_open in another room or from another camera; one matched pair kept"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/00_F113_mid_assembly.png",
+   "why": "a mid-animation frame: loose pieces of a room on black"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/RoomExperience/AllLayouts/phone_door_camera.png",
+   "why": "the app's panels with a unit number and a door-camera picture of a person"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/FacadeRooms/after/*.png",
+   "why": "QA captures of the facade-rooms fix, not presentation pictures: flat elevations on black or grey with blown-out windows and bird / tree silhouettes; the 'detail' shots show loose panels"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/09_collapsed_return.png",
+   "why": "same view as 01_collapsed (c_site_top), harder shadows"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/SiteEnvironment/UI/Screenshots/*.png",
+   "why": "the app's panels lie over the model: demo readings (31 C, AQI, ppm, pH), the menu with AVAILABILITY, the time bar"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/CondoHologram/Preview_SurfaceFilter.png",
+   "why": "same view as Preview_Overview (c_campus_holo), a filter test"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/CondoHologram/Baseline_CurrentSavedV1.png",
+   "why": "an unfinished test render: most of the model's walls are missing"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/CondoHologram/V2_Overview.png",
+   "why": "an unfinished test render: most of the model's walls are missing"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/CondoHologram/V2_*.png",
+   "why": "an early wire test of one room inside a floor ring; the catalogue's room_*_wire holograms replace it"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/CondoHologram/RoomTranslation_*.png",
+   "why": "an early wire test of one room inside a floor ring; the catalogue's room_*_wire holograms replace it"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/CondoHologram/Assembly/*_Room*.png",
+   "why": "an early wire test of one room inside a floor ring; the catalogue's room_*_wire holograms replace it"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/CondoHologram/Assembly/*_Overview.png",
+   "why": "the whole campus with mirrored 'BUILDING ...' lettering on the roofs"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/CondoHologram/Assembly/*_Top.png",
+   "why": "a strip of the campus from above, cut by the frame, its lettering lying sideways"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/CondoHologram/Assembly/Assembly_Exploded.png",
+   "why": "a work-in-progress exploded test: the floor plates break into dotted fragments"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/Build_f*.png",
+   "why": "an early animation test: a second copy of the model cuts into the top and bottom of the frame"
+  },
+  {
+   "glob": "ue/embassyworld3/Saved/CondoHologram/Assembly/AnimatePreview/*/Build_f*.png",
+   "why": "hologram build-animation frame (1440x810): where buildings stand their roofs carry the mirrored 'BUILDING ...' lettering (the catalogue excludes its own frames from f1300 on for it); the frames before the buildings repeat the catalogue's campus_holo_f1060..f1240; the first frame of a run is black"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/02-smart.png",
+   "why": "every word read at full size: 'Unit 12A', 22 C, 48%, room names, and a Devices card whose words no ceremony line backs (Door Lock Locked, Air Purifier On) with the states 'Lights On' / 'Curtains Open' baked in before any cue says so; scenes Relax / Away / Sleep / Dinner (the smart-home designer reached the same verdict)"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/01-home.png",
+   "why": "a made-up resident ('Good Morning, Sarah'), 'Unit 12A', 'Bangkok, Thailand' and demo readings (26, 24 C, 420 ppm, 12 ug/m3)"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/03-climate.png",
+   "why": "demo figures only: 22 C, humidity 58%, schedule 7:00 AM - 10:00 PM"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/04-sensors.png",
+   "why": "demo readings: CO2 420 ppm, PM2.5 12, PM10 18, 24 C, 58% -- figures no ceremony line says"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/05-emma.png",
+   "why": "a made-up chat with times and another brand's name ('Siam Paragon', a Bangkok mall); '24/7'"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/06-services.png",
+   "why": "names services no ceremony line says (Concierge, Facility Reservations, Transport Assistance, Housekeeping, Maintenance Requests, Resident Support) -- the catalogue excludes prj_app for the same"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/07-facilities.png",
+   "why": "availability and bookings ('Infinity Pool - Available - 30 people', dates, times, 'Confirmed'), with facility names that are not this project's"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/08-maintenance.png",
+   "why": "an empty request form (placeholders, '0/500', 'up to 5 photos')"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/09-transport.png",
+   "why": "other brands and a made-up trip (Siam Paragon, Terminal 21 Asok, Emporium, Suvarnabhumi Airport), a driver's name and rating, 'Condo Shuttle - Convenient & Free', 'ETA 5 min'"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/screens-png/10-profile.png",
+   "why": "a made-up resident's name, 'Unit 12A', payment methods, a car-park entry in the access history"
+  },
+  {
+   "glob": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/icons/*.svg",
+   "why": "NOT looked at one by one: the app's glyph set (Lucide, ISC); only the eight glyphs a designer picked were read and taken"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/PoolAnimation/pool_29.png",
+   "why": "repeats pool_00 (the cycle starting again)"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/PoolAnimation/pool_36.png",
+   "why": "repeats pool_06 (the cycle starting again)"
+  },
+  {
+   "path": "ue/embassyworld3/Saved/PoolAnimation/pool_small.png",
+   "why": "the same view as pool_23, smaller (960x540)"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/Embassy-World-All-Screens.png",
+   "why": "all ten screens side by side: every exclusion of the single screens"
+  },
+  {
+   "path": "ue/embassyworld3/Embassy-World-Smart-Home-Figma (1)/assets/embassy-world-logo-original.png",
+   "why": "the same logo as brand-logo.png (c_logo), smaller in its frame"
+  },
+  {
+   "path": "web/6.gallery/exterior/CD03/Scene 69.png",
+   "why": "two photo cut-outs of real people stand large at the pavilion's bar (about 250 px tall, faces clear at 3x): a woman in a blue coat and sunglasses, a seated woman with a cup -- no crop keeps the bar without them"
+  },
+  {
+   "glob": "web/2.about us/*/*.png",
+   "why": "portrait photos of real people (the executives)"
+  },
+  {
+   "path": "web/3.project details/master plan/_Embassy World  Floor Plan/1.png",
+   "why": "the plans' cover page with the caption 'for illustrative purposes only ... subject to changes'"
+  },
+  {
+   "path": "web/3.project details/master plan/_Embassy World  Floor Plan/11.png",
+   "why": "the roof-top plan"
+  },
+  {
+   "glob": "web/3.project details/master plan/_Embassy World  Floor Plan/*.png",
+   "why": "a floor plan of the units: every unit's number on it, and the key plan"
+  },
+  {
+   "path": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/19.jpg",
+   "why": "an 'OPTION 2' variant; its glass looks onto a city skyline and a pool terrace that level 3 does not have"
+  },
+  {
+   "path": "web/4.facilities/3rd Floor/EMBASSY WORLD - 3RD FLOOR/24.jpg",
+   "why": "an 'OPTION 2' variant with a skyline-and-sea window (the stories' recipe chose 25.jpg over it)"
+  },
+  {
+   "path": "web/4.facilities/Basement/EMBASSY WORLD - Basement/18.jpg",
+   "why": "the big screen reads as a sea window with mountains (the stories' recipe chose 16.jpg over it)"
+  },
+  {
+   "path": "web/4.facilities/Basement/EMBASSY WORLD - Basement/19.jpg",
+   "why": "a layout page: a narrow view between two blurred panels"
+  },
+  {
+   "glob": "web/4.facilities/G FLOOR/G FLOOR*WC*.jpg",
+   "why": "washrooms, lockers and showers: no ceremony line is about them"
+  },
+  {
+   "path": "web/4.facilities/S__29040686.jpg",
+   "why": "a white page of text: numbered lists of facility names"
+  },
+  {
+   "glob": "web/6.gallery/Interior/*",
+   "why": "byte-identical copy of the same file under web/4.facilities (checked by sha256)"
+  },
+  {
+   "path": "web/Embassy World Creative Direction Draft1 (1).jpg",
+   "why": "a text brief for the website (Thai), not a picture"
+  }
+ ]
+}

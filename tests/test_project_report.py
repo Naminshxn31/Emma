@@ -553,6 +553,8 @@ def test_a_price_said_without_a_figure_and_the_sales_board_are_cut():
     stay closed (12 Oct), and never the rooms left."""
     for line in ("ตามทีมขาย C และ D ติดสวนราคาสูงกว่า A และ F",
                  "ฝั่งแดดไม่ลง ขายคนไทยราคาไม่แพง",
+                 # 15.5.4 (robot 6 Nov: "แล้วอยู่ตึกไหนดี" brings this row back first)
+                 '| A และ F | ฝั่งติดถนน แดดไม่ลง ลมพัดผ่านดี ราคาเข้าถึงง่าย เหมาะลูกค้าไทยงบไม่สูง | A: ORT Far 81 |',
                  "ห้องมุมแพงกว่าห้องธรรมดาเท่าไร",
                  "สถานะขาย ณ 30/09/2026: ขายแล้ว **347 ยูนิต (32.6%)** ว่าง **719 ยูนิต**",
                  "Garden มี 18 ห้อง ว่าง 15 ห้อง",
@@ -601,6 +603,41 @@ def test_the_old_two_bedroom_balcony_is_cut_and_the_rest_of_the_answer_stays():
         assert project_report.clean(line, terms) == "", line
     # 23.5's balcony -- the answer that replaces them -- passes
     assert project_report.clean("**ตอบ:** แบบ 51 ตร.ม. ระเบียงลึกกว่า ประมาณ 1.4 เมตร กว้างเกือบ 3 เมตร", terms) != ""
+
+
+def test_a_sister_projects_name_is_not_stripped_with_ours(report):
+    """Robot 6 Nov 09:06: the model searched "Embassy Life"; the project-name
+    stripper took "Embassy" and the search ran on "life" -- the gym's "life
+    from life" came back, and she refused the developer's other project as
+    off-topic. Our own name still decides nothing."""
+    folder, write = report
+    (folder / "19_faq.md").write_text(
+        # the gym's question first: on "life" alone the two tie and the first wins
+        "**ถาม:** Biogenesis แปลว่า life from life ใช่ไหม\n"
+        "**ตอบ:** biogenesis คือ life coming from life ชื่อของยิมที่รวมน้ำ ร่างกาย และเทคโนโลยีสุขภาพ\n\n"
+        "**ถาม:** Embassy One และ Embassy Life คืออะไร เกี่ยวกับ Embassy World อย่างไร\n"
+        "**ตอบ:** เป็นโครงการพี่น้องที่อยู่ในระบบขายเดียวกัน Embassy Life กำหนดเสร็จธันวาคม 2029\n\n"
+        "**ถาม:** สระว่ายน้ำกลางโครงการยาวเท่าไร\n**ตอบ:** สระกลางยาวประมาณ 155 เมตร ตามแบบ\n",
+        encoding="utf-8")
+    write()
+    for query in ("Embassy Life", "What is Embassy Life?", "Embassy One คืออะไร"):
+        hits = project_report.search(query)
+        assert hits and "โครงการพี่น้อง" in hits[0]["text"], query
+    # what decides on the real report (22 chapters, 300+ questions): with the
+    # name cut, "life" alone fell under FAQ_MIN_INFORMATION and the passages
+    # about "life" won; measured on 907 FAQ / eval / logged queries, only the
+    # five that name a sister project changed
+    assert project_report._focus("Embassy Life").split() == ["Embassy", "Life"]
+    assert project_report._focus("What is Embassy One?").split() == ["What", "is", "Embassy", "One?"]
+    assert project_report._PROJECT_NAME.sub(" ", "Embassy World").strip() == ""
+    assert project_report._PROJECT_NAME.sub(" ", "โครงการ Embassy ยาวเท่าไร").split() == ["ยาวเท่าไร"]
+    assert "Life" in project_report._PROJECT_NAME.sub(" ", "Embassy Life")
+    assert project_report._PROJECT_NAME.sub(" ", "เอ็มบาสซี่ไลฟ์").split() == ["เอ็มบาสซี่ไลฟ์"]
+    assert project_report._PROJECT_NAME.sub(" ", "เอ็มบาสซี่ ไลฟ์").split() == ["เอ็มบาสซี่", "ไลฟ์"]
+    # Embassy One in Thai too (final review 6 Nov: "เอ็มบาสซี่วันคืออะไร" lost its name)
+    assert project_report._PROJECT_NAME.sub(" ", "เอ็มบาสซี่วันคืออะไร").split() == ["เอ็มบาสซี่วันคืออะไร"]
+    for ours in ("เอ็มบาสซี่", "เอ็มบาสซี่เวิลด์", "เอ็มบาสซี เวิลด์"):
+        assert project_report._PROJECT_NAME.sub(" ", ours).strip() == "", ours
 
 
 def test_a_question_about_one_room_type_never_gets_anothers_answer(report, monkeypatch):

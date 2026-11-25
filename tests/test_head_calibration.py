@@ -39,9 +39,13 @@ class Robot:
     REALLY does on this simulated robot (a negative pan = "+" turns it to the
     robot's right). Moves are instant; the clock is the test's."""
 
-    def __init__(self, pan_deg=25.0, tilt_deg=20.0, *, texture=True, camera_on_head=True, hfov=None):
+    def __init__(self, pan_deg=25.0, tilt_deg=20.0, *, texture=True, camera_on_head=True, hfov=None,
+                 mirrored=False):
         self.pan_deg, self.tilt_deg = pan_deg, tilt_deg
         self.camera_on_head = camera_on_head
+        # the robot's head camera: its picture is left-right flipped (a box label in the 4 Nov
+        # sweep's pictures reads right only flipped, checked 9 Nov)
+        self.mirrored = mirrored
         # the lens it really has (facewatch assumes ROBOT_CAMERA_HFOV_DEG)
         self.focal = FOCAL if hfov is None else (W / 2) / math.tan(math.radians(hfov / 2))
         self.world = _scene() if texture else np.full((900, 1600), 128, np.uint8)
@@ -62,7 +66,8 @@ class Robot:
         cx = self.world.shape[1] / 2 - self.focal * math.tan(math.radians(self.angle()))
         cy = self.world.shape[0] / 2 + self.focal * math.tan(math.radians(self.elevation()))
         x0, y0 = int(round(cx - W / 2)), int(round(cy - H / 2))
-        return cv2.cvtColor(self.world[y0:y0 + H, x0:x0 + W], cv2.COLOR_GRAY2BGR)
+        picture = cv2.cvtColor(self.world[y0:y0 + H, x0:x0 + W], cv2.COLOR_GRAY2BGR)
+        return cv2.flip(picture, 1) if self.mirrored else picture
 
     # robot_camera.feed
     def latest(self):
@@ -157,7 +162,7 @@ def _run(follow, robot, seconds, step=0.25):
 
 # ---- the arithmetic ------------------------------------------------------------
 
-def _frames(robot, pan_pct=30, tilt_pct=25):
+def _frames(robot, pan_pct=head_follow.CAL_PAN, tilt_pct=head_follow.CAL_TILT):
     out = {}
     for name, pan, tilt in (("centre", 0, 0), ("left", pan_pct, 0), ("right", -pan_pct, 0),
                             ("down", 0, tilt_pct), ("back", 0, 0)):
@@ -216,11 +221,30 @@ def test_the_first_call_measures_then_brings_a_guest_to_the_middle(bench, monkey
     cal = [f for k, f in bench if k == "head_calibration"]
     assert len(cal) == 1 and cal[0]["ok"] is True
     sweep = [(f["pan"], f["tilt"]) for f in robot.sent if f["type"] == "head_look"]
-    assert sweep[:5] == [(0, 0), (30, 0), (-30, 0), (0, 25), (0, 0)]
+    P, T = head_follow.CAL_PAN, head_follow.CAL_TILT
+    assert sweep[:5] == [(0, 0), (P, 0), (-P, 0), (0, T), (0, 0)]
     _run(follow, robot, 12.0)
     assert abs(12.0 - robot.angle()) < head_follow.PAN_DEADBAND_DEG, "the guest is in the middle"
     assert follow.off is None
     assert abs(robot.pan) <= 60
+
+
+def test_a_head_that_turns_far_per_percent_is_still_measured(bench, monkeypatch):
+    """The robot, 4 Nov: 30 % of pan slid the head camera's picture 166 of 320
+    px and 25 % of tilt 84 of 240 -- the first sweeps (30/25) read no_match
+    twice, phase correlation wrapping past half the picture. ~120/~80 deg at
+    100 % in the camera's units: the sweep's steps must stay small enough."""
+    robot = Robot(120.0, 81.0)
+    call, follow = _wire(monkeypatch, robot)
+    _guest_at(monkeypatch, robot, 12.0)
+    _run(follow, robot, 1.0)
+    (row,) = [f for k, f in bench if k == "head_calibration"]
+    assert row["ok"] is True, row
+    saved = json.loads(head_follow.CAL_PATH.read_text(encoding="utf-8"))
+    assert saved["pan_deg_per_100"] == pytest.approx(120.0, rel=0.08)
+    assert saved["tilt_deg_per_100"] == pytest.approx(81.0, rel=0.08)
+    _run(follow, robot, 12.0)
+    assert abs(12.0 - robot.angle()) < head_follow.PAN_DEADBAND_DEG, "the guest is in the middle"
 
 
 def test_with_the_guess_a_reversed_head_would_turn_away(bench, monkeypatch):
@@ -280,6 +304,7 @@ def test_a_sweep_that_moved_and_failed_is_not_repeated_in_front_of_guests(bench,
     row = [f for k, f in bench if k == "head_calibration"][-1]
     assert row["ok"] is False and row["reason"] == "no_motion"
     assert len([f for f in robot.sent if f["type"] == "head_look"]) == 5
+    assert (head_follow.SWEEP_DIR / "sweep.json").exists(), "a failed sweep is the one the bench needs"
     call2, follow2 = _wire(monkeypatch, robot)            # the next call (its own page log)
     _run(follow2, robot, 3.0)
     assert follow2.off == "uncalibrated:no_motion"
@@ -329,6 +354,31 @@ def test_the_sweep_rows_carry_numbers_only(bench, monkeypatch):
     assert all(ch in "0123456789.-+e,[]{}\": _abcdefghijklmnopqrstuvwxyz" for ch in flat)
 
 
+def test_the_sweep_keeps_its_pictures_and_their_timing_for_the_bench(bench, monkeypatch):
+    """4 Nov: the first sweep on the robot read no_match with the head sweeping
+    fully and nobody in front -- the bench needs the five pictures and how
+    each pose's frames slid after the look was sent."""
+    robot = Robot(25.0, 20.0)
+    call, follow = _wire(monkeypatch, robot)
+    _guest_at(monkeypatch, robot, 0.0)
+    _run(follow, robot, 1.0)
+    names = sorted(p.name for p in head_follow.SWEEP_DIR.glob("*.jpg"))
+    assert names == ["0_centre.jpg", "1_left.jpg", "2_right.jpg", "3_down.jpg", "4_back.jpg"]
+    doc = json.loads((head_follow.SWEEP_DIR / "sweep.json").read_text(encoding="utf-8"))
+    assert doc["result"]["ok"] is True
+    assert [s["name"] for s in doc["steps"]] == ["centre", "left", "right", "down", "back"]
+    centre, left = doc["steps"][0], doc["steps"][1]
+    # the first pose has no picture before it: its frames sit against its own first one
+    assert centre["trace"] and all(abs(t[1]) < 0.3 for t in centre["trace"])
+    assert left["ack_ms"] == 800 and left["chosen_s"] >= left["due_s"]
+    # moves are instant here: every frame after the send sits CAL_PAN % of
+    # 25 deg to the right of centre's picture, before and after the one measured
+    slide = -head_follow.CAL_PAN / 100.0 * 25.0
+    assert len(left["trace"]) >= 10
+    assert all(t[1] == pytest.approx(slide, abs=0.5) and t[3] > 0.3 for t in left["trace"])
+    assert left["trace"][-1][0] >= left["chosen_s"] + head_follow.SWEEP_TRACE_AFTER_S - 0.15
+
+
 def test_the_sweep_waits_for_the_pages_caps_and_an_old_apk_is_said_once(bench, monkeypatch):
     robot = Robot()
     call, follow = _wire(monkeypatch, robot)
@@ -362,7 +412,7 @@ def test_a_walk_that_begins_mid_sweep_is_not_a_failed_measurement(bench, monkeyp
 
     async def send_text(text):
         frame = json.loads(text)
-        if frame["type"] == "head_look" and frame["pan"] == -30:     # the third look
+        if frame["type"] == "head_look" and frame["pan"] == -head_follow.CAL_PAN:     # the third look
             robot.sent.append(frame)
             follow.ack({"seq": frame["seq"], "accepted": False, "reason": "navigating", "ms": None})
             return

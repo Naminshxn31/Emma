@@ -1,0 +1,293 @@
+<!doctype html>
+<!--
+  Emma standing on a stage, rendered OFFLINE (scripts/render_emma_console.py drives this page
+  in headless Chromium, one frame at a time, and encodes the frames into a transparent clip
+  for the ceremony screen's s06_l05 / s06_l07 -- owner 18 Nov 2026, about the star-orb that
+  stood in for her there: "ไม่ต้องเอาขึ้นมาเลย ก็ให้ตัวหุ่นที่โดดน้ำมายืนที่แท่นเลย").
+
+  A copy of the way scripts/emma_dive/page.html does it (same model, materials, studio
+  environment, key / fill / rim as client/assets/emma-3d-lab/mascot.js), with another
+  performance. What the rig really is (measured on the GLB, 18 Nov): six bones -- Root, Body,
+  Neck, Head, Arm.L, Arm.R; the arms are flat fins with no elbow and no hand; the face is a
+  decal with arch eyes and a chrome smile that never change. So:
+    * everything is procedural, on those bones and on four groups round the model (yaw, lift,
+      lean about her base, squash about her base);
+    * the baked 'idle' clip is NOT played (its only motion is a 3 s head nod, and 3 s does not
+      divide the 4 s idle loop) -- the nod is made here with a period that does;
+    * a blink is the eye meshes' own vertices flattened for a few frames (there is no lid);
+    * "arms up" is as far as a fin goes before it enters the head: out and up, about 40
+      degrees above level.
+
+  The camera and her root never move: the act moves the clip's box. Three parts on one
+  timeline, and EVERY seam is the same pose N (all offsets exactly zero):
+      preen  0.0-3.0 s   N -> a proud little pose for "my good looks" -> N
+      idle   3.0-7.0 s   the standing loop (hover bob, breath, a look, two blinks)
+      cheer  7.0-9.0 s   a winner's loop for "first place": arms up, two bounces, back to N
+  A pose is a function of the whole frame number (spec.fps: 60 since 18 Nov, the film's own
+  rate -- 30 was two-frame steps under a camera that glides every frame), never of a clock.
+  Every time here is in seconds, so the rate changes only how often a pose is sampled.
+
+  Nothing here runs on the robot or the event screen: it is a render tool.
+-->
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">
+{"imports": {"three": "/vendor/build/three.module.js", "three/addons/": "/vendor/examples/jsm/"}}
+</script>
+</head><body>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const canvas = document.getElementById('c');
+let renderer, scene, camera, model, bones = {}, rest = {}, eyes = [];
+let root, liftG, pivot, squash, baseY = 0, topY = 1, SPEC = null;
+
+let FPS = 30;                  // set from spec.fps in setup
+const BLINK_STEP = 1 / 30;     // a blink's own steps, in seconds (it was made at 30 fps: shut 2, held 1, open 3)
+const SEG = { preen: [0, 3], idle: [3, 7], cheer: [7, 9] };
+const END = 9;
+
+const lerp = THREE.MathUtils.lerp, clamp = THREE.MathUtils.clamp;
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const TAU = Math.PI * 2;
+
+// [[seconds, value], ...]: eased between neighbours, flat before the first and after the last.
+// At a key's own time the value is that key's, exactly (the seams depend on it).
+function key(u, keys) {
+  if (u <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) if (u <= keys[i][0]) {
+    const a = keys[i - 1], b = keys[i];
+    return lerp(a[1], b[1], smooth((u - a[0]) / (b[0] - a[0])));
+  }
+  return keys[keys.length - 1][1];
+}
+// a hop: up and down on a parabola between two times (0 outside)
+function hop(u, t0, t1, h) { if (u <= t0 || u >= t1) return 0; const s = (u - t0) / (t1 - t0); return 4 * h * s * (1 - s); }
+// a blink that starts at t0: shut in two frames, held one, open in three
+function blink(u, t0) { return key(u, [[t0, 0], [t0 + 2 * BLINK_STEP, 1], [t0 + 3 * BLINK_STEP, 1], [t0 + 6 * BLINK_STEP, 0]]); }
+// a sine that is exactly 0 at p = 0 but runs `lag` of a cycle late (overlapping action)
+function late(p, cycles, lag) { return Math.sin(TAU * (cycles * p - lag)) + Math.sin(TAU * lag); }
+
+window.setup = async function (spec) {
+  SPEC = spec;
+  FPS = spec.fps || 30;
+  const W = spec.w * spec.ss, Hh = spec.h * spec.ss;
+  canvas.width = W; canvas.height = Hh;
+  canvas.style.width = W + 'px'; canvas.style.height = Hh + 'px';
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas, preserveDrawingBuffer: true,
+                                       powerPreference: 'high-performance' });
+  renderer.setPixelRatio(1);
+  renderer.setSize(W, Hh, false);
+  renderer.setClearColor(0, 0);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = spec.exposure || 1.0;
+  scene = new THREE.Scene();
+
+  // the approved studio environment (mascot.js, verbatim numbers)
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const studio = new THREE.Scene();
+  studio.background = new THREE.Color(.006, .006, .0065);
+  const cards = [];
+  const cardRing = (elevationDeg, radius, count, size, power, sectors = {}) => {
+    const e = elevationDeg * Math.PI / 180, y = radius * Math.sin(e), r = radius * Math.cos(e);
+    for (let i = 0; i < count; i++) { const az = i / count * Math.PI * 2;
+      cards.push({ p: [r * Math.sin(az), y, r * Math.cos(az)], s: size, power: sectors[i] ?? power }); }
+  };
+  cardRing(45, 8.5, 8, [5.2, 3.6], 1.2, { 7: 8, 6: 4, 0: 4, 4: 1.5 });
+  cardRing(3, 9, 4, [14, 5], .16, { 0: .22 });
+  cardRing(-25, 6.5, 8, [5.4, 2.6], .40, { 0: .55, 1: .5, 7: .5 });
+  for (const card of cards) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(...card.s),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color().setScalar(card.power), side: THREE.DoubleSide }));
+    m.position.set(...card.p); m.lookAt(0, 0, 0); studio.add(m);
+  }
+  scene.environment = pmrem.fromScene(studio, .04, .1, 100, { size: 512 }).texture;
+  pmrem.dispose();
+  const keyL = new THREE.DirectionalLight(0xfffdf9, 2.2); keyL.position.set(-5, 6, 4); scene.add(keyL);
+  const fill = new THREE.DirectionalLight(0xf4f7ff, .15); fill.position.set(4, 3, 0); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, .8); rim.position.set(1, 4, -4); scene.add(rim);
+
+  const gltf = await new GLTFLoader().loadAsync('/emma.glb');
+  model = gltf.scene;
+  const envIntensity = { 'Polished chrome': 2.2, 'Graphite joints': 1.0, 'Black chrome eyes': 1.0, 'Pearl enamel': .45, 'Soft white glove': .8 };
+  const box = new THREE.Box3();
+  model.updateMatrixWorld(true);
+  model.traverse(o => {
+    if (o.name && o.name.startsWith('Hover__')) { o.visible = false; return; }   // the ring under her is out (owner 30 Sep)
+    if (o.isMesh) {
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.envMapIntensity = envIntensity[m.name] ?? 1.0;
+      o.frustumCulled = false;                       // a skinned mesh's bounds are its bind pose's
+      box.union(new THREE.Box3().setFromObject(o));
+      if (/^Eye/.test(o.name)) {                     // the two arch eyes: their own vertices are the blink
+        const pos = o.geometry.attributes.position, n = pos.count, orig = new Float32Array(n * 3);
+        let lo = 1e9, hi = -1e9;
+        for (let i = 0; i < n; i++) { orig[i * 3] = pos.getX(i); orig[i * 3 + 1] = pos.getY(i); orig[i * 3 + 2] = pos.getZ(i);
+          lo = Math.min(lo, orig[i * 3 + 1]); hi = Math.max(hi, orig[i * 3 + 1]); }
+        eyes.push({ pos, orig, lo, hi, n });
+      }
+    }
+    if (o.isBone) bones[o.name.replace('.', '')] = o;
+  });
+  for (const [n, b] of Object.entries(bones)) rest[n] = { q: b.quaternion.clone(), p: b.position.clone() };
+  baseY = box.min.y; topY = box.max.y;               // what is drawn of her (the hidden ring is not)
+
+  // root (yaw) > lift (hover bob, a hop) > pivot (lean about her base) > squash (about her base) > model
+  root = new THREE.Group(); liftG = new THREE.Group(); pivot = new THREE.Group(); squash = new THREE.Group();
+  scene.add(root); root.add(liftG); liftG.add(pivot); pivot.add(squash); squash.add(model);
+  pivot.position.y = baseY; model.position.y = -baseY;
+
+  camera = new THREE.PerspectiveCamera(spec.fov, spec.w / spec.h, .05, 200);
+  setCamera(spec);
+  return { baseY, topY, bones: Object.keys(bones), eyes: eyes.map(e => [e.n, e.lo, e.hi]),
+           clips: gltf.animations.map(c => c.name + ':' + c.duration.toFixed(2)),
+           box: [box.min.toArray(), box.max.toArray()] };
+};
+
+function setCamera(c) {
+  camera.position.set(0, c.camY, c.dist);
+  camera.lookAt(0, c.lookY, 0);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+}
+window.setCamera = c => { Object.assign(SPEC, c); setCamera(SPEC); return [SPEC.camY, SPEC.lookY, SPEC.dist]; };
+
+// ---- a pose: offsets from N (all zero = N) ----
+function blank() {
+  return { yaw: 0, lift: 0, pitch: 0, roll: 0, sy: 1, bodyPitch: 0, bodyYaw: 0, bodyRoll: 0,
+           neckPitch: 0, neckYaw: 0, neckRoll: 0, headPitch: 0,
+           armR: { lift: 0, fwd: 0, inn: 0 }, armL: { lift: 0, fwd: 0, inn: 0 }, blink: 0 };
+}
+
+// The standing idle under the preen and the idle loop: `len` seconds hold a whole number of
+// every cycle, and every term is exactly 0 at the loop's first frame.
+function standing(P, u, len) {
+  const p = u / len;
+  P.lift += 0.022 * (1 - Math.cos(TAU * 2 * p));            // hover bob: UP from N only (N is her lowest: the act stands her base on a podium)
+  P.sy *= 1 + 0.007 * Math.sin(TAU * 2 * p);                // a breath with it (about her base: the base stays)
+  P.roll += 0.010 * Math.sin(TAU * p);                      // a slow sway
+  P.neckPitch += 0.012 * late(p, 2, 0.07);                  // the head rides the bob a little late
+  const flap = 0.035 * late(p, 2, 0.05);                    // and so do the fins
+  P.armR.lift += flap; P.armL.lift += flap;
+}
+
+function idle(u) {                                          // 4 s
+  const P = blank();
+  standing(P, u, 4);
+  const look = key(u, [[1.95, 0], [2.40, 1], [3.05, 1], [3.62, 0]]);     // a tiny look to the hall
+  P.neckYaw += 0.11 * look; P.neckRoll += -0.03 * look; P.yaw += 0.03 * look; P.neckPitch += -0.02 * look;
+  P.blink = Math.max(blink(u, 0.80), blink(u, 1.93));       // (people blink as their eyes move off)
+  return P;
+}
+
+function preen(u) {                                         // 3 s: N -> the pose -> N
+  const P = blank();
+  standing(P, u, 3);
+  // she turns a shoulder to the hall (about 20 degrees more to screen-left) and back
+  P.yaw += 0.35 * key(u, [[0, 0], [0.22, 0.10], [0.80, -1], [2.05, -1], [2.62, 0.07], [2.84, 0], [3, 0]]);
+  // a small dip before, tall and proud in the pose
+  P.sy *= key(u, [[0, 1], [0.20, 0.972], [0.78, 1.03], [1.32, 1.022], [1.64, 1.045], [2.05, 1.032], [2.56, 0.988], [2.82, 1], [3, 1]]);
+  P.bodyPitch += key(u, [[0, 0], [0.22, 0.04], [0.85, -0.03], [1.35, -0.03], [1.66, -0.08], [2.05, -0.07], [2.60, 0.012], [2.85, 0], [3, 0]]);
+  P.roll += key(u, [[0, 0], [0.85, -0.03], [1.36, -0.03], [1.68, 0.025], [2.05, 0.02], [2.66, 0], [3, 0]]);
+  // the near fin (screen-right) comes up beside her head and pats it twice -- fluffing the hair
+  // she does not have -- then flicks out. (Looked at, 18 Nov: a fin raised past ~75 degrees goes
+  // BEHIND the head, and it shows only while the head tilts away from it; brought round to the
+  // front it is seen edge-on, a line. So: beside the head, head tilted away.)
+  P.armR.lift += key(u, [[0, 0], [0.20, -0.06], [0.78, 1.80], [0.95, 1.64], [1.10, 1.80], [1.27, 1.64], [1.40, 1.76],
+                         [1.64, 1.08], [2.05, 1.16], [2.60, -0.05], [2.82, 0], [3, 0]]);
+  P.armR.inn += key(u, [[0, 0], [0.30, 0], [0.80, 0.08], [1.40, 0.08], [1.64, -0.25], [2.05, -0.20], [2.55, 0], [3, 0]]);
+  // the far fin goes to her hip, a little back
+  P.armL.lift += key(u, [[0, 0], [0.20, -0.04], [0.88, 0.30], [2.05, 0.34], [2.62, -0.03], [2.85, 0], [3, 0]]);
+  P.armL.fwd += key(u, [[0, 0], [0.88, -0.25], [2.05, -0.25], [2.6, 0], [3, 0]]);
+  // her head: back to the hall, tilted away from the fin with the chin up, then to the flick
+  P.neckYaw += key(u, [[0, 0], [0.30, -0.04], [0.92, 0.24], [2.10, 0.24], [2.68, -0.02], [2.9, 0], [3, 0]]);
+  P.neckRoll += key(u, [[0, 0], [0.30, -0.02], [0.92, 0.12], [1.40, 0.12], [1.70, -0.07], [2.10, -0.05], [2.7, 0], [3, 0]]);
+  P.neckPitch += key(u, [[0, 0], [0.25, 0.05], [0.95, -0.08], [1.40, -0.07], [1.70, -0.11], [2.10, -0.09], [2.7, 0.02], [2.9, 0], [3, 0]]);
+  P.blink = Math.max(blink(u, 0.98), blink(u, 1.20));       // she bats her eyes
+  return P;
+}
+
+function cheer(u) {                                         // 2 s: N -> arms up, two bounces -> N
+  const P = blank();
+  P.lift += hop(u, 0.14, 0.66, 0.13) + hop(u, 0.80, 1.30, 0.11);
+  P.sy *= key(u, [[0, 1], [0.12, 0.955], [0.24, 1.05], [0.40, 1.0], [0.60, 1.03], [0.70, 0.955], [0.80, 0.965], [0.92, 1.05],
+                   [1.05, 1.0], [1.24, 1.025], [1.34, 0.96], [1.52, 1.02], [1.70, 0.995], [1.85, 1], [2, 1]]);
+  // "arms up" as this body has it (looked at, 18 Nov): the fins are short and sit under a head
+  // wider than her shoulders -- past ~75 degrees of lift they are behind it. So they are flung
+  // out wide, tips above her shoulders, and flap down a little on each landing.
+  const up = key(u, [[0, 0], [0.12, -0.10], [0.34, 1.36], [0.50, 1.24], [0.70, 0.92], [0.98, 1.34], [1.15, 1.24], [1.34, 0.92],
+                     [1.52, 1.26], [1.62, 1.20], [1.96, 0], [2, 0]]);
+  const fwd = key(u, [[0, 0], [0.12, 0], [0.36, 0.22], [1.62, 0.22], [1.96, 0], [2, 0]]);
+  P.armR.lift += up; P.armL.lift += up; P.armR.inn += fwd; P.armL.inn += fwd;
+  P.yaw += key(u, [[0, 0], [0.36, 0.10], [1.60, 0.10], [1.95, 0], [2, 0]]);          // she opens to the hall
+  P.roll += key(u, [[0, 0], [0.14, 0], [0.40, -0.05], [0.72, 0], [1.05, 0.05], [1.36, 0], [2, 0]]);
+  P.bodyPitch += key(u, [[0, 0], [0.12, 0.08], [0.36, -0.07], [0.70, -0.02], [1.0, -0.07], [1.34, -0.02], [1.6, -0.05], [1.95, 0], [2, 0]]);
+  P.neckPitch += key(u, [[0, 0], [0.14, 0.06], [0.42, -0.10], [0.74, 0.03], [1.04, -0.09], [1.38, 0.03], [1.62, -0.04], [1.96, 0], [2, 0]]);
+  return P;
+}
+const PART = { preen, idle, cheer };
+
+// which part a clip time is in, and its local seconds. `only` evaluates that part's own
+// function even at its end time (the seam check: the loop's end must be its start).
+function locate(t, only) {
+  const k = Math.round(t * FPS);
+  let name = only;
+  if (!name) { name = 'cheer'; for (const [n, [a, b]] of Object.entries(SEG)) if (k >= Math.round(a * FPS) && k < Math.round(b * FPS)) { name = n; break; } }
+  return { name, u: (k - Math.round(SEG[name][0] * FPS)) / FPS };
+}
+
+const qe = (x, y, z, order = 'XYZ') => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, order));
+function arm(name, side, a) {
+  // in the BODY's frame, about the shoulder: lift (+ = out and up), then fwd (a hanging fin
+  // swings to the front), then inn (a raised fin comes round to the front)
+  const b = bones[name]; if (!b) return;
+  b.quaternion.copy(rest[name].q).premultiply(qe(-a.fwd, -side * a.inn, side * a.lift, 'YXZ'));
+}
+function shut(c) {
+  for (const e of eyes) {
+    const y0 = lerp(e.lo, e.hi, SPEC.blinkLine ?? 0.4), k = 1 - (SPEC.blinkDepth ?? 0.80) * c;
+    for (let i = 0; i < e.n; i++) e.pos.setXYZ(i, e.orig[i * 3], y0 + (e.orig[i * 3 + 1] - y0) * k, e.orig[i * 3 + 2] + (SPEC.blinkOut ?? 0.02) * c);
+    e.pos.needsUpdate = true;
+  }
+}
+
+function apply(P) {
+  for (const [n, b] of Object.entries(bones)) { b.quaternion.copy(rest[n].q); b.position.copy(rest[n].p); }
+  root.rotation.set(0, SPEC.yaw0 + P.yaw, 0);
+  liftG.position.y = P.lift;
+  pivot.rotation.set(P.pitch, 0, P.roll);
+  const sxz = 1 / Math.sqrt(P.sy);                          // squash & stretch keeps her volume
+  squash.scale.set(sxz, P.sy, sxz);
+  bones.Body.quaternion.multiply(qe(P.bodyPitch, P.bodyYaw, P.bodyRoll));
+  bones.Neck.quaternion.multiply(qe(P.neckPitch, P.neckYaw, P.neckRoll, 'YXZ'));
+  bones.Head.quaternion.multiply(qe(P.headPitch, 0, 0));
+  arm('ArmR', 1, P.armR); arm('ArmL', -1, P.armL);
+  shut(P.blink);
+  scene.updateMatrixWorld(true);
+  renderer.render(scene, camera);
+  return canvas.toDataURL('image/png');
+}
+
+window.frame = function (t, only) { const at = locate(t, only); return apply(PART[at.name](at.u)); };
+window.poseAt = function (t, only) { const at = locate(t, only); return { part: at.name, u: at.u, pose: PART[at.name](at.u) }; };
+// a pose by hand (the pose lab): offsets on top of N
+window.shot = function (over) {
+  const P = blank();
+  for (const [k, v] of Object.entries(over || {})) { if (v && typeof v === 'object') Object.assign(P[k], v); else P[k] = v; }
+  return apply(P);
+};
+
+function project(v) { const p = v.clone().project(camera); return [(p.x + 1) / 2, (1 - p.y) / 2]; }
+window.points = function () {
+  apply(blank());
+  const at = (x, y, z) => project(root.localToWorld(new THREE.Vector3(x, y, z)));
+  return { times: { preen: SEG.preen, idle: SEG.idle, cheer: SEG.cheer, end: END }, fps: FPS,
+           base: at(0, baseY, 0), head_top: at(0, topY, 0), chest: at(0, 1.62, 0.58), eyes: at(0, 3.14, 1.0),
+           hover_base_not_drawn: at(0, 0, 0), shoulder_right: at(0.65, 2.12, -0.16), shoulder_left: at(-0.65, 2.12, -0.16),
+           camera: [SPEC.camY, SPEC.lookY, SPEC.dist, SPEC.fov], yaw0: SPEC.yaw0 };
+};
+window.ready = true;
+</script>
+</body></html>

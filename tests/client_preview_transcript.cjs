@@ -7,6 +7,8 @@ const c = vm.createContext({
   ArrayBuffer, curUser: '', userLine: null, userLinesById: Object.create(null),
   curBot: '', assistantTurnText: '', assistantLine: null, assistantTurnStarted: false,
   transcript: [], sentMs: 0, playing: false, inCall: true, ws: null, drawer: null,
+  // the mic (outside the slices): speech_started reads it, the greeting's marker is in the handler
+  muted: false, greetingComing: false,
   bargePendingUntil: 0, bargeRelayUntil: 0, performance: { now: () => 1 },
   renderDrawer() {}, paintReply() {}, show() {}, status() {}, setTranscriptDrawerOpen() {},
   outputRate: 24000, playChunk() { playedChunks += 1; },

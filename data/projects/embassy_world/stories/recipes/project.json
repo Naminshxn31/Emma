@@ -169,5 +169,20 @@
   "max_w": 800,
   "format": "webp",
   "why": "Final render of a unit's living room (web pack 6.gallery/unit, Living view b): starry ceiling, crystal pendant, sofa and dining table by the curtained window -- the room the approved slide intro-043 showed as an earlier concept. Owner 21 Oct 2026: every story picture a final render. Crop keeps the living/dining area under the ceiling cove (16:10)."
+ },
+ {
+  "id": "n_prj_dev_awards",
+  "source": "../../data/projects/embassy_world/presentations/slides/intro_003.jpg",
+  "source_sha256": "8e1319c3c2c563f861ba416ae2ba57c2b2be07cf03242b74997d03373c0395a6",
+  "crop": [
+   190,
+   198,
+   1730,
+   1020
+  ],
+  "max_w": 1540,
+  "format": "webp",
+  "why": "Approved slide intro-003, the ten award plaques 2011-2025 with their year labels; the AWARDS title and the Embassy World logo at the top right are cut. None of the plaques names Embassy World (report 2.5) and her line says the group's work received them.",
+  "max_kb": 420
  }
 ]

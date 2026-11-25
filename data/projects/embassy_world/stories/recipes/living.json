@@ -124,5 +124,140 @@
   "max_w": 1080,
   "format": "webp",
   "why": "Website gallery CD03 Scene 58 (daylight, high view down the Water Lagoon): several of its islands with trees, the shell-shaped pavilion island, the glass bridges. 16:9 so the number sits under the picture. Base of lagoon_islands (owner 14 Oct: the islands question had no motion)."
+ },
+ {
+  "id": "n_liv_lagoon_night",
+  "source": "final1118/v6.jpg",
+  "source_sha256": "19241309b90820f7bbfd74bdfddc0e75bd6c789fcadb0558b5fe8faf5b89e515",
+  "crop": [
+   0,
+   0,
+   7680,
+   4320
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_liv_courtyard_top",
+  "source": "final1118/v2.jpg",
+  "source_sha256": "fc17525ae2a0fbc0b405a39aea3aea0d06313bcd8145603bf7219e0ed0d01530",
+  "crop": [
+   0,
+   0,
+   7680,
+   4320
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_liv_kid_pool",
+  "source": "web/6.gallery/exterior/Playscape/Scene 55.png",
+  "source_sha256": "5ca44fb3e87e377dbb67719b40b9272cc077e0fa75961baac4ba2fe8e83ae1ac",
+  "crop": [
+   700,
+   630,
+   2300,
+   1430
+  ],
+  "max_w": 1600,
+  "format": "webp",
+  "why": "Website gallery Playscape Scene 55 (aerial): the space-dome playground, the polished sculpture slide into the pool and the ring of the Kid's Pool beside it (report 9.9 / 12.10: Kid's Pool next to the Playscape). Crop starts right of x=700 and below y=630 so the small figures on the path and at the Junior World door are out of the picture. Used by pools_all and for_families.",
+  "max_kb": 420
+ },
+ {
+  "id": "n_liv_playscape",
+  "source": "web/6.gallery/exterior/Playscape/Scene 50.png",
+  "source_sha256": "b87dbfe9fa731f661964593101e22ec87b0741a8dd14c83dea1297bbf3894179",
+  "crop": [
+   160,
+   104,
+   2560,
+   1704
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "why": "Website gallery Playscape Scene 50 (eye level): the 'Space Playground' dome on legs, the steel tube slide, the planet-pattern floor (report 9.9). for_families 'Space Playground' row. No people, no text; 3:2 crop.",
+  "max_kb": 420
+ },
+ {
+  "id": "n_liv_park",
+  "source": "final1118/park.png",
+  "source_sha256": "9092d255cdeada46f17e91eca9c6d8c6585901255392307ca01a76021f44c812",
+  "crop": [
+   0,
+   0,
+   2560,
+   1440
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_liv_garden",
+  "source": "final1118/v4.jpg",
+  "source_sha256": "8235c68b6de5ecf49eaa3618d41c84954bd5bba13a6864e6e7230eb406540f89",
+  "crop": [
+   0,
+   0,
+   7680,
+   4320
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_liv_trees",
+  "source": "final1118/v3.jpg",
+  "source_sha256": "8698e4e1e74035f282126d5bb847efd138c0fba5ca86cd0725d2c42c2310048c",
+  "crop": [
+   0,
+   400,
+   7680,
+   4720
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_liv_lawn",
+  "source": "web/6.gallery/exterior/CD03/Scene 37.png",
+  "source_sha256": "55d6daa98565e4fd7bf125de824d5e56c4bc79edd6263c41796f999e1b9c5ab1",
+  "crop": [
+   0,
+   104,
+   2560,
+   1704
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "why": "Website gallery CD03 Scene 37: stepped lawn terraces with white daybeds under the mirror-steel canopies, pool behind (report 12.11: Stepped Garden, daybeds). park_green 'Stepped Garden' card. 16:10 crop; no people.",
+  "max_kb": 420
+ },
+ {
+  "id": "n_lagoon_islands_aerial",
+  "source": "final1118/v2.jpg",
+  "source_sha256": "fc17525ae2a0fbc0b405a39aea3aea0d06313bcd8145603bf7219e0ed0d01530",
+  "crop": [
+   0,
+   0,
+   7680,
+   4320
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
  }
 ]

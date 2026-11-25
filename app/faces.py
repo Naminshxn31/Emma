@@ -222,16 +222,25 @@ def reset() -> None:
     _load_failed = False
 
 
-def locate(image: np.ndarray, det_size: int = 640) -> list[Face]:
+def locate(image: np.ndarray, det_size: int | None = None) -> list[Face]:
     """Where the faces are, largest first. No embeddings.
 
     Largest first because the person standing closest to the robot is the
     one being spoken to, and the row behind them is not.
+
+    `det_size` None = FACE_DET_SIZE, the door camera's frames (5 Nov: 640 finds
+    no more than 320 does in a 1024 px frame of a 19 deg lens, at four times the
+    cost, on every empty frame of the day). A portrait for the gallery asks for
+    640 itself.
     """
-    app = _analyzer(det_size)
+    size = int(det_size or settings.face_det_size or 640)
+    app = _analyzer(size if det_size else 640)
     if app is None:
         return []
-    boxes, kpss = app.det_model.detect(image, metric="default")
+    if size == 640:
+        boxes, kpss = app.det_model.detect(image, metric="default")
+    else:
+        boxes, kpss = app.det_model.detect(image, input_size=(size, size), metric="default")
     faces = [
         Face(box[:4], float(box[4]), None, None if kpss is None else kpss[i])
         for i, box in enumerate(boxes)

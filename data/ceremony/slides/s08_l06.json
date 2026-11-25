@@ -1,0 +1,45 @@
+{
+ "texts": {
+  "brand": "Embassy World",
+  "emma": "Emma",
+  "chip": "Certainly, Khun Miki",
+  "label": "Lobby lights",
+  "state": "Turning off",
+  "command": "Turning off the lobby lights now"
+ },
+ "pictures": {},
+ "beats": [
+  {
+   "at_en": "Certainly",
+   "do": "chip",
+   "key": "chip"
+  },
+  {
+   "at_en": "Turning off",
+   "do": "work",
+   "key": [
+    "label",
+    "state",
+    "command"
+   ],
+   "span": 0.55
+  },
+  {
+   "at_en": "now",
+   "do": "sent"
+  }
+ ],
+ "options": {
+  "mode": "console",
+  "device": "lights",
+  "light0": 1,
+  "knob0": "on",
+  "lit0": true,
+  "working0": false,
+  "tilt": -5,
+  "chip_side": "left"
+ },
+ "template": "act",
+ "act": "smarthome_brand",
+ "figures": {}
+}

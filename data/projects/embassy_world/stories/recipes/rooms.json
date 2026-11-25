@@ -103,5 +103,63 @@
   "max_w": 720,
   "format": "webp",
   "why": "Website unit render ('Living view b'), the LEFT part: the tall glass door to the balcony with its curtains, sofa and TV wall. mood_dining already uses the right part of the same render (dining table); this crop is the other half, so the two never show the same thing. Mood picture of unit_details (windows / balcony door), always under the 'Interior mood' tag. 4:5 portrait like the other mood pictures."
+ },
+ {
+  "id": "n_rm_lobby",
+  "source": "final1118/g_lobby1.jpg",
+  "source_sha256": "6328ddc9c30c40dad62810da1efc59260461d28914aa308fb0b14ec83da21cd2",
+  "crop": [
+   10,
+   0,
+   2741,
+   1536
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_rm_corridor",
+  "source": "final1118/g_corridor.jpg",
+  "source_sha256": "f9ac191cf6007d62d119bbbed2f4263da18c20f2209af27505277ee757830122",
+  "crop": [
+   0,
+   560,
+   1792,
+   1568
+  ],
+  "max_w": 1792,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ภาพไฟนอลชุด 18 พ.ย. 2026 ของเจ้าของ ครอปให้ไม่มีข้อความกำกับมุมล่าง ขนาดจอใหญ่ (เจ้าของ 24 พ.ย. 'ขอชัดและเป็นภาพล่าสุด')"
+ },
+ {
+  "id": "n_rm_playscape_aerial",
+  "source": "web/6.gallery/exterior/Playscape/Scene 55.png",
+  "crop": [
+   0,
+   0,
+   2560,
+   1600
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "why": "Website exterior render (6.gallery/exterior/Playscape) looking down on the Playscape: the Space Playground dome with its stainless tube slide, the splash pond with jets, the ring swing, the sculpture slide into the pool, Junior World's glass front above (report 9.9 / 12.10: the play court by the lagoon below Junior World). Base picture of playground_where: the ring sits on the dome itself, read off this picture -- the ground-floor plan (fac_plan_g) draws the building only and has no Playground label to point at. Only the bottom 104 px of water cut (16:10). Two tiny figures on the paths, not subjects.",
+  "max_kb": 420
+ },
+ {
+  "id": "n_rm_playscape",
+  "source": "web/6.gallery/exterior/Playscape/Scene 64(2).png",
+  "crop": [
+   0,
+   52,
+   2560,
+   1652
+  ],
+  "max_w": 1920,
+  "format": "webp",
+  "why": "Website exterior render of the Playscape at eye level: the spaceship climber on stainless legs with the rope-net cone, the polished sculpture slide arch, the ring swing behind, ground jets on the planet-pattern floor, the pool at left (report 9.9 elements). Photo of playground_where. Centre 16:10 crop; a small child far back by the slide is not a subject.",
+  "max_kb": 420
  }
 ]

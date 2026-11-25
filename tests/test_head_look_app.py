@@ -35,6 +35,12 @@ public class LookHarness {
         p("tilt.100", HeadLook.tiltPulse(100));
         p("tilt.-100", HeadLook.tiltPulse(-100));
         p("tilt.-25", HeadLook.tiltPulse(-25));
+        p("tilt.-5", HeadLook.tiltPulse(-5));
+        p("tilt.20", HeadLook.tiltPulse(20));
+        p("tilt.40", HeadLook.tiltPulse(40));
+        p("cmd.tilt.over", HeadLook.command(1500, 1541, 800));
+        p("cmd.tilt.under", HeadLook.command(1500, 1471, 800));
+        p("cmd.tilt.edges", HeadLook.command(1500, 1540, 800) + " " + HeadLook.command(1500, 1472, 800));
         p("valid.ok", HeadLook.valid(-100, 100));
         p("valid.bad", HeadLook.valid(101, 0));
         p("ms.unknown", HeadLook.durationMs(false, 1500, 1500, 1510, 1500));
@@ -64,6 +70,20 @@ public class LookHarness {
         p("ref.centre.off", HeadLook.refusal(false, false, true, "navigating", false, false, false, true));
         p("ref.centre.op", HeadLook.refusal(true, true, true, "navigating", false, false, false, true));
         p("centre.yes", HeadLook.isCentre(1500, 1500));
+        p("walk.centre.navu", HeadLook.walkSafe("nav_unknown", 1500, 1500));
+        p("walk.pan.any", HeadLook.walkSafe("navigating", 1501, 1500));
+        p("walk.pan.any.r", HeadLook.walkSafe("navigating", 1499, 1536));
+        p("walk.ms.walk", HeadLook.walkMs("navigating", 500));
+        p("walk.ms.call", HeadLook.walkMs(null, 500));
+        p("walk.ms.slow", HeadLook.walkMs("navigating", 3000));
+        p("walk.gap.walk", HeadLook.minGapMs("navigating"));
+        p("walk.gap.call", HeadLook.minGapMs(null));
+        p("walk.down.edge", HeadLook.walkSafe("navigating", 1500, 1536));
+        p("walk.down.over", HeadLook.walkSafe("navigating", 1500, 1537));
+        p("walk.down.old", HeadLook.walkSafe("navigating", 1500, 1580));
+        p("walk.up", HeadLook.walkSafe("navigating", 1500, 1490));
+        p("walk.navu.pan", HeadLook.walkSafe("nav_unknown", 1540, 1500));
+        p("walk.idle.pan", HeadLook.walkSafe(null, 1540, 1500));
         p("centre.no", HeadLook.isCentre(1500, 1520));
     }
 }
@@ -93,8 +113,20 @@ def test_percent_maps_to_the_swept_range_and_no_further(look):
     assert look["pan.100"] == "1700" and look["pan.-100"] == "1300"
     assert look["pan.50"] == "1600"
     assert look["pan.999"] == "1700", "a bad percent is clamped, never extrapolated"
-    assert look["tilt.100"] == "1700" and look["tilt.-100"] == "1300" and look["tilt.-25"] == "1450"
     assert look["valid.ok"] == "true" and look["valid.bad"] == "false"
+
+
+def test_the_tilt_stops_short_of_where_the_head_stops(look):
+    """4 Nov dock ladder (5 % steps, 3 s apart, the head camera's picture shift):
+    the head stops going down at ~22-23 % (~1545) and up at ~16 % (~1468) --
+    past that ch8 pushes on a head that no longer moves (12 Sep: smoked). The
+    walk scan's 40 % (1580) and an 80 % try did. ch8 is clamped to 1472-1540
+    whatever percent comes, and the board line refuses anything outside it."""
+    assert look["tilt.100"] == "1540" and look["tilt.40"] == "1540"
+    assert look["tilt.-100"] == "1472" and look["tilt.-25"] == "1472"
+    assert look["tilt.20"] == "1540" and look["tilt.-5"] == "1490", "inside the stops: the span as before"
+    assert look["cmd.tilt.over"] == "null" and look["cmd.tilt.under"] == "null"
+    assert look["cmd.tilt.edges"] == "#7P1500#8P1540T800 #7P1500#8P1472T800"
 
 
 def test_every_move_is_timed_and_the_blind_one_is_the_owners_t3000(look):
@@ -124,6 +156,25 @@ def test_the_refusal_order(look):
         "busy", "too_soon"]
 
 
+def test_a_walk_takes_the_scan_box_only_while_the_walk_is_known(look):
+    """4 Nov (owner: "หันตอนเดินไปด้วยไม่ได้หรอ ให้มันสแกนไปด้วย"): the server sweeps the
+    head on a walk for the walk pictures. Afternoon, owner: "อย่าหันหัวไวเกินและถี่เกิน
+    เดี๋ยวมอเตอร์ที่หัวจะไหม้" -- no pan at all on a walk (the base turns), a nod of
+    0..36 us down (the call's own 18 % cap; 40 % ran into the head's stop, 4 Nov
+    evening), at least 1.5 s a move and 2 s apart.
+    Past it, up, a pan, or a blind poll (nav_unknown) does not pass -- centre
+    always does."""
+    assert look["walk.centre.navu"] == "true"
+    assert look["walk.down.edge"] == "true"
+    for k in ("walk.pan.any", "walk.pan.any.r", "walk.down.over", "walk.down.old", "walk.up",
+              "walk.navu.pan"):
+        assert look[k] == "false", k
+    assert look["walk.ms.walk"] == "1500" and look["walk.ms.slow"] == "3000"
+    assert look["walk.ms.call"] == "500", "a call's follow keeps its own timing"
+    assert look["walk.gap.walk"] == "2000" and look["walk.gap.call"] == "400"
+    assert look["walk.idle.pan"] == "false", "walkSafe is about walks: no walk, the other gates decide"
+
+
 def test_a_look_back_to_centre_passes_a_walk_and_nothing_else(look):
     # 31 Oct, round 2: a head left turned when a walk starts faced sideways for all of it
     assert look["ref.centre.nav"] == "null" and look["ref.centre.navu"] == "null"
@@ -138,7 +189,8 @@ def test_the_head_limits_are_the_swept_range_and_the_gestures_keep_theirs():
     head = read(HEAD)
     for name, value in (("LIMIT_MIN", 1300), ("LIMIT_MAX", 1700), ("PAN_SPAN_US", 200),
                         ("TILT_DOWN_SPAN_US", 200), ("TILT_UP_SPAN_US", 200), ("UNKNOWN_MS", 3000),
-                        ("PAN", 7), ("TILT", 8), ("CENTRE", 1500)):
+                        ("PAN", 7), ("TILT", 8), ("CENTRE", 1500), ("TILT_LIMIT_MIN", 1472),
+                        ("TILT_LIMIT_MAX", 1540), ("WALK_TILT_DOWN_US", 36)):
         assert re.search(r"static final int %s = %d;" % (name, value), head), name
     # the cited evidence exists
     assert "docs/robot-servo-limits-2026-10-31.md" in head
@@ -147,6 +199,8 @@ def test_the_head_limits_are_the_swept_range_and_the_gestures_keep_theirs():
     gestures = read(GESTURES)
     assert "static final int HEAD_LIMIT_MIN = 1460;" in gestures
     assert "static final int HEAD_LIMIT_MAX = 1540;" in gestures
+    # ch8's minus side: the head's up stop (4 Nov), the same number as HeadLook's
+    assert "static final int HEAD_TILT_LIMIT_MIN = 1472;" in gestures
     assert "HeadLook" not in code_only(gestures)
     assert "import android" not in code_only(head) and "org.json" not in code_only(head)
 
@@ -170,11 +224,15 @@ def test_the_grammar_has_the_look_shape_and_maps_it_to_its_bridge_call():
 def test_a_look_passes_the_gates_then_rechecks_them_under_the_arm_lock():
     body = code_only(read(BODY))
     look = method(body, "String look(int pan, int tilt)")
-    assert "HeadLook.refusal(enabled(), host.operatorVisible(), host.foreground(), host.navBlock()," in look
-    assert "latched(now), headBusy(), false, HeadLook.isCentre(toPan, toTilt));" in look
+    assert "String nav = host.navBlock();" in look
+    assert "HeadLook.refusal(enabled(), host.operatorVisible(), host.foreground(), nav," in look
+    assert "latched(now), headBusy(), false, HeadLook.walkSafe(nav, toPan, toTilt));" in look
     # the answer says how long the move takes (the server reads the picture after it)
     assert "return lookAck(true, null, ms);" in look
-    assert "HeadLook.UNKNOWN_MS : HeadLook.durationMs(true, at[0], at[1], toPan, toTilt);" in look
+    assert "HeadLook.UNKNOWN_MS" in look and ": HeadLook.durationMs(true, at[0], at[1], toPan, toTilt));" in look
+    # on a walk every move is slow and the gap long (owner 4 Nov: "อย่าหันหัวไวเกินและถี่เกิน")
+    assert "int ms = HeadLook.walkMs(nav, at == null ? HeadLook.UNKNOWN_MS" in look
+    assert 'now - lastLookAt < HeadLook.minGapMs(nav)) reason = "too_soon";' in look
     ack = method(body, "private static String lookAck(boolean accepted, String reason, int ms)")
     assert '.put("ms", ms < 0 ? JSONObject.NULL : Integer.valueOf(ms))' in ack
     centre = method(body, "private void centreIfIdle()")
@@ -190,8 +248,9 @@ def test_a_look_passes_the_gates_then_rechecks_them_under_the_arm_lock():
     check = send.index("if (mine != lookSeq.get() || gen != generation.get() || latched()", gate)
     write = send.index("arm.writeLine(line);", check)
     assert gate < check < write
-    assert "|| (host.navBlock() != null && !HeadLook.isCentre(toPan, toTilt))" in send
+    assert "|| (host.navBlock() != null && !HeadLook.walkSafe(host.navBlock(), toPan, toTilt))" in send
     assert "|| headBusy()) return;" in send
+    assert "int ms = HeadLook.walkMs(host.navBlock(), at == null ? HeadLook.UNKNOWN_MS" in send
     # a group, a rest or a gesture that moves the head owns it
     busy = method(body, "private boolean headBusy()")
     for part in ('groupRunning || "rest_return".equals(phase)', "BodyGestures.isHead(id)",
@@ -207,7 +266,7 @@ def test_every_stop_voids_queued_looks_and_forgets_the_head():
     assert "headLost();" in void
     # every place that already forgot the head for the gestures forgets the look's too
     resets = body.count("headKnown = false;") - 1          # minus the field's own declaration
-    assert resets == 5
+    assert resets == 6                                     # 6th: the pageant turns the head (9 Nov)
     assert body.count("headLost();") == resets + 2        # + voidEverything, + a failed write
 
 

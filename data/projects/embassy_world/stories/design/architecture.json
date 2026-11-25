@@ -834,7 +834,10 @@
      ],
      "line": 1
     }
-   ]
+   ],
+   "backdrop": {
+    "asset": "n_liv_lagoon_night"
+   }
   },
   "taps": [
    {
@@ -928,7 +931,10 @@
      ],
      "line": 1
     }
-   ]
+   ],
+   "backdrop": {
+    "asset": "n_back_front"
+   }
   },
   "taps": [
    {
@@ -1162,7 +1168,7 @@
     {
      "label_en": "Water Lagoon",
      "sub_en": "Main pool · ≈ 155 m long · ≈ 1.3 m deep",
-     "asset": "liv_trees",
+     "asset": "n_liv_trees",
      "at": [
       56.0,
       52.0
@@ -1173,7 +1179,7 @@
     {
      "label_en": "Islands & bridges",
      "sub_en": "5 planted islands · 3 bridges, 1 glass · jacuzzis",
-     "asset": "lagoon_islands_aerial",
+     "asset": "n_lagoon_islands_aerial",
      "at": [
       28.1,
       44.8
@@ -1184,7 +1190,7 @@
     {
      "label_en": "Lobby",
      "sub_en": "Building A · ground floor",
-     "asset": "rm_lobby",
+     "asset": "n_rm_lobby",
      "at": [
       64.6,
       24.8
@@ -1195,7 +1201,7 @@
     {
      "label_en": "Biogenesis",
      "sub_en": "Fitness · curved glass wall to the lagoon",
-     "asset": "fac_g_biogenesis",
+     "asset": "n_fac_g_biogenesis",
      "at": [
       64.9,
       40.0
@@ -1206,7 +1212,7 @@
     {
      "label_en": "Junior World",
      "sub_en": "Kids' room · space theme",
-     "asset": "fac_g_junior",
+     "asset": "n_fac_g_junior",
      "at": [
       53.2,
       33.3
@@ -1217,7 +1223,7 @@
     {
      "label_en": "Playground & kids' pool",
      "sub_en": "Space playground by the water",
-     "asset": "rm_playscape_aerial",
+     "asset": "n_rm_playscape_aerial",
      "at": [
       55.9,
       41.3
@@ -1228,7 +1234,7 @@
     {
      "label_en": "Lawns & gardens",
      "sub_en": "Sun loungers · shady trees",
-     "asset": "liv_lawn",
+     "asset": "n_liv_lawn",
      "at": [
       84.5,
       31.5
@@ -1239,7 +1245,7 @@
     {
      "label_en": "Basement",
      "sub_en": "Aqua Cinema · saunas · ice bath",
-     "asset": "fac_b_aqua_cinema",
+     "asset": "n_fac_b_aqua_cinema",
      "at": null,
      "line": 9,
      "tap": "story_masterplan_lagoon_basement"
@@ -1247,7 +1253,7 @@
     {
      "label_en": "Level 3 · Building A",
      "sub_en": "Sky Pool · lounges",
-     "asset": "fac_3_sky_pool",
+     "asset": "n_fac_3_sky_pool",
      "at": null,
      "line": 10,
      "tap": "story_masterplan_lagoon_level3"
@@ -1847,7 +1853,7 @@
    }
   ],
   "params": {
-   "bg_asset": "plan_ground_site",
+   "bg_asset": "site_plan_clean",
    "value": {
     "to": 15556,
     "dec": 0,
@@ -1968,7 +1974,7 @@
    }
   ],
   "params": {
-   "bg_asset": "campus_holo_f2054",
+   "bg_asset": "units_campus",
    "value": {
     "to": 1066,
     "dec": 0,
@@ -2147,7 +2153,10 @@
      ],
      "line": 3
     }
-   ]
+   ],
+   "backdrop": {
+    "asset": "n_liv_garden"
+   }
   },
   "taps": [
    {

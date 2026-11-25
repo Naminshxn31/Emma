@@ -1,0 +1,555 @@
+{
+  "format": "emma-ceremony-host-lines-v1",
+  "about": "บทของคุณมิกิ (พิธีกร) ที่มาก่อนแต่ละคิวของ Emma — ใช้ให้โหมด \"ตามคุณมิกิ\" (app/ceremony_follow.py, CEREMONY_FOLLOW_HOST) จับว่าเขาพูดถึงบทไหนแล้ว แล้วให้เซิร์ฟเวอร์เล่นคิวถัดไปเหมือนทีมงานกด · คัดลอกจาก host_th ของแต่ละคิวใน data/ceremony/floor1_ceremony.json (Actor Script ที่เจ้าของส่ง 12 พ.ย.) — แก้ที่นี่ได้โดยไม่กระทบการอนุมัติคิว (ไม่อยู่ใน digest) · kind: host = มีบทให้จับ · continues = Emma พูดต่อจากบทก่อนเอง · chain_follow = เฉลยมุกที่ chain ทำให้ · manual = ไม่มีบทคุณมิกิ ทีมงานกดเอง · host_en = คำแปลอังกฤษของ host_th ที่เราแปลเอง (25 พ.ย. คุณมิกิจะพูดอังกฤษ) ไม่ใช่คำพูดของคุณมิกิจริง — เมื่อเจ้าของส่งบทอังกฤษของเขา ให้ใส่ทับ host_en (แก้เฉพาะข้อมูล ไม่ต้องแก้โค้ด) · ตัวจับเทียบทั้ง host_th และ host_en · ask_en = คำถามของคุณมิกิอย่างเดียว (เจ้าของ 24 พ.ย. ~13:45 \"ปรับให้สคริป์ของเราเหลือคำถาม ถ้าหุ่นได้ยินประโยคที่คล้ายคำถามก็เปลี่ยนภาพจอแล้วพูดตามบท\") — ตัวจับใช้เป็นอีกแบบของบท ต้องได้ยินคำหลักครบ (คำถามสั้น) และไม่ต้องมีคำเกริ่น",
+  "lines": {
+    "s02_l03": {
+      "kind": "host",
+      "host_th": "สวัสดีเอ็มม่า ยินดีต้อนรับนะครับ ทุกคนคงอยากรู้แล้วว่า คุณสามารถช่วยพวกเรา หรือทำอะไรได้บ้าง?",
+      "host_en": "Hello Emma, welcome. I think everyone is curious to know what you can do and how you can help us.",
+      "ask_en": [
+        "how can you help us",
+        "what can you help us with",
+        "what can you do to help"
+      ],
+      "ask_say": [
+        "you help",
+        "can you do",
+        "you can do"
+      ],
+      "means": [
+        "\\b(?:what|how) (?:else )?(?:you can|can you|could you|do you|will you|would you|are you able to|you could|are you going to|you are able to|you will)\\b(?: \\w+){0,2} (?:do|help|assist|support|offer)\\b",
+        "\\b(?:what|how)\\b.{0,25}\\byou\\b.{0,12}\\b(?:help|assist|support)\\b",
+        "\\bwhat (?:kind|kinds|sort) of (?:help|things|work|support|assistance)\\b.{0,30}\\byou\\b",
+        "\\bintroduce (?:yourself|your self)\\b",
+        "\\btell (?:us|me|everyone|them|our guests)\\b.{0,25}\\b(?:about )?(?:yourself|your self|who you are|what you do|what you can do)\\b",
+        "\\bwhat (?:is|are|'s) your (?:role|job|duty|duties|abilities|ability|skills?|functions?|capabilit\\w+|purpose)\\b",
+        "\\byour (?:abilities|ability|capabilit\\w+|skills)\\b",
+        "\\bwho are you\\b",
+        "\\bwhat are you (?:here for|capable of|able to do|good at)\\b",
+        "\\bhow can help us\\b",
+        "\\bhow (?:you|can you) help\\b",
+        "\\bwhat can do\\b",
+        "^(?:hello |welcome )*how can you help\\b",
+        "\\bwhat (?:kind|sort) of (?:assistant|robot) (?:you are|are you)\\b",
+        "\\b(?:what|how)\\b.{0,25}\\byou\\b.{0,12}\\b(?:helpful|useful|of help)\\b",
+        "\\bwhat (?:is|are) your (?:abilit\\w+|functions?)\\b",
+        "\\bwhat your (?:abilit\\w+|functions?)\\b",
+        "\\bwhat (?:can|could|do|will|would) you (?:do|offer|bring)\\b"
+      ],
+      "means_not": [
+        "\\b(?:family|customer|wife|children|kids|recommend|suggest|quotation|swim|dance|sing|cook)\\b",
+        "\\bhow do you do$",
+        "\\bnot do\\b",
+        "n't do\\b",
+        "\\b(?:want|like|love) to do\\b",
+        "\\b(?:tomorrow|weekend|for fun|at night|after work)\\b",
+        "\\b(?:stay|stays|staying)\\b"
+      ],
+      "means_not_all": [
+        "\\b(?:customer|buyer|client|family|wife|husband|children|kids|recommend|suggest|pretend|imagine)\\b"
+      ]
+    },
+    "s02_l05": {
+      "kind": "continues",
+      "note_th": "Emma พูดต่อจากบทก่อนทันที (บทระบุ \"ต่อจากบทก่อน\") — โหมดตามคุณมิกิเล่นเองหลังบทก่อนจบ"
+    },
+    "s02_l09": {
+      "kind": "host",
+      "host_th": "ถ้าอย่างนั้น ก่อนที่เราจะลงรายละเอียด เอ็มม่าช่วยบอกทุกคนหน่อยครับว่า โครงการของเราแตกต่างจากที่อื่นอย่างไร?",
+      "host_en": "In that case, before we go into the details, Emma, could you tell everyone how our project is different from other places?",
+      "ask_en": [
+        "how is our project different",
+        "what makes our project different",
+        "what makes Embassy World different",
+        "how is it different from other places"
+      ],
+      "means": [
+        "\\b(?:different|difference|differs?|differen\\w+|unique|uniqueness|special|distinctive|distinct|stands? out|stand out|one of a kind|set(?:s)? (?:us|it|our project) apart)\\b.{0,60}\\b(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect)|we|us|it|our|others?|other places)\\b",
+        "\\b(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect)|we|us|it|our)\\b.{0,60}\\b(?:different|difference|differs?|unique|uniqueness|special|distinctive|distinct|stand(?:s)? out|apart|one of a kind)\\b",
+        "\\b(?:highlights?|selling points?|strengths?|advantages?)\\b.{0,30}\\b(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect)|our)\\b",
+        "\\bcompared? (?:to|with) (?:other|others)\\b",
+        "\\bwhy\\b.{0,30}\\b(?:choose|buy|pick)\\b",
+        "\\b(?:our|the) (?:key |main |unique )?(?:selling points?|strengths?|highlights?|advantages?)\\b",
+        "\\b(?:what|watch|which|what's) ma(?:ke|kes|de)\\b.{0,25}\\b(?:different|differen\\w+|special|unique)\\b",
+        "\\bbetter than other\\b",
+        "\\bwhy is\\b.{0,25}\\b(?:special|unique|different)\\b",
+        "\\bnot (?:the )?(?:same as|like|similar to) (?:the )?others?(?: places?| projects?)?\\b"
+      ],
+      "means_not": [
+        "\\b(?:price|promotion|promo|discount)\\b",
+        "\\b(?:types?|kinds?|sizes?) of (?:rooms?|units?)\\b"
+      ]
+    },
+    "s03_l03": {
+      "kind": "host",
+      "host_th": "เอาล่ะครับ ตอนนี้ทุกคนคงเห็นแล้วว่า Embassy World มีอะไรพิเศษบ้าง แต่ผมยังอยากรู้อีกเรื่อง... โครงการของเราตั้งอยู่ที่ไหนครับเอ็มม่า?",
+      "host_en": "Alright, so now everyone has seen what makes Embassy World special. But there is one more thing I would like to know... where is our project located, Emma?",
+      "ask_en": [
+        "where is our project located",
+        "where is the project",
+        "where is Embassy World located",
+        "what is the project location",
+        "where is our project"
+      ],
+      "means": [
+        "\\bwhere(?: is|'s| are| about| abouts)?\\b.{0,40}\\b(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect)|we|it)\\b.{0,20}\\b(?:locat\\w*|situated|based|built|found|exactly)\\b",
+        "\\bwhere(?: is|'s)?\\b.{0,20}\\b(?:our |the |your |this |r )?(?:project|embassy(?: world)?|development|condo\\w*|property|protect)\\b(?! (?:manager|team|owner|model|office|sales))",
+        "\\b(?:location|located|locate|address|situated)\\b.{0,30}\\b(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect)|it|we|our)\\b",
+        "\\b(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect)|it|our|we)\\b.{0,30}\\b(?:location|located|locate|address|situated)\\b",
+        "\\bhow (?:far|close|near)\\b.{0,40}\\b(?:beach|beech|sea|jomtien)\\b",
+        "\\b(?:which|what) (?:area|part|road|street|district|location|zone)\\b.{0,40}\\b(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect)|we|it)\\b",
+        "\\b(?:tell|explain|show|about|describe)\\b.{0,30}\\b(?:location|neighbou?rhood|surroundings?|surrounding area)\\b",
+        "\\bwhere (?:can (?:we|people|customers|they) find|will (?:it|the project|our project) be)\\b",
+        "\\bwhat(?: is|'s)? (?:around|near|nearby|close to)\\b.{0,30}\\b(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect)|us|it|here)\\b",
+        "^(?:so |and )?where are we(?: located)?$"
+      ],
+      "means_not": [
+        "\\b(?:toilet|restroom|bathroom|parking|manager|lobby|reception|exit|office|pool|gym|fitness|cinema|sauna|spa|airport|hospital|school|restaurant|7 eleven)\\b",
+        "\\bwhere can (?:i|we|you|they|people|guests|residents|kids|children|tourists?|visitors?) (?:work|eat|play|visit|swim|exercise|shop|relax|go|park)\\b"
+      ]
+    },
+    "s04_l03": {
+      "kind": "host",
+      "host_th": "เริ่มจากห้องพักก่อนเลยครับ โครงการของเรามีทั้งหมดกี่ยูนิต และมีห้องแบบไหนบ้าง?",
+      "host_en": "Let's start with the rooms. How many units does our project have in total, and what types of rooms are there?",
+      "ask_en": [
+        "how many units",
+        "what types of rooms",
+        "what room types are there"
+      ],
+      "means": [
+        "\\bhow many (?:\\w+ ){0,3}(?:units?|rooms?|apartments?|condos?|residences?|homes)\\b",
+        "\\b(?:number|total) of (?:\\w+ )?(?:units?|rooms?|apartments?|residences?)\\b",
+        "\\b(?:what|which) (?:\\w+ ){0,2}(?:types?|kinds?|sorts?|styles?|sizes?) of (?:\\w+ )?(?:rooms?|units?|apartments?|residences?)\\b",
+        "\\b(?:rooms?|units?|apartments?) (?:types?|kinds?|options?|choices|mix)\\b",
+        "\\b(?:types?|kinds?) of (?:rooms?|units?|apartments?)\\b",
+        "\\b(?:rooms?|units?)\\b.{0,30}\\b(?:in total|altogether|all together)\\b",
+        "\\bhow many\\b.{0,15}\\b(?:and|or) (?:what|which) (?:types?|kinds?)\\b",
+        "\\btotal (?:units?|rooms?)\\b",
+        "\\bwhat (?:rooms?|units?) (?:do|does|are|can|have)\\b",
+        "\\b(?:tell|start|talk)\\b.{0,25}\\babout (?:the|our) (?:rooms?|units?)\\b"
+      ],
+      "means_not": [
+        "\\bhotel\\b",
+        "\\bhow many (?:\\w+ ){0,2}(?:units?|rooms?) (?:are |is |do we have |have we )?(?:still )?(?:left|available|unsold)\\b",
+        "\\b(?:left|sold|empty|floor|bedroom unit cost|price|cost|much|people|guests|family|quotation|sea view|reserved|smoking|meeting|building a|building b)\\b",
+        "\\bbuildings? [a-f]\\b",
+        "\\b(?:in|for|per|each|every) (?:each |every |the )?buildings?\\b",
+        "\\bhow many (?:\\w+ ){0,1}(?:one|two|three|1|2|3)[ -]?(?:bed ?rooms?|br)\\b",
+        "\\bhow many studios?\\b",
+        "\\b(?:left|remaining|remain|unsold|available|availability)\\b",
+        "\\bsizes?\\b",
+        "\\bshow (?:units?|rooms?|flats?)\\b"
+      ]
+    },
+    "s04_l06": {
+      "kind": "host",
+      "host_th": "แล้วสิ่งอำนวยความสะดวกของเรา มีอะไรที่เอ็มม่าอยากให้ทุกคนเห็นเป็นพิเศษครับ?",
+      "host_en": "And what about our facilities? Is there anything you would especially like everyone to see, Emma?",
+      "ask_en": [
+        "what about our facilities",
+        "what facilities do we have",
+        "tell us about the facilities"
+      ],
+      "means": [
+        "\\bfaciliti?(?:es|y|ties)\\b",
+        "\\bfacilit\\w*\\b",
+        "\\bamenit\\w+\\b",
+        "\\bcommon (?:areas?|spaces?)\\b",
+        "\\bshared (?:areas?|spaces?)\\b",
+        "\\b(?:recreation\\w*|leisure) (?:areas?|spaces?|facilit\\w+)\\b",
+        "\\bwhat can (?:residents|people|customers|the residents) (?:enjoy|use|do)\\b",
+        "\\b(?:anything|something|what)\\b.{0,20}\\b(?:especially|particularly)\\b.{0,20}\\b(?:see|show)\\b",
+        "\\b(?:is there|do we have)\\b.{0,12}\\b(?:swimming )?pool\\b",
+        "\\banything\\b.{0,30}\\bsee\\b"
+      ],
+      "means_not": [
+        "\\b(?:kids?|children'?s?|indoor|sky)'? (?:swimming )?pool\\b",
+        "\\b(?:size|height|deep|depth|how big|square|area of|hotel|next door|open(?:ing)? hours?|what time|price|cost|fee|fees|how much|24 hours|which floor|more detail)\\b",
+        "\\b(?:basement|underground|(?:ground|first|third|3rd|entrance) (?:floor|level)|(?:level|floor) (?:3|three|g))\\b",
+        "\\bfor (?:the |our |my )?(?:kids?|children|families|little ones)\\b",
+        "\\bglass\\b"
+      ]
+    },
+    "s04_l09": {
+      "kind": "host",
+      "host_th": "ว้าว... คุณจำรายละเอียดได้ดีมากเลยนะเอ็มม่า",
+      "host_en": "Wow... you remember the details very well, Emma.",
+      "ask_en": [
+        "you remember the details very well",
+        "you remember everything",
+        "you remember so well"
+      ],
+      "means": [
+        "\\b(?:you|your)\\b.{0,25}\\b(?:remember\\w*|memor\\w+|memory)\\b",
+        "\\b(?:good|great|amazing|impressive|excellent|fantastic|perfect|wonderful|incredible) (?:memory|with details)\\b",
+        "\\bremember\\w* (?:all |every |the |so |very )"
+      ],
+      "means_not": [
+        "\\bhow (?:is|good is) your memory\\b",
+        "\\bwhy\\b",
+        "\\bdo you remember\\b",
+        "\\bremember (?:me|my name|him|her|us|who)\\b",
+        "\\bcan you remember\\b",
+        "\\b(?:will|please) remember\\b"
+      ],
+      "means_next": [
+        "\\b(?:amazing|impressive|excellent|smart|clever|wonderful|fantastic|incredible|brilliant|genius)\\b",
+        "\\b(?:details?|everything)\\b.{0,15}\\bwell\\b",
+        "\\bknow\\b.{0,20}\\b(?:details?|everything|a lot|so much)\\b",
+        "\\bwow\\b"
+      ],
+      "alike": "praise",
+      "tell": true
+    },
+    "s04_l11": {
+      "kind": "chain_follow",
+      "note_th": "เฉลยมุก — ตามมาเองจากมุกเกริ่น (chain) ไม่ต้องมีบทคุณมิกิ"
+    },
+    "s04_l13": {
+      "kind": "chain_follow",
+      "note_th": "ท้ายมุกสระ (Emma ว่ายน้ำ) — ตามเฉลยมาเอง ไม่ต้องกด (เจ้าของ 24 พ.ย.: 'ฉากตอนว่ายหายไปต้องเอามารวมกันไหม')"
+    },
+    "s04_l15": {
+      "kind": "host",
+      "host_th": "ได้เลยครับ แต่วันนี้อยู่ช่วยทีมขายกับผมก่อนนะเอ็มม่า",
+      "host_en": "Of course, but today please stay and help the sales team with me first, Emma.",
+      "ask_en": [
+        "stay and help the sales team",
+        "help the sales team with me"
+      ],
+      "means": [
+        "\\b(?:stay|work|remain|be)\\b.{0,25}\\b(?:help|assist|support|with)\\b.{0,20}\\b(?:sales?|sale|selling|team|us here|me first|me)\\b",
+        "\\b(?:help|assist|support)\\b.{0,15}\\b(?:sales?|sale|selling) (?:team|staff|people)\\b",
+        "\\bstay (?:here|with (?:me|us)|and help)\\b",
+        "\\b(?:no|not)\\b.{0,10}\\b(?:swim\\w*|pool)\\b.{0,30}\\b(?:today|now|yet|first|later|work|help)\\b",
+        "\\b(?:swim\\w*|pool)\\b.{0,30}\\b(?:later|another day|next time|after)\\b"
+      ],
+      "means_not": [
+        "\\bcan you help the sales team sell\\b",
+        "\\b(?:how|what) (?:can|could|do|will|would|are) you\\b"
+      ],
+      "means_next": [
+        "\\b(?:help|stay|staying|work|working|assist|later|not now|next time|another day)\\b"
+      ],
+      "tell": true
+    },
+    "s05_l03": {
+      "kind": "host",
+      "host_th": "ถ้าอย่างนั้น เรามาลองสถานการณ์จริงกันครับ สมมติว่าผมเป็นลูกค้าที่กำลังมองหาห้องสำหรับครอบครัว อยู่กับภรรยาและลูก ๆ เอ็มม่าจะช่วยแนะนำอย่างไร?",
+      "host_en": "In that case, let's try a real situation. Suppose I am a customer looking for a room for my family, with my wife and my children. How would you help recommend?",
+      "ask_en": [
+        "looking for a room for my family",
+        "how would you help recommend",
+        "suppose I am a customer"
+      ],
+      "means": [
+        "\\b(?:i'm|i am|suppose|imagine|pretend|say|act|if i)\\b.{0,30}\\b(?:customer|buyer|client|guest)\\b",
+        "\\b(?:room|unit|place|condo|home|apartment|residence)\\b.{0,30}\\b(?:for )?(?:my |a |our )?(?:family|wife|children|kids)\\b",
+        "\\b(?:family|wife|children|kids)\\b.{0,50}\\b(?:room|unit|recommend|suggest|place|condo|home|apartment)\\b",
+        "\\b(?:recommend|suggest)\\b.{0,40}\\b(?:room|unit|customer|family|me)\\b",
+        "\\b(?:which|what) (?:room|unit)\\b.{0,30}\\b(?:should|suit|recommend|suggest|fit|best|good)\\b",
+        "\\blooking for (?:a |an )?(?:room|unit|condo|home|apartment)\\b"
+      ],
+      "means_not": [
+        "\\b(?:restaurant|hotel|food|book)\\b",
+        "\\b(?:kids?|children'?s?) ?'?s? (?:room|club|pool|zone|area)\\b",
+        "\\bwhere\\b",
+        "\\b(?:face|faces|facing|overlook\\w*|see|view of|views of) the (?:sea|ocean|beach)\\b",
+        "\\b(?:sea|see|ocean) views?\\b"
+      ],
+      "tell": true
+    },
+    "s05_l06": {
+      "kind": "host",
+      "host_th": "ผมอยากได้ห้องที่มองเห็นทะเลครับ",
+      "host_en": "I would like a room with a sea view.",
+      "ask_en": [
+        "I would like a sea view",
+        "I want a sea view",
+        "I would like a room with a sea view",
+        "I would like a see view"
+      ],
+      "means": [
+        "\\b(?:sea|see|ocean|beach|seaside|c) ?(?:views?|side|front|facing)\\b",
+        "\\bviews? of the (?:sea|ocean|beach|see)\\b",
+        "\\b(?:see|look at|looking at|overlook\\w*|face|facing|faces) the (?:sea|ocean|beach)\\b",
+        "\\b(?:sea|ocean) (?:please|for me)\\b",
+        "\\bsees? the (?:sea|ocean)\\b"
+      ],
+      "means_not": [
+        "\\b(?:how many|which (?:rooms|units)|do all|does every|what does it cost|price|how much|is there|are there)\\b"
+      ],
+      "means_next": [
+        "\\b(?:sea|ocean|beach)\\b",
+        "^(?:the |a )?see(?: please)?$"
+      ],
+      "tell": true
+    },
+    "s05_l07": {
+      "kind": "continues",
+      "note_th": "Emma พูดต่อจากบทก่อนทันที (บทระบุ \"ต่อจากบทก่อน\") — โหมดตามคุณมิกิเล่นเองหลังบทก่อนจบ"
+    },
+    "s05_l08": {
+      "kind": "continues",
+      "note_th": "Emma พูดต่อจากบทก่อนทันที (บทระบุ \"ต่อจากบทก่อน\") — โหมดตามคุณมิกิเล่นเองหลังบทก่อนจบ"
+    },
+    "s05_l11": {
+      "kind": "host",
+      "host_th": "ดีเลยครับ ช่วยพิมพ์ใบเสนอราคา แล้วส่งต่อให้เจ้าหน้าที่ที่ดูแลผมด้วยครับ",
+      "host_en": "Great. Please print the quotation, and pass it on to the staff member who is looking after me.",
+      "ask_en": [
+        "print the quotation",
+        "pass it on to the staff",
+        "spin the quotation"
+      ],
+      "ask_word": [
+        "quotation"
+      ],
+      "means": [
+        "\\b(?:print\\w*|spin|pin|prepare|issue|make|give|send|pass|bring|create|get|draw|hand|do|need|want|like|have|see|show|arrange|go ahead with)\\b.{0,40}\\b(?:quotations?|quotes?|quote|price offer|co tation|quota\\w*)\\b",
+        "\\b(?:quotations?|quote)\\b.{0,40}\\b(?:please|print\\w*|staff|pass|hand|send|to my|to the)\\b",
+        "^(?:yes |sure |great |ok |okay )*(?:the |a )?(?:quotation|quote)(?: please)?$"
+      ],
+      "means_not": [
+        "\\b(?:ready yet|what is a quotation|how long)\\b",
+        "\\bhow (?:do|can|could|to) (?:i|we|they|people|you)? ?(?:get|have|ask)\\b"
+      ],
+      "means_next": [
+        "^(?:yes|yeah|sure|ok|okay|great|please|of course|go ahead|absolutely|certainly|that would be)\\b"
+      ]
+    },
+    "s05_l13": {
+      "kind": "continues",
+      "note_th": "ต่อจาก s05_l11 เอง (ข้อ 10 คำตอบเดียว)"
+    },
+    "s06_l03": {
+      "kind": "host",
+      "host_th": "แล้วถ้าลูกค้าถามรายละเอียดลึกกว่านั้นล่ะครับเอ็มม่า อย่างความสูงของอาคาร ความลึกของสระว่ายน้ำ หรือขนาดพื้นที่ส่วนกลาง คุณตอบได้ไหม?",
+      "host_en": "And what if a customer asks for more detail than that, Emma? Like the height of the building, the depth of the swimming pool, or the size of the common areas. Can you answer that?",
+      "ask_en": [
+        "what if a customer asks for more detail",
+        "the height of the building",
+        "the depth of the swimming pool",
+        "the size of the common areas"
+      ],
+      "means": [
+        "\\b(?:more|deeper|further|extra|technical|specific|detailed) (?:\\w+ )?(?:details?|information|info|questions?|specifications?|data|numbers?)\\b",
+        "\\b(?:height|tall|how high|high) (?:\\w+ ){0,3}building\\b",
+        "\\bbuilding(?:'s)? (?:height|is it high)\\b",
+        "\\bhow (?:tall|high)\\b.{0,20}\\b(?:building|buildings|tower|project|it)\\b",
+        "\\b(?:depth|deep|how deep)\\b.{0,25}\\b(?:pool|swimming)\\b",
+        "\\b(?:pool|swimming pool)\\b.{0,20}\\b(?:depth|deep)\\b",
+        "\\b(?:size|how big|how large|area|square met\\w+)\\b.{0,25}\\bcommon (?:area|areas|space|spaces)\\b",
+        "\\bcustomers?\\b.{0,20}\\basks?\\b.{0,30}\\b(?:detail\\w*|more|deeper|technical)\\b",
+        "\\bhow many (?:storeys?|stories|storys?|floors?|levels?)\\b.{0,25}\\b(?:building|buildings|project|tower|it|we|they)\\b"
+      ],
+      "means_not": [
+        "\\b(?:bedroom|price|how much (?!(?:of )?(?:the )?(?:indoor|area|space|facilit|common))|ceiling|eiffel|mountain|statue|tree|are you)\\b",
+        "\\b(?:basement|parking|underground)\\b"
+      ]
+    },
+    "s06_l05": {
+      "kind": "host",
+      "host_th": "ถูกต้องครับเอ็มม่า คุณรู้รายละเอียดดีมากจริง ๆ",
+      "host_en": "That's right, Emma. You really do know the details very well.",
+      "ask_en": [
+        "you really do know the details",
+        "you know the details very well"
+      ],
+      "means": [
+        "\\byou\\b.{0,20}\\bknow\\b.{0,30}\\b(?:details?|everything|a lot|so much|well|all)\\b",
+        "\\b(?:know|knows) (?:it |them |all |everything |the details? |our project )*(?:very |so |really )?well\\b",
+        "\\byou(?:'re| are)\\b.{0,15}\\b(?:smart|clever|knowledgeable|intelligent|well prepared|impressive|an expert|genius)\\b",
+        "\\b(?:so|very|really) (?:smart|clever|knowledgeable|intelligent)\\b"
+      ],
+      "means_not": [
+        "\\bdo you know\\b",
+        "\\bhow do you know\\b",
+        "\\bremember\\w*\\b",
+        "\\bdon't know\\b",
+        "\\bwhy\\b"
+      ],
+      "means_next": [
+        "\\b(?:amazing|impressive|excellent|smart|clever|wonderful|fantastic|incredible|brilliant|genius|correct)\\b",
+        "\\bdetails?\\b",
+        "\\b(?:that's|that is|you are|you're) right\\b"
+      ],
+      "alike": "praise",
+      "tell": true
+    },
+    "s06_l07": {
+      "kind": "chain_follow",
+      "note_th": "เฉลยมุก — ตามมาเองจากมุกเกริ่น (chain) ไม่ต้องมีบทคุณมิกิ"
+    },
+    "s07_l02": {
+      "kind": "host",
+      "host_th": "อีกสิ่งหนึ่งที่ผมอยากให้ทุกคนเห็น คือเทคโนโลยีที่เราตั้งใจนำมาใช้ในการอยู่อาศัยและการดูแลโครงการครับ เอ็มม่า ช่วยเปิดวิดีโอเทคโนโลยีของ Embassy World ให้ทุกท่านชมหน่อยครับ",
+      "host_en": "Another thing I would like everyone to see is the technology we intend to use for living and for taking care of the project. Emma, please play the Embassy World technology video for everyone.",
+      "ask_en": [
+        "play the technology video",
+        "the Embassy World technology video",
+        "play the Embassy World technology video",
+        "play the tech video",
+        "please play the technology video for everyone"
+      ],
+      "means": [
+        "\\b(?:tech\\w*|technolog\\w*|smart(?: home| living)?|innovation) (?:\\w+ ){0,2}(?:video|film|movie|clip|videos)\\b",
+        "(?:video|film|movie|clip|videos).{0,30}\\b(?:tech\\w*|technolog\\w*|smart home|innovation)\\b",
+        "\\b(?:play|show|start|run|watch|see|put on|present|open|turn on|screen)\\b.{0,40}\\btechnolog\\w*\\b",
+        "\\btechnolog\\w*\\b.{0,40}\\b(?:video|film|movie|clip|videos)\\b"
+      ],
+      "means_not": [
+        "\\bstory\\b",
+        "\\b(?:stop|pause|close|turn off)\\b",
+        "\\bhow (?:long|many minutes)\\b"
+      ],
+      "means_next": [
+        "\\b(?:play|show|start|run|put on)\\b.{0,20}\\b(?:video|film|movie|clip)\\b"
+      ]
+    },
+    "s07_l07": {
+      "kind": "host",
+      "host_th": "หน้านี้แสดงอะไร และช่วยทีมดูแลโครงการอย่างไรครับ?",
+      "host_en": "What does this page show, and how does it help the project management team?",
+      "ask_en": [
+        "what does this page show",
+        "how does it help the management team",
+        "what does this screen show",
+        "what does this dashboard show"
+      ],
+      "ask_word": [
+        "dashboard"
+      ],
+      "means": [
+        "\\b(?:what|explain|tell|describe)\\b.{0,30}\\b(?:this|that|the) (?:page|screen|dashboard|display|slide|chart|graph|monitor|picture|image)\\b",
+        "\\b(?:page|screen|dashboard|display)\\b.{0,40}\\b(?:show\\w*|mean\\w*|tell\\w*|about|help\\w*|for|do|does)\\b",
+        "\\bdashboard\\b",
+        "\\bwhat (?:is|are) (?:we|this|that) (?:seeing|looking at|showing)\\b",
+        "\\bwhat (?:are we looking at|do we see|is on (?:the|this) (?:screen|page))\\b",
+        "\\bhow (?:does|do|can) (?:it|this|that|the (?:page|system|screen))\\b.{0,20}\\bhelp\\b.{0,40}\\b(?:team|management|manage|project|staff)\\b",
+        "\\bwater quality\\b",
+        "\\bhow (?:is|are) (?:this|it|that)\\b.{0,15}\\b(?:useful|helpful)\\b"
+      ],
+      "means_not": [
+        "\\b(?:next|turn off|brightness|dim|bigger|close|off|touch|video)\\b"
+      ]
+    },
+    "s08_l06": {
+      "kind": "host",
+      "host_th": "วันนี้ผมอยากให้ทุกท่านได้เห็นการทำงานของระบบด้วยตัวเอง เรามาเริ่มจากไฟในล็อบบี้กันครับ เอ็มม่า ช่วยปิดไฟล็อบบี้ครับ",
+      "host_en": "Today I would like everyone to see the system working for themselves. Let's start with the lobby lights. Emma, please turn off the lobby lights.",
+      "ask_en": [
+        "turn off the lobby lights",
+        "switch off the lights",
+        "turn the lights off"
+      ],
+      "means": [
+        "\\b(?:turn|switch|shut|put|power|take)\\b.{0,25}\\b(?:off|of|out|down)\\b.{0,25}\\b(?:lights?|lighting|lamps?|lice|lites?)\\b",
+        "\\b(?:turn|switch|shut)\\b.{0,25}\\b(?:lights?|lighting|lamps?|lice|lites?)\\b.{0,12}\\b(?:off|out)\\b",
+        "\\b(?:lights?|lighting|lamps?|lice|lites?) (?:off|out)\\b",
+        "\\boff (?:the |all |our )*(?:lobby )?(?:lights?|lighting|lamps?|lice|lites?)\\b",
+        "\\b(?:close|kill|cut) (?:the |all |lobby |our )*(?:lights?|lighting|lamps?|lice|lites?)\\b",
+        "\\bmake (?:it|the (?:lobby|room)) dark\\b"
+      ],
+      "means_not": [
+        "\\b(?:back on|on again|bedroom|don't|do not)\\b"
+      ]
+    },
+    "s08_l08": {
+      "kind": "manual",
+      "note_th": "หลังทีมไฟยืนยันไฟดับ — เหตุการณ์บนเวที ไม่มีบทพูด"
+    },
+    "s08_l10": {
+      "kind": "host",
+      "host_th": "เอ็มม่า เปิดไฟล็อบบี้อีกครั้งครับ",
+      "host_en": "Emma, please turn the lobby lights back on.",
+      "ask_en": [
+        "turn the lobby lights back on",
+        "turn the lights back on",
+        "turn the lights on again",
+        "turn on the lobby lights",
+        "turn on the lights"
+      ],
+      "ask_say": [
+        "turn on",
+        "switch on",
+        "back on",
+        "lights on",
+        "on again",
+        "on please"
+      ],
+      "means": [
+        "\\b(?:turn|switch|put|bring|power)\\b.{0,25}\\b(?:on|back)\\b.{0,25}\\b(?:lights?|lighting|lamps?|lice|lites?)\\b",
+        "\\b(?:turn|switch|put|bring|power)\\b.{0,25}\\b(?:lights?|lighting|lamps?|lice|lites?)\\b.{0,15}\\b(?:on|back|again)\\b",
+        "\\b(?:lights?|lighting|lamps?|lice|lites?) (?:back )?on\\b",
+        "\\b(?:open) (?:the |all |lobby |our )*(?:lights?|lighting|lamps?|lice|lites?)\\b",
+        "\\b(?:lights?|lighting|lamps?|lice|lites?)\\b.{0,12}\\b(?:back|again)\\b",
+        "\\bmake (?:it|the (?:lobby|room)) bright\\b"
+      ],
+      "means_not": [
+        "\\boff\\b",
+        "\\bdon't\\b"
+      ]
+    },
+    "s08_l12": {
+      "kind": "manual",
+      "note_th": "หลังทีมไฟยืนยันไฟสว่าง — เหตุการณ์บนเวที ไม่มีบทพูด"
+    },
+    "s08_l14": {
+      "kind": "host",
+      "host_th": "แล้วผ้าม่านล่ะครับ เอ็มม่า ช่วยเปิดผ้าม่านล็อบบี้ด้วยครับ",
+      "host_en": "And what about the curtains, Emma? Please open the lobby curtains as well.",
+      "ask_en": [
+        "open the lobby curtains",
+        "open the curtains",
+        "what about the curtains"
+      ],
+      "means": [
+        "\\b(?:open|draw|pull|raise|lift|part)\\b.{0,25}\\b(?:curtains?|drapes?|blinds?|certain(?:s)?)\\b",
+        "\\b(?:curtains?|drapes?|blinds?|certain(?:s)?)\\b.{0,25}\\b(?:open|opened|up|as well|too|also)\\b",
+        "\\b(?:what|how) about (?:the |our )?(?:lobby )?(?:curtains?|drapes?|blinds?|certain(?:s)?)\\b",
+        "\\band (?:the |our )?(?:lobby )?curtains?$"
+      ],
+      "means_not": [
+        "\\b(?:close|shut|down|color|colour|stage|technicians?)\\b"
+      ]
+    },
+    "s08_l16": {
+      "kind": "manual",
+      "note_th": "หลังทีมม่านยืนยันม่านเปิด — เหตุการณ์บนเวที ไม่มีบทพูด"
+    },
+    "s09_l02": {
+      "kind": "host",
+      "host_th": "ทุกอย่างที่ทุกท่านเห็นในวันนี้ เป็นส่วนหนึ่งของความตั้งใจที่เราใส่ลงไปใน Embassy World ครับ ก่อนเปิดพรีวิวอย่างเป็นทางการ ผมอยากให้ทุกท่านได้ชมภาพโครงการและเรื่องราวที่เราอยากถ่ายทอดผ่านงานออกแบบนี้ เอ็มม่า เปิดวิดีโอ Embassy World Story ครับ",
+      "host_en": "Everything you have seen today is part of the care we have put into Embassy World. Before the official preview, I would like everyone to watch images of the project and the story we want to tell through this design. Emma, please play the Embassy World Story video.",
+      "ask_en": [
+        "play the Embassy World story video",
+        "play the story video",
+        "watch the story of Embassy World",
+        "play the story",
+        "play the Embassy World story"
+      ],
+      "means": [
+        "\\bstor(?:y|ies) (?:video|film|movie|clip|videos)\\b",
+        "(?:video|film|movie|clip|videos).{0,30}\\bstor(?:y|ies)\\b",
+        "\\b(?:play|show|start|run|watch|see|put on|present|open|turn on|screen)\\b.{0,40}\\b(?:stor(?:y|ies)|world story)\\b",
+        "\\bstor(?:y|ies) of (?:the |our )?(?:(?:project|embassy(?: world)?|development|condo(?:minium)?|building|property|place|site|r project|protect))\\b",
+        "\\b(?:play|show|start|run|watch|see|put on|present|open|turn on|screen)\\b.{0,30}\\b(?:project|final|last|main) (?:video|film|movie|clip|videos)\\b"
+      ],
+      "means_not": [
+        "\\btechnolog\\w*\\b",
+        "\\b(?:tell me|bedtime|funny|your) stor(?:y|ies)\\b",
+        "\\b(?:stop|pause)\\b",
+        "\\bhow (?:long|many minutes)\\b"
+      ],
+      "means_next": [
+        "\\b(?:play|show|start|run|put on)\\b.{0,20}\\b(?:video|film|movie|clip)\\b"
+      ]
+    },
+    "s10_l05": {
+      "kind": "manual",
+      "note_th": "หลังวิดีโอ Fantasy จบ — ไม่มีบทคุณมิกิคั่น"
+    }
+  }
+}

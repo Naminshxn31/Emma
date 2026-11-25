@@ -232,12 +232,15 @@ TRANSLATOR_GREETING = (
 #: Profiles this file knows how to build. Anything else falls back to
 #: `condo`, because the machine that must never change behaviour by accident
 #: is the one in the sales gallery.
-PROFILES = ("condo", "emma", "joke", "translator", "event")
+PROFILES = ("condo", "emma", "joke", "translator", "event", "ceremony")
 #: The profiles that ARE the sales host: `event` is condo at an event (owner
 #: 30 Oct, the "Emma Event" robot app -- app/event_host.py), with every one
-#: of condo's rules, tools and stories, plus the event's block. Checks that
-#: mean "the sales host" read this, not `== "condo"`.
-SALES_PROFILES = ("condo", "event")
+#: of condo's rules, tools and stories, plus the event's block. `ceremony` is
+#: condo in the opening ceremony (owner 9 Nov, the "Emma Ceremony" app --
+#: app/ceremony.py: "ที่สามารถใช้ข้อมูลอันเก่าได้"), the same approved facts,
+#: stories and report, plus the ceremony's block. Checks that mean "the sales
+#: host" read this, not `== "condo"`.
+SALES_PROFILES = ("condo", "event", "ceremony")
 
 
 # Facts the assistant is allowed to state, resolved by project/source ID.
@@ -412,7 +415,7 @@ FACILITY_STORY_CLAUSE = ('ให้เรียก present_story(topic="faciliti
 
 def facility_story_offered() -> bool:
     """present_story is offered here and the overview story is approved."""
-    if not _tool_visible("present_story"):
+    if not _stories_told():
         return False
     from app import stories
 
@@ -567,6 +570,19 @@ _CONDO_ACCENT_SLIP = (
 _ACCENT_SLIP = "คุยอังกฤษอยู่แล้วได้ยินประโยคเดียวเป็นเยอรมัน ให้ตอบอังกฤษ ห้ามตอบเยอรมัน "
 
 
+def default_language_name() -> str:
+    """The Thai name of TALK_DEFAULT_LANGUAGE for the rule's last clause
+    ("ไทย" for the default "th", byte for byte the sentence it always was).
+    A code app/talk_lang.py cannot name falls back to Thai, with a warning."""
+    from app.talk_lang import NAMES
+
+    code = settings.talk_default_language
+    if code not in NAMES:
+        logger.warning("TALK_DEFAULT_LANGUAGE=%r is not a language code (th, en, zh, ...) -- using th", code)
+        code = "th"
+    return NAMES[code]
+
+
 def _language_rule(languages: str, *, condo: bool = False) -> str:
     """Build rule #2 of the prompt from the REPLY_LANGUAGES setting.
 
@@ -612,7 +628,7 @@ def _language_rule(languages: str, *, condo: bool = False) -> str:
             "เปลี่ยนเมื่อลูกค้าขอ หรือพูดภาษาใหม่ต่อเนื่อง; "
             "ประโยคตัวอย่างในเครื่องหมายคำพูดทุกที่ในคำสั่งเขียนเป็นไทยเพื่อบอกความหมาย คุยภาษาอื่นอยู่ให้พูดความหมายนั้น"
             "เป็นภาษาของบทสนทนา คุยอังกฤษอยู่ ผิด: 'ขอโทษค่ะ ได้ยินไม่ชัด' ถูก: 'Sorry, I didn't catch that.' "
-            "เริ่มต้นด้วยภาษาไทยจนกว่าลูกค้าจะพูดภาษาอื่น"
+            "เริ่มต้นด้วยภาษา%sจนกว่าลูกค้าจะพูดภาษาอื่น" % default_language_name()
         )
 
     codes = [c.strip() for c in value.split(",") if c.strip()]
@@ -957,7 +973,15 @@ STORIES_FACE_LINE = (
 
 def _stories_suffix() -> str:
     """The stories line, present exactly when the tool is (`_tool_visible`)."""
-    return ("- " + STORIES_FACE_LINE + "\n") if _tool_visible("present_story") else ""
+    return ("- " + STORIES_FACE_LINE + "\n") if _stories_told() else ""
+
+
+def _stories_told() -> bool:
+    """present_story is how this call answers project questions -- not the ceremony's, where it only has what the script
+    does not answer (app/ceremony_stories.py: its own note, its own description)."""
+    from app import ceremony_stories
+
+    return _tool_visible("present_story") and not ceremony_stories.in_ceremony()
 
 
 def _line_after(text: str, prefix: str) -> str:
@@ -1066,7 +1090,7 @@ def build_condo_v2(project_name: str, *, languages: str, robot_name: str,
                        for ln in _SLIDE_RULES.strip().splitlines()[1:] if ". " in ln)
     if groups is None or "units" in groups:
         actions.append("- " + UNITS_TOOLS_BLOCK)
-    if robot_face and _tool_visible("present_story"):
+    if robot_face and _stories_told():
         actions.append("- " + STORIES_FACE_LINE)
     out = (intro + NL + NL + core + face
            + NL + NL + "# ขอบเขต" + NL + scope + NL + "ชื่อโครงการคือ " + name_line
@@ -1102,14 +1126,16 @@ def build_instructions(
         logger.warning("unknown ASSISTANT_PROFILE %r — using the condo profile", profile)
         profile = "condo"
 
-    if profile == "event":
-        # The sales host, byte for byte, with the event's block last before
-        # the speaker labels (app/event_host.py: the event, how scenes come).
+    if profile in ("event", "ceremony"):
+        # The sales host, byte for byte, with the event's block (app/event_host.py: the event,
+        # how scenes come) -- or, in the Emma Ceremony app, the ceremony's block (the event's
+        # own facts, the ceremony's rule, its script with a switch on; owner 9 Nov "ไม่งั้นจะ
+        # ปนกัน": neither block has anything of the other) -- last before the speaker labels.
         from app import event_host
 
         out = build_instructions(project_name, extra_facts, languages, robot_name, "condo",
                                  translator_target, robot_face)
-        block = "\n\n" + event_host.event_block()
+        block = "\n\n" + (event_host.ceremony_block() if profile == "ceremony" else event_host.event_block())
         label = _speaker_label_suffix()
         if label and out.endswith(label):
             return out[:-len(label)] + block + label

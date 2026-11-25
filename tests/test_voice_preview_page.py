@@ -1428,8 +1428,9 @@ def test_emma_does_not_shake_or_vibrate():
     html = PAGE.read_text(encoding="utf-8")
     assert "navigator.vibrate" not in html
     # A new cache key, so the robot's WebView does not keep the shaking copy
-    # (20260930-clean); bumped again 10 Oct for the attention cue.
-    assert "/assets/emma-3d-lab/mascot.js?v=20261010-attend" in html
+    # (20260930-clean); bumped again 10 Oct for the attention cue, and 17 Nov when she
+    # stopped drawing herself under the ceremony's event screen (tests/test_ceremony_acts.py).
+    assert "/assets/emma-3d-lab/mascot.js?v=20261124-film" in html
 
 
 def test_face_scan_cancels_the_session_and_releases_the_camera_on_every_way_out():
@@ -2398,11 +2399,13 @@ def test_a_mute_holds_across_calls_until_the_mic_is_tapped():
     assert "setMuteHold(muted);" in toggle
     summons = html[html.index("answerSummons: function (reason) {"):]
     assert summons[:summons.index("startCall();")].count(
-        "if (muteHold && !FACE_RING.test(String(reason || ''))) return false;") == 1
+        "if (muteHold && !FACE_RING.test(String(reason || '')) && !STAFF_RING.test(String(reason || ''))) "
+        "return false;") == 1
     assert "if (!inCall) { if (muteHold) setMuteHold(false); startCall(); }" in html
     # review 14 Oct: a second tap while connecting muted -- and held -- a call that
-    # then said "Listening" with every frame dropped; no mic yet = the tap does nothing
-    assert "else if (micStream) toggleMute();" in html
+    # then said "Listening" with every frame dropped. A tapped call's double tap still does
+    # nothing; a call a bell dialled mutes, and comes up saying so (tests/client_mute_hold.cjs)
+    assert "else if (micStream || arrayMicSilent || dialledByBell || greetingOpensMic) toggleMute();" in html
     # an idle-timed-out held call rests on "Muted", and an error keeps its own words
     assert "status(muteHold ? 'Muted' : 'Call ended — tap the mic to start again');" in html
     assert "if (!callError) status('Muted'); return; }" in html and "callError = true;" in html
@@ -2412,15 +2415,35 @@ def test_a_mute_holds_across_calls_until_the_mic_is_tapped():
     assert "sessionStorage.getItem(MUTE_HOLD_KEY) === '1'" in html     # survives the app's reload on resume
     bell = html[html.index("var RETRY_MIN_MS = 2000, RETRY_MAX_MS = 30000;"):]
     bell = bell[:bell.index("function later()")]
-    assert "if (held() && !FACE_RING.test(reason)) return;" in bell
+    assert "if (held() && !FACE_RING.test(reason) && !STAFF_RING.test(reason)) return;" in bell
     assert "window.EmmaCall.answerSummons(reason);" in bell
-    assert "sock.send(JSON.stringify({ type: 'hold', on: held() }))" in bell
+    # the hold message; the Emma Ceremony app's adds `ceremony: true` (23 Nov, app/wake.py `_CEREMONY`)
+    assert "var msg = { type: 'hold', on: held(), press: press };" in bell
+    assert "sock.send(JSON.stringify(msg));" in bell
     assert "document.addEventListener('emma-mute-hold', sendHold);" in bell
-    assert "retryMs = RETRY_MIN_MS; sendHold(); return;" in bell          # told again on every reconnect
+    assert "retryMs = RETRY_MIN_MS; bellOpen(evt); return;" in bell       # told again on every reconnect
+    assert "sendHold();" in bell[bell.index("function bellOpen(evt)"):]
     assert "if (stopped || sock) return;" in bell and "held()) return;" not in bell.split("function ring")[0]
     import re as _re
     face = _re.compile(r"^face_")
     assert all(face.match(r) for r in ("face_approach", "face_known", "face_stranger"))
+    # Owner 10 Nov ("เปิดสายแต่ mute ไมค์ได้ไหม"): the event staff page's rings are answered under the
+    # hold too -- on a muted line (micForDial). Both copies of the rule, and every reason the event
+    # code rings with; the standing line's is still not one of them.
+    assert html.count("var STAFF_RING = /^event_/;") == 2
+    # the page's own pattern against the reasons the code really rings with (review 10 Nov: a
+    # hand-written list matched a hand-written regex) -- every event_* line said through announce
+    # (event_host._say/_say_line, event_roam) and the walk's own bell
+    staff = _re.compile(_re.search(r"var STAFF_RING = /(.+?)/;", html).group(1))
+    rung = set()
+    for name in ("event_host.py", "event_roam.py", "event_walk.py"):
+        src = (ROOT / "app" / name).read_text(encoding="utf-8")
+        rung |= {m.group(1) for m in _re.finditer(r'(?:_say_line|_say|summon)\((?:.{0,400}?)"(event_[a-z_]+)"',
+                                                   src, _re.S)}
+    assert {"event_walk", "event_scene", "event_arrived", "event_walk_line", "event_held",
+            "event_walk_trouble", "event_clip_end", "event_roam_home"} <= rung, rung
+    assert all(staff.match(r) for r in rung)
+    assert not staff.match("standing_line") and not face.match("standing_line")
     assert not face.match("standing_line")
 
 
@@ -2511,9 +2534,11 @@ def test_a_muted_mic_stays_muted_on_the_pill_whatever_ends_her_turn():
     # the room screen's copy (/mirror) has no mic to mute: its call-started pose
     assert "show('listening');" in html.split("case 'mirror_start':", 1)[1].split("break;", 1)[0]
     bare.remove("show('listening');")
-    assert bare == ["show('listening'); status('Listening...');",
-                    "if (inCall) { show('listening'); status('Listening...'); } else paintReply();"], bare
-    assert bare[1] in html.split("case 'speech_started':", 1)[1].split("break;", 1)[0]
+    # review 6 Nov: speech_started is no longer bare -- a tap inside the VAD's first 250 ms left it
+    # reading "Listening..." on a muted call (frames already sent had opened the segment)
+    assert bare == ["show('listening'); status('Listening...');"], bare
+    assert ("if (inCall) { show('listening'); status(muted ? 'Muted' : 'Listening...'); } else paintReply();"
+            in html.split("case 'speech_started':", 1)[1].split("break;", 1)[0])
     mic = html[html.index("function handleMicAudio(frame) {"):]
     assert mic.index("if (muted || !ws") < mic.index("show('listening'); status('Listening...');")
 
@@ -2729,7 +2754,7 @@ _CAPTION_STATE = """() => {
   return { has: !!box, shown: shown.map(w => w.textContent).join(''),
            received: document.querySelector('.reply-text').textContent,
            lines: tops.size, pitch: box ? parseFloat(cs.lineHeight) : 0, height: r ? r.height : 0,
-           font: box ? parseFloat(cs.fontSize) : 0, width: Math.round(sec.getBoundingClientRect().width),
+           font: box ? parseFloat(cs.fontSize) : 0, width: sec.offsetWidth,
            below: shown.length ? shown[shown.length - 1].getBoundingClientRect().bottom - r.bottom : 0,
            slid: !!box && getComputedStyle(box.querySelector('.reply-cap-track')).transform !== 'none',
            hidden: sec.style.display === 'none' || getComputedStyle(sec).visibility === 'hidden',
@@ -3059,6 +3084,108 @@ def test_muted_her_answer_ends_on_the_muted_pill_without_the_cue(_chromium_face)
         ctx.close()
 
 
+# ---- the mic button in a real browser (owner, 5 Nov: "ปิดไมค์ ... อยู่หุ่นก็สามารถได้ยิน"): what actually goes up ----
+
+_LABEL = "() => document.querySelector('.control.mic .control-label').textContent"
+_READY = """() => window.__emit({type: 'ready', provider: 'gemini', profile: 'condo', voice: 'Kore',
+    input_rate: 16000, output_rate: 24000, half_duplex: true, barge_in: false, hold_speech: false,
+    quick_asks: {brand: 'Embassy World', langs: [], hint: {}, items: []}})"""
+_FRAMES = "() => (window.__sent || []).filter((m) => m === '[binary]').length"
+
+
+def _a_bell_rings(chromium, reason, held=False):
+    """The page at rest, then a bell: EmmaCall.answerSummons, the door the standing line and the camera use."""
+    browser, port, fake_socket = chromium
+    ctx = browser.new_context(viewport={"width": 1080, "height": 1920}, permissions=["microphone"])
+    ctx.add_init_script(fake_socket)
+    if held:
+        ctx.add_init_script("sessionStorage.setItem('emma-mute-hold', '1');")
+    page = ctx.new_page()
+    page.goto("http://127.0.0.1:%d/preview?app=1&cue=0" % port)
+    page.wait_for_function("() => document.querySelector('.control.mic') && window.EmmaCall")
+    page.wait_for_timeout(1200)                            # /voices + /health
+    assert page.evaluate("(r) => window.EmmaCall.answerSummons(r)", reason) is True
+    page.wait_for_function("() => !!window.__callWS && window.__callWS.readyState === 1")
+    return ctx, page
+
+
+def _mic_up(page):
+    page.evaluate(_READY)
+    page.wait_for_timeout(1200)                            # getUserMedia, the worklet, some frames
+
+
+def test_on_a_hold_the_camera_s_call_opens_the_mic_at_her_first_sound_not_at_the_dial(_chromium_face):
+    ctx, page = _a_bell_rings(_chromium_face, "face_known", held=True)
+    try:
+        _mic_up(page)
+        assert page.evaluate(_LABEL) == "Muted" and page.evaluate(_PILL) == "Muted"
+        assert page.evaluate(_FRAMES) == 0, "the pre-ring comes for any close face: not a frame to the server"
+        said = page.evaluate("() => (window.__sent || []).filter((m) => m !== '[binary]')")
+        assert any("hold_waiting" in m for m in said), "the waiting line tells the server it is muted (review 6 Nov)"
+        # a sound that is not the greeting -- a staff scene's line -- opens nothing (review 6 Nov)
+        events, _ = _answer("The ceremony starts now. ", 3.0)
+        page.evaluate("(ev) => window.__play(ev)", events)
+        page.wait_for_function(_STATE_IS, arg="speaking", timeout=5000)
+        assert page.evaluate(_LABEL) == "Muted", "her scene line opened a muted mic"
+        page.wait_for_function(_STATE_IS, arg="listening", timeout=10000)
+        page.wait_for_timeout(500)
+        assert page.evaluate(_FRAMES) == 0
+        # the greeting, marked by the server (events.announce): that call's mic is for the person greeted
+        page.evaluate("() => window.__emit({type: 'greeting_mic'})")
+        events, _ = _answer("Hello, I am Emma. ", 15.0)
+        page.evaluate("(ev) => window.__play(ev)", events)
+        page.wait_for_function(_STATE_IS, arg="speaking", timeout=5000)
+        assert page.evaluate(_LABEL) == "Listening", "14 Oct's rule: that call's mic is for the person greeted"
+        page.wait_for_function(_STATE_IS, arg="listening", timeout=10000)
+        page.wait_for_timeout(800)
+        assert page.evaluate(_FRAMES) > 0
+        said = page.evaluate("() => (window.__sent || []).filter((m) => m !== '[binary]')")
+        assert any("hold_greeting" in m for m in said) and not any("mute_tap" in m for m in said)
+        assert page.evaluate("() => sessionStorage.getItem('emma-mute-hold')") == "1", "the hold is there for when it ends"
+    finally:
+        ctx.close()
+
+
+def test_a_tap_while_the_standing_line_connects_mutes_the_call_it_opens(_chromium_face):
+    ctx, page = _a_bell_rings(_chromium_face, "standing_line")
+    try:
+        page.click(".control.mic")                         # "Connecting": it used to be dropped
+        _mic_up(page)
+        assert page.evaluate(_LABEL) == "Muted" and page.evaluate(_PILL) == "Muted"
+        assert page.evaluate(_FRAMES) == 0
+        said = page.evaluate("() => (window.__sent || []).filter((m) => m !== '[binary]')")
+        assert any("mute_tap" in m for m in said), "the server is told, for its follow-up and its log"
+        assert page.evaluate("() => sessionStorage.getItem('emma-mute-hold')") == "1"
+    finally:
+        ctx.close()
+
+
+def test_a_tap_while_the_camera_s_call_connects_is_not_a_mute(_chromium_face):
+    # Somebody is at the screen, and it would last until morning.
+    ctx, page = _a_bell_rings(_chromium_face, "face_known")
+    try:
+        page.click(".control.mic")
+        _mic_up(page)
+        assert page.evaluate(_LABEL) == "Listening"
+        assert page.evaluate(_FRAMES) > 0
+        assert page.evaluate("() => sessionStorage.getItem('emma-mute-hold')") is None
+    finally:
+        ctx.close()
+
+
+def test_a_tap_on_a_held_call_waiting_for_its_greeting_opens_the_mic_and_lifts_the_hold(_chromium_face):
+    ctx, page = _a_bell_rings(_chromium_face, "face_known", held=True)
+    try:
+        _mic_up(page)
+        page.click(".control.mic")
+        page.wait_for_timeout(600)
+        assert page.evaluate(_LABEL) == "Listening"
+        assert page.evaluate(_FRAMES) > 0
+        assert page.evaluate("() => sessionStorage.getItem('emma-mute-hold')") is None
+    finally:
+        ctx.close()
+
+
 _LOOKS = """(() => {
   // once an answer is done, the caption's look is the page's only 100 ms timer
   const set = window.setTimeout;
@@ -3140,3 +3267,55 @@ def test_the_desk_pages_audio_start_and_lifecycle_checks_pass_in_node(script):
                             encoding="utf-8", timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "PASS" in result.stdout
+
+
+def test_the_mute_hold_runs_from_the_real_page_source():
+    """Owner, 5 Nov: "ปิดไมค์ แต่เหมือนรีแล้วก็กลับมาพูด". sessionStorage dies with
+    the WebView: the page adopts the server's word on every bell, never writes
+    it back as a press, a tap during a server restart is not lost, and a server
+    with the switch off changes nothing (tests/client_mute_hold.cjs)."""
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required: the mute hold's page half is NOT being checked")
+    result = subprocess.run(
+        [node, str(ROOT / "tests" / "client_mute_hold.cjs")],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=20,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_muted_is_visible_and_a_chest_tap_is_not_a_way_out_of_it():
+    html = PAGE.read_text(encoding="utf-8")
+    # one place: the label is the truth of whether the mic is closed
+    label = html[html.index("function setMicLabel(text) {"):]
+    assert "document.body.classList.toggle('mic-held', text === 'Muted');" in label[:label.index("\n    }")]
+    css = html[html.index("body.mic-held .control.mic .control-icon {"):]
+    css = css[:css.index("}")]
+    assert "animation" not in css and "blur" not in css                  # colour only: the face's performance rules
+    # every path to "Muted" goes through status(), which says since when
+    status = html[html.index("function status(text) {"):]
+    assert "if (text === 'Muted' && holdSince) text = mutedSince();" in status[:status.index("\n    }")]
+    # cycleMode redials through startCall, which opens the mic
+    cycle = html.split("function cycleMode() {", 1)[1].split("\n    }\n", 1)[0]
+    assert "if (!(muteHold && appShell)) setTimeout(startCall, 220);" in cycle
+    # the standing line's dial and not the camera's: somebody is at the screen for that one (review 5 Nov)
+    summons = html[html.index("answerSummons: function (reason) {"):]
+    # the standing line's call only (review 6 Nov: every non-camera bell was a mute until morning)
+    assert "dialledByBell = String(reason || '') === 'standing_line';" in summons[:summons.index("startCall();")]
+    assert "if (!summonedDial) dialledByBell = false;" in html
+    # under a hold the camera's call opens the mic at its GREETING's first sound, not at the dial and
+    # not at any sound (review 6 Nov): the server marks the greeting (events.announce greeting_mic)
+    assert "micForDial(); curBot = '';" in html
+    first = html.split("if (greetingComing) {", 1)[1].split("\n      }", 1)[0]
+    assert "Date.now() - greetingComing < GREETING_MIC_MS" in first and "if (fresh && muted) greetingHeard();" in first
+    assert "greetingComing = Date.now();" in html.split("case 'greeting_mic':", 1)[1].split("break;", 1)[0]
+    assert "case 'greeting_mic':" in html
+    assert "muted = false; curBot" not in html
+    # the server hears the press inside a call
+    toggle = html[html.index("function tellServerMuted() {"):]
+    assert "why: 'mute_tap', muted: muted" in toggle[:toggle.index("\n    }")]
+    toggle = html[html.index("function toggleMute() {"):]
+    assert "tellServerMuted();" in toggle[:toggle.index("\n    }")]

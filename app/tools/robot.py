@@ -56,6 +56,14 @@ async def request_handshake() -> dict:
     if session is None:
         return {"ok": False, "hardware": "failed",
                 "instruction": "ตอนนี้ไม่ได้คุยผ่านหน้าหุ่น จึงสั่งแขนจับมือไม่ได้"}
+    from app import event_tour
+
+    if event_tour.holds_arm():
+        # card 1's tour (owner 23 Nov) gives its own handshakes, one after another, each waited out: group 6 in
+        # between would be refused busy -- or hold the arm out over its next walk's rest (and it turns the head)
+        return {"ok": False, "hardware": "refused",
+                "instruction": "ตอนนี้หุ่นกำลังทำตามคิวของทีมงาน (เดินไปจับมือแขกทีละจุด) จึงยังจับมือตามขอไม่ได้ "
+                               "ห้ามบอกว่ายื่นมือแล้ว ให้บอกสั้นๆ ว่ารอสักครู่"}
     requested = await robot_arm.greet(session=session)
     if not requested:
         return {"ok": False, "hardware": "failed",
@@ -65,10 +73,14 @@ async def request_handshake() -> dict:
     # ack, so "requested" is not "the hand is coming". Narrating motion
     # after somebody pressed the red bar is a robot that says it moves when
     # it does not. The fix with an ack lives in the app and the face page.
+    from app.robot_body import _ARM_HURT
+
+    # _ARM_HURT: robot 6 Nov, "เจ็บนะ" after a handshake got "ตรวจสอบความปลอดภัยแล้ว"
+    # (app/robot_body.py) -- every handshake result the model hears carries it.
     return {"ok": True, "hardware": "requested",
             "instruction": ("ส่งคำขอท่าจับมือไปยังแอปบนหุ่นแล้ว แต่แอปอาจปฏิเสธเงียบๆ "
                             "(เช่นเพิ่งกดหยุด หรือหุ่นกำลังเดิน) ห้ามพูดว่ากำลังยื่นมือหรือยื่นมือแล้ว "
-                            "ให้ชวนจับมือเฉยๆ")}
+                            "ให้ชวนจับมือเฉยๆ" + _ARM_HURT)}
 
 
 @tool(

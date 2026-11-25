@@ -109,6 +109,27 @@ def test_a_known_face_on_the_robot_is_asked_about_the_project_not_live_or_invest
         "และห้ามถือว่าคนที่พูดคือต้า — ไม่มีระบบจำเสียง อาจเป็นคนอื่นที่ยืนอยู่ด้วย")
 
 
+def test_a_known_face_on_the_robot_is_greeted_in_english_when_that_is_the_default(monkeypatch):
+    """Owner, 3 Nov, on the robot: "ภาษาให้ตั้ง eng เป็น default" -- the robot
+    greeted him "สวัสดีค่ะคุณโชกุน รู้จักโครงการของเรามาก่อนไหมคะ" and he picked
+    English on the menu. TALK_DEFAULT_LANGUAGE=en: the same two questions,
+    quoted in English only (a quoted Thai line is said word for word), the
+    same bans; the sales room's camera keeps its line whatever the setting."""
+    monkeypatch.setattr(settings, "assistant_profile", "condo")
+    monkeypatch.setattr(settings, "face_camera_source", "robot")
+    thai = greeter.greeting_for(_sighting())
+    monkeypatch.setattr(settings, "talk_default_language", "en")
+    text = greeter.greeting_for(_sighting())
+    assert text != thai
+    assert "ภาษาอังกฤษ" in text and "Have you heard about our project before?" in text
+    assert "Is there anything I can help you with?" in text
+    assert "รู้จักโครงการของเรามาก่อนไหมคะ" not in text and "มีอะไรให้ช่วยไหมคะ" not in text
+    assert "ต้า" in text and "ห้ามถามว่าสนใจห้องไว้อยู่เองหรือลงทุน" in text
+    assert "ห้ามพูดถึงกล้อง" in text and "ห้ามเรียกชื่ออีก" in text
+    monkeypatch.setattr(settings, "face_camera_source", "local")
+    assert "ภาษาอังกฤษ" not in greeter.greeting_for(_sighting())
+
+
 # -- a group in front (FACE_GROUP_GREETING, owner 2 Nov 2026) ---------------
 
 def _group(kind="stranger", name=None, faces=3):
@@ -862,7 +883,9 @@ def test_a_summoned_session_has_no_opening_line_of_its_own():
     import inspect
 
     src = inspect.getsource(session_module.VoiceSession.run)
-    assert "greeting=None if self.summoned else greeting_for(self.profile)" in src
+    # (and the Emma Ceremony app's call, 9 Nov: a call that opens mid-ceremony greets nobody)
+    assert ("greeting=None if (self.summoned or self.profile == \"ceremony\") else greeting_for(self.profile)"
+            in src)
 
 
 def test_the_page_tells_the_server_when_a_dial_was_rung():

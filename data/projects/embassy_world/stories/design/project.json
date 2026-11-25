@@ -118,7 +118,7 @@
     "prj_dev_logo"
    ],
    "frame_ms": 160,
-   "final_asset": "prj_dev_awards",
+   "final_asset": "n_prj_dev_awards",
    "final_mode": "fade",
    "rise_line": 5,
    "counters": [
@@ -808,25 +808,25 @@
    "items": [
     {
      "label_en": "Miki Haim",
-     "asset": "exec_ceo",
+     "asset": "n_exec_ceo",
      "note_en": "Chief Executive Officer",
      "line": 0
     },
     {
      "label_en": "Pudthachad Sucharitakul",
-     "asset": "exec_coo",
+     "asset": "n_exec_coo",
      "note_en": "Chief Operating Officer",
      "line": 1
     },
     {
      "label_en": "Dor Haim",
-     "asset": "exec_cfo",
+     "asset": "n_exec_cfo",
      "note_en": "Chief Financial Officer",
      "line": 2
     },
     {
      "label_en": "Moran S. Haim",
-     "asset": "exec_gm",
+     "asset": "n_exec_gm",
      "note_en": "General Manager",
      "line": 3
     }
@@ -958,7 +958,7 @@
     {
      "label_en": "Hyde Park → The Vision",
      "sub_en": "2006 – 2015 · Pattaya",
-     "asset": "dev_timeline_early",
+     "asset": "n_dev_timeline_early",
      "asset_kind": "photo",
      "value": {
       "to": 10,
@@ -970,7 +970,7 @@
     {
      "label_en": "Amazon → Embassy Life",
      "sub_en": "2013 – 2027 · Pattaya",
-     "asset": "dev_timeline_late",
+     "asset": "n_dev_timeline_late",
      "asset_kind": "photo",
      "value": {
       "to": 6,

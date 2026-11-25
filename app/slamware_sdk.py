@@ -117,6 +117,40 @@ def laser_scan(sdk: "SlamwareSdk", timeout: float | None = None) -> dict:
     return {"laser_points": points, "pose": {"x": r.get("x"), "y": r.get("y"), "yaw": r.get("yaw")}}
 
 
+def odo_pose(sdk: "SlamwareSdk", timeout: float | None = None) -> tuple[float, float, float]:
+    """The base's wheel-odometry pose, ``getodopose`` -- (x, y, yaw) in odometry's own frame, which
+    a relocalization does not move (only differences of it mean anything).
+
+    23 Nov, floor 1, 22:26: a walk out of the box (1.0 m, velocity, no map) stopped at 0.24 m on
+    "the board's pose jumped 0.19 m / 1° in 0.1 s", and the back onto the dock a minute later on
+    "jumped 0.16 m while backing" -- the board's localization flipping along the dock's line (its
+    lidar fits equal there), not the wheels. A straight line is measured by the wheels instead
+    (scripts/board_walk.py `LineMeter`, `_OdoGuard`).
+
+    NOT YET SEEN ON THIS BOARD (the robot was off when this was written): the command is in
+    RoboStudio's own SDK library -- librpsdk.so's command table next to ``getpose`` /
+    ``getlaserscan`` (``getodopose``; ``SlamwareCorePlatform::getOdoPose`` ->
+    ``SlamwareTcpClient::asyncGetOdoPose``, which answers the same ``rpos::core::Pose`` as
+    ``getpose``). Its reply is read the way ``getlaserscan``'s pose is (x, y, yaw at the top of
+    ``result``), or under ``pose``. Anything else -- refused, no answer, not three finite numbers
+    -- raises SdkError, and the caller measures by the board's pose with its jumps taken out."""
+    import math
+
+    r = sdk.call("getodopose", None, timeout)
+    if r.get("code") not in (None, 1):
+        raise SdkError("getodopose refused: %s" % (r.get("codestr") or r))
+    for doc in (r, r.get("pose"), r.get("value")):
+        if not isinstance(doc, dict):
+            continue
+        try:
+            x, y, yaw = float(doc["x"]), float(doc["y"]), float(doc["yaw"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if all(math.isfinite(v) for v in (x, y, yaw)):
+            return x, y, yaw
+    raise SdkError("getodopose answered no pose: %s" % str(r)[:120])
+
+
 class SlamwareSdk:
     def __init__(self, host: str = "127.0.0.1", port: int = 11445, timeout: float = 3.0,
                  connect: Callable[..., Any] = socket.create_connection):
@@ -185,6 +219,10 @@ class VelocitySession:
         self.clock, self.sleep = clock, sleep
         self.last_ok = 0.0
         self.renewals = 0
+        #: why the last `set` that returned True took the action up again: "taken" (the board
+        #: answered operation_fail -- B or the robot's own screen DELETEd it: a person) or "gap"
+        #: (longer than RENEW_AFTER_S since the last good send -- a slow read, the watchdog).
+        self.last_renew: str | None = None
 
     def open(self) -> int:
         result = self.sdk.call("velocitycontrol", self.flag)
@@ -217,6 +255,7 @@ class VelocitySession:
             raise SdkError("velocity session is not open")
         if self.clock() - self.last_ok > self.RENEW_AFTER_S:
             self._renew()
+            self.last_renew = "gap"
             return True
         answer = self._send(vx, omega)
         if answer == "done":
@@ -224,6 +263,7 @@ class VelocitySession:
             return False
         if answer == "operation_fail":
             self._renew()
+            self.last_renew = "taken"
             return True
         raise SdkError("setvelocity refused: %s" % answer)
 

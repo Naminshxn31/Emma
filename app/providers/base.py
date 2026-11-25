@@ -69,6 +69,12 @@ class ProviderEvent:
         # outlive its call and every announcement would wait out TURN_WAIT_S.
         # Emitted only while that switch is on.
         "tool_dropped", "reconnected",
+        # A story's picture for a line the SERVER says (a ceremony cue pressed
+        # with a picture, app/event_cues.py `show`): `data` = {topic, cue, by}.
+        # The provider puts it in its stream right before the line's first
+        # word; the session draws it as a present_story result (session.py
+        # `_story_picture`). Nothing of it goes to the model.
+        "story_picture",
     ]
     audio: bytes | None = None
     text: str | None = None
@@ -151,6 +157,77 @@ class VoiceProvider(abc.ABC):
         and a turn is exactly what a label must not be).
         """
         return False
+
+    #: Can `play_recorded` put a recorded line out as her reply? The ceremony
+    #: cues (app/event_cues.py) ask before they promise "recorded" to anyone.
+    plays_recorded: bool = False
+    #: Can a ceremony line carry a story's picture (`play_recorded(picture=)`,
+    #: `queue_picture`)? event_cues asks before it passes one: a provider
+    #: without the keyword must never be handed it (the line would not play).
+    shows_pictures: bool = False
+
+    async def play_recorded(self, text: str, pcm: bytes, *, lang: str = "th",
+                            wait_tools: bool = False, interrupt_first: bool = False,
+                            report: dict | None = None, picture: dict | None = None) -> bool:
+        """Play `pcm` (24 kHz mono PCM16, her own voice recorded ahead) with
+        `text` as its transcript, as if it were her reply. True = the whole
+        line went out. Default: not supported, nothing sent.
+
+        A provider that supports it raises its hold on the model's own output
+        the moment this is CALLED (before the returned coroutine runs), so a
+        caller inside a tool call is covered from the instant it asks.
+
+        `picture` (`shows_pictures` only): a `story_picture` event's data, put
+        out right before the line's first word -- after the `interrupted` that
+        stops an old reply (it would settle a story already drawn) -- so the
+        page stages it as THIS answer's screen before her first sound."""
+        return False
+
+    def queue_picture(self, picture: dict) -> bool:
+        """A `story_picture` for the reply to the text just sent (a ceremony cue
+        the model reads, app/event_cues.py): queued behind everything already on
+        its way to the page, ahead of that reply. False = not queued, because
+        that reply is not the next thing out or there is no stream to put it in."""
+        return False
+
+    def stop_line(self, *, hold_model: bool = False, clear: bool = False) -> dict:
+        """Staff stopped the ceremony line being said (app/event_cues.py `cut`):
+        stop feeding a recorded line and lower its hold, drop what is queued for
+        the page, hold the rest of the model's turn when it is reading one
+        (`hold_model`), stop the page's audio (`interrupted`), and take the
+        line's picture down (`clear`). What it did, by key; {} = nothing it can."""
+        return {}
+
+    def end_recorded(self, report: dict | None = None) -> None:
+        """Drop a hold `play_recorded` raised whose line will not be played --
+        only the one whose `report` this is, when given (a newer line's stays)."""
+        return None
+
+    def unquote_next_reply(self, on: bool = True) -> None:
+        """Her next reply reads a line quoted in « » (a ceremony cue, read mode):
+        keep the marks out of its transcript -- on the robot that is the caption.
+        `on=False`: that turn is over, or its text never went out."""
+        return None
+
+    def refresh_recorded(self, report: dict) -> bool:
+        """Keep the hold of a recorded line that has not started yet (its caller is
+        still waiting). False = no such hold."""
+        return False
+
+    def tools_pending(self) -> bool:
+        """A tool call of the model's is running right now."""
+        return False
+
+    def mark_named(self, at: float) -> None:
+        """She has just spoken a line of the exchange (a ceremony cue); its audio
+        ends at `at`. The reply gate's "she was addressed" window runs from then."""
+        return None
+
+    def tap_output(self, fn):
+        """Call `fn(event)` with every event this provider hands the session,
+        until the returned callable is called. None = this provider cannot
+        (the cue log then has no fidelity for a line the model read)."""
+        return None
 
     @abc.abstractmethod
     def events(self) -> AsyncIterator[ProviderEvent]:

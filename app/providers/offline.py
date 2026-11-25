@@ -55,6 +55,27 @@ NOT_HEARD_MIN_S = 0.8
 _ASKED = re.compile(r"(\?|？|คะ)\s*$")
 
 
+def _mic_deaf() -> bool:
+    """A cue-only ceremony with the robot still (app/event_host.py mic_deaf): the mic
+    goes in as silence. Never raises: a probe that fails hears."""
+    try:
+        from app import event_host
+
+        return event_host.mic_deaf()
+    except Exception:                                    # noqa: BLE001
+        return False
+
+
+def _cue_only_closed() -> bool:
+    """...with or without the robot moving: only a stop is hers to answer. Never raises."""
+    try:
+        from app import event_host
+
+        return event_host.cue_only_closed()
+    except Exception:                                    # noqa: BLE001
+        return False
+
+
 def _own_gate(vad_floor: float | None):
     """The session's VAD gate, built like GeminiProvider's (vad_gate.for_session:
     the same floor, grace, speaker focus and per-session detector). Offline
@@ -138,7 +159,8 @@ class OfflineProvider(VoiceProvider):
         from app import turnlog
 
         turnlog.record("offline_session", lines=status["approved"], drafts=status["draft"])
-        if self.greeting is not None:
+        if self.greeting is not None and not _cue_only_closed():
+            # not over a cue-only ceremony's host (a call reopened mid-ceremony; review 7 Nov)
             await self._work.put(("greeting", None))
         return self
 
@@ -158,6 +180,10 @@ class OfflineProvider(VoiceProvider):
         gate = self._vad_gate
         if gate is None or self._closing:
             return
+        if _mic_deaf():
+            # a cue-only ceremony, the robot still (app/event_host.py): silence instead of
+            # the room, through the gate -- an open segment closes cleanly (gemini's rule)
+            pcm16 = bytes(len(pcm16))
         for kind, _data in gate.feed(pcm16):
             if kind == "start":
                 # New speech: earlier captions no longer authorise motion
@@ -330,6 +356,11 @@ class OfflineProvider(VoiceProvider):
         else:
             route = router.route(text, lang, self._route_state, now=now, expecting=expecting,
                                  stories_on=self._stories_on())
+        if route.action != "stop" and _cue_only_closed():
+            # a cue-only ceremony (the audio still went up: the robot moves, and a spoken
+            # stop must be heard): nothing but a stop is hers to answer -- NoiseReplyGate's
+            # "cue_only" on the online road
+            route = router.Route("silent", why="cue_only")
         turnlog.record("offline_route", action=route.action, line=route.line, topic=route.topic,
                        why=route.why, lang=lang)
         await self._perform(route, lang)
@@ -499,27 +530,105 @@ class OfflineProvider(VoiceProvider):
 
         for n, text in enumerate(texts):
             pcm = await asyncio.to_thread(voice.pcm_for, text, lang)
-            pieces = re.findall(r"\S+\s*", text)
-            if n and pieces:
-                pieces[0] = " " + pieces[0]
-            self._talk.emma(text)
-            if not pcm:
-                if pieces:
-                    await self._events.put(ProviderEvent(kind="assistant_transcript", text="".join(pieces)))
-                continue
-            chunks = voice.chunks(pcm)
-            k = 0
-            for i, chunk in enumerate(chunks):
-                while k < len(pieces) and k * len(chunks) // len(pieces) <= i:
-                    await self._events.put(ProviderEvent(kind="assistant_transcript", text=pieces[k]))
-                    k += 1
-                await self._events.put(ProviderEvent(kind="audio", audio=chunk))
-            while k < len(pieces):
-                await self._events.put(ProviderEvent(kind="assistant_transcript", text=pieces[k]))
-                k += 1
-            now = time.monotonic()
-            self._audio_until = max(self._audio_until, now) + len(pcm) / 2 / voice.RATE
+            await self._speak_one(text, pcm, joined=bool(n))
         if texts and _ASKED.search(texts[-1]):
             self._asked_until = max(self._audio_until, time.monotonic())
         else:
             self._asked_until = None
+
+    async def _speak_one(self, text: str, pcm: bytes | None, *, joined: bool = False,
+                         report: dict | None = None) -> None:
+        from app.offline import voice
+
+        pieces = re.findall(r"\S+\s*", text)
+        if joined and pieces:
+            pieces[0] = " " + pieces[0]
+        self._talk.emma(text)
+        if not pcm:
+            if pieces:
+                await self._events.put(ProviderEvent(kind="assistant_transcript", text="".join(pieces)))
+            return
+        chunks = voice.chunks(pcm)
+        k = 0
+        for i, chunk in enumerate(chunks):
+            while k < len(pieces) and k * len(chunks) // len(pieces) <= i:
+                await self._events.put(ProviderEvent(kind="assistant_transcript", text=pieces[k]))
+                k += 1
+            await self._events.put(ProviderEvent(kind="audio", audio=chunk))
+            if i == 0 and report is not None:
+                report["first_at"] = time.monotonic()
+        while k < len(pieces):
+            await self._events.put(ProviderEvent(kind="assistant_transcript", text=pieces[k]))
+            k += 1
+        now = time.monotonic()
+        self._audio_until = max(self._audio_until, now) + len(pcm) / 2 / voice.RATE
+
+    # ---- a recorded ceremony line (app/event_cues.py) ----
+    #
+    # The one cue mode that needs no model: her own voice, recorded ahead.
+    # Nothing here writes a word, so there is no model output to hold -- and
+    # no cue is ever READ offline (event_cues refuses it: no model to read).
+
+    plays_recorded = True
+    shows_pictures = True
+
+    def play_recorded(self, text: str, pcm: bytes, *, lang: str = "th",
+                      wait_tools: bool = False, interrupt_first: bool = False,
+                      report: dict | None = None, picture: dict | None = None):
+        """Her recorded line as her reply -- the coroutine that plays it (the
+        same shape as GeminiProvider's). Pushed whole: the page plays it back
+        to back and drops it on a barge-in, as it does every offline line.
+        `picture`: the story put up with it, right before its first word."""
+        return self._play_recorded(text, pcm, interrupt_first, {} if report is None else report,
+                                   dict(picture) if isinstance(picture, dict) else None)
+
+    async def _play_recorded(self, text: str, pcm: bytes, interrupt_first: bool, report: dict,
+                             picture: dict | None = None) -> bool:
+        from app.offline import voice
+
+        pcm = bytes(pcm or b"")
+        pcm = pcm[:len(pcm) // 2 * 2]
+        text = " ".join((text or "").split())
+        if not text or not pcm or self._closing:
+            report["why"] = "closing" if self._closing else "nothing"
+            return False
+        report["seconds"] = round(len(pcm) / 2 / voice.RATE, 2)
+        if interrupt_first:
+            await self._barge_if_playing()
+        if picture is not None:
+            # after the interruption (it settles a story already drawn), before
+            # the first word: GeminiProvider._play_recorded says why
+            await self._events.put(ProviderEvent(kind="story_picture", data=picture))
+            report["picture"] = True
+        self._replied_since_end = True
+        await self._speak_one(text, pcm, report=report)
+        report["sent_s"] = report["seconds"]
+        self._asked_until = max(self._audio_until, time.monotonic()) if _ASKED.search(text) else None
+        await self._events.put(ProviderEvent(kind="turn_complete"))
+        report["closed"] = True
+        return True
+
+    def stop_line(self, *, hold_model: bool = False, clear: bool = False) -> dict:
+        """Staff stopped the ceremony line (app/event_cues.py `cut`). A recorded line
+        here is pushed whole, so it is all queued or on the page already: drop what
+        is still queued (her audio and words), then `interrupted` stops what the page
+        scheduled. No model, so nothing to hold."""
+        out: dict = {}
+        kept, dropped = [], 0
+        while not self._events.empty():
+            event = self._events.get_nowait()
+            if event is not None and event.kind in ("audio", "assistant_transcript"):
+                dropped += len(event.audio or b"")
+                continue
+            kept.append(event)
+        for event in kept:
+            self._events.put_nowait(event)
+        if dropped:
+            out["purged_ms"] = round(dropped / 2 / self.output_sample_rate * 1000)
+        self._events.put_nowait(ProviderEvent(kind="interrupted"))
+        out["interrupted"] = True
+        if clear:
+            self._events.put_nowait(ProviderEvent(kind="story_picture", data={"clear": True}))
+            out["cleared"] = True
+        self._audio_until = time.monotonic()
+        return out

@@ -280,6 +280,7 @@ class Watcher:
                                if confirm_frames is None else confirm_frames)
         self.cooldown_s = settings.face_cooldown_s if cooldown_s is None else cooldown_s
         self.min_face_px = settings.face_min_px if min_face_px is None else min_face_px
+        self._base_min_px = self.min_face_px
         self.track_wait_s = (settings.face_track_wait_s
                              if track_wait_s is None else track_wait_s)
         #: The arrival the current frames belong to: when it started, where
@@ -310,10 +311,29 @@ class Watcher:
         #: toward a face: motion blur, and a box that jumps across the frame.
         #: They decide nothing (`hold_still`).
         self.still_until = 0.0
+        #: This frame is part of a NAME being confirmed: the loop takes the next one at
+        #: once (FACE_FAST_CONFIRM). Not a stranger's: the camera sends ~10 fps, so no sleep means
+        #: closer-together frames, and a colleague walking in scores under the bar on the way
+        #: (0.33-0.38, 31 Aug): 4 frames in 0.57 s instead of 1.44 s (PC) greets them
+        #: anonymously, and the same-spot rules then keep the name back (review 5 Nov).
+        self.deciding = False
+        #: When this streak's first frame was (NAME_SPAN_S).
+        self._streak_at = 0.0
+        #: When a face was last found to be somebody already greeted. For the walk up to
+        #: whoever she sees (app/face_approach.py): at the stop, that is no greeting.
+        self.suppressed_at: float | None = None
 
         self._streak_key: str | None = None
         self._streak = 0
         self._last_greeted: dict[str, float] = {}
+        #: The nearest face in reach, greetable or not, and where (with the head's pose and the
+        #: frame's shape for `_in_head_frame`): for a greeting that waited for a sentence to end
+        #: (greeter._greet_when_quiet), "is the person it was decided for still there". Not
+        #: `someone_at`: that stops for whoever was just decided, their cooldown starts at once.
+        self.present_at: float | None = None
+        self.present_box: tuple | None = None
+        self.present_head: tuple | None = None
+        self.present_shape: tuple | None = None
         #: When somebody the robot might actually greet was last in frame —
         #: set before the confirmation completes, so the greeter can start
         #: dialling while the decision is still being made (confirming
@@ -372,6 +392,20 @@ class Watcher:
             logger.info("face models not installed — recognition off")
             return None
         path = Path(settings.face_gallery).expanduser()
+        if settings.face_guests_file:
+            # The booth's guests (app/guests.py), beside the staff gallery.
+            from app import guests
+
+            try:
+                gallery = guests.live_gallery(path)
+            except ValueError as exc:
+                logger.warning("%s", exc)
+                return None
+            if gallery is None:
+                # A robot with nobody yet, on a booth day, still has to start
+                # watching: the first scan arrives through the follower.
+                gallery = faces.Gallery([], np.zeros((0, 512), np.float32))
+            return cls(gallery)
         if not path.is_file():
             logger.info("no gallery at %s — recognition off", path)
             return None
@@ -410,11 +444,28 @@ class Watcher:
         self._located = None
         self._confirmed = _UNSET
         self.look_closer = None
+        self.deciding = False
+        if settings.face_approach:
+            from app import face_approach
+
+            self.min_face_px = face_approach.door_min_px(self._base_min_px)
         try:
             return self._see(frame, now, crop)
         finally:
             if settings.focus_enabled or settings.asd_enabled:
                 self._publish(frame, now)
+            if settings.face_approach:
+                # Every usable face's own track, for walking up to a scanned
+                # guest (app/face_approach.py). Off = not even imported.
+                self._approach_look(frame, now)
+
+    def _approach_look(self, frame, now: float) -> None:
+        try:
+            from app import face_approach
+
+            face_approach.observe(self, frame, self._located or [], now)
+        except Exception:                          # pragma: no cover - belt
+            logger.exception("face: the approach look failed")
 
     def _see(self, frame: np.ndarray, now: float, crop: dict | None = None) -> Sighting | None:
         # Locate, not detect: the embedding is the expensive half and both
@@ -453,6 +504,8 @@ class Watcher:
                        faces=len(found), px=int(x2 - x1))
             return None
         self._follow(face, now)
+        self.present_at, self.present_box = now, tuple(face.bbox)
+        self.present_head, self.present_shape = _head_now(), tuple(getattr(frame, "shape", ()) or ())
 
         if self._describe(frame, face, crop) is None:
             self._note("เห็นหน้าแต่อ่านไม่ได้ (เบลอ/มืดเกิน)",
@@ -467,7 +520,8 @@ class Watcher:
             best = self.gallery.names[i]
             if score >= self.threshold:
                 name, meta = best, self.gallery.meta[i]
-                unnamed = self._why_not_name(name, score, runner_up, found)
+                unnamed = (self._under_guest_bar(meta, score) or self._guest_unrecorded(name, meta)
+                           or self._why_not_name(name, score, runner_up, found))
                 if unnamed:
                     # Recognised, but not to be named: greeted like a
                     # stranger, with the reason carried on the sighting for
@@ -475,8 +529,10 @@ class Watcher:
                     # face as unknown — including remembering it, so the
                     # anonymous greeting is not repeated either.
                     if self._unnamed_logged.get(name) != unnamed:
+                        # A guest's name stays out of server.log: the booth's
+                        # guest list is where it is kept, until its stated date.
                         logger.info("face: %s recognised (%.3f) but not named — %s",
-                                    name, score, unnamed)
+                                    "guest" if meta.get("source") == "booth" else name, score, unnamed)
                         self._unnamed_logged[name] = unnamed
                     name, meta = None, {"unnamed": unnamed, "would_be": best}
 
@@ -598,11 +654,15 @@ class Watcher:
             self._streak += 1
         else:
             self._streak_key, self._streak = key, 1
+            self._streak_at = now
         # A stranger has to hold the frame twice as long as a colleague.
         # The gallery can vouch for a colleague; for a stranger the only
         # witness is persistence - and the 0.062-scoring garbage frame that
         # was greeted this morning would not have survived six frames.
         needed = self.confirm_frames if name else self.confirm_frames * 2
+        if (name and settings.face_fast_confirm and self._streak >= needed
+                and now - self._streak_at < self.NAME_SPAN_S):
+            needed = self._streak + 1          # hurried frames are not more witnesses: one further on
         if self._streak >= needed:
             # Who the nearest face is, as far as naming goes — confirmed by
             # the same streak a greeting needs, and already through margin,
@@ -618,6 +678,7 @@ class Watcher:
         if greetable and self._streak >= max(2, needed - 1):
             self.someone_at = now
         if self._streak < needed:
+            self.deciding = greetable and name is not None
             who = name if name else "คนแปลกหน้า"
             shown = "%.2f" % score if score >= 0 else "-"
             self._note("เห็น%s (%s) — ยืนยัน %d/%d" % (who, shown, self._streak, needed),
@@ -634,6 +695,7 @@ class Watcher:
             last = self._last_greeted.get(key)
             self._last_greeted[key] = now
             if last is not None and (now - last) < self.cooldown_s:
+                self.suppressed_at = now
                 self._note("%s ทักไปแล้ว — ทักใหม่ได้ถ้าหายไปเกิน %d วิ" % (
                     name, int(self.cooldown_s)), name=name,
                     score=round(float(score), 3))
@@ -649,6 +711,7 @@ class Watcher:
             for entry in list(self._strangers):
                 if float(np.dot(face.vec, entry["vec"])) >= self.threshold:
                     self._strangers.remove(entry)
+                    self.suppressed_at = now
                     self._note("%s คือคนที่เพิ่งทักแบบไม่มีชื่อ — ไม่ทักซ้ำ" % name,
                                name=name)
                     return None
@@ -665,10 +728,14 @@ class Watcher:
                 recent = (now - entry.get("greeted_at", entry["at"])) < self.STRANGER_TO_NAME_S
                 if recent and _overlap(face.bbox, _in_head_frame(entry.get("bbox"), entry.get("head"),
                                                                  frame)) >= self.SAME_SPOT_IOU:
+                    # A booth guest's name stays out of server.log (review 23 Nov: this
+                    # line was the one that still wrote it).
                     logger.info("face: %s confirmed %.0fs after an anonymous greeting in "
                                 "the same spot — same arrival, not greeting twice",
-                                name, now - entry.get("greeted_at", entry["at"]))
+                                "guest" if meta.get("source") == "booth" else name,
+                                now - entry.get("greeted_at", entry["at"]))
                     self._strangers.remove(entry)
+                    self.suppressed_at = now
                     self._note("%s ยืนจุดที่เพิ่งทักแบบไม่มีชื่อ — ไม่ทักซ้ำ" % name,
                                name=name)
                     return None
@@ -681,6 +748,7 @@ class Watcher:
                             **self._track_stats(now))
 
         if stranger_seen is not None:
+            self.suppressed_at = now
             self._note("คนแปลกหน้าคนเดิม (ทักแล้ว) ยังอยู่ — ไม่ทักซ้ำ")
             return None                    # greeted already; clock refreshed
 
@@ -715,6 +783,7 @@ class Watcher:
             self._strangers.append({"vec": np.array(face.vec, copy=True), "at": now,
                                     "greeted_at": now, "bbox": tuple(face.bbox), "head": _head_now()})
             del self._strangers[:-16]
+            self.suppressed_at = now
             self._note("ภาพเบลอของคนที่เพิ่งทักชื่อ — ไม่ทักซ้ำ")
             return None
 
@@ -772,7 +841,7 @@ class Watcher:
         return None
 
     def _track_stats(self, now: float) -> dict:
-        if self.track_wait_s <= 0 or self._track is None:
+        if (self.track_wait_s <= 0 and not settings.face_fast_confirm) or self._track is None:
             return {}
         t = self._track
         # Numbers and reasons only: this line is how SHARP_MIN/YAW_MAX get
@@ -1002,7 +1071,9 @@ class Watcher:
         if not found:
             return 0
         primary = max(found, key=lambda f: f.bbox[2] - f.bbox[0])
-        bar = max(self.min_face_px, 0.6 * (primary.bbox[2] - primary.bbox[0]))
+        # _base_min_px: while walking up to people is armed, min_face_px is raised to decide who
+        # is greeted from here. A 110-125 px companion is company all the same (review 5 Nov).
+        bar = max(self._base_min_px, 0.6 * (primary.bbox[2] - primary.bbox[0]))
         return sum(1 for f in found if (f.bbox[2] - f.bbox[0]) >= bar)
 
     #: Laplacian variance of the face, grey, resized to 64x64 (so the number
@@ -1020,10 +1091,41 @@ class Watcher:
     #: the lens). The scan's side poses sit at 0.37-1.70; there the own
     #: score fell to 0.46-0.73 and the best *other* person rose to 0.50.
     YAW_MAX = 0.5
+    #: With FACE_FAST_CONFIRM, the first and last frame of a naming streak at least this far
+    #: apart: frames ~0.1 s apart are nearly one picture, and a passing blur or a look on one's
+    #: way past must not be all that names somebody. FACE_FPS's sleep used to do this.
+    NAME_SPAN_S = 0.3
     #: Same arrival = boxes overlapping this much, no more than this apart.
     #: At 6 fps a person walking up moves a fraction of their face width.
     TRACK_IOU = 0.2
     TRACK_GAP_S = 1.0
+
+    @staticmethod
+    def _under_guest_bar(meta: dict, score: float) -> str | None:
+        """A scan-booth guest's name needs the event's bar at this door too, not
+        just on the way to walking up (review 5 Nov). FACE_THRESHOLD was set
+        against a gallery of about ten people: with 500 guests x 3 rows it names
+        somebody who never scanned 1.2e-3 per frame, against 3.3e-5 today and
+        3.9e-5 at 0.60 (scripts/eval_face_crowd.py). Staff rows keep the door's
+        own bar, so a machine with no guests decides exactly as before."""
+        if meta.get("source") != "booth" or score >= settings.face_approach_threshold:
+            return None
+        return "guest under %.2f (%.3f)" % (settings.face_approach_threshold, score)
+
+    @staticmethod
+    def _guest_unrecorded(name: str, meta: dict) -> str | None:
+        """A booth guest is named only on their own record, whatever
+        FACE_REQUIRE_CONSENT says. That switch tolerates MISSING for staff
+        enrolled before records existed (app/consent.py); every guest row came
+        with a record, so a guest row without one is a record lost (a forced
+        deploy of people.json), and the row itself goes at the next purge.
+        Kept a year now (owner 23 Nov), so not left to the hourly purge alone."""
+        if meta.get("source") != "booth":
+            return None
+        from app import consent
+
+        state = consent.status(name)
+        return None if state == consent.OK else "guest consent %s" % state
 
     def _why_not_name(self, name: str, score: float, runner_up: float,
                       found: list) -> str | None:

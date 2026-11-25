@@ -542,6 +542,12 @@ async def greet(session=None) -> bool:
             # see a walk the server runs (robot_face_link._send): no hand out
             # while the wheels turn.
             raise PermissionError("event_walk")
+        from app import event_box
+
+        if event_box.holds(session):
+            # in the box (app/event_box.py, owner 23 Nov): a hand held out there meets its wall -- the Event and
+            # Ceremony apps' calls only (a leftover latch must not take the sales app's handshake)
+            raise PermissionError("in_box")
         # The robot face uses the same Android SDK path as the operator's
         # confirmed handshake. A short adb write can be acknowledged by the
         # board without producing visible motion on this robot.

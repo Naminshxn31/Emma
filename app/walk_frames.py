@@ -90,6 +90,13 @@ MOTION_START_POLLS = 2
 #: Still this long = that walk ended. board_walk waits 8 s at the multimedia
 #: door and pauses at points; one walk must stay one run.
 MOTION_STILL_S = 15.0
+#: The base standing still, from the walk pictures' own board poses: moved
+#: less than this since it stopped (head_follow's walk scan nods only then --
+#: 4 Nov afternoon, owner: "อย่าหันหัวไวเกินและถี่เกิน"). A pose older than
+#: STILL_STALE_S is no answer: a board that stopped answering is not "still".
+STILL_M = 0.01
+STILL_DEG = 0.5
+STILL_STALE_S = 2.0
 
 _task: dict[str, Any] = {"task": None}
 
@@ -135,6 +142,59 @@ class Motion:
 
 
 _motion = Motion()
+#: Where the base stopped (the anchor), since when, and the last pose's time.
+_STILL: dict[str, Any] = {"pose": None, "since": None, "at": None}
+
+
+def _note_pose(pose: Any, now: float) -> None:
+    try:
+        here = (float(pose["x"]), float(pose["y"]), float(pose.get("yaw") or 0.0))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        _STILL.update(pose=None, since=None, at=None)
+        return
+    anchor = _STILL["pose"]
+    moved = anchor is None
+    if not moved:
+        turned = abs((math.degrees(here[2] - anchor[2]) + 180.0) % 360.0 - 180.0)
+        moved = math.hypot(here[0] - anchor[0], here[1] - anchor[1]) >= STILL_M or turned >= STILL_DEG
+    if moved:
+        _STILL.update(pose=here, since=now)
+    _STILL["at"] = now
+
+
+def forget_still() -> None:
+    _STILL.update(pose=None, since=None, at=None)
+
+
+def still_s(now: float | None = None) -> float | None:
+    """How long the base has stood still on this walk, from the walk pictures'
+    board poses (compared with where it stopped, so a slow creep adds up);
+    None when no fresh pose -- no walk, WALK_FRAMES off, a silent board --
+    and then the walk scan does not nod (head_follow)."""
+    now = time.monotonic() if now is None else now
+    at, since = _STILL["at"], _STILL["since"]
+    if at is None or since is None or now - at > STILL_STALE_S:
+        return None
+    return max(0.0, now - since)
+
+
+def moved_at() -> float | None:
+    """When (monotonic) the base was last seen moving on its own (`Motion`: two polls in a row
+    past MOTION_M, or one while it was moving) -- pushed, a joystick, board_walk over adb. None =
+    never seen (no poll yet, WALK_FRAMES off, the board silent). For the event card's arrival
+    line: the robot pushed off the spot it arrived at is not there any more (review 14 Nov)."""
+    if _motion.until < 0:
+        return None
+    return _motion.until - MOTION_STILL_S
+
+
+def base_moving() -> bool:
+    """The base moving on its own, from the board's poses (`Motion`): a walk
+    no other source reports -- board_walk run over adb (floor 1), a joystick.
+    Only while WALK_FRAMES polls the board and nothing else labels the walk
+    (then that source answers). For head_follow's walk scan and the arm lock
+    (robot_face_link.server_walking), 4 Nov."""
+    return _motion.active(time.monotonic())
 
 
 async def _poll_motion(now: float) -> None:
@@ -172,7 +232,7 @@ def _label() -> str | None:
     try:
         from app import event_walk
 
-        if event_walk.walking():
+        if event_walk.moving():                    # out, not still resting its arm (review 7 Nov)
             run = event_walk.current()
             return "event-" + (getattr(run, "spot", "") or "walk")
     except Exception:  # noqa: BLE001 -- a probe, never the reason a walk is missed
@@ -236,8 +296,10 @@ def _head() -> list[float] | None:
     """Where the head was told to look (degrees, + = left / down): a picture
     taken with the head turned is not a picture of what is ahead."""
     try:
-        from app import head_follow
+        from app import event_pageant, head_follow
 
+        if event_pageant.active():
+            return None                 # the debut's pageant turns it, unseen by the server
         pan, tilt = head_follow.offset_deg()
         return [round(pan, 1), round(tilt, 1)]
     except Exception:  # noqa: BLE001
@@ -313,6 +375,7 @@ def _open(label: str) -> Run:
 
 
 def _close(run: Run) -> None:
+    forget_still()
     doc = {"label": run.label, "started": run.started_at,
            "ended": _dt.datetime.now().isoformat(timespec="seconds"),
            "seconds": round(time.monotonic() - run.started, 1),
@@ -389,6 +452,7 @@ async def snap(run: Run) -> dict:
         run.last_state = record["walk"]
     record["head"] = _head()
     record.update(await _board())
+    _note_pose(record.get("pose"), time.monotonic())
     with (run.folder / "frames.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
     run.n += 1

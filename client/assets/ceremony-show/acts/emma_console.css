@@ -1,0 +1,971 @@
+/* Act "emma_console" (ceremony film): Emma's own console. Every selector is under
+   .cs-act-emma_console; sizes in --cu (1% of the stage width); only transform and opacity move;
+   every glow is a drawn gradient. The stage (horizon arc, beam, grid) is the core's.
+
+   Motion (18 Nov skill pass): the film's identity -- Premium, no overshoot; Playful only in the
+   superfan quiz (s06_l07). Signature curve --ec-e for on-screen moves, --ec-in for entrances
+   (decelerate), --ec-out for exits (accelerate, 30-50% shorter), --ec-play for the joke,
+   --ec-sine for ambient loops. Durations: .3s quick, .5s standard, .9s slow, 1.2s at most for a
+   reveal. Staggers 60-100 ms, 500 ms in all.
+   Type (18 Nov afternoon, the owner's Apple reference): the core's face and its arrival; this
+   file sets sizes and places only -- no capitals forced, no italics, no wide tracking.
+   The bottom of the stage (below 43.8cu) is the subtitle box's: no panel, card, word, podium,
+   Emma or confetti reaches it. */
+.cs-act-emma_console {
+  --ec-e: var(--cs-ease, cubic-bezier(0.4, 0, 0.2, 1));
+  --ec-in: var(--cs-ease-in, cubic-bezier(0.05, 0.7, 0.1, 1));
+  --ec-out: var(--cs-ease-out, cubic-bezier(0.3, 0, 1, 1));
+  --ec-play: var(--cs-ease-play, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  --ec-sine: cubic-bezier(0.37, 0, 0.63, 1);
+  --ec-p: calc(120 * var(--cu));
+}
+
+/* ---------------------------------------------------------------- glow follow-through
+   A glass panel of this act (.ec-fx) arrives dark-edged; its drawn glow (the core's ::before)
+   blooms out a beat after the panel has landed, and goes first when it leaves. A panel that
+   was already up when the line began (.ec-held) has its glow at once: the cut shows nothing. */
+.cs-act-emma_console.cs-t-act .cs-glass.ec-fx::before { opacity: 0; transform: scale(.96); transition: opacity .3s var(--ec-out), transform .3s var(--ec-out); }
+.cs-act-emma_console.cs-t-act.cs-live .cs-glass.ec-fx.ec-lit::before {
+  opacity: calc(var(--cs-light, 1) * var(--ec-glow, 1)); transform: none;
+  transition: opacity .5s var(--ec-e) var(--ec-glow-at, .45s), transform .5s var(--ec-in) var(--ec-glow-at, .45s);
+}
+.cs-act-emma_console.cs-t-act .cs-glass.ec-fx.ec-lit.ec-held::before { opacity: calc(var(--cs-light, 1) * var(--ec-glow, 1)); transform: none; transition: opacity .5s var(--ec-e); }
+
+/* the soft light behind a lit phrase (the core's halo), drawn so it has faded to nothing at the
+   edge of its own box: on this act's dark ground the plain one ended in a visible rectangle
+   (frames 18 Nov: a lighter box round "about Embassy World") */
+.cs-act-emma_console .cs-text-glow::before {
+  background:
+    radial-gradient(closest-side at 34% 50%, rgba(204, 244, 240, .26) 0%, rgba(176, 236, 240, .12) 55%, rgba(176, 236, 240, 0) 100%),
+    radial-gradient(closest-side at 66% 50%, rgba(140, 204, 250, .28) 0%, rgba(140, 204, 250, .13) 55%, rgba(140, 204, 250, 0) 100%);
+}
+
+/* ---------------------------------------------------------------- arcs: one-shot lifts
+   A panel that travels across the stage lifts off its straight line half-way (and, leaving,
+   first gives a little the other way: anticipation). The JS flips p0/p1 per move, so the
+   same keyframes can play again. --ax/--as: the wind-up; --ly/--lz: the top of the arc. */
+.cs-act-emma_console .ec-lift.ec-p0 { animation: emma_console-lift0 1.02s var(--ec-e); }
+.cs-act-emma_console .ec-lift.ec-p1 { animation: emma_console-lift1 1.02s var(--ec-e); }
+@keyframes emma_console-lift0 {
+  0% { transform: perspective(var(--ec-p)) translate3d(0, 0, 0) scale(1); }
+  12% { transform: perspective(var(--ec-p)) translate3d(calc(var(--ax, 0) * var(--cu)), 0, 0) scale(var(--as, 1)); }
+  50% { transform: perspective(var(--ec-p)) translate3d(0, calc(var(--ly, 0) * var(--cu)), calc(var(--lz, 0) * var(--cu))) scale(1); }
+  100% { transform: perspective(var(--ec-p)) translate3d(0, 0, 0) scale(1); }
+}
+@keyframes emma_console-lift1 {
+  0% { transform: perspective(var(--ec-p)) translate3d(0, 0, 0) scale(1); }
+  12% { transform: perspective(var(--ec-p)) translate3d(calc(var(--ax, 0) * var(--cu)), 0, 0) scale(var(--as, 1)); }
+  50% { transform: perspective(var(--ec-p)) translate3d(0, calc(var(--ly, 0) * var(--cu)), calc(var(--lz, 0) * var(--cu))) scale(1); }
+  100% { transform: perspective(var(--ec-p)) translate3d(0, 0, 0) scale(1); }
+}
+
+/* ---------------------------------------------------------------- ambient: the shot breathes
+   A held shot is never a still (owner 18 Nov: some stretches "ค้าง"): the layer under the
+   panels drifts and pushes in a touch on a long sine, already moving at the first frame (a
+   negative delay). Small on purpose -- a camera breathing, not a move. */
+.cs-act-emma_console .ec-amb { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 50% 44%; animation: emma_console-amb 15s var(--ec-sine) -5s infinite alternate; }
+@keyframes emma_console-amb {
+  from { transform: translate3d(calc(-.28 * var(--cu)), calc(.1 * var(--cu)), 0) scale(1); }
+  to { transform: translate3d(calc(.28 * var(--cu)), calc(-.16 * var(--cu)), 0) scale(1.012); }
+}
+/* a glint runs along a lit glass panel's top edge now and then (secondary life on a hold) */
+.cs-act-emma_console .ec-edge { position: absolute; left: 7%; right: 7%; top: calc(-.06 * var(--cu)); height: calc(.14 * var(--cu)); overflow: hidden; opacity: 0; transition: opacity .5s var(--ec-e); pointer-events: none; }
+.cs-act-emma_console .ec-lit > .ec-edge { opacity: 1; }
+.cs-act-emma_console .ec-edgei { position: absolute; left: 0; top: 0; width: 26%; height: 100%; opacity: 0; transform: translate3d(-110%, 0, 0);
+  background: linear-gradient(90deg, rgba(200, 240, 255, 0), rgba(235, 250, 255, .95) 50%, rgba(200, 240, 255, 0)); animation: emma_console-edge 6.4s var(--ec-sine) 1.1s infinite; }
+.cs-act-emma_console .ec-dc .ec-edgei { animation-delay: 2.6s; }
+.cs-act-emma_console .ec-unitp .ec-edgei { animation-delay: 4.3s; }
+.cs-act-emma_console .ec-door.ec-dright .ec-edgei { animation-delay: 1.9s; }
+.cs-act-emma_console .ec-door.ec-dmid .ec-edgei { animation-delay: .4s; }
+@keyframes emma_console-edge { 0% { opacity: 0; transform: translate3d(-110%, 0, 0); } 6% { opacity: 1; } 30% { opacity: 0; transform: translate3d(400%, 0, 0); } 100% { opacity: 0; transform: translate3d(400%, 0, 0); } }
+
+/* ---------------------------------------------------------------- the console's marks: plain UI
+   (owner 18 Nov: the glowing star-ball is out -- "คืออะไรไม่ต้องเอาขึ้นมาเลย"). Two rules meet at a
+   notch; a status light is a ring with a lit dot. */
+.cs-act-emma_console .ec-topbar { position: absolute; left: 0; right: 0; top: 0; height: calc(6 * var(--cu)); }
+.cs-act-emma_console .ec-notch {
+  position: absolute; left: calc(47.4 * var(--cu)); top: calc(2.66 * var(--cu)); width: calc(5.2 * var(--cu)); height: calc(1.2 * var(--cu)); border-radius: calc(.6 * var(--cu));
+  border: 1px solid rgba(170, 220, 255, .8); background: linear-gradient(180deg, rgba(46, 72, 214, .5), rgba(10, 18, 64, .7));
+  opacity: 0; transform: scale(.4, 1); transition: opacity .5s var(--ec-e), transform .5s var(--ec-in);
+}
+.cs-act-emma_console.cs-live .ec-notch { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-notchi { position: absolute; left: 30%; top: 40%; width: 40%; height: 20%; border-radius: calc(.1 * var(--cu)); background: rgb(var(--cs-cyan)); animation: emma_console-glow 3.2s var(--ec-sine) infinite alternate; }
+@keyframes emma_console-glow { from { opacity: .55; transform: scale(.82, 1); } to { opacity: 1; transform: scale(1, 1); } }
+/* the rules draw out of the notch after it has come up (follow-through) */
+.cs-act-emma_console .ec-ln { position: absolute; top: calc(3.2 * var(--cu)); width: calc(17.3 * var(--cu)); height: calc(.12 * var(--cu)); opacity: 0; transform: scale(0, 1); transition: transform .9s var(--ec-in) .3s, opacity .3s var(--ec-e) .3s; }
+.cs-act-emma_console .ec-ln.ec-l { left: calc(29.7 * var(--cu)); transform-origin: 100% 50%; background: linear-gradient(90deg, rgba(110, 231, 255, 0), rgba(110, 231, 255, .9)); }
+.cs-act-emma_console .ec-ln.ec-r { right: calc(29.7 * var(--cu)); transform-origin: 0 50%; background: linear-gradient(270deg, rgba(110, 231, 255, 0), rgba(110, 231, 255, .9)); }
+.cs-act-emma_console.cs-live .ec-ln { opacity: 1; transform: none; }
+/* the notch answers (anticipation of the panel that comes next): it taps, a ring leaves it */
+.cs-act-emma_console .ec-topbar::after {
+  content: ""; position: absolute; left: 50%; top: calc(3.26 * var(--cu)); width: calc(8 * var(--cu)); height: calc(3 * var(--cu)); margin: calc(-1.5 * var(--cu)) 0 0 calc(-4 * var(--cu)); border-radius: calc(1.5 * var(--cu));
+  border: 1px solid rgba(150, 220, 255, .8); opacity: 0;
+}
+.cs-act-emma_console .ec-topbar.ec-pp0::after { animation: emma_console-ripple0 .9s var(--ec-in) 1; }
+.cs-act-emma_console .ec-topbar.ec-pp1::after { animation: emma_console-ripple1 .9s var(--ec-in) 1; }
+@keyframes emma_console-ripple0 { from { opacity: .9; transform: scale(.5); } to { opacity: 0; transform: scale(2.6, 2); } }
+@keyframes emma_console-ripple1 { from { opacity: .9; transform: scale(.5); } to { opacity: 0; transform: scale(2.6, 2); } }
+.cs-act-emma_console .ec-topbar.ec-pp0 .ec-notch { animation: emma_console-tap0 .5s var(--ec-e) 1; }
+.cs-act-emma_console .ec-topbar.ec-pp1 .ec-notch { animation: emma_console-tap1 .5s var(--ec-e) 1; }
+@keyframes emma_console-tap0 { 0% { transform: none; } 35% { transform: scale(1.14); } 100% { transform: none; } }
+@keyframes emma_console-tap1 { 0% { transform: none; } 35% { transform: scale(1.14); } 100% { transform: none; } }
+/* a status light */
+.cs-act-emma_console .ec-orb { position: absolute; border-radius: 50%; border: 1px solid rgba(170, 220, 255, .75); background: rgba(8, 16, 60, .55); }
+.cs-act-emma_console .ec-orb-core {
+  position: absolute; left: 27%; top: 27%; width: 46%; height: 46%; border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0, #c8f4ff 40%, rgba(110, 231, 255, .6) 70%, rgba(110, 231, 255, 0) 100%);
+  animation: emma_console-glow 2.8s var(--ec-sine) infinite alternate;
+}
+.cs-act-emma_console .ec-orb.ec-mini { width: calc(1.25 * var(--cu)); height: calc(1.25 * var(--cu)); }
+.cs-act-emma_console .ec-orb.ec-dot { left: calc(1.2 * var(--cu)); top: calc(1.2 * var(--cu)); width: calc(1.3 * var(--cu)); height: calc(1.3 * var(--cu)); }
+
+/* the console menu: her four capabilities as glyphs, no words. The rail drops in, its glyphs
+   follow one by one (70 ms apart); the glyph of what she is doing lights and lifts */
+.cs-act-emma_console .ec-rail {
+  position: absolute; left: calc(3.1 * var(--cu)); top: calc(2 * var(--cu)); height: calc(4.5 * var(--cu)); padding: calc(.45 * var(--cu)) 0 calc(.45 * var(--cu)) calc(.45 * var(--cu)); border-radius: calc(1.1 * var(--cu)); display: flex;
+  border: 1px solid rgba(130, 175, 255, .5); background: linear-gradient(180deg, rgba(46, 72, 214, .26), rgba(12, 22, 74, .4));
+  opacity: 0; transform: translate3d(0, calc(-1.2 * var(--cu)), 0); transition: opacity .5s var(--ec-e) .25s, transform .5s var(--ec-in) .25s;
+}
+.cs-act-emma_console.cs-live .ec-rail { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-mi { position: relative; width: calc(3.45 * var(--cu)); height: calc(3.45 * var(--cu)); border-radius: calc(.8 * var(--cu)); margin-right: calc(.45 * var(--cu)); border: 1px solid rgba(130, 175, 255, .26); background: rgba(8, 14, 52, .4); transition: transform .3s var(--ec-e); }
+.cs-act-emma_console.cs-live .ec-mi { animation: emma_console-mi .5s var(--ec-in) backwards; animation-delay: calc(.4s + var(--i, 0) * 70ms); }
+@keyframes emma_console-mi { from { opacity: 0; transform: translate3d(0, calc(-.6 * var(--cu)), 0) scale(.82); } to { opacity: 1; transform: none; } }
+.cs-act-emma_console .ec-mi::before { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: inherit; opacity: 0; transition: opacity .3s var(--ec-e); background: linear-gradient(180deg, rgba(96, 176, 255, .85), rgba(47, 107, 255, .62)); }
+.cs-act-emma_console .ec-mi.ec-was { border-color: rgba(130, 175, 255, .55); }
+.cs-act-emma_console .ec-mi.ec-was::before { opacity: .3; }
+.cs-act-emma_console .ec-mi.ec-on { border-color: rgba(190, 232, 255, .95); transform: translate3d(0, calc(-.15 * var(--cu)), 0) scale(1.08); }
+.cs-act-emma_console .ec-mi.ec-on::before { opacity: 1; }
+.cs-act-emma_console .ec-glyph { position: absolute; left: calc(.78 * var(--cu)); top: calc(.78 * var(--cu)); width: calc(1.9 * var(--cu)); height: calc(1.9 * var(--cu)); fill: none; stroke: rgba(190, 215, 255, .55); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.cs-act-emma_console .ec-mi.ec-on .ec-glyph, .cs-act-emma_console .ec-mi.ec-was .ec-glyph { stroke: #e6f1ff; }
+/* the line before was one of these cues: the console is already up (no second entrance) */
+.cs-act-emma_console.ec-cont .ec-notch, .cs-act-emma_console.ec-cont .ec-ln, .cs-act-emma_console.ec-cont .ec-rail { opacity: 1; transform: none; transition: none; }
+.cs-act-emma_console.ec-cont .ec-mi, .cs-act-emma_console.cs-instant .ec-mi { animation: none; }
+
+/* ---------------------------------------------------------------- headline: a kicker over a phrase
+   One heading at a time, centred under the notch. The words arrive the core's way (they light
+   up left to right) and leave the same way (fx.depart): the heading itself only appears and
+   goes -- no move of its own on the words. */
+.cs-act-emma_console .ec-head { position: absolute; left: 0; right: 0; top: calc(5.4 * var(--cu)); text-align: center; opacity: 0; transition: opacity .25s var(--ec-out) .22s; }
+.cs-act-emma_console .ec-head.ec-on { opacity: 1; transition: none; }
+.cs-act-emma_console .ec-head > .cs-text { display: block; width: fit-content; margin: 0 auto; }
+.cs-act-emma_console .ec-head .cs-type-label { font-size: calc(1.35 * var(--cu)); margin-bottom: calc(.45 * var(--cu)); }
+.cs-act-emma_console .ec-head .cs-type-h2 { font-size: calc(2.8 * var(--cu)); line-height: 1.12; white-space: nowrap; }
+.cs-act-emma_console .ec-head.ec-hello { opacity: 0; }
+.cs-act-emma_console.cs-live .ec-head.ec-hello { opacity: 1; transition: none; }
+.cs-act-emma_console.cs-live .ec-head.ec-hello.ec-out { opacity: 0; transition: opacity .25s var(--ec-out) .22s; }
+.cs-act-emma_console .ec-head.ec-every.ec-out { opacity: 0; transition: opacity .25s var(--ec-out) .22s; }
+
+/* ---------------------------------------------------------------- the backlit name
+   The core's giant word (Inter, its gradient ink and halo) at a moderate size; it arrives the
+   core's way -- this wrapper only places it and lets it step back. */
+.cs-act-emma_console .ec-giantw { position: absolute; left: 0; right: 0; text-align: center; opacity: 0; transition: opacity .3s var(--ec-out); }
+.cs-act-emma_console .ec-giantw.ec-on { opacity: .9; transition: none; }
+.cs-act-emma_console .ec-giantw.ec-intro { top: calc(9.4 * var(--cu)); transform: none; }
+.cs-act-emma_console .ec-giantw.ec-intro .ec-gi { font-size: calc(7.6 * var(--cu)); }
+/* staging: the name steps back and up when the window takes the stage */
+.cs-act-emma_console .ec-giantw.ec-intro.ec-on.ec-dim { opacity: .38; transform: translate3d(0, calc(-2.6 * var(--cu)), 0) scale(.86); transition: opacity .9s var(--ec-e), transform .9s var(--ec-e); }
+.cs-act-emma_console .ec-giantw.ec-on.ec-dim.ec-gone { opacity: 0; transition: opacity .5s var(--ec-out), transform .9s var(--ec-e); }
+.cs-act-emma_console .ec-giantw.ec-caps { top: calc(4.2 * var(--cu)); }
+.cs-act-emma_console .ec-giantw.ec-caps .ec-gi { font-size: calc(5.4 * var(--cu)); }
+
+/* ---------------------------------------------------------------- panels: shared pieces */
+.cs-act-emma_console .ec-pane { position: absolute; left: 0; top: 0; width: 100%; height: 100%; --r: calc(1.3 * var(--cu)); }
+.cs-act-emma_console .ec-pix { position: absolute; overflow: hidden; border-radius: calc(.85 * var(--cu)); border: 1px solid rgba(150, 190, 255, .5); background: #02040c; }
+.cs-act-emma_console .ec-pix::after { content: ""; position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; background: linear-gradient(180deg, rgba(130, 180, 255, .18), rgba(130, 180, 255, 0) 22%); }
+.cs-act-emma_console .ec-pix.ec-full { left: 0; top: 0; width: 100%; height: 100%; border: 0; background: none; border-radius: 0; }
+.cs-act-emma_console .ec-pix.ec-mdl { background: none; }
+.cs-act-emma_console .ec-pix.ec-mdl .cs-aimg { object-fit: contain; }
+/* a pill: its words lit inside it, padded all round */
+.cs-act-emma_console .ec-pill, .cs-act-emma_console .cs-sat.ec-pill {
+  position: absolute; display: block; white-space: nowrap; padding: calc(.7 * var(--cu)) calc(1.8 * var(--cu)) calc(.78 * var(--cu)); border-radius: calc(1.6 * var(--cu)); --r: calc(1.6 * var(--cu)); --g: calc(.8 * var(--cu));
+  border: 1px solid rgba(160, 214, 255, .9); background: linear-gradient(180deg, rgba(46, 72, 214, .55), rgba(10, 18, 64, .78));
+}
+.cs-act-emma_console .ec-pill .cs-text, .cs-act-emma_console .cs-sat .cs-text { font-size: calc(2 * var(--cu)); font-weight: 520; }
+.cs-act-emma_console .ec-pill .ec-acc { --cs-type-mid: #bff3ff; --cs-type-end: #8fdcff; }
+.cs-act-emma_console .ec-pill .ec-dot { display: inline-block; width: calc(.3 * var(--cu)); height: calc(.3 * var(--cu)); margin: 0 calc(.8 * var(--cu)) calc(.2 * var(--cu)); border-radius: 50%; background: rgb(var(--cs-cyan)); vertical-align: middle; }
+/* a pill rises into place (the act's one entrance direction for a frame round words) */
+.cs-act-emma_console .cs-sat.ec-tag2p, .cs-act-emma_console .cs-sat.ec-wtag { opacity: 0; transform: translate3d(0, calc(1 * var(--cu)), 0); transition: opacity .25s var(--ec-out), transform .3s var(--ec-out); }
+.cs-act-emma_console .cs-sat.ec-tag2p.ec-in, .cs-act-emma_console .cs-sat.ec-wtag.ec-in { opacity: 1; transform: none; transition: opacity .3s var(--ec-e), transform .5s var(--ec-in); }
+
+/* ---------------------------------------------------------------- small cards
+   (owner 18 Nov, a crop of s02_l05: "The sales team / look after customers more easily" -- the
+   second line, in wide letters, ran to the card's right edge.) A card is as wide as its words,
+   padded all round (the status light keeps its own corner), at most --cw wide: a long line
+   wraps inside the padding instead of reaching the edge. */
+.cs-act-emma_console .ec-card {
+  position: absolute; display: block; box-sizing: border-box; width: max-content; max-width: calc(var(--cw, 26) * var(--cu));
+  padding: calc(1.3 * var(--cu)) calc(3.4 * var(--cu)) calc(1.4 * var(--cu)) calc(1.7 * var(--cu)); --r: calc(1.2 * var(--cu)); --g: calc(1 * var(--cu));
+  background: linear-gradient(160deg, rgba(20, 40, 128, .9), rgba(6, 12, 48, .95));
+}
+.cs-act-emma_console .ec-card > .ec-orb.ec-mini { right: calc(1.2 * var(--cu)); top: calc(1.4 * var(--cu)); }
+.cs-act-emma_console .ec-cbody > .cs-text { display: block; }
+.cs-act-emma_console .ec-card .ec-clead { font-size: calc(1.9 * var(--cu)); margin-bottom: calc(.35 * var(--cu)); }
+.cs-act-emma_console .ec-card .ec-cmain { font-size: calc(2.3 * var(--cu)); font-weight: 560; line-height: 1.2; letter-spacing: -.01em; }
+.cs-act-emma_console .ec-card .ec-csub { font-size: calc(1.9 * var(--cu)); margin-top: calc(.55 * var(--cu)); line-height: 1.35; }
+
+/* satellite pictures: each slides OUT from behind the panel it belongs to (the panel is their
+   origin), turning to face us; leaving, it tucks back in, quicker */
+.cs-act-emma_console .cs-sat.ec-satp { position: absolute; display: block; padding: calc(.42 * var(--cu)); --r: calc(1.1 * var(--cu)); --g: calc(1 * var(--cu)); opacity: 0; transition: opacity .3s var(--ec-out), transform .5s var(--ec-out); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-in { opacity: 1; transition: opacity .5s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console .cs-sat.ec-satp .ec-pix { left: calc(.42 * var(--cu)); top: calc(.42 * var(--cu)); right: calc(.42 * var(--cu)); bottom: calc(.42 * var(--cu)); border-radius: calc(.75 * var(--cu)); }
+/* (right of its panel: tucked to the left; left of its panel: tucked to the right) */
+.cs-act-emma_console .cs-sat.ec-satp.ec-r, .cs-act-emma_console .cs-sat.ec-satp.ec-r3r { transform: perspective(var(--ec-p)) translate3d(calc(-6 * var(--cu)), 0, calc(-6 * var(--cu))) rotateY(-30deg) scale(.94); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-l, .cs-act-emma_console .cs-sat.ec-satp.ec-r3l, .cs-act-emma_console .cs-sat.ec-satp.ec-wz { transform: perspective(var(--ec-p)) translate3d(calc(6 * var(--cu)), 0, calc(-6 * var(--cu))) rotateY(30deg) scale(.94); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-r.ec-in, .cs-act-emma_console .cs-sat.ec-satp.ec-r3r.ec-in { transform: perspective(var(--ec-p)) translate3d(0, 0, calc(2 * var(--cu))) rotateY(-14deg); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-l.ec-in, .cs-act-emma_console .cs-sat.ec-satp.ec-r3l.ec-in, .cs-act-emma_console .cs-sat.ec-satp.ec-wz.ec-in { transform: perspective(var(--ec-p)) translate3d(0, 0, calc(2 * var(--cu))) rotateY(14deg); }
+
+/* ---------------------------------------------------------------- station states (caps)
+   enters: rises from below and tilts up onto its plane (--ec-in, after her menu glyph lit);
+   steps aside: winds up the other way, arcs up and away to the left (--ec-e, lift);
+   leaves: accelerates out (--ec-out, shorter); the row: each in turn, left to right */
+.cs-act-emma_console .ec-world { position: absolute; left: 0; top: 0; width: 100%; height: 100%; perspective: calc(120 * var(--cu)); perspective-origin: 50% 38%; transition: opacity .9s var(--ec-e), transform .9s var(--ec-e); }
+.cs-act-emma_console .ec-st {
+  position: absolute; left: calc(20 * var(--cu)); top: calc(13.5 * var(--cu)); width: calc(60 * var(--cu)); height: calc(28.6 * var(--cu));
+  transition: transform .9s var(--ec-e) .12s, opacity .5s var(--ec-e) .12s;
+}
+.cs-act-emma_console .ec-stb { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+/* (fix round 19 Nov) the hero -- the station she is on -- stands under the tray, a little
+   smaller than the stage; when she names the next thing it glides up into its own slot of the
+   tray (t1-t4: the x of the row she ends on, a little higher and smaller), on an arc, and the
+   next one rises into the middle a beat after it has left */
+.cs-act-emma_console .ec-st.ec-s-below { opacity: 0; transform: translate3d(0, calc(9.4 * var(--cu)), calc(-12 * var(--cu))) rotateX(16deg) scale(.78); }
+.cs-act-emma_console .ec-st.ec-s-focus { opacity: 1; transform: translate3d(0, calc(3.4 * var(--cu)), 0) rotateX(3deg) scale(.78); transition: transform .9s var(--ec-in) .34s, opacity .5s var(--ec-e) .34s; }
+.cs-act-emma_console .ec-st.ec-first.ec-s-focus { transition-delay: .06s, .06s; }
+.cs-act-emma_console .ec-st.ec-t1 { opacity: 1; --ec-glow: .55; transform: translate3d(calc(-33.9 * var(--cu)), calc(-12.5 * var(--cu)), 0) rotateY(13deg) scale(.26); }
+.cs-act-emma_console .ec-st.ec-t2 { opacity: 1; --ec-glow: .55; transform: translate3d(calc(-12.4 * var(--cu)), calc(-12.5 * var(--cu)), 0) rotateY(7deg) scale(.26); }
+.cs-act-emma_console .ec-st.ec-t3 { opacity: 1; --ec-glow: .55; transform: translate3d(calc(12.2 * var(--cu)), calc(-12.5 * var(--cu)), 0) rotateY(-7deg) scale(.26); }
+.cs-act-emma_console .ec-st.ec-t4 { opacity: 1; --ec-glow: .55; transform: translate3d(calc(33.75 * var(--cu)), calc(-12.5 * var(--cu)), 0) rotateY(-13deg) scale(.26); }
+.cs-act-emma_console .ec-st.ec-t1, .cs-act-emma_console .ec-st.ec-t2, .cs-act-emma_console .ec-st.ec-t3, .cs-act-emma_console .ec-st.ec-t4 { transition: transform 1.05s var(--ec-e) .08s, opacity .5s var(--ec-e) .08s; }
+.cs-act-emma_console .ec-st.ec-t1 > .ec-stb, .cs-act-emma_console .ec-st.ec-t2 > .ec-stb, .cs-act-emma_console .ec-st.ec-t3 > .ec-stb, .cs-act-emma_console .ec-st.ec-t4 > .ec-stb { --ly: -2.4; --lz: 5; }
+/* small (in the tray or the row): its own little words and satellites tuck away -- specks there */
+.cs-act-emma_console .ec-st.ec-small .cs-sat.ec-satp, .cs-act-emma_console .ec-st.ec-small .ec-call, .cs-act-emma_console .ec-st.ec-small .cs-sat.ec-tag2p, .cs-act-emma_console .ec-st.ec-small .ec-br,
+.cs-act-emma_console .ec-st.ec-small .ec-wbar, .cs-act-emma_console .ec-st.ec-small .ec-lyplane { opacity: 0; transition: opacity .3s var(--ec-out); }
+.cs-act-emma_console .ec-st.ec-s-side { opacity: .42; --ec-glow: .4; transform: translate3d(calc(-50 * var(--cu)), calc(1 * var(--cu)), calc(-26 * var(--cu))) rotateY(52deg) scale(.72); }
+.cs-act-emma_console .ec-st.ec-s-side > .ec-stb { --ax: 1.6; --as: .985; --ly: -2.8; --lz: -6; }
+.cs-act-emma_console .ec-st.ec-s-gone { opacity: 0; transform: translate3d(calc(-64 * var(--cu)), 0, calc(-40 * var(--cu))) rotateY(70deg) scale(.5); transition: transform .6s var(--ec-out), opacity .4s var(--ec-out); }
+.cs-act-emma_console .ec-st.ec-s-focus.ec-f-left { transform: translate3d(calc(-10 * var(--cu)), calc(3.4 * var(--cu)), 0) rotateX(3deg) scale(.76); transition: transform .9s var(--ec-e), opacity .5s var(--ec-e); }
+.cs-act-emma_console .ec-st.ec-a1 { opacity: 1; transform: translate3d(calc(-33.9 * var(--cu)), calc(-6.4 * var(--cu)), 0) rotateY(13deg) scale(.335); }
+.cs-act-emma_console .ec-st.ec-a2 { opacity: 1; transform: translate3d(calc(-12.4 * var(--cu)), calc(-6.4 * var(--cu)), 0) rotateY(7deg) scale(.335); }
+.cs-act-emma_console .ec-st.ec-a3 { opacity: 1; transform: translate3d(calc(12.2 * var(--cu)), calc(-6.4 * var(--cu)), 0) rotateY(-7deg) scale(.335); }
+.cs-act-emma_console .ec-st.ec-a4 { opacity: 1; transform: translate3d(calc(33.75 * var(--cu)), calc(-6.4 * var(--cu)), 0) rotateY(-13deg) scale(.335); }
+.cs-act-emma_console .ec-st.ec-a1, .cs-act-emma_console .ec-st.ec-a1 > .ec-stb { transition-delay: .15s; animation-delay: .15s; }
+.cs-act-emma_console .ec-st.ec-a2, .cs-act-emma_console .ec-st.ec-a2 > .ec-stb { transition-delay: .23s; animation-delay: .23s; }
+.cs-act-emma_console .ec-st.ec-a3, .cs-act-emma_console .ec-st.ec-a3 > .ec-stb { transition-delay: .31s; animation-delay: .31s; }
+.cs-act-emma_console .ec-st.ec-a4, .cs-act-emma_console .ec-st.ec-a4 > .ec-stb { transition-delay: .39s; animation-delay: .39s; }
+.cs-act-emma_console .ec-st.ec-a1 > .ec-stb, .cs-act-emma_console .ec-st.ec-a2 > .ec-stb, .cs-act-emma_console .ec-st.ec-a3 > .ec-stb, .cs-act-emma_console .ec-st.ec-a4 > .ec-stb { --ly: -3; --lz: 4; }
+.cs-act-emma_console .ec-world.ec-arcmode .cs-sat.ec-satp, .cs-act-emma_console .ec-world.ec-arcmode .ec-call, .cs-act-emma_console .ec-world.ec-arcmode .cs-sat.ec-tag2p, .cs-act-emma_console .ec-world.ec-arcmode .ec-br, .cs-act-emma_console .ec-world.ec-arcmode .ec-wbar { opacity: 0; transition: opacity .3s var(--ec-out); }
+/* her prompt bar is the hero now: the row steps back under it */
+.cs-act-emma_console .ec-world.ec-under { opacity: .6; transform: translate3d(0, calc(-.5 * var(--cu)), 0) scale(.985); }
+
+/* station 1: her window with the project in it */
+.cs-act-emma_console .ec-wbar { position: absolute; left: 0; top: 0; right: 0; height: calc(3.7 * var(--cu)); }
+.cs-act-emma_console .ec-wbar .ec-wn { position: absolute; left: calc(3.4 * var(--cu)); top: calc(.7 * var(--cu)); font-size: calc(2 * var(--cu)); font-weight: 520; color: #eaf3ff; }
+.cs-act-emma_console .ec-wpill { position: absolute; left: calc(11 * var(--cu)); top: calc(1 * var(--cu)); width: calc(17 * var(--cu)); height: calc(1.8 * var(--cu)); border-radius: calc(1 * var(--cu)); background: rgba(6, 10, 50, .6); border: 1px solid rgba(130, 175, 255, .25); }
+.cs-act-emma_console .ec-wdots { position: absolute; right: calc(1.6 * var(--cu)); top: calc(1 * var(--cu)); width: calc(7 * var(--cu)); height: calc(1.8 * var(--cu)); background: radial-gradient(circle at 10% 50%, rgba(10, 20, 80, .9) 0 calc(.85 * var(--cu)), rgba(0, 0, 0, 0) calc(.9 * var(--cu))), radial-gradient(circle at 50% 50%, rgba(10, 20, 80, .9) 0 calc(.85 * var(--cu)), rgba(0, 0, 0, 0) calc(.9 * var(--cu))), radial-gradient(circle at 90% 50%, rgba(10, 20, 80, .9) 0 calc(.85 * var(--cu)), rgba(0, 0, 0, 0) calc(.9 * var(--cu))); }
+.cs-act-emma_console .ec-wview { left: calc(.6 * var(--cu)); top: calc(3.9 * var(--cu)); right: calc(.6 * var(--cu)); bottom: calc(.6 * var(--cu)); border-radius: calc(.6 * var(--cu)); }
+/* the window's picture as a plain picture (over the held photo): a slow drift by transform keeps it alive */
+.cs-act-emma_console .ec-wvdrift { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 50% 50%; animation: emma_console-wvdrift 12s var(--ec-sine) -4s infinite alternate; }
+@keyframes emma_console-wvdrift { from { transform: translate3d(-.6%, 0, 0) scale(1.04); } to { transform: translate3d(.6%, -.4%, 0) scale(1.08); } }
+.cs-act-emma_console .cs-sat.ec-satp.ec-r { left: calc(53.5 * var(--cu)); top: calc(11.5 * var(--cu)); width: calc(19.5 * var(--cu)); height: calc(12.8 * var(--cu)); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-l { left: calc(-9.4 * var(--cu)); top: calc(17.4 * var(--cu)); width: calc(18.6 * var(--cu)); height: calc(10.4 * var(--cu)); }
+/* the window's slow push while she talks about the project (a camera, eased both ends) */
+.cs-act-emma_console.ec-z1 .ec-st1 .ec-pane { animation: emma_console-push 14s var(--ec-e) 1 forwards; }
+@keyframes emma_console-push { from { transform: scale(1); } to { transform: scale(1.04); } }
+
+/* station 2: the unit types, a fan of three models; each move of the shuffle arcs (the card
+   coming to the front rises toward us, the ones going back dip away) */
+.cs-act-emma_console .ec-rack { background: linear-gradient(180deg, rgba(20, 40, 128, .3), rgba(6, 12, 48, .55)); border-color: rgba(130, 175, 255, .5); }
+.cs-act-emma_console .ec-cdo {
+  position: absolute; left: calc(19 * var(--cu)); top: calc(3.2 * var(--cu)); width: calc(22 * var(--cu)); height: calc(19 * var(--cu));
+  transition: transform .7s var(--ec-e), opacity .5s var(--ec-e);
+}
+.cs-act-emma_console .ec-cd {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: calc(1.5 * var(--cu)); border: 1px solid rgba(130, 175, 255, .55);
+  background: radial-gradient(ellipse 70% 60% at 50% 55%, #0a1238 0, #03050f 100%);
+}
+.cs-act-emma_console .ec-cd.ec-lift.ec-p0, .cs-act-emma_console .ec-cd.ec-lift.ec-p1 { animation-duration: .7s; }
+.cs-act-emma_console .ec-cd .ec-pix { left: calc(.8 * var(--cu)); top: calc(.6 * var(--cu)); right: calc(.8 * var(--cu)); bottom: calc(.6 * var(--cu)); border: 0; background: none; }
+.cs-act-emma_console .ec-cdo.ec-pc { transform: translate3d(0, 0, calc(6 * var(--cu))) scale(1.06); z-index: 3; }
+.cs-act-emma_console .ec-cdo.ec-pc > .ec-cd { border-color: rgba(200, 236, 255, .98); --ly: -1.4; --lz: 4; }
+.cs-act-emma_console .ec-cdo.ec-pl { transform: translate3d(calc(-19 * var(--cu)), 0, calc(-9 * var(--cu))) rotateY(30deg) scale(.86); z-index: 1; opacity: .8; }
+.cs-act-emma_console .ec-cdo.ec-pr { transform: translate3d(calc(19 * var(--cu)), 0, calc(-9 * var(--cu))) rotateY(-30deg) scale(.86); z-index: 1; opacity: .8; }
+.cs-act-emma_console .ec-cdo.ec-pl > .ec-cd, .cs-act-emma_console .ec-cdo.ec-pr > .ec-cd { --ly: 1; --lz: -4; }
+/* the brackets close on the front card, clockwise, 60 ms apart */
+.cs-act-emma_console .ec-br { position: absolute; width: calc(2.3 * var(--cu)); height: calc(2.3 * var(--cu)); border: calc(.16 * var(--cu)) solid rgb(var(--cs-cyan)); opacity: 0; transition: opacity .3s var(--ec-out), transform .3s var(--ec-out); z-index: 5; }
+.cs-act-emma_console .ec-br.ec-btl { left: calc(17.2 * var(--cu)); top: calc(1.9 * var(--cu)); border-right: 0; border-bottom: 0; border-radius: calc(.8 * var(--cu)) 0 0 0; transform: translate3d(calc(-2 * var(--cu)), calc(-2 * var(--cu)), calc(8 * var(--cu))); }
+.cs-act-emma_console .ec-br.ec-btr { left: calc(40.6 * var(--cu)); top: calc(1.9 * var(--cu)); border-left: 0; border-bottom: 0; border-radius: 0 calc(.8 * var(--cu)) 0 0; transform: translate3d(calc(2 * var(--cu)), calc(-2 * var(--cu)), calc(8 * var(--cu))); }
+.cs-act-emma_console .ec-br.ec-bbl { left: calc(17.2 * var(--cu)); top: calc(21 * var(--cu)); border-right: 0; border-top: 0; border-radius: 0 0 0 calc(.8 * var(--cu)); transform: translate3d(calc(-2 * var(--cu)), calc(2 * var(--cu)), calc(8 * var(--cu))); }
+.cs-act-emma_console .ec-br.ec-bbr { left: calc(40.6 * var(--cu)); top: calc(21 * var(--cu)); border-left: 0; border-top: 0; border-radius: 0 0 calc(.8 * var(--cu)) 0; transform: translate3d(calc(2 * var(--cu)), calc(2 * var(--cu)), calc(8 * var(--cu))); }
+.cs-act-emma_console .ec-br.ec-in { opacity: 1; transform: translate3d(0, 0, calc(8 * var(--cu))); transition: opacity .3s var(--ec-e), transform .5s var(--ec-in); transition-delay: calc(var(--i, 0) * 60ms); }
+.cs-act-emma_console .cs-sat.ec-tag2p { left: calc(13 * var(--cu)); top: calc(24.6 * var(--cu)); width: calc(34 * var(--cu)); box-sizing: border-box; text-align: center; }
+
+/* station 3: floor plans and visualisations on a lit table */
+.cs-act-emma_console .ec-table { background: linear-gradient(180deg, rgba(20, 44, 150, .5), rgba(6, 14, 70, .62)); border-color: rgba(130, 180, 255, .55); }
+.cs-act-emma_console .ec-tgrid { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: calc(1.3 * var(--cu)); background-image: repeating-linear-gradient(90deg, rgba(120, 170, 255, .16) 0 1px, rgba(0, 0, 0, 0) 1px calc(3.2 * var(--cu))), repeating-linear-gradient(0deg, rgba(120, 170, 255, .16) 0 1px, rgba(0, 0, 0, 0) 1px calc(3.2 * var(--cu))); }
+.cs-act-emma_console .ec-mlayer { position: absolute; left: calc(14.3 * var(--cu)); top: calc(1.7 * var(--cu)); width: calc(31.4 * var(--cu)); height: calc(25.1 * var(--cu)); }
+.cs-act-emma_console .ec-planeplan { transform-origin: 0 0; }
+.cs-act-emma_console .ec-plbox { position: relative; width: calc(30 * var(--cu)); height: calc(23.55 * var(--cu)); overflow: hidden; }
+.cs-act-emma_console .ec-plimg { position: absolute; left: calc(-.79 * var(--cu)); top: calc(-.96 * var(--cu)); width: calc(34.44 * var(--cu)); height: calc(24.5 * var(--cu)); }
+.cs-act-emma_console .ec-plimg .cs-apic { filter: none; }
+.cs-act-emma_console .ec-plimg .cs-aimg { opacity: .95; }
+.cs-act-emma_console .ec-wipein { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_console .cs-sat.ec-satp.ec-r3l { left: calc(-9.5 * var(--cu)); top: calc(5.8 * var(--cu)); width: calc(17 * var(--cu)); height: calc(12.6 * var(--cu)); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-r3r { left: calc(53 * var(--cu)); top: calc(10.4 * var(--cu)); width: calc(18.4 * var(--cu)); height: calc(12 * var(--cu)); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-r3l .ec-pix { background: linear-gradient(180deg, #1a3ca8, #0c2073); }
+.cs-act-emma_console .cs-sat.ec-satp .ec-pix.ec-flat .cs-aimg { opacity: .9; }
+.cs-act-emma_console .ec-lyplane { z-index: 4; }
+.cs-act-emma_console .ec-lyt { font-size: calc(2.45 * var(--cu)); white-space: nowrap; color: #eaf4ff; }
+/* the call-out: the word lights up in place, then its rule draws out of it */
+.cs-act-emma_console .ec-call { position: absolute; left: calc(45.2 * var(--cu)); top: calc(4.3 * var(--cu)); width: calc(19 * var(--cu)); height: calc(5 * var(--cu)); opacity: 0; transform: translate3d(0, 0, calc(6 * var(--cu))); transition: opacity .25s var(--ec-out); }
+.cs-act-emma_console .ec-call.ec-in { opacity: 1; transition: none; }
+.cs-act-emma_console .ec-callt { font-size: calc(2.6 * var(--cu)); white-space: nowrap; }
+.cs-act-emma_console .ec-cline { position: absolute; left: 0; top: calc(3.2 * var(--cu)); width: calc(15 * var(--cu)); height: calc(.12 * var(--cu)); background: linear-gradient(90deg, rgba(110, 231, 255, 0), #bfeaff); transform-origin: 0 50%; transform: scale(0, 1); transition: transform .5s var(--ec-in) .25s; }
+.cs-act-emma_console .ec-call.ec-in .ec-cline { transform: none; }
+
+/* station 4 + the quotation document: bars of light, no numbers */
+.cs-act-emma_console .ec-dc { --r: calc(1.2 * var(--cu)); display: block; position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding: calc(1.6 * var(--cu)) calc(1.5 * var(--cu)) calc(1.4 * var(--cu));
+  background: linear-gradient(180deg, rgba(40, 66, 200, .42), rgba(16, 30, 96, .55) 40%, rgba(8, 14, 56, .68)); }
+.cs-act-emma_console .ec-dc-h { position: relative; display: flex; align-items: center; height: calc(5 * var(--cu)); margin-bottom: calc(1.3 * var(--cu)); }
+.cs-act-emma_console .ec-dc-h > .ec-orb.ec-mini { position: relative; flex: 0 0 auto; }
+.cs-act-emma_console .ec-dc-t { font-size: calc(2 * var(--cu)); margin-left: calc(.8 * var(--cu)); white-space: nowrap; }
+.cs-act-emma_console .ec-dc-thumb { position: absolute; right: 0; top: calc(-.4 * var(--cu)); width: calc(5.8 * var(--cu)); height: calc(4.8 * var(--cu)); border-radius: calc(.7 * var(--cu)); overflow: hidden; border: 1px solid rgba(150, 190, 255, .55); background: radial-gradient(ellipse 80% 70% at 50% 55%, #0a1340, #03050f); }
+.cs-act-emma_console .ec-dc-thumb .ec-glyph { left: calc(1.6 * var(--cu)); top: calc(1.4 * var(--cu)); width: calc(2.6 * var(--cu)); height: calc(2 * var(--cu)); }
+.cs-act-emma_console .ec-dc-sub { position: absolute; left: calc(2.2 * var(--cu)); bottom: calc(-.3 * var(--cu)); width: calc(11 * var(--cu)); height: calc(.5 * var(--cu)); border-radius: calc(.3 * var(--cu)); background: rgba(150, 190, 255, .28); transform-origin: 0 50%; }
+.cs-act-emma_console .ec-dc-rows { position: absolute; left: calc(1.5 * var(--cu)); right: calc(1.5 * var(--cu)); top: calc(7.9 * var(--cu)); bottom: calc(1.5 * var(--cu)); display: flex; flex-direction: column; justify-content: space-between; }
+.cs-act-emma_console .ec-rw { position: relative; flex: 1 1 0; margin-bottom: calc(.6 * var(--cu)); border-radius: calc(.5 * var(--cu)); border: 1px solid rgba(130, 175, 255, .22); background: rgba(14, 26, 90, .45); transition: opacity .5s var(--ec-e); }
+.cs-act-emma_console .ec-rw:last-of-type { margin-bottom: 0; }
+/* a row's two bars grow out from their edges, 60 ms after the row above */
+.cs-act-emma_console .ec-lb, .cs-act-emma_console .ec-vb { position: absolute; top: 50%; height: calc(.7 * var(--cu)); margin-top: calc(-.35 * var(--cu)); border-radius: calc(.4 * var(--cu)); transform-origin: 0 50%; transform: scale(1, 1); opacity: 1; transition: transform .5s var(--ec-in), opacity .3s var(--ec-e); transition-delay: calc(var(--i, 0) * 60ms); }
+.cs-act-emma_console .ec-lb { left: calc(1 * var(--cu)); width: 24%; background: linear-gradient(90deg, #cfe3ff, #9bbdff); }
+.cs-act-emma_console .ec-vb { right: calc(1 * var(--cu)); width: 42%; background: linear-gradient(90deg, #5fb7ff, #8ee2ff); transform-origin: 100% 50%; transition-delay: calc(var(--i, 0) * 60ms + 80ms); }
+.cs-act-emma_console .ec-rw.ec-todo { border-style: dashed; border-color: rgba(150, 195, 255, .5); background: rgba(14, 26, 90, .2); }
+.cs-act-emma_console .ec-rw.ec-todo .ec-lb, .cs-act-emma_console .ec-rw.ec-todo .ec-vb { transform: scale(0, 1); opacity: 0; }
+.cs-act-emma_console .ec-rw.ec-blank .ec-lb, .cs-act-emma_console .ec-rw.ec-blank .ec-vb { transform: scale(0, 1); opacity: 0; }
+.cs-act-emma_console .ec-rw.ec-now { border-color: rgba(200, 236, 255, .95); background: linear-gradient(180deg, rgba(120, 180, 255, .35), rgba(60, 110, 220, .22)); }
+.cs-act-emma_console .ec-rw.ec-now .ec-lb { transform: scale(1, 1); opacity: 1; }
+.cs-act-emma_console .ec-rw.ec-now .ec-vb { transform: scale(.16, 1); opacity: .7; background: rgba(150, 200, 255, .5); }
+/* (the row she is on breathes while she works on it: its value bar inches out and back) */
+.cs-act-emma_console .ec-dc.ec-busy .ec-rw.ec-now .ec-vb { animation: emma_console-inch 1.6s var(--ec-sine) infinite alternate; }
+@keyframes emma_console-inch { from { transform: scale(.12, 1); opacity: .55; } to { transform: scale(.34, 1); opacity: .85; } }
+.cs-act-emma_console .ec-scan { position: absolute; left: calc(-.5 * var(--cu)); right: calc(-.5 * var(--cu)); top: 0; height: 12.5%; opacity: 0; transform: translate3d(0, calc(var(--scan, 0) * 100%), 0); transition: transform .5s var(--ec-e), opacity .3s var(--ec-e); pointer-events: none; }
+.cs-act-emma_console .ec-scan::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: calc(.16 * var(--cu)); background: linear-gradient(90deg, rgba(110, 231, 255, 0), #bfeaff 20%, #ffffff 50%, #bfeaff 80%, rgba(110, 231, 255, 0)); }
+.cs-act-emma_console .ec-dc.ec-holding .ec-scan { opacity: 1; animation: emma_console-scan 3.4s var(--ec-sine) infinite alternate; }
+.cs-act-emma_console .ec-dc.ec-busy .ec-scan { opacity: 1; }
+@keyframes emma_console-scan { from { transform: translate3d(0, calc(var(--scan, 0) * 100%), 0); } to { transform: translate3d(0, calc(var(--scan, 0) * 100% + 24%), 0); } }
+.cs-act-emma_console .ec-dc.ec-ready .ec-scan, .cs-act-emma_console .ec-dc.ec-full .ec-scan, .cs-act-emma_console .ec-dc.ec-sample .ec-scan { opacity: 0; animation: none; }
+.cs-act-emma_console .ec-cdoc { left: calc(22 * var(--cu)); top: calc(1.7 * var(--cu)); width: calc(16 * var(--cu)); height: calc(25 * var(--cu)); }
+.cs-act-emma_console .ec-cdoc .ec-dc-rows { top: calc(6.8 * var(--cu)); }
+.cs-act-emma_console .ec-cdoc .ec-dc-h { height: calc(3.6 * var(--cu)); }
+.cs-act-emma_console .ec-cdoc .ec-dc-thumb { display: none; }
+.cs-act-emma_console .ec-cdoc .ec-ring, .cs-act-emma_console .ec-cdoc .ec-scan { display: none; }
+/* "Certainly": one sheen crosses the document (secondary: it is her answer, not a new thing) */
+.cs-act-emma_console .ec-dc::after { content: ""; position: absolute; left: 0; top: calc(.6 * var(--cu)); bottom: calc(.6 * var(--cu)); width: 22%; pointer-events: none; opacity: 0; background: linear-gradient(100deg, rgba(190, 232, 255, 0), rgba(190, 232, 255, .32) 50%, rgba(190, 232, 255, 0)); }
+.cs-act-emma_console .ec-dc.ec-halo::after { animation: emma_console-sheen .9s var(--ec-e) 1; }
+@keyframes emma_console-sheen { 0% { opacity: 0; transform: translate3d(0, 0, 0); } 30% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: translate3d(354%, 0, 0); } }
+
+/* the ring on the document's corner: turning while she works, a full circle with a tick when done
+   (the tick draws after the document has landed: follow-through) */
+.cs-act-emma_console .ec-ring { position: absolute; right: calc(-5.2 * var(--cu)); top: calc(-3.4 * var(--cu)); width: calc(4.6 * var(--cu)); height: calc(4.6 * var(--cu)); opacity: 0; transform: scale(.7); transition: opacity .3s var(--ec-e), transform .5s var(--ec-in); }
+.cs-act-emma_console .ec-dc.ec-busy .ec-ring, .cs-act-emma_console .ec-dc.ec-ready .ec-ring { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-spin { position: absolute; left: 0; top: 0; width: 100%; height: 100%; animation: emma_console-turn 1.8s linear infinite; }
+.cs-act-emma_console .ec-dc.ec-ready .ec-spin { animation: none; }
+@keyframes emma_console-turn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.cs-act-emma_console .ec-rsv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+.cs-act-emma_console .ec-rtrack { fill: none; stroke: rgba(130, 175, 255, .2); stroke-width: 2.4; }
+.cs-act-emma_console .ec-rarc { fill: none; stroke: rgb(var(--cs-cyan)); stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 24 77; transition: opacity .3s var(--ec-out); }
+.cs-act-emma_console .ec-rfull { fill: none; stroke: rgb(var(--cs-cyan)); stroke-width: 2.6; opacity: 0; transition: opacity .5s var(--ec-e) .45s; }
+.cs-act-emma_console .ec-rtick { fill: none; stroke: #ffffff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .5s var(--ec-in) .7s; }
+.cs-act-emma_console .ec-dc.ec-ready .ec-rfull { opacity: 1; }
+.cs-act-emma_console .ec-dc.ec-ready .ec-rarc { opacity: 0; }
+.cs-act-emma_console .ec-dc.ec-ready .ec-rtick { stroke-dashoffset: 0; }
+.cs-act-emma_console .ec-dc.ec-sample .ec-dc-sub { background: rgba(110, 231, 255, .5); }
+
+/* ---------------------------------------------------------------- captions, prompt bar (caps end) */
+.cs-act-emma_console .ec-cap { position: absolute; text-align: center; opacity: 0; transform: translate3d(0, calc(1 * var(--cu)), 0); transition: opacity .5s var(--ec-e), transform .5s var(--ec-in); transition-delay: calc(.55s + var(--i, 0) * 80ms); }
+.cs-act-emma_console .ec-cap.ec-on { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-cap > .cs-text { display: block; }
+.cs-act-emma_console .ec-cap .cs-type-label { font-size: calc(1.15 * var(--cu)); }
+.cs-act-emma_console .ec-cap .ec-cap-t { font-size: calc(1.95 * var(--cu)); font-weight: 560; line-height: 1.2; white-space: normal; }
+.cs-act-emma_console .ec-pbar { position: absolute; left: calc(23.3 * var(--cu)); top: calc(35.2 * var(--cu)); width: calc(53.4 * var(--cu)); height: calc(5.9 * var(--cu)); --r: calc(3 * var(--cu)); --g: calc(1.2 * var(--cu)); opacity: 0; transform: translate3d(0, calc(2 * var(--cu)), 0); transition: opacity .5s var(--ec-e), transform .9s var(--ec-in);
+  border-color: rgba(170, 215, 255, .95); background: linear-gradient(180deg, rgba(52, 84, 230, .5), rgba(22, 40, 120, .52) 46%, rgba(10, 18, 70, .66)); }
+.cs-act-emma_console .ec-pbar.ec-on { opacity: 1; transform: none; }
+/* her voice button: four level bars that breathe while the bar is up */
+.cs-act-emma_console .ec-bo { position: absolute; left: calc(1.2 * var(--cu)); top: calc(1.05 * var(--cu)); width: calc(3.6 * var(--cu)); height: calc(3.6 * var(--cu)); border-radius: 50%; border: 1px solid rgba(190, 232, 255, .85); background: linear-gradient(180deg, rgba(96, 176, 255, .55), rgba(30, 60, 190, .55)); opacity: 0; transform: scale(.6); transition: opacity .3s var(--ec-e) .3s, transform .5s var(--ec-in) .3s; }
+.cs-act-emma_console .ec-pbar.ec-on .ec-bo { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-wv { position: absolute; top: 30%; height: 40%; width: 8%; border-radius: calc(.2 * var(--cu)); background: #f2f8ff; left: calc(29% + var(--i, 0) * 12.5%); transform: scale(1, .45); }
+.cs-act-emma_console .ec-pbar.ec-on .ec-wv { animation: emma_console-level 1.1s var(--ec-sine) infinite alternate; animation-delay: calc(var(--i, 0) * -.37s); }
+@keyframes emma_console-level { from { transform: scale(1, .35); } to { transform: scale(1, 1); } }
+.cs-act-emma_console .ec-pw { position: absolute; left: calc(6.4 * var(--cu)); top: 0; right: calc(6 * var(--cu)); height: 100%; display: flex; align-items: center; opacity: 0; transform: translate3d(0, calc(.6 * var(--cu)), 0); transition: opacity .3s var(--ec-out), transform .3s var(--ec-out); }
+.cs-act-emma_console .ec-pw.ec-on { opacity: 1; transform: none; transition: opacity .5s var(--ec-e) .15s, transform .5s var(--ec-in) .15s; }
+.cs-act-emma_console .ec-pw.ec-gone { transform: translate3d(0, calc(-.8 * var(--cu)), 0); }
+.cs-act-emma_console .ec-pt { font-size: calc(2.15 * var(--cu)); font-weight: 520; white-space: nowrap; }
+.cs-act-emma_console .ec-go { position: absolute; right: calc(1.3 * var(--cu)); top: calc(1.4 * var(--cu)); width: calc(3.1 * var(--cu)); height: calc(3.1 * var(--cu)); border-radius: 50%; border: 1px solid rgba(170, 215, 255, .8); background: linear-gradient(180deg, rgba(96, 176, 255, .75), rgba(47, 107, 255, .55)); opacity: .55; transform: scale(.88); transition: opacity .3s var(--ec-e), transform .5s var(--ec-in); }
+.cs-act-emma_console .ec-go::after { content: ""; position: absolute; left: calc(.98 * var(--cu)); top: calc(.85 * var(--cu)); width: calc(1.15 * var(--cu)); height: calc(1.35 * var(--cu)); background: #f4f7ff; clip-path: polygon(50% 0, 100% 48%, 62% 48%, 62% 100%, 38% 100%, 38% 48%, 0 48%); }
+.cs-act-emma_console .ec-pbar.ec-send .ec-go { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-tl4 { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .3s var(--ec-e); }
+.cs-act-emma_console .ec-tl4.ec-on { opacity: 1; }
+.cs-act-emma_console .ec-tp { fill: none; stroke: rgba(150, 215, 255, .7); stroke-width: .12; stroke-linecap: round; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .9s var(--ec-in); transition-delay: calc(.1s + var(--i, 0) * 80ms); }
+.cs-act-emma_console .ec-tp.ec-drawn { stroke-dashoffset: 0; }
+
+/* the sales team's card + a thread of light (caps, stage 5): the thread draws out of the
+   document first, the card slides out at its end */
+.cs-act-emma_console .ec-scard { left: calc(61 * var(--cu)); top: calc(24.5 * var(--cu)); --cw: 27; opacity: 0; transform: translate3d(calc(-4 * var(--cu)), 0, 0) scale(.95); transition: opacity .25s var(--ec-out), transform .3s var(--ec-out); }
+.cs-act-emma_console .ec-scard.ec-in { opacity: 1; transform: none; transition: opacity .35s var(--ec-e), transform .9s var(--ec-in); }
+
+/* ---------------------------------------------------------------- threads: a line draws, packets of light run along it */
+.cs-act-emma_console .ec-th { position: absolute; height: calc(.2 * var(--cu)); transition: opacity .3s var(--ec-out); }
+.cs-act-emma_console .ec-thl { position: absolute; left: 0; top: 0; width: 100%; height: calc(.12 * var(--cu)); background: linear-gradient(90deg, rgba(110, 231, 255, .85), rgba(110, 231, 255, .35)); transform-origin: 0 50%; transform: scale(0, 1); transition: transform .5s var(--ec-in); }
+.cs-act-emma_console .ec-th.ec-on .ec-thl { transform: none; }
+.cs-act-emma_console .ec-thp { position: absolute; left: 0; top: calc(-.28 * var(--cu)); width: calc(1.5 * var(--cu)); height: calc(.7 * var(--cu)); border-radius: calc(.4 * var(--cu)); background: #ffffff; opacity: 0; }
+.cs-act-emma_console .ec-th.ec-run .ec-thp { animation: emma_console-packet 2.6s var(--ec-e) infinite; }
+.cs-act-emma_console .ec-th.ec-run .ec-thp.ec-b { animation-delay: 1.3s; }
+@keyframes emma_console-packet { 0% { opacity: 0; transform: translate3d(0, 0, 0); } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; transform: translate3d(calc(var(--len, 12) * var(--cu)), 0, 0); } }
+.cs-act-emma_console .ec-th.ec-longth { --len: 10; }
+.cs-act-emma_console .ec-th.ec-q0, .cs-act-emma_console .ec-th.ec-q1, .cs-act-emma_console .ec-th.ec-q2, .cs-act-emma_console .ec-th.ec-q3 { --len: 11; }
+
+/* ---------------------------------------------------------------- intro (s02_l03)
+   (owner 19 Nov: the logo card in the middle of the facade "does not fit" -- out.) The facade is
+   the picture; her words stand on it as a title, centred under her name: "I represent Embassy
+   World" (lit left to right by the core as the facade's light sweeps left to right behind it),
+   "the smart assistant" under it, on a soft shade -- a drawn gradient, no blur -- that rises
+   with the title and knocks the facade's lines back behind the letters. The groups she works
+   for hang from the title on a fork of light: the stem drops, a rule draws out to the side,
+   the card slides out along it (follow-through: its icon). */
+.cs-act-emma_console .ec-repshade { position: absolute; left: calc(12 * var(--cu)); top: calc(8.4 * var(--cu)); width: calc(76 * var(--cu)); height: calc(31.6 * var(--cu)); pointer-events: none;
+  background: radial-gradient(closest-side, rgba(3, 5, 13, .7) 0%, rgba(3, 5, 13, .52) 46%, rgba(3, 5, 13, .2) 78%, rgba(3, 5, 13, 0) 100%);
+  opacity: 0; transform: scale(.88, .8); transition: opacity .9s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console .ec-repshade.ec-on { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-rept { position: absolute; left: 0; right: 0; top: calc(16.2 * var(--cu)); text-align: center; }
+.cs-act-emma_console .ec-rept > .cs-text { display: block; width: fit-content; margin: 0 auto; white-space: nowrap; }
+.cs-act-emma_console .ec-rept .ec-rep-a { font-size: calc(3.7 * var(--cu)); font-weight: 560; line-height: 1.16; }
+.cs-act-emma_console .ec-rept .ec-rep-b { margin-top: calc(.55 * var(--cu)); font-size: calc(2.5 * var(--cu)); font-weight: 480; line-height: 1.16; --cs-type-mid: #bff3ff; --cs-type-end: #8fdcff; }
+/* the fork: the stem drops from the title, then each rule draws out of it to its card */
+.cs-act-emma_console .ec-fstem { position: absolute; left: calc(49.91 * var(--cu)); top: calc(26.3 * var(--cu)); width: calc(.18 * var(--cu)); height: calc(5.03 * var(--cu)); transform-origin: 50% 0; opacity: 0; transform: scale(1, 0);
+  background: linear-gradient(180deg, rgba(110, 231, 255, .2), rgba(150, 240, 255, .95)); transition: opacity .3s var(--ec-e), transform .3s var(--ec-in); }
+.cs-act-emma_console .ec-fstem.ec-on { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-tline { position: absolute; top: calc(31.2 * var(--cu)); width: calc(6 * var(--cu)); height: calc(.18 * var(--cu)); opacity: 0; transform: scale(0, 1); transition: opacity .3s var(--ec-e) .15s, transform .5s var(--ec-in) .15s; }
+.cs-act-emma_console .ec-tline.ec-l { left: calc(44 * var(--cu)); transform-origin: 100% 50%; background: linear-gradient(270deg, rgba(150, 240, 255, .95), rgba(110, 231, 255, .55)); }
+.cs-act-emma_console .ec-tline.ec-r { left: calc(50 * var(--cu)); transform-origin: 0 50%; background: linear-gradient(90deg, rgba(150, 240, 255, .95), rgba(110, 231, 255, .55)); }
+.cs-act-emma_console .ec-tline.ec-on { opacity: 1; transform: none; }
+/* the two cards slide out from the stem, along their rules (each anchored at the side it comes
+   from: the words grow away from the title's middle) */
+.cs-act-emma_console .ec-gsat { top: calc(28.6 * var(--cu)); --cw: 24; padding-right: calc(5.4 * var(--cu)); opacity: 0; transition: opacity .35s var(--ec-e) .25s, transform .9s var(--ec-in) .25s; }
+.cs-act-emma_console .ec-gsat > .ec-orb { opacity: 0; }
+.cs-act-emma_console .ec-gsat.ec-gleft { right: calc(56 * var(--cu)); transform: translate3d(calc(4 * var(--cu)), 0, 0) scale(.95); }
+.cs-act-emma_console .ec-gsat.ec-gright { left: calc(56 * var(--cu)); transform: translate3d(calc(-4 * var(--cu)), 0, 0) scale(.95); }
+.cs-act-emma_console .ec-gsat.ec-on { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-gsat .ec-cmain { font-size: calc(2.2 * var(--cu)); white-space: nowrap; }
+.cs-act-emma_console .ec-gic { position: absolute; right: calc(1.1 * var(--cu)); top: calc(1.25 * var(--cu)); width: calc(3.1 * var(--cu)); height: calc(3.1 * var(--cu)); border-radius: calc(.7 * var(--cu)); border: 1px solid rgba(130, 175, 255, .45); background: rgba(8, 14, 52, .5); opacity: 0; transform: scale(.6); }
+.cs-act-emma_console .ec-gsat.ec-on .ec-gic { opacity: 1; transform: none; transition: opacity .3s var(--ec-e) .65s, transform .5s var(--ec-in) .65s; }
+.cs-act-emma_console .ec-gic .ec-glyph { left: calc(.6 * var(--cu)); top: calc(.6 * var(--cu)); width: calc(1.9 * var(--cu)); height: calc(1.9 * var(--cu)); stroke: #e6f1ff; }
+
+/* the facade (s02_l03, "I represent Embassy World"; the owner's reference reel 18 Nov): the
+   project's hologram facade fills the stage behind her console, dark; light gathers at its
+   left edge (anticipation); six bands wipe to full light one after another (60 ms: a slanted
+   front) with glitter riding each front; sparkles twinkle once as the front passes them
+   (follow-through); then a slow violet-to-blue wash flows along the bands, the sparkles
+   twinkle now and then and the camera keeps pushing in, slowly (ambient: the hold after the
+   sweep is never a still). Transform and opacity only. The bottom of the shot is graded down
+   under the subtitle box. */
+.cs-act-emma_console .ec-facade { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; opacity: 0; transition: opacity .5s var(--ec-e); }
+.cs-act-emma_console .ec-facade.ec-on { opacity: 1; }
+/* the cards' moment: the facade steps back */
+.cs-act-emma_console .ec-facade.ec-on.ec-dim { opacity: .5; transition: opacity .9s var(--ec-e); }
+.cs-act-emma_console .ec-fcam { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 56% 42%; }
+.cs-act-emma_console .ec-facade.ec-f-sweep .ec-fcam { animation: emma_console-fpush 20s var(--ec-sine) 1 forwards; }
+@keyframes emma_console-fpush { from { transform: scale(1); } to { transform: translate3d(calc(-.8 * var(--cu)), calc(.3 * var(--cu)), 0) scale(1.06); } }
+.cs-act-emma_console .ec-fbase { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: .16; transition: opacity .4s var(--ec-e); }
+.cs-act-emma_console .ec-facade.ec-f-gather .ec-fbase { opacity: .26; }
+.cs-act-emma_console .ec-facade.ec-f-lit .ec-fbase { opacity: 0; }
+.cs-act-emma_console .ec-fband { position: absolute; left: 0; width: 100%; overflow: hidden; }
+.cs-act-emma_console .ec-fbin { position: absolute; left: 0; width: 100%; }
+/* the facade held by the line after s02_l03 (caps): one picture, lit; its push and its wash go
+   on from where that line left them (--fpd / --fwd); it dims as her stations take the stage */
+.cs-act-emma_console .ec-fall { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_console .ec-facade.ec-held.ec-f-sweep .ec-fcam { animation-delay: var(--fpd, 0s); }
+.cs-act-emma_console .ec-facade.ec-held.ec-f-flow .ec-washi { animation-delay: var(--fwd, 0s); }
+.cs-act-emma_console .ec-facade.ec-on.ec-dim.ec-dim2 { opacity: .22; transition: opacity 1.2s var(--ec-e); }
+.cs-act-emma_console .ec-fshade { position: absolute; left: 0; right: 0; bottom: 0; height: 30%; pointer-events: none; background: linear-gradient(180deg, rgba(3, 5, 13, 0), rgba(3, 5, 13, .55) 45%, rgba(3, 5, 13, .8)); }
+/* (owner 19 Nov, s02_l03 version 6: "why isn't the background Building A?") The facade as a
+   PHOTOGRAPH -- the owner's own render of Building A under a dusk sky. Dark before her words (the
+   picture at a fifth), the band sweep lights it left to right behind a soft warm front (no
+   glitter: that was the hologram's), then a grade of its own: the bright sky taken down round the
+   title so white letters read, the facade mid-frame nearly as it is, the lower floors taken down
+   under the subtitle box (with .ec-fshade). The slow push goes in towards the building, not the sky. */
+.cs-act-emma_console .ec-facade.ec-photo .ec-fcam { transform-origin: 50% 74%; }
+/* (the photo's push never comes to rest while the line holds -- through Khun Miki's question the
+   shot keeps breathing, and a full-detail layer that stops animating is rastered again at its
+   resting scale: where the 20 s push ends, a slow breathe takes over from the same transform.
+   The copy s02_l05 holds behind its stations stands still instead -- see heldFacade) */
+/* (the breath is the inner wrapper's own animation, not a second one on the camera: two transform
+   animations on one element cannot run on the compositor -- the push ran on the main thread and the
+   whole photo layer, seven copies of a 2720 px picture, was rastered again every frame (~470 tiles a
+   second, the held s02_l03 at 40-47 fps on the event notebook, 23 Nov). Nested, the two are the same
+   picture: the breath's move is the old one's less the push's end, divided by its scale (1.06)) */
+.cs-act-emma_console .ec-facade.ec-photo.ec-f-sweep .ec-fcam { animation: emma_console-fpush 20s var(--ec-sine) 1 forwards; }
+.cs-act-emma_console .ec-fbr { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 50% 74%; }
+.cs-act-emma_console .ec-facade.ec-photo.ec-f-sweep .ec-fbr { animation: emma_console-fbreathe 11s var(--ec-sine) 20s infinite alternate; }
+@keyframes emma_console-fbreathe { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(calc(-.28302 * var(--cu)), calc(.11321 * var(--cu)), 0) scale(1.014151); } }
+.cs-act-emma_console .ec-facade.ec-photo .ec-fbase { opacity: .2; }
+.cs-act-emma_console .ec-facade.ec-photo.ec-f-gather .ec-fbase { opacity: .3; }
+.cs-act-emma_console .ec-facade.ec-photo.ec-f-lit .ec-fbase { opacity: 0; }
+.cs-act-emma_console .ec-fgrade { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(6, 10, 30, .34) 0%, rgba(6, 10, 30, .26) 30%, rgba(6, 10, 30, .1) 52%, rgba(6, 10, 30, .16) 70%, rgba(6, 10, 30, .42) 100%); }
+/* the whole picture takes over from the bands once the sweep is over (the same pixels: nothing is
+   seen to change but the hairlines between the bands going); the bands go a moment later */
+.cs-act-emma_console .ec-facade.ec-photo .ec-fwhole { opacity: 0; }
+.cs-act-emma_console .ec-facade.ec-photo.ec-f-lit .ec-fwhole { opacity: 1; transition: opacity .3s var(--ec-e); }
+.cs-act-emma_console .ec-facade.ec-photo.ec-f-lit .ec-fband { opacity: 0; transition: opacity 0s linear .45s; }
+.cs-act-emma_console .ec-facade.ec-photo.ec-f-done .ec-fband { display: none; }
+/* staging for the cards: the photo steps back less than the hologram did -- it is the building
+   the owner wants seen. (Measured, 2552 x 1306: fading the facade itself -- the parent of the
+   pushing photo layer -- cost s02_l05 a dropped run as its stations rose; the hologram, mostly
+   black, did not. The photo stays at full opacity and a plain night veil over it fades in
+   instead: the same look, a cheap layer) */
+.cs-act-emma_console .ec-facade.ec-photo.ec-on.ec-dim, .cs-act-emma_console .ec-facade.ec-photo.ec-on.ec-dim.ec-dim2 { opacity: 1; }
+.cs-act-emma_console .ec-fveil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; background: #03050d; opacity: 0; transition: opacity .9s var(--ec-e); }
+.cs-act-emma_console .ec-facade.ec-photo.ec-dim .ec-fveil { opacity: .2; }
+.cs-act-emma_console .ec-facade.ec-photo.ec-dim.ec-dim2 .ec-fveil { opacity: .68; transition: opacity 1.2s var(--ec-e); }
+.cs-act-emma_console .ec-facade.ec-photo .ec-glit { background: linear-gradient(90deg, rgba(255, 236, 214, 0), rgba(255, 236, 214, .1) 45%, rgba(255, 242, 228, .34) 85%, rgba(255, 250, 240, .5)); }
+.cs-act-emma_console .ec-facade.ec-photo .ec-gather { background: linear-gradient(90deg, rgba(255, 238, 220, .32), rgba(255, 226, 196, .1) 55%, rgba(255, 220, 190, 0)); }
+.cs-act-emma_console .ec-glit {
+  position: absolute; right: calc(-.4 * var(--cu)); top: 0; width: calc(5 * var(--cu)); height: 100%; opacity: 0; transition: opacity .5s var(--ec-e);
+  background:
+    radial-gradient(circle at 84% 12%, #ffffff 0 calc(.13 * var(--cu)), rgba(255, 255, 255, 0) calc(.38 * var(--cu))),
+    radial-gradient(circle at 52% 30%, #dff6ff 0 calc(.08 * var(--cu)), rgba(223, 246, 255, 0) calc(.26 * var(--cu))),
+    radial-gradient(circle at 90% 52%, #ffffff 0 calc(.11 * var(--cu)), rgba(255, 255, 255, 0) calc(.34 * var(--cu))),
+    radial-gradient(circle at 66% 76%, #eadcff 0 calc(.1 * var(--cu)), rgba(234, 220, 255, 0) calc(.3 * var(--cu))),
+    radial-gradient(circle at 30% 60%, #cfeaff 0 calc(.06 * var(--cu)), rgba(207, 234, 255, 0) calc(.2 * var(--cu))),
+    radial-gradient(circle at 14% 22%, #e6dcff 0 calc(.05 * var(--cu)), rgba(230, 220, 255, 0) calc(.18 * var(--cu))),
+    radial-gradient(circle at 78% 92%, #ffffff 0 calc(.07 * var(--cu)), rgba(255, 255, 255, 0) calc(.22 * var(--cu))),
+    linear-gradient(90deg, rgba(110, 231, 255, 0), rgba(150, 215, 255, .12) 45%, rgba(190, 236, 255, .42) 82%, rgba(255, 255, 255, .7));
+}
+.cs-act-emma_console .cs-wipe.cs-wiping > .ec-glit { opacity: 1; animation: emma_console-glit .42s var(--ec-sine) infinite alternate; }
+@keyframes emma_console-glit { from { transform: translate3d(0, calc(-.15 * var(--cu)), 0); } to { transform: translate3d(0, calc(.15 * var(--cu)), 0); } }
+.cs-act-emma_console .ec-gather { position: absolute; left: 0; top: 0; width: calc(12 * var(--cu)); height: 100%; opacity: 0; transform-origin: 0 50%; transform: scale(.35, 1); background: linear-gradient(90deg, rgba(180, 230, 255, .45), rgba(110, 170, 255, .14) 55%, rgba(47, 107, 255, 0)); transition: opacity .4s var(--ec-e), transform .4s var(--ec-in); }
+.cs-act-emma_console .ec-facade.ec-f-gather .ec-gather { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-facade.ec-f-gather.ec-f-sweep .ec-gather { opacity: 0; transform: translate3d(calc(6 * var(--cu)), 0, 0); transition: opacity .5s var(--ec-out), transform .5s var(--ec-out); }
+.cs-act-emma_console .ec-wash { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.2s var(--ec-e); }
+.cs-act-emma_console .ec-facade.ec-f-flow .ec-wash { opacity: 1; }
+.cs-act-emma_console .ec-washi { position: absolute; left: 0; top: 0; width: 70%; height: 100%; transform: translate3d(-100%, 0, 0);
+  background: linear-gradient(90deg, rgba(150, 110, 255, 0), rgba(170, 120, 255, .17) 28%, rgba(214, 176, 255, .12) 50%, rgba(110, 200, 255, .15) 72%, rgba(110, 200, 255, 0)); }
+.cs-act-emma_console .ec-facade.ec-f-flow .ec-washi { animation: emma_console-wash 7.5s var(--ec-sine) infinite; }
+@keyframes emma_console-wash { from { transform: translate3d(-100%, 0, 0); } to { transform: translate3d(143%, 0, 0); } }
+.cs-act-emma_console .ec-spks { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_console .ec-spk {
+  position: absolute; width: calc(1.8 * var(--cu)); height: calc(1.8 * var(--cu)); margin: calc(-.9 * var(--cu)) 0 0 calc(-.9 * var(--cu)); opacity: 0; transform: scale(.2);
+  background:
+    linear-gradient(90deg, rgba(230, 245, 255, 0) 0 44%, rgba(240, 250, 255, .95) 50%, rgba(230, 245, 255, 0) 56% 100%) 50% 50% / 100% 12% no-repeat,
+    linear-gradient(0deg, rgba(230, 245, 255, 0) 0 44%, rgba(240, 250, 255, .95) 50%, rgba(230, 245, 255, 0) 56% 100%) 50% 50% / 12% 100% no-repeat,
+    radial-gradient(circle, #ffffff 0 7%, rgba(200, 225, 255, .7) 14%, rgba(170, 160, 255, 0) 38%);
+}
+.cs-act-emma_console .ec-spk.ec-tw { animation: emma_console-tw .9s var(--ec-e) 1; }
+.cs-act-emma_console .ec-spk.ec-twa { animation: emma_console-twa 5.2s var(--ec-sine) infinite; animation-delay: calc(var(--k, 0) * .65s); }
+@keyframes emma_console-tw { 0% { opacity: 0; transform: scale(.2) rotate(0deg); } 35% { opacity: 1; transform: scale(1) rotate(45deg); } 100% { opacity: 0; transform: scale(.4) rotate(90deg); } }
+@keyframes emma_console-twa { 0% { opacity: 0; transform: scale(.2) rotate(0deg); } 8% { opacity: .9; transform: scale(.85) rotate(40deg); } 18% { opacity: 0; transform: scale(.35) rotate(80deg); } 100% { opacity: 0; transform: scale(.2) rotate(80deg); } }
+
+/* ---------------------------------------------------------------- quote (s05)
+   one hero at a time: the unit while she asks about it, the document while she works on it;
+   the other dims and steps back (and its glow with it) */
+.cs-act-emma_console .ec-unitp { position: absolute; left: calc(7.5 * var(--cu)); top: calc(13.8 * var(--cu)); width: calc(36.5 * var(--cu)); height: calc(28 * var(--cu)); --r: calc(1.4 * var(--cu)); opacity: 0; transform: perspective(var(--ec-p)) translate3d(0, calc(4 * var(--cu)), calc(-6 * var(--cu))) rotateY(13deg); transition: opacity .5s var(--ec-e), transform .9s var(--ec-e); }
+.cs-act-emma_console .ec-unitp.ec-rest { opacity: 1; transform: perspective(var(--ec-p)) rotateY(13deg); }
+.cs-act-emma_console .ec-unitp.ec-rest.ec-dim { opacity: .55; --ec-glow: .35; transform: perspective(var(--ec-p)) translate3d(calc(-1 * var(--cu)), 0, calc(-6 * var(--cu))) rotateY(16deg); }
+.cs-act-emma_console .ec-unitp.ec-away { opacity: 0; transform: perspective(var(--ec-p)) translate3d(calc(-10 * var(--cu)), 0, calc(-16 * var(--cu))) rotateY(28deg); transition: opacity .4s var(--ec-out), transform .6s var(--ec-out); }
+.cs-act-emma_console .ec-unitp .ec-pix.ec-full { left: calc(3 * var(--cu)); top: calc(1.2 * var(--cu)); width: calc(30.5 * var(--cu)); height: calc(25.6 * var(--cu)); }
+/* (the model turns very slowly on its plate while it is the subject: the hold breathes) */
+.cs-act-emma_console .ec-unitp .ec-pix.ec-full .cs-apic { transform-origin: 50% 60%; animation: emma_console-sway 9s var(--ec-sine) -2s infinite alternate; }
+@keyframes emma_console-sway { from { transform: translate3d(calc(-.3 * var(--cu)), 0, 0) scale(1); } to { transform: translate3d(calc(.3 * var(--cu)), calc(-.2 * var(--cu)), 0) scale(1.025); } }
+.cs-act-emma_console .ec-uglow { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: calc(1.4 * var(--cu)); background: radial-gradient(ellipse 60% 55% at 50% 52%, rgba(47, 107, 255, .3), rgba(47, 107, 255, 0)); pointer-events: none; }
+.cs-act-emma_console .ec-plate { position: absolute; left: calc(1 * var(--cu)); top: calc(1 * var(--cu)); padding: calc(.65 * var(--cu)) calc(1.5 * var(--cu)) calc(.72 * var(--cu)) calc(1.9 * var(--cu)); border-radius: calc(.7 * var(--cu)); border: 1px solid rgba(130, 175, 255, .6); background: rgba(6, 12, 46, .8); opacity: 0; transform: translate3d(0, calc(.8 * var(--cu)), 0); transition: opacity .3s var(--ec-e), transform .5s var(--ec-in); }
+.cs-act-emma_console .ec-plate.ec-on { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-plate::before { content: ""; position: absolute; left: calc(.7 * var(--cu)); top: calc(.6 * var(--cu)); bottom: calc(.6 * var(--cu)); width: calc(.2 * var(--cu)); border-radius: calc(.1 * var(--cu)); background: rgb(var(--cs-cyan)); transform-origin: 50% 0; transform: scale(1, 0); transition: transform .5s var(--ec-in) .25s; }
+.cs-act-emma_console .ec-plate.ec-on::before { transform: none; }
+.cs-act-emma_console .ec-plate .ec-plt { font-size: calc(1.55 * var(--cu)); font-weight: 520; white-space: nowrap; }
+/* the document: enters from the right and back (--ec-in); swings to the centre or to face us
+   on an arc (wind-up first: --ax); the camera leans in when she says she is working on it */
+.cs-act-emma_console .ec-docw { position: absolute; left: calc(56.5 * var(--cu)); top: calc(12.6 * var(--cu)); width: calc(34 * var(--cu)); height: calc(29.6 * var(--cu)); transform-origin: 50% 50%; opacity: 0; transform: perspective(var(--ec-p)) translate3d(calc(6 * var(--cu)), calc(5 * var(--cu)), calc(-8 * var(--cu))) rotateY(-26deg); transition: opacity .3s var(--ec-out), transform .5s var(--ec-out); }
+.cs-act-emma_console .ec-docw.ec-rest { opacity: 1; transform: perspective(var(--ec-p)) rotateY(-15deg); transition: opacity .5s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console .ec-docw.ec-away { opacity: 0; }
+.cs-act-emma_console .ec-docw.ec-centre { opacity: 1; transform: perspective(var(--ec-p)) translate3d(calc(-23.5 * var(--cu)), calc(-.5 * var(--cu)), calc(6 * var(--cu))) rotateY(0deg) scale(1.02); transition: opacity .5s var(--ec-e), transform .9s var(--ec-e) .12s; }
+.cs-act-emma_console .ec-docw.ec-face { opacity: 1; transform: perspective(var(--ec-p)) translate3d(calc(-17 * var(--cu)), 0, calc(5 * var(--cu))) rotateY(-2deg) scale(1.02); transition: opacity .5s var(--ec-e), transform .9s var(--ec-e) .12s; }
+.cs-act-emma_console .ec-docw.ec-centre .ec-dc, .cs-act-emma_console .ec-docw.ec-face .ec-dc { --ax: 1.4; --as: .985; --ly: -1.8; --lz: 5; }
+.cs-act-emma_console .ec-docw .ec-dc { left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_console.ec-push .ec-docw.ec-rest { transform: perspective(var(--ec-p)) translate3d(calc(-1 * var(--cu)), 0, calc(3 * var(--cu))) rotateY(-15deg) scale(1.03); transition: opacity .5s var(--ec-e), transform .9s var(--ec-e); }
+/* the staff's card takes the stage: the document steps back a little */
+.cs-act-emma_console.ec-handed .ec-docw.ec-centre { opacity: .82; transform: perspective(var(--ec-p)) translate3d(calc(-24 * var(--cu)), calc(-.5 * var(--cu)), calc(2 * var(--cu))) rotateY(0deg) scale(.99); transition: opacity .5s var(--ec-e), transform .9s var(--ec-e); }
+.cs-act-emma_console.ec-faced .ec-th { opacity: 0; }
+/* (--cw 26, was 25: Kantalad, 22 Nov night -- "explain the details" at 2.3cu is 383px in Kantalad,
+   349 in Inter; the card's words had 382 and s05_backup_quote's line went to three rows with
+   "details" alone. 26cu = 401px inside; the card is as wide as its words, s05_l13's is unchanged) */
+.cs-act-emma_console .ec-qcard { left: calc(69.4 * var(--cu)); top: calc(16.6 * var(--cu)); --cw: 26; opacity: 0; transform: translate3d(calc(-5 * var(--cu)), 0, 0) scale(.95); transition: opacity .25s var(--ec-out), transform .3s var(--ec-out); }
+.cs-act-emma_console .ec-qcard.ec-in { opacity: 1; transform: none; transition: opacity .35s var(--ec-e), transform .9s var(--ec-in); }
+/* "will bring the details": the card lifts toward her listener, its light answers */
+.cs-act-emma_console .ec-qcard.ec-in.ec-carry { transform: translate3d(0, calc(-.5 * var(--cu)), 0); transition: opacity .5s var(--ec-e), transform .5s var(--ec-e); }
+.cs-act-emma_console .ec-qcard.ec-carry > .ec-orb.ec-mini { animation: emma_console-tap0 .5s var(--ec-e) 1; }
+/* the next steps: four chevrons, 80 ms apart, flowing on */
+.cs-act-emma_console .ec-steps { position: absolute; left: calc(69.6 * var(--cu)); top: calc(27.4 * var(--cu)); display: flex; opacity: 0; transition: opacity .3s var(--ec-e); }
+.cs-act-emma_console .ec-steps.ec-on { opacity: 1; }
+.cs-act-emma_console .ec-chev { width: calc(2.6 * var(--cu)); height: calc(2.6 * var(--cu)); transform: translate3d(calc(-1.5 * var(--cu)), 0, 0); opacity: 0; }
+.cs-act-emma_console .ec-chev .ec-glyph { position: static; width: calc(2.6 * var(--cu)); height: calc(2.6 * var(--cu)); stroke: rgb(var(--cs-cyan)); stroke-width: 2.2; }
+.cs-act-emma_console .ec-steps.ec-on .ec-chev { animation: emma_console-chev .9s var(--ec-in) forwards; animation-delay: calc(var(--i, 0) * 80ms); }
+@keyframes emma_console-chev { 0% { opacity: 0; transform: translate3d(calc(-1.5 * var(--cu)), 0, 0); } 45% { opacity: 1; } 100% { opacity: .6; transform: translate3d(calc(1.2 * var(--cu)), 0, 0); } }
+.cs-act-emma_console .ec-stepw { position: absolute; left: calc(70 * var(--cu)); top: calc(30.8 * var(--cu)); opacity: 0; transition: opacity .25s var(--ec-out); }
+.cs-act-emma_console .ec-stepw.ec-on { opacity: 1; transition: none; }
+.cs-act-emma_console .ec-stepw .ec-stt { font-size: calc(1.6 * var(--cu)); font-weight: 500; white-space: nowrap; }
+/* the Sample tag lands on the document once it has turned to us (follow-through) */
+.cs-act-emma_console .ec-stag { position: absolute; left: calc(44 * var(--cu)); top: calc(9.4 * var(--cu)); opacity: 0; transform: translate3d(0, calc(-1.2 * var(--cu)), 0) rotateZ(-8deg) scale(1.08); transition: opacity .3s var(--ec-e), transform .5s var(--ec-in); padding: calc(.55 * var(--cu)) calc(1.7 * var(--cu)) calc(.62 * var(--cu)); border-radius: calc(.6 * var(--cu)); border: 1px solid rgba(190, 232, 255, .9); background: linear-gradient(180deg, rgba(96, 176, 255, .85), rgba(47, 107, 255, .62)); }
+.cs-act-emma_console .ec-stag.ec-on { opacity: 1; transform: rotateZ(-3deg); }
+.cs-act-emma_console .ec-stag .ec-stg { font-size: calc(1.6 * var(--cu)); font-weight: 560; }
+
+/* ---------------------------------------------------------------- wall (s06)
+   the wall unrolls behind her, centre column first (70 ms a column, 30 ms a row); the outer
+   layer drifts on a long sine (a hold is never a still), the inner one holds the perspective */
+.cs-act-emma_console .ec-wallw { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 50% 40%; animation: emma_console-wdrift 16s var(--ec-sine) -6s infinite alternate; }
+@keyframes emma_console-wdrift { from { transform: translate3d(calc(.5 * var(--cu)), 0, 0) scale(1); } to { transform: translate3d(calc(-.5 * var(--cu)), calc(-.2 * var(--cu)), 0) scale(1.018); } }
+.cs-act-emma_console .ec-wcam { position: absolute; left: 0; top: 0; width: 100%; height: 100%; perspective: calc(120 * var(--cu)); perspective-origin: 50% 42%; transform-origin: 50% 40%; transition: transform 2.4s var(--ec-e); }
+/* "very carefully": the wall leans in toward her a touch */
+.cs-act-emma_console.ec-w-near .ec-wcam { transform: scale(1.03); }
+.cs-act-emma_console .ec-wc {
+  position: absolute; left: calc(44.4 * var(--cu)); top: calc(14.5 * var(--cu)); width: calc(11.2 * var(--cu)); height: calc(7 * var(--cu));
+  transform: translate3d(0, 0, calc(-44 * var(--cu))) rotateY(0deg) translate3d(0, 0, calc(44 * var(--cu))) translateY(calc(0 * var(--cu))) scale(.3); opacity: 0;
+  transition: transform .9s var(--ec-in), opacity .5s var(--ec-e); transition-delay: calc(var(--d, 0) * 70ms + var(--rr, 0) * 30ms);
+}
+/* (owner's notes 19 Nov: the line before -- s06_l03 -- now ends on a wall of the facilities' own
+   pictures. This line used to open on an empty stage under it: the dissolve faded those pictures
+   out and the wall came back three seconds later. Now its first frame already carries the study
+   wall -- dim, unlit, a step back, behind her -- so the cut is picture to picture; at "I've
+   studied everything" the wall steps forward into place, centre column first, and at "about
+   Embassy World" it lights) */
+.cs-act-emma_console.ec-w-pre .ec-wc { opacity: .82; transform: translate3d(0, 0, calc(-44 * var(--cu))) rotateY(calc(var(--c, 0) * 19deg)) translate3d(0, 0, calc(44 * var(--cu))) translateY(calc(var(--r, 0) * 7.9 * var(--cu))) scale(.93); }
+.cs-act-emma_console.ec-w-on .ec-wc { opacity: 1; transform: translate3d(0, 0, calc(-44 * var(--cu))) rotateY(calc(var(--c, 0) * 19deg)) translate3d(0, 0, calc(44 * var(--cu))) translateY(calc(var(--r, 0) * 7.9 * var(--cu))) scale(1); }
+/* the punchline's set-up: the cards swish apart from the centre out, with a little overshoot */
+.cs-act-emma_console.ec-w-part .ec-wc { transform: translate3d(calc(var(--c, 0) * 5 * var(--cu)), 0, calc(-44 * var(--cu))) rotateY(calc(var(--c, 0) * 23deg)) translate3d(0, 0, calc(44 * var(--cu))) translateY(calc(var(--r, 0) * 7.9 * var(--cu))) scale(1); transition: transform .5s var(--ec-play), opacity .3s var(--ec-out); transition-delay: calc(var(--d, 0) * 40ms); }
+.cs-act-emma_console .ec-wr { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-style: preserve-3d; }
+/* the quiz cards: one wave of turns, each with a playful wobble as it comes round */
+/* (fix round 19 Nov: the wave runs out from the centre, 110 ms a column, 40 ms a row -- some
+   cards are always face-on, the wall never reads as blanked.) Owner's notes 19 Nov: the wall is
+   real pictures. A card no longer flips to a back with a second copy of its picture: it turns
+   edge-on, and comes round (the same way on) as a quiz card -- its own picture under a light
+   quiz-blue tint, the answer box over it (the marks switch at the edge-on moment, when the card
+   is a line). The wave only plays on time; a late screen gets the quiz cards as they land.
+   "I'm sure": the same turn back to her pictures, faster, as the cards swish apart. */
+.cs-act-emma_console.ec-w-flipping .ec-wr { animation: emma_console-qturn .75s linear calc(var(--d, 0) * 110ms + var(--rr, 0) * 40ms) 1 both; }
+.cs-act-emma_console.ec-w-unflip .ec-wr { animation: emma_console-qback .6s linear calc(var(--d, 0) * 70ms + var(--rr, 0) * 30ms) 1 both; }
+@keyframes emma_console-qturn {
+  0% { transform: rotateY(0deg); animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  50% { transform: rotateY(90deg); animation-timing-function: linear; }
+  50.01% { transform: rotateY(-90deg); animation-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275); }   /* (--ec-play, written out: a keyframe's own curve) */
+  100% { transform: rotateY(0deg); }
+}
+@keyframes emma_console-qback {
+  0% { transform: rotateY(0deg); animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  50% { transform: rotateY(90deg); animation-timing-function: linear; }
+  50.01% { transform: rotateY(-90deg); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }   /* (--ec-e) */
+  100% { transform: rotateY(0deg); }
+}
+.cs-act-emma_console .ec-wf { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: calc(.8 * var(--cu)); border: 1px solid rgba(150, 190, 255, .55); overflow: hidden; -webkit-backface-visibility: hidden; backface-visibility: hidden; background: #02040c; }
+/* the quiz marks on a card: a light quiz-blue tint (the picture reads through it) and the answer box */
+.cs-act-emma_console .ec-wqt { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; background: linear-gradient(180deg, rgba(46, 72, 214, .26), rgba(10, 18, 70, .44)); }
+.cs-act-emma_console .ec-wqq { position: absolute; left: 12%; right: 12%; top: 18%; bottom: 18%; border-radius: calc(.6 * var(--cu)); border: 1px dashed rgba(200, 230, 255, .78); background: rgba(10, 20, 80, .26); opacity: 0; }
+.cs-act-emma_console.ec-w-flip .ec-wqt, .cs-act-emma_console.ec-w-flip .ec-wqq { opacity: 1; }
+.cs-act-emma_console.ec-w-flipping .ec-wqt, .cs-act-emma_console.ec-w-flipping .ec-wqq { animation: emma_console-qon .75s linear calc(var(--d, 0) * 110ms + var(--rr, 0) * 40ms) 1 both; }
+.cs-act-emma_console.ec-w-unflip .ec-wqt, .cs-act-emma_console.ec-w-unflip .ec-wqq { animation: emma_console-qoff .6s linear calc(var(--d, 0) * 70ms + var(--rr, 0) * 30ms) 1 both; }
+@keyframes emma_console-qon { 0%, 50% { opacity: 0; } 50.01%, 100% { opacity: 1; } }
+@keyframes emma_console-qoff { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+.cs-act-emma_console .ec-wi { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform: translate3d(calc(var(--ox, 0) * -.22%), calc(var(--oy, 0) * -.22%), 0) scale(var(--sc, 1.3)); }
+/* (owner 19 Nov: the wall is the owner's own renders, one cell of the study sheet per card --
+   the whole sheet sits in the card, moved so that its cell fills it; the card clips the rest) */
+.cs-act-emma_console .ec-wi > .cs-apic.ec-sheet { position: absolute; }
+/* (a card's picture holder is clear until the core has decoded its picture -- the core's own
+   frame is clear until then too, keep-out patches and all; this only makes the holder say so) */
+.cs-act-emma_console .ec-wi:has(> .cs-apic:not(.cs-loaded)) { opacity: 0; }
+.cs-act-emma_console .ec-wf::after { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: linear-gradient(180deg, rgba(3, 5, 13, .62), rgba(3, 5, 13, .72)); opacity: 1; transition: opacity .5s var(--ec-e); transition-delay: calc(var(--d, 0) * 70ms); }
+/* "about Embassy World": the wall lights from the centre out */
+.cs-act-emma_console.ec-w-lit .ec-wf::after { opacity: 0; }
+.cs-act-emma_console.ec-w-part .ec-wf::after { opacity: .5; transition-delay: 0s; }
+/* (fix round 19 Nov: the centre of the wall no longer vanishes -- it stood empty a second
+   before the podium came. The cards part and step back, the centre ones the most; the wall
+   stays behind her) */
+.cs-act-emma_console.ec-w-part .ec-wc { opacity: calc(.38 + var(--d, 0) * .14); }
+.cs-act-emma_console.ec-w-stage .ec-wc { opacity: calc(.26 + var(--d, 0) * .12); transition: transform .5s var(--ec-play), opacity .6s var(--ec-e); }
+/* "very carefully": a reading light crosses the wall, card by card, left to right (a sheen
+   inside each card; no lens over the pictures) */
+.cs-act-emma_console .ec-wread { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; transform: translate3d(-70%, 0, 0);
+  background: linear-gradient(100deg, rgba(200, 240, 255, 0) 20%, rgba(220, 246, 255, .42) 50%, rgba(200, 240, 255, 0) 80%); }
+.cs-act-emma_console.ec-w-read .ec-wread { animation: emma_console-read 1.1s var(--ec-e) both; animation-delay: calc(var(--k, 0) * 150ms + var(--rr, 0) * 50ms); }
+@keyframes emma_console-read { 0% { opacity: 0; transform: translate3d(-70%, 0, 0); } 35% { opacity: 1; } 100% { opacity: 0; transform: translate3d(70%, 0, 0); } }
+
+/* ---- Emma (s06_l05 / l07): the clip in a box. .ec-emma = the point on the floor under her
+   (it carries her across, in x); .ec-emy = her height above it (the hop's rise and fall);
+   .ec-emb = the clip's frame, squashed and stretched about her lowest point. */
+.cs-act-emma_console .ec-emma { position: absolute; left: calc(var(--ex, 20) * var(--cu)); top: calc(var(--ey, 43) * var(--cu)); width: 0; height: 0;
+  opacity: 0; transform: translate3d(0, calc(2.4 * var(--cu)), 0); transition: opacity .5s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console.cs-live .ec-emma { opacity: 1; transform: none; }
+.cs-act-emma_console.ec-e-held .ec-emma { opacity: 1; transform: none; transition: none; }
+.cs-act-emma_console .ec-emy { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.cs-act-emma_console .ec-emb { position: absolute; left: calc(var(--fw) * -.5 * var(--cu)); top: calc(var(--fb) * -1 * var(--cu)); width: calc(var(--fw) * var(--cu)); height: calc(var(--fh) * var(--cu));
+  transform-origin: 50% var(--bo, 91.9%); transition: transform .45s var(--ec-e); }
+.cs-act-emma_console .ec-emb .cs-avid video { object-fit: fill; }
+/* a clip cut to the part of the frame she is ever in: laid at its window of the frame's box (the
+   act sets left / top / width / height from options.emma.window; 23 Nov, VP9 alpha on the notebook's CPU) */
+.cs-act-emma_console .ec-emb .cs-avid.ec-cwin { position: absolute; }
+/* the hover light under her (she floats a hand above the floor): it breathes */
+.cs-act-emma_console .ec-eglow { position: absolute; left: calc(-6.5 * var(--cu)); top: calc(-.95 * var(--cu)); width: calc(13 * var(--cu)); height: calc(1.9 * var(--cu)); border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(170, 232, 255, .72), rgba(77, 163, 255, .3) 50%, rgba(47, 107, 255, 0)); animation: emma_console-hover 2s var(--ec-sine) infinite alternate; }
+@keyframes emma_console-hover { from { opacity: .7; transform: scale(.94, 1); } to { opacity: 1; transform: scale(1.04, 1); } }
+/* "Besides my good looks": a soft light comes up behind her as she preens (secondary) */
+.cs-act-emma_console .ec-ehalo { position: absolute; left: calc(-13 * var(--cu)); top: calc(-27 * var(--cu)); width: calc(26 * var(--cu)); height: calc(24 * var(--cu)); border-radius: 50%; opacity: 0; transform: scale(.8);
+  background: radial-gradient(closest-side, rgba(120, 190, 255, .34), rgba(77, 163, 255, .14) 55%, rgba(47, 107, 255, 0)); transition: opacity .9s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console.ec-e-proud .ec-ehalo { opacity: 1; transform: none; }
+.cs-act-emma_console.ec-e-held.ec-e-proud .ec-ehalo { transition: none; }
+/* the joke: she perks up to face the quiz; in the pause she crouches (anticipation); at "I'm
+   sure" she winds up lower */
+.cs-act-emma_console.ec-e-perk .ec-emb { transform: scale(.98, 1.03); }
+.cs-act-emma_console.ec-e-crouch .ec-emb { transform: scale(1.07, .91); transition: transform .5s var(--ec-e); }
+.cs-act-emma_console.ec-e-crouch.ec-e-wind .ec-emb { transform: scale(1.1, .87); transition: transform .35s var(--ec-e); }
+/* "first place": she stands on the first-place block (--hx, --hy from the floor point) */
+.cs-act-emma_console.ec-e-pod .ec-emma { transform: translate3d(calc(var(--hx) * var(--cu)), 0, 0); }
+.cs-act-emma_console.ec-e-pod .ec-emy { transform: translate3d(0, calc(var(--hy) * var(--cu)), 0); }
+.cs-act-emma_console.ec-e-pod .ec-eglow { transform: translate3d(0, calc(var(--hy) * var(--cu)), 0); animation: none; }
+/* the hop (Playful): 120 ms after the word she springs (stretch), arcs over -- across in one
+   long ease, up decelerating and down accelerating (gravity; the top of the arc stays clear of
+   the words at the head of the console) -- lands on the block 640 ms
+   later with a squash, rebounds and settles; her hover light goes out in the air and comes on
+   again on the block */
+/* (fix round 19 Nov: 160 ms after the word -- the podium is popping up -- a last deeper
+   crouch (she leaves the floor at 280 ms, out of it), a 900 ms arc (it read as ~0.25 s at
+   640), a squash on the block at 1180 ms and a settle) */
+.cs-act-emma_console.ec-e-hop .ec-emma { animation: emma_console-hopx 900ms cubic-bezier(.33, .12, .62, .92) 280ms 1 both; }
+.cs-act-emma_console.ec-e-hop .ec-emy { animation: emma_console-hopy 900ms linear 280ms 1 both; }
+.cs-act-emma_console.ec-e-hop .ec-emb { animation: emma_console-squash 1350ms var(--ec-e) 160ms 1 both; }
+.cs-act-emma_console.ec-e-hop .ec-eglow { animation: emma_console-glowhop 1200ms linear 280ms 1 both; }
+@keyframes emma_console-hopx { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(var(--hx) * var(--cu)), 0, 0); } }
+@keyframes emma_console-hopy {
+  0% { transform: translate3d(0, 0, 0); animation-timing-function: cubic-bezier(.3, .55, .45, 1); }
+  68% { transform: translate3d(0, calc((var(--hy) - 2) * var(--cu)), 0); animation-timing-function: cubic-bezier(.58, 0, .78, .42); }
+  100% { transform: translate3d(0, calc(var(--hy) * var(--cu)), 0); }
+}
+@keyframes emma_console-squash {
+  0% { transform: scale(1.1, .87); }
+  8% { transform: scale(1.14, .82); }
+  16% { transform: scale(.93, 1.09); }
+  40% { transform: scale(.97, 1.04); }
+  62% { transform: scale(1, 1); }
+  70% { transform: scale(.95, 1.07); }
+  76% { transform: scale(1.15, .83); }
+  86% { transform: scale(.97, 1.04); }
+  93% { transform: scale(1.015, .985); }
+  100% { transform: scale(1, 1); }
+}
+@keyframes emma_console-glowhop {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  12% { opacity: 0; transform: translate3d(0, 0, 0) scale(.6); }
+  69% { opacity: 0; transform: translate3d(0, calc(var(--hy) * var(--cu)), 0) scale(.6); }
+  80% { opacity: 1; transform: translate3d(0, calc(var(--hy) * var(--cu)), 0) scale(1.1); }
+  100% { opacity: .85; transform: translate3d(0, calc(var(--hy) * var(--cu)), 0) scale(1); }
+}
+
+/* her lines of s06_l05, beside her: the newest lit on the row at the bottom, the one before it
+   dimmed a row above, older ones cooled out; the column moves up a row as each one comes */
+.cs-act-emma_console .ec-tlines { position: absolute; left: calc(46 * var(--cu)); top: calc(34.4 * var(--cu)); transform: translate3d(0, calc(var(--at, 0) * -3.8 * var(--cu)), 0); transition: transform .5s var(--ec-e); }
+.cs-act-emma_console .ec-trow { position: absolute; left: 0; top: calc(var(--i, 0) * 3.8 * var(--cu)); white-space: nowrap; transition: opacity .5s var(--ec-e); }
+.cs-act-emma_console .ec-trow.ec-prev { opacity: .42; }
+.cs-act-emma_console .ec-trow.ec-old { opacity: 0; transition: opacity .3s var(--ec-out) .2s; }
+.cs-act-emma_console .ec-tlines .ec-tln { font-size: calc(2.6 * var(--cu)); line-height: 1.2; }
+/* the joke's words at the head of the console, one at a time (typed in step with her voice) */
+.cs-act-emma_console .ec-kickw .ec-kk, .cs-act-emma_console .ec-pplate .ec-pp { font-size: calc(2.5 * var(--cu)); }
+.cs-act-emma_console .ec-kickw.ec-out { opacity: 0; transition: opacity .25s var(--ec-out) .2s; }
+/* the set-up stands whole, dimmed, while the punchline is typed under it; when she jumps the
+   set-up cools away and the punchline rises into its place (a row of 3.3cu) */
+.cs-act-emma_console .ec-head.ec-kickw.ec-on.ec-prev { opacity: .5; transition: opacity .5s var(--ec-e); }
+.cs-act-emma_console .ec-head.ec-pplate { transition: opacity .25s var(--ec-out) .22s, transform .55s var(--ec-e); }
+.cs-act-emma_console .ec-head.ec-pplate.ec-on { transition: transform .55s var(--ec-e); }
+.cs-act-emma_console .ec-head.ec-pplate.ec-low { transform: translate3d(0, calc(3.3 * var(--cu)), 0); }
+.cs-act-emma_console .ec-beams { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .5s var(--ec-e) .35s; pointer-events: none; }
+.cs-act-emma_console .ec-beams.ec-on { opacity: 1; }
+.cs-act-emma_console .ec-bm { position: absolute; top: calc(-2 * var(--cu)); width: calc(20 * var(--cu)); height: calc(40 * var(--cu)); transform-origin: 50% 0; background: linear-gradient(180deg, rgba(150, 205, 255, .5), rgba(77, 163, 255, .16) 55%, rgba(47, 107, 255, 0)); -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0), #000 50%, rgba(0, 0, 0, 0)); mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0), #000 50%, rgba(0, 0, 0, 0)); clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%); }
+.cs-act-emma_console .ec-bm.ec-b1 { left: calc(24 * var(--cu)); animation: emma_console-sway1 7s var(--ec-sine) infinite alternate; }
+.cs-act-emma_console .ec-bm.ec-b2 { left: calc(40 * var(--cu)); animation: emma_console-sway2 9s var(--ec-sine) infinite alternate-reverse; }
+.cs-act-emma_console .ec-bm.ec-b3 { left: calc(56 * var(--cu)); animation: emma_console-sway3 8s var(--ec-sine) infinite alternate; }
+@keyframes emma_console-sway1 { from { transform: rotate(-20deg); } to { transform: rotate(-12deg); } }
+@keyframes emma_console-sway2 { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+@keyframes emma_console-sway3 { from { transform: rotate(12deg); } to { transform: rotate(20deg); } }
+/* the podium pops up from the floor, block by block (the first-place block first: she is on
+   her way to it); a line of light along each top */
+.cs-act-emma_console .ec-podium { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .2s var(--ec-e); }
+.cs-act-emma_console.ec-w-stage .ec-podium { opacity: 1; }
+.cs-act-emma_console .ec-stp { position: absolute; border: 1px solid rgba(170, 215, 255, .75); border-radius: calc(.4 * var(--cu)) calc(.4 * var(--cu)) 0 0; background: linear-gradient(180deg, rgba(120, 175, 255, .55), rgba(40, 70, 210, .5) 14%, rgba(16, 32, 120, .62)); transform-origin: 50% 100%; transform: scale(1, 0); transition: transform .5s var(--ec-play); }
+.cs-act-emma_console .ec-stp::before { content: ""; position: absolute; left: 6%; right: 6%; top: 0; height: calc(.16 * var(--cu)); background: linear-gradient(90deg, rgba(200, 240, 255, 0), #e6f8ff 50%, rgba(200, 240, 255, 0)); }
+.cs-act-emma_console.ec-w-stage .ec-stp { transform: none; }
+.cs-act-emma_console .ec-stp.ec-s1 { left: calc(41.5 * var(--cu)); top: calc(34 * var(--cu)); width: calc(17 * var(--cu)); height: calc(9.2 * var(--cu)); }
+.cs-act-emma_console .ec-stp.ec-s2 { left: calc(26.5 * var(--cu)); top: calc(37.4 * var(--cu)); width: calc(15 * var(--cu)); height: calc(5.8 * var(--cu)); transition-delay: 70ms; }
+.cs-act-emma_console .ec-stp.ec-s3 { left: calc(58.5 * var(--cu)); top: calc(39 * var(--cu)); width: calc(15 * var(--cu)); height: calc(4.2 * var(--cu)); transition-delay: 140ms; }
+/* the title beside her on the podium: the core pops it in (the joke's beat) */
+.cs-act-emma_console .ec-giantw.ec-hi { left: calc(63 * var(--cu)); right: auto; top: calc(16.5 * var(--cu)); text-align: left; }
+.cs-act-emma_console .ec-giantw.ec-hi .ec-gi { font-size: calc(4.6 * var(--cu)); }
+.cs-act-emma_console .ec-confetti { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+.cs-act-emma_console .ec-confetti.ec-on { opacity: 1; }
+.cs-act-emma_console .ec-cf { position: absolute; left: calc(calc(50 * var(--cu)) + var(--x, 0) * calc(.8 * var(--cu))); top: calc(6 * var(--cu)); width: calc(var(--s, 4) * calc(.1 * var(--cu))); height: calc(var(--s, 4) * calc(.22 * var(--cu))); background: #6ee7ff; opacity: 0; }
+.cs-act-emma_console .ec-cf:nth-child(3n) { background: #ffffff; }
+.cs-act-emma_console .ec-cf:nth-child(3n+1) { background: #4d8dff; }
+/* confetti falls (gravity: accelerating), spread over 450 ms after the landing, and is gone
+   before the floor (nothing reaches the subtitle box) */
+.cs-act-emma_console .ec-confetti.ec-on .ec-cf { animation: emma_console-fall 2.6s var(--ec-out) forwards; animation-delay: calc(.75s + var(--d, 0) * .2s); }
+@keyframes emma_console-fall { 0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); } 10% { opacity: 1; } 70% { opacity: .8; } 100% { opacity: 0; transform: translate3d(calc(var(--x, 0) * calc(.35 * var(--cu))), calc(32 * var(--cu)), 0) rotate(520deg); } }
+
+/* ---------------------------------------------------------------- doors (s07_l02)
+   the doors lean in a touch (anticipation), then accelerate out of the way; the middle one
+   first, the outer two after it (60 ms apart); a late screen gets the open state at once */
+.cs-act-emma_console .ec-door { position: absolute; top: calc(12 * var(--cu)); width: calc(30 * var(--cu)); height: calc(29 * var(--cu)); --r: calc(1.3 * var(--cu)); transition: transform .7s var(--ec-out), opacity .5s var(--ec-out); }
+.cs-act-emma_console .ec-door.ec-dleft { left: calc(18 * var(--cu)); transform: perspective(var(--ec-p)) rotateY(12deg); transition-delay: 60ms; }
+.cs-act-emma_console .ec-door.ec-dright { left: calc(44 * var(--cu)); transform: perspective(var(--ec-p)) rotateY(-12deg); transition-delay: 120ms; }
+.cs-act-emma_console .ec-door.ec-dmid { left: calc(35 * var(--cu)); width: calc(30 * var(--cu)); opacity: .9; transform: perspective(var(--ec-p)) translate3d(0, 0, 0); }
+.cs-act-emma_console.ec-open .ec-door.ec-dleft { transform: perspective(var(--ec-p)) translate3d(calc(-30 * var(--cu)), 0, calc(-10 * var(--cu))) rotateY(64deg); opacity: .2; }
+.cs-act-emma_console.ec-open .ec-door.ec-dright { transform: perspective(var(--ec-p)) translate3d(calc(30 * var(--cu)), 0, calc(-10 * var(--cu))) rotateY(-64deg); opacity: .2; }
+.cs-act-emma_console.ec-open .ec-door.ec-dmid { opacity: 0; transform: perspective(var(--ec-p)) translate3d(0, 0, calc(-12 * var(--cu))); }
+.cs-act-emma_console.ec-open.cs-live:not(.cs-instant) .ec-door.ec-dleft { animation: emma_console-dleft .85s var(--ec-e) 60ms 1 backwards; }
+.cs-act-emma_console.ec-open.cs-live:not(.cs-instant) .ec-door.ec-dright { animation: emma_console-dright .85s var(--ec-e) 120ms 1 backwards; }
+@keyframes emma_console-dleft {
+  0% { transform: perspective(var(--ec-p)) rotateY(12deg); opacity: 1; }
+  20% { transform: perspective(var(--ec-p)) translate3d(calc(.8 * var(--cu)), 0, calc(1.2 * var(--cu))) rotateY(8deg); opacity: 1; animation-timing-function: var(--ec-out); }
+  100% { transform: perspective(var(--ec-p)) translate3d(calc(-30 * var(--cu)), 0, calc(-10 * var(--cu))) rotateY(64deg); opacity: .2; }
+}
+@keyframes emma_console-dright {
+  0% { transform: perspective(var(--ec-p)) rotateY(-12deg); opacity: 1; }
+  20% { transform: perspective(var(--ec-p)) translate3d(calc(-.8 * var(--cu)), 0, calc(1.2 * var(--cu))) rotateY(-8deg); opacity: 1; animation-timing-function: var(--ec-out); }
+  100% { transform: perspective(var(--ec-p)) translate3d(calc(30 * var(--cu)), 0, calc(-10 * var(--cu))) rotateY(-64deg); opacity: .2; }
+}
+.cs-act-emma_console .ec-dg { position: absolute; left: 7%; top: 9%; width: 52%; height: 2.4%; border-radius: calc(.3 * var(--cu)); background: rgba(120, 160, 255, .2); }
+.cs-act-emma_console .ec-dg.ec-b { top: 17%; width: 38%; background: rgba(120, 160, 255, .14); }
+.cs-act-emma_console .ec-dg.ec-c { left: 7%; top: 30%; width: 86%; height: 56%; border-radius: calc(.8 * var(--cu)); background: rgba(120, 160, 255, .08); border: 1px solid rgba(120, 160, 255, .16); }
+/* the play disc emerges where the doors were; its ring follows it out (follow-through) */
+.cs-act-emma_console .ec-disc { position: absolute; left: 50%; top: calc(19.5 * var(--cu)); width: calc(11 * var(--cu)); height: calc(11 * var(--cu)); margin-left: calc(-5.5 * var(--cu)); border-radius: 50%; border: 1px solid rgba(190, 232, 255, .9); background: radial-gradient(circle at 36% 30%, rgba(120, 180, 255, .5), rgba(20, 40, 150, .55) 60%, rgba(8, 16, 70, .7)); opacity: 0; transform: scale(.7); transition: opacity .5s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console .ec-disc.ec-on { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-disc .ec-glyph { position: absolute; left: calc(3.3 * var(--cu)); top: calc(3.3 * var(--cu)); width: calc(4.4 * var(--cu)); height: calc(4.4 * var(--cu)); fill: #f4f7ff; stroke: #f4f7ff; stroke-width: 1; }
+.cs-act-emma_console .ec-dring { position: absolute; left: calc(-1.2 * var(--cu)); top: calc(-1.2 * var(--cu)); width: calc(13.4 * var(--cu)); height: calc(13.4 * var(--cu)); border-radius: 50%; border: 1px solid rgba(150, 225, 255, .8); opacity: 0; }
+.cs-act-emma_console .ec-disc.ec-on .ec-dring { animation: emma_console-dring .9s var(--ec-in) .25s 1 backwards, emma_console-dbreathe 4s var(--ec-sine) 1.2s infinite alternate; }
+@keyframes emma_console-dring { from { opacity: .9; transform: scale(.7); } to { opacity: .35; transform: scale(1.12); } }
+@keyframes emma_console-dbreathe { from { opacity: .35; transform: scale(1.12); } to { opacity: .2; transform: scale(1.2); } }
+/* (fix round 19 Nov) s07_l02's screen of light, which s07_l07 opens on: the dashboard's window,
+   at its place, holding a projector's light -- a soft glow in the middle, three wide bands of
+   light drifting across it at their own slow paces, motes rising in the beam, a vignette. It
+   does not follow the hall's light (ctx.light): the hall goes down, the screen stays lit.
+   (Its states are sc-*: a plain "gather" is the intro facade's light, 12cu wide -- the first
+   shot of this screen was a 12cu strip.)
+   It gathers on "Everyone" / "This page", is whole with the title, and draws back as the
+   dashboard comes up in it */
+.cs-act-emma_console .ec-scr { position: absolute; left: calc(.7 * var(--cu)); top: calc(.7 * var(--cu)); right: calc(.7 * var(--cu)); bottom: calc(.7 * var(--cu)); border-radius: calc(.9 * var(--cu)); overflow: hidden; pointer-events: none;
+  background: radial-gradient(ellipse 62% 70% at 50% 46%, rgba(96, 170, 255, .26), rgba(47, 107, 255, .1) 52%, rgba(8, 16, 60, 0) 100%), linear-gradient(180deg, #050b26, #030616);
+  opacity: .6; transform: scale(.985); transition: opacity .9s var(--ec-e), transform 1.2s var(--ec-e); }
+.cs-act-emma_console .ec-scr.ec-sc-gather { opacity: .82; transform: scale(.995); }
+.cs-act-emma_console .ec-scr.ec-sc-show { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-scr.ec-sc-show.ec-sc-gone { opacity: 0; transform: scale(.97); transition: opacity .7s var(--ec-e), transform .9s var(--ec-e); }
+.cs-act-emma_console .ec-scrb { position: absolute; top: -20%; left: 0; height: 140%; width: 44%; opacity: .55; transform: translate3d(-60%, 0, 0) skewX(-16deg);
+  background: linear-gradient(90deg, rgba(110, 231, 255, 0), rgba(150, 210, 255, .2) 50%, rgba(110, 231, 255, 0));
+  animation: emma_console-scrb 12s var(--ec-sine) -3s infinite alternate; }
+.cs-act-emma_console .ec-scrb.ec-b { width: 30%; opacity: .45; animation-duration: 15.5s; animation-delay: -9s; }
+.cs-act-emma_console .ec-scrb.ec-c { width: 62%; opacity: .35; animation-duration: 19s; animation-delay: -14s; animation-direction: alternate-reverse;
+  background: linear-gradient(90deg, rgba(166, 216, 247, 0), rgba(200, 241, 234, .14) 50%, rgba(166, 216, 247, 0)); }
+@keyframes emma_console-scrb { from { transform: translate3d(-55%, 0, 0) skewX(-16deg); } to { transform: translate3d(185%, 0, 0) skewX(-16deg); } }
+.cs-act-emma_console .ec-scrm { position: absolute; left: 0; top: 0; width: 100%; height: 160%; opacity: .7;
+  /* (three sparse tiles of unlike periods laid over one another: a single tile read as a grid of dots) */
+  background: radial-gradient(circle at 12% 30%, rgba(220, 240, 255, .6) 0 calc(.08 * var(--cu)), rgba(220, 240, 255, 0) calc(.19 * var(--cu))) 0 0 / calc(17.3 * var(--cu)) calc(11.9 * var(--cu)),
+    radial-gradient(circle at 64% 72%, rgba(190, 230, 255, .5) 0 calc(.07 * var(--cu)), rgba(190, 230, 255, 0) calc(.16 * var(--cu))) calc(3.1 * var(--cu)) calc(1.7 * var(--cu)) / calc(23.9 * var(--cu)) calc(15.1 * var(--cu)),
+    radial-gradient(circle at 38% 18%, rgba(210, 236, 255, .42) 0 calc(.06 * var(--cu)), rgba(210, 236, 255, 0) calc(.14 * var(--cu))) calc(7.7 * var(--cu)) calc(4.3 * var(--cu)) / calc(13.1 * var(--cu)) calc(19.7 * var(--cu));
+  animation: emma_console-scrm 22s var(--ec-sine) -7s infinite alternate; }
+@keyframes emma_console-scrm { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(1.2 * var(--cu)), -30%, 0); } }
+.cs-act-emma_console .ec-scrv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: radial-gradient(ellipse 75% 80% at 50% 48%, rgba(3, 5, 13, 0) 55%, rgba(3, 5, 13, .55) 100%); }
+/* the title in the screen */
+.cs-act-emma_console .ec-sayw { position: absolute; left: 0; right: 0; top: calc(11.9 * var(--cu)); text-align: center; opacity: 0; transition: opacity .25s var(--ec-out); }
+.cs-act-emma_console .ec-sayw.ec-on { opacity: 1; transition: none; }
+.cs-act-emma_console .ec-sayw .ec-sy { font-size: calc(3.4 * var(--cu)); }
+/* s07_l07: the dashboard's own screen comes up in the light, from a little lower */
+.cs-act-emma_console .ec-holo { transition: opacity .8s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console .ec-holo.ec-dark { opacity: 0; transform: translate3d(0, calc(.8 * var(--cu)), 0); }
+
+/* ---------------------------------------------------------------- water (s07_l07) */
+.cs-act-emma_console .ec-wwin { position: absolute; left: calc(18.75 * var(--cu)); top: calc(13.6 * var(--cu)); width: calc(62.5 * var(--cu)); height: calc(28.4 * var(--cu)); --r: calc(1.3 * var(--cu)); transition: transform .9s var(--ec-in), opacity .5s var(--ec-e); }
+.cs-act-emma_console .ec-wwin.ec-s-below { opacity: 0; transform: perspective(var(--ec-p)) translate3d(0, calc(6 * var(--cu)), calc(-10 * var(--cu))) rotateX(14deg); }
+.cs-act-emma_console .ec-wwin.ec-up { opacity: 1; transform: perspective(var(--ec-p)) rotateX(3deg); }
+/* staging: while the team's card has the stage, the dashboard steps back */
+.cs-act-emma_console .ec-wwin.ec-up.ec-dim { opacity: .62; --ec-glow: .45; transform: perspective(var(--ec-p)) translate3d(0, 0, calc(-4 * var(--cu))) rotateX(3deg); transition: transform .9s var(--ec-e), opacity .5s var(--ec-e); }
+.cs-act-emma_console .ec-holo { position: absolute; left: calc(.7 * var(--cu)); top: calc(.7 * var(--cu)); right: calc(.7 * var(--cu)); height: calc(14 * var(--cu)); border-radius: calc(.9 * var(--cu)); overflow: hidden; background: #02040c; border: 1px solid rgba(150, 190, 255, .5); }
+.cs-act-emma_console .ec-rl { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_console .ec-rl .cs-aimg { object-position: 50% 47%; }
+.cs-act-emma_console .ec-rl.ec-a1, .cs-act-emma_console .ec-rl.ec-a2, .cs-act-emma_console .ec-rl.ec-a3 { opacity: 0; }
+.cs-act-emma_console .ec-holo.ec-cycle .ec-rl.ec-a1 { animation: emma_console-r1 8s var(--ec-sine) infinite; }
+.cs-act-emma_console .ec-holo.ec-cycle .ec-rl.ec-a2 { animation: emma_console-r2 8s var(--ec-sine) infinite; }
+.cs-act-emma_console .ec-holo.ec-cycle .ec-rl.ec-a3 { animation: emma_console-r3 8s var(--ec-sine) infinite; }
+@keyframes emma_console-r1 { 0% { opacity: 0; } 12% { opacity: 1; } 28% { opacity: 1; } 40% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes emma_console-r2 { 0% { opacity: 0; } 25% { opacity: 0; } 40% { opacity: 1; } 56% { opacity: 1; } 68% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes emma_console-r3 { 0% { opacity: 0; } 52% { opacity: 0; } 66% { opacity: 1; } 84% { opacity: 1; } 96% { opacity: 0; } 100% { opacity: 0; } }
+/* the hologram's bands: faint lines that shimmer and drift on its screen while it is up */
+.cs-act-emma_console .ec-bands { position: absolute; left: 0; top: calc(-1 * var(--cu)); width: 100%; height: calc(100% + 2 * var(--cu)); pointer-events: none; opacity: .5;
+  background: repeating-linear-gradient(180deg, rgba(150, 215, 255, .09) 0, rgba(150, 215, 255, .09) calc(.12 * var(--cu)), rgba(150, 215, 255, 0) calc(.12 * var(--cu)), rgba(150, 215, 255, 0) calc(.6 * var(--cu)));
+  animation: emma_console-bands 3.6s var(--ec-sine) infinite alternate; }
+@keyframes emma_console-bands { from { opacity: .35; transform: translate3d(0, calc(-.3 * var(--cu)), 0); } to { opacity: .75; transform: translate3d(0, calc(.3 * var(--cu)), 0); } }
+.cs-act-emma_console .ec-wplate { position: absolute; left: calc(.9 * var(--cu)); top: calc(.9 * var(--cu)); z-index: 3; padding: calc(.62 * var(--cu)) calc(1.5 * var(--cu)) calc(.7 * var(--cu)) calc(1.9 * var(--cu)); border-radius: calc(.7 * var(--cu)); border: 1px solid rgba(130, 175, 255, .6); background: rgba(6, 12, 46, .8); }
+.cs-act-emma_console .ec-wplate::before { content: ""; position: absolute; left: calc(.7 * var(--cu)); top: calc(.58 * var(--cu)); bottom: calc(.58 * var(--cu)); width: calc(.2 * var(--cu)); border-radius: calc(.1 * var(--cu)); background: rgb(var(--cs-cyan)); }
+.cs-act-emma_console .ec-wpt { font-size: calc(2 * var(--cu)); font-weight: 520; white-space: nowrap; }
+/* ambient: a scan line sweeps the screen now and then (eased, never linear) */
+.cs-act-emma_console .ec-wscan { position: absolute; left: 0; top: 0; width: calc(.16 * var(--cu)); height: 100%; background: linear-gradient(180deg, rgba(110, 231, 255, 0), #bfeaff 30%, #ffffff 50%, #bfeaff 70%, rgba(110, 231, 255, 0)); opacity: 0; }
+.cs-act-emma_console .ec-holo.ec-cycle .ec-wscan { animation: emma_console-wscan 8s var(--ec-sine) infinite; }
+@keyframes emma_console-wscan { 0% { opacity: 0; transform: translate3d(0, 0, 0); } 8% { opacity: .9; } 50% { opacity: .9; } 60% { opacity: 0; transform: translate3d(calc(56 * var(--cu)), 0, 0); } 100% { opacity: 0; transform: translate3d(calc(56 * var(--cu)), 0, 0); } }
+.cs-act-emma_console .ec-inst { position: absolute; left: calc(.7 * var(--cu)); right: calc(.7 * var(--cu)); top: calc(15.2 * var(--cu)); bottom: calc(.7 * var(--cu)); opacity: 0; transform: translate3d(0, calc(1.6 * var(--cu)), 0); transition: opacity .5s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console .ec-inst.ec-in { opacity: 1; transform: none; }
+.cs-act-emma_console .ec-gauge { position: absolute; top: calc(.5 * var(--cu)); width: calc(7 * var(--cu)); height: calc(7 * var(--cu)); left: calc(1.2 * var(--cu) + var(--i, 0) * 8.8 * var(--cu)); }
+.cs-act-emma_console .ec-gsv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+.cs-act-emma_console .ec-gtrack { fill: none; stroke: rgba(130, 175, 255, .24); stroke-width: 2.2; }
+/* each gauge's arc draws round its track, 80 ms after the one before; then turns slowly */
+.cs-act-emma_console .ec-garc { fill: none; stroke: rgb(var(--cs-sky)); stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: var(--len, .3) 1; stroke-dashoffset: var(--len, .3); transform-origin: 50% 50%; transition: stroke-dashoffset .9s var(--ec-in); transition-delay: calc(var(--i, 0) * 80ms); }
+.cs-act-emma_console .ec-gspin { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cs-act-emma_console .ec-gauge.ec-drawn .ec-garc { stroke-dashoffset: 0; }
+.cs-act-emma_console .ec-inst.ec-live .ec-gspin { animation: emma_console-gturn 16s linear 1s infinite; }
+.cs-act-emma_console .ec-gauge:nth-child(2) .ec-gspin { animation-duration: 21s; }
+.cs-act-emma_console .ec-gauge:nth-child(3) .ec-gspin { animation-duration: 18s; animation-direction: reverse; }
+.cs-act-emma_console .ec-gauge:nth-child(4) .ec-gspin { animation-duration: 24s; }
+@keyframes emma_console-gturn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.cs-act-emma_console .ec-wave { position: absolute; left: calc(41 * var(--cu)); top: calc(.5 * var(--cu)); width: calc(19.6 * var(--cu)); height: calc(7 * var(--cu)); overflow: visible; }
+.cs-act-emma_console .ec-wl1, .cs-act-emma_console .ec-wl2 { fill: none; stroke-linecap: round; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .9s var(--ec-in) .3s; vector-effect: non-scaling-stroke; }
+.cs-act-emma_console .ec-wl1 { stroke: #bfeaff; stroke-width: 3.2; }
+.cs-act-emma_console .ec-wl2 { stroke: rgb(var(--cs-sky)); stroke-width: 2.4; transition-delay: .42s; }
+.cs-act-emma_console .ec-wave.ec-drawn .ec-wl1, .cs-act-emma_console .ec-wave.ec-drawn .ec-wl2 { stroke-dashoffset: 0; }
+.cs-act-emma_console .ec-winfo { position: absolute; left: calc(1.2 * var(--cu)); top: calc(8.1 * var(--cu)); opacity: 0; transition: opacity .25s var(--ec-out); }
+.cs-act-emma_console .ec-winfo.ec-on { opacity: 1; transition: none; }
+.cs-act-emma_console .ec-winfo .ec-wil { font-size: calc(2 * var(--cu)); white-space: nowrap; }
+.cs-act-emma_console .ec-k2 { top: calc(5.4 * var(--cu)); }
+.cs-act-emma_console .ec-k2 > .cs-text { font-size: calc(1.35 * var(--cu)); }
+/* the team's card slides out from behind the dashboard's right edge */
+.cs-act-emma_console .ec-wteam { left: calc(73.4 * var(--cu)); top: calc(20.6 * var(--cu)); --cw: 21.6; opacity: 0; transform: perspective(var(--ec-p)) translate3d(calc(-6 * var(--cu)), 0, calc(-4 * var(--cu))) rotateY(-24deg) scale(.94); transition: opacity .25s var(--ec-out), transform .3s var(--ec-out); }
+.cs-act-emma_console .ec-wteam.ec-in { opacity: 1; transform: perspective(var(--ec-p)) translate3d(0, 0, calc(4 * var(--cu))) rotateY(-12deg); transition: opacity .35s var(--ec-e), transform .9s var(--ec-in); }
+.cs-act-emma_console .ec-wteam.ec-in.ec-dim { opacity: .7; --ec-glow: .5; transform: perspective(var(--ec-p)) translate3d(0, 0, calc(1 * var(--cu))) rotateY(-12deg); transition: opacity .5s var(--ec-e), transform .9s var(--ec-e); }
+.cs-act-emma_console .ec-wteam .ec-cmain { font-size: calc(1.75 * var(--cu)); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-wz { left: calc(2.4 * var(--cu)); top: calc(19.6 * var(--cu)); width: calc(20.5 * var(--cu)); height: calc(11.4 * var(--cu)); }
+.cs-act-emma_console .cs-sat.ec-satp.ec-wz .cs-aimg { object-fit: cover; }
+.cs-act-emma_console .cs-sat.ec-wtag { left: calc(22 * var(--cu)); top: calc(38.4 * var(--cu)); width: calc(56 * var(--cu)); box-sizing: border-box; text-align: center; }
+.cs-act-emma_console .ec-wtag .cs-text { font-size: calc(1.9 * var(--cu)); }
+
+/* s07_l07: the drawn dashboard (no figures) in the console window and its close-up satellite;
+   its three sparklines draw one after another (80 ms), then the long trend under them */
+.cs-act-emma_console .ec-dash { position: absolute; left: 0; top: 0; width: 100%; height: 100%; fill: none; }
+.cs-act-emma_console .ec-dk-drop { fill: rgba(var(--cs-cyan), .18); stroke: rgb(var(--cs-cyan)); stroke-width: 1.2; }
+.cs-act-emma_console .ec-dk-tile { fill: rgba(40, 70, 160, .28); stroke: rgba(150, 190, 255, .55); stroke-width: .6; }
+.cs-act-emma_console .ec-dk-spark, .cs-act-emma_console .ec-dk-trend { stroke: rgb(var(--cs-cyan)); stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .9s var(--ec-in); transition-delay: calc(var(--i, 0) * 80ms); }
+.cs-act-emma_console .ec-dk-trend { transition-delay: .3s; }
+.cs-act-emma_console .ec-dk-axis { stroke: rgba(150, 190, 255, .35); stroke-width: .5; }
+.cs-act-emma_console .ec-holo.ec-cycle .ec-dk-spark, .cs-act-emma_console .ec-holo.ec-cycle .ec-dk-trend,
+.cs-act-emma_console .cs-sat.ec-satp.ec-in .ec-dk-spark, .cs-act-emma_console .cs-sat.ec-satp.ec-in .ec-dk-trend { stroke-dashoffset: 0; }
+.cs-act-emma_console .cs-sat.ec-satp .ec-dzoom { position: absolute; left: calc(.42 * var(--cu)); top: calc(.42 * var(--cu)); width: calc(100% - .84 * var(--cu)); height: calc(100% - .84 * var(--cu)); border-radius: calc(.75 * var(--cu)); background: #02040c; }
+
+/* ==== the owner's review of 20 Nov (PDF p.15, s07_l02 options.end 'zoom'): once she has said it, the
+   title fades and the camera goes into the screen of light until it fills the whole screen -- the
+   video's screen; the next line (s07_l07) opens there and draws back out to its window ==== */
+.cs-act-emma_console .ec-zoomw {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  transform-origin: calc(50 * var(--cu)) calc(27.8 * var(--cu)); transition: transform 2.6s var(--ec-e);
+}
+.cs-act-emma_console .ec-zoomw.ec-zin { transform: translate3d(0, calc(.33 * var(--cu)), 0) scale(2.32); }
+.cs-act-emma_console .ec-zoomw.ec-now { transition: none; }
+.cs-act-emma_console .ec-zoomw.ec-out { transition: transform 2.2s var(--ec-e); }
+.cs-act-emma_console .ec-sayw.ec-gone, .cs-act-emma_console .ec-topbar.ec-gone { opacity: 0; transition: opacity .6s var(--ec-out); }

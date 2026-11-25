@@ -32,12 +32,23 @@ from pathlib import Path
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app import display, face_mirror, heard, robot_contracts, robot_face_link, speech_gestures, turnlog, voices
+from app import display, face_mirror, heard, live_subtitle, robot_contracts, robot_face_link, speech_gestures, turnlog, voices
 from app.config import settings
 from app.prompts import SALES_PROFILES, build_instructions, greeting_for
 from app.providers import ProviderError, default_voice_for, get_provider
 
 logger = logging.getLogger("condo_voice.session")
+
+
+def _frame_rms(pcm16: bytes) -> float:
+    """0..1 loudness of one PCM16 mono frame (the turn log's scale)."""
+    n = len(pcm16) // 2
+    if not n:
+        return 0.0
+    import numpy as np
+
+    a = np.frombuffer(pcm16[: n * 2], dtype="<i2").astype(np.float32) / 32768.0
+    return float(np.sqrt(np.mean(a * a)))
 
 
 #: Words of a failure that was the network's. The first three were the whole
@@ -183,6 +194,12 @@ GOODBYE_TEXT = ("คนที่คุยอยู่เพิ่งเดิน
                 "เช่น 'ขอบคุณที่แวะมานะคะ' ใช้ภาษาเดียวกับที่คุยกันอยู่ "
                 "ห้ามถามคำถาม ห้ามเล่าเรื่องที่ค้างอยู่ต่อ ห้ามพูดถึงกล้อง "
                 "และห้ามพูดว่า 'ระบบตรวจพบ'")
+def _ceremony_now() -> bool:
+    from app import event_host
+
+    return event_host.ceremony_now()
+
+
 #: The follow-up after silence (FOLLOW_UP_AFTER_S). An instruction, the
 #: model's own words: one question that carries the topic on, never a
 #: "anything else?" -- and explicitly the "ไม่ถามต่อ" rule's exception.
@@ -211,6 +228,27 @@ _CLOSING_TH = ("ขอบคุณ", "ไม่เป็นไร", "แค่�
                "ไม่สนใจ")
 _CLOSING_EN = re.compile(r"\bthank|that'?s all|that is all|\bbye\b|no thanks|not interested",
                          re.IGNORECASE)
+
+
+def mic_device_row(event: dict) -> dict:
+    """The input a call's page opened (`mic_state` why=call_open, sent after `ready`): its name and
+    what the browser applied, and the names of the inputs it can see. Owner 10 Nov: an external mic
+    may replace the robot's array -- before this, nothing in the logs said which input a call used
+    (the page sent an empty label), so a receiver ignored by Android's routing looked like a quiet
+    room. Device names only, cut short; anything of the wrong type is dropped, never coerced."""
+    def number(value):
+        ok = isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 384000
+        return value if ok else None
+
+    def flag(value):
+        return value if isinstance(value, bool) else None
+
+    label = event.get("label")
+    inputs = event.get("inputs")
+    return {"label": label[:60] if isinstance(label, str) else "",
+            "rate": number(event.get("rate")), "channels": number(event.get("channels")),
+            "agc": flag(event.get("agc")), "ec": flag(event.get("ec")), "ns": flag(event.get("ns")),
+            "inputs": [x[:40] for x in inputs[:6] if isinstance(x, str)] if isinstance(inputs, list) else None}
 
 
 def _guest_closed(text: str) -> bool:
@@ -342,7 +380,10 @@ class VoiceSession:
         # A public mode URL cannot unlock the machine owner's private persona.
         # `event` = the sales host at an event (the "Emma Event" robot app,
         # app/event_host.py): condo's rules with the event's block on top.
-        if self.profile not in {"condo", "emma", "joke", "translator", "event"}:
+        # `ceremony` = the sales host in the opening ceremony (the "Emma Ceremony"
+        # robot app, owner 9 Nov -- app/ceremony.py): condo's rules with the
+        # ceremony's block, and its face's call IS the ceremony mode.
+        if self.profile not in {"condo", "emma", "joke", "translator", "event", "ceremony"}:
             self.profile = "condo"
         if self.profile == "emma" and settings.assistant_profile != "emma":
             self.profile = "condo"
@@ -407,6 +448,9 @@ class VoiceSession:
         self._follow_up_task: asyncio.Task | None = None
         self._said_since_guest = ""
         self._guest_text = ""
+        #: A booth guest's greeting (events.announce said_private): 1 = its turn, 2 = that turn is
+        #: over and nobody has spoken since. No text in `said` rows until then.
+        self._said_private = 0
         # The choice buttons under her own question (_offer_choices): what she
         # said since the last turn_complete, and which set is on screen now.
         self._said_this_turn = ""
@@ -455,6 +499,13 @@ class VoiceSession:
         _registry.robot_face_session.set(self if robot_face else None)
         if robot_face:
             robot_face_link.claim(self)
+            # The Emma Ceremony app's face: the ceremony mode is on from here, before the dial
+            # (owner 9 Nov -- the app open IS the mode: a call that opens mid-ceremony must not
+            # greet the room). A takeover or this call's end turns it off (app/ceremony.py).
+            if self.profile == "ceremony":
+                from app import ceremony
+
+                ceremony.claim(self)
         # Captions and activity marks are kept per conversation (heard.py);
         # the provider has no reference to its session, so it finds it here.
         heard.bind_session(self)
@@ -490,7 +541,9 @@ class VoiceSession:
             robot_face=robot_face,
         )
         dial_kwargs = dict(
-            greeting=None if self.summoned else greeting_for(self.profile),
+            # No greeting in the ceremony app (9 Nov): the room hears only the ceremony's lines,
+            # and a call that opens mid-ceremony (the network, a restart) must not welcome anyone.
+            greeting=None if (self.summoned or self.profile == "ceremony") else greeting_for(self.profile),
             # Toolless by config for the translator, not by prompt: a
             # declared tool is a callable tool whatever the prompt says.
             use_tools=(self.profile != "translator"),
@@ -498,6 +551,10 @@ class VoiceSession:
             # hears the person in front, EmmaJoke/interpreter hear the room.
             vad_floor=settings.call_vad_floor(self.profile),
         )
+        _silence_ms = settings.call_vad_silence_ms(self.profile)
+        if _silence_ms is not None:
+            # CEREMONY_LIVE_END_SILENCE_MS (owner 24 Nov): the live-first ceremony call waits longer for the host to finish
+            dial_kwargs["vad_silence_ms"] = _silence_ms
         if self._offline_first:
             # OFFLINE_FALLBACK, link already known down (or asked for): no
             # Gemini dial to wait 10 s on -- the offline voice opens at once.
@@ -505,6 +562,20 @@ class VoiceSession:
             provider = get_provider("offline", self.voice, instructions, **dial_kwargs)
         else:
             provider = get_provider(self.provider_name, self.voice, instructions, **dial_kwargs)
+        if settings.one_voice_profiles:
+            # ONE_VOICE_PROFILES (app/one_voice.py, owner 19 Nov): the voice door at the local
+            # VAD's opening, for the profiles listed. Empty (the default) = this one read.
+            # In a thread: the first call hashes the 28 MB speaker model (review 19 Nov).
+            from app import one_voice
+
+            gate = getattr(provider, "_vad_gate", None)
+            if gate is not None:
+                gate.voice_door = await asyncio.to_thread(one_voice.door_for, self.profile)
+            else:
+                # No local VAD gate (VAD_MODE=gemini, the default; the Silero model missing; the
+                # offline provider): nothing to hang the door on, so every voice passes -- said
+                # out loud, not silently (review 20 Nov: this branch used to log nothing).
+                one_voice.no_gate(self.profile, provider=type(provider).__name__)
         opener = self._offline_dial(provider, instructions, dial_kwargs)
 
         from app.metrics import active
@@ -589,6 +660,16 @@ class VoiceSession:
                     asks = quick_asks.for_page(self.profile, settings.project_name)
                     if asks is not None:
                         ready["quick_asks"] = asks
+                if robot_face and self.profile == "ceremony" and settings.ceremony_face_film:
+                    # The ceremony's film on the chest screen too (app/face_film.py): the face page's frame
+                    # enters with this one-time ticket (face_mirror.view does not pass `ready`'s extras on)
+                    from app import face_film
+
+                    film = face_film.ticket()
+                    if film:
+                        ready["film_ticket"] = film
+                        if settings.ceremony_face_film_scale < 1:
+                            ready["film_scale"] = round(settings.ceremony_face_film_scale, 2)
                 if self._offline:
                     # OFFLINE_FALLBACK: the face says so in its status pill
                     # (an honest "Offline mode", not a Gemini-sounding Ready).
@@ -722,6 +803,20 @@ class VoiceSession:
         "_close_when_nobody_is_there": "idle_timeout", "_engagement_watch": "goodbye",
         "_offline_until_online": "network_back",
     }
+
+    def keep_line(self) -> None:
+        """Somebody's approach is using this line (face_approach): its idle clock counts from now.
+        Not `_idle_from` (one writer, and it means a greeting turn) nor `_last_heard_at` (nobody was
+        heard). When the approach stops calling it, the ordinary rules end the line."""
+        self._kept_at = time.monotonic()
+
+    def open_ears(self, why: str) -> None:
+        """A summoned call hears from now, not after its greeting (SUMMONED_HOLD_MAX_S): the walk up
+        to somebody (face_approach), whose greeting comes at the stop and whose "หยุด" comes before it."""
+        self._ears_opened_early = True
+        if getattr(self, "_ears_closed_until", None) is not None:
+            self._ears_closed_until = None
+            turnlog.record("ears_open", greeted=False, why=why)
 
     def _note_end(self, reason: str) -> None:
         """Why this call is ending (a category, never text). First cause
@@ -1064,6 +1159,57 @@ class VoiceSession:
             from app import enhance
 
             self._enhancer = enhance.for_session(getattr(provider, "input_sample_rate", 16000))
+
+    #: After a guarded stretch ends, how long the frames' loudness is still watched (and only
+    #: watched): what the room said back AFTER the tail is the number the tail is set from.
+    ROOM_ECHO_WATCH_S = 0.6
+
+    def _room_echo_guard(self, data: bytes) -> bytes | None:
+        """The room's speakers play her voice later than the robot's own (room_screens.
+        echo_tail_s): until that long after her voice ended by the server's clock, the mic
+        frame is silence. With the local VAD gate that is zeros of the same length (the
+        ceremony's deaf mic: an open segment closes cleanly, the pre-roll keeps nothing of
+        her echo); with server-side detection it is None = nothing sent (gemini.send_audio's
+        own rule: silence sent upstream is still a stream to judge).
+
+        One turn-log row per stretch, numbers only: `peak` over the whole stretch, `after` =
+        inside the tail itself, `post` = the ROOM_ECHO_WATCH_S after the tail (heard as it
+        came) -- a `post` as loud as `after` says the tail is too short. On the robot face
+        the page drops frames itself while she plays and 0.35 s after, so the stretch's
+        frames are the tail's from +0.35 s."""
+        from app import room_screens
+
+        until = getattr(self, "_play_until", 0.0) or 0.0
+        tail = room_screens.echo_tail_s() if until else 0.0
+        now = time.monotonic()
+        held = getattr(self, "_room_echo", None)
+        if tail > 0 and now < until + tail:
+            if held is None or held.get("ended") is not None:
+                if held is not None:
+                    self._room_echo_row(held)             # a new reply began inside the watch
+                held = self._room_echo = {"frames": 0, "peak": 0.0, "after": 0.0, "post": 0.0,
+                                          "tail": tail, "ended": None}
+            rms = _frame_rms(data)
+            held["frames"] += 1
+            held["peak"] = max(held["peak"], rms)
+            if now >= until:                              # her voice has ended: what the tail itself heard
+                held["after"] = max(held["after"], rms)
+            if getattr(self.provider, "_vad_gate", None) is None:
+                return None
+            return bytes(len(data))
+        if held is not None:
+            if held["ended"] is None:
+                held["ended"] = now
+            if now - held["ended"] < self.ROOM_ECHO_WATCH_S:
+                held["post"] = max(held["post"], _frame_rms(data))
+            else:
+                self._room_echo = None
+                self._room_echo_row(held)
+        return data
+
+    def _room_echo_row(self, held: dict) -> None:
+        turnlog.record("room_echo_guard", frames=held["frames"], peak=round(held["peak"], 4),
+                       after=round(held["after"], 4), post=round(held["post"], 4), tail_s=held["tail"])
 
     def _note_playback(self, seconds: float) -> None:
         """Reply audio handed to the page plays back to back from the moment
@@ -1455,6 +1601,7 @@ class VoiceSession:
                 if settings.head_follow:
                     await self._turn_head(now)
                 if (settings.focus_invite and settings.focus_invite_denied_n > 0
+                        and not _ceremony_now()
                         and self.summoned and settings.focus_require_face
                         and (getattr(self, "_greeting_turn_seen", False)
                              or getattr(self, "_ever_heard", False))):
@@ -1641,8 +1788,11 @@ class VoiceSession:
             # idled, re-greetable, and once the guest spoke ended by the
             # 30 s ABANDON rule instead of IDLE_TIMEOUT_S. A turn on a line
             # somebody already spoke on is an answer, not a greeting.
+            # ...and a line face_approach opened its ears on before the stop (`open_ears`): chatter
+            # heard on the way made it "used", and its greeting was never counted -- the line then
+            # lived by the 30 s ABANDON rule, not IDLE_TIMEOUT_S (review 6 Nov).
             if not (getattr(self, "summoned", False)
-                    and not getattr(self, "_ever_heard", False)):
+                    and (not getattr(self, "_ever_heard", False) or getattr(self, "_ears_opened_early", False))):
                 return
         self._greeting_turn_seen = True
         now = time.monotonic()
@@ -1712,6 +1862,11 @@ class VoiceSession:
                             continue
                     self._mic_report(data)
                     self._call_debug_feed(data)
+                    # the room's copy of her own voice (ROOM_SCREEN_ECHO_TAIL_S): before the
+                    # name ears too -- her own "Emma" out of the room's speakers is not a call
+                    data = self._room_echo_guard(data)
+                    if data is None:
+                        continue
                     if getattr(self, "_call_ears", None) is not None:
                         # Before the gate sees this frame: a hit here opens
                         # focus's window in time for the gate's question on
@@ -1765,6 +1920,15 @@ class VoiceSession:
                     if event.get("type") == "quick_ask":
                         await self._quick_ask(event)
                         continue
+                    if event.get("type") == "open_app_result":
+                        # The robot face's answer to the ceremony's handoff (app/ceremony.py
+                        # `handoff`: it asked this page to open the Emma Event app). Only the
+                        # call that was asked counts; the module checks that itself.
+                        if len(text) <= 512:
+                            from app import ceremony
+
+                            ceremony.open_app_result(self, event)
+                        continue
                     if event.get("type") == "story_report":
                         self._story_report(event.get("report"))
                         continue
@@ -1781,6 +1945,19 @@ class VoiceSession:
                                        muted=bool(event.get("muted")),
                                        state=event.get("state"),
                                        handed=bool(event.get("handed")))
+                        if event.get("why") == "call_open":
+                            turnlog.record("mic_device", **mic_device_row(event))
+                        # The mic button (voice-preview.html toggleMute): the
+                        # turn log's only record of a press (5 Nov: what the
+                        # owner reported could only be inferred from gaps).
+                        # ...and the camera's line under a hold: waiting for its greeting
+                        # (muted) and after it (open). Review 6 Nov: the waiting line never told,
+                        # so it was held open for ever as an unused standing line, and the phone
+                        # read the hold, not the mic, while the greeted call's mic was open.
+                        if event.get("why") in ("mute_tap", "hold_waiting", "hold_greeting", "hold_expired"):
+                            self._page_muted = bool(event.get("muted"))
+                            # A person's tap in this call, or the camera's waiting line: greeter tells them apart.
+                            self._page_muted_why = event.get("why") if self._page_muted else None
                         continue
                     if event.get("type") == "audio_lead":
                         # How far the browser's audio queue runs ahead of the
@@ -1951,6 +2128,7 @@ class VoiceSession:
                     # array's playback clock (its tail still runs).
                     self._play_until = min(getattr(self, "_play_until", 0.0), time.monotonic())
                     speech_gestures.on_interrupted(self)
+                    live_subtitle.cut()                    # the hall's Thai line of her live answer comes down (CEREMONY_LIVE_SUBTITLE_TH)
                     self._spoke_this_turn = False
                     self._said_this_turn = ""
                     # A barge-in mid-tour is a pause, not a skip: keep the deck
@@ -1982,7 +2160,11 @@ class VoiceSession:
                     self._spoke_this_turn = False
 
                 elif event.kind == "turn_complete":
+                    if getattr(self, "_said_private", 0):
+                        self._said_private = 2
                     self.metrics.finish()
+                    self._note_ceremony_answer(None)       # live-first slide picker: her answer is complete
+                    live_subtitle.end_turn()               # ...and the hall's Thai line ends after its last sentence
                     # she may have answered a question about a language in it
                     # (app/talk_lang.py `_held`): the menu's button follows
                     await self._show_held_language()
@@ -2059,6 +2241,7 @@ class VoiceSession:
                     _utt = (event.data or {}).get("utterance_id")
                     heard.record(event.text or "", session=self,
                                  utterance_id=_utt if isinstance(_utt, str) else None)
+                    self._note_ceremony_words()       # "ตอบสด": the host's topic on the event screen
                     # Somebody is in the room. Only guest speech resets the
                     # idle clock — the robot narrating to nobody is the case
                     # the timer exists to end, and it is busy throughout.
@@ -2084,9 +2267,15 @@ class VoiceSession:
                     if _chunk.count("\n") >= 2 and len(_chunk) >= 40:
                         self._silent_block_seen = True
                         turnlog.record("silent_block", chars=len(_chunk))
-                    turnlog.record("said", text=event.text or "")
+                    if getattr(self, "_said_private", 0):
+                        # The name is in here, spelled however the transcript spells it.
+                        turnlog.record("said", text="", withheld=True, chars=len(event.text or ""))
+                    else:
+                        turnlog.record("said", text=event.text or "")
                     self._said_since_guest = (getattr(self, "_said_since_guest", "") + (event.text or ""))[-400:]
                     self._said_this_turn = (getattr(self, "_said_this_turn", "") + (event.text or ""))[-400:]
+                    self._note_ceremony_answer(event.text or "")   # live-first slide picker: her words (app/ceremony_follow.py)
+                    live_subtitle.feed(event.text or "")           # hall's Thai subtitle of HER words (never the host's): off = returns at once
                     await self._send_json({"type": "assistant_transcript", "text": event.text or ""})
                     # ...and to the robot's own screen, which unlike this tab
                     # is being read by the guest — so it goes through the
@@ -2102,9 +2291,11 @@ class VoiceSession:
 
                 elif event.kind == "tool_dropped":
                     self._tool_finished(event, dropped=True)
+                    self._tool_mark(event, opened=False)
 
                 elif event.kind == "tool_call":
                     self._tool_started(event)
+                    self._tool_mark(event, opened=True)
                     # Review 12 Oct: a follow-up must not land while a tool runs
                     # (gemini-3.8 completes a turn BEFORE its call; with
                     # TURN_IDLE_TRACKS_TOOLS off nothing else holds it). The
@@ -2115,6 +2306,7 @@ class VoiceSession:
 
                 elif event.kind == "tool_result":
                     self._tool_finished(event, dropped=False)
+                    self._tool_mark(event, opened=False)
                     # Failures get a line of their own. 2026-08-26 16:26:
                     # play_youtube failed live ("มีข้อผิดพลาดนิดหน่อยค่ะ"),
                     # the same call worked from a fresh process minutes
@@ -2159,7 +2351,13 @@ class VoiceSession:
                             audio_lead_s=round(display.remaining_lead(), 1),
                         )
                     self._note_screen(event.text or "", data, bool(changed_screen))
+                    self._note_ceremony_picture(payload, own=True)      # her own tool's picture
                     await self._send_json(payload)
+
+                elif event.kind == "story_picture":
+                    # A story with a line the server says (a ceremony cue pressed
+                    # with a picture): no tool ran, so none of the tool rows above.
+                    await self._story_picture(event.data or {})
 
                 elif event.kind == "error":
                     # A rejected session is safety-critical: preserve that
@@ -2260,7 +2458,25 @@ class VoiceSession:
         if not flight:
             self._release_idle()
 
+    def _tool_mark(self, event, *, opened: bool) -> None:
+        """Tool calls open, each with its start, and the time of the last call or
+        result, whatever TURN_IDLE_TRACKS_TOOLS says: the camera greeter's "is she
+        answering somebody" (greeter._conversation_state). Per call and timed from
+        its own start: with tracking off, gemini.py yields no tool_dropped for a
+        cancelled call, and a count would stay up (review 6 Nov)."""
+        call_id = getattr(event, "call_id", None) or (getattr(event, "data", None) or {}).get("call_id")
+        now = time.monotonic()
+        open_calls = self.__dict__.setdefault("_tool_calls_open", {})
+        if opened:
+            open_calls[call_id or "call@%.6f" % now] = now
+        elif call_id in open_calls:
+            del open_calls[call_id]
+        elif call_id is None and open_calls:
+            open_calls.pop(min(open_calls, key=open_calls.get))   # no ids: the oldest
+        self._tool_seen_at = now
+
     def _clear_tools_in_flight(self, why: str) -> None:
+        self.__dict__.setdefault("_tool_calls_open", {}).clear()
         flight = getattr(self, "_tools_in_flight", None)
         if flight:
             logger.info("forgetting %d tool call(s) in flight (%s)", len(flight), why)
@@ -2405,9 +2621,24 @@ class VoiceSession:
         try:
             while True:
                 await asyncio.sleep(5.0)
+                from app import event_host
+
+                if event_host.ceremony_now():
+                    # Nobody talks to her through a three-minute clip, and the camera
+                    # is not looking for anybody: a hang-up here is a deaf robot when
+                    # the host next says her name. The clock starts over afterwards.
+                    # A mark of its own: `_idle_from` has one writer, the greeting (a
+                    # test holds that), and this one ends with EVENT_CEREMONY_MAX_S.
+                    self._ceremony_at = time.monotonic()
+                    continue
                 limit = settings.idle_timeout_s
                 if self.summoned and not getattr(self, "_greeting_turn_seen", False):
-                    if settings.standing_line and not self._ever_heard:
+                    # Not when muted (5 Nov): a virgin line is held so a greeting
+                    # lands fast, and landing on a closed mic she would greet
+                    # somebody she cannot hear. It ends, and the page rests on
+                    # "Muted"; the camera's bell dials a line that can listen.
+                    if (settings.standing_line and not self._ever_heard
+                            and not getattr(self, "_page_muted", False)):
                         # The standing line (owner 2026-09-30): a virgin
                         # summoned session IS the held-open line the next
                         # face greeting lands on in under a second, and it
@@ -2450,7 +2681,7 @@ class VoiceSession:
                     # voice decides there: IDLE_TIMEOUT_S of nobody heard,
                     # held by her own voice, like a call somebody tapped.
                     if (away is not None and away >= self.FOCUS_AWAY_S
-                            and focus.at_big_screen() is None):
+                            and focus.at_big_screen() is None and not focus.person_near()):
                         limit = min(limit, self.FOCUS_AWAY_S) if limit else self.FOCUS_AWAY_S
                         why = "no_face"
                 if not limit:
@@ -2465,7 +2696,11 @@ class VoiceSession:
                 # deck case in the docstring).
                 held = min(self._array_audible_until(now),
                            self._last_heard_at + self.ANSWER_HOLDS_IDLE_S)
-                quiet = now - max(self._last_heard_at, getattr(self, "_idle_from", 0.0), held)
+                # `_greeted_at`: a camera greeting on a line somebody already used (greeter.py,
+                # FACE_GREET_LAPSE_S), which `_idle_from` does not see.
+                quiet = now - max(self._last_heard_at, getattr(self, "_idle_from", 0.0), held,
+                                  getattr(self, "_ceremony_at", 0.0), getattr(self, "_greeted_at", 0.0),
+                                  getattr(self, "_kept_at", 0.0))
                 if quiet < limit:
                     continue
                 logger.info("no guest speech for %.0fs%s — ending the session", quiet,
@@ -2493,6 +2728,8 @@ class VoiceSession:
     def _guest_started_turn(self) -> None:
         """The guest spoke (or tapped a topic): whatever follow-up was
         pending is void -- they are talking; the next answer gets its own."""
+        if getattr(self, "_said_private", 0) == 2:
+            self._said_private = 0               # not during the greeting's own turn: a cough
         task = getattr(self, "_follow_up_task", None)
         if task is not None and not task.done() and getattr(self, "_answer_pending", False):
             turnlog.record("follow_up", sent=False, why="guest_spoke")
@@ -2541,9 +2778,15 @@ class VoiceSession:
 
     def _follow_up_veto(self, now: float) -> str | None:
         """Why this silence must not be followed up, or None."""
-        from app import focus
+        from app import event_host, focus
         from app.tools import slides
 
+        if event_host.ceremony_now():
+            return "ceremony"                # a question of hers into somebody's speech
+        if getattr(self, "_page_muted", False):
+            # The silence is the mute itself: nobody could answer her question,
+            # and to the person who pressed it she just came back talking.
+            return "muted"
         if _ENDS_ON_QUESTION.search((getattr(self, "_said_since_guest", "") or "").strip()):
             return "she_asked"
         if _guest_closed(getattr(self, "_guest_text", "") or ""):
@@ -2557,7 +2800,7 @@ class VoiceSession:
             # (not at a room's big screen: no face there is the TV, not an
             # empty room -- 28 Oct, 5 follow-ups vetoed with testers present)
             if (away is not None and away >= self.FOLLOW_UP_FACE_GONE_S
-                    and focus.at_big_screen() is None):
+                    and focus.at_big_screen() is None and not focus.person_near()):
                 return "nobody_in_front"     # the goodbye is the walk-away's answer
         return None
 
@@ -2788,6 +3031,82 @@ class VoiceSession:
             self._screen_staged = True
             self._story_taps = set()
 
+    async def _story_picture(self, data: dict) -> None:
+        """A story put up with a line the SERVER says -- a ceremony cue staff
+        pressed with a picture (app/event_cues.py `show`, owner 7 Nov: the map on
+        the TV with the location line). The provider put this right before the
+        line's first word, so it goes to the page exactly as a present_story
+        result inside that answer does -- same message, name and shape: the face
+        stages it (voice-preview.html showStory -> answerStaged), the line's first
+        sound finds the stage already this answer's and does not clear it, and
+        the story's clock hears the line from its first word; the room screen
+        gets its copy through `_send_json` (face_mirror.view). Built HERE from the
+        id alone: this call's own context decides which taps exist, and nothing
+        but the page ever sees the payload -- no tool ran, nothing goes back to
+        the model (event_cues tells it the id beside later tool results)."""
+        from app import stories
+
+        topic = data.get("topic") if isinstance(data.get("topic"), str) else None
+        cue = data.get("cue") if isinstance(data.get("cue"), str) else None
+        by = "offscript" if data.get("by") == "offscript" else "cue"      # present_story's own rows have no `by`
+        if data.get("clear") is True:
+            # The picture of a line that did not stand: staff stopped it, or her
+            # voice of it never came (event_cues.cut / read mode) -- down on the
+            # face and the TV (face_mirror passes a clear), its taps with it.
+            if getattr(self, "_robot_face_claim", False):
+                turnlog.record("story_picture_cleared", cue=cue, by=by)
+                self._note_screen("event_cue", {"screen": "clear"}, False)
+                cleared = {"type": "tool_result", "name": "event_cue", "result": {"screen": "clear"}}
+                self._note_ceremony_picture(cleared, own=False)
+                await self._send_json(cleared)
+            return
+        if not getattr(self, "_robot_face_claim", False):
+            turnlog.record("story_picture_failed", topic=topic, cue=cue, by=by, error="not_robot_face")
+            return
+        try:
+            # No taps (review 7 Nov, B2): a guest or the host touching the chest screen
+            # made her talk over the ceremony and changed the picture on the TV. A
+            # ceremony line's picture is to look at.
+            result = await asyncio.to_thread(stories.picture, topic, taps=False)
+        except Exception:                       # noqa: BLE001 -- a picture never stops her line
+            logger.exception("the picture %s could not be built", topic)
+            result = {"ok": False, "error": "error"}
+        if not isinstance(result, dict) or not result.get("ok") or not isinstance(result.get("story"), dict):
+            # the catalog changed between the press and her line: the line plays bare
+            turnlog.record("story_picture_failed", topic=topic, cue=cue, by=by,
+                           error=str((result or {}).get("error") or "error")[:40])
+            return
+        turnlog.record("story_shown", topic=result["topic"], taps=len(result["story"].get("taps") or []),
+                       by=by, cue=cue)
+        stories.mark_shown(result["topic"])
+        self._note_screen("present_story", result, False)
+        shown = {"type": "tool_result", "name": "present_story", "result": result}
+        self._note_ceremony_picture(shown, own=by == "offscript")   # a cue's own picture: never ตอบสด's to take
+        await self._send_json(shown)
+        if by == "offscript" and isinstance(data.get("sub"), dict):
+            # the hall's Thai line of the story she tells (app/ceremony_stories.py): the approved words, like a cue's
+            from app import face_mirror
+
+            face_mirror.subtitle(data["sub"])
+            task = asyncio.create_task(self._story_subtitle_end(data["sub"].get("id")))
+            self._story_sub_task = task
+
+    async def _story_subtitle_end(self, sub_id) -> None:
+        """The hall's line of an off-script story comes down when her voice is over (the page has its own ends too)."""
+        from app import ceremony_stories, face_mirror
+
+        began, quiet = time.monotonic(), None
+        while time.monotonic() - began < ceremony_stories.SUB_MAX_S:
+            await asyncio.sleep(0.25)
+            now = time.monotonic()
+            if self._she_is_audible(now) or now - began < 4.0:
+                quiet = None
+            elif quiet is None:
+                quiet = now
+            elif now - quiet >= 2.5:
+                break
+        face_mirror.subtitle_end(sub_id)
+
     async def _offer_choices(self) -> None:
         """Owner 12 Oct: "ลูกค้ากำลังมองหาห้องแบบสตูดิโอ หนึ่งห้องนอน หรือสองห้องนอนคะ
         คำพวกนี้อยากให้ขึ้นเป็นตัวเลือกบนจอด้วยให้ลูกค้ากดเข้าไปดูได้".
@@ -2888,6 +3207,16 @@ class VoiceSession:
         this profile does not have, a page that is not the robot face, or a
         second tap within QUICK_ASK_MIN_GAP_S goes nowhere."""
         if not getattr(self, "_robot_face_claim", False) or getattr(self, "provider", None) is None:
+            return
+        from app import event_host
+
+        if event_host.cue_only():
+            # A cue-only ceremony (review 7 Nov, B2): a topic, a story's picture, a choice
+            # under her question, the language menu -- a touch on the chest screen made
+            # her talk over the host and changed the TV's picture. Only staff's presses.
+            ask_id = event.get("id")
+            turnlog.record("quick_ask_ignored", why="cue_only",
+                           id=ask_id if isinstance(ask_id, str) and self._STORY_ID.fullmatch(ask_id) else None)
             return
         from app import quick_asks
 
@@ -3016,6 +3345,58 @@ class VoiceSession:
             if payload.get("type") == "ready":
                 face_mirror.call_started()
             face_mirror.publish_json(payload)
+
+    def _note_ceremony_picture(self, payload: dict, *, own: bool) -> None:
+        """What the robot face is about to show, for the ceremony page's "ตอบสด" (app/ceremony.py
+        note_face_message): `own` = her own tool's result (the receive loop), else a picture or a
+        clear the server put up itself (`_story_picture`: a cue's `show`, a stopped cue's clear).
+        A picture of her live answer is taken off at the next line pressed. Never raises."""
+        if not getattr(self, "_robot_face_claim", False):
+            return
+        try:
+            from app import ceremony
+
+            ceremony.note_face_message(self, payload, own=own)
+        except Exception:                          # noqa: BLE001 -- the face's message goes out
+            logger.exception("ceremony: noting the face's picture")
+
+    def _note_ceremony_words(self) -> None:
+        """The host's words so far in this utterance, for the event screen's topic slide while the ceremony
+        page's "ตอบสด" is open (app/ceremony_motion.py: the server decides, never the model). Runs on every
+        caption of every call (the sales robot's too): `wants_words` is asked FIRST -- not the ceremony app's
+        call, no window open, or no slide to show = nothing else runs, the caption is not even read. The words
+        go nowhere but the matcher (no log, no screen). Never raises."""
+        try:
+            from app import ceremony_motion
+
+            if settings.ceremony_follow_host:
+                # "ทั้งพิธีคุยสด" (owner 24 Nov, app/ceremony_follow.py): the host's words against the host line of
+                # the next cue of the order -- the server decides. Off (default) = this line does not exist.
+                from app import ceremony_follow
+
+                if ceremony_follow.wants_words(self):
+                    ceremony_follow.on_host_words(self, heard.latest_caption(self))
+            if not ceremony_motion.wants_words(self):
+                return
+            ceremony_motion.on_host_words(self, heard.latest_caption(self))
+        except Exception:                          # noqa: BLE001 -- the screen, never the call
+            logger.exception("ceremony: the host's topic")
+
+    def _note_ceremony_answer(self, text) -> None:
+        """Her live answer's words (text) or its end (None) for the live-first slide picker
+        (app/ceremony_follow.py `on_answer_words` / `on_answer_done`). Only with follow on; nothing else runs.
+        The words go nowhere but the matcher. Never raises."""
+        try:
+            if not settings.ceremony_follow_host:
+                return
+            from app import ceremony_follow
+
+            if text is None:
+                ceremony_follow.on_answer_done(self)
+            else:
+                ceremony_follow.on_answer_words(self, text)
+        except Exception:                          # noqa: BLE001 -- the call, never the picker
+            logger.exception("ceremony: her answer for the picker")
 
     def _mirrored(self) -> bool:
         """This call is the robot face's and a room screen may copy it
@@ -3184,6 +3565,11 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
         note_end = getattr(previous, "_note_end", None)
         if callable(note_end):
             note_end("superseded")        # its own session_end says why
+        # The ceremony app's call is over the moment another takes the robot (the Event app's
+        # face, a desk tab): `ceremony.on()` already reads that from `_active`; this says so.
+        from app import ceremony as _ceremony
+
+        _ceremony.release(previous, "superseded")
         try:
             await previous._send_json({
                 "type": "error",
@@ -3244,7 +3630,22 @@ async def handle_connection(ws: WebSocket, provider: str | None = None, voice: s
         # Acks this session was waiting for resolve `disconnected` now, not
         # at their timeout; its caps, nav state and issued run ids go with it.
         robot_face_link.session_closed(session)
+        # ...and the ceremony mode, if this was the ceremony app's call (another session's
+        # is left alone: a superseded call closing late must not end the new one's mode).
+        from app import ceremony as _ceremony
+
+        _ceremony.release(session, getattr(session, "_end_reason", None) or "ended")
         heard.forget(session)
+        if getattr(session, "_head_follow", None) is not None and _active is session:
+            # Only the call that owned the head (a superseded call closing late must not unsettle
+            # the live one's), and never a reason for the rest of this cleanup not to run: `_active`
+            # left set is a robot that never greets again (review 6 Nov).
+            try:
+                from app import head_follow as _head_follow
+
+                _head_follow.call_ended()
+            except Exception:                # noqa: BLE001
+                logger.exception("head follow: call end not recorded")
         try:
             if _active is session:
                 _reset_conversation_state()

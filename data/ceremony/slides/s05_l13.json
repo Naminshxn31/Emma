@@ -1,0 +1,31 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "texts": {
+    "staff": "Our staff",
+    "carry": "will bring the details",
+    "steps": "explain the next steps"
+  },
+  "beats": [
+    {
+      "at_en": "Our staff",
+      "do": "staff",
+      "key": "staff"
+    },
+    {
+      "at_en": "bring the details",
+      "do": "carry",
+      "key": "carry"
+    },
+    {
+      "at_en": "explain the next steps",
+      "do": "steps",
+      "key": "steps"
+    }
+  ],
+  "options": {
+    "mode": "quote",
+    "start": "held",
+    "straight": true
+  }
+}

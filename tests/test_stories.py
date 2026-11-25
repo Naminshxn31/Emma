@@ -1492,7 +1492,7 @@ def test_the_page_loads_the_engine_and_draws_a_story_only_on_the_robot_face():
 # pointer-events, the wrong-card tap back -- unless ?v= changes. Change
 # emma-story.js or .css and this test fails until both tags in
 # voice-preview.html are bumped and the pin set to the new content.
-ENGINE_TAG = ("20261029-a", "39c5a4636873902e")
+ENGINE_TAG = ("20261124-c", "7b7911df5441c077")
 
 
 def test_the_engines_cache_tag_moves_with_the_engine():
@@ -2252,3 +2252,109 @@ def test_a_cold_details_lookup_never_holds_the_story(approved, monkeypatch):
     while time.monotonic() < deadline and not stories._DETAILS.get("fx_sky_pool"):
         time.sleep(0.02)
     assert stories.tool_result("fx_sky_pool")["details"]
+
+
+# ---- the event screen's wide stage (24 Nov: "อยากให้ภาพทั้งหมดโชว์แบบใหญ่ ... เต็มซ้ายขวา", "ภาพผังห้องก็ห้ามโชว์เลข") ----
+
+def test_the_event_screens_wide_stage_is_asked_for_by_the_ceremonys_hall_page_alone():
+    js, css, page = (p.read_text(encoding="utf-8") for p in (ENGINE, STYLE, PAGE))
+    # off unless the page asks; without it every floor of the landscape layout is where it was (TF = LH - M)
+    assert "this.wide = this.opts.wide === true;" in js
+    assert "this.TF = this.wide ? Math.round(this.LH * 0.77) : this.LH - this.M;" in js
+    assert js.index("this.wide = this.opts.wide === true;") > js.index("if (this.land) {")     # never on a portrait screen
+    robot = page.split("var drawn = window.EmmaStory.play(story, {", 1)[1].split("});", 1)[0]
+    assert "wide" not in robot and "noPlan" not in robot                  # the robot's own face, the sales room
+    show = page.split("function showMirrorStory(story) {", 1)[1].split("function mirrorStoryDown()", 1)[0]
+    assert "mirrorWide = land && document.documentElement.classList.contains('mirror-show') && !(typeof mirrorFilm !== 'undefined' && mirrorFilm);" in show
+    assert "wide: mirrorWide," in show and "noPlan: document.documentElement.classList.contains('mirror-show')," in show
+    assert "if (mirrorWide) return [0, 0, w, h];" in page and page.count("mirrorWide = false;") == 2   # (declared; an answer picture)
+    # its rules never match without it
+    block = css.split("/* ---- the event screen's wide stage", 1)[1]
+    for rule in re.findall(r"^([^{}@\n]+)\{", re.sub(r"/\*.*?\*/", "", block, flags=re.S), flags=re.M):
+        assert all(".es-wide" in sel or sel.strip() == ".es-shade-wide" for sel in rule.split(",")), rule
+
+
+def test_no_plan_is_on_the_ceremonys_screens():
+    js = ENGINE.read_text(encoding="utf-8")
+    assert "this.noPlan = this.opts.noPlan === true;" in js
+    assert "if ((S.wide || S.noPlan) && photo) { base.style.visibility = 'hidden'; photoLine = 0; spotLine = 0; scale = 1; }" in js
+    assert "if (S.noPlan && !LR) { box.style.display = 'none'; cardTop = box._top; }" in js
+    drill = js.split("TEMPLATES.drill = function", 1)[1].split("TEMPLATES.spotlight", 1)[0]
+    assert "box.style.display = 'none';                // (no plan on the event screen" in drill
+
+
+def test_the_films_pictures_stay_in_the_catalogue_when_no_story_uses_them():
+    """The ceremony film's signed slides take their pictures from this catalogue and their signature covers the bytes:
+    the stories' new pictures are new ids, and what the film names is kept (stories/keep_pins.json)."""
+    root = stories.folder()
+    keep = json.loads((root / "keep_pins.json").read_text(encoding="utf-8"))["assets"]
+    catalog = json.loads((root / stories.CATALOG_NAME).read_text(encoding="utf-8"))
+    pins = json.loads((root / "asset_pins.json").read_text(encoding="utf-8"))
+    assert keep and set(keep) <= set(catalog["assets"])
+    used = set()
+    for s in catalog["stories"]:
+        used |= set(stories.asset_refs(s["params"]))
+    assert not {a for a in used if a in keep and "n_" + a in pins}            # the stories are on the new pictures
+    assert "liv_park" in keep and "mood_bedroom" in keep                       # two the signed slides name
+    # a plan with printed numbers is in no story of the extra lines
+    extra = json.loads((root.parents[2] / "ceremony" / "floor1_ceremony.extra.json").read_text(encoding="utf-8"))["cues"]
+    topics = {c["id"][2:] for c in extra}
+    for s in catalog["stories"]:
+        if s["id"] in topics:
+            refs = set(stories.asset_refs(s["params"]))
+            assert "plan_ground_site" not in refs, s["id"]
+
+
+# ---- the event screen's film scenes (client/assets/story-wide/, 24 Nov: "ข้อความเอาไปทำโมชั่นเหมือนบทหลัก") ----
+
+FILM = ENGINE.parent / "story-wide"
+
+
+def test_the_film_scenes_are_the_room_screens_story_frames_alone():
+    stage = (ENGINE.parent / "story-stage.html").read_text(encoding="utf-8")
+    page = PAGE.read_text(encoding="utf-8")
+    for f in ("kit", "place", "sequence", "figures", "geo"):
+        assert "/assets/story-wide/%s.js?v=" % f in stage
+    assert "story-wide" not in page                                             # never on the robot's face page itself
+    js = ENGINE.read_text(encoding="utf-8")
+    assert "var scene = this.wide && root.StoryWide && root.StoryWide.scenes && root.StoryWide.scenes[data.template];" in js
+    assert "if (!this.tpl) this.tpl = TEMPLATES[data.template](this, p);" in js   # a scene that fails = the engine's layout
+
+
+def test_the_film_scenes_keep_the_projects_motion_rules():
+    for f in sorted(FILM.glob("*.css")):
+        css = re.sub(r"/\*.*?\*/", "", f.read_text(encoding="utf-8"), flags=re.S)
+        assert "infinite" not in css and "backdrop-filter" not in css and "filter:" not in css, f.name
+        assert "position: fixed" not in css, f.name
+        assert not re.search(r"\d(?:vw|vh|cu)\b", css), f.name                    # the stage's own unit only
+        for prop, value in re.findall(r"(?<![\w-])(box-shadow|text-shadow)\s*:\s*([^;}]+)", css):
+            for shadow in re.split(r",(?![^(]*\))", value):
+                bare = re.sub(r"rgba?\([^)]*\)|#[0-9a-fA-F]{3,8}", " ", shadow)
+                lengths = re.findall(r"calc\([^)]*\)\)?|-?\d*\.?\d+[a-z%]*", bare)
+                assert len(lengths) < 3 or re.match(r"-?0", lengths[2]), (f.name, prop, value)
+        for frames in re.findall(r"@keyframes[^{]*\{((?:[^{}]*\{[^{}]*\})*)\s*\}", css):
+            props = set(re.findall(r"([a-z-]+)\s*:", frames))
+            assert props <= {"transform", "opacity"}, (f.name, props)
+        for anim in re.findall(r"transition\s*:\s*([^;}]+)", css):
+            for part in re.split(r",(?![^(]*\))", anim):
+                prop = part.strip().split()[0]
+                assert prop in ("transform", "opacity", "none", "stroke-dashoffset", "visibility"), (f.name, prop)
+    for f in sorted(FILM.glob("*.js")):
+        js = f.read_text(encoding="utf-8")
+        for banned in ("setInterval", "fetch(", "XMLHttpRequest", "WebSocket", "localStorage", "innerHTML", ".style.filter", "boxShadow"):
+            assert banned not in js, (f.name, banned)
+
+
+def test_the_film_scenes_write_no_words_of_their_own():
+    """Every word, figure and picture is the story's (params): a scene has no sentence of its own in it."""
+    for f in sorted(FILM.glob("*.js")):
+        js = re.sub(r"/\*.*?\*/", "", f.read_text(encoding="utf-8"), flags=re.S)
+        js = re.sub(r"(?m)//.*$", "", js)
+        for lit in re.findall(r"'((?:[^'\\\\\n]|\\\\.)*)'", js):
+            if "OpenStreetMap" in lit:                        # (the map's credit, as in the engine: it must be there)
+                continue
+            words = re.findall(r"[A-Za-z]{3,}", lit)
+            if " " in lit.strip() and len(words) >= 2 and not re.search(r"[(){}#.:;%=_<>/\\-]|\bsw|\bsq|\bfg|\bge|\bes-", lit) and lit != "use strict":
+                raise AssertionError((f.name, lit))
+            assert not re.search(r"[\u0e00-\u0e7f]", lit), (f.name, lit)
+

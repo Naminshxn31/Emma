@@ -1,0 +1,31 @@
+{
+ "template": "act",
+ "act": "units_views",
+ "continues": "s05_l03",
+ "texts": {
+  "kicker": "I'd suggest starting with",
+  "twobr": "2 BEDROOM",
+  "seaplate": "With a view of the sea",
+  "sea": "Sea",
+  "family": "Everyone in the family",
+  "roomtolive": "Room to live",
+  "privacy": "Some privacy"
+ },
+ "pictures": {
+  "pool_pic": {"asset": "fin_pool_v4b"},
+  "above_pic": {"asset": "fin_pool_v2_hd"},
+  "wire_2": {"asset": "room_2br_wire"},
+  "solid_2": {"asset": "c_room_2br_solid"},
+  "living": {"asset": "mood_living"},
+  "bedroom": {"asset": "mood_bedroom"}
+ },
+ "beats": [
+  {"at_en": "In that case", "do": "leave", "key": "kicker"},
+  {"at_en": "a 2-bedroom unit", "do": "card", "key": ["twobr", "wire_2", "solid_2"]},
+  {"at_en": "with a view of the sea", "do": "sea", "key": "seaplate"},
+  {"at_en": "everyone in the family", "do": "family", "key": ["family", "living"]},
+  {"at_en": "room to live", "do": "caption", "key": "roomtolive"},
+  {"at_en": "some privacy", "do": "privacy", "key": ["privacy", "bedroom"]}
+ ],
+ "options": {"mode": "suggest"}
+}

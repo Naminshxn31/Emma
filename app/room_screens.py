@@ -353,6 +353,33 @@ def _robot_ip_toward(host: str) -> str:
     raise OSError("no route toward %s" % host)
 
 
+def echo_tail_s() -> float:
+    """How long after her voice ends the microphone still hears the room's copy of it
+    (ROOM_SCREEN_ECHO_TAIL_S): only while a screen is up with its sound on. 0 = no guard.
+    Bounded: a typo must not make her deaf for a minute."""
+    if not (settings.room_screens_enabled and settings.room_screen_sound and STATE["open"]):
+        return 0.0
+    # Her voice is not replayed in the hall at all (the ceremony's, CEREMONY_VOICE_ON_ROBOT): the robot's own
+    # speaker is guarded by the face page itself (HALF_DUPLEX: while she plays and 0.35 s after). The debut's
+    # music is not her voice and never was under this guard (`_play_until` is her voice).
+    from app import face_mirror
+    if face_mirror.voice_on_robot():
+        return 0.0
+    return max(0.0, min(3.0, float(settings.room_screen_echo_tail_s)))
+
+
+def keep_tone(raw: str) -> tuple[float, float] | None:
+    """ROOM_SCREEN_KEEP_TONE "<hz>,<dB>" -> (hz, dB), or None for anything that is not a
+    tone a speaker should be given: 10-22000 Hz, -80..-20 dB (never loud by a typo)."""
+    try:
+        hz, db = (float(v) for v in raw.split(","))
+    except ValueError:
+        return None
+    if not (10.0 <= hz <= 22000.0 and -80.0 <= db <= -20.0):
+        return None
+    return hz, db
+
+
 def mirror_url(screen: dict) -> str:
     """The face page for that PC, with a one-time ticket (never the token)."""
     from app import mirror_server
@@ -361,6 +388,9 @@ def mirror_url(screen: dict) -> str:
     query = {"ticket": mirror_server.issue_ticket()}
     if settings.room_screen_sound:
         query["sound"] = "1"
+        tone = keep_tone(settings.room_screen_keep_tone)
+        if tone:
+            query["keep"] = "%g,%g" % tone
     return "http://%s:%d/mirror?%s" % (_robot_ip_toward(host), settings.mirror_port, urlencode(query))
 
 

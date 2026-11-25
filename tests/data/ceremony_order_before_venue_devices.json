@@ -1,0 +1,261 @@
+{
+ "about": "The ceremony running order as it was on 20 Nov 2026, before the venue-device steps (app/venue_devices.py) went into data/ceremony/floor1_ceremony.json. tests/test_venue_ceremony.py holds the real order, with its device steps taken out, to this byte for byte: with VENUE_DEVICES off the ceremony runs exactly as before. Edits to the order that are not device steps move this copy with them, by hand, and say so here: 23 Nov 2026, the two jokes said straight through (`chain` on s04_l09 and s06_l05, and their four notes -- owner: 'พูดต่อเนื่องเลย'). 23 Nov 2026, the opening as card 1 (owner: 'ช่วงพิธีอยู่แอปพิธีทั้งหมด'): scene 1's box tick, walk to stage_centre and greet_arm replaced by the tick 'ไฟห้องปิด ม่านปิด หุ่นพร้อมในกล่อง' and the `opening` step (scene debut); scene 2's three handshakes and its walk to beside_host taken out (the opening does them). 23 Nov 2026 evening, the owner took the countdown out of the screen's debut: the opening's note says its build, black and hit instead. 23 Nov 2026 night (second review): the box tick carries `in_box` -- it arms the opening's one walk out (app/event_box.py). 24 Nov 2026, the owner's one-answer questions: `chain` on s02_l03 (question 1), s04_l11 (the swimming joke's end), s05_l06 (question 9) and s05_l11 (question 10); s05_l07 (no demo room number) out of the order; the quotation's tick last in scene 5, with its new words.",
+ "order": [
+  {
+   "n": 1,
+   "title_th": "วิสัยทัศน์และการเปิดตัวเอ็มม่า",
+   "steps": [
+    {
+     "do": "manual",
+     "label_th": "ไฟห้องปิด ม่านปิด หุ่นพร้อมในกล่อง",
+     "in_box": true,
+     "note_th": "ทีมไฟ/ม่านทำเอง (หุ่นยังไม่ได้คุมไฟ) · ติ๊กเมื่อห้องมืด ม่านปิด และหุ่นอยู่ในกล่อง หันออกทางประตูกล่อง แขนลง · ประตูกล่องเปิดตอนเสียงกระแทก (ทีมเวที) · ติ๊กนี้ = บอกระบบว่าหุ่นอยู่ในกล่อง: ขั้นเปิดตัวเดินออกได้ครั้งเดียว และแขนล็อกตั้งแต่ติ๊ก (ติ๊กซ้ำเมื่อหุ่นกลับเข้ากล่องจริงเท่านั้น)"
+    },
+    {
+     "do": "opening",
+     "scene": "debut",
+     "label_th": "เปิดตัว (การ์ด 1)",
+     "note_th": "กดครั้งเดียว (แตะสองครั้ง): จอเปิดตัว ดนตรีขึ้น → จอมืด → เสียงกระแทก → หุ่นเดินออกจากกล่อง แขนลง → หยุดนิ่งแล้วยกมือโบก + พูดประโยคเปิดตัว มือลง → ไปจับมือคุณมิกิ → แขก 3 จุด → กลับข้างคุณมิกิ · ทีมเวทีเปิดประตูกล่องตอนเสียงกระแทก (ประตูเปิดไม่สุด = หุ่นรอ 45 วิแล้วหยุด ไม่โบก ไม่ไปต่อ) · มีอะไรผิดกดหยุดสีแดง แล้วทำส่วนที่เหลือเองจากปุ่มในขั้นนี้ · Emma ไม่พูดอะไรนอกจากประโยคเปิดตัว"
+    }
+   ]
+  },
+  {
+   "n": 2,
+   "title_th": "เอ็มม่าช่วยอะไรได้และโครงการแตกต่างอย่างไร",
+   "steps": [
+    {
+     "do": "cue",
+     "cue": "s02_l03",
+     "chain": true,
+     "note_th": "ข้อ 1 พูดต่อกับบทถัดไปเป็นบทเดียว ไม่เปิดช่วงให้พูดคั่น (เจ้าของ 24 พ.ย.: 'มันควรรวมของ 2 บทไหม')"
+    },
+    {
+     "do": "cue",
+     "cue": "s02_l05"
+    },
+    {
+     "do": "cue",
+     "cue": "s02_l09"
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "title_th": "ทำเลที่ตั้ง",
+   "steps": [
+    {
+     "do": "cue",
+     "cue": "s03_l03",
+     "show": "location_beach"
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "title_th": "ห้องพักและสิ่งอำนวยความสะดวก",
+   "steps": [
+    {
+     "do": "cue",
+     "cue": "s04_l03",
+     "show": "unit_count"
+    },
+    {
+     "do": "cue",
+     "cue": "s04_l06",
+     "show": "facilities_overview"
+    },
+    {
+     "do": "cue",
+     "cue": "s04_l09",
+     "chain": true,
+     "note_th": "มุกเกริ่น — กดครั้งเดียว เฉลยตามมาเองทันทีที่ Emma พูดจบ ไม่เว้นจังหวะ (เจ้าของ 23 พ.ย.: 'พูดต่อเนื่องเลย ไม่ต้องเว้นช่วง')"
+    },
+    {
+     "do": "cue",
+     "cue": "s04_l11",
+     "chain": true,
+     "note_th": "เฉลยมุก — ตามมาเองหลังมุกเกริ่น ไม่ต้องกด (กดเองเฉพาะเมื่อขั้นนี้บอกว่าไม่ตามมา) · แล้วรอเสียงหัวเราะเบาลงก่อนกดบทถัดไป"
+    },
+    {
+     "do": "cue",
+     "cue": "s04_l13"
+    },
+    {
+     "do": "cue",
+     "cue": "s04_l15",
+     "note_th": "หลังคุณมิกิพูด 'แต่วันนี้อยู่ช่วยทีมขายกับผมก่อนนะเอ็มม่า'"
+    }
+   ]
+  },
+  {
+   "n": 5,
+   "title_th": "แนะนำห้องและใบเสนอราคา",
+   "steps": [
+    {
+     "do": "cue",
+     "cue": "s05_l03"
+    },
+    {
+     "do": "cue",
+     "cue": "s05_l06",
+     "show": "views_collections",
+     "chain": true,
+     "note_th": "ข้อ 9 เป็นบทเดียว: แนะนำห้องแล้วถามเรื่องใบเสนอราคาต่อเลย (เจ้าของ 24 พ.ย.: 'จะอยู่ในคำถามที่ 9 ต่อเลย') · บทห้องสาธิต s05_l07 ถอดจากลำดับ: ยังไม่มีเลขห้องจากทีมขาย"
+    },
+    {
+     "do": "cue",
+     "cue": "s05_l08",
+     "note_th": "ถ้าตกลงก่อนวันงานว่าไม่พิมพ์ใบเสนอราคา: บทนี้คงไว้ แล้วแทน s05_l11 + ขั้นติ๊ก + s05_l13 ด้วยบทสำรอง s05_backup_quote (ไม่อยู่ในลำดับ — อยู่ต่อท้ายแล้ว 'ถัดไป' จะเล่นซ้อนบทจริง)"
+    },
+    {
+     "do": "cue",
+     "cue": "s05_l11",
+     "chain": true,
+     "note_th": "ข้อ 10 เป็นคำตอบเดียว: รับคำขอแล้วบอกว่าเจ้าหน้าที่จะนำมาให้ ต่อกันเอง ไม่ต้องกด (เจ้าของ 24 พ.ย.)"
+    },
+    {
+     "do": "cue",
+     "cue": "s05_l13"
+    },
+    {
+     "do": "manual",
+     "label_th": "ใบเสนอราคา — เจ้าหน้าที่มอบเอกสารให้คุณมิกิ",
+     "note_th": "หุ่นไม่ได้พิมพ์เอง · ติ๊กไว้เตือนทีมงาน บทถัดไปไม่รอขั้นนี้"
+    }
+   ]
+  },
+  {
+   "n": 6,
+   "title_th": "ข้อมูลเชิงลึกของโครงการ",
+   "steps": [
+    {
+     "do": "cue",
+     "cue": "s06_l03",
+     "show": "building_height"
+    },
+    {
+     "do": "cue",
+     "cue": "s06_l05",
+     "chain": true,
+     "note_th": "มุกเกริ่น — กดครั้งเดียว เฉลยตามมาเองทันทีที่ Emma พูดจบ ไม่เว้นจังหวะ (เจ้าของ 23 พ.ย.: 'พูดต่อเนื่องเลย ไม่ต้องเว้นช่วง')"
+    },
+    {
+     "do": "cue",
+     "cue": "s06_l07",
+     "note_th": "เฉลยมุก — ตามมาเองหลังมุกเกริ่น ไม่ต้องกด (กดเองเฉพาะเมื่อขั้นนี้บอกว่าไม่ตามมา) · รอเสียงหัวเราะเบาลงก่อนคุณมิกิพูดต่อ"
+    }
+   ]
+  },
+  {
+   "n": 7,
+   "title_th": "เทคโนโลยีของโครงการ",
+   "steps": [
+    {
+     "do": "cue",
+     "cue": "s07_l02"
+    },
+    {
+     "do": "manual",
+     "label_th": "วิดีโอเทคโนโลยี (ทีมจอ LED เล่น)",
+     "note_th": "คู่มือภาพบนจอ S07-C02: เล่นหลัง Emma พูดจบ ค้างเฟรมสรุปเมื่อจบ"
+    },
+    {
+     "do": "manual",
+     "label_th": "หน้าถัดไป: แดชบอร์ดคุณภาพน้ำ (ทีมจอ LED เปลี่ยน)",
+     "note_th": "คุณมิกิพูด 'เอ็มม่า เปิดหน้าถัดไปครับ' — หุ่นไม่ได้คุมจอ LED"
+    },
+    {
+     "do": "cue",
+     "cue": "s07_l07"
+    }
+   ]
+  },
+  {
+   "n": 8,
+   "title_th": "สาธิตระบบ Smart Home",
+   "steps": [
+    {
+     "do": "cue",
+     "cue": "s08_l06"
+    },
+    {
+     "do": "manual",
+     "label_th": "ไฟล็อบบี้ดับแล้ว — ทีมไฟยืนยัน",
+     "note_th": "หุ่นไม่ได้คุมไฟ: กดเมื่อไฟดับจริง แล้วค่อยกดบทถัดไป"
+    },
+    {
+     "do": "cue",
+     "cue": "s08_l08"
+    },
+    {
+     "do": "cue",
+     "cue": "s08_l10"
+    },
+    {
+     "do": "manual",
+     "label_th": "ไฟล็อบบี้สว่างแล้ว — ทีมไฟยืนยัน",
+     "note_th": "กดเมื่อไฟสว่างจริง"
+    },
+    {
+     "do": "cue",
+     "cue": "s08_l12"
+    },
+    {
+     "do": "cue",
+     "cue": "s08_l14"
+    },
+    {
+     "do": "manual",
+     "label_th": "ผ้าม่านเปิดเสร็จ — ทีมงานยืนยัน",
+     "note_th": "กดเมื่อม่านเปิดถึงจุดที่กำหนด"
+    },
+    {
+     "do": "cue",
+     "cue": "s08_l16"
+    }
+   ]
+  },
+  {
+   "n": 9,
+   "title_th": "The Story และคำขอบคุณจากคุณมิกิ",
+   "steps": [
+    {
+     "do": "cue",
+     "cue": "s09_l02"
+    },
+    {
+     "do": "manual",
+     "label_th": "วิดีโอ Embassy World Story (ทีมจอ LED เล่น)",
+     "note_th": "คู่มือภาพบนจอ S09-C02: เล่นหลัง Emma พูดจบ · ต่อด้วยคำขอบคุณของคุณมิกิ (Emma ไม่มีบท)"
+    }
+   ]
+  },
+  {
+   "n": 10,
+   "title_th": "เปิดพรีวิวอย่างเป็นทางการ",
+   "steps": [
+    {
+     "do": "walk",
+     "spot": "beside_globe",
+     "label_th": "ไปยืนข้างลูกโลก LED",
+     "note_th": "จุด 'ข้างลูกโลก LED' คนละจุดกับ 'ข้างคุณมิกิ' (ฉาก 2) — บันทึกที่หน้างานหลังตั้งลูกโลก"
+    },
+    {
+     "do": "manual",
+     "label_th": "คุณมิกิแตะลูกโลก → Fantasy + ไฮไลต์โครงการ (ทีมจอ LED เล่น)",
+     "note_th": "Emma ไม่พูดระหว่างวิดีโอ"
+    },
+    {
+     "do": "cue",
+     "cue": "s10_l05"
+    },
+    {
+     "do": "handoff",
+     "to": "event",
+     "label_th": "จบพิธี → เปิดแอป Emma Event",
+     "note_th": "หลังถ่ายภาพร่วมกัน · ช่วงหลังพิธี กดฉาก 'หลังพิธี' ที่หน้าคุม Event"
+    }
+   ]
+  }
+ ]
+}

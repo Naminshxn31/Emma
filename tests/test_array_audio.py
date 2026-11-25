@@ -31,6 +31,11 @@ from tests.array_room import BEAM_HARNESS, LATENCY, ORDER, beam, gains, lsd  # n
 from tests.array_room import run_java as _run
 from tests.test_emma_robot_body_nav_app import SRC, _javac, code_only, method, read
 
+# The first test's setup compiles the app's Java (javac, ~12 s on a quiet PC) and its
+# call runs the beam (~3.4 s): over the 20 s default on a busy machine, and pytest-timeout
+# then kills the WHOLE run, not just this test (7 Nov: two full-suite runs died here).
+pytestmark = pytest.mark.timeout(90)
+
 BEAM = SRC / "ArrayBeam.java"
 MATH = SRC / "DoaMath.java"
 LINK = SRC / "DoaLink.java"

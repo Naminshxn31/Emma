@@ -1375,3 +1375,110 @@ def test_on_the_fallback_model_the_nudge_is_the_question_asked_again(monkeypatch
     from app.providers.gemini import _takes_empty_turn
     assert _takes_empty_turn("gemini-3.8-live") and _takes_empty_turn("models/gemini-3.8-live")
     assert not _takes_empty_turn(FALLBACK) and not _takes_empty_turn("models/" + FALLBACK)
+
+
+# ---- an answer the drop cut off (robot 6 Nov 09:13:57) --------------------
+#: A question about the fitness centre: a 1011 2.7 s into the story, the resume refused
+#: ("1008 ... session not found or expired"), a fresh session with
+#: session_fresh pending=false -- and the question never answered.
+CUT_QUESTION = "ในฟิตเนสมีอุปกรณ์อะไรบ้าง"
+CUT_VOICE = (int(0.2 * 32767)).to_bytes(2, "little", signed=True) * 480
+
+
+def _drop_mid_answer(monkeypatch, *, finished=False, then=()):
+    """On the REAL receive loop: a question, a tool's result back, her voice
+    starts (and, with `finished`, its turn_complete), `then` more messages,
+    and the stream raises; the resume is refused and a fresh session opens."""
+    monkeypatch.setattr(settings, "reply_stall_s", 30.0)      # no timer fires: only the fresh ask
+    monkeypatch.setattr(settings, "reply_stall_reconnect_s", 30.0)
+    monkeypatch.setattr(settings, "gemini_model_fallback", "")
+    provider, _ = _provider(monkeypatch, [True, False])
+    first = _Feed()
+    provider._session = first
+    opened, handles = [], []
+
+    async def connect():
+        handles.append(provider._resume_handle)
+        if provider._resume_handle:
+            raise RuntimeError("1008 None. BidiGenerateContent session not found or expired")
+        provider._session = _Feed()
+        opened.append(provider._session)
+
+    monkeypatch.setattr(provider, "_connect", connect)
+
+    async def run():
+        async def consume():
+            async for _ in provider._receive_events():
+                pass
+
+        loop = asyncio.create_task(consume())
+        await provider.send_audio(LOUD)
+        provider._input_event(CUT_QUESTION)
+        await provider.send_audio(QUIET)
+        provider._reply_seen("tool_call")            # present_story
+        provider._watch_after_tool()                 # its result went back
+        msgs = [_said("ฟิตเนส Biogenesis อยู่ชั้น G"), _audio(CUT_VOICE)]
+        if finished:
+            msgs.append(_content(turn_complete=True))
+        msgs.extend(then)
+        for msg in msgs:
+            await first.inbox.put(msg)
+        await asyncio.sleep(0.05)
+        await first.inbox.put(None)                  # the 1011: receive() raises
+        await asyncio.sleep(0.2)
+        loop.cancel()
+
+    asyncio.run(run())
+    return provider, opened, handles
+
+
+def test_an_answer_the_drop_cut_off_is_asked_again_on_the_fresh_session(monkeypatch, rows):
+    provider, opened, handles = _drop_mid_answer(monkeypatch)
+    assert handles == ["handle", None] and len(opened) == 1
+    asked = [c for c in _client_contents(opened[0]) if c.get("turns")]
+    assert len(asked) == 1, "asked once, at once"
+    text = asked[0]["turns"].parts[0].text
+    assert '"%s"' % CUT_QUESTION in text
+    assert 'Emma: "ฟิตเนส Biogenesis' in text, "the new model is told what she had begun to say"
+    assert "ห้ามทักทาย" in text
+    fresh = [r for r in rows if r["event"] == "session_fresh"]
+    assert fresh and fresh[0]["pending"] is False and fresh[0]["cut"] is True
+    assert [r["stage"] for r in rows if r["event"] == "reply_stall"] == ["fresh"]
+
+
+def test_a_finished_answer_is_never_given_twice(monkeypatch, rows):
+    provider, opened, _ = _drop_mid_answer(monkeypatch, finished=True)
+    assert len(opened) == 1 and _client_contents(opened[0]) == []
+    assert [r for r in rows if r["event"] == "session_fresh"][0]["cut"] is False
+
+
+def test_her_follow_up_cut_off_is_nobodys_question(monkeypatch, rows):
+    """The answer finished; then her own follow-up line (FOLLOW_UP_AFTER_S) was
+    cut. Nothing a guest asked is open: nothing goes out."""
+    provider, opened, _ = _drop_mid_answer(
+        monkeypatch, finished=True, then=(_said("อยากดูชั้นไหนต่อคะ"), _audio(CUT_VOICE)))
+    assert len(opened) == 1 and _client_contents(opened[0]) == []
+
+
+def test_the_guest_speaking_again_closes_the_cut_answer(monkeypatch):
+    provider, _ = _provider(monkeypatch, [])
+    provider._answer_open = (CUT_QUESTION, False)
+    provider._stall_restart()
+    assert provider._answer_open is None
+
+
+def test_a_resumed_session_forgets_the_cut_answer(monkeypatch, rows):
+    """Resumed (the server kept the session): this change asks nothing there,
+    and a fresh session minutes later must not ask a stale answer."""
+    provider, _ = _provider(monkeypatch, [])
+    provider._session = None                         # the drop road
+
+    async def resume():
+        provider._session = _Session()
+
+    monkeypatch.setattr(provider, "_connect", resume)
+    provider._answer_open = (CUT_QUESTION, False)
+    assert asyncio.run(provider._reconnect()) is True
+    assert [r["outcome"] for r in rows if r["event"] == "reconnect"] == ["resumed"]
+    assert provider._answer_open is None
+    assert _client_contents(provider._session) == []

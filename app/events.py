@@ -51,6 +51,16 @@ from app import turnlog
 
 logger = logging.getLogger("condo_voice.events")
 
+
+def _ceremony_now() -> bool:
+    """The Emma Ceremony app's call is up (app/ceremony.py). Never raises: unknown = no."""
+    try:
+        from app import event_host
+
+        return bool(event_host.ceremony_now())
+    except Exception:  # noqa: BLE001
+        return False
+
 #: One announcement at a time. Created at import, like `display._lock`, so
 #: `tests/conftest.py::_fresh_async_state` has to reset it too — the suite
 #: runs an event loop per test, and a lock abandoned by a closed loop stays
@@ -133,6 +143,8 @@ async def announce(
     then_pause: float = DEFAULT_PAUSE,
     summon: bool = False,
     arm_greeting: bool = False,
+    said_private: bool = False,
+    held_language: bool = True,
 ) -> bool:
     """Say something the guest didn't ask for, once they can hear it.
 
@@ -149,12 +161,29 @@ async def announce(
     is delivered on the fresh line. Events that only matter mid-conversation
     (a tour nudge) keep the default and drop.
 
+    `said_private`: this text has a booth guest's name in it, so her answer will too. Its `said`
+    rows keep no text (session.py): the transcript may spell the name any way at all, so
+    it is the turn that is left out, not the word (review 5 Nov).
+
+    `held_language=False`: the text fixes its own language -- a ceremony cue read
+    word for word in Thai (app/event_cues.py). The menu's "answer only in English"
+    after READ_RULE's "Thai, never translate" is two orders in one turn (review 6 Nov).
+
     Returns whether the text actually reached the model.
     """
     import asyncio
 
     from app import display
     from app import session as session_module
+
+    if source.startswith("face_"):
+        # MUTE_CAMERA_GREETS=false: muted means no greeting either, on a line
+        # still open as much as on a line the bell would have opened.
+        from app import wake
+
+        if wake.camera_refused():
+            turnlog.record("announce", source=source, sent=False, reason="muted")
+            return False
 
     # Resolved before the wait, not after: this announcement belongs to the
     # conversation that was happening when the event fired. If that session
@@ -232,12 +261,38 @@ async def announce(
                            reason="no longer relevant", waited=round(waited, 1))
             return False
 
+        if source.startswith("face_") and _ceremony_now():
+            # The camera decided with no ceremony call up (the call dropped and was redialling,
+            # the app had just opened, a muted standing line) and its ring then dialled the
+            # Emma Ceremony app's call: the mode is on by now, and a greeting -- a server turn
+            # the cue-only gate plays -- plus its handshake would land in the ceremony (review
+            # of the split, 9 Nov). Asked HERE, after every wait, for every camera source.
+            logger.info("a ceremony is on — dropping the %s greeting", source)
+            turnlog.record("announce", source=source, sent=False, reason="ceremony",
+                           waited=round(waited, 1))
+            return False
+
         if idle is not None:
             idle.clear()                  # the model owes a turn for this text
-        text = with_held_language(text, session.provider)
+        if source.startswith("face_"):
+            # The camera's greeting opens a muted call's mic, and nothing else does (14 Oct rule;
+            # review 6 Nov: the page opened it on any first sound -- a scene's line, a tap's answer).
+            # Before the text: her first chunk can come back fast.
+            send_json = getattr(session, "_send_json", None)
+            if callable(send_json):
+                try:
+                    await send_json({"type": "greeting_mic"})
+                except Exception:          # noqa: BLE001 -- the greeting goes out regardless
+                    logger.debug("could not mark the greeting for the page", exc_info=True)
+        if held_language:
+            text = with_held_language(text, session.provider)
+        if said_private:
+            session._said_private = 1            # before the send: her first words can beat its return
         try:
             await session.provider.send_text(text)
         except Exception:
+            if said_private:
+                session._said_private = 0
             if idle is not None:
                 idle.set()
             logger.exception("could not deliver the %s announcement", source)

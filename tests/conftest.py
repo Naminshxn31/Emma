@@ -29,6 +29,16 @@ def _no_turn_log(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _fresh_source_cache():
+    """event_script.source_text caches a source's text for 30 s (the robot's loop, 24 Nov): a test that writes facts
+    or a report chapter must see its own text, never the previous test's."""
+    from app import event_script
+    event_script._source_cache.clear()
+    yield
+    event_script._source_cache.clear()
+
+
+@pytest.fixture(autouse=True)
 def _fresh_async_state():
     """Give every test its own locks, tasks and audio clock.
 
@@ -184,6 +194,10 @@ def _fresh_async_state():
     # 30s abandon, idle timeout) green or red by .env. Tests that mean the
     # standing line set it themselves.
     _settings.standing_line = False
+    # A hold on this machine's disk must not make the suite's standing line
+    # tests deaf, and the owner's 14 Oct camera rule is the one they assert.
+    _settings.mic_hold_persist = False
+    _settings.mute_camera_greets = True
     # HOLD_SPEECH=true on the robot changes the ready event every voice test
     # reads. Same rule: the suite must not change colour by .env.
     _settings.hold_speech = False
@@ -207,6 +221,9 @@ def _fresh_async_state():
     _settings.silence_bare_ack = False
     # NOISE_REPLY_NEAR_RMS (robot.env, 29 Oct): off here; its own tests set it.
     _settings.noise_reply_near_rms = 0.0
+    # HEAD_PAN_TRIM_PCT (robot.env -10 since 25 Nov: this robot's straight head): 0 here, every look test counts from
+    # the app's own centre; the trim's tests set it.
+    _settings.head_pan_trim_pct = 0
     _settings.reply_stall_s = 0.0
     _settings.reply_stall_reconnect_s = 8.0
     _settings.focus_require_face = True
@@ -225,15 +242,53 @@ def _fresh_async_state():
     _settings.focus_invite_denied_n = 0
     _settings.focus_engage_mode = "semi"
     _settings.focus_attention = False
+    # The scan booth and walking up to a guest (docs/emma-face-approach.md):
+    # off whatever this machine's .env says; their own tests set them.
+    _settings.face_guests_file = ""
+    _settings.guest_sync_port = 0
+    _settings.guest_sync_key = ""
+    _settings.face_approach = False
+    _settings.face_approach_anyone = False
+    # robot.env runs the walk-up as a dry run (9 Nov); code default here, its own tests set it
+    _settings.face_approach_dry_run = False
+    _settings.person_vision = False
+    _settings.person_vision_score = 0.5
+    _settings.person_vision_every_s = 1.0
+    _settings.person_vision_looks = 3
+    _settings.face_approach_look_every_s = 20.0
+    _settings.face_det_size = 640
+    _settings.face_fast_confirm = False
+    _settings.face_greet_lapse_s = 0.0
+    from app import face_approach as _face_approach, guest_sync_server as _guest_sync, guests as _guests
+    from app import person_vision as _person_vision
+
+    _person_vision.reset()
+    _face_approach.reset()
+    _guest_sync.reset()
+    _guests.reset()
     # A group in front (2 Nov, docs/emma-multi-person-2026-11-02.md): the
     # round of looks and the one greeting for everybody. Code defaults (off);
     # their own tests set them.
     _settings.focus_gaze_visit_s = 0.0
     _settings.face_group_greeting = False
+    # The language she starts in (3 Nov): robot.env says "en"; code default.
+    _settings.talk_default_language = "th"
     _settings.focus_goodbye = False
     _settings.focus_goodbye_after_s = 8.0
     _settings.asd_enabled = False
     _settings.voiceprint_enabled = False
+    # The one-voice door (app/one_voice.py): off whatever this machine's .env says.
+    _settings.one_voice_profiles = frozenset()
+    _settings.one_voice_name = ""
+    _settings.event_ceremony_max_s = 10800.0
+    # The near door (app/near_voice.py): off whatever this machine's .env says.
+    _settings.voice_near_door = "off"
+    _settings.voice_near_m = 1.5
+    _settings.voice_near_loud_rms = 0.2
+    _settings.voice_near_warm_s = 180.0
+    from app import near_voice as _near_voice
+
+    _near_voice.reset()
     _settings.doa_enabled = False
     _settings.doa_focus = True
     # The array as the call's ears (app/array_audio.py) and the GTCRN
@@ -327,27 +382,115 @@ def _fresh_async_state():
     _settings.room_screens_enabled = False
     _settings.room_screens_file = ""
     _settings.room_screen_sound = False
+    _settings.room_screen_keep_tone = ""
+    _settings.room_screen_echo_tail_s = 0.0
+    _settings.ceremony_voice_on_robot = False       # robot.env: the ceremony speaks from the robot (24 Nov)
+    _settings.ceremony_prefix_padding_ms = 0          # robot.env: 1000 (24 Nov night)
+    _settings.reconnect_keeps_mic = False           # robot.env: the mic is held through a rejoin (24 Nov)
+    _settings.catwalk_music = False                 # robot.env: the walk's music on the hall's screen (24 Nov)
+    _settings.ceremony_face_film = False            # robot.env: the film on the chest screen too (24 Nov)
+    _settings.ceremony_face_film_scale = 1.0
     from app import room_screens as _room_screens
 
     _room_screens.reset()
     from app.tools import screens as _screen_tool
 
     _screen_tool._asked["at"] = None
+    # ...nor the venue's lights and curtains (app/venue_devices.py, 20 Nov): a machine whose .env
+    # drives them must not switch the lobby dark from a unit test. Off, no hub, no controller, no
+    # learned codes; the devices file is the tracked one (the ceremony order's device ids are
+    # checked against it on every machine). Tests that mean a device set these themselves.
+    _settings.venue_devices = False
+    _settings.venue_devices_dry_run = False
+    _settings.venue_devices_file = "data/events/venue_devices.json"
+    _settings.venue_codes_file = ""
+    _settings.venue_broadlink_host = ""
+    _settings.venue_broadlink_mac = ""
+    _settings.venue_broadlink_devtype = ""
+    _settings.venue_http_base_url = ""
+    _settings.venue_http_token = ""
+    _settings.venue_device_timeout_s = 8.0
+    from app import venue_devices as _venue_devices
+
+    _venue_devices.reset()
     # The event host (app/event_host.py): no staff listener on a LAN port, no
     # walk, no event file read from this machine, no scene left from the last
     # test. Tests that want the event point event_file at their own fixture.
     _settings.event_control_port = 0
     _settings.event_control_key = ""
     _settings.event_walk_enabled = False
+    # The arm's rest before a server walk asks the robot face (none in a unit test): its own tests turn it on.
+    _settings.event_walk_arm_rest = False
+    # The debut's line waits for the hand (event_pageant.hand_up, 2.4 s on the robot since 23 Nov): its own tests set it.
+    _settings.event_pageant_lead_s = 0.0
+    # robot.env plays the debut's recorded line (10 Nov); a test that wants it turns it on
+    _settings.event_recorded_lines = False
+    # robot.env runs card 1's tour after the debut (23 Nov, app/event_tour.py); its own tests turn it on
+    _settings.event_tour = False
     _settings.event_file = ""
+    # ...nor the ceremony app's file (app/ceremony.py, its own since 9 Nov), nor its mode from
+    # the last test (a claim is a session's: `_active` is cleared above, the claim here).
+    _settings.ceremony_file = ""
     from app import event_host as _event_host
 
     _event_host.reset()
+    from app import ceremony as _ceremony
+
+    _ceremony.reset()
+    # ...nor "ตอบสด"'s topic slide on the event screen (app/ceremony_motion.py), never the preview's drafts
+    from app import ceremony_motion as _ceremony_motion
+
+    _ceremony_motion.reset()
+    _ceremony_motion.DRAFTS = False
+    # ...nor a ceremony cue's press, line or "just said" fact from the last test
+    # (app/event_cues.py), nor the context note a machine's .env may have on.
+    _settings.event_cue_context_note = False
+    _settings.event_live_max_s = 180.0     # the ceremony's live window (event_host.live_open)
+    _settings.ceremony_adhoc_max_s = 120.0  # ...and the ceremony page's "ตอบสด" (ceremony.adhoc_open)
+    _settings.ceremony_follow_host = False  # robot.env: card 2, the server follows the host (24 Nov, app/ceremony_follow.py)
+    _settings.ceremony_follow_cues = True   # robot.env false = live first (24 Nov ~11:40): tests that want it set it themselves
+    _settings.ceremony_free_talk = False    # robot.env true (24 Nov ~12:40): tests that want free talk set it themselves
+    _settings.ceremony_script_show_only = False   # robot.env true (24 Nov ~13:50): tests that want it set it themselves
+    _settings.ceremony_extra_lines = False        # robot.env true (24 Nov ~19:20): tests that want it set it themselves
+    _settings.ceremony_offscript_stories = False  # robot.env true (24 Nov ~18:10): tests that want it set it themselves
+    _settings.ceremony_name_first = False         # robot.env true (24 Nov ~17:40): tests that want it set it themselves
+    _settings.ceremony_answer_named = False       # robot.env true (24 Nov ~15:38): tests that want it set it themselves
+    _settings.ceremony_live_subtitle_th = False   # robot.env true (24 Nov): no test translates anything over the network
+    _settings.ceremony_logo_after_s = 4.0
+    _settings.ceremony_follow_answer_all = False
+    _settings.ceremony_live_end_silence_ms = 0
+    _settings.ceremony_mic_only = False
+    _settings.ceremony_english_only = False
+    _settings.ceremony_jokes_auto = False
+    _settings.ceremony_follow_script_prompt = False
+    from app import ceremony_follow as _ceremony_follow
+
+    _ceremony_follow.reset()
+    from app import event_cues as _event_cues
+
+    _event_cues.reset()
+    # ...nor the running order's marks and its place (app/event_order.py)
+    from app import event_order as _event_order
+
+    _event_order.reset()
+    _event_order.STATE["pressing"] = None             # reset() keeps a press in flight's gate; a test's is gone
     # Walk pictures (app/walk_frames.py) write people's pictures to the robot's
     # disk: never from a unit test, whatever this machine's .env says.
     _settings.walk_frames = False
+    # ...and the base-motion check is module state that a walk_frames test's
+    # fake poses leave "moving" for 15 s -- which now locks the arms and puts
+    # the head in its walk scan (walk_frames.base_moving, 4 Nov) in whatever
+    # test runs next
+    from app import walk_frames as _walk_frames
+
+    _walk_frames._motion.__init__()
+    _walk_frames.forget_still()
     # ...nor turn a real head (app/head_follow.py): code defaults every test.
     _settings.head_follow = False
+    _settings.head_follow_first = True
+    _settings.ceremony_head_still = False
+    _settings.head_lock_by = "first"
+    _settings.head_front_stand_s = 2.5
     _settings.head_pan_full_deg = 20.0
     _settings.head_tilt_full_deg = 20.0
     _settings.head_pan_max = 60
@@ -355,8 +498,13 @@ def _fresh_async_state():
     _settings.head_tilt_up_max = 20
     _settings.head_search_tilt = 30
     _settings.head_search_rms = 0.06
+    _settings.head_search_needs_lidar = False
     _settings.head_follow_doa = False
     _settings.head_calibrate = True
+    _settings.head_walk_scan = False
+    _settings.walk_quiet = False
+    _settings.robot_camera_hfov_measured = 0.0
+    _settings.robot_camera_mirrored = False
     _settings.lidar_people = False
     _settings.lidar_people_every_s = 0.5
     from app import lidar_people as _lidar_people
@@ -621,6 +769,40 @@ def _no_machine_array_captures(monkeypatch, tmp_path):
 
 
 @pytest.fixture(autouse=True)
+def _no_machine_event_order(monkeypatch):
+    """The ceremony's running order keeps where it got to next to the walk's run
+    file (data/events/.run/order.json, app/event_order.py): a test must neither
+    write the robot's copy nor start from one this machine left. Tests of the
+    keeping point it at their own tmp file."""
+    from app import event_order
+
+    monkeypatch.setattr(event_order, "state_path", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def _no_machine_event_run(monkeypatch, tmp_path):
+    """The event walk's and card 1's tour's notes (data/events/.run/: active.json, scene.json, tour.json, ...) are
+    the robot's runtime state: a test must never write this machine's (23 Nov: a tour test left
+    data/events/.run/tour.json -- "ended done" on the PC). Tests that keep notes point it at their own tmp dir."""
+    from app import event_box, event_walk
+
+    monkeypatch.setattr(event_walk, "RUN_DIR", tmp_path / ".event-run")
+    # the in-the-box latch lives there too (box.json): every test starts with her out of any box, read afresh
+    event_box.reset()
+    yield
+    event_box.reset()
+
+
+@pytest.fixture(autouse=True)
+def _no_machine_head_sweep(monkeypatch, tmp_path):
+    """A head sweep writes its pictures to data/robot/head_sweep/ (the bench's
+    copy): a test that runs a sweep must not reach the machine's folder."""
+    from app import head_follow
+
+    monkeypatch.setattr(head_follow, "SWEEP_DIR", tmp_path / "head_sweep")
+
+
+@pytest.fixture(autouse=True)
 def _forget_what_was_heard():
     """"What the guest last said" is module state, and it now decides whether
     a tool acts. A test that leaves "ปิดสไลด์" behind arms the next one.
@@ -678,6 +860,7 @@ def _no_machine_offline_mode(monkeypatch, tmp_path):
     from app.offline import asr, lines, router, voice
 
     monkeypatch.setattr(_settings, "offline_fallback", False)
+    monkeypatch.setattr(_settings, "net_status", False)        # robot.env: the staff lamp (10 Nov)
     monkeypatch.setattr(_settings, "net_probe_s", 0.0)
     monkeypatch.setattr(_settings, "offline_asr_dir", str(tmp_path / "offline_asr"))
     monkeypatch.setattr(_settings, "offline_voice_dir", str(tmp_path / "offline_voice"))

@@ -59,7 +59,8 @@ function loadModel() {
       bodyStatusFrame, navStatusFrame, navCapsFrame, frameFits, holdController, joinDoors,
       NAV_REASONS_TH, BODY_IDS, SPEECH_BODY_IDS, START_HOLD_MS, MAX_INBOUND_BYTES, ID_RE: ID_RE.source,
       COMMAND_ID_RE: COMMAND_ID_RE.source, BODY_STATUSES, NAV_STATES, BODY_STATUS_STATES,
-      autoState, autoBanner, activityMessage, statusKey, NAV_ORIGINS, AUTO_PHASES, ACTIVITY_KINDS };`, ctx);
+      autoState, autoBanner, activityMessage, statusKey, NAV_ORIGINS, AUTO_PHASES, ACTIVITY_KINDS,
+      openAppMessage, relayOpenApp, OPEN_APPS, eventBodyMessage, EVENT_BODY_IDS };`, ctx);
   return ctx.__api;
 }
 
@@ -71,12 +72,13 @@ function runModel(cases) {
         START_HOLD_MS: api.START_HOLD_MS,
         MAX_INBOUND_BYTES: api.MAX_INBOUND_BYTES, ID_RE: api.ID_RE, COMMAND_ID_RE: api.COMMAND_ID_RE,
         BODY_STATUSES: api.BODY_STATUSES, NAV_STATES: api.NAV_STATES, BODY_STATUS_STATES: api.BODY_STATUS_STATES,
-        NAV_ORIGINS: api.NAV_ORIGINS, AUTO_PHASES: api.AUTO_PHASES, ACTIVITY_KINDS: api.ACTIVITY_KINDS };
+        NAV_ORIGINS: api.NAV_ORIGINS, AUTO_PHASES: api.AUTO_PHASES, ACTIVITY_KINDS: api.ACTIVITY_KINDS,
+        EVENT_BODY_IDS: api.EVENT_BODY_IDS };
     }
     if (c.fn === 'relayCommand') {
-      // args: [evt, answers {message: reply object}, onRobot]
+      // args: [evt, answers {message: reply object}, onRobot, eventPage]
       const asked = [];
-      const ack = api.relayCommand(c.args[0], (m) => { asked.push(m); return (c.args[1] || {})[m] || null; }, c.args[2]);
+      const ack = api.relayCommand(c.args[0], (m) => { asked.push(m); return (c.args[1] || {})[m] || null; }, c.args[2], c.args[3]);
       return { ack, asked };
     }
     if (c.fn === 'hold') {
@@ -199,7 +201,8 @@ function harness(opts) {
     URLSearchParams, Date: FakeDate,
     setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
     setInterval: clock.setInterval, clearInterval: clock.clearInterval,
-    location: { search: opts.search || '', protocol: opts.protocol || 'https:', host: opts.host || 'robot.test:8001' },
+    location: { search: opts.search || '', protocol: opts.protocol || 'https:', host: opts.host || 'robot.test:8001',
+      pathname: opts.pathname || '/preview' },
     navigator: { userAgent: opts.ua || 'Mozilla/5.0' },
     document: doc,
     addEventListener(t, fn) { (winHandlers[t] = winHandlers[t] || []).push(fn); },
@@ -941,6 +944,72 @@ Object.assign(scenarios, {
     h.ctx.fireWin('emma-nav-changed');
     const cleared = sent.slice(mark2).filter((f) => f.type === 'nav_status');
     return { latched, cleared };
+  },
+});
+
+// The pageant (review 23 Nov): the ceremony's opening plays it in the Emma Ceremony app -- that page
+// relays the server's `style: "event"` command as the Event app's page does; the sales app's, the
+// desk's and the mirror's never ask the app.
+Object.assign(scenarios, {
+  async pageant_pages() {
+    const reply = { accepted: true, reason: null, status: null, est_ms: 43600 };
+    const answers = { 'emma-body:pageant:event': reply, 'emma-body:pageant_end:event': reply };
+    const cases = [
+      ['ceremony_app', { search: '?app=1&ceremony=1&cam=1&token=t', ua: ROBOT.ua }],
+      ['event_app', { search: '?app=1&event=1&token=t', ua: ROBOT.ua }],
+      ['sales_app', { search: '?app=1&token=t', ua: ROBOT.ua }],
+      ['mirror', { search: '?app=1&ceremony=1&token=t', ua: ROBOT.ua, pathname: '/mirror' }],
+    ];
+    const out = {};
+    for (const [name, opts] of cases) {
+      const h = harness(Object.assign({ answers }, opts));
+      const acks = [];
+      const send = (f) => { acks.push(f); };
+      h.ctx.EmmaRobotBridge.command({ type: 'body_command', command_id: CMD, action: 'pageant', style: 'event' }, send);
+      h.ctx.EmmaRobotBridge.command({ type: 'body_command', command_id: CMD, action: 'pageant_end', style: 'event' }, send);
+      await advance(10);
+      out[name] = { prompts: h.prompts.filter((p) => String(p).indexOf('emma-body:pageant') === 0), acks };
+    }
+    return out;
+  },
+});
+
+// The ceremony's end (owner 9 Nov 2026: the ceremony is its own app, and its last step opens
+// Emma Event). open_app reaches the app only from the ceremony app's page (ceremony=1) on an
+// APK that says EmmaOpenApp/1; every other page answers why not and asks nothing.
+Object.assign(scenarios, {
+  async open_app() {
+    const OPEN_UA = ROBOT.ua + ' EmmaArrayMic/1 EmmaOpenApp/1';
+    const CEREMONY = '?app=1&ceremony=1&cam=1&token=t';
+    const cases = [
+      ['opened', { search: CEREMONY, ua: OPEN_UA }, { accepted: true }],
+      ['not_installed', { search: CEREMONY, ua: OPEN_UA }, { accepted: false, reason: 'not_installed' }],
+      ['bad_reason', { search: CEREMONY, ua: OPEN_UA }, { accepted: false, reason: 'Not Installed; rm -rf' }],
+      ['no_answer', { search: CEREMONY, ua: OPEN_UA }, undefined],
+      ['old_apk', { search: CEREMONY, ua: ROBOT.ua + ' EmmaArrayMic/1' }, { accepted: true }],
+      ['event_app', { search: '?app=1&event=1&token=t', ua: OPEN_UA }, { accepted: true }],
+      ['sales_app', { search: '?app=1&token=t', ua: OPEN_UA }, { accepted: true }],
+      ['desk', { search: '?ceremony=1&token=t', ua: 'Mozilla/5.0' }, { accepted: true }],
+      ['mirror', { search: CEREMONY, ua: OPEN_UA, pathname: '/mirror' }, { accepted: true }],
+    ];
+    const out = {};
+    const opens = (h) => h.prompts.filter((p) => String(p).indexOf('emma-face:open') === 0);
+    for (const [name, opts, answer] of cases) {
+      const h = harness(Object.assign({ answers: (m) => (String(m).indexOf('emma-face:open') === 0 ? answer : undefined) }, opts));
+      const sent = [];
+      h.ctx.EmmaRobotBridge.openApp({ type: 'open_app', app: 'event' }, (f) => { sent.push(f); return true; });
+      out[name] = { sent, prompts: opens(h) };
+    }
+    // on the ceremony app itself: another app, a package name, not an open_app at all, no sender
+    const h = harness(Object.assign({ answers: () => ({ accepted: true }) }, { search: CEREMONY, ua: OPEN_UA }));
+    const sent = [];
+    const push = (f) => { sent.push(f); return true; };
+    h.ctx.EmmaRobotBridge.openApp({ type: 'open_app', app: 'control' }, push);
+    h.ctx.EmmaRobotBridge.openApp({ type: 'open_app', app: 'com.emma.robot.event' }, push);
+    h.ctx.EmmaRobotBridge.openApp({ type: 'head_look', app: 'event' }, push);
+    h.ctx.EmmaRobotBridge.openApp({ type: 'open_app', app: 'event' }, null);
+    out.wrong = { sent, prompts: opens(h) };
+    return out;
   },
 });
 

@@ -75,6 +75,8 @@ import contextlib
 import logging
 import math
 import time
+import types
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app import turnlog
@@ -117,6 +119,16 @@ _holds: dict[str, float] = {}
 #: FACE_ZOOM: at most one crop request this often. The page answers in a
 #: few hundred ms; asking faster only queues looks at the same moment.
 ZOOM_INTERVAL_S = 0.5
+#: ...and only for a face this small (with FACE_FAST_CONFIRM). Measured 5 Nov on the 7
+#: enrolled people's scans, in a 1024 x 768 frame, q95 over the stream's q70: +0.043 at
+#: 70 px, +0.023 at 110, +0.006 at 160, +0.009 at 240. Past that a crop costs the page a
+#: q95 encode and this loop a decode and a second locate, for nothing.
+ZOOM_MAX_PX = 160
+#: A pause between the frames of an arrival being decided: only so the event loop breathes.
+FAST_FRAME_GAP_S = 0.01
+#: How often the loop says how long frames take (`face_perf`, FACE_FAST_CONFIRM). Until 5 Nov
+#: no row said: "where does the time go" had seconds from rows and guesses from a CPU reading.
+PERF_EVERY_S = 60.0
 
 #: FACE_TURN_TO_CHECK. The ceiling is in code, not only in .env: whatever
 #: FACE_TURN_MAX_DEG says, a camera-triggered turn is never more than this.
@@ -233,6 +245,13 @@ def paused() -> bool:
     return now < _paused_until or any(now < until for until in _holds.values())
 
 
+def paused_except(key: str) -> bool:
+    """`paused()` not counting `key`'s own hold (face_approach holds the door camera while it walks:
+    that is not a face scan somebody is in the middle of)."""
+    now = time.monotonic()
+    return now < _paused_until or any(now < until for k, until in _holds.items() if k != key)
+
+
 def _gallery_signature(path: Path) -> tuple[int, int] | None:
     """(st_mtime_ns, st_size) of the gallery file, or None if it is not there.
 
@@ -247,6 +266,31 @@ def _gallery_signature(path: Path) -> tuple[int, int] | None:
     return st.st_mtime_ns, st.st_size
 
 
+def _live_signature(path: Path):
+    """The version of what the watcher matches against. With FACE_GUESTS_FILE
+    off this IS `_gallery_signature` (a pull changes nothing); on, a scan arriving
+    at the robot changes it too, and is recognised without a restart."""
+    from app import guests
+
+    stamp = _gallery_signature(path)
+    if not guests.enabled():
+        return stamp
+    other = _gallery_signature(guests.path())
+    return None if stamp is None and other is None else (stamp, other)
+
+
+def _load_live(path: Path):
+    from app import faces, guests
+
+    if not guests.enabled():
+        return faces.Gallery.load(path)
+    gallery = guests.live_gallery(path)
+    if gallery is None:
+        # both gone at once: the follower's "gone is not empty" rule
+        raise ValueError("no gallery and no guests")
+    return gallery
+
+
 class _GalleryFollower:
     """Reload the gallery into a running Watcher when the file changes.
 
@@ -259,7 +303,7 @@ class _GalleryFollower:
     read.
     """
 
-    def __init__(self, path: Path, baseline: tuple[int, int] | None):
+    def __init__(self, path: Path, baseline):
         self.path = path
         #: The version the running gallery came from. Taken by the caller
         #: *before* the first load: a save landing between that stat and the
@@ -277,13 +321,13 @@ class _GalleryFollower:
         if now < self.next_check:
             return
         self.next_check = now + GALLERY_POLL_S
-        stamp = _gallery_signature(self.path)
+        stamp = _live_signature(self.path)
         if stamp is None or stamp == self.loaded:
             # Gone is not "empty": a rebuild may be mid-write, and the
             # vectors in memory are still the best answer the robot has.
             return
         try:
-            gallery = await asyncio.to_thread(faces.Gallery.load, self.path)
+            gallery = await asyncio.to_thread(_load_live, self.path)
         except Exception as exc:
             # Keep what works. A version that failed is tried again on the
             # next poll — `Gallery.save` is atomic, but a file copied in by
@@ -387,6 +431,35 @@ def greeting_for(sighting) -> str:
             # ไหม" and he corrected it). The sales room's camera keeps its line.
             ask = ("ถามคำถามเปิดเบาๆ ข้อเดียว เช่น \"รู้จักโครงการของเรามาก่อนไหมคะ\" "
                    "หรือ \"มีอะไรให้ช่วยไหมคะ\" ห้ามถามว่าสนใจห้องไว้อยู่เองหรือลงทุนในคำทักนี้")
+            if settings.talk_default_language == "en":
+                # Owner, 3 Nov, on the robot: "ภาษาให้ตั้ง eng เป็น default" --
+                # this greeting was the one Thai opening left (the stranger's is
+                # GREETING, a group's GROUP_GREETING_EN). The same two questions,
+                # quoted in English only: a Thai line quoted on an English road
+                # is said word for word (CLAUDE.md, 19 Oct).
+                ask = ("ถามคำถามเปิดเบาๆ ข้อเดียว — ทั้งคำทักและคำถามเป็นภาษาอังกฤษ (ยังไม่รู้ภาษาที่จะคุยกัน) "
+                       "เช่น \"Have you heard about our project before?\" "
+                       "หรือ \"Is there anything I can help you with?\" "
+                       "ห้ามถามว่าสนใจห้องไว้อยู่เองหรือลงทุนในคำทักนี้ "
+                       "พอลูกค้าพูดแล้ว ตอบเป็นภาษาเดียวกับที่ลูกค้าพูด")
+        if _returning_guest(sighting):
+            # Owner, 23 Nov: the booth's guests are kept "เพราะจะให้หุ่นจำได้เวลาวันอื่น
+            # ที่ลูกค้ามาดูโครงการ". On a later day they are back, not meeting her:
+            # the open question above ("have you heard about our project") is
+            # one a guest of the launch was already answered. Quoted in the
+            # language of the road she is on (a Thai line on the English road is
+            # said word for word, CLAUDE.md 19 Oct).
+            role = "เคยลงทะเบียนกับ Emma ไว้ตอนมางานของโครงการ วันนี้กลับมาอีกครั้ง"
+            if settings.talk_default_language == "en":
+                ask = ("ต้อนรับกลับมา แล้วถามว่าวันนี้ให้ช่วยอะไร — ทั้งคำทักและคำถามเป็นภาษาอังกฤษ "
+                       "(ยังไม่รู้ภาษาที่จะคุยกัน) เช่น \"Welcome back!\" และ "
+                       "\"Is there anything I can help you with today?\" "
+                       "ห้ามถามว่าสนใจห้องไว้อยู่เองหรือลงทุนในคำทักนี้ "
+                       "พอลูกค้าพูดแล้ว ตอบเป็นภาษาเดียวกับที่ลูกค้าพูด")
+            else:
+                ask = ("ต้อนรับกลับมา แล้วถามว่าวันนี้ให้ช่วยอะไร เช่น \"ยินดีต้อนรับกลับมาค่ะ\" "
+                       "และ \"วันนี้มีอะไรให้ดิฉันช่วยไหมคะ\" "
+                       "ห้ามถามว่าสนใจห้องไว้อยู่เองหรือลงทุนในคำทักนี้")
         if focus.labels_deliverable():
             # With speaker labels there IS a way to know who is speaking,
             # and the default sentence below ("ไม่มีระบบจำเสียง", never use
@@ -517,6 +590,35 @@ def _room_fields(sighting, greeting: bool = True) -> dict:
     return out
 
 
+#: Bangkok, written out: the robot's clock is China's (CLAUDE.md), and "a later
+#: day" is the guest's day, not the board's.
+_BANGKOK = timezone(timedelta(hours=7))
+
+
+def _returning_guest(sighting, now: datetime | None = None) -> bool:
+    """A booth guest whose scan was on an earlier day (Bangkok): a later visit.
+    No date on the row (a guest file from before 23 Nov) = not returning: the
+    first-meeting greeting is never wrong, "welcome back" to a first meeting is."""
+    meta = getattr(sighting, "meta", None) or {}
+    if meta.get("source") != "booth":
+        return False
+    try:
+        since = datetime.fromisoformat(str(meta.get("since") or ""))
+    except ValueError:
+        return False
+    if since.tzinfo is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    return since.astimezone(_BANGKOK).date() < now.astimezone(_BANGKOK).date()
+
+
+def _logged_name(sighting):
+    """The name for a log, which is kept 30 days: not a guest's. Their name and
+    face are kept for the date on the booth's notice, on the robot's own guest
+    list -- not in a log nobody reads before it expires (source: app/guests.py rows)."""
+    return None if sighting.meta.get("source") == "booth" else sighting.name
+
+
 async def _greet(sighting) -> None:
     extra = {}
     if sighting.meta.get("unnamed"):
@@ -525,26 +627,67 @@ async def _greet(sighting) -> None:
         extra = {"unnamed": sighting.meta["unnamed"]}
     extra.update(_track_fields(sighting))
     extra.update(_room_fields(sighting))
+    pause = {}
+    if settings.face_fast_confirm:
+        # 0.4 s of silence after audio that was not there: every camera greeting had it
+        # (`waited` 0.4 in 57 of 57 rows, 9 Oct to 5 Nov). The wait for audio itself stays.
+        pause = {"then_pause": 0.0}
+    if sighting.kind == "known" and sighting.meta.get("source") == "booth":
+        # Her answer says their name. The booth's guest list keeps it for the date on its notice;
+        # a log is kept 30 days and is not where it belongs. See `events.announce`.
+        pause["said_private"] = True
     arm = True
     if settings.face_handshake_named_only:
         # Off, the gesture rides every camera greeting exactly as before
         # (ROBOT_GREETING_GESTURE_ENABLED and the arm's own gates decide).
         arm, why = _handshake(sighting)
         extra.update(handshake=arm, handshake_why=why)
-    turnlog.record("face_seen", kind=sighting.kind, name=sighting.name,
+    turnlog.record("face_seen", kind=sighting.kind, name=_logged_name(sighting),
                    score=round(sighting.score, 3), group=sighting.group, **extra)
-    from app import events
+    if settings.face_approach:
+        from app import face_approach
 
-    await events.announce(
+        face_approach.note_greeted(sighting.name if sighting.kind == "known" else None)
+    from app import events
+    from app import session as session_module
+
+    def still_relevant() -> bool:
+        # Confirmed before a scan began, delivered after: the summon wait
+        # and the audio queue can hold a greeting for seconds, and one
+        # landing mid-scan is the interruption `pause()` exists to stop.
+        if paused():
+            return False
+        if _ceremony_on():
+            # decided with no ceremony call up; the ring brought the ceremony app's call (review
+            # of the split, 9 Nov) -- events.announce drops every camera source then as well
+            return False
+        # FACE_GREET_LAPSE_S: the wait was for her voice too (the robot face reports no audio
+        # lead, so `announce` sends at her turn_complete), and she may have been answering
+        # somebody all along. Mid-sentence is not a reason here: that was waited for already.
+        return (float(settings.face_greet_lapse_s or 0.0) <= 0
+                or _conversation_state(session_module._active) != "exchange")
+
+    sent = await events.announce(
         greeting_for(sighting),
         source="face_known" if sighting.kind == "known" else "face_stranger",
         summon=True,
         arm_greeting=arm,
-        # Confirmed before a scan began, delivered after: the summon wait
-        # and the audio queue can hold a greeting for seconds, and one
-        # landing mid-scan is the interruption `pause()` exists to stop.
-        still_relevant=lambda: not paused(),
+        still_relevant=still_relevant,
+        **pause,
     )
+    if sent:
+        mark_greeted(session_module._active)
+
+
+def mark_greeted(session) -> None:
+    """A camera greeting went out on `session` (this module's and face_approach's own). The idle
+    clock (session `_close_when_nobody_is_there`): on a line somebody already used, the greeting
+    is no turn `_greeting_turn_done` counts, and the hang-up kept counting from the last words of
+    whoever talked before. FACE_GREET_LAPSE_S=0 greets only virgin lines: nothing to mark."""
+    if session is None or float(settings.face_greet_lapse_s or 0.0) <= 0:
+        return
+    with contextlib.suppress(Exception):
+        session._greeted_at = time.monotonic()
 
 
 def _face_debug(status: dict) -> None:
@@ -607,10 +750,49 @@ def _see(watcher, frame, crop_on: bool):
     return watcher.see(frame)
 
 
+def _frame_gap(watcher, interval: float) -> float:
+    """How long before the next frame. A name being confirmed takes the next frame at once:
+    closer-together frames, kept from being one picture by Watcher.NAME_SPAN_S. Everything else
+    keeps FACE_FPS's sleep, a stranger above all (Watcher.deciding says why): the first version
+    hurried strangers too and called that "the same frames, sooner". It was not."""
+    if settings.face_fast_confirm and getattr(watcher, "deciding", False):
+        return FAST_FRAME_GAP_S
+    return interval
+
+
+class _Perf:
+    """How long `see` takes, for one `face_perf` row a minute."""
+
+    def __init__(self) -> None:
+        self.empty: list[float] = []
+        self.faces: list[float] = []
+        self.at = time.monotonic()
+
+    def note(self, watcher, seconds: float) -> None:
+        if not settings.face_fast_confirm:
+            return
+        # A real one: the detector's constant 9-11 px answer is not a frame with a face in it.
+        bar = getattr(watcher, "min_face_px", 0)
+        real = any(f.bbox[2] - f.bbox[0] >= bar for f in getattr(watcher, "_located", None) or [])
+        (self.faces if real else self.empty).append(seconds)
+        now = time.monotonic()
+        if now - self.at < PERF_EVERY_S:
+            return
+        def ms(values: list[float], share: float) -> int | None:
+            return round(sorted(values)[int(share * (len(values) - 1))] * 1000) if values else None
+        turnlog.record("face_perf", frames=len(self.empty) + len(self.faces), with_face=len(self.faces),
+                       empty_p50_ms=ms(self.empty, 0.5), empty_p90_ms=ms(self.empty, 0.9),
+                       face_p50_ms=ms(self.faces, 0.5), face_p90_ms=ms(self.faces, 0.9),
+                       seconds=round(now - self.at, 1), det_size=settings.face_det_size)
+        self.empty, self.faces, self.at = [], [], now
+
+
 def _ask_closer(want: dict, last_ask: float, now: float) -> float:
     """Ask the face page for a crop of `want` at most every ZOOM_INTERVAL_S.
     Returns the time of the last request."""
     if now - last_ask < ZOOM_INTERVAL_S:
+        return last_ask
+    if settings.face_fast_confirm and want.get("px", 0) >= ZOOM_MAX_PX:
         return last_ask
     from app import robot_camera
 
@@ -659,6 +841,8 @@ async def _turn_refusal(angle: float) -> tuple[str | None, dict]:
         return "motion_disabled", info
     if not robot_chassis.configured():
         return "no_chassis", info
+    if _ceremony_on():
+        return "ceremony", info
     if abs(angle) < TURN_DEADBAND_DEG:
         return "centred", info
     if time.monotonic() - _last_turn_at < TURN_COOLDOWN_S:
@@ -806,8 +990,107 @@ def _start_turn(watcher, want: dict) -> asyncio.Task:
     return asyncio.create_task(_turn_to_check(watcher, want))
 
 
+def _ceremony_on() -> bool:
+    """An event's opening ceremony (app/event_host.py): the camera greets nobody."""
+    from app import event_host
+
+    return event_host.ceremony_now()
+
+
+#: FACE_GREET_LAPSE_S: her first audio follows the end of a guest's speech within 1.8 s in 95 %
+#: of 801 turns and 2.6 s in 99 % (robot logs 9 Oct - 6 Nov, metric_first_audio). Past this with
+#: no voice of hers she is not answering what was said: staff talking to each other, a bare "ค่ะ"
+#: dropped. A tap or a tool's result likewise has her answer coming within this.
+REPLY_SOON_S = 3.0
+#: A tool call still open this long is one that never reported back (the registry's own ceiling
+#: is 15 s, a paced slide tool's longer): no longer read as an answer on its way.
+TOOL_OPEN_MAX_S = 35.0
+#: How long a greeting waits for somebody's sentence to end and her answer window after it. Not
+#: in the camera loop: without frames for CAMERA_STALE_S (3 s) the listening gate reads "no
+#: camera" and refuses voices.
+QUIET_WAIT_S = 8.0
+#: Talk she answered none of for QUIET_WAIT_S is people talking to each other (6 Nov: staff in
+#: front of the robot, sentences 1-3 s apart, so no answer window ever ran out): the greeting
+#: goes in at the next breath, waiting at most this much longer for one.
+GAP_WAIT_S = 4.0
+#: The greeted person must still be in front: a face located this recently.
+STILL_HERE_S = 2.0
+
+
+def _her_voice_until(session, now: float) -> float:
+    """When her voice ends by the server's clocks (0 = she has not spoken on this line)."""
+    until = getattr(session, "_array_audible_until", None)
+    if not callable(until):
+        return 0.0
+    try:
+        return float(until(now) or 0.0)
+    except Exception:                              # pragma: no cover - belt
+        return 0.0
+
+
+def _conversation_state(session, now: float | None = None) -> str | None:
+    """None: free to greet. "exchange": she is in a conversation with somebody -- no greeting
+    (ประโยคทักทายไม่ให้พูดแทรก, 30 Sep). "pending": somebody is mid-sentence, or has just
+    finished and her answer may be on its way -- a greeting waits to see which.
+
+    FACE_GREET_LAPSE_S=0: the 30 Sep rule as it was (`_in_conversation`'s docstring), "exchange"
+    or None and never "pending". Above 0 (owner 6 Nov, "ไม่เห็นทักเลย"): what counts is a
+    conversation WITH HER, not that the line heard something. Staff talking to each other in
+    front of the robot get a bare "ค่ะ" the server drops, or nothing; that is not a conversation
+    a greeting would cut into, and it kept the standing line "used" for as long as they talked.
+    """
+    if session is None:
+        return None
+    lapse = float(settings.face_greet_lapse_s or 0.0)
+    if lapse <= 0:
+        if getattr(session, "summoned", False) and not getattr(session, "_greeting_turn_seen", False):
+            return "exchange" if getattr(session, "_ever_heard", False) else None
+        return "exchange"
+    now = time.monotonic() if now is None else now
+    # The camera's own waiting line reports hold_waiting (muted): its greeting opens the mic (the
+    # 14 Oct rule, events.announce's greeting_mic), so that is no reason here. A mute somebody TAPPED
+    # in this call is (review 6 Nov): before the lapse a used line was never greeted, so a mute pressed
+    # mid-call stayed shut; now a greeting 20 s later would have reopened it. Not on this call.
+    if getattr(session, "_page_muted", False) and getattr(session, "_page_muted_why", None) == "mute_tap":
+        return "exchange"
+    voice = _her_voice_until(session, now)
+    if voice and now < voice + lapse:
+        return "exchange"                          # she is speaking, or spoke within the lapse
+    if now - float(getattr(session, "_quick_ask_at", -1e9) or -1e9) < REPLY_SOON_S:
+        return "exchange"                          # a tap: her answer is coming
+    opened = getattr(session, "_tool_calls_open", None) or {}
+    if any(now - started < TOOL_OPEN_MAX_S for started in opened.values()):
+        return "exchange"                          # a tool runs for somebody's question
+    if now - float(getattr(session, "_tool_seen_at", -1e9) or -1e9) < REPLY_SOON_S:
+        return "exchange"                          # its result is in, her answer is coming
+    speaking = getattr(session, "_guest_speaking", None)
+    if callable(speaking) and speaking():
+        return "pending"
+    provider = getattr(session, "provider", None)
+    if _reply_held(session):
+        # Her reply has begun and a gate holds its first audio (a bare "ค่ะ" or a reply to
+        # noise, still being decided): `_replied_since_end` is set, her voice clock is not.
+        # Greeting now would cut her answer (review 6 Nov). The gates empty `_held` when
+        # they decide and at turn_complete.
+        return "pending"
+    stall = getattr(provider, "_stall_wait", None)
+    if stall is not None and now - float(stall) < QUIET_WAIT_S:
+        # REPLY_STALL_S's guard waits on a worded question nobody has answered: her slow
+        # answers (5 of 801 over 3 s) come inside this.
+        return "pending"
+    ended = getattr(provider, "_speech_ended_at", None)
+    if (ended is not None and not getattr(provider, "_replied_since_end", True)
+            and now - ended < REPLY_SOON_S):
+        return "pending"
+    return None
+
+
 def _in_conversation(session) -> bool:
-    """Is this a conversation a stranger's greeting would interrupt?
+    """Is this a conversation a greeting would interrupt? With FACE_GREET_LAPSE_S above 0 this
+    is `_conversation_state`: she is talking with somebody, or somebody is mid-sentence. The rest
+    of this docstring is the rule at 0, and why.
+
+    Is this a conversation a stranger's greeting would interrupt?
 
     Not merely "is there a session". The pre-ring opens the session
     *before* the face is confirmed, so by the time a stranger is
@@ -821,6 +1104,8 @@ def _in_conversation(session) -> bool:
     """
     if session is None:
         return False
+    if float(settings.face_greet_lapse_s or 0.0) > 0:
+        return _conversation_state(session) is not None
     if getattr(session, "summoned", False) and not getattr(session, "_greeting_turn_seen", False):
         # ...unless somebody already started talking on that line. On a
         # standing line (2026-09-30) the held-open session can be spoken to
@@ -829,6 +1114,100 @@ def _in_conversation(session) -> bool:
         # this line too.
         return bool(getattr(session, "_ever_heard", False))
     return True
+
+
+def _reply_held(session) -> bool:
+    """A reply gate holds her first audio (her answer has begun): greeting now would cut it."""
+    provider = getattr(session, "provider", None)
+    return any(getattr(getattr(provider, gate, None), "_held", None) for gate in ("_ack_gate", "_noise_gate"))
+
+
+def _still_there(watcher, box, head) -> bool:
+    """The face nearest the lens is recent and where the decided one stood (review 6 Nov: the
+    waiter read `someone_at`, which stops for whoever was just decided -- their cooldown starts
+    at once -- and stamps for anybody else greetable, so it dropped the person waited for as
+    "left" and said their name to somebody else). The same spot as facewatch's own same-arrival
+    rule, the box moved by the head's turn since. A swap in the same spot it cannot see."""
+    from app import facewatch
+
+    at = getattr(watcher, "present_at", None)
+    now_box = getattr(watcher, "present_box", None)
+    if at is None or now_box is None or box is None or time.monotonic() - at > STILL_HERE_S:
+        return False
+    shape = getattr(watcher, "present_shape", None) or ()
+    frame = types.SimpleNamespace(ndim=len(shape), shape=shape)
+    return facewatch._overlap(now_box, facewatch._in_head_frame(box, head, frame)) >= facewatch.Watcher.SAME_SPOT_IOU
+
+
+async def _greet_when_quiet(watcher, sighting, session) -> None:
+    """A greeting decided while somebody was mid-sentence: once they finish and no answer of hers
+    comes (QUIET_WAIT_S at most), greet; if she answers them instead, it is a conversation, and
+    the greeting is dropped as before. Talk that went on that long with no answer from her is
+    people talking to each other, and the greeting goes in at their next breath (GAP_WAIT_S).
+    The person must still be in front, the line the same."""
+    from app import session as session_module
+
+    def speaking() -> bool:
+        talking = getattr(session, "_guest_speaking", None)
+        return bool(callable(talking) and talking())
+
+    # Where the person it was decided for stood: the task runs before the camera loop reads its
+    # next frame, so this is still the deciding frame's face.
+    decided_box = getattr(watcher, "present_box", None)
+    decided_head = getattr(watcher, "present_head", None)
+    deadline = time.monotonic() + QUIET_WAIT_S
+    why = "talking"
+    while time.monotonic() < deadline:
+        await asyncio.sleep(0.2)
+        if session_module._active is not session:
+            why = "line_changed"
+            break
+        state = _conversation_state(session)
+        if state == "exchange":
+            why = "live_session"
+            break
+        if state is None:
+            why = None
+            break
+    if why == "talking":
+        # The risk taken here, knowingly: somebody whose question to her began right after their
+        # friends' talk is cut by the greeting, and asks again. Without it nobody standing in a
+        # talking group was ever greeted (owner 6 Nov: "ไม่เห็นทักเลย").
+        deadline = time.monotonic() + GAP_WAIT_S
+        while time.monotonic() < deadline:
+            await asyncio.sleep(0.1)
+            if session_module._active is not session:
+                why = "line_changed"
+                break
+            if _conversation_state(session) == "exchange":
+                why = "live_session"
+                break
+            if not speaking() and not _reply_held(session):
+                why = None
+                break
+    if why is None:
+        if paused():
+            why = "scan"
+        elif _ceremony_on():
+            why = "ceremony"
+        elif not _still_there(watcher, decided_box, decided_head):
+            why = "left"
+        elif settings.face_approach:
+            from app import face_approach
+
+            if face_approach.holds_greeting(sighting):
+                why = "approach"
+    if why is not None:
+        logger.info("face: %s %s (%.3f) not greeted after waiting for a quiet moment (%s)",
+                    sighting.kind, _logged_name(sighting) or "-", sighting.score, why)
+        turnlog.record("face_seen", kind=sighting.kind, name=_logged_name(sighting),
+                       score=round(sighting.score, 3), group=sighting.group or "",
+                       greeted=False, why=why, waited=True, **_track_fields(sighting),
+                       **_room_fields(sighting, greeting=False))
+        return
+    logger.info("face: %s %s (%.3f) after a quiet moment", sighting.kind,
+                _logged_name(sighting) or "-", sighting.score)
+    await _greet(sighting)
 
 
 async def _open_camera_patiently(camera):
@@ -864,7 +1243,7 @@ async def run() -> None:
     from app import session as session_module
 
     gallery_path = Path(settings.face_gallery).expanduser()
-    baseline = _gallery_signature(gallery_path)     # before the load; see _GalleryFollower
+    baseline = _live_signature(gallery_path)        # before the load; see _GalleryFollower
     watcher = facewatch.Watcher.from_settings()
     if watcher is None:
         # from_settings has already said which piece is missing. No camera is
@@ -884,7 +1263,9 @@ async def run() -> None:
     last_ring = 0.0
     last_ask = 0.0
     turn_task: asyncio.Task | None = None
+    greet_task: asyncio.Task | None = None
     follow = _GalleryFollower(gallery_path, baseline)
+    perf = _Perf()
     was_held = False
     logger.info("camera greeting on — %.1f fps, threshold %.2f, cooldown "
                 "%.0fs. The enrolment station cannot open the same camera "
@@ -896,6 +1277,13 @@ async def run() -> None:
             # here, which is what makes swapping the gallery safe. Followed
             # during a pause too — that is when a scan saves.
             await follow.poll(watcher)
+            if settings.face_guests_file:
+                from app import guests
+
+                if guests.purge_due():
+                    # Off the loop: it can wait on people.json's lock, and this
+                    # process is also carrying the call's audio.
+                    await asyncio.to_thread(guests.purge)
             held = paused()
             if held != was_held:
                 was_held = held
@@ -949,7 +1337,9 @@ async def run() -> None:
             # also carrying a live audio session. The measured cost at
             # FACE_THREADS=2 is 18% of the machine with a face in frame,
             # 8% without.
+            looked_at = time.monotonic()
             sighting = await asyncio.to_thread(_see, watcher, frame, _zoom_on())
+            perf.note(watcher, time.monotonic() - looked_at)
             _log_watch_events(watcher)
             if paused():
                 # The pause began while `see()` was in its thread. Its
@@ -996,7 +1386,25 @@ async def run() -> None:
                             sighting.score)
                 debug_status["verdict"] = "เห็นคนแปลกหน้า — ตั้งค่าไว้ไม่ทักคนแปลกหน้า"
                 sighting = None
-            if sighting is not None and _in_conversation(session_module._active):
+            if sighting is not None and settings.face_approach:
+                from app import face_approach
+
+                if face_approach.holds_greeting(sighting):
+                    # She is walking up to a scanned guest, or about to.
+                    debug_status["verdict"] = "กำลังจะเข้าหาแขก — ไม่ทักที่นี่"
+                    sighting = None
+            if sighting is not None and _ceremony_on():
+                # "Hello everyone" into the opening speech, every time the head
+                # finds another face in the seats. The cooldown `see` just set means
+                # these people are greeted later, not all at once when it ends.
+                turnlog.record("face_seen", kind=sighting.kind, name=_logged_name(sighting),
+                               score=round(sighting.score, 3), group=sighting.group or "",
+                               greeted=False, why="ceremony", **_track_fields(sighting),
+                               **_room_fields(sighting, greeting=False))
+                debug_status["verdict"] = "พิธีเปิด — กล้องไม่ทักใคร"
+                sighting = None
+            state = None if sighting is None else _conversation_state(session_module._active)
+            if sighting is not None and state == "exchange":
                 # A face wakes the line up; a face does not cut into a
                 # conversation. Strangers first (2026-09-01, one session):
                 # three "strangers" at 0.355 / 0.469 / 0.478 — every one of
@@ -1014,9 +1422,9 @@ async def run() -> None:
                 # the same person is not re-asked about for FACE_COOLDOWN_S.
                 logger.info("face: %s %s (%.3f) during a live session — "
                             "not interrupting", sighting.kind,
-                            sighting.name or "-", sighting.score)
+                            _logged_name(sighting) or "-", sighting.score)
                 turnlog.record("face_seen", kind=sighting.kind,
-                               name=sighting.name,
+                               name=_logged_name(sighting),
                                score=round(sighting.score, 3),
                                group=sighting.group or "",
                                greeted=False, why="live_session",
@@ -1025,12 +1433,26 @@ async def run() -> None:
                 debug_status["verdict"] = ("เห็น%s แต่กำลังคุยอยู่ — ไม่พูดแทรก"
                                            % (sighting.name or "คนแปลกหน้า"))
                 sighting = None
+            if sighting is not None and greet_task is not None and not greet_task.done():
+                # One greeting at a time: the one waiting for a quiet moment is still to come.
+                turnlog.record("face_seen", kind=sighting.kind, name=_logged_name(sighting),
+                               score=round(sighting.score, 3), group=sighting.group or "",
+                               greeted=False, why="another_waiting", **_track_fields(sighting),
+                               **_room_fields(sighting, greeting=False))
+                sighting = None
+            if sighting is not None and state == "pending":
+                # FACE_GREET_LAPSE_S: somebody is mid-sentence. Waited for off this loop (the
+                # listening gate needs its frames).
+                debug_status["verdict"] = "รอให้คนพูดจบก่อนทัก"
+                greet_task = asyncio.create_task(
+                    _greet_when_quiet(watcher, sighting, session_module._active))
+                sighting = None
             _face_debug(debug_status)
             if sighting is not None:
                 logger.info("face: %s %s (%.3f)", sighting.kind,
-                            sighting.name or "-", sighting.score)
+                            _logged_name(sighting) or "-", sighting.score)
                 await _greet(sighting)
-            await asyncio.sleep(interval)
+            await asyncio.sleep(_frame_gap(watcher, interval))
     except asyncio.CancelledError:
         raise
     except Exception:
@@ -1038,8 +1460,9 @@ async def run() -> None:
         # must not die quietly either.
         logger.exception("camera greeting stopped")
     finally:
-        if turn_task is not None and not turn_task.done():
-            turn_task.cancel()
+        for task in (turn_task, greet_task):
+            if task is not None and not task.done():
+                task.cancel()
         with contextlib.suppress(Exception):
             cap.release()
 
@@ -1056,6 +1479,17 @@ def start() -> None:
     if not settings.face_enabled or _task is not None:
         return
     _task = asyncio.create_task(run())
+    # The scan booth's two pieces, both behind their own switches (off = no
+    # task, no listener). From here and not main.py: without the camera loop
+    # neither has anything to do.
+    if settings.guest_sync_port:
+        from app import guest_sync_server
+
+        guest_sync_server.start()
+    if settings.face_approach:
+        from app import face_approach
+
+        face_approach.start()
 
 
 async def stop() -> None:
@@ -1066,3 +1500,11 @@ async def stop() -> None:
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError, Exception):
         await task
+    if settings.guest_sync_port:
+        from app import guest_sync_server
+
+        await guest_sync_server.stop()
+    if settings.face_approach:
+        from app import face_approach
+
+        await face_approach.stop()

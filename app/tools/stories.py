@@ -44,8 +44,10 @@ PARAMETERS = {
 def _declare():
     """This machine's catalog as the enum, each topic with the questions it
     answers (the description is what tells the model when to call it)."""
-    from app import stories
+    from app import ceremony_stories, stories
 
+    if ceremony_stories.in_ceremony() and ceremony_stories.on():
+        return ceremony_stories.declare()
     offered = stories.available()
     if not offered:
         return DESCRIPTION, PARAMETERS
@@ -74,6 +76,8 @@ def _declare():
 @tool(name="present_story", description=DESCRIPTION, parameters=PARAMETERS, declare=_declare,
       screen_only=("story",))
 def present_story(topic: str) -> dict:
-    from app import stories
+    from app import ceremony_stories, stories
 
+    if ceremony_stories.in_ceremony() and ceremony_stories.on():
+        return ceremony_stories.tool_result(topic)
     return stories.tool_result(topic)

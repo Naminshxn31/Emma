@@ -89,6 +89,7 @@ def turn_sweep_gap(points: np.ndarray, turn: float, *, length: float = ROBOT_BAS
 #: cut a diagonal across ฝ่ายอาคาร and hit a desk. Degrees in the route file
 #: because people write them; radians everywhere else.
 LANE_HEADINGS_DEG = (0, 90, 180, -90)
+LOOK_STEP_DEG = 5
 
 
 def wrap_pi(a: float) -> float:
@@ -454,6 +455,10 @@ class Step:
     # a door step: aim at the middle its own passes remembered, this door and
     # this way through (drive_route's door memory), not the drawing's
     remember: bool = False
+    # a look: stand still this long after the turn (4 Nov afternoon, owner:
+    # "ไม่เห็นก้มมองดูวัดพื้น หรือโต๊ะเลย" -- the head's walk scan, eye level /
+    # desk / floor on both sides, needs the base still for one whole round)
+    dwell_s: float = 0.0
 
 
 def door_key(door: str, heading_deg: float) -> str:
@@ -512,6 +517,11 @@ class Route:
     # spot, after the turn round and before backing in (7 ต.ค. 14:47).
     dock_check: tuple[str, ...] = ()
     dock_gap: DockGap | None = None
+    # The charger's marker (x, y, yaw) to dock by, when the route says (4 Nov):
+    # the board's home pose is not something to trust on floor 2 -- a map
+    # upload put a stray dock of 2 Oct there, and on the dock the board takes
+    # 200 for a new home pose and keeps the old one. None = the board's.
+    dock_marker: tuple[float, float, float] | None = None
     # where a door's middle was measured before the runtime kept its own memory
     # (`door_key` -> the jambs-beside middles of past passes, oldest first, the
     # coordinate across the door): what a `remember` step starts from
@@ -529,7 +539,24 @@ class Route:
 #: one turn, then straight ahead with our own heading corrections. The
 #: owner watched MoveTo weave and swing at the end (6 ต.ค.), so open lanes
 #: are moving to "drive".
-STEP_KINDS = ("checkpoint", "move", "drive", "door", "dock")
+#: "look": turn on the spot to `heading` and nothing more -- a room survey's
+#: look round where no wall is mapped to measure (4 Nov, the dock room's
+#: north and south ends); a checkpoint there would stop the run.
+STEP_KINDS = ("checkpoint", "move", "drive", "door", "dock", "look")
+#: A look's longest stand: a round of the head's walk scan is ~15 s; a minute
+#: is a typo (or a robot parked in a corridor by its own route).
+MAX_DWELL_S = 60.0
+
+
+def _look_heading(raw: Any, where: str) -> float:
+    """A look turns on the spot and drives nowhere, so it is not held to the
+    lane headings: any multiple of LOOK_STEP_DEG in (-180, 180]. 4 Nov
+    afternoon: the head may not pan on a walk ("อย่าหันหัวไวเกินและถี่เกิน"),
+    so the BASE turns for the sides, every 20 deg on a 19-deg camera."""
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw % LOOK_STEP_DEG or not -180 < raw <= 180:
+        raise ValueError("%s: a look's heading is a multiple of %d in (-180, 180], got %r"
+                         % (where, LOOK_STEP_DEG, raw))
+    return float(raw)
 
 
 def _heading(raw: Any, where: str) -> float:
@@ -553,7 +580,7 @@ def parse_route(doc: dict[str, Any]) -> Route:
             raise ValueError("%s: 'do' must be one of %s" % (where, STEP_KINDS))
         st = Step(do=kind, label=raw.get("label", ""))
         if "heading" in raw:
-            st.heading_deg = _heading(raw["heading"], where)
+            st.heading_deg = (_look_heading if kind == "look" else _heading)(raw["heading"], where)
         if kind in ("move", "drive"):
             to = raw.get("to")
             if not (isinstance(to, list) and len(to) == 2):
@@ -562,6 +589,15 @@ def parse_route(doc: dict[str, Any]) -> Route:
             if kind == "drive":
                 # walls to measure on the way (drive_route's rolling fixes)
                 st.use = tuple(raw.get("use") or ())
+        if kind == "look" and st.heading_deg is None:
+            raise ValueError("%s: a look needs 'heading'" % where)
+        if "dwell" in raw:
+            dwell = raw["dwell"]
+            if kind != "look":
+                raise ValueError("%s: only a look dwells" % where)
+            if isinstance(dwell, bool) or not isinstance(dwell, (int, float)) or not 0 < dwell <= MAX_DWELL_S:
+                raise ValueError("%s: 'dwell' is seconds, 0 < dwell <= %g" % (where, MAX_DWELL_S))
+            st.dwell_s = float(dwell)
         if kind == "checkpoint":
             st.use = tuple(raw.get("use") or ())
             st.doors = tuple(raw.get("doors") or ())
@@ -614,7 +650,8 @@ def parse_route(doc: dict[str, Any]) -> Route:
     return Route(name=str(doc.get("name") or "route"), anchors=anchors, doors=doors, steps=steps,
                  start_from_dock=bool(doc.get("start_from_dock")),
                  dock_pose=None if dock is None else (float(dock[0]), float(dock[1]), float(dock[2])),
-                 dock_check=dock_check, dock_gap=gap, door_seed=seed)
+                 dock_check=dock_check, dock_gap=gap, door_seed=seed,
+                 dock_marker=_triple(doc.get("dock_marker"), "dock_marker"))
 
 
 def dock_wall_fix(points: np.ndarray, pose: tuple[float, float, float], gap: DockGap, *,
@@ -798,6 +835,14 @@ def dock_gap_fix(points: np.ndarray, pose: tuple[float, float, float], gap: Dock
     return {"dx": float(dx), "dy": float(line_y - (centre + gap.offset)), "dyaw": float(dyaw),
             "centre": float(centre), "width": float(hi - lo), "outer": outer,
             "spread": spread, "wall_n": wall["wall_n"]}
+
+
+def _triple(raw, what: str) -> tuple[float, float, float] | None:
+    if raw is None:
+        return None
+    if not (isinstance(raw, list) and len(raw) == 3):
+        raise ValueError("%s must be [x, y, yaw]" % what)
+    return float(raw[0]), float(raw[1]), float(raw[2])
 
 
 def load_route(path: str | Path) -> Route:

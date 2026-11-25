@@ -116,6 +116,8 @@ BRIDGE_STRINGS = {
     '"emma-nav:status"': "bridge.navStatus()",
     '"emma-nav:stop"': "bridge.navStop()",
     '"emma-face:token"': "bridge.faceToken()",
+    # the ceremony app opens Emma Event (owner 9 Nov): the app's own literal, never page text
+    '"emma-face:open:event"': 'bridge.openApp("event")',
 }
 
 
@@ -339,7 +341,9 @@ public final class Harness {
         p("refusal.null_status", BodyGestures.refusal(true, false, true, null, false, null, true, false, false, false));
         // clamps
         Set<Integer> c578 = chans(5, 7, 8);
-        p("frames.ok", ok(BodyGestures.checkFrames(fs(BodyGestures.frame(800, 5, 1700), BodyGestures.frame(5000, 8, 1460)), c578)));
+        p("frames.ok", ok(BodyGestures.checkFrames(fs(BodyGestures.frame(800, 5, 1700), BodyGestures.frame(5000, 8, 1472)), c578)));
+        p("frames.tilt_up_stop", ok(BodyGestures.checkFrames(fs(BodyGestures.frame(5000, 8, 1471)), c578)));
+        p("frames.turn_minus", ok(BodyGestures.checkFrames(fs(BodyGestures.frame(5000, 7, 1460)), c578)));
         p("frames.short", ok(BodyGestures.checkFrames(fs(BodyGestures.frame(799, 5, 1500)), c578)));
         p("frames.long", ok(BodyGestures.checkFrames(fs(BodyGestures.frame(5001, 5, 1500)), c578)));
         BodyGestures.Frame f = BodyGestures.frame(1000, 5, 1500);
@@ -374,6 +378,27 @@ public final class Harness {
         p("rest_after.arm", BodyGestures.restAfter(pose));
         p("rest_after.head", BodyGestures.restAfter(fs(BodyGestures.frame(3000, 7, 1500, 8, 1540))));
         p("head.nod", BodyGestures.isHead("nod") + " " + BodyGestures.isHead("wave"));
+        // the arm comes down slowly (owner 6 Nov)
+        BodyGestures.Frame low = BodyGestures.handshakeLowering();
+        p("lower.handshake", low.durationMs + " " + low.targets);
+        p("lower.handshake_clamps", ok(BodyGestures.checkFrames(fs(low), low.targets.keySet())));
+        p("lower.min", BodyGestures.ARM_LOWER_MIN_MS + " " + BodyGestures.HANDSHAKE_LOWER_MS);
+        // raise_right_arm as recorded on the robot 15 Oct (emma_body_poses.xml)
+        List<BodyGestures.Frame> rec = fs(BodyGestures.frame(1000, 2, 1300, 3, 1700, 4, 1340),
+                BodyGestures.frame(800, 2, 1300, 3, 1620, 4, 1420), BodyGestures.frame(800, 2, 1300, 3, 1700, 4, 1340),
+                BodyGestures.frame(1000, 2, 1500, 3, 1300, 4, 1500));
+        List<BodyGestures.Frame> slow = BodyGestures.lowerLastSlowly(rec);
+        p("lower.recorded", slow.size() + " " + slow.get(3).durationMs + " " + slow.get(3).targets + " "
+                + slow.get(0).durationMs + " " + slow.get(1).durationMs + " " + BodyGestures.totalMs(slow));
+        p("lower.recorded_clamps", ok(BodyGestures.checkFrames(slow, chans(2, 3, 4))));
+        p("lower.head", BodyGestures.lowerLastSlowly(BodyGestures.builtInFrames("nod")).get(3).durationMs);
+        p("lower.already", BodyGestures.lowerLastSlowly(fs(BodyGestures.frame(3000, 5, 1500))).get(0).durationMs);
+        BodyGestures.Frame four = BodyGestures.frame(4000, 5, 1500);
+        List<BodyGestures.Frame> near = BodyGestures.lowerLastSlowly(fs(four, four, BodyGestures.frame(2500, 5, 1600),
+                BodyGestures.frame(1000, 5, 1400)));
+        p("lower.cap", near.get(3).durationMs + " " + BodyGestures.totalMs(near));
+        p("lower.full_cap", BodyGestures.lowerLastSlowly(fs(four, four, BodyGestures.frame(3000, 5, 1600),
+                BodyGestures.frame(1000, 5, 1400))).get(3).durationMs);
     }
 }
 """
@@ -457,6 +482,9 @@ def test_compiled_built_in_gestures_obey_their_own_clamps(harness):
     ("total12000", "ok"), ("total12001", "refused"), ("channel", "refused"), ("narrowed", "refused"),
     ("ch8_1541", "refused"), ("ch8_1459", "refused"), ("ch7_1580", "refused"),
     ("ch5_1701", "refused"), ("ch5_1299", "refused"), ("empty", "refused"),
+    # 4 Nov dock ladder: the head stops going up at ~1468 -- ch8's minus side is
+    # 1472, ch7's stays 1460
+    ("tilt_up_stop", "refused"), ("turn_minus", "ok"),
 ])
 def test_compiled_frame_clamps(harness, case, expected):
     assert harness["frames." + case] == expected
@@ -911,7 +939,7 @@ def test_a_stop_cannot_land_between_the_gate_check_and_the_arm_command():
         < lam.index("if (generation.get() == stoppedAt && !busy.get()) arm.stopAll();")
     # and every command is followed by the overtaken check
     assert play.count("stopIfOvertaken(gen);") == 3
-    assert "stopIfOvertaken(gen);" in method(body, "private void restReturn(int gen, String why)")
+    assert "stopIfOvertaken(gen);" in method(body, "private void restReturn(int gen, String why, String from)")
     assert "if (gen != generation.get() || latched()) stopArm();" in method(body, "private void stopIfOvertaken(int gen)")
 
 
@@ -1266,3 +1294,81 @@ def test_the_bridge_takes_one_fixed_speech_shape():
     assert "return body.requestSpeech(id);" in main
     # the studio's frame length: the draft line says what each frame lasts
     assert "motionDraft.captureFrame(BodyGestures.STUDIO_FRAME_MS[frameMsIndex]);" in main
+
+
+def test_compiled_the_arm_comes_down_slowly(harness):
+    """Owner 6 Nov: "แขนจะกลับท่าพักเองหลังจับมือ 5 วิ ให้เอาลงช้าๆแทน" and, for her
+    talking arm, "ให้ขยับลงช้าๆแทน". The handshake's way down is one slow frame on
+    the joints whose rest the 15 Oct sweep shows -- never ch5 (rest below the
+    clamps: 1300 there is the arm RAISED), never fingers, never the head -- and
+    a recorded pose's last frame is stretched, the rest of it untouched."""
+    assert harness["lower.handshake"] == "3000 {2=1500, 3=1300, 4=1500, 6=1500}"
+    assert harness["lower.handshake_clamps"] == "ok"
+    assert harness["lower.min"] == "2000 3000"
+    assert harness["lower.recorded"] == "4 2000 {2=1500, 3=1300, 4=1500} 1000 800 4600"
+    assert harness["lower.recorded_clamps"] == "ok"
+    assert harness["lower.head"] == "1500", "head poses keep their own timings"
+    assert harness["lower.already"] == "3000", "a slow last frame is never shortened"
+    assert harness["lower.cap"] == "1500 12000", "stretched only as far as MAX_TOTAL_MS"
+    assert harness["lower.full_cap"] == "1000"
+
+
+def test_the_handshake_comes_down_slowly_before_group_99():
+    body = code_only(read(BODY))
+    finished = method(body, "void onArmFinished()")
+    assert 'if ("handshake".equals(active)) later(gen, () -> lowerThenRest(gen, "#AGF"), groupHoldMs);' in finished
+    assert 'else later(gen, () -> restReturn(gen, "#AGF"), groupHoldMs);' in finished
+    low = method(body, "private void lowerThenRest(int gen, String why)")
+    # the checks of every rest-return, the phase moved under the lock
+    assert 'if (gen != generation.get() || !"running".equals(phase)) return;' in low
+    assert "host.operatorVisible()" in low and 'phase = "lowering";' in low
+    assert "BodyGestures.handshakeLowering()" in low
+    # a stop voids the run like any frame gesture; done = group 99 for what is left
+    assert "arm.playFrames(frames, () -> gen == generation.get() && !latched()," in low
+    assert '() -> restReturn(gen, why + ", lowered", "lowering")' in low
+    # a beat after the frame before group 99, as after any frames (review 6 Nov)
+    assert "BodyGestures.REST_AFTER_FRAMES_MS)" in low[low.index('why + ", lowered"'):]
+    assert 'finish(gen, "failed", "arm_unavailable");' in low
+    # the arm never stays out: a backstop before the run starts, and a failure rests it
+    backstop = low.index('later(gen, () -> restReturn(gen, why + ", lowering overran", "lowering"),')
+    assert backstop < low.index("arm.playFrames(")
+    assert "down.durationMs + FRAMES_WATCHDOG_SLACK_MS);" in low
+    assert 'restReturn(gen, why + ", lowering failed", "lowering");' in low
+    assert "stopIfOvertaken(gen);" in low
+    # one return ends one phase, once (check-and-set under the lock); every
+    # other caller -- the 30 s no-#AGF fallback among them -- ends only a
+    # "running" gesture, so it cannot cut a lowering short (review 6 Nov)
+    rest = method(body, "private void restReturn(int gen, String why, String from)")
+    assert "if (gen != generation.get() || !from.equals(phase)) return;" in rest
+    assert rest.index("synchronized (this) {") < rest.index('phase = "rest_return";') < rest.index("io.execute(")
+    assert 'restReturn(gen, why, "running");' in method(body, "private void restReturn(int gen, String why)")
+    # ...and the pageant's own way down (Pageant.java, owner 9 Nov), the same three returns -- plus
+    # its fourth since 10 Nov's side pose: an end inside the first raise frame is group 99 at once
+    # (ch5 is still travelling out from its rest; the lowering frame's ch5 1300 would swing it out)
+    pageant_low = method(body, "private void pageantLower(int gen, String why)")
+    assert low.count(', "lowering")') == 3 and pageant_low.count(', "lowering")') == 4
+    assert '" during the raise -- group 99", "lowering")' in pageant_low
+    assert body.count(', "lowering")') == 7, "only the two lowerings end a lowering"
+    # it reads as rest_return, owns the head, and holds busy (nothing resets it)
+    assert 'if ("rest_return".equals(phase) || "lowering".equals(phase)) return "rest_return";' in body
+    assert '"lowering".equals(phase)) return true;' in method(body, "private boolean headBusy()")
+    assert "busy.set(false)" not in low
+    # every recorded pose comes down slowly, wherever its frames are read
+    assert "return BodyGestures.lowerLastSlowly(pose.frames);" in method(
+        body, "private List<BodyGestures.Frame> framesFor(String id)")
+
+
+def test_a_beat_with_its_slow_lowering_fits_the_servers_beat_gap():
+    """The server asks for her next beat every SPEECH_GESTURE_BEAT_GAP_S. It
+    must land while the arm holds: a beat (raise_right_arm as recorded 15 Oct:
+    1000+800+800 ms, then the stretched lowering) still playing is refused
+    "busy", and after SPEECH_REST_AFTER_MS of holding the arm goes to group 99
+    (busy again -- review 6 Nov: a gap far past the window passed the first
+    version of this test)."""
+    gestures = read(GESTURES)
+    lower = int(re.search(r"static final int ARM_LOWER_MIN_MS = (\d+);", gestures).group(1))
+    hold = int(re.search(r"static final int SPEECH_REST_AFTER_MS = (\d+);", gestures).group(1))
+    config = (ROOT / "app" / "config.py").read_text(encoding="utf-8")
+    gap = float(re.search(r'"SPEECH_GESTURE_BEAT_GAP_S", "([\d.]+)"', config).group(1)) * 1000
+    beat = 1000 + 800 + 800 + lower
+    assert beat + 500 <= gap <= beat + hold - 500, (beat, gap, hold)

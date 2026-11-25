@@ -1,0 +1,131 @@
+{
+ "texts": {
+  "giant": "Thank you",
+  "emma": "Emma",
+  "l1": "An assistant to our sales team",
+  "l2": "And all of our agents",
+  "gk": "Get to know our project even better",
+  "c1t": "Take a look at",
+  "c1h": "The project details",
+  "c2t": "Talk with",
+  "c2h": "Our team",
+  "c3t": "Try",
+  "c3h": "The Smart Home experience"
+ },
+ "pictures": {
+  "full": {
+   "asset": "fin_pool_v4_1610"
+  },
+  "w1": {
+   "asset": "fin_pool_v1b"
+  },
+  "w2": {
+   "asset": "fin_entrance"
+  },
+  "w3": {
+   "asset": "fin_pool_v4_1610"
+  },
+  "w4": {
+   "asset": "fin_front_1120"
+  },
+  "w5": {
+   "asset": "fin_building_a"
+  },
+  "endpic": {
+   "asset": "fin_front_1120"
+  }
+ },
+ "beats": [
+  {
+   "at_en": "Thank you all",
+   "do": "title",
+   "key": "giant"
+  },
+  {
+   "at_en": "being part of Embassy World",
+   "do": "ring"
+  },
+  {
+   "at_en": "I'm delighted",
+   "do": "fly"
+  },
+  {
+   "at_en": "an assistant",
+   "do": "panel1",
+   "key": [
+    "emma",
+    "l1"
+   ],
+   "span": 0.1
+  },
+  {
+   "at_en": "and all of our agents",
+   "do": "panel2",
+   "key": "l2",
+   "span": 0.07
+  },
+  {
+   "at_en": "and I'm ready",
+   "do": "pull"
+  },
+  {
+   "at_en": "get to know",
+   "do": "pair1",
+   "key": "gk",
+   "span": 0.12
+  },
+  {
+   "at_en": "our project",
+   "do": "pair2"
+  },
+  {
+   "at_en": "even better",
+   "do": "pair3"
+  },
+  {
+   "at_en": "Please take a look",
+   "do": "back",
+   "key": [
+    "c1t",
+    "c1h"
+   ],
+   "span": 0.07
+  },
+  {
+   "at_en": "talk with our team",
+   "do": "inv2",
+   "key": [
+    "c2t",
+    "c2h"
+   ],
+   "span": 0.06
+  },
+  {
+   "at_en": "try the Smart Home",
+   "do": "inv3",
+   "key": [
+    "c3t",
+    "c3h"
+   ],
+   "span": 0.11
+  },
+  {
+   "at_en": "yourselves",
+   "do": "glint2"
+  }
+ ],
+ "options": {
+  "mode": "brand",
+  "title_size": 6,
+  "look": "land",
+  "end_zoom": 1.03,
+  "bleed": true,
+  "wheel": {
+   "r": 70,
+   "step": 24
+  }
+ },
+ "template": "act",
+ "act": "smarthome_brand",
+ "figures": {}
+}

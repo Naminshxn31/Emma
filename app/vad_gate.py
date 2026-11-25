@@ -128,6 +128,14 @@ class VadGate:
         self._seg_audio: bytearray | None = None
         self._closed: tuple[int, float, float, bytes] | None = None
         self._focus_logged_at = 0.0
+        #: ONE_VOICE_PROFILES (app/one_voice.py): the voice door, the last test at the opening.
+        #: The session sets it; None = no door, and `feed` reads this one attribute and nothing
+        #: else (every profile not listed is byte-identical). See `_voice_door`.
+        self.voice_door = None
+        self._door_held: bytearray | None = None     # the head of a run awaiting the verdict
+        self._door_rms = 0.0
+        self._door_blocked = False                   # the rest of this detector run is refused
+        self._door_window = bytearray()              # its latest audio, for the door's relook
 
     #: Seconds after opening during which the floor does not apply.
     FLOOR_GRACE_S = 3.0
@@ -266,6 +274,16 @@ class VadGate:
 
         import time as _time
 
+        if self.voice_door is not None and not self.in_speech and (
+                self._door_held is not None or self._door_blocked):
+            # A run the voice door is holding or refusing already passed the opening doors
+            # below, once. Asking them again every frame counted it as a new opening each time
+            # (review 19 Nov: 200 focus.may_open calls for one refused 4 s run, each a
+            # focus_open row and a renewal of focus's converse hold for a refused bystander).
+            door_actions = self._voice_door(self.voice_door, pcm16, samples, speaking, detector_speech)
+            if door_actions is not None:
+                return door_actions
+
         if speaking and not self.in_speech:
             rms = float(np.sqrt((samples * samples).mean()))
             if rms < self.SILENCE_RMS:
@@ -333,6 +351,11 @@ class VadGate:
                         self._focus_logged_at = now
                     speaking = False
 
+        if self.voice_door is not None and not self.in_speech:
+            door_actions = self._voice_door(self.voice_door, pcm16, samples, speaking, detector_speech)
+            if door_actions is not None:
+                return door_actions
+
         actions: list[tuple[str, bytes]] = []
         if speaking and not self.in_speech:
             self.in_speech = True
@@ -383,6 +406,95 @@ class VadGate:
                 del self._preroll[:len(self._preroll) - cap]
         return actions
 
+    def _voice_door(self, door, pcm16: bytes, samples, speaking: bool, detector_speech: bool):
+        """The one-voice door (app/one_voice.py), asked only when no segment is open.
+
+        Same shape as the floor and focus -- a "no" is silence, nothing goes upstream -- with one
+        difference they do not have: the verdict needs ~1.2 s of the voice, so the head of the
+        run is HELD here (not forwarded, not lost) and goes up first when the door says yes.
+        The detector keeps hearing every frame, so its one hangover clock is untouched. Returns
+        the actions for this frame, or None when the door has nothing to do with it (the normal
+        flow below decides, e.g. rolling the pre-roll in silence)."""
+        from app import one_voice
+
+        if self._door_blocked:
+            if not detector_speech:
+                # The refused run is over; this frame is quiet and rolls into the pre-roll.
+                self._door_blocked = False
+                self._door_window = bytearray()
+                return None
+            self._door_window.extend(pcm16)
+            cap = int(one_voice.DOOR_RELOOK_WINDOW_S * 2 * self._rate)
+            if len(self._door_window) > cap:
+                del self._door_window[:len(self._door_window) - cap]
+            if door.relook(bytes(self._door_window), len(pcm16)) == one_voice.PASS:
+                head = bytes(self._door_window)
+                self._door_blocked = False
+                self._door_window = bytearray()
+                return self._door_open(head, self._door_rms)
+            return []
+        held = self._door_held
+        if held is not None:
+            held.extend(pcm16)
+            if detector_speech:
+                verdict = door.look(bytes(held))
+                if verdict == one_voice.WAIT:
+                    return []
+                self._door_held = None
+                if verdict == one_voice.PASS:
+                    return self._door_open(bytes(held), self._door_rms)
+                self._door_blocked = True
+                cap = int(one_voice.DOOR_RELOOK_WINDOW_S * 2 * self._rate)
+                self._door_window = bytearray(held[-cap:])
+                return []
+            # The run ended while held: a short word ("ค่ะ", "หยุด") or a verdict still out.
+            self._door_held = None
+            if door.short(bytes(held)) == one_voice.PASS:
+                return self._door_open(bytes(held), self._door_rms) + self._door_close()
+            return []
+        if not speaking:
+            return None
+        # Every other door said yes: this run's head waits for the voice's verdict.
+        import numpy as np
+
+        door.begin(len(self._preroll))
+        self._door_rms = float(np.sqrt((samples * samples).mean()))
+        held = bytearray(self._preroll)
+        held.extend(pcm16)
+        self._preroll.clear()
+        verdict = door.look(bytes(held))
+        if verdict == one_voice.PASS:
+            return self._door_open(bytes(held), self._door_rms)
+        self._door_held = held
+        return []
+
+    def _door_open(self, head: bytes, rms: float) -> list:
+        """Open a segment whose head the voice door held: the same bookkeeping as the open below."""
+        import time as _time
+
+        import numpy as np
+
+        self.in_speech = True
+        self.segments += 1
+        self.open_rms = rms
+        self._focus_level = float(np.sqrt(max(self._energy, 0.0)))
+        self._focus_quiet_s = 0.0
+        self._focus_quiet_rms = 0.0
+        self._seg_t0 = _time.monotonic() - len(head) / (2.0 * self._rate)
+        if self.keep_audio:
+            self._seg_audio = bytearray(head)
+        return [("start", b""), ("audio", head)]
+
+    def _door_close(self) -> list:
+        """Close at once a segment `_door_open` just opened (a short word let in after its run)."""
+        import time as _time
+
+        self.in_speech = False
+        self._report_focus_end()
+        audio, self._seg_audio = self._seg_audio, None
+        self._closed = (self.segments, self._seg_t0, _time.monotonic(), bytes(audio) if audio else b"")
+        return [("end", b"")]
+
     def _keep_segment_audio(self, pcm16: bytes) -> None:
         audio = self._seg_audio
         if audio is not None and len(audio) < int((MAX_SEGMENT_S + 1.0) * 2 * self._rate):
@@ -398,8 +510,9 @@ class VadGate:
         return closed
 
 
-def _make_detector():
+def _make_detector(silence_ms: int | None = None):
     """A sherpa-onnx Silero detector per session, or None with a loud reason.
+    `silence_ms`: this call's end-of-turn silence (settings.call_vad_silence_ms); None = VAD_SILENCE_MS.
 
     None must never be quiet: `VAD_MODE=local` with no model would otherwise
     just mean "behaves exactly like before", which is the misconfiguration
@@ -429,7 +542,8 @@ def _make_detector():
         # does not silently change how patient the robot is. VAD_SILENCE_MS
         # was just raised to 900 because 500 cut off Thai speakers pausing
         # mid-sentence; that decision must survive the mode switch.
-        cfg.silero_vad.min_silence_duration = settings.vad_silence_ms / 1000
+        cfg.silero_vad.min_silence_duration = (
+            settings.vad_silence_ms if silence_ms is None else int(silence_ms)) / 1000
         # 100 ms admitted desk taps and browser/USB transients as one-word
         # turns (measured as the phantom transcript "FB1"). Wait for sustained
         # speech; prefix padding keeps the first syllable in the sent audio.
@@ -457,7 +571,7 @@ def _make_detector():
         return None
 
 
-def for_session(min_rms: float | None = None):
+def for_session(min_rms: float | None = None, silence_ms: int | None = None, prefix_padding_ms: int | None = None):
     """The gate for a new session, or None when the mode is off/unavailable.
 
     Per-session on purpose: the detector carries decoder state, and two
@@ -469,13 +583,14 @@ def for_session(min_rms: float | None = None):
     """
     if settings.vad_mode != "local":
         return None
-    detector = _make_detector()
+    detector = _make_detector() if silence_ms is None else _make_detector(silence_ms)
     if detector is None:
         return None
     floor = settings.vad_min_rms if min_rms is None else float(min_rms)
-    logger.info("local VAD active: silence stays here, Gemini hears speech only%s",
-                (" | near-field floor %.3f" % floor) if floor > 0 else " | no loudness floor")
-    return VadGate(detector, prefix_padding_ms=settings.vad_prefix_padding_ms,
+    logger.info("local VAD active: silence stays here, Gemini hears speech only%s%s",
+                (" | near-field floor %.3f" % floor) if floor > 0 else " | no loudness floor",
+                "" if silence_ms is None else " | end-of-turn silence %d ms" % int(silence_ms))
+    return VadGate(detector, prefix_padding_ms=settings.vad_prefix_padding_ms if not prefix_padding_ms else int(prefix_padding_ms),
                    min_rms=floor,
                    floor_grace_s=settings.vad_floor_grace_s,
                    focus_ratio=settings.vad_focus_ratio,

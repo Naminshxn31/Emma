@@ -47,6 +47,10 @@ final class BodyController {
         void ensureArm() throws Exception;
         /** Something the page or the SafetyBar shows changed (any thread). */
         void changed();
+        /** This is Emma Event or Emma Ceremony (EmmaFace.playsPageant): the two builds that play
+         *  the pageant (Pageant.java, owner 9 Nov: "ท่านี้จะใช้เฉพาะโหมดนี้"; 23 Nov: "ช่วงพิธีอยู่แอปพิธี
+         *  ทั้งหมด" -- the debut is the ceremony's first step, waved in the ceremony app). */
+        boolean pageantApp();
     }
 
     static final String PREFS = "emma_body_nav";
@@ -94,7 +98,14 @@ final class BodyController {
     private final ArrayDeque<Long> speechStarts = new ArrayDeque<>();
 
     private volatile long latchedUntil = 0L;
+    /** Every stop() that set the latch, counted (sibling takeover, 24 Nov: see liftLatchTo). */
+    private final AtomicInteger latchSets = new AtomicInteger();
     private volatile long lastEnd = -BodyGestures.COOLDOWN_MS;
+    /** The last pageant start (Pageant.MIN_GAP_MS). */
+    private long lastPageantAt = -Pageant.MIN_GAP_MS;
+    /** When the pageant's frames went to the board (elapsedRealtime; 0 = not yet): an end inside
+     *  the first raise frame is group 99, not our lowering (pageantLower). */
+    private volatile long pageantPlayAt = 0L;
     /** Groups move joints nobody can read back; app start knows nothing either. */
     private volatile boolean headKnown = false;
 
@@ -118,9 +129,11 @@ final class BodyController {
     /** Only the newest queued look may reach the board: io is shared with the
      *  gestures, and a backlog of old looks would swing the head back. */
     private final AtomicInteger lookSeq = new AtomicInteger();
-    /** idle | running | holding | rest_return. "holding" = a speech
+    /** idle | running | holding | lowering | rest_return. "holding" = a speech
      *  gesture's frames ended with the arm out, waiting for her next beat
-     *  (SPEECH_REST_AFTER_MS) before group 99; busy is free in it. */
+     *  (SPEECH_REST_AFTER_MS) before group 99; busy is free in it. "lowering" =
+     *  the handshake's slow frame down before its group 99 (lowerThenRest);
+     *  busy is held, and it reads as rest_return everywhere. */
     private volatile String phase = "idle";
     private volatile String active = null;
     private volatile boolean groupRunning = false;
@@ -209,13 +222,27 @@ final class BodyController {
                 String status = effectiveStatus(id);
                 if (status != null) gestures.put(id, status);
             }
-            return new JSONObject()
+            JSONObject caps = new JSONObject()
                     .put("enabled", enabled())
                     .put("allow_direction_known", allowDirectionKnown())
                     .put("gestures", gestures)
                     .put("speech", true)          // this build plays emma-body:<id>:speech
                     .put("look", true)            // and emma-body:look:<pan>:<tilt> (HeadLook)
-                    .toString();
+                    .put("pageant", host.pageantApp());  // and emma-body:pageant:event (Pageant): Event + Ceremony
+            if (host.pageantApp()) {
+                // The pageant's timing from its own frames (PageantTiming; review 24 Nov: no version
+                // handshake -- a server timed for 23 Nov's 4.0 s raise with the 6.9 s one started her
+                // line in its first frame). Its own try: a failure only leaves the fields out (the server
+                // then times it as the old APK, the longer wait), never the caps' gestures.
+                try {
+                    caps.put("pageant_v", PageantTiming.VERSION)
+                            .put("pageant_lead_ms", PageantTiming.leadMs())
+                            .put("pageant_two_sides_ms", PageantTiming.twoSidesMs());
+                } catch (Exception e) {
+                    Log.w(TAG, "pageant timing left out of the caps", e);
+                }
+            }
+            return caps.toString();
         } catch (Exception e) {
             return "{\"enabled\":false,\"allow_direction_known\":false,\"gestures\":{}}";
         }
@@ -238,7 +265,7 @@ final class BodyController {
         if (latched(now)) return "latched";
         // holding: the arm is still out -- reported as running, never idle
         if ("running".equals(phase) || "holding".equals(phase)) return "running";
-        if ("rest_return".equals(phase)) return "rest_return";
+        if ("rest_return".equals(phase) || "lowering".equals(phase)) return "rest_return";
         if (now - lastEnd < BodyGestures.COOLDOWN_MS) return "cooldown";
         return "idle";
     }
@@ -263,6 +290,26 @@ final class BodyController {
     void clearLatch() {
         latchedUntil = 0L;
         host.changed();
+    }
+
+    /** When the latch runs out (elapsedRealtime), and how many stops have set it: what
+     *  MainActivity keeps at a foreground loss, to tell later that no other stop came since. */
+    long latchUntil() {
+        return latchedUntil;
+    }
+
+    int latchSets() {
+        return latchSets.get();
+    }
+
+    /** MainActivity's sibling takeover only (24 Nov 2026: `am start` of Emma Ceremony paused Emma
+     *  Event, whose pause latched arm and walk for 60 s, and the server read that latch on Event's
+     *  still-open status link and refused the ceremony's opening until Event was force-stopped).
+     *  Lowers the latch back to `until` -- what it was before the pause, so a B pressed earlier
+     *  still runs out at its own time -- and never raises it. The stop itself stands: the
+     *  generation stays voided, nothing that was cancelled comes back. */
+    void liftLatchTo(long until) {
+        if (until < latchedUntil) latchedUntil = until;
     }
 
     // ---- requests ----------------------------------------------------------------
@@ -319,6 +366,173 @@ final class BodyController {
         return ack(true, id, null, status, est);
     }
 
+    // ---- the pageant (Pageant.java; owner 9 Nov 2026) ---------------------------------------
+
+    /** emma-body:pageant:event from the trusted page: the Emma Event debut's beauty-queen wave,
+     *  sent by the server's scene (app/event_pageant.py), never by a guest's words. The one gesture
+     *  the app plays while the server walks the base (owner 9 Nov: "โบกไปด้วยระหว่างเดิน ... ท่านี้
+     *  จะใช้เฉพาะโหมดนี้แก้กฏได้"), so only in the Emma Event app. Every other gate of a gesture holds:
+     *  the switch, the operator screen, foreground, a walk THIS app runs (emma_nav / drive_route --
+     *  the server's own walk is the one the pageant is for), the stop latch, busy; plus its own gap
+     *  between starts. No status mapping: it is compiled in, checked again at play time. */
+    synchronized String requestPageant() {
+        if (!host.pageantApp()) return ack(false, "pageant", "not_event_app", null, -1);
+        long now = SystemClock.elapsedRealtime();
+        // busy unless the arm is IDLE: a speech beat "holding" frees busy with its arm still out, and
+        // the pageant over it never moves those channels -- the held arm stayed out under the wave
+        // until group 99 (review 9 Nov). The server asks again while busy.
+        String reason = BodyGestures.refusal(enabled(), host.operatorVisible(), host.foreground(),
+                host.navBlock(), latched(now), BodyGestures.VERIFIED, false,
+                busy.get() || !"idle".equals(phase), now - lastPageantAt < Pageant.MIN_GAP_MS, false);
+        if (reason == null && Pageant.check(Pageant.sequence()) != null) reason = "needs_mapping";
+        if (reason != null) return ack(false, "pageant", reason, null, -1);
+        if (!busy.compareAndSet(false, true)) return ack(false, "pageant", "busy", null, -1);
+        lastPageantAt = now;
+        pageantPlayAt = 0L;
+        attempts.incrementAndGet();
+        starts.addLast(now);
+        phase = "running";
+        active = "pageant";
+        // its "started" is recorded when the frames go (playPageant, after the arm connect), not here
+        final int gen = generation.get();
+        final List<BodyGestures.Frame> frames = Pageant.sequence();
+        host.changed();
+        io.execute(() -> playPageant(gen, frames));
+        return ack(true, "pageant", null, null, BodyGestures.totalMs(frames) + Pageant.LOWER_MS);
+    }
+
+    /** emma-body:pageant_end:event: the hand comes down now (her line is over, the walk ended
+     *  short, the next scene). Slowly, then group 99 -- never a stop: a stop is the red button's,
+     *  and it freezes the arm where it is. The ack's est_ms is the server's answer to "is a pageant
+     *  still up": null = none (nothing to do), a number = coming down (just now, or already --
+     *  its lowering or group 99), so a walk about to rest the arm asks again. */
+    String endPageant() {
+        final int gen;
+        synchronized (this) {
+            if (!host.pageantApp()) return ack(false, "pageant_end", "not_event_app", null, -1);
+            if (!"pageant".equals(active)) return ack(true, "pageant_end", null, null, -1);
+            if (!"running".equals(phase)) return ack(true, "pageant_end", null, null, Pageant.LOWER_MS);
+            gen = generation.get();
+        }
+        pageantLower(gen, "server");
+        return ack(true, "pageant_end", null, null, Pageant.LOWER_MS);
+    }
+
+    /** On io: the raise and the waving sides as one frame run; its end (MAX_MS) lowers it. */
+    private void playPageant(int gen, List<BodyGestures.Frame> frames) {
+        if (stale(gen)) return;
+        try {
+            host.ensureArm();
+        } catch (Exception e) {
+            Log.e(TAG, "arm connect failed for the pageant", e);
+            finish(gen, "failed", "arm_unavailable");
+            return;
+        }
+        String bad = Pageant.check(frames);
+        if (bad != null) {
+            Log.w(TAG, "pageant refused at play time: " + bad);
+            finish(gen, "failed", "needs_mapping");
+            return;
+        }
+        // "started" now, after the arm connect -- the server counts the standing pageant's minimum
+        // (app/event_pageant.MIN_STANDING_S, 0.6 s over two sides) from it, and a cold connect (the
+        // first press after the app starts: the vendor app's force-stop alone may take up to
+        // RootShell.TIMEOUT_MS) once ate a side when it was recorded at the request (review 10 Nov)
+        synchronized (this) {
+            if (stale(gen)) return;
+            // Review 23 Nov: an end that came while ensureArm was connecting (the server's pageant_end:
+            // her line short, the next scene) found pageantPlayAt 0 and already queued group 99 behind
+            // us (pageantLower) -- the run is over: no "started", no frames after it.
+            if (!"running".equals(phase) || !"pageant".equals(active)) return;
+            record("pageant", "started", null);
+        }
+        host.changed();
+        ArrayList<ArmController.PoseFrame> run = new ArrayList<>();
+        for (BodyGestures.Frame frame : frames) run.add(new ArmController.PoseFrame(frame.targets, frame.durationMs));
+        final int attempt = attempts.get();
+        // the backstop, as for any frame run (review #13): a run that never reports still comes down
+        later(gen, () -> {
+            if (attempt == attempts.get() && "running".equals(phase) && "pageant".equals(active)) {
+                pageantLower(gen, "watchdog");
+            }
+        }, BodyGestures.totalMs(frames) + FRAMES_WATCHDOG_SLACK_MS);
+        try {
+            synchronized (armGate) {
+                if (stale(gen)) return;
+                // and again here, next to the command (review 23 Nov): an end between "started" and
+                // now has its group 99 queued on io behind this task -- F1 must not go out ahead of
+                // it. An end after this check is the raise's own case: pageantLower reads
+                // pageantPlayAt as 0 or < RAISE_MS and its group 99 (io, armGate) comes after these
+                // frames and ends them.
+                if (!"running".equals(phase) || !"pageant".equals(active)) return;
+                headKnown = false;
+                headLost();                  // the pageant owns the head (headBusy)
+                pageantPlayAt = SystemClock.elapsedRealtime();
+                arm.playFrames(run, () -> gen == generation.get() && !latched(),
+                        () -> pageantLower(gen, "max_ms"), () -> {
+                            Log.w(TAG, "pageant: arm board lost mid-run");
+                            finish(gen, "failed", "arm_unavailable");
+                        });
+            }
+            stopIfOvertaken(gen);
+            Log.i(TAG, "pageant: " + frames.size() + " frames, " + BodyGestures.totalMs(frames) + " ms");
+        } catch (Exception e) {
+            Log.e(TAG, "pageant failed", e);
+            finish(gen, "failed", "arm_unavailable");
+        }
+    }
+
+    /** The pageant's way down: one slow frame of ours (Pageant.lower: the hand, the elbow and the
+     *  head back), then group 99 -- the handshake's lowerThenRest, for this pose. Its frame run
+     *  replaces the waving one on the board's pose thread (a newer run ends the older at once).
+     *  Once only: whoever comes first (the server's end, the run's own end, the watchdog) moves
+     *  the phase to "lowering" and the others find it gone. */
+    private void pageantLower(int gen, String why) {
+        final BodyGestures.Frame down = Pageant.lower();
+        synchronized (this) {
+            if (gen != generation.get() || !"running".equals(phase) || !"pageant".equals(active)) return;
+            if (host.operatorVisible()) {          // the operator owns the arm now
+                finish(gen, "stopped", "operator_screen");
+                return;
+            }
+            phase = "lowering";
+        }
+        host.changed();
+        long played = pageantPlayAt;
+        if (played == 0L || SystemClock.elapsedRealtime() - played < Pageant.RAISE_MS) {
+            // Still in the first raise frame (review 10 Nov): ch5 is travelling OUT from its rest, far
+            // below 1300, and our lowering frame's 1300 would carry the arm on out to ~45 deg -- and a
+            // frame without ch5 would not stop the board's own move there. Only group 99 (resetHome,
+            // which also ends the frame run) takes every channel's target back; the arm is still
+            // near its rest, so the vendor's speed is no swing.
+            restReturn(gen, "pageant " + why + " during the raise -- group 99", "lowering");
+            return;
+        }
+        later(gen, () -> restReturn(gen, "pageant " + why + ", lowering overran", "lowering"),
+                down.durationMs + FRAMES_WATCHDOG_SLACK_MS);
+        final ArrayList<ArmController.PoseFrame> frames = new ArrayList<>();
+        frames.add(new ArmController.PoseFrame(down.targets, down.durationMs));
+        io.execute(() -> {
+            try {
+                synchronized (armGate) {
+                    if (gen != generation.get() || latched()) return;
+                    if (!"lowering".equals(phase)) return;     // its backstop already rested it
+                    arm.playFrames(frames, () -> gen == generation.get() && !latched(),
+                            () -> later(gen, () -> restReturn(gen, "pageant " + why + ", lowered", "lowering"),
+                                    BodyGestures.REST_AFTER_FRAMES_MS), () -> {
+                                Log.w(TAG, "pageant lowering: arm board lost mid-run");
+                                finish(gen, "failed", "arm_unavailable");
+                            });
+                }
+                stopIfOvertaken(gen);
+                Log.i(TAG, "pageant lowering (" + why + ")");
+            } catch (Exception e) {
+                Log.e(TAG, "pageant lowering failed", e);
+                restReturn(gen, "pageant " + why + ", lowering failed", "lowering");
+            }
+        });
+    }
+
     /** The legacy `emma-arm:greet:6` (camera greeter). MainActivity has
      *  already checked the gates it always had (foreground, focus, not the
      *  operator screen); it now also shares the arm's one lock, and never
@@ -347,18 +561,20 @@ final class BodyController {
         int toPan = HeadLook.panPulse(pan);
         int toTilt = HeadLook.tiltPulse(tilt);
         // every input read OUTSIDE lookLock: it guards two fields, never a call out
-        String gate = HeadLook.refusal(enabled(), host.operatorVisible(), host.foreground(), host.navBlock(),
-                latched(now), headBusy(), false, HeadLook.isCentre(toPan, toTilt));
+        String nav = host.navBlock();
+        String gate = HeadLook.refusal(enabled(), host.operatorVisible(), host.foreground(), nav,
+                latched(now), headBusy(), false, HeadLook.walkSafe(nav, toPan, toTilt));
         String reason = gate;
         synchronized (lookLock) {
-            if (reason == null && now - lastLookAt < HeadLook.MIN_GAP_MS) reason = "too_soon";
+            if (reason == null && now - lastLookAt < HeadLook.minGapMs(nav)) reason = "too_soon";
             if (reason == null) lastLookAt = now;
         }
         if (reason != null) return lookAck(false, reason, -1);
         // how long the move will take, from where the head is now: the server
         // reads the next picture after it (sendLook works it out again on io)
         int[] at = headPosition(now);
-        int ms = at == null ? HeadLook.UNKNOWN_MS : HeadLook.durationMs(true, at[0], at[1], toPan, toTilt);
+        int ms = HeadLook.walkMs(nav, at == null ? HeadLook.UNKNOWN_MS
+                : HeadLook.durationMs(true, at[0], at[1], toPan, toTilt));
         sendLook(toPan, toTilt);
         ui.removeCallbacksAndMessages(LOOK_TIMER);
         ui.postAtTime(this::centreIfIdle, LOOK_TIMER, SystemClock.uptimeMillis() + HeadLook.IDLE_CENTRE_MS);
@@ -368,12 +584,14 @@ final class BodyController {
     /** A vendor group, a rest, or a gesture whose frames move ch7/ch8 owns the
      *  head. A speech gesture's arm frames (and its "holding") do not. */
     private boolean headBusy() {
-        if (groupRunning || "rest_return".equals(phase)) return true;
+        if (groupRunning || "rest_return".equals(phase) || "lowering".equals(phase)) return true;
         String id = active;
         if (!"running".equals(phase) || id == null) return false;
-        if (BodyGestures.isHead(id)) return true;
+        if (BodyGestures.isHead(id) || "pageant".equals(id)) return true;    // the pageant turns ch7
         List<BodyGestures.Frame> frames = framesFor(id);
-        if (frames == null) return true;             // handshake, greet_arm, rest: groups
+        // greet_arm, rest: groups; the handshake (group 6, or our own frames since 25 Nov -- it
+        // keeps the head still while the hand is out, as group 6 did): none come from framesFor
+        if (frames == null) return true;
         for (BodyGestures.Frame frame : frames) {
             if (frame.targets.containsKey(HeadLook.PAN) || frame.targets.containsKey(HeadLook.TILT)) return true;
         }
@@ -408,12 +626,12 @@ final class BodyController {
                 host.ensureArm();
                 synchronized (armGate) {
                     if (mine != lookSeq.get() || gen != generation.get() || latched()
-                            || (host.navBlock() != null && !HeadLook.isCentre(toPan, toTilt))
+                            || (host.navBlock() != null && !HeadLook.walkSafe(host.navBlock(), toPan, toTilt))
                             || headBusy()) return;
                     long now = SystemClock.elapsedRealtime();
                     int[] at = headPosition(now);
-                    int ms = at == null ? HeadLook.UNKNOWN_MS
-                            : HeadLook.durationMs(true, at[0], at[1], toPan, toTilt);
+                    int ms = HeadLook.walkMs(host.navBlock(), at == null ? HeadLook.UNKNOWN_MS
+                            : HeadLook.durationMs(true, at[0], at[1], toPan, toTilt));
                     String line = HeadLook.command(toPan, toTilt, ms);
                     if (line == null) return;
                     arm.writeLine(line);
@@ -470,9 +688,12 @@ final class BodyController {
         }
     }
 
+    /** A recorded arm pose comes back down slowly (owner 6 Nov: "ให้ขยับลงช้าๆ"):
+     *  every reader -- the gates, the estimate, the watchdog, the play -- sees
+     *  the same stretched frames. */
     private List<BodyGestures.Frame> framesFor(String id) {
         BodyPoseStore.Pose pose = poses.get(id);
-        if (pose != null) return pose.frames;
+        if (pose != null) return BodyGestures.lowerLastSlowly(pose.frames);
         return BodyGestures.builtInFrames(id);
     }
 
@@ -515,6 +736,10 @@ final class BodyController {
             return;
         }
         try {
+            if ("handshake".equals(id) && BodyGestures.HANDSHAKE_OWN_FRAMES) {
+                playOwnHandshake(gen);       // our frames, not group 6 (owner 25 Nov)
+                return;
+            }
             if ("handshake".equals(id) || "greet_arm".equals(id)) {
                 synchronized (armGate) {
                     if (stale(gen)) return;
@@ -604,6 +829,52 @@ final class BodyController {
         }
     }
 
+    /** On io, after the arm connect: our own handshake (BodyGestures.HANDSHAKE_OWN_FRAMES, owner
+     *  25 Nov -- group 6 bent the elbow back UP on its way down). The hand goes out in one frame
+     *  (handshakeOffer), stays out HANDSHAKE_HOLD_MS for the guest, then comes down slowly in
+     *  lowerThenRest -- the same slow frame and group 99 the group-6 handshake ends with, now
+     *  actually lowering from the offer. The server sees what it always saw: "started" (begin),
+     *  then "done" after group 99, est HANDSHAKE_EST_MS; busy is held throughout and the head is
+     *  left alone (headBusy) as during group 6.
+     *  Nothing here waits on #AGF: groupRunning stays false, so an #AGF the board may send for a
+     *  frame is never read as group 6's; the frame run's own end starts the hold. */
+    private void playOwnHandshake(int gen) {
+        String bad = BodyGestures.handshakeProblem();
+        if (bad != null) {
+            Log.w(TAG, "own handshake refused at play time: " + bad);
+            finish(gen, "failed", "needs_mapping");
+            return;
+        }
+        final BodyGestures.Frame offer = BodyGestures.handshakeOffer();
+        final ArrayList<ArmController.PoseFrame> frames = new ArrayList<>();
+        frames.add(new ArmController.PoseFrame(offer.targets, offer.durationMs));
+        // the backstop (review #13's rule for any frame run): an offer that never reports -- no
+        // onDone, no onAbort -- still comes down, slowly; past the hold, never inside it
+        final int attempt = attempts.get();
+        later(gen, () -> {
+            if (attempt == attempts.get() && "running".equals(phase) && "handshake".equals(active)) {
+                lowerThenRest(gen, "offer overran");
+            }
+        }, offer.durationMs + BodyGestures.HANDSHAKE_HOLD_MS + FRAMES_WATCHDOG_SLACK_MS);
+        try {
+            synchronized (armGate) {
+                if (stale(gen)) return;
+                groupRunning = false;        // no group: an #AGF in the offer or the hold is not ours
+                arm.playFrames(frames, () -> gen == generation.get() && !latched(),
+                        () -> later(gen, () -> lowerThenRest(gen, "held"), BodyGestures.HANDSHAKE_HOLD_MS), () -> {
+                            Log.w(TAG, "own handshake: arm board lost mid-offer");
+                            finish(gen, "failed", "arm_unavailable");
+                        });
+            }
+            stopIfOvertaken(gen);
+            Log.i(TAG, "gesture handshake: own offer " + offer.targets + " in " + offer.durationMs
+                    + " ms, hold " + BodyGestures.HANDSHAKE_HOLD_MS + " ms");
+        } catch (Exception e) {
+            Log.e(TAG, "own handshake failed", e);
+            finish(gen, "failed", "arm_unavailable");
+        }
+    }
+
     /** A speech gesture's frames are done: "done" for the server, the arm
      *  stays out, busy is free for her next beat, and group 99 follows unless
      *  one comes inside SPEECH_REST_AFTER_MS. */
@@ -660,11 +931,65 @@ final class BodyController {
         final int gen = generation.get();
         if (groupRunning && !groupAgfSeen && "running".equals(phase)) {
             groupAgfSeen = true;
-            // wait a beat for the person to actually shake the offered hand
-            later(gen, () -> restReturn(gen, "#AGF"), groupHoldMs);
+            // the vendor's handshake alone (owner 25 Nov, BodyGestures.HANDSHAKE_VENDOR_ONLY): group 6
+            // has already brought the hand down -- its rest group 99 at once, no hold, no frame of ours.
+            // Otherwise: wait a beat for the person to actually shake the offered hand; the handshake
+            // then comes down slowly (owner 6 Nov), group 3's raised arm rests as before
+            if ("handshake".equals(active) && BodyGestures.HANDSHAKE_VENDOR_ONLY) later(gen, () -> restReturn(gen, "#AGF, vendor handshake"), 0);
+            else if ("handshake".equals(active)) later(gen, () -> lowerThenRest(gen, "#AGF"), groupHoldMs);
+            else later(gen, () -> restReturn(gen, "#AGF"), groupHoldMs);
         } else if ("rest_return".equals(phase) && restAgf == null) {
             finish(gen, "done", null);
         }
+    }
+
+    /** The handshake's end, after its hold (owner 6 Nov: "แขนจะกลับท่าพักเอง
+     *  หลังจับมือ 5 วิ ให้เอาลงช้าๆแทน" -- a guest still holding the hand said
+     *  "ดึงมือแรง เจ็บ"). Group 99 alone snapped the arm back at the vendor's
+     *  speed; now one slow frame of ours (BodyGestures.handshakeLowering) brings
+     *  it most of the way first and group 99 finishes from there. The board
+     *  moves each channel from where it is -- group 6's end pose -- to the
+     *  frame's targets over its time. Busy stays held (no gesture, look or
+     *  walk-rest starts in the middle), a stop voids it like any frame run,
+     *  and a lowering that never reports still gets its group 99. */
+    private void lowerThenRest(int gen, String why) {
+        final BodyGestures.Frame down = BodyGestures.handshakeLowering();
+        synchronized (this) {
+            if (gen != generation.get() || !"running".equals(phase)) return;
+            if (host.operatorVisible()) {          // the operator owns the arm now
+                finish(gen, "stopped", "operator_screen");
+                return;
+            }
+            groupRunning = false;
+            phase = "lowering";
+        }
+        host.changed();
+        later(gen, () -> restReturn(gen, why + ", lowering overran", "lowering"),
+                down.durationMs + FRAMES_WATCHDOG_SLACK_MS);
+        final ArrayList<ArmController.PoseFrame> frames = new ArrayList<>();
+        frames.add(new ArmController.PoseFrame(down.targets, down.durationMs));
+        io.execute(() -> {
+            try {
+                synchronized (armGate) {     // review #3: no stop between the check and the command
+                    if (gen != generation.get() || latched()) return;
+                    if (!"lowering".equals(phase)) return;     // its backstop already rested it
+                    // a beat after the frame, as after any frames (REST_AFTER_FRAMES_MS): an #AGF the
+                    // board may send for the frame must not be read as group 99's (review 6 Nov)
+                    arm.playFrames(frames, () -> gen == generation.get() && !latched(),
+                            () -> later(gen, () -> restReturn(gen, why + ", lowered", "lowering"),
+                                    BodyGestures.REST_AFTER_FRAMES_MS), () -> {
+                                Log.w(TAG, "handshake lowering: arm board lost mid-run");
+                                finish(gen, "failed", "arm_unavailable");
+                            });
+                }
+                stopIfOvertaken(gen);
+                Log.i(TAG, "handshake lowering slowly (" + why + ")");
+            } catch (Exception e) {
+                // the arm is still out: the vendor's rest beats leaving it there
+                Log.e(TAG, "handshake lowering failed", e);
+                restReturn(gen, why + ", lowering failed", "lowering");
+            }
+        });
     }
 
     /** Group 6 ends at its final pose and a PWM board cannot be asked to undo
@@ -672,13 +997,25 @@ final class BodyController {
      *  "มือไม่ขึ้น" (2026-09-30). So every arm gesture ends in the vendor's
      *  own rest group 99. */
     private void restReturn(int gen, String why) {
-        if (gen != generation.get() || !"running".equals(phase)) return;
-        if (host.operatorVisible()) {          // the operator owns the arm now
-            finish(gen, "stopped", "operator_screen");
-            return;
+        restReturn(gen, why, "running");
+    }
+
+    /** `from` is the one phase this return may end: "running" for every
+     *  gesture, "lowering" only from the handshake's own lowering (its onDone,
+     *  its backstop or its failure -- whichever comes first wins, the check
+     *  and the set under one lock). A "running" return finds a lowering and
+     *  does nothing: the 30 s no-#AGF fallback must not cut a slow lowering
+     *  short with group 99 (review 6 Nov). */
+    private void restReturn(int gen, String why, String from) {
+        synchronized (this) {
+            if (gen != generation.get() || !from.equals(phase)) return;
+            if (host.operatorVisible()) {          // the operator owns the arm now
+                finish(gen, "stopped", "operator_screen");
+                return;
+            }
+            groupRunning = false;
+            phase = "rest_return";
         }
-        groupRunning = false;
-        phase = "rest_return";
         host.changed();
         io.execute(() -> {
             try {
@@ -780,6 +1117,7 @@ final class BodyController {
      *  calling thread; only the SDK call goes to body-stopper. */
     void stop(String reason) {
         latchedUntil = SystemClock.elapsedRealtime() + BodyGestures.STOP_LATCH_MS;
+        latchSets.incrementAndGet();      // MainActivity's sibling takeover: "no other stop since"
         voidEverything(reason);
         stopArm();
         // Review2 #21: the page hears it AFTER the arm stop is queued. The

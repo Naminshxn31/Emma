@@ -1,0 +1,60 @@
+{
+ "texts": {
+  "chip1": "With pleasure",
+  "chip2": "Please enjoy",
+  "giant": "The story of",
+  "name": "Embassy World"
+ },
+ "pictures": {
+  "into": {
+   "asset": "fin_pool_v4_1610"
+  },
+  "reel1": {
+   "asset": "fin_front_1120"
+  },
+  "reel2": {
+   "asset": "fin_pool_v1b"
+  },
+  "reel3": {
+   "asset": "fin_entrance"
+  },
+  "reel4": {
+   "asset": "fin_building_a"
+  }
+ },
+ "beats": [
+  {
+   "at_en": "With pleasure",
+   "do": "chip1",
+   "key": "chip1"
+  },
+  {
+   "at_en": "please enjoy",
+   "do": "reel",
+   "key": "chip2"
+  },
+  {
+   "at_en": "the story of",
+   "do": "story",
+   "key": [
+    "giant",
+    "into"
+   ]
+  },
+  {
+   "at_en": "Embassy World",
+   "do": "name",
+   "key": "name"
+  }
+ ],
+ "options": {
+  "mode": "brand",
+  "title_size": 3.6,
+  "name_size": 7.4,
+  "end": "dive",
+  "bleed": true
+ },
+ "template": "act",
+ "act": "smarthome_brand",
+ "figures": {}
+}

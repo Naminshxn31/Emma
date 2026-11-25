@@ -70,6 +70,49 @@ scripted robot as the robot suite; nothing reaches a robot. Every sentence in
 the file is written for the suite, by category — never a guest's words. Its
 own flags: owner_address, filler_offer, too_long, wrong_lang,
 denies_language, mode_switch_repeated, plus the per-turn regexes.
+
+The ceremony suite (owner 6 Nov 2026: "ส่งให้ Gemini ตอบ หรือให้ตอบจากสคริปต์ อันไหนดีกว่า วัดดู")
+------------------------------------------------------------------------------------------
+`--suite ceremony --ceremony-mode read|free|tool` runs data/eval/qa_live_ceremony.json
+(the host's script questions verbatim and paraphrased, plus host lines that are NOT
+script questions) on the event profile with a ceremony scene running, one mode per run:
+
+* read  -- staff press the cue and nothing is recorded: the turn is
+  `event_script.read_text(cue)` as server text. The host's words are not used, so
+  each variant of a cue is one more sample of the same press; off-script cases skip.
+* free  -- the host's words as the guest turn, EVENT_SCRIPT_PROMPT on (the script in
+  the system prompt, app/event_host.py script_block).
+* tool  -- the host's words, EVENT_SCRIPT_TOOL on (`say_script_line`), with
+  `event_cues.play` stubbed in this process to answer "say_yourself", "recorded", or
+  "clips" (recorded exactly when data/ceremony/voice/ has the cue's clip) -- nothing plays
+  anywhere. A recorded answer mirrors the provider's contract: her own output is HELD
+  while the line plays (`held_after_recorded`, never room speech), the reply watchdog is
+  answered, and the host waits for the line to end before speaking again.
+
+The robot's order since 9 Nov: the ceremony is an app of its own ("Emma Ceremony",
+app/ceremony.py) and its call IS the ceremony -- profile `ceremony`, the mode on from the
+call's claim, before the prompt is built (`_enter_ceremony`). No scene is pressed any more
+(the `server:scene:ceremony_start` head of 6-8 Nov is gone with the scene). Then any `before`
+cues, then the host's line. The mode is claimed with "replies": "named" in this process: the
+free and tool modes measure her LIVE answer to the host, which a cue-only ceremony (the
+file's default) never gives -- what the suite measured before 9 Nov too.
+
+The cues are drafts until a person signs them: `event_script.servable` serves drafts in
+THIS process only (`script_drafts_in_memory`), and the event's films count as present
+(`clips_present_in_memory` -- s8 starts one; this measures her words). Nothing is
+written. The robot's switches that shape what the room hears are set in-process too
+(stories on and approved in memory, SILENCE_BARE_ACK, the reply watchdog,
+TALK_DEFAULT_LANGUAGE=en). The ceremony's door (a reply needs her name, or a named
+exchange just before) never judges a text turn, so each case says whether the room would
+hear the answer (`robot_hears`) and only those are scored.
+
+Per case (`record["ceremony"]`): what the room hears (her words -- the transcript, or the
+local recogniser when Live sent none -- plus the cue's line when it "played" recorded),
+fidelity against the expected cue's line (app/event_voice.py: a number in Thai words is
+said), numbers the line lacks (the critical miss), the cue the tool named, speech after a
+recorded cue, first sound from the send, audio seconds. `<run>.summary.json` gets a
+`ceremony` table per mode; `--ceremony-table a.jsonl b.jsonl ...` prints one table over
+several runs, offline.
 """
 from __future__ import annotations
 
@@ -82,6 +125,7 @@ import json
 import logging
 import re
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -93,6 +137,13 @@ ROBOT_SCENARIOS = ROOT / "data" / "eval" / "qa_live_robot.json"
 CONTENT_SCENARIOS = ROOT / "data" / "eval" / "qa_live_robot_content.json"
 #: The event host (app/event_host.py, owner 30 Oct): scenes switched by staff.
 EVENT_SCENARIOS = ROOT / "data" / "eval" / "qa_live_event.json"
+#: The launch ceremony's script questions (app/event_script.py, owner 6 Nov).
+CEREMONY_SCENARIOS = ROOT / "data" / "eval" / "qa_live_ceremony.json"
+CEREMONY_FORMAT = "emma-ceremony-eval-v1"
+CEREMONY_MODES = ("read", "free", "tool")
+#: what the stubbed event_cues.play answers: always say_yourself, always recorded, or
+#: recorded exactly when the cue has a clip event_cues would play (data/ceremony/voice/)
+CUE_ANSWERS = ("say_yourself", "recorded", "clips")
 FAQ = (ROOT / "data" / "personal-docs" / "embassy-world" / "project-report-2026-10-06"
        / "19_faq.md")
 OUT_DIR = ROOT / "data" / "eval-runs"
@@ -105,6 +156,11 @@ logger = logging.getLogger("eval_live_qa")
 _case_log: contextvars.ContextVar[list | None] = contextvars.ContextVar("case_log", default=None)
 #: What the scripted robot answers in the case currently running, per kind.
 _case_acks: contextvars.ContextVar[dict | None] = contextvars.ContextVar("case_acks", default=None)
+#: The ceremony suite's stand-in for the provider's hold on her own output while a recorded
+#: cue line plays ({"until", "turn"}), and the case's provider (the stub tells it the line
+#: began, as play_recorded does).
+_case_hold: contextvars.ContextVar[dict | None] = contextvars.ContextVar("case_hold", default=None)
+_case_provider: contextvars.ContextVar[object | None] = contextvars.ContextVar("case_provider", default=None)
 
 
 # ---------------------------------------------------------------- cases
@@ -151,7 +207,8 @@ def parse_faq(path: Path) -> list[dict]:
     return cases
 
 
-def load_cases(suite: str, faq_path: Path) -> list[dict]:
+def load_cases(suite: str, faq_path: Path, ceremony_mode: str = "free",
+               cue_answer: str = "say_yourself") -> list[dict]:
     cases: list[dict] = []
     if suite in ("scenarios", "all"):
         data = json.loads(SCENARIOS.read_text(encoding="utf-8"))
@@ -190,6 +247,14 @@ def load_cases(suite: str, faq_path: Path) -> list[dict]:
         for case in data["cases"]:
             case.setdefault("suite", "event")
             cases.append(case)
+    # Not part of "all": the ceremony app's profile in its opening ceremony, one mode per run.
+    if suite == "ceremony":
+        data = json.loads(CEREMONY_SCENARIOS.read_text(encoding="utf-8"))
+        script = ceremony_script()
+        problems = validate_ceremony_cases(data, script)
+        if problems:
+            raise ValueError("qa_live_ceremony.json: " + "; ".join(problems))
+        cases.extend(ceremony_cases(data, script, ceremony_mode, cue_answer))
     return cases
 
 
@@ -355,6 +420,179 @@ def validate_content_cases(data: dict) -> list[str]:
             except (re.error, TypeError):
                 problems.append(f"{cid}: bad regex {pattern!r}")
     return problems
+
+
+# ---------------------------------------------------------------- the ceremony suite
+
+_CEREMONY_ID = re.compile(r"^K-[a-z0-9_]+-[a-z0-9_]+$")
+_CEREMONY_KEYS = {"id", "cue", "variant", "host", "before", "rubric"}
+_CEREMONY_VARIANTS = ("verbatim", "paraphrase", "off_script")
+#: What the run needs of the file to measure anything: a few paraphrases per line (the
+#: host does not read the script), and lines that are not script questions at all.
+CEREMONY_MIN_PARAPHRASES = 2
+CEREMONY_MIN_OFF_SCRIPT = 3
+
+
+def ceremony_script() -> dict | None:
+    """CEREMONY_FILE (the tracked floor-1 one when CEREMONY_FILE is blank)."""
+    from app import event_script
+
+    path = event_script.path() or ROOT / "data" / "ceremony" / "floor1_ceremony.json"
+    return event_script.load(path)
+
+
+def _is_direction(host: str | None) -> bool:
+    """A cue the host says nothing to: the script writes the moment in brackets (s1_greet)."""
+    return (host or "").strip().startswith("(")
+
+
+def validate_ceremony_cases(data: dict, script: dict | None) -> list[str]:
+    """Every problem with the ceremony cases file against the script. Empty = valid.
+
+    Offline (`--check`, tests) because a case naming a cue that has no line, or a
+    "verbatim" host line that drifted from the script, would cost a Live session and
+    score against nothing."""
+    from app import event_script
+
+    if script is None:
+        return ["no ceremony script (CEREMONY_FILE)"]
+    if not isinstance(data, dict) or data.get("format") != CEREMONY_FORMAT:
+        return [f"format must be {CEREMONY_FORMAT}"]
+    cases = data.get("cases")
+    if not isinstance(cases, list) or not cases:
+        return ["no cases"]
+    cues = {c["id"]: c for c in event_script.cues(script)}
+    problems: list[str] = []
+    seen: set[str] = set()
+    per_cue: dict[str, dict[str, int]] = {}
+    off_script = 0
+    for case in cases:
+        cid = case.get("id") if isinstance(case, dict) else None
+        if not isinstance(cid, str) or not _CEREMONY_ID.match(cid):
+            problems.append(f"{cid!r}: id must look like K-<cue>-<variant>")
+            continue
+        if cid in seen:
+            problems.append(f"{cid}: duplicate id")
+        seen.add(cid)
+        for key in case:
+            if key not in _CEREMONY_KEYS:
+                problems.append(f"{cid}: unknown key {key}")
+        host = case.get("host")
+        if not isinstance(host, str) or not host.strip():
+            problems.append(f"{cid}: host must be the host's words")
+            host = ""
+        variant = case.get("variant")
+        if variant not in _CEREMONY_VARIANTS:
+            problems.append(f"{cid}: variant must be one of {_CEREMONY_VARIANTS}")
+            continue
+        cue_id = case.get("cue")
+        if variant == "off_script":
+            off_script += 1
+            if cue_id is not None:
+                problems.append(f"{cid}: an off-script line expects no cue")
+            if not case.get("rubric"):
+                problems.append(f"{cid}: an off-script line needs a rubric (what the right answer is)")
+            if case.get("before"):
+                problems.append(f"{cid}: an off-script line has no 'before'")
+            continue
+        cue = cues.get(cue_id)
+        if cue is None:
+            problems.append(f"{cid}: cue {cue_id!r} is not in the script")
+            continue
+        if not cue.get("th"):
+            problems.append(f"{cid}: cue {cue_id} has no line (th) to measure against")
+            continue
+        if variant == "verbatim":
+            if _is_direction(cue.get("host_th")):
+                problems.append(f"{cid}: {cue_id}'s host line is a stage direction -- nothing to say verbatim")
+            elif " ".join(host.split()) != " ".join((cue.get("host_th") or "").split()):
+                problems.append(f"{cid}: verbatim host line differs from the script's host_th")
+        before = case.get("before")
+        if before is not None:
+            chain = [before] if isinstance(before, str) else before
+            if not isinstance(chain, list) or not chain:
+                problems.append(f"{cid}: before must be a cue id or a list of them")
+                chain = []
+            for prior_id in chain:
+                prior = cues.get(prior_id) if isinstance(prior_id, str) else None
+                if (prior is None or not prior.get("th") or _is_direction(prior.get("host_th"))
+                        or prior_id == cue_id):
+                    problems.append(f"{cid}: before {prior_id!r} must be another cue with a line and host words")
+        counts = per_cue.setdefault(cue_id, {"verbatim": 0, "paraphrase": 0})
+        counts[variant] += 1
+    for cue_id, cue in cues.items():
+        if not cue.get("th"):
+            continue
+        counts = per_cue.get(cue_id, {"verbatim": 0, "paraphrase": 0})
+        if not _is_direction(cue.get("host_th")) and counts["verbatim"] < 1:
+            problems.append(f"{cue_id}: no verbatim case")
+        if counts["paraphrase"] < CEREMONY_MIN_PARAPHRASES:
+            problems.append(f"{cue_id}: needs at least {CEREMONY_MIN_PARAPHRASES} paraphrases")
+    if off_script < CEREMONY_MIN_OFF_SCRIPT:
+        problems.append(f"needs at least {CEREMONY_MIN_OFF_SCRIPT} off-script host lines")
+    return problems
+
+
+#: A staff press of a cue in read mode: "cue:<id>" -> event_script.read_text(cue) as server text.
+CUE_PRESS = "cue:"
+
+
+def robot_hears(mode: str, host_lines: list[str]) -> bool:
+    """Would the room hear her answer to the LAST of these host lines, on the robot?
+
+    A staff press (read) is a server turn the ceremony's door never judges. A host line
+    is answered only if it carries her name, or a reply her name earned is still within
+    NAMED_WINDOW_S (NoiseReplyGate.named_only; a cue line refreshes that window too). Each
+    line of the chain is one exchange: heard = named or the window open; a heard one opens
+    the window for the next (her answer, or the cue line, comes right before it); an
+    unheard one leaves it as it was. The scene press that opens the case opens nothing:
+    its reply is a server turn's."""
+    if mode == "read":
+        return True
+    from app.providers.transcript_filter import HER_NAME_ONLY
+
+    window = False
+    heard = False
+    for line in host_lines:
+        heard = bool(HER_NAME_ONLY.search(line or "")) or window
+        if heard:
+            window = True
+    return heard
+
+
+def ceremony_cases(data: dict, script: dict, mode: str, cue_answer: str = "say_yourself") -> list[dict]:
+    """The file's cases as harness cases for one mode, in the order the robot meets them: the
+    ceremony app's call is the ceremony from its start (no scene to press since 9 Nov), then
+    each cue of `before` (a cue id or a chain
+    of them: the two compliments, s3_joke and s5_joke, are told apart only by what was just
+    answered, and an unnamed line is heard only after a named one), then the case's own
+    line. Only the last turn is scored."""
+    from app import event_script
+
+    if mode not in CEREMONY_MODES:
+        raise ValueError(f"ceremony mode {mode!r} not in {CEREMONY_MODES}")
+    cues = {c["id"]: c for c in event_script.cues(script)}
+    out = []
+    for raw in data["cases"]:
+        cue_id = raw.get("cue")
+        before = raw.get("before")
+        chain = [before] if isinstance(before, str) else list(before or [])
+        hosts = [cues[b]["host_th"] for b in chain] + [raw["host"]]
+        if mode == "read":
+            if cue_id is None:
+                continue                                 # a press needs a cue
+            turns = [CUE_PRESS + b for b in chain] + [CUE_PRESS + cue_id]
+        else:
+            turns = list(hosts)
+        out.append({"id": raw["id"], "suite": "ceremony", "cat": "ceremony/" + mode, "lang": "th",
+                    "turns": turns, "score_turn": len(turns) - 1, "cue": cue_id,
+                    "variant": raw["variant"], "host": raw["host"], "before": chain or None,
+                    "robot_hears": robot_hears(mode, hosts),
+                    # the line she is to SAY: the English when the file is spoken in English
+                    "line": event_script.spoken(cues[cue_id], script)["th"] if cue_id else None,
+                    "rubric": raw.get("rubric"),
+                    "ceremony_mode": mode, "cue_answer": cue_answer if mode == "tool" else None})
+    return out
 
 
 #: Calling the person in front the owner, the boss or "ท่าน", or calling
@@ -725,6 +963,226 @@ def make_content_suite() -> list[str]:
     for key, value in CONTENT_SUITE_SETTINGS.items():
         setattr(settings, key, value)
     return ["%s=%s" % kv for kv in CONTENT_SUITE_SETTINGS.items()]
+
+
+#: The groups of robot.env that answer the project, without the stubbed robot/body and
+#: the room screens this PC has none of. `stories` and `ceremony` are added per run.
+CEREMONY_GROUPS = "knowledge,mydocs,units,calc"
+
+
+def make_event_suite() -> list[str]:
+    """The Emma Event app the way the robot runs it, in this process only (never .env). 10 Nov
+    ("ลองทดสอบเช็คซีนทั้งหมด"): the event suite had run on THIS PC's settings -- Thai as the
+    starting language (the robot starts in English), no stories, no reply watchdog -- so what it
+    measured was not what the robot would say. Walking stays off: each case says which text it
+    sends (scene = where she stands, walk = setting out, arrive = got there)."""
+    from app.config import settings
+
+    if not settings.event_file:
+        settings.event_file = "data/events/floor1_event.json"
+    values = dict(STORY_CASE_SETTINGS)
+    values.update({"silence_bare_ack": True, "talk_default_language": "en", "event_walk_enabled": False})
+    for key, value in values.items():
+        setattr(settings, key, value)
+    _RUN_STACK.enter_context(stories_approved_in_memory())
+    return ["%s=%s" % kv for kv in values.items()]
+#: Held open for the whole ceremony run: drafts and stories approved in memory.
+_RUN_STACK = contextlib.ExitStack()
+
+
+@contextlib.contextmanager
+def script_drafts_in_memory():
+    """Every cue of the ceremony script is a DRAFT until a person signs it
+    (scripts/approve_event_script.py --by NAME), and nothing serves a draft. The eval
+    has to measure the lines before anyone may sign them, so for this process only
+    `event_script.servable` answers as with drafts=True -- the content rules still
+    apply, nothing is written, and the patch is undone afterwards."""
+    from app import event_script
+
+    real = event_script.servable
+
+    def drafts_for_this_eval(doc=None, *, drafts=False):
+        return real(doc, drafts=True)
+
+    event_script.servable = drafts_for_this_eval
+    try:
+        yield
+    finally:
+        event_script.servable = real
+
+
+@contextlib.contextmanager
+def clips_present_in_memory():
+    """A cue that starts a film (s8_story_video) is not servable while the film is not on
+    disk (event_script.problems `clip_missing`). This suite measures her WORDS; the film is
+    the screen's, separate. So for this process only every clip of the event file reports
+    has_file=True -- nothing reads, plays or writes one (the eval has no screen and no room
+    PC; the event_clip tool stays invisible without the `screens` group)."""
+    from app import event_clips
+
+    real = event_clips.table
+
+    def every_clip_here():
+        return {cid: dict(entry, has_file=True) for cid, entry in real().items()}
+
+    event_clips.table = every_clip_here
+    try:
+        yield
+    finally:
+        event_clips.table = real
+
+
+#: Her reading speed (characters per second, Thai -- the face's `voiceRate`), for a line
+#: with no clip to say how long its recording would run.
+LINE_CPS = 12.5
+
+
+def _recorded_seconds(cue: dict) -> float:
+    from app import event_voice, speech_match
+
+    seconds = event_voice.status(cue).get("seconds") if cue else None
+    if isinstance(seconds, (int, float)) and seconds > 0:
+        return float(seconds)
+    return max(2.0, len(speech_match.fold((cue or {}).get("th"))) / LINE_CPS)
+
+
+def _as_if_the_line_started(provider, line: str) -> None:
+    """What providers/gemini.py `_play_recorded` does to the conversation when a recorded line
+    starts, minus the audio (nothing plays here): the reply watchdog is answered
+    (`_cue_answered` -- else it would ask the host's question again and get her own second
+    answer), she has replied, her words are hers in the language tracker and the recap, and
+    the noise gate is told the server spoke."""
+    for name, call in (("_cue_answered", ()), ("_remember", ("emma", line))):
+        fn = getattr(provider, name, None)
+        if callable(fn):
+            fn(*call)
+    if hasattr(provider, "_replied_since_end"):
+        provider._replied_since_end = True
+    talk = getattr(provider, "_talk", None)
+    if talk is not None and hasattr(talk, "emma"):
+        talk.emma(line)
+    gate = getattr(provider, "_noise_gate", None)
+    if gate is not None and hasattr(gate, "text_turn"):
+        gate.text_turn()
+
+
+def stub_cue_player(answer: str) -> None:
+    """`event_cues.play(cue, by=...)` for this process: nothing plays. "recorded" = a
+    recording exists and is playing; "say_yourself" = the line goes to the session;
+    "clips" = recorded exactly when event_cues would find the cue's clip. Each call is
+    filed under the case (`cue_play`) with the line it stands for.
+
+    A recorded answer mirrors the real contract (providers/gemini.py `play_recorded`): the
+    provider HOLDS her own output while the line plays -- for the recording's length plus
+    its slack, and a model turn that began under it until that turn ends -- and the reply
+    watchdog is answered. The hold is the run_case reader's (`_case_hold`): what she says
+    under it is `held_after_recorded`, what she tried to say, never what the room heard."""
+    import types
+
+    import app
+
+    try:
+        from app import event_cues
+    except ImportError:                                  # built beside this suite
+        event_cues = types.ModuleType("app.event_cues")
+        sys.modules["app.event_cues"] = event_cues
+        app.event_cues = event_cues
+
+    async def play(cue_id, *, by="staff"):
+        from app import event_script, event_voice
+        from app.providers import gemini
+
+        cue = event_script.servable().get(cue_id)
+        cue = event_script.spoken(cue) if cue else cue        # "speak": "en" = the English is the line
+        line = (cue or {}).get("th")
+        mode = answer
+        if answer == "clips":
+            # what event_cues decides: a clip of THIS line on this model and voice (the
+            # approval aside -- drafts are served in this process)
+            mode = "recorded" if line and event_voice.status(cue)["recorded"] else "say_yourself"
+        log = _case_log.get()
+        if log is not None:
+            log.append({"cue_play": cue_id, "by": by, "mode": mode if line else None, "line": line})
+        if not line:
+            return {"ok": False, "error": "unknown_cue"}
+        if mode == "recorded":
+            hold = _case_hold.get()
+            if hold is not None:
+                # the line's own length from when the result goes back (RECORDED_HOLD_SLACK_S
+                # is the cap on a hold nobody lowered, not where a played line's hold ends)
+                hold["until"] = time.monotonic() + _recorded_seconds(cue)
+                hold["cap_s"] = getattr(gemini, "RECORDED_HOLD_SLACK_S", 25.0)
+            provider = _case_provider.get()
+            if provider is not None:
+                _as_if_the_line_started(provider, line)
+            return {"ok": True, "mode": "recorded"}
+        return {"ok": True, "mode": "say_yourself", "line": line}
+
+    event_cues.play = play
+
+
+class _CeremonyCall:
+    """The Emma Ceremony app's call as this process stands it in: app/ceremony.py `claim` wants
+    a ceremony-profile session that is the active call. No socket, no provider -- nothing here
+    reaches a robot, and nothing reads more of it than these."""
+    profile = "ceremony"
+    provider = None
+    _robot_face_claim = True
+    _page_muted = False
+
+
+def _enter_ceremony() -> None:
+    """The ceremony app's call opened: the mode on from its claim, before the prompt is built --
+    the robot's way since 9 Nov. "named": this suite measures her live answer (module note).
+    Once per process is enough (every case wants it on); again only when it went off."""
+    from app import ceremony
+    from app import session as session_module
+
+    if ceremony.on():
+        return
+    call = _CeremonyCall()
+    session_module._active = call
+    ceremony.claim(call, replies="named")
+
+
+def make_ceremony_suite(mode: str, cue_answer: str = "say_yourself", stories: bool = True) -> list[str]:
+    """The robot's event server for one mode, in this process only (never .env)."""
+    from app.config import settings
+
+    if not settings.event_file:
+        settings.event_file = "data/events/floor1_event.json"    # its spots and films: shared
+    if not settings.ceremony_file:
+        settings.ceremony_file = "data/ceremony/floor1_ceremony.json"
+    values = dict(STORY_CASE_SETTINGS) if stories else {
+        k: v for k, v in STORY_CASE_SETTINGS.items() if k not in ("stories_enabled", "tool_groups")}
+    values["tool_groups"] = ",".join(g for g in (CEREMONY_GROUPS, "stories" if stories else "",
+                                                 "ceremony" if mode == "tool" else "") if g)
+    values.update({
+        # robot.env: a bare "ค่ะ" never reaches the speaker -- what the recorded cue relies on
+        "silence_bare_ack": True,
+        "talk_default_language": "en",                   # robot.env (3 Nov)
+        "event_script_prompt": mode == "free",
+        "event_script_tool": mode == "tool",
+        "event_walk_enabled": False,
+    })
+    for key, value in values.items():
+        setattr(settings, key, value)
+    _RUN_STACK.enter_context(script_drafts_in_memory())
+    _RUN_STACK.enter_context(clips_present_in_memory())
+    if stories:
+        _RUN_STACK.enter_context(stories_approved_in_memory())
+    if ceremony_script() is None:
+        raise ValueError("CEREMONY_FILE has no script -- the suite would measure nothing")
+    notes = ["%s=%s" % kv for kv in values.items()]
+    if mode == "tool":
+        stub_cue_player(cue_answer)
+        from app.tools import ceremony
+
+        # The door asks the live session's gate, which a text turn never passes through
+        # for any mode: open here, so the run measures the model's pick.
+        ceremony._door_open = lambda: True
+        notes.append("cue_answer=%s door=open" % cue_answer)
+    return notes
 
 
 _SMARTHOME_BOOT: dict | None = None
@@ -1151,6 +1609,385 @@ def summarize(records: list[dict], *, profile: str, model: str | None) -> dict:
     }
 
 
+# ---------------------------------------------------------------- ceremony scoring
+
+#: A reply to an off-script host line this close to a cue's line said the script anyway.
+MISFIRE_AT = 0.6
+#: Her audio for at least this long in a turn is something she said, not a click.
+VOICED_S = 0.5
+#: --ceremony-asr: run the local Thai recogniser on every scored turn with her voice
+#: ("all": a second reading beside the transcript, and the one that hears a mispronounced
+#: word), only on a turn whose transcript never came ("missing"), or never ("off").
+CEREMONY_ASR = {"mode": "all"}
+_ASR_LOCK = threading.Lock()
+#: cue id -> the recogniser's reading of that line's approved clip (None = no clip here)
+_ASR_REFS: dict[str, str | None] = {}
+_THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
+#: read_text quotes the line in « »; the transcript sometimes keeps them (6 Nov)
+_QUOTES = str.maketrans("", "", "«»")
+
+
+def asr_norm(text: str | None) -> str:
+    """Thai as the local recogniser writes it, made comparable (applied to BOTH sides):
+    NFKC (it writes ำ as ํ+า), Arabic digits for Thai ones (๑๐๖๖), no « »."""
+    import unicodedata
+
+    return unicodedata.normalize("NFKC", text or "").translate(_THAI_DIGITS).translate(_QUOTES)
+
+
+def _transcribe(pcm16: bytes, rate: int) -> str | None:
+    """app/offline/asr.py's Thai decoder (the offline mode's); None = no model here."""
+    from app.offline import asr
+
+    with _ASR_LOCK:                                      # one decode at a time, whatever the concurrency
+        found = asr.engine().transcribe(pcm16, lang="th", rate=rate)
+    return None if found is None else found.text
+
+
+def _clip_reading(cue_id: str) -> str | None:
+    """The recogniser's reading of the approved clip of this cue's line -- what an ASR-scored
+    turn is held to, so its quirks (Thai digits, "1 Bedroom" heard "วันเบดรูม") are on both
+    sides: a perfect take read against the WRITTEN line scored 0.66 (s3_units, 6 Nov)."""
+    if cue_id not in _ASR_REFS:
+        from app import event_script, event_voice
+
+        cue = event_script.servable().get(cue_id)
+        # the local recogniser is Thai (app/offline/asr.py): an English clip has no reference
+        clip = event_voice.pcm(cue) if cue and event_script.speak() == "th" else None
+        _ASR_REFS[cue_id] = _transcribe(clip, event_voice.RATE) if clip else None
+    return _ASR_REFS[cue_id]
+
+
+def ceremony_asr(case: dict, turn: dict | None, pcm16: bytes, rate: int) -> dict | None:
+    """Blocking (a thread): the recogniser on the scored turn's audio, per --ceremony-asr.
+    {"text", "reference", "reference_from"} or {"error"}; None = not run."""
+    mode = CEREMONY_ASR["mode"]
+    if mode == "off" or turn is None or len(pcm16 or b"") / 2 / rate < VOICED_S:
+        return None
+    if mode == "missing" and (turn.get("said") or "").strip():
+        return None
+    try:
+        text = _transcribe(pcm16, rate)
+        if text is None:
+            return {"error": "no_model"}
+        reference = _clip_reading(case["cue"]) if case.get("cue") else None
+    except Exception as exc:                             # noqa: BLE001 -- a scorer, not the run
+        return {"error": type(exc).__name__}
+    return {"text": text, "reference": reference,
+            "reference_from": "clip" if reference else ("line" if case.get("line") else None)}
+
+
+def _asr_fidelity(asr: dict, played: list[str], line: str | None) -> float | None:
+    """An ASR reading scored in ASR space: against the clip's reading, else the line."""
+    from app import event_voice, speech_match
+
+    text = asr_norm(asr.get("text"))
+    reference = asr.get("reference")
+    if reference is not None:
+        ref = asr_norm(reference)
+        return speech_match.fidelity(((ref + " ") if played else "") + text, ref)
+    if line:
+        ref = asr_norm(line)
+        return event_voice.line_fidelity(((ref + " ") if played else "") + text, ref)
+    return None
+
+
+def ceremony_score(case: dict, turns: list[dict], asr: dict | None = None) -> dict:
+    """One ceremony case, scored on its last turn, as the ROOM hears it: her words, and
+    the cue's line when the tool "played" it recorded (the stub files `cue_play`).
+
+    `scorer` says what read her words: "transcript" (the session's own), "asr" (the
+    local recogniser -- the transcript never came, ~1 turn in 3 on 3.8, 6 Nov), "recording"
+    (only the recording spoke), "silence" (nothing at all), None (she spoke, nothing could
+    read it: unscored, never a 0). Fidelity and numbers use app/event_voice.py's rules (a
+    number said in Thai words is said)."""
+    from app import event_script, event_voice, speech_match
+    from app.prompts import load_facts
+    from app.providers.transcript_filter import HER_NAME_ONLY
+
+    mode = case.get("ceremony_mode")
+    expected, line = case.get("cue"), case.get("line")
+    idx = case.get("score_turn", len(turns) - 1)
+    named = None if mode == "read" else bool(HER_NAME_ONLY.search(case.get("host") or ""))
+    out = {"mode": mode, "cue_answer": case.get("cue_answer"), "expected": expected,
+           "variant": case.get("variant"), "before": case.get("before"),
+           # the ceremony's door wants her name; text turns skip it in every mode, so whether
+           # the ROOM would have heard this answer is worked out from the case (robot_hears)
+           "named": named,
+           "robot_hears": bool(case.get("robot_hears", True if mode == "read" else named))}
+    turn = turns[idx] if 0 <= idx < len(turns) else None
+    if turn is None:
+        out.update(failed=True, silent=True, scorer=None, why="no_turn")
+        return out
+    said = (turn.get("said") or "").translate(_QUOTES).strip()
+    tools = turn.get("tools") or []
+    chosen = [(t.get("args") or {}).get("cue") for t in tools if t.get("name") == "say_script_line"]
+    played = [t["line"] for t in tools if t.get("cue_play") and t.get("mode") == "recorded" and t.get("line")]
+    voiced = (turn.get("audio_s") or 0) >= VOICED_S
+    asr_text = asr.get("text") if isinstance(asr, dict) and isinstance(asr.get("text"), str) else None
+    if said:
+        scorer, heard, norm = "transcript", " ".join(played + [said]), (lambda s: s)
+    elif voiced:
+        scorer = "asr" if asr_text is not None else None
+        heard = " ".join(played + ([asr_norm(asr_text)] if asr_text is not None else []))
+        norm = asr_norm
+    else:
+        scorer = "recording" if played else "silence"
+        heard, norm = " ".join(played), (lambda s: s)
+    timeline = turn.get("timeline") or []
+    first_audio = next((t for t, k in timeline if k == "audio"), None)
+    first_call = next((t for t, k in timeline if k == "tool_call"), None)
+    first_sound = first_audio
+    if played and first_call is not None:
+        # the recording starts as the call is dispatched
+        first_sound = first_call if first_audio is None else min(first_audio, first_call)
+    lines = {cid: event_script.spoken(c)["th"] for cid, c in event_script.servable().items() if c.get("th")}
+    best = max(((event_voice.line_fidelity(heard, norm(th)), cid) for cid, th in lines.items()),
+               default=(0.0, None)) if heard else (0.0, None)
+    out.update(said=said, heard=heard, scorer=scorer, no_transcript=voiced and not said,
+               asr=asr, chosen=chosen, played_recorded=len(played),
+               other_tools=sorted({t["name"] for t in tools if t.get("name") and t["name"] != "say_script_line"}),
+               first_sound_s=first_sound, first_tool_s=first_call, audio_s=turn.get("audio_s"),
+               silent=not heard and not voiced, failed=not turn.get("complete"),
+               best_cue=best[1] if best[0] > 0 else None, best_fidelity=round(best[0], 3))
+    if asr_text is not None:
+        # beside the transcript too ("all"): the reading that hears what she SAID, not
+        # what she generated -- and how far the two scorers sit apart on the same turn
+        cross = _asr_fidelity(asr, played, line)
+        out["asr_fidelity"] = None if cross is None else round(cross, 3)
+    if line:
+        if scorer == "asr":
+            fid = out.get("asr_fidelity")
+        elif scorer is None:
+            fid = None                                   # she spoke, nothing read it: not a 0
+        else:
+            fid = round(event_voice.line_fidelity(heard, line), 3)
+        noise = None
+        if scorer == "asr":
+            # Numbers the recogniser heard, counted against the LINE only (review 6 Nov: taking
+            # the clip's reading as approved too let its misreadings through -- "1.3" read as
+            # ๑๓ would have passed a real "13 เมตร"). What the recogniser also writes on the
+            # approved clip itself is listed beside it as `asr_number_noise`: the same misreading
+            # on a perfect take, for the reader to discount -- still counted. Missing numbers
+            # are judged against the clip's reading ("1 Bedroom" heard วันเบดรูม is no number).
+            reference = asr.get("reference")
+            ref = asr_norm(reference if reference else line)
+            own = asr_norm(asr_text)
+            approved = speech_match.numbers(line)
+            found = speech_match.numbers(own)
+            unapproved = [v for v in found if not any(abs(v - w) < 1e-6 for w in approved)]
+            on_clip = speech_match.numbers(ref) if reference else []
+            noise = [v for v in unapproved if any(abs(v - w) < 1e-6 for w in on_clip)]
+            numbers = {"from": "clip_reading" if reference else "line", "heard": found}
+            missing = [] if played else event_voice.unspoken_numbers(own, ref)
+        else:
+            numbers = speech_match.number_check(heard, line)
+            # the critical miss: a figure the approved line never had (the line's own number
+            # said twice is a repeat -- extra speech, counted there)
+            approved = speech_match.numbers(line)
+            unapproved = [v for v in numbers["extra"] if not any(abs(v - w) < 1e-6 for w in approved)]
+            missing = event_voice.unspoken_numbers(heard, line) if scorer else None
+        out.update(line=line, fidelity=fid, numbers=numbers, unapproved_numbers=unapproved,
+                   extra_numbers=len(unapproved), missing_numbers=missing)
+        if noise is not None:
+            out["asr_number_noise"] = noise
+    else:
+        tool_text = json.dumps([t.get("result") for t in tools], ensure_ascii=False)
+        loose = (_numbers(heard) - _numbers(load_facts()) - _numbers(tool_text)
+                 - _numbers(case.get("host") or ""))
+        loose = sorted(n for n in loose if len(n.replace(".", "")) > 1)
+        out.update(unsourced_numbers=loose, extra_numbers=len(loose),
+                   misfire=best[0] >= MISFIRE_AT if heard else False)
+    if mode == "tool":
+        out["right_cue"] = (chosen[:1] == [expected]) if expected else not chosen
+        if played:
+            # her own voice in a turn whose cue played recorded, OUTSIDE the provider's hold
+            # (after the line): read from the audio, so a second voice counts even when no
+            # transcript came. What the hold kept off the speaker is apart, below.
+            out["extra_after_recorded_s"] = turn.get("audio_s") or 0
+            out["extra_after_recorded_chars"] = len(speech_match.fold(said))
+    if "held_said" in turn or "held_audio_s" in turn:
+        # what she tried to say over her own recording -- informative, never room speech
+        out["held_after_recorded"] = {"said": turn.get("held_said") or "",
+                                      "audio_s": turn.get("held_audio_s") or 0}
+    return out
+
+
+def _pct(part: int, whole: int) -> float | None:
+    return round(100.0 * part / whole, 1) if whole else None
+
+
+def _median(values: list[float]) -> float | None:
+    import statistics
+
+    return round(statistics.median(values), 3) if values else None
+
+
+def _hears(s: dict) -> bool:
+    """Would the room have heard this answer (`robot_hears`)? A record from before the field
+    (the 6 Nov read run): a staff press always, a host line when it names her."""
+    if "robot_hears" in s:
+        return bool(s["robot_hears"])
+    return s.get("mode") == "read" or bool(s.get("named"))
+
+
+def _script_stats(good: list[dict], tool: bool) -> dict:
+    """The numbers over completed script cases the room would hear. Fidelity leaves out a
+    case whose cue played recorded: what the room heard there is the approved recording,
+    1.0 by construction -- that mode is judged by its pick, misfires and latency."""
+    worded = [s for s in good if not s.get("played_recorded")]
+    fid = [s["fidelity"] for s in worded if s.get("fidelity") is not None]
+    lat = [s["first_sound_s"] for s in good if s.get("first_sound_s") is not None]
+    scorers: dict[str, int] = {}
+    for s in worded:
+        if "scorer" not in s:                            # a record from before scorers (6 Nov smoke)
+            s["scorer"] = ("transcript" if s.get("fidelity") is not None else None)
+        name = str(s.get("scorer"))                      # "None" = she spoke, nothing read it
+        scorers[name] = scorers.get(name, 0) + 1
+    row = {"scored": len(good), "fidelity_cases": len(fid),
+           "fidelity_median": _median(fid), "fidelity_p10": _p(fid, 10),
+           "fidelity_ge_0_9_pct": _pct(sum(1 for f in fid if f >= 0.9), len(fid)),
+           # the transcript scorer alone, and the recogniser's reading beside it: the two
+           # are different instruments -- read the scored_by counts before the median
+           "fidelity_median_transcript": _median([s["fidelity"] for s in worded if s.get("scorer") == "transcript"
+                                                  and s.get("fidelity") is not None]),
+           "asr_fidelity_median": _median([s["asr_fidelity"] for s in worded
+                                           if s.get("asr_fidelity") is not None]),
+           "scored_by": scorers,
+           "unscored": scorers.get("None", 0),
+           "no_transcript": sum(1 for s in good if s.get("no_transcript")),
+           "extra_number_cases": sum(1 for s in good if s.get("extra_numbers")),
+           "extra_numbers_total": sum(s.get("extra_numbers") or 0 for s in good),
+           "asr_number_noise_cases": sum(1 for s in good if s.get("asr_number_noise")),
+           "first_sound_median_s": _median(lat),
+           "silent_pct": _pct(sum(1 for s in good if s.get("silent")), len(good)),
+           "per_cue_fidelity_median": {
+               cue: _median([s["fidelity"] for s in worded if s.get("expected") == cue
+                             and s.get("fidelity") is not None])
+               for cue in sorted({s["expected"] for s in worded})}}
+    if tool:
+        row["cue_accuracy_pct"] = _pct(sum(1 for s in good if s.get("right_cue")), len(good))
+        recorded = [s for s in good if s.get("played_recorded")]
+        row["recorded_played"] = len(recorded)
+        # a second voice AFTER the line (the hold kept what came during it)
+        row["recorded_with_extra_speech"] = sum(
+            1 for s in recorded if (s.get("extra_after_recorded_s") or 0) >= VOICED_S
+            or s.get("extra_after_recorded_chars"))
+        row["held_after_recorded"] = sum(
+            1 for s in recorded if ((s.get("held_after_recorded") or {}).get("audio_s") or 0) >= VOICED_S
+            or (s.get("held_after_recorded") or {}).get("said"))
+        row["played_twice"] = sum(1 for s in good if (s.get("played_recorded") or 0) > 1)
+    return row
+
+
+def ceremony_summary(records: list[dict]) -> dict:
+    """Per mode (tool split by the stub's answer): the numbers the owner's question needs.
+
+    Only what the ROOM would hear is scored (review 6 Nov): on the robot an answer to a host
+    line without her name is dropped unless a named exchange came just before
+    (`robot_hears`); text turns skip that door here, so those cases are run but kept apart
+    (`unheard`: what she would have said to nobody). Free and tool modes are also split by
+    whether the host's own line names her (`by_named`). Errored sessions count as failed,
+    never as a score."""
+    groups: dict[str, list] = {}
+    for rec in records:
+        sc = rec.get("ceremony")
+        if not isinstance(sc, dict):
+            continue
+        key = str(sc.get("mode") or "?")
+        if key == "tool":
+            key += "/" + str(sc.get("cue_answer") or "say_yourself")
+        groups.setdefault(key, []).append((rec, sc))
+    out: dict[str, dict] = {}
+    for key in sorted(groups):
+        rows = groups[key]
+        tool = key.startswith("tool")
+        script = [(r, s) for r, s in rows if s.get("expected")]
+        off = [(r, s) for r, s in rows if not s.get("expected")]
+        done = [s for r, s in script if not r.get("error") and not s.get("failed")]
+        heard = [s for s in done if _hears(s)]
+        unheard = [s for s in done if not _hears(s)]
+        row = {"cases": len(script),
+               "failed": sum(1 for r, s in script if r.get("error") or s.get("failed")),
+               "robot_hears": sum(1 for r, s in script if _hears(s)),
+               **_script_stats(heard, tool)}
+        row["unheard"] = {"cases": len(unheard),
+                          "fidelity_median": _median([s["fidelity"] for s in unheard if s.get("fidelity") is not None
+                                                      and not s.get("played_recorded")]),
+                          **({"cue_accuracy_pct": _pct(sum(1 for s in unheard if s.get("right_cue")), len(unheard))}
+                             if tool else {})}
+        if key != "read":
+            row["by_named"] = {}
+            for label, want in (("named", True), ("unnamed", False)):
+                part = [s for s in done if bool(s.get("named")) is want]
+                part_heard = [s for s in part if _hears(s)]
+                sub = _script_stats(part_heard, tool)
+                row["by_named"][label] = {
+                    "cases": sum(1 for r, s in script if bool(s.get("named")) is want),
+                    "robot_hears": len(part_heard),
+                    **{k: sub[k] for k in ("fidelity_median", "fidelity_cases", "silent_pct", "first_sound_median_s")},
+                    **({"cue_accuracy_pct": sub["cue_accuracy_pct"]} if tool else {})}
+        ok_off = [s for r, s in off if not r.get("error") and not s.get("failed")]
+        off_heard = [s for s in ok_off if _hears(s)]
+        row["off_script"] = {
+            "cases": len(off),
+            "robot_hears": len(off_heard),
+            # only what reaches the room: an unnamed line's answer is dropped on the robot
+            "spoke": sum(1 for s in off_heard if not s.get("silent")),
+            "misfire": sum(1 for s in off_heard if s.get("misfire")),
+            "unsourced_number_cases": sum(1 for s in off_heard if s.get("extra_numbers")),
+            "cue_called": sum(1 for s in off_heard if s.get("chosen")),
+            # informative: what she did with lines nobody would have heard her answer
+            "unheard_spoke": sum(1 for s in ok_off if not _hears(s) and not s.get("silent")),
+            "unheard_cue_called": sum(1 for s in ok_off if not _hears(s) and s.get("chosen")),
+        }
+        out[key] = row
+    return out
+
+
+def ceremony_table(summary: dict) -> str:
+    """The summary as a few lines a person reads first."""
+    def num(value, fmt="%.2f"):
+        return "-" if value is None else fmt % value
+
+    head = ("%-20s %4s %4s %4s %6s %6s %5s %5s %7s %6s %5s %4s %4s %6s %9s | %-26s"
+            % ("mode", "n", "hear", "fail", "fid50", "fid10", ">=.9", "xnum#", "sound_s", "silent",
+               "no_tx", "asr#", "unsc", "cue_ok", "rec:t/h", "off n/hear/spoke/mis/num"))
+    out = [head, "-" * len(head)]
+    for key, row in summary.items():
+        off = row["off_script"]
+        rec = ("%d:%d/%d" % (row["recorded_played"], row["recorded_with_extra_speech"], row["held_after_recorded"])
+               if "recorded_played" in row else "-")
+        out.append("%-20s %4d %4d %4d %6s %6s %5s %5d %7s %6s %5d %4d %4d %6s %9s | %d/%d/%d/%d/%d" % (
+            key, row["cases"], row["robot_hears"], row["failed"], num(row["fidelity_median"]),
+            num(row["fidelity_p10"]), num(row["fidelity_ge_0_9_pct"], "%.0f%%"), row["extra_number_cases"],
+            num(row["first_sound_median_s"], "%.1f"), num(row["silent_pct"], "%.0f%%"),
+            row.get("no_transcript", 0), row.get("scored_by", {}).get("asr", 0), row.get("unscored", 0),
+            num(row.get("cue_accuracy_pct"), "%.0f%%"), rec,
+            off["cases"], off["robot_hears"], off["spoke"], off["misfire"], off["unsourced_number_cases"]))
+        for label, sub in (row.get("by_named") or {}).items():
+            out.append("%-20s %4d %4d %4s %6s %6s %5s %5s %7s %6s %5s %4s %4s %6s" % (
+                "  · " + label, sub["cases"], sub["robot_hears"], "", num(sub["fidelity_median"]), "", "", "",
+                num(sub["first_sound_median_s"], "%.1f"), num(sub["silent_pct"], "%.0f%%"), "", "", "",
+                num(sub.get("cue_accuracy_pct"), "%.0f%%")))
+    out += [
+        "n = script cases; hear = those the robot's room would hear (a staff press always; a host line only "
+        "when it names her or a named exchange came just before -- the ceremony's door). Every column after "
+        "`fail` counts heard cases only; unheard ones are in the JSON (`unheard`). named/unnamed: the host's "
+        "own line names her or not.",
+        "fid = fidelity to the approved line (transcript; or the local recogniser against its reading of the "
+        "approved clip when no transcript came: no_tx turns, asr# of them read, unsc unscored). A cue played "
+        "recorded is left out of fid (1.0 by construction) -- tool/recorded is judged by cue_ok, misfires "
+        "and sound_s. xnum# = cases with a number the line does not have.",
+        "sound_s = seconds from the turn sent to her first audio (recorded: the tool call's arrival, when the "
+        "recording would start). Text turns skip what the robot adds before that: the ~0.9 s end-of-speech "
+        "wait and the upload of the host's voice (free/tool), the staff's reaction to press (read).",
+        "rec:t/h = recorded plays : with her own voice after the line / with speech the hold kept off. "
+        "off = off-script host lines: n / heard / she spoke / said a script line / unsourced number (heard only).",
+    ]
+    return "\n".join(out)
+
+
 # ---------------------------------------------------------------- one case
 
 class _EvalFace:
@@ -1220,6 +2057,10 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
 
         plan_display.register(sid, fake_screen)
 
+    if case.get("suite") == "ceremony":
+        # The prompt is built the way the robot's call is since 9 Nov: the ceremony app's call,
+        # its mode on from the claim (no scene to press before it any more)
+        _enter_ceremony()
     instructions = build_instructions(
         settings.project_name, languages=settings.reply_languages,
         robot_name=settings.robot_name, profile=profile, robot_face=robot or robot_face)
@@ -1231,6 +2072,32 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
     turns: list[dict] = []
     state = {"pending": 0, "last": time.monotonic(), "cur": None}
     usage_peak: dict[str, int] = {}
+    #: her audio per turn, kept in memory for the ceremony's recogniser (never written)
+    keep_audio = case.get("suite") == "ceremony"
+    #: the provider's hold on her own output while a recorded cue line plays (stub_cue_player
+    #: raises it; the tool's task inherits this context, so the stub finds this case's)
+    hold = {"until": None, "turn": False, "cap_s": None}
+    _case_hold.set(hold)
+    _case_provider.set(provider)
+
+    def held_now() -> bool:
+        """Under the hold: the line still playing, or a model turn that began under it and has
+        not ended (providers/gemini.py: the turn is held to its end)."""
+        if hold["until"] is None:
+            return False
+        if time.monotonic() < hold["until"] or hold["turn"]:
+            hold["turn"] = True
+            return True
+        hold["until"] = None
+        return False
+
+    async def line_played_out() -> None:
+        """The host waits for her line to end before speaking (bounded by the hold's cap)."""
+        if hold["until"] is None:
+            return
+        cap = time.monotonic() + float(hold.get("cap_s") or 25.0)
+        while time.monotonic() < min(hold["until"], cap):
+            await asyncio.sleep(0.2)
 
     def new_turn(user: str | None) -> dict:
         turn = {"user": user, "said": "", "audio_bytes": 0, "tools": [],
@@ -1252,6 +2119,18 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
             state["last"] = time.monotonic()
             if cur is None:
                 continue
+            if ev.kind in ("assistant_transcript", "audio") and held_now():
+                # what she tried to say over her own recording: kept apart, never room speech
+                kind = "held_" + ev.kind
+                if not cur["timeline"] or cur["timeline"][-1][1] != kind:
+                    cur["timeline"].append((round(time.monotonic() - state["started"], 2), kind))
+                if ev.kind == "assistant_transcript":
+                    cur["held_said"] = cur.get("held_said", "") + (ev.text or "")
+                else:
+                    cur["held_audio_bytes"] = cur.get("held_audio_bytes", 0) + len(ev.audio or b"")
+                continue
+            if ev.kind in ("turn_complete", "interrupted"):
+                hold["turn"] = False                     # a held model turn ends here
             if ev.kind != "audio" or not cur["timeline"] or cur["timeline"][-1][1] != "audio":
                 cur["timeline"].append(
                     (round(time.monotonic() - state["started"], 2), ev.kind))
@@ -1259,6 +2138,10 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                 cur["said"] += ev.text or ""
             elif ev.kind == "audio":
                 cur["audio_bytes"] += len(ev.audio or b"")
+                if keep_audio:
+                    # the ceremony suite scores a turn whose transcript never came by
+                    # the local recogniser (Live drops it on ~1 turn in 3, 6 Nov)
+                    cur.setdefault("_pcm", bytearray()).extend(ev.audio or b"")
             elif ev.kind == "tool_call":
                 state["pending"] += 1
                 state["tc_since_tool"] = 0
@@ -1301,6 +2184,9 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
         turn["audio_s"] = round(turn.pop("audio_bytes") / 2 / provider.output_sample_rate, 1)
         turn["said"] = turn["said"].strip()
         turn["gaps"] = tool_call_gaps(turn["timeline"])
+        if "held_said" in turn or "held_audio_bytes" in turn:
+            turn["held_said"] = turn.get("held_said", "").strip()
+            turn["held_audio_s"] = round(turn.pop("held_audio_bytes", 0) / 2 / provider.output_sample_rate, 1)
         return turn
 
     started = time.monotonic()
@@ -1317,6 +2203,24 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                     ok = await wait_turn(greet_turn)
                     record["greeting"] = close_turn(greet_turn, ok)
                 for n, text in enumerate(case["turns"]):
+                    await line_played_out()
+                    if text.startswith(CUE_PRESS):
+                        # Staff pressed a ceremony cue with no recording (the read
+                        # mode): the cue's line, quoted, as the server's own turn.
+                        from app import event_script, events
+
+                        cue = event_script.servable().get(text[len(CUE_PRESS):])
+                        cue = event_script.spoken(cue) if cue else cue
+                        base = event_script.read_text(cue, cue.get("lang") or "th") if cue else None
+                        if base is None:
+                            raise ValueError("cue %r has no line to read" % text[len(CUE_PRESS):])
+                        turn = new_turn(text)
+                        await provider.send_text(events.with_held_language(base, provider))
+                        ok = await wait_turn(turn)
+                        turns.append(close_turn(turn, ok))
+                        if not ok and turn["errors"]:
+                            break
+                        continue
                     if text.startswith(SERVER_LINE):
                         # A line the server writes itself (events.announce):
                         # the session's own text, the held language on it the
@@ -1325,7 +2229,7 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                         from app.session import FOLLOW_UP_TEXT, GOODBYE_TEXT
 
                         what = text[len(SERVER_LINE):]
-                        if what.startswith(("scene:", "arrive:")):
+                        if what.startswith(("scene:", "arrive:", "walk:")):
                             # The event host (app/event_host.py): staff switched
                             # to a scene -- acted where she stands, walking is
                             # staff's and off here -- or its walk arrived.
@@ -1335,13 +2239,39 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                             sc = event_host.scene(sid)
                             if sc is None:
                                 raise ValueError("unknown scene %r (EVENT_FILE)" % sid)
-                            event_host.STATE.update(scene=sid, stop=0)
+                            if kind in ("scene", "walk"):
+                                # what start_scene sets (no mode since 9 Nov: the ceremony is
+                                # an app, never one of these scenes)
+                                event_host.STATE.update(scene=sid, stop=0, since=time.time())
+                            else:
+                                event_host.STATE.update(scene=sid, stop=0)
                             spot = (event_host.load() or {}).get("spots", {}).get(event_host._here(sc) or "")
-                            base = (event_host.scene_text(sc, walking=False, spot_id=event_host._here(sc))
-                                    if kind == "scene" else
-                                    event_host.arrival_text(sc, spot["name_th"] if spot else sid))
+                            # "walk:" = the scene's start text when its walk did set out (10 Nov: the
+                            # walking text was never measured, only the standing and arrival ones)
+                            where = event_host._here(sc)
+                            if kind == "scene" and sc["roam"] and where is None and not settings.event_walk_enabled:
+                                where = ""               # start_scene: a refused roam is acted where she stands
+                            base = (event_host.scene_text(sc, walking=kind == "walk", spot_id=where)
+                                    if kind in ("scene", "walk") else
+                                    # the debut's line as the wheels turn (10 Nov: "เดินไปด้านหน้าพร้อม
+                                    # โบกมือและพูด") -- what she is told when its recording cannot play
+                                    event_host.walk_line_text(sc) if kind == "walk_line" else
+                                    event_host.arrival_text(sc, (
+                                        # the robot's own name for a walk ahead (review 10 Nov: the
+                                        # stage's name was measured while the robot sends this one)
+                                        event_host.FORWARD_NAME_TH
+                                        if sc.get("forward_m") and event_host.spot_steps(spot) is None
+                                        else spot["name_th"] if spot else sid)))
                         else:
                             base = {"follow_up": FOLLOW_UP_TEXT, "goodbye": GOODBYE_TEXT}[what]
+                        if base is None:
+                            # a scene with no words of its own (the ceremony's switch since
+                            # 7 Nov): start_scene announces nothing, so nothing is sent here --
+                            # the turn is kept, empty, so `score_turn` still points at its line
+                            turn = new_turn(text)
+                            turn["server_silent"] = True
+                            turns.append(close_turn(turn, True))
+                            continue
                         turn = new_turn(text)
                         await provider.send_text(events.with_held_language(base, provider))
                         ok = await wait_turn(turn)
@@ -1419,12 +2349,33 @@ async def run_case(case: dict, *, greeting: bool, robot_face: bool,
                 for e in t.get("errors", [])]
     if upstream and not record.get("error"):
         record["error"] = "upstream: " + upstream[0][:480]
+    # audio stays out of the record (it is her voice, and megabytes); the scorer reads it here
+    pcms = [bytes(t.pop("_pcm", b"")) for t in turns]
+    if isinstance(record.get("greeting"), dict):
+        record["greeting"].pop("_pcm", None)
     record["turns"] = turns
     record["elapsed_s"] = round(time.monotonic() - started, 1)
+    if case.get("suite") == "ceremony":
+        idx = case.get("score_turn", len(turns) - 1)
+        asr = await asyncio.to_thread(ceremony_asr, case, turns[idx] if 0 <= idx < len(turns) else None,
+                                      pcms[idx] if 0 <= idx < len(pcms) else b"",
+                                      provider.output_sample_rate)
+        record["ceremony"] = ceremony_score(case, turns, asr=asr)
     from app.prompts import load_facts
 
     record["flags"] = flags_for(case, turns, load_facts() + json.dumps(case, ensure_ascii=False))
+    if case.get("suite") == "ceremony":
+        record["flags"] = recorded_silence_is_right(turns, record["flags"])
     return record
+
+
+def recorded_silence_is_right(turns: list[dict], flags: list[str]) -> list[str]:
+    """A turn whose cue played recorded is SUPPOSED to have no voice of hers: its `silent`
+    flag is the right answer, not a fault (the ceremony score counts what the room heard)."""
+    quiet = {"t%d:silent" % i for i, turn in enumerate(turns)
+             if turn.get("server_silent")             # a scene that says nothing: nothing was sent
+             or any(t.get("cue_play") and t.get("mode") == "recorded" for t in turn.get("tools") or [])}
+    return [f for f in flags if f not in quiet]
 
 
 # ---------------------------------------------------------------- main
@@ -1444,7 +2395,8 @@ def split_serial(todo: list[dict]) -> tuple[list[dict], list[dict]]:
 #: "tap:lang_ru!cut" is the pick that stopped her mid-answer).
 TAP = "tap:"
 #: ...and a line the server writes itself: "server:follow_up" / "server:goodbye",
-#: and the event host's "server:scene:<scene id>" / "server:arrive:<scene id>"
+#: and the event host's "server:scene:<scene id>" / "server:arrive:<scene id>" /
+#: "server:walk_line:<scene id>" (a say_on_walk scene's line on the way, 10 Nov)
 #: (events.announce's texts, with what announce adds to them).
 SERVER_LINE = "server:"
 
@@ -1555,7 +2507,25 @@ def resolve_profile(suite: str, profile: str | None) -> str:
     the sales room. An explicit --profile wins."""
     if profile:
         return profile
-    return {"robot": "joke", "content": "joke", "event": "event"}.get(suite, "condo")
+    return {"robot": "joke", "content": "joke", "event": "event", "ceremony": "ceremony"}.get(suite, "condo")
+
+
+def ceremony_unservable(cases: list[dict]) -> list[str]:
+    """Expected cues the run could not hand the session even as drafts (a content rule,
+    a number whose source this machine cannot read): those cases would measure nothing.
+    Asked the way the run asks -- drafts served, the event's films taken as present."""
+    from app import event_script
+
+    with script_drafts_in_memory(), clips_present_in_memory():
+        table = event_script.servable()
+        out = []
+        for cue_id in sorted({c["cue"] for c in cases if c.get("cue")}
+                             | {b for c in cases for b in c.get("before") or []}):
+            if cue_id not in table:
+                cue = event_script.cue(cue_id, ceremony_script())
+                out.append("cue %s is not servable even as a draft: %s"
+                           % (cue_id, event_script.problems(cue) if cue else "missing"))
+    return out
 
 
 def check_offline(args) -> int:
@@ -1564,13 +2534,27 @@ def check_offline(args) -> int:
     The scenario files are only ever read by a two-hour paid run; this is
     the way to know beforehand that the run will measure what it says.
     """
+    if args.suite == "ceremony":
+        from app.config import settings
+
+        if not settings.event_file:                      # this process only, as the run does
+            settings.event_file = "data/events/floor1_event.json"
+        if not settings.ceremony_file:
+            settings.ceremony_file = "data/ceremony/floor1_ceremony.json"
     try:
-        cases = load_cases(args.suite, Path(args.faq))
+        cases = load_cases(args.suite, Path(args.faq), getattr(args, "ceremony_mode", "free"),
+                           getattr(args, "cue_answer", "say_yourself"))
     except (OSError, ValueError) as exc:
         print(f"!! {exc}", file=sys.stderr)
         return 1
     if args.suite == "robot":
         problems = guard_problems(cases)
+        for problem in problems:
+            print(f"!! {problem}", file=sys.stderr)
+        if problems:
+            return 1
+    if args.suite == "ceremony":
+        problems = ceremony_unservable(cases)
         for problem in problems:
             print(f"!! {problem}", file=sys.stderr)
         if problems:
@@ -1598,8 +2582,12 @@ async def main_async(args) -> int:
         settings.gemini_model = args.model
     make_safe()
     robot_notes = (make_robot_suite() if args.suite == "robot" else
-                   make_content_suite() if args.suite == "content" else [])
-    if args.suite in ("robot", "content") and args.concurrency > 3:
+                   make_content_suite() if args.suite == "content" else
+                   make_ceremony_suite(args.ceremony_mode, args.cue_answer,
+                                       stories=not args.no_ceremony_stories)
+                   if args.suite == "ceremony" else
+                   make_event_suite() if args.suite == "event" else [])
+    if args.suite in ("robot", "content", "ceremony", "event") and args.concurrency > 3:
         # Free tier allows ~3 Live sessions in all, the room may hold one.
         print("!! --concurrency capped at 3 for the robot suite", file=sys.stderr)
         args.concurrency = 3
@@ -1615,12 +2603,39 @@ async def main_async(args) -> int:
     await asyncio.to_thread(search_condo_info, "warm up")
     print(f"search warmed in {time.monotonic() - t0:.1f}s", flush=True)
 
-    cases = load_cases(args.suite, Path(args.faq))
+    cases = load_cases(args.suite, Path(args.faq), args.ceremony_mode, args.cue_answer)
     if args.suite == "robot":
         # Loud, not fatal: a case the guard refuses still measures what the
         # model says about the refusal — but not what its id claims.
         for problem in guard_problems(cases):
             print(f"!! {problem}", file=sys.stderr)
+    if args.suite == "ceremony":
+        # Loud: a cue the session is never handed scores the model without its line.
+        for problem in ceremony_unservable(cases):
+            print(f"!! {problem}", file=sys.stderr)
+        CEREMONY_ASR["mode"] = args.ceremony_asr
+        if args.ceremony_asr != "off":
+            from app.offline import asr as offline_asr
+
+            missing = offline_asr.problems("thai")
+            if missing:
+                print("!! the local Thai recogniser is not here (%s) -- a turn with no transcript "
+                      "is UNSCORED, not read (python scripts/fetch_offline_models.py)" % "; ".join(missing[:2]),
+                      file=sys.stderr)
+        if args.ceremony_mode == "tool":
+            from app.tools import registry
+
+            token = registry.session_profile.set(profile)
+            face = registry.robot_face_session.set(object())
+            try:
+                entry = registry.get("say_script_line")
+                if entry is None or not registry.allowed(entry):
+                    print("!! say_script_line is not offered -- the tool mode measures nothing",
+                          file=sys.stderr)
+                    return 1
+            finally:
+                registry.robot_face_session.reset(face)
+                registry.session_profile.reset(token)
     if args.ids:
         wanted = {x.strip() for x in args.ids.split(",") if x.strip()}
         cases = [c for c in cases if c["id"] in wanted]
@@ -1634,8 +2649,13 @@ async def main_async(args) -> int:
         # (a price, a chosen room type, a room number must not become one)
         cases = [dict(c, stories=True) for c in cases]
 
+    run_tag = ""
+    if args.suite == "ceremony":
+        # one mode per run: the file name says which, for --ceremony-table later
+        run_tag = "ceremony-%s-" % args.ceremony_mode + (
+            args.cue_answer + "-" if args.ceremony_mode == "tool" and args.cue_answer != "say_yourself" else "")
     out = Path(args.resume) if args.resume else OUT_DIR / (
-        "live-qa-%s.jsonl" % dt.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        "live-qa-%s%s.jsonl" % (run_tag, dt.datetime.now().strftime("%Y%m%d-%H%M%S")))
     out.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if out.exists():
@@ -1682,6 +2702,8 @@ async def main_async(args) -> int:
                     # (9 Oct: 1 of 97 sessions greeted), so a content case
                     # greets only when it says so.
                     greets = (bool(case.get("greeting")) if case.get("suite") == "content"
+                              # the ceremony's call was up long before the host's question
+                              else False if case.get("suite") == "ceremony"
                               else not args.no_greeting)
                     rec = await run_case(case, greeting=greets,
                                          robot_face=not args.desktop,
@@ -1725,29 +2747,66 @@ def write_summary(out: Path, *, profile: str, model: str | None) -> dict:
     """Summarise every record in the run file (a resumed run included) next
     to it, and print it. Only records without an error count: a session that
     died mid-turn has no timing worth proposing a setting from."""
-    records = []
-    if out.exists():
-        for line in out.read_text(encoding="utf-8").splitlines():
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            if not rec.get("error"):
-                records.append(rec)
+    every = read_records(out)
+    records = [rec for rec in every if not rec.get("error")]
     summary = summarize(records, profile=profile, model=model)
+    ceremony = ceremony_summary(every)        # an errored session counts there, as failed
+    if ceremony:
+        summary["ceremony"] = ceremony
     path = out.with_name(out.stem + ".summary.json")
     path.write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     print("summary -> %s\n%s" % (path, json.dumps(summary, ensure_ascii=False, indent=1)),
           flush=True)
+    if ceremony:
+        print(ceremony_table(ceremony), flush=True)
     return summary
+
+
+def read_records(path: Path) -> list[dict]:
+    """Every record of a run file, errored ones included."""
+    out = []
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(rec, dict):
+                out.append(rec)
+    return out
+
+
+def print_ceremony_table(paths: list[str]) -> int:
+    """`--ceremony-table a.jsonl b.jsonl ...`: one table over several runs, offline."""
+    records = [rec for p in paths for rec in read_records(Path(p))]
+    summary = ceremony_summary(records)
+    if not summary:
+        print("!! no ceremony records in " + ", ".join(paths), file=sys.stderr)
+        return 1
+    print(ceremony_table(summary))
+    return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--suite", choices=["scenarios", "faq", "all", "robot", "content", "event"],
+    ap.add_argument("--suite", choices=["scenarios", "faq", "all", "robot", "content", "event", "ceremony"],
                     default="all",
                     help="robot = body/walk commands on the robot face; content = what "
-                         "EmmaJoke says on the robot face (neither is part of all)")
+                         "EmmaJoke says on the robot face; ceremony = the launch ceremony's "
+                         "script questions, one --ceremony-mode per run (none is part of all)")
+    ap.add_argument("--ceremony-mode", choices=list(CEREMONY_MODES), default="free",
+                    help="read = staff press the cue (no recording); free = the script in the "
+                         "prompt (EVENT_SCRIPT_PROMPT); tool = say_script_line (EVENT_SCRIPT_TOOL)")
+    ap.add_argument("--cue-answer", choices=list(CUE_ANSWERS), default="say_yourself",
+                    help="tool mode: what the stubbed event_cues.play answers (nothing plays); "
+                         "clips = recorded when data/ceremony/voice/ has the cue's clip")
+    ap.add_argument("--ceremony-asr", choices=["all", "missing", "off"], default="all",
+                    help="ceremony: the local Thai recogniser on every scored turn (all), only "
+                         "where no transcript came (missing), or never")
+    ap.add_argument("--no-ceremony-stories", action="store_true",
+                    help="ceremony: without the robot face's stories (on, as on the robot, by default)")
+    ap.add_argument("--ceremony-table", nargs="+", metavar="RUN_JSONL",
+                    help="print the ceremony table over these run files and exit (offline)")
     ap.add_argument("--profile", choices=["condo", "joke", "emma", "event"],
                     help="profile under test (default: joke for --suite robot, else condo)")
     ap.add_argument("--model", help="Live model for this run only (e.g. "
@@ -1780,6 +2839,8 @@ def main() -> int:
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     sys.stdout.reconfigure(encoding="utf-8")
+    if args.ceremony_table:
+        return print_ceremony_table(args.ceremony_table)
     return asyncio.run(main_async(args))
 
 

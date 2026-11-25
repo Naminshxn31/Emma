@@ -126,6 +126,11 @@ EXTRA_GLOBS = [
     # Floor 1's remembered points (gitignored with the rest of data/robot/):
     # the dock pose and approach the event host's walks dock with.
     "data/robot/waypoints/*.json",
+    # The Emma Ceremony app's script and running order (CEREMONY_FILE, owner 9 Nov: the
+    # ceremony is an app of its own): tracked once the lead commits it, shipped by name until
+    # then -- a robot without it is a ceremony app with nothing to press. Only the top level:
+    # its voice/ folder ships by its index (`event_voice_files`), never by a glob.
+    "data/ceremony/*.json",
 ]
 #: Big files the robot downloads itself (pinned) instead of 0.3 MB/s over adb.
 #: Shipped only if this PC has the file (its sha256 is the pin), so fetch here
@@ -145,6 +150,10 @@ FETCH_ON_ROBOT = {
     # the sha, the point indices belong to this exact model.
     "data/faces/models/auraface/2d106det.onnx":
         "https://huggingface.co/fal/AuraFace-v1/resolve/main/2d106det.onnx",
+    # Is that a person (app/person_vision.py): YOLOX-nano, 3.7 MB, Apache-2.0, pinned there too.
+    # scripts/fetch_person_model.py on this PC first.
+    "data/models/person/yolox_nano.onnx":
+        "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.onnx",
     # Voice prints (app/voiceprint.py): 3D-Speaker CAM++ zh+en, 28 MB, Apache-2.0.
     # scripts/fetch_voiceprint_model.py on this PC first. ("recongition" is how
     # the release tag is really spelled.)
@@ -154,7 +163,14 @@ FETCH_ON_ROBOT = {
 }
 #: .env keys that never leave this PC (they do nothing on the robot, or
 #: they are keys the robot has no use for -- fewer secrets on the robot).
-ENV_DROP = {"OPENAI_API_KEY", "PRINTER_NAME", "PDF_PRINT_EXE", "ROBOT_ARM_ADB", "ROBOT_ARM_ADB_SERIAL"}
+#: ELEVENLABS_API_KEY (10 Nov): scripts/voice_line.py renders a scene's recorded line on this PC; the
+#: robot only plays the file -- a key it never uses is a key it can only leak.
+#: BOOTH_* and the booth's side of GUEST_SYNC (23 Nov): the scan booth may be this
+#: PC; the robot needs only GUEST_SYNC_KEY. BOOTH_PIN is a staff secret the robot
+#: never asks for.
+ENV_DROP = {"OPENAI_API_KEY", "PRINTER_NAME", "PDF_PRINT_EXE", "ROBOT_ARM_ADB", "ROBOT_ARM_ADB_SERIAL",
+            "ELEVENLABS_API_KEY", "BOOTH_PIN", "BOOTH_CONSENT_UNTIL", "BOOTH_CONTROLLER", "BOOTH_CONTACT",
+            "BOOTH_STATION", "BOOTH_RETURN_URL", "GUEST_SYNC_URL", "GUEST_SYNC_CERT"}
 #: .env keys whose robot value is robot.env's alone: this PC's line is never
 #: carried over. OFFLINE_FALLBACK (review 26 Oct, reproduced): the owner
 #: trying the backup on this PC (docs/emma-offline-mode.md step 3) and then
@@ -265,6 +281,82 @@ def answer_image_files(root: Path = ROOT) -> set[str]:
             if "/" not in item["path"] and (root / folder / item["path"]).is_file()}
 
 
+def _catwalk_files(root) -> set[str]:
+    """The catwalk music the room's screen plays (app/catwalk_music.py), when it is switched on."""
+    try:
+        from app import catwalk_music
+
+        return {str(p.relative_to(root)).replace("\\", "/") for p in catwalk_music.files(root).values()}
+    except (ImportError, AttributeError, ValueError):
+        return set()
+
+
+def event_clip_files(root: Path = ROOT) -> set[str]:
+    """The event's films (app/event_clips.py) and its scenes' recorded lines (app/event_host.py
+    `recorded`, 10 Nov): what its file names, from its one folder. Gitignored and big, so nothing
+    else ships them, and no event file names one on any other day. Same shape as
+    answer_image_files."""
+    try:
+        doc = json.loads((root / "data" / "events" / "floor1_event.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    out: set[str] = set()
+    named = [clip.get("file") for clip in (doc.get("clips") or {}).values() if isinstance(clip, dict)]
+    named += [scene["recorded"].get("file") for scene in (doc.get("scenes") or [])
+              if isinstance(scene, dict) and isinstance(scene.get("recorded"), dict)]
+    # ... and a tour's recorded lines (app/event_tour.py `lines`, 24 Nov): never shipped, she is silent at that handshake
+    named += [rec.get("file") for scene in (doc.get("scenes") or []) if isinstance(scene, dict)
+              and isinstance(scene.get("tour"), dict) and isinstance(scene["tour"].get("lines"), dict)
+              for rec in scene["tour"]["lines"].values() if isinstance(rec, dict)]
+    # ... and a spot's `show` lines (app/event_host.py go_spot, 25 Nov: card 3's globe) -- rehearsal 4 found them
+    # missing on the robot: the tease said nothing and the walk went on without it
+    named += [spot["show"][k].get("file") for spot in (doc.get("spots") or {}).values() if isinstance(spot, dict)
+              and isinstance(spot.get("show"), dict) for k in ("first", "arrive") if isinstance(spot["show"].get(k), dict)]
+    for name in named:
+        if isinstance(name, str) and name.startswith("data/events/clips/") and ".." not in name and (root / name).is_file():
+            out.add(name)
+    return out | _catwalk_files(root)
+
+
+#: Beside the ceremony's own file since 9 Nov (app/event_voice.py `folder`; it was
+#: data/events/voice/ while the ceremony was a scene of the event file).
+EVENT_VOICE_DIR = "data/ceremony/voice"
+
+
+def event_voice_files(root: Path = ROOT) -> set[str]:
+    """Emma's recorded ceremony lines (app/event_voice.py, scripts/render_event_
+    script.py): the index and the WAVs it names -- a bare file name inside the
+    folder, nothing else (no path, no "..", .wav only), and only those this PC
+    has. Gitignored, so nothing else ships them. The robot re-hashes each clip
+    and checks its model, voice and transcript before playing it, so a stray or
+    stale one ships harmlessly; one the index names and this PC lacks is simply
+    not there, and that cue is read live."""
+    folder = root / EVENT_VOICE_DIR
+    try:
+        index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    clips = index.get("clips") if isinstance(index, dict) else None
+    if not isinstance(clips, dict):
+        return set()
+    out = {EVENT_VOICE_DIR + "/index.json"}
+    for entry in clips.values():
+        name = entry.get("file") if isinstance(entry, dict) else None
+        if (isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_-]+\.wav", name)
+                and (folder / name).is_file()):
+            out.add("%s/%s" % (EVENT_VOICE_DIR, name))
+    return out
+
+
+def event_voice_summary(files: list[str], push: list[str]) -> str | None:
+    """deploy's line about the recorded ceremony lines (shown on --dry-run too)."""
+    clips = [f for f in files if f.startswith(EVENT_VOICE_DIR + "/") and f.endswith(".wav")]
+    if not clips:
+        return None
+    pushing = [f for f in push if f.startswith(EVENT_VOICE_DIR + "/")]
+    return "ceremony voice: %d recorded line(s) in %s, %d file(s) to push" % (len(clips), EVENT_VOICE_DIR, len(pushing))
+
+
 def _robot_env_on(root: Path, key: str) -> bool:
     env = root / "data" / "robot-server" / "robot.env"
     return env.is_file() and any(
@@ -296,6 +388,157 @@ def story_asset_files(root: Path = ROOT) -> set[str]:
             if isinstance(name, str) and "/" not in name and "\\" not in name and (folder / name).is_file():
                 out.add((folder / name).relative_to(root).as_posix())
     return out
+
+
+#: The ceremony film's opening clip (app/ceremony_slides.py IDLE_CLIP).
+CEREMONY_IDLE_CLIP = "c_logo_reveal"
+#: The debut on card 1 (app/ceremony_reveal.py): its settings name its sound and its video
+#: (app/ceremony_slides.py reveal_sound_id / reveal_video_id; these ids when they do not).
+CEREMONY_REVEAL = ("data", "ceremony", "reveal.json")
+CEREMONY_REVEAL_IDS = {"sound": "reveal_debut", "video": "debut_wave"}
+
+
+def _reveal_ids(root: Path) -> set[str]:
+    try:
+        doc = json.loads(root.joinpath(*CEREMONY_REVEAL).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        doc = {}
+    doc = doc if isinstance(doc, dict) else {}
+    return {doc.get(k) if isinstance(doc.get(k), str) else v for k, v in CEREMONY_REVEAL_IDS.items()}
+
+
+def _asset_ids(value, out: set[str]) -> set[str]:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in ("asset", "backdrop") and isinstance(item, str):
+                out.add(item)
+            else:
+                _asset_ids(item, out)
+    elif isinstance(value, list):
+        for item in value:
+            _asset_ids(item, out)
+    return out
+
+
+def ceremony_film_files(root: Path = ROOT) -> set[str]:
+    """The ceremony film's own files (data/ceremony/assets/, gitignored: 80 MB of full-size
+    pictures, depth maps, candidates and a clip) -- ONLY those a slide names, with their depth
+    map and licence, and the idle clip: 17 Nov night the folder held 265 files, the slides
+    use a fraction. Every one is pinned in index.json (tracked); the server re-hashes before
+    it serves one, so a file missing here only costs its picture its sharper copy."""
+    folder = root / "data" / "ceremony" / "assets"
+    try:
+        rows = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    rows = rows.get("assets") if isinstance(rows, dict) else rows
+    used: set[str] = {CEREMONY_IDLE_CLIP} | _reveal_ids(root)
+    for path in [root / "data" / "ceremony" / "floor1_ceremony.slides.json"] + sorted((root / "data" / "ceremony" / "slides").glob("*.json")):
+        try:
+            _asset_ids(json.loads(path.read_text(encoding="utf-8")), used)
+        except (OSError, ValueError):
+            continue
+    out: set[str] = set()
+
+    def take(name) -> None:
+        if isinstance(name, str) and name and ".." not in name.split("/") and not name.startswith("/") and ":" not in name:
+            if (folder / name).is_file():
+                out.add((folder / name).relative_to(root).as_posix())
+
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or not (row.get("id") in used or row.get("from_pin") in used):
+            continue
+        take(row.get("file"))
+        depth = row.get("depth")
+        if isinstance(depth, dict):
+            take((depth.get("soft") or {}).get("file") if isinstance(depth.get("soft"), dict) else None)
+            take(depth.get("file"))
+        else:
+            take(depth)
+        licence = row.get("licence")
+        for name in (licence.get("files") or []) if isinstance(licence, dict) else []:
+            take(name)
+    return out
+
+
+#: The ceremony film's face (owner 22 Nov: "เปลี่ยนทั้งหมดเลยนะ" -- every word of the film and the
+#: event screen's Thai subtitles in Jipatype's Kantalad; licensed by the owner for the event's
+#: presentation only, so the four files are gitignored, never in the repository). `--others
+#: --exclude-standard` leaves a gitignored file out without a word, and ceremony-show.css's
+#: @font-face would then point at nothing on the robot: shipped by name here, and a deploy
+#: from a PC without them stops and says so (`ceremony_font_missing`).
+CEREMONY_FONT_DIR = "client/assets/ceremony-show/fonts"
+CEREMONY_FONT_FILES = ("Kantalad-Regular.otf", "Kantalad-Medium.otf", "Kantalad-SemiBold.otf", "Kantalad-Bold.otf")
+
+
+def _font_problem(path: Path) -> str | None:
+    """Why `path` is not a face the film can use, or None. Review 22 Nov night: a deploy checked
+    only that the four names existed -- an empty file, a half-copied one or a .woff2 renamed
+    .otf would have shipped, and Chrome drops a face it cannot read without a word (the screen
+    then draws in Inter). The four are CFF OpenType: their first four bytes are "OTTO"."""
+    size = path.stat().st_size
+    if size == 0:
+        return "%s is empty" % path.name
+    with path.open("rb") as fh:
+        head = fh.read(4)
+    if head != b"OTTO":
+        return "%s is not a CFF OpenType font (it starts %r, not b'OTTO')" % (path.name, head)
+    return None
+
+
+def ceremony_font_problems(root: Path = ROOT) -> list[str]:
+    """The Kantalad faces this PC has that are not fonts (`_font_problem`), one line each."""
+    out = []
+    for name in CEREMONY_FONT_FILES:
+        path = root / CEREMONY_FONT_DIR / name
+        if path.is_file():
+            why = _font_problem(path)
+            if why:
+                out.append(why)
+    return out
+
+
+def ceremony_font_files(root: Path = ROOT) -> set[str]:
+    """The Kantalad faces this PC has (only those names, only in that folder) -- and only real
+    ones: a face that is empty or not OpenType is never shipped (ceremony_font_problems says why)."""
+    return {"%s/%s" % (CEREMONY_FONT_DIR, name) for name in CEREMONY_FONT_FILES
+            if (root / CEREMONY_FONT_DIR / name).is_file() and _font_problem(root / CEREMONY_FONT_DIR / name) is None}
+
+
+def ceremony_font_kept(gone: list[str]) -> list[str]:
+    """The Kantalad faces a deploy would delete from the robot because this PC lacks them: never.
+    Review 22 Nov night: `deploy --without-ceremony-font` deleted the robot's copies (everything in
+    the robot's MANIFEST that the PC lacks goes) -- the flag is for a PC without the licensed
+    files, and that PC must not take them off a robot that has them. A deploy only stops pushing
+    them; the robot keeps what it had (and its MANIFEST keeps naming them)."""
+    faces = {"%s/%s" % (CEREMONY_FONT_DIR, name) for name in CEREMONY_FONT_FILES}
+    return sorted(f for f in gone if f in faces)
+
+
+def ceremony_font_missing(files) -> list[str]:
+    """The Kantalad faces a deploy of `files` would leave out."""
+    have = set(files)
+    return [name for name in CEREMONY_FONT_FILES if "%s/%s" % (CEREMONY_FONT_DIR, name) not in have]
+
+
+def ceremony_font_summary(files: list[str], push: list[str], problems: list[str] | None = None) -> str:
+    missing = ceremony_font_missing(files)
+    if missing:
+        bad = ("; " + "; ".join(problems)) if problems else ""
+        return ("ceremony font: MISSING on this PC: %s%s -- the event screen would draw the film and its subtitles "
+                "in a fallback face. Copy the four Kantalad faces (CFF OpenType .otf) into %s, or deploy "
+                "--without-ceremony-font: nothing of the font is pushed, and the faces already on the robot stay "
+                "there (a robot that never had them draws the film in Inter)"
+                % (", ".join(missing), bad, CEREMONY_FONT_DIR))
+    faces = {"%s/%s" % (CEREMONY_FONT_DIR, name) for name in CEREMONY_FONT_FILES}
+    return "ceremony font: %d Kantalad face(s), %d to push" % (len(faces), len([f for f in push if f in faces]))
+
+
+def ceremony_film_summary(files: list[str], push: list[str]) -> str:
+    film = [f for f in files if f.startswith("data/ceremony/assets/") and not f.endswith("index.json")]
+    pushing = [f for f in push if f in set(film)]
+    total = sum((ROOT / f).stat().st_size for f in film if (ROOT / f).is_file())
+    return "ceremony film: %d file(s) the slides name (%.1f MB), %d to push" % (len(film), total / 1e6, len(pushing))
 
 
 _TRUE = {"1", "true", "yes", "on"}
@@ -372,7 +615,11 @@ def deploy_files(root: Path = ROOT) -> list[str]:
                 if _deployable(rel):
                     files.add(rel)
     files |= answer_image_files(root)
+    files |= event_clip_files(root)
+    files |= event_voice_files(root)
     files |= story_asset_files(root)
+    files |= ceremony_film_files(root)
+    files |= ceremony_font_files(root)
     files |= offline_voice_files(root)
     # the recognizers never go over adb (the robot fetches them itself), even
     # when a future glob or tracked rule would catch them
@@ -618,7 +865,7 @@ def refresh_faq_cache() -> str:
     return ""
 
 
-def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
+def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False, without_font: bool = False) -> None:
     note = refresh_faq_cache()
     if note:
         print(note)
@@ -626,6 +873,11 @@ def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
     if warning:
         print(warning)
     files = deploy_files()
+    # (before anything is pushed: a film whose @font-face points at nothing -- or at a file that is
+    # not a font -- is not shipped quietly)
+    font_problems = ceremony_font_problems(ROOT)
+    if ceremony_font_missing(files) and not dry and not without_font:
+        raise Fail(ceremony_font_summary(files, [], font_problems))
     local = manifest(ROOT, files)
     # Diff against what is REALLY on the robot, not against our MANIFEST: the
     # first deploy wrote a MANIFEST for files that never arrived (see bundle()).
@@ -640,8 +892,19 @@ def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
     gone = sorted(f for f in previous if f not in local and f not in FETCH_ON_ROBOT and f not in asr_pins)
     spared = [] if force else spared_deletes(gone, robot.hashes(CODE, gone), previous)
     gone = [f for f in gone if f not in spared]
+    # (the robot's Kantalad faces are never deleted, --force or not: ceremony_font_kept)
+    font_kept = ceremony_font_kept(gone)
+    gone = [f for f in gone if f not in font_kept]
     size = sum((ROOT / f).stat().st_size for f in push)
     print("%d files, %d to push (%.1f MB), %d to delete" % (len(files), len(push), size / 1e6, len(gone)))
+    voice_line = event_voice_summary(files, push)
+    if voice_line:
+        print(voice_line)
+    print(ceremony_film_summary(files, push))
+    print(ceremony_font_summary(files, push, font_problems))
+    if font_kept:
+        print("ceremony font: keeping the %d Kantalad face(s) already on the robot (this PC lacks them; "
+              "a deploy never deletes them): %s" % (len(font_kept), ", ".join(f.rsplit("/", 1)[1] for f in font_kept)))
     if kept:
         print("kept %d file(s) the robot's server changed since the last deploy (deploy --force overwrites): %s"
               % (len(kept), ", ".join(kept[:8]) + (" ..." if len(kept) > 8 else "")))
@@ -649,6 +912,11 @@ def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
         print("not deleting %d robot data file(s) this PC lacks (deploy --force deletes): %s"
               % (len(spared), ", ".join(spared[:8]) + (" ..." if len(spared) > 8 else "")))
     if dry:
+        # the names, not just the count (10 Nov: "check first" -- what goes up is what was checked)
+        for f in push[:60]:
+            print("  push   %s" % f)
+        for f in gone[:60]:
+            print("  delete %s" % f)
         return
     if push:
         blob = bundle(ROOT, push)
@@ -688,6 +956,8 @@ def cmd_deploy(robot: Robot, dry: bool = False, force: bool = False) -> None:
     # next deploy still sees the robot's edit instead of adopting it as ours.
     deployed = {f: h for f, h in expect.items() if f not in kept}
     deployed.update({f: previous[f] for f in kept if f in previous})
+    # (the faces left on the robot stay named in its MANIFEST as what is there)
+    deployed.update({f: previous[f] for f in font_kept})
     man = json.dumps({"deployed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                       "files": {**deployed, **{f: p["sha256"] for f, p in pins.items()}, **asr_pins}},
                      sort_keys=True).encode()
@@ -769,8 +1039,33 @@ def _permissions(robot: Robot) -> None:
         % {"c": CODE, "u": UID, "b": BASE})
 
 
-def cmd_secrets(robot: Robot) -> None:
+def _secrets_preview(robot: Robot, env: str) -> None:
+    """What `secrets` would change, writing nothing: key NAMES added, removed
+    and changed in the robot's .env (never a value), and which secret files
+    differ by hash. 3 Nov 2026: `--dry-run secrets` was ignored -- argparse
+    took the flag, only deploy read it -- and the real .env was written while
+    the check before a deploy was meant to look only."""
+    want = dict(parse_env(env))
+    have = dict(parse_env(robot.root("cat %s/.env 2>/dev/null" % CODE, check=False)))
+    added = sorted(set(want) - set(have))
+    removed = sorted(set(have) - set(want))
+    changed = sorted(k for k in set(want) & set(have) if want[k] != have[k])
+    print("secrets --dry-run: .env %d keys (robot has %d) -- added: %s; removed: %s; changed: %s"
+          % (len(want), len(have), ", ".join(added) or "-", ", ".join(removed) or "-",
+             ", ".join(changed) or "-"))
+    files = {dst: (ROOT / src).read_bytes() for src, dst in SECRET_FILES.items()}
+    files.update({dst: (ROOT / src).read_bytes() for src, dst in OPTIONAL_SECRET_FILES.items()
+                  if (ROOT / src).is_file()})
+    on_robot = robot.hashes(CODE, sorted(files))
+    differ = [dst for dst, data in sorted(files.items()) if on_robot.get(dst) != sha256(data)]
+    print("secrets --dry-run: files that would change: %s -- nothing written" % (", ".join(differ) or "-"))
+
+
+def cmd_secrets(robot: Robot, dry_run: bool = False) -> None:
     env = compose_env((ROOT / ".env").read_text(encoding="utf-8"), OVERRIDES.read_text(encoding="utf-8"))
+    if dry_run:
+        _secrets_preview(robot, env)
+        return
     robot.write_secret(".env", env.encode("utf-8"))
     sent = []
     for src, dst in SECRET_FILES.items():
@@ -793,11 +1088,22 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("what", choices=["lock", "install", "deploy", "secrets", "start", "stop", "restart",
                                      "status", "logs", "forward"])
-    ap.add_argument("--serial", default="192.168.1.197:5555")
+    ap.add_argument("--serial", default="192.168.0.2:5555")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true",
                     help="deploy: overwrite files the robot's server changed (faces, approvals)")
+    ap.add_argument("--without-ceremony-font", action="store_true",
+                    help="deploy even though this PC lacks the ceremony film's Kantalad faces (or has one that is "
+                         "not a font): nothing of the font is pushed, and the faces already on the robot stay there "
+                         "-- no deploy deletes them. A robot that never had them draws the film in Inter")
     a = ap.parse_args(argv)
+    # A flag a command does not read is a check that did not happen: `secrets
+    # --dry-run` once wrote the robot's .env (3 Nov). Those two preview; status
+    # and logs only read anyway; everything else refuses rather than acting.
+    if a.dry_run and a.what not in ("deploy", "secrets", "status", "logs"):
+        print("--dry-run previews only deploy and secrets; `%s` would act -- nothing done" % a.what,
+              file=sys.stderr)
+        return 2
     try:
         if a.what == "lock":
             cmd_lock()
@@ -806,9 +1112,9 @@ def main(argv=None) -> int:
         if a.what == "install":
             cmd_install(robot)
         elif a.what == "deploy":
-            cmd_deploy(robot, a.dry_run, a.force)
+            cmd_deploy(robot, a.dry_run, a.force, a.without_ceremony_font)
         elif a.what == "secrets":
-            cmd_secrets(robot)
+            cmd_secrets(robot, a.dry_run)
         elif a.what == "forward":
             # adb prints the bound port ("18001") on success -- not an address
             # anybody can open, and it used to replace the line below

@@ -48,8 +48,59 @@ ours() {   # the pid in the file is our server (or its launch shell), not a reus
   echo "$p"
 }
 
+untracked() {   # our server running with no pid file to say so -- the interpreter itself
+  # 11 Nov 10:4x: a restart raced the app's watchdog, a starter that lost :8001 left ITS pid in the
+  # file, and from then on every watchdog tick booted another server that could not bind (~2 a
+  # minute for an hour): each boot's startup ran -- the board's action cancelled, a walk in
+  # progress cleared (event_walk.recover_after_restart) -- and `stop` could not find the winner.
+  # Only a process whose command line ENDS with the server script: never a shell that names it.
+  for d in /proc/[0-9]*; do
+    case "$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)" in
+      *python*" scripts/emma_server.py "|*python*" scripts/emma_server.py") echo "${d#/proc/}"; return 0 ;;
+    esac
+  done
+  return 1
+}
+
+NETP=/proc/net
+ADBSTAMP=$B/run/adb.restart
+ADBLOG=$B/run/adb.log
+adb_tcp() {   # adb over Wi-Fi up whenever the owner set a port for it -- a restart of adbd if not
+  # 20 Nov 2026: after a power cycle the robot answered ping but not adb (5555) for minutes --
+  # persist.adb.tcp.port=5555 and USB debugging on, the boot before and the boot after had it --
+  # and only somebody at its screen could bring it back (owner: "วันอื่นก็ต่อได้ทำไมวันนี้ต่อไม่ได้
+  # ... เดี๋ยวก็เป็นแบบนี้อีก"). The app's watchdog runs `start` as root every 30 s: here adbd is
+  # restarted when the port is set, adbd runs, and nothing listens on that port. Never when the
+  # owner turned USB debugging off (adbd not running), never with a port of 0/none, at most once a
+  # minute, a line in run/adb.log each time. No adb client is cut: none is on a port nobody
+  # listens on. Commands are fixed here, never from the environment (this runs as root).
+  port=$(getprop persist.adb.tcp.port 2>/dev/null | tr -cd '0-9')
+  [ -n "$port" ] && [ "$port" -gt 0 ] 2>/dev/null || return 0
+  if [ "$(getprop init.svc.adbd 2>/dev/null)" = running ]; then
+    hex=$(printf '%04X' "$port")
+    # a LISTEN (0A) socket on :port, IPv4 or IPv6 (adbd binds either, by build)
+    grep -qiE "^ *[0-9]+: [0-9A-F]+:$hex [0-9A-F]+:[0-9A-F]+ 0A " $NETP/tcp $NETP/tcp6 2>/dev/null && return 0
+  else
+    # adbd not running: started again only while USB debugging is still on (persist.sys.usb.config
+    # names adb -- "adb" on this robot, 20 Nov); the owner turning it off is the owner's
+    case ",$(getprop persist.sys.usb.config 2>/dev/null)," in *,adb,*) ;; *) return 0 ;; esac
+  fi
+  now=$(date +%s)
+  last=$(cat "$ADBSTAMP" 2>/dev/null | tr -cd '0-9')
+  [ -n "$last" ] && [ $((now - last)) -lt 60 ] && return 0
+  mkdir -p $B/run && chmod 0700 $B/run
+  echo "$now" > "$ADBSTAMP"
+  [ -f "$ADBLOG" ] && [ "$(wc -c < "$ADBLOG")" -gt 100000 ] && mv -f "$ADBLOG" "$ADBLOG.1"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') adb: nothing on :$port (service.adb.tcp.port=$(getprop service.adb.tcp.port)) -- restarting adbd" >> "$ADBLOG"
+  setprop service.adb.tcp.port "$port"
+  stop adbd
+  start adbd
+  return 0
+}
+
 case "$1" in
   start)
+    adb_tcp 2>/dev/null     # first, every tick: the robot reachable even when the server is fine
     if p=$(ours); then echo "running $p"; exit 0; fi
     [ -x $R/py ] || { echo "no runtime: robot_server.py install"; exit 2; }
     [ -f $C/.env ] || { echo "no .env: robot_server.py secrets"; exit 2; }
@@ -67,6 +118,7 @@ case "$1" in
     fi
     trap 'rmdir "$LOCK" 2>/dev/null' EXIT
     if p=$(ours); then echo "running $p"; exit 0; fi      # the other starter got there first
+    if p=$(untracked); then echo "$p" > "$PIDF"; echo "running $p (was untracked)"; exit 0; fi
     # Started by the face app, this shell is inside the APP's process group
     # (cgroup uid_<app>/pid_<app>). Android kills that whole group when the app
     # dies or is force-stopped (every APK reinstall), and its phantom-process
@@ -109,19 +161,30 @@ case "$1" in
     exec $R/py -s scripts/emma_server.py >> data/server.log 2>&1
     ;;
   stop)
-    p=$(ours) || { echo "not running"; rm -f "$PIDF"; exit 0; }
+    p=$(ours) || p=$(untracked) || { echo "not running"; rm -f "$PIDF"; exit 0; }
     kill -TERM "$p"
     i=0
     while [ $i -lt 20 ] && [ -d /proc/$p ]; do sleep 0.5; i=$((i + 1)); done
     if [ -d /proc/$p ]; then kill -KILL "$p"; echo "killed $p"; else echo "stopped $p"; fi
     rm -f "$PIDF"
+    # and any other server left running untracked (the file held a short-lived loser's pid): a
+    # restart that left it would serve the OLD code after a deploy
+    n=0
+    while [ $n -lt 3 ] && q=$(untracked); do
+      kill -TERM "$q"
+      i=0
+      while [ $i -lt 20 ] && [ -d /proc/$q ]; do sleep 0.5; i=$((i + 1)); done
+      [ -d /proc/$q ] && kill -KILL "$q"
+      echo "stopped $q (untracked)"
+      n=$((n + 1))
+    done
     ;;
   restart)
     sh "$0" stop
     sh "$0" start
     ;;
   status)
-    if p=$(ours); then echo "running $p"; else echo "not running"; exit 3; fi
+    if p=$(ours); then echo "running $p"; elif p=$(untracked); then echo "running $p (untracked)"; else echo "not running"; exit 3; fi
     ;;
   *)
     echo "usage: emma_server.sh start|stop|restart|status"; exit 64

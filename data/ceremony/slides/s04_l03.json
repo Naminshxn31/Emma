@@ -1,0 +1,114 @@
+{
+ "template": "act",
+ "act": "units_views",
+ "figures": {
+  "total": {
+   "value": "1,066",
+   "unit": "UNITS",
+   "label": "IN TOTAL"
+  }
+ },
+ "pictures": {
+  "wire_s": {
+   "asset": "room_studio_wire"
+  },
+  "solid_s": {
+   "asset": "c_room_studio_solid"
+  },
+  "wire_1": {
+   "asset": "room_1br_wire"
+  },
+  "solid_1": {
+   "asset": "c_room_1br_solid"
+  },
+  "wire_2": {
+   "asset": "room_2br_wire"
+  },
+  "solid_2": {
+   "asset": "c_room_2br_solid"
+  },
+  "unit_s": {
+   "asset": "c_unit_studio_bed"
+  },
+  "unit_1": {
+   "asset": "c_unit_1br_living"
+  },
+  "unit_2": {
+   "asset": "c_unit_2br_master"
+  },
+  "b_a": {
+   "asset": "fac_ue_building_a"
+  },
+  "b_b": {
+   "asset": "c_bld_b_holo"
+  },
+  "b_c": {
+   "asset": "bld_c_holo"
+  },
+  "b_d": {
+   "asset": "c_bld_d_holo"
+  },
+  "b_e": {
+   "asset": "c_bld_e_holo"
+  },
+  "b_f": {
+   "asset": "c_bld_f_holo"
+  }
+ },
+ "beats": [
+  {
+   "at_en": "1,066",
+   "do": "number",
+   "key": "total"
+  },
+  {
+   "at_en": "studios",
+   "do": "studios",
+   "key": [
+    "studios",
+    "wire_s",
+    "solid_s",
+    "wire_1",
+    "wire_2"
+   ]
+  },
+  {
+   "at_en": "1-bedroom",
+   "do": "onebr",
+   "key": [
+    "onebr",
+    "solid_1"
+   ]
+  },
+  {
+   "at_en": "2-bedroom",
+   "do": "twobr",
+   "key": [
+    "twobr",
+    "solid_2"
+   ]
+  },
+  {
+   "at_en": "to suit",
+   "do": "suit",
+   "key": [
+    "suit",
+    "ways",
+    "unit_s",
+    "unit_1",
+    "unit_2"
+   ]
+  }
+ ],
+ "options": {
+  "mode": "units"
+ },
+ "texts": {
+  "kicker": "EMBASSY WORLD",
+  "studios": "STUDIOS",
+  "onebr": "1 BEDROOM",
+  "twobr": "2 BEDROOM",
+  "suit": "TO SUIT",
+  "ways": "DIFFERENT WAYS OF LIVING"
+ }
+}

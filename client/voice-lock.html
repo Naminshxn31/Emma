@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>บันทึกเสียงให้ Emma จำ</title>
+<style>
+  /* The page where a person records their voice so the mic hears only them (owner 19 Nov).
+     Everything it says comes from its socket (/ws/voice-lock, app/one_voice_page.py); the
+     microphone and the meter are this browser's own. */
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --ink: #1d2330; --muted: #5d6677; --line: #dfe3ea;
+    --accent: #2f6fdf; --accent-ink: #ffffff; --ok: #1d8a4e; --ok-bg: #e5f5ec;
+    --bad: #c33a32; --bad-bg: #fbe9e7; --warn: #a76a00; --warn-bg: #fff3d6;
+    --meter-bg: #e8ebf0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --card: #1b2029; --ink: #e8ecf3; --muted: #9aa4b5; --line: #2c3340;
+      --accent: #5b93ff; --accent-ink: #0c1220; --ok: #4fd18a; --ok-bg: #14291e;
+      --bad: #ff7b72; --bad-bg: #2d1615; --warn: #ffc65c; --warn-bg: #2b2210; --meter-bg: #262c37;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.5 "Leelawadee UI", "Noto Sans Thai", "Sarabun", system-ui, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; }
+  h1 { font-size: 1.45rem; margin: 8px 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px; margin: 0 0 14px;
+  }
+  .card h2 { font-size: 1.12rem; margin: 0 0 10px; display: flex; gap: 10px; align-items: center; }
+  .step {
+    flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; display: inline-flex;
+    align-items: center; justify-content: center; background: var(--accent); color: var(--accent-ink);
+    font-size: .95rem; font-weight: 700;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button {
+    font: inherit; border: 0; border-radius: 12px; padding: 14px 18px; min-height: 52px;
+    background: var(--accent); color: var(--accent-ink); font-weight: 600; cursor: pointer;
+  }
+  button.secondary { background: var(--meter-bg); color: var(--ink); }
+  button.danger { background: var(--bad); color: #fff; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.big { width: 100%; font-size: 1.08rem; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modes button { min-height: 64px; }
+  .modes button.on { outline: 3px solid var(--ok); outline-offset: 2px; }
+  select, input[type=text], input[type=number] {
+    font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); min-height: 48px;
+  }
+  select { width: 100%; }
+  label.check { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; }
+  label.check input { width: 22px; height: 22px; margin-top: 3px; flex: 0 0 auto; }
+  .meter { height: 18px; border-radius: 9px; background: var(--meter-bg); overflow: hidden; margin: 10px 0 6px; }
+  .meter > div { height: 100%; width: 0%; background: var(--ok); transition: width .08s linear; }
+  .status { border-radius: 10px; padding: 10px 12px; font-weight: 600; }
+  .status.ok { background: var(--ok-bg); color: var(--ok); }
+  .status.bad { background: var(--bad-bg); color: var(--bad); }
+  .status.warn { background: var(--warn-bg); color: var(--warn); }
+  .status.idle { background: var(--meter-bg); color: var(--muted); }
+  .small { color: var(--muted); font-size: .9rem; }
+  .read {
+    background: var(--meter-bg); border-radius: 10px; padding: 10px 14px; margin: 10px 0;
+    font-size: 1.05rem;
+  }
+  .read p { margin: 4px 0; }
+  .progress { height: 12px; border-radius: 6px; background: var(--meter-bg); overflow: hidden; margin: 10px 0; }
+  .progress > div { height: 100%; width: 0%; background: var(--accent); }
+  ol.lines { margin: 8px 0; padding-left: 1.6em; columns: 2; column-gap: 24px; }
+  ol.lines li { break-inside: avoid; }
+  ul.results { list-style: none; margin: 10px 0 0; padding: 0; max-height: 360px; overflow: auto; }
+  ul.results li {
+    display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 10px;
+    margin: 0 0 6px; font-weight: 600;
+  }
+  li.yes { background: var(--ok-bg); color: var(--ok); }
+  li.no { background: var(--bad-bg); color: var(--bad); }
+  li.none { background: var(--meter-bg); color: var(--muted); }
+  .modes button.wide { grid-column: 1 / -1; }
+  ul.sortlist { list-style: none; margin: 10px 0 0; padding: 0; max-height: 520px; overflow: auto; }
+  ul.sortlist li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px;
+    border-radius: 10px; background: var(--meter-bg); margin: 0 0 6px; }
+  ul.sortlist li.now { outline: 2px solid var(--accent); }
+  ul.sortlist .sn { flex: 1 1 110px; font-weight: 700; }
+  ul.sortlist button { min-height: 40px; padding: 6px 12px; }
+  ul.sortlist button.secondary { border: 1px solid var(--muted); }
+  .tally { display: flex; gap: 16px; font-weight: 700; margin: 8px 0 0; }
+  .verdict { font-size: 1.35rem; font-weight: 800; border-radius: 12px; padding: 14px; margin: 10px 0; }
+  .verdict.ok { background: var(--ok-bg); color: var(--ok); }
+  .verdict.bad { background: var(--bad-bg); color: var(--bad); }
+  .verdict.unknown { background: var(--warn-bg); color: var(--warn); }
+  pre { white-space: pre-wrap; font-size: .78rem; background: var(--meter-bg); padding: 10px; border-radius: 10px; overflow-x: auto; }
+  .hidden { display: none !important; }
+  .banner { background: var(--bad-bg); color: var(--bad); border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; font-weight: 600; }
+  @media (max-width: 560px) {
+    body { font-size: 16px; }
+    .modes { grid-template-columns: 1fr; }
+    ol.lines { columns: 1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>บันทึกเสียงให้ Emma จำ (ทดลองบนคอม)</h1>
+  <p class="lede">บันทึกเสียงคนหนึ่งคน แล้วลองว่าไมค์แยกเสียงเขาออกจากคนอื่นได้ไหม · ลายเสียงและเสียงที่อัดเก็บในเครื่องนี้เท่านั้น ลบได้ที่ข้อ 5
+    · เปิดหน้านี้บนเครื่องที่เสียบตัวรับไมค์</p>
+  <div id="banner" class="banner hidden"></div>
+  <div id="gateNote" class="status idle hidden" style="margin:0 0 14px"></div>
+
+  <section class="card" id="micCard">
+    <h2><span class="step">1</span>เลือกไมค์ แล้วลองพูด</h2>
+    <div class="row">
+      <button id="micOpen" class="big">เปิดไมค์</button>
+    </div>
+    <div id="micBody" class="hidden">
+      <select id="micSelect" aria-label="ไมค์"></select>
+      <div class="meter"><div id="meterBar"></div></div>
+      <div id="micStatus" class="status idle">ยังไม่ได้ยินอะไร</div>
+      <p class="small" id="micInfo"></p>
+    </div>
+  </section>
+
+  <section class="card" id="enrollCard">
+    <h2><span class="step">2</span>บันทึกเสียงของคนที่จะให้จำ</h2>
+    <div class="row">
+      <label for="who" class="small">ชื่อเรียก (ภาษาอังกฤษ)</label>
+      <input id="who" type="text" value="owner" maxlength="40" autocomplete="off" style="flex:1;min-width:140px">
+    </div>
+    <label class="check"><input type="checkbox" id="consent">
+      <span>เจ้าของเสียงยินยอมให้เก็บลายเสียงไว้ในเครื่องนี้เพื่อทดสอบ (ลบได้ทุกเมื่อ)</span></label>
+    <div class="read" id="readText">
+      <p class="small">กด "บันทึกเสียง" แล้วอ่านออกเสียงปกติ ไมค์ติดตัวตำแหน่งที่จะใช้จริง:</p>
+      <p>สวัสดีค่ะ วันนี้อยากทราบเรื่องโครงการนี้หน่อย ว่ามีสิ่งอำนวยความสะดวกอะไรบ้าง</p>
+      <p>ห้องแบบสองห้องนอนมีขนาดเท่าไหร่ แล้วมีระเบียงด้วยไหม</p>
+      <p>ที่นี่ห่างจากหาดกี่กิโลเมตร ถ้าเดินไปจะใช้เวลาประมาณเท่าไหร่</p>
+      <p>สระว่ายน้ำอยู่ชั้นไหน แล้วมีฟิตเนสกับห้องซาวน่าให้ใช้ด้วยหรือเปล่า</p>
+      <p>Hello Emma, I would like to know more about this project and what facilities it has.</p>
+      <p>How far is the beach from here, and how long would it take to walk there?</p>
+      <p>Tell me about the idea behind the building and why it was designed this way.</p>
+      <p>ขอบคุณมากนะ เดี๋ยวขอคุยกับทีมขายต่ออีกสักครู่แล้วกัน</p>
+    </div>
+    <div class="row">
+      <button id="enrollBtn" class="big" disabled>บันทึกเสียง</button>
+    </div>
+    <div class="progress hidden" id="enrollProg"><div></div></div>
+    <div class="row hidden" id="enrollStopRow">
+      <button id="enrollStop" class="secondary">อ่านจบแล้ว หยุดบันทึก</button>
+      <span class="small" id="enrollLeft"></span>
+    </div>
+    <div id="enrollResult" class="status idle hidden"></div>
+  </section>
+
+  <section class="card" id="listenCard">
+    <h2><span class="step">3</span>ลองฟัง: ใช่เสียงนี้ไหม</h2>
+    <p class="small">เลือกว่าใครกำลังพูด แล้วพูดทีละประโยค เว้น ~2 วิ · ทุกประโยคขึ้น ✓ หรือ ✗ ทันที · ปุ่มทดสอบเก็บเสียงไว้ให้ข้อ 4 สรุป</p>
+    <div class="modes">
+      <button class="secondary" data-label="target">ฉันพูด (คนที่บันทึกไว้)</button>
+      <button class="secondary" data-label="other">อีกคนพูดใส่ไมค์ตัวนี้</button>
+      <button class="secondary" data-label="nearby">คนข้างๆ พูด ไม่มีไมค์</button>
+      <button class="secondary" data-label="">ลองฟังเฉยๆ (ไม่เก็บเสียง)</button>
+      <button class="secondary wide" data-label="unsorted">อัดรวมทุกคน — ใครพูดก็ได้ แยกเสียงทีหลัง (ข้อ 3ข)</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="listenStop" class="danger hidden">หยุดฟัง</button>
+      <span class="small">เกณฑ์ <input id="threshold" type="number" min="0.1" max="0.95" step="0.01" value="0.50" style="width:92px"></span>
+      <span class="small" id="savedCounts"></span>
+    </div>
+    <div class="tally" id="tally"></div>
+    <ul class="results" id="results"></ul>
+    <div id="linesBox" class="read hidden">
+      <p class="small" id="linesHint"></p>
+      <ol class="lines" id="lines"></ol>
+    </div>
+  </section>
+
+  <section class="card" id="sortCard">
+    <h2><span class="step">3ข</span>แยกเสียงที่อัดรวม</h2>
+    <p class="small">ฟังทีละประโยค แล้วกดว่าเป็นเสียงใคร · ตอนแยกระบบไม่บอกคะแนน ให้หูเป็นคนตัดสิน · แยกแล้วไปรวมในข้อ 4 · ไม่แน่ใจ = ทิ้ง</p>
+    <div class="row">
+      <button id="sortLoad" class="secondary">โหลดเสียงที่ยังไม่แยก</button>
+      <span class="small" id="sortCount"></span>
+    </div>
+    <ul class="sortlist" id="sortList"></ul>
+  </section>
+
+  <section class="card" id="evalCard">
+    <h2><span class="step">4</span>สรุปผล: แยกเสียงได้ไหม</h2>
+    <p class="small">ต้องมีประโยคยาวของคนที่บันทึก ≥ 10 และของอีกคน (พูดใส่ไมค์ตัวนี้) ≥ 10</p>
+    <button id="evalBtn" class="big">สรุปผลการทดสอบ</button>
+    <div id="verdict" class="verdict hidden"></div>
+    <div id="evalFacts"></div>
+    <details class="hidden" id="evalDetails"><summary>ตัวเลขทั้งหมด</summary><pre id="evalLines"></pre></details>
+  </section>
+
+  <section class="card" id="forgetCard">
+    <h2><span class="step">5</span>ลบเสียงที่บันทึก</h2>
+    <p class="small" id="printInfo">ยังไม่มีลายเสียงในเครื่อง</p>
+    <button id="forgetBtn" class="danger big">ลบลายเสียงและเสียงที่อัดไว้ทั้งหมด</button>
+  </section>
+</main>
+
+<script>
+'use strict';
+// The capture worklet: the call page's algorithm (client/index.html `Cap`) so a print learned here
+// hears what a call on this PC hears, plus the block's peak -- a receiver that sends exact zeros
+// (a GCK transmitter that is off) must read as "nothing at all", not as a quiet room.
+const WORKLET_SRC = `
+class Cap extends AudioWorkletProcessor {
+  constructor(o) {
+    super();
+    const p = (o && o.processorOptions) || {};
+    this.target = p.targetRate || 16000;
+    this.ratio = sampleRate / this.target;
+    this.acc = 0; this.pending = [];
+    this.chunk = Math.round(this.target * 0.02);
+  }
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (ch) {
+      let sum = 0, peak = 0;
+      for (let i = 0; i < ch.length; i++) {
+        const v = ch[i];
+        sum += v * v;
+        const a = v < 0 ? -v : v;
+        if (a > peak) peak = a;
+        this.acc += 1;
+        if (this.acc >= this.ratio) {
+          this.acc -= this.ratio;
+          const s = Math.max(-1, Math.min(1, v));
+          this.pending.push(s < 0 ? s * 0x8000 : s * 0x7fff);
+        }
+      }
+      this.port.postMessage({ level: Math.sqrt(sum / ch.length), peak });
+      while (this.pending.length >= this.chunk) {
+        const f = this.pending.splice(0, this.chunk);
+        const a = new Int16Array(f.length);
+        for (let i = 0; i < f.length; i++) a[i] = f[i];
+        this.port.postMessage(a.buffer, [a.buffer]);
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('cap', Cap);
+`;
+// The receiver is "Microphone (GCK)" (20 Nov, measured with the owner speaking). LCS_USB_AUDIO is a
+// different USB input that sends exact zeros -- picking it made the page say "transmitter off".
+const GCK = ['(gck)', ' gck'];
+const TEST_LINES = [
+  'เอ็มม่า สระว่ายน้ำอยู่ชั้นไหน', 'ห้องสองห้องนอนกว้างเท่าไหร่', 'จากที่นี่ไปหาดใช้เวลากี่นาที',
+  'มีห้องวิวทะเลเหลืออยู่ไหม', 'Emma, tell me about the project', 'How far is the beach from here?',
+  'โรงเรียนใกล้ที่สุดอยู่ไหน', 'ตึกเอมีกี่ชั้น', 'What facilities do you have?',
+  'อยากดูห้องตัวอย่างวันเสาร์นี้', 'Can you show me the floor plan?', 'Is there parking for every unit?',
+  'ช่วยเล่าเรื่องฟิตเนสให้ฟังหน่อย', 'ขอบคุณมาก เดี๋ยวคุยกับทีมขายต่อ',
+  'ค่ะ', 'ใช่', 'หยุด', 'Emma', 'yes', 'โอเค'];
+const $ = (id) => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+const token = q.get('token') || '';
+let ws = null, wsDown = false, state = null;
+let ctx = null, stream = null, node = null, micSrc = null, micGen = 0;
+let sending = false, mode = 'idle', listenLabel = null;
+let enrollTimer = null, enrollStart = 0, enrollSeconds = 40;
+let win = { peak: 0, sum: 0, n: 0, at: performance.now() };
+let heardAnything = false, openedAt = 0;
+let micFlags = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+function banner(text) { const b = $('banner'); b.textContent = text; b.classList.toggle('hidden', !text); }
+function setStatus(el, kind, text) { el.className = 'status ' + kind; el.textContent = text; el.classList.remove('hidden'); }
+function name() { return ($('who').value || '').trim(); }
+function threshold() { const v = parseFloat($('threshold').value); return isFinite(v) ? v : 0.5; }
+
+// ---- the socket ----------------------------------------------------------------------------
+function connect() {
+  const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/voice-lock'
+    + (token ? '?token=' + encodeURIComponent(token) : '');
+  ws = new WebSocket(url);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => { banner(''); send({ type: 'hello' }); };
+  ws.onmessage = (ev) => { try { onMessage(JSON.parse(ev.data)); } catch (e) { console.error(e); } };
+  ws.onclose = () => {
+    // A dropped socket ends whatever was under way on the server: the buttons must not stay
+    // in "recording" / "listening" with nothing behind them (review 19 Nov).
+    if (mode === 'enroll') {
+      endEnrollUi();
+      setStatus($('enrollResult'), 'bad', '✗ การเชื่อมต่อหลุดระหว่างบันทึก — บันทึกใหม่');
+    }
+    stopSending();
+    mode = 'idle';
+    markMode(null);
+    updateButtons();
+    if (wsDown) return;
+    banner('ขาดการเชื่อมต่อกับเซิร์ฟเวอร์ — กำลังต่อใหม่...');
+    setTimeout(connect, 2000);
+  };
+}
+function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+function onMessage(m) {
+  if (m.type === 'error' && m.code === 'unauthorized') {
+    wsDown = true;
+    banner('เซิร์ฟเวอร์ไม่ให้เข้า: เปิดหน้านี้ด้วย ?token=... ให้ตรงกับ WS_TOKEN (หรือเปิดจาก localhost บนเครื่องนี้)');
+    return;
+  }
+  if (m.type === 'state') return showState(m);
+  if (m.type === 'error') {
+    if (mode === 'listen') markMode(null);     // the server stopped listening (e.g. too_fast)
+    document.querySelectorAll('#sortList li button:disabled').forEach((b) => { b.disabled = false; });
+    stopSending();
+    if (mode === 'enroll') endEnrollUi();
+    banner(m.message || 'มีข้อผิดพลาด');
+    return;
+  }
+  if (m.type === 'enrolling') { sending = true; mode = 'enroll'; return; }
+  if (m.type === 'enrolled') return showEnrolled(m);
+  if (m.type === 'listening') {
+    sending = true; mode = 'listen'; listenLabel = m.label;
+    markMode(document.querySelector('.modes button[data-label="' + (m.label || '') + '"]'));
+    return;
+  }
+  if (m.type === 'utterance') return showUtterance(m);
+  if (m.type === 'unsorted') return showUnsorted(m.items || []);
+  if (m.type === 'clip') return playClip(m);
+  if (m.type === 'sorted') return markSorted(m);
+  if (m.type === 'stopped') { stopSending(); markMode(null); return; }
+  if (m.type === 'eval') return showEval(m);
+  if (m.type === 'forgotten') {
+    $('results').innerHTML = ''; $('tally').textContent = '';
+    stopClip(); $('sortList').innerHTML = ''; $('sortCount').textContent = '';
+    setStatus($('enrollResult'), m.left ? 'warn' : 'idle', (m.print ? 'ลบลายเสียงแล้ว' : 'ไม่มีลายเสียงชื่อนี้')
+      + ' · ลบเสียงที่อัด ' + (m.files || 0) + ' ไฟล์' + (m.left ? ' (เหลือ ' + m.left + ' ไฟล์ที่มีหน้าอื่นใช้อยู่ — กดลบอีกครั้ง)' : ''));
+    return;
+  }
+}
+
+function showGate(g) {
+  // ONE_VOICE_PROFILES: armed, or listed but unable to attach (VAD_MODE not local) -- never
+  // looking armed when every voice would pass in a real call.
+  const note = $('gateNote'), prof = (g && g.profiles) || [];
+  if (!prof.length) { note.classList.add('hidden'); return; }
+  if (!g.attachable) {
+    setStatus(note, 'bad', 'ตั้ง ONE_VOICE_PROFILES (' + prof.join(', ') + ') ไว้ แต่ประตูเสียงต่อกับสายคุยไม่ได้ ('
+      + (g.why === 'vad_mode_not_local' ? 'VAD_MODE ไม่ใช่ local' : 'ไม่มีโมเดลตัดช่วงพูด')
+      + ') — ตอนคุยจริงทุกเสียงผ่าน');
+  } else {
+    setStatus(note, 'ok', 'ประตูเสียงเปิดในสายคุยของ: ' + prof.join(', ') + ' (เกณฑ์ ' + g.threshold + ')');
+  }
+}
+function showState(s) {
+  state = s;
+  showGate(s.gate);
+  enrollSeconds = s.enroll_s || 40;
+  $('enrollBtn').textContent = 'บันทึกเสียง (' + Math.round(enrollSeconds) + ' วิ)';
+  if (!s.model) banner('ไม่มีโมเดลจำเสียงในเครื่อง — รัน scripts/fetch_voiceprint_model.py ก่อน');
+  else if (!s.vad) banner('ไม่มีโมเดลตัดช่วงพูด — รัน scripts/fetch_vad_model.py ก่อน');
+  const mine = (s.prints || []).find((p) => p.name === name());
+  $('printInfo').textContent = (s.prints || []).length
+    ? 'ลายเสียงในเครื่อง: ' + s.prints.map((p) => p.name + ' (' + (p.speech_s || '?') + ' วิ, '
+      + (p.created || '').replace('T', ' ') + ')').join(' · ')
+    : 'ยังไม่มีลายเสียงในเครื่อง';
+  const c = s.saved || {};
+  const parts = [['target', 'ฉัน'], ['other', 'อีกคน'], ['nearby', 'คนข้างๆ']]
+    .filter(([k]) => c[k]).map(([k, t]) => t + ' ' + c[k]);
+  if (s.unsorted) parts.push('ยังไม่แยก ' + s.unsorted);
+  $('savedCounts').textContent = parts.length ? 'เก็บไว้แล้ว: ' + parts.join(' · ') : '';
+  updateButtons(mine);
+}
+function updateButtons(mine) {
+  const micOn = !!node;
+  const p = mine === undefined ? (state && (state.prints || []).find((x) => x.name === name())) : mine;
+  $('enrollBtn').disabled = !micOn || mode !== 'idle' || !(state && state.model && state.vad);
+  document.querySelectorAll('.modes button').forEach((b) => { b.disabled = !micOn || !p || mode === 'enroll'; });
+  $('evalBtn').disabled = !p;
+  $('forgetBtn').disabled = !(state && ((state.prints || []).length || Object.keys(state.saved || {}).length || state.unsorted));
+}
+
+// ---- the microphone --------------------------------------------------------------------------
+async function loadMicFlags() {
+  // The call page's processing on this PC (/health): enrol through the chain the door would judge.
+  try {
+    const h = await (await fetch('/health')).json();
+    if (h && h.mic) {
+      micFlags.noiseSuppression = !!h.mic.noise_suppression;
+      micFlags.autoGainControl = h.mic.agc !== false;
+    }
+  } catch (e) { /* defaults: the call page's own */ }
+  // ?agc=0 / ?agc=1 like the call page (the robot's kiosk URL carries ?agc=0). 20 Nov: with AGC on,
+  // people a metre from the wearer reached the GCK as loud as he did (loudness let 91% of them in):
+  // near/far can only be measured with the browser's own gain off.
+  if (['0', '1'].includes(q.get('agc'))) micFlags.autoGainControl = q.get('agc') === '1';
+}
+function dropMic() {
+  // The old node goes entirely, handler first (the call pages' releaseCallHardware does the same).
+  // 20 Nov: only `node.disconnect()` was here -- the old source stayed wired into the old node and
+  // its port kept posting PCM, so every mic switch added a sender: 50 -> 151 -> 251 frames/s of
+  // interleaved audio, and Silero found 0 s of speech in the owner's reading (peak 1.0).
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  stream = null;
+  if (node) { try { node.port.onmessage = null; node.port.close(); node.disconnect(); } catch (e) {} node = null; }
+  if (micSrc) { try { micSrc.disconnect(); } catch (e) {} micSrc = null; }
+}
+async function openMic(deviceId) {
+  // One open at a time wins: the newest request (review 20 Nov: two quick switches could leave the
+  // FIRST device recording, under the second one's name, with a capture leaked). A call that lost
+  // stops its own stream and returns null.
+  const gen = ++micGen;
+  dropMic();                 // nothing half-alive while we wait: a failed open leaves no mic, not a dead one
+  updateButtons();
+  const audio = { channelCount: 1, ...micFlags };
+  if (deviceId) audio.deviceId = { exact: deviceId };
+  let s;
+  try {
+    s = await navigator.mediaDevices.getUserMedia({ audio });
+    if (gen === micGen && !ctx) {
+      ctx = new AudioContext();
+      const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+      try { await ctx.audioWorklet.addModule(url); } finally { URL.revokeObjectURL(url); }
+    }
+    if (gen === micGen && ctx.state === 'suspended') await ctx.resume();
+  } catch (e) {
+    if (s) s.getTracks().forEach((t) => t.stop());
+    if (gen === micGen) {
+      // Review 20 Nov: the old node stayed wired to the stopped stream, the buttons stayed on, and
+      // the page blamed the transmitter ("ศูนย์ล้วน") for a mic the browser never opened.
+      setStatus($('micStatus'), 'bad', 'เปิดไมค์ตัวนี้ไม่ได้ (' + (e && e.name || 'Error') + ') — ไมค์ถูกโปรแกรมอื่นใช้อยู่หรือถอดออก: เลือกตัวอื่นหรือกด F5');
+      $('micInfo').textContent = 'ไมค์: —';
+      updateButtons();
+    }
+    throw e;
+  }
+  if (gen !== micGen) { s.getTracks().forEach((t) => t.stop()); return null; }
+  stream = s;
+  const src = micSrc = ctx.createMediaStreamSource(stream);
+  node = new AudioWorkletNode(ctx, 'cap', { processorOptions: { targetRate: 16000 } });
+  node.port.onmessage = (ev) => {
+    if (ev.data instanceof ArrayBuffer) { if (sending && ws && ws.readyState === 1) ws.send(ev.data); return; }
+    meter(ev.data.level, ev.data.peak);
+  };
+  src.connect(node);
+  heardAnything = false; openedAt = performance.now();
+  win = { peak: 0, sum: 0, n: 0, at: performance.now() };
+  const track = stream.getAudioTracks()[0];
+  $('micInfo').textContent = 'ไมค์: ' + (track && track.label || '?') + ' · ตัดเสียงสะท้อน '
+    + (micFlags.echoCancellation ? 'เปิด' : 'ปิด') + ' · ลดเสียงรบกวน ' + (micFlags.noiseSuppression ? 'เปิด' : 'ปิด')
+    + ' · ปรับระดับอัตโนมัติ ' + (micFlags.autoGainControl ? 'เปิด' : 'ปิด') + ' (ตามสายคุยจริงของเครื่องนี้)';
+  updateButtons();
+  return track;
+}
+async function listMics(selectedId) {
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+  const sel = $('micSelect');
+  sel.innerHTML = '';
+  for (const d of devs) {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    const gck = GCK.some((g) => (d.label || '').toLowerCase().includes(g));
+    o.textContent = (d.label || 'ไมค์ ' + (sel.length + 1)) + (gck ? '  ← ไมค์ไร้สาย GCK' : '');
+    sel.appendChild(o);
+  }
+  if (selectedId) sel.value = selectedId;
+  return devs;
+}
+$('micOpen').onclick = async () => {
+  banner('');
+  try {
+    await loadMicFlags();
+    let track = await openMic(null);
+    if (!track) return;                         // a newer open (a second click) carries on
+    const devs = await listMics(track.getSettings().deviceId);
+    const gck = devs.find((d) => GCK.some((g) => (d.label || '').toLowerCase().includes(g)));
+    if (gck && gck.deviceId !== track.getSettings().deviceId) {
+      $('micSelect').value = gck.deviceId;
+      track = await openMic(gck.deviceId);
+      if (!track) return;
+    }
+    $('micOpen').classList.add('hidden');
+    $('micBody').classList.remove('hidden');
+    updateButtons();
+  } catch (e) {
+    banner('เปิดไมค์ไม่ได้ (' + (e && e.name || 'Error') + ') — อนุญาตไมค์ในเบราว์เซอร์ หรือเปิดหน้าผ่าน https / localhost');
+  }
+};
+$('micSelect').onchange = async () => {
+  stopListening();
+  if (mode === 'enroll') {            // one print from two mics is neither mic's
+    send({ type: 'enroll_cancel' });
+    endEnrollUi();
+    setStatus($('enrollResult'), 'warn', 'เปลี่ยนไมค์ระหว่างบันทึก — ยกเลิกแล้ว บันทึกใหม่กับไมค์ตัวนี้');
+  }
+  try { await openMic($('micSelect').value); } catch (e) { banner('เปิดไมค์ตัวนี้ไม่ได้ (' + (e && e.name) + ')'); }
+};
+function meter(level, peak) {
+  const now = performance.now();
+  win.peak = Math.max(win.peak, peak); win.sum += level * level; win.n += 1;
+  const db = level > 0 ? 20 * Math.log10(level) : -100;
+  $('meterBar').style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + '%';
+  if (now - win.at < 700) return;
+  const rmsDb = win.n && win.sum > 0 ? 10 * Math.log10(win.sum / win.n) : -Infinity;
+  const p = win.peak;
+  win = { peak: 0, sum: 0, n: 0, at: now };
+  const el = $('micStatus');
+  if (p === 0) {
+    const long = now - openedAt > 4000 && !heardAnything;
+    setStatus(el, 'bad', long
+      ? 'ไม่มีเสียงเลย — ไมค์ส่งศูนย์ล้วน: ตัวส่งปิด/ไม่ได้จับคู่/ปิดเสียงอยู่ (ถ้าพูดใส่ไมค์แล้วยังขึ้นแบบนี้ ให้เช็คที่ตัวส่ง)'
+      : 'ศูนย์ล้วน — ถ้ากำลังพูดใส่ไมค์อยู่ = ตัวส่งไม่ส่งเสียง (ไมค์ GCK ตัดเป็นศูนย์ตอนเงียบด้วย ลองพูด)');
+    return;
+  }
+  heardAnything = true;
+  if (p >= 0.99) setStatus(el, 'warn', 'ดังเกิน เสียงแตก (' + rmsDb.toFixed(0) + ' dB) — ลดเกนที่ตัวส่งหรือระดับไมค์ใน Windows');
+  else if (rmsDb < -65) setStatus(el, 'idle', 'ไมค์ทำงาน เงียบอยู่ (' + rmsDb.toFixed(0) + ' dB) — ลองพูด');
+  else if (rmsDb < -50) setStatus(el, 'warn', 'ได้ยินแต่เบามาก (' + rmsDb.toFixed(0) + ' dB) — พูดใส่ไมค์ หรือไมค์อยู่ไกล');
+  else setStatus(el, 'ok', 'ได้ยินดี (' + rmsDb.toFixed(0) + ' dB)');
+}
+
+// ---- 2: record the voice -------------------------------------------------------------------
+$('enrollBtn').onclick = () => {
+  banner('');
+  stopClip();
+  if (!$('consent').checked) { banner('ติ๊กช่องยินยอมก่อน'); return; }
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(name())) { banner('ชื่อเรียกใช้ A-Z a-z 0-9 _ - เท่านั้น เช่น owner'); return; }
+  stopListening();
+  const track = stream && stream.getAudioTracks()[0];
+  send({ type: 'enroll_start', name: name(), consent: true, mic: track ? track.label : '' });
+  mode = 'enroll';
+  enrollStart = performance.now();
+  $('enrollProg').classList.remove('hidden');
+  $('enrollStopRow').classList.remove('hidden');
+  $('enrollResult').classList.add('hidden');
+  updateButtons();
+  enrollTimer = setInterval(() => {
+    const el = (performance.now() - enrollStart) / 1000;
+    $('enrollProg').firstElementChild.style.width = Math.min(100, el / enrollSeconds * 100) + '%';
+    $('enrollLeft').textContent = 'เหลือ ' + Math.max(0, Math.ceil(enrollSeconds - el)) + ' วิ';
+    if (el >= enrollSeconds) finishEnroll();
+  }, 200);
+};
+$('enrollStop').onclick = () => finishEnroll();
+function finishEnroll() {
+  if (mode !== 'enroll') return;
+  clearInterval(enrollTimer); enrollTimer = null;
+  sending = false;
+  send({ type: 'enroll_stop' });
+  setStatus($('enrollResult'), 'idle', 'กำลังสร้างลายเสียง...');
+  $('enrollStopRow').classList.add('hidden');
+}
+function endEnrollUi() {
+  clearInterval(enrollTimer); enrollTimer = null;
+  mode = 'idle'; sending = false;
+  $('enrollStopRow').classList.add('hidden');
+  updateButtons();
+}
+function showEnrolled(m) {
+  endEnrollUi();
+  $('enrollProg').firstElementChild.style.width = '100%';
+  const el = $('enrollResult');
+  if (m.ok) {
+    setStatus(el, 'ok', '✓ บันทึกเสียงแล้ว: พูด ' + m.speech_s + ' วิ, เป็นเสียงคนเดียว ('
+      + m.kept + '/' + m.windows + ' ช่วง, ตรงกันเองต่ำสุด ' + m.worst + ')'
+      + (m.clip > 0.001 ? ' — แต่มีเสียงแตก ' + (m.clip * 100).toFixed(1) + '% ควรลดเกนแล้วบันทึกใหม่' : ''));
+  } else if (m.why === 'too_quiet') {
+    setStatus(el, 'bad', '✗ ไมค์ที่อัดเงียบเกือบสนิท (ดังสุด ' + m.peak + ') — น่าจะเลือกไมค์ผิดตัว: ข้อ 1 ต้องเป็น "Microphone (GCK)"'
+      + ' และแถบต้องขยับตอนพูด · ไมค์ที่ใช้: ' + (m.mic || '?'));
+  } else if (m.why === 'too_short') {
+    setStatus(el, 'bad', '✗ พูดไม่พอ: ได้ยินเสียงพูด ' + m.speech_s + ' วิ ต้องอย่างน้อย ' + m.need_s
+      + ' วิ (ดังสุด ' + m.peak + ') — อ่านต่อเนื่อง ใกล้ไมค์ แล้วบันทึกใหม่');
+  } else if (m.why === 'too_fast') {
+    setStatus(el, 'bad', '✗ หน้าเว็บส่งเสียงซ้ำ (ได้เสียง ' + m.seconds + ' วิ ในเวลา ' + m.wall_s
+      + ' วิ) — ไม่ใช่เรื่องการพูด: กด F5 เลือกไมค์ใหม่ แล้วบันทึกอีกครั้ง');
+  } else if (m.why === 'mixed_voices') {
+    setStatus(el, 'bad', '✗ มีเสียงคนอื่นปนในที่อัด — บันทึกใหม่ตอนมีแค่คนนี้พูด');
+  } else if (m.why === 'no_sound') {
+    setStatus(el, 'bad', '✗ ไมค์ไม่ส่งเสียงเลย (ศูนย์ล้วน) — เปิด/จับคู่ตัวส่งก่อน');
+  } else {
+    setStatus(el, 'bad', '✗ บันทึกไม่สำเร็จ (' + m.why + ')');
+  }
+}
+
+// ---- 3: listen -----------------------------------------------------------------------------
+document.querySelectorAll('.modes button').forEach((b) => {
+  b.onclick = () => {
+    banner('');
+    stopClip();
+    stopListening(true);
+    const label = b.dataset.label || null;
+    send({ type: 'listen_start', name: name(), label, threshold: threshold() });
+    $('results').innerHTML = '';
+    $('tally').textContent = '';
+    showLines(label);
+  };
+});
+function markMode(btn) {
+  document.querySelectorAll('.modes button').forEach((x) => x.classList.toggle('on', x === btn));
+  $('listenStop').classList.toggle('hidden', !btn);
+  if (!btn) $('linesBox').classList.add('hidden');
+}
+function showLines(label) {
+  const box = $('linesBox'), ol = $('lines');
+  ol.innerHTML = '';
+  if (label === 'target' || label === 'other') {
+    $('linesHint').textContent = label === 'target'
+      ? 'คนที่บันทึกไว้พูดทีละบรรทัด (รวมคำสั้นท้ายรายการ):'
+      : 'อีกคนติดไมค์ตำแหน่งเดียวกัน แล้วพูดทีละบรรทัด — ถ้าเลือกได้ ให้เสียงใกล้เคียงคนที่บันทึกที่สุด:';
+    for (const t of TEST_LINES) { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); }
+    box.classList.remove('hidden');
+  } else if (label === 'unsorted') {
+    $('linesHint').textContent = 'ใครพูดก็ได้ ทั้งคนติดไมค์และคนรอบๆ ผลัดกันอ่านทีละบรรทัด เว้น ~2 วิ · จบแล้วกด "หยุดฟัง" แล้วไปข้อ 3ข ฟังแยกว่าใครพูด';
+    for (const t of TEST_LINES) { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); }
+    box.classList.remove('hidden');
+  } else if (label === 'nearby') {
+    $('linesHint').textContent = 'คนที่ติดไมค์เงียบ · อีกคนยืนห่าง 1–2 ม. พูดบรรทัด 1–14 เสียงปกติ · ถ้าไม่มีบรรทัดขึ้นเลย = ไมค์ไม่ได้ยินเขา (ดี)';
+    for (const t of TEST_LINES.slice(0, 14)) { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); }
+    box.classList.remove('hidden');
+  } else {
+    box.classList.add('hidden');
+  }
+}
+$('listenStop').onclick = () => stopListening();
+function stopListening(switching) {
+  // Switching to another speaker: the server's listen_start ends the old run itself (a
+  // listen_stop first would answer "stopped" AFTER the new button lit up, and clear it).
+  if (mode !== 'listen') return;
+  sending = false;
+  mode = 'idle';
+  if (switching) return;
+  send({ type: 'listen_stop' });
+  markMode(null);
+}
+function stopSending() { sending = false; if (mode === 'listen') mode = 'idle'; }
+function showUtterance(m) {
+  const li = document.createElement('li');
+  const len = m.speech_s.toFixed(1) + ' วิ';
+  if (m.label === 'unsorted') {
+    // No ✓/✗ while recording everyone: whose voice it is gets decided by ear in 3ข, not by the
+    // system under test.
+    li.className = 'none';
+    li.innerHTML = '<span>● เก็บไว้ แยกทีหลัง</span>';
+    const r = document.createElement('span');
+    r.textContent = len;
+    li.appendChild(r);
+    $('results').prepend(li);
+    $('tally').textContent = 'อัดรวมแล้ว ' + (m.n || '') + ' ประโยค';
+    return;
+  }
+  if (m.decision === 'ACCEPT') { li.className = 'yes'; li.innerHTML = '<span>✓ ใช่เสียงนี้</span>'; }
+  else if (m.decision === 'REJECT') { li.className = 'no'; li.innerHTML = '<span>✗ ไม่ใช่</span>'; }
+  else { li.className = 'none'; li.innerHTML = '<span>· สั้นเกินวัด</span>'; }
+  const right = document.createElement('span');
+  right.textContent = (m.score == null ? '' : 'คะแนน ' + m.score.toFixed(2) + ' · ') + len
+    + (m.short ? ' (สั้น: เชื่อไม่ได้)' : '');
+  li.appendChild(right);
+  $('results').prepend(li);
+  const t = m.tally || {};
+  $('tally').textContent = '✓ ' + (t.ACCEPT || 0) + '   ✗ ' + (t.REJECT || 0) + '   · ' + (t.NONE || 0);
+}
+
+// ---- 3b: sort the mixed recording by ear ------------------------------------------------------
+const SORT_BUTTONS = [['target', 'ฉัน'], ['other', 'อีกคน (ติดไมค์)'], ['nearby', 'คนข้างๆ (ไม่มีไมค์)'], ['discard', 'ทิ้ง']];
+let playCtx = null, playing = null;
+$('sortLoad').onclick = () => { stopListening(); send({ type: 'unsorted_list' }); };
+function showUnsorted(items) {
+  const ul = $('sortList');
+  ul.innerHTML = '';
+  $('sortCount').textContent = items.length ? 'เหลือ ' + items.length + ' ประโยค' : 'ไม่มีเสียงที่ยังไม่แยก';
+  items.forEach((it, i) => {
+    const li = document.createElement('li');
+    li.dataset.file = it.file;
+    const sn = document.createElement('span');
+    sn.className = 'sn';
+    sn.textContent = '#' + (i + 1) + ' · ' + Number(it.speech_s).toFixed(1) + ' วิ';
+    li.appendChild(sn);
+    const play = document.createElement('button');
+    play.className = 'secondary';
+    play.textContent = '▶ ฟัง';
+    play.onclick = () => {
+      if (mode === 'enroll') { banner('กำลังบันทึกลายเสียงอยู่ — ฟังได้หลังบันทึกเสร็จ'); return; }
+      stopListening();                       // the speakers must not go back into the mic as a sentence
+      // The context resumes inside the tap: the clip arrives after a round trip, outside the gesture.
+      try { if (!playCtx) playCtx = new AudioContext(); if (playCtx.state === 'suspended') playCtx.resume(); } catch (e) {}
+      ul.querySelectorAll('li.now').forEach((x) => x.classList.remove('now'));
+      li.classList.add('now');
+      send({ type: 'clip', file: it.file });
+    };
+    li.appendChild(play);
+    for (const [lab, txt] of SORT_BUTTONS) {
+      const b = document.createElement('button');
+      b.className = lab === 'discard' ? 'danger' : 'secondary';
+      b.textContent = txt;
+      b.dataset.sort = lab;
+      b.onclick = () => {
+        stopListening();
+        li.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+        send({ type: 'sort', file: it.file, label: lab });
+      };
+      li.appendChild(b);
+    }
+    ul.appendChild(li);
+  });
+}
+function stopClip() {
+  if (playing) { try { playing.stop(); } catch (e) {} }
+  playing = null;
+  document.querySelectorAll('#sortList li.now').forEach((x) => x.classList.remove('now'));
+}
+function playClip(m) {
+  try {
+    if (!playCtx) playCtx = new AudioContext();
+    if (playCtx.state === 'suspended') playCtx.resume();
+    const bin = atob(m.pcm || '');
+    const n = bin.length >> 1;
+    if (!n) return;
+    const buf = playCtx.createBuffer(1, n, m.rate || 16000);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) {
+      let v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8);
+      if (v >= 0x8000) v -= 0x10000;
+      ch[i] = v / 32768;
+    }
+    if (playing) { try { playing.stop(); } catch (e) {} }
+    const src = playCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(playCtx.destination);
+    src.onended = () => { if (playing === src) playing = null; };
+    src.start();
+    playing = src;
+    window.__lastClipSamples = n;            // tests read what was played
+  } catch (e) {
+    banner('เล่นเสียงไม่ได้ (' + (e && e.name || 'Error') + ')');
+  }
+}
+function markSorted(m) {
+  const li = Array.from($('sortList').children).find((x) => x.dataset.file === m.file);
+  if (li) li.remove();
+  $('sortCount').textContent = m.left ? 'เหลือ ' + m.left + ' ประโยค' : 'แยกครบแล้ว — ไปข้อ 4 กดสรุปผล';
+}
+
+// ---- 4: the verdict --------------------------------------------------------------------------
+$('evalBtn').onclick = () => {
+  stopListening();
+  $('verdict').className = 'verdict unknown'; $('verdict').textContent = 'กำลังสรุป...';
+  $('verdict').classList.remove('hidden');
+  send({ type: 'eval', name: name(), threshold: threshold() });
+};
+function pct(x) { return x == null ? '-' : (x * 100).toFixed(0) + '%'; }
+function showEval(m) {
+  const v = $('verdict'), n = m.numbers || {}, L = (n.long || {}), rec = L.recommend;
+  if (m.verdict === 'WORKS') { v.className = 'verdict ok'; v.textContent = 'ได้ ✓ แยกเสียงคนที่บันทึกออกจากอีกคนได้ (ประโยคยาว)'; }
+  else if (m.verdict === 'DOES NOT WORK') { v.className = 'verdict bad'; v.textContent = 'ไม่ได้ ✗ ไมค์นี้แยกสองคนนี้ไม่ออก'; }
+  else { v.className = 'verdict unknown'; v.textContent = 'ยังบอกไม่ได้ — ต้องมีประโยคยาวของคนที่บันทึก ≥ 10 และของอีกคน ≥ 10'; }
+  const f = $('evalFacts');
+  f.innerHTML = '';
+  const facts = [];
+  const c = m.counts || {};
+  facts.push('เสียงที่ใช้สรุป: ฉัน ' + (c.target || 0) + ' · อีกคน ' + (c.other || 0) + ' · คนข้างๆ ' + (c.nearby || 0));
+  if (rec) facts.push('เกณฑ์ที่แนะนำ ' + rec.threshold.toFixed(2) + ': คนที่บันทึกถูกปฏิเสธ ' + pct(rec.frr)
+    + ' · อีกคนผ่าน ' + pct(rec.far) + (n.provisional ? ' (ยังไม่แน่น: อีกคนอาจผ่านได้ถึง ' + pct(n.far_upper95) + ' — ทดสอบเพิ่มอีกรอบ)' : ''));
+  const S = (n.short || {}).recommend;
+  if (S && S.frr != null) facts.push('คำสั้น (< 1 วิ): ที่เกณฑ์ที่กันอีกคนได้ คนที่บันทึกถูกปฏิเสธ ' + pct(S.frr)
+    + (S.frr > 0.3 ? ' — ลายเสียงใช้กับคำสั้นไม่ได้ (คาดไว้แล้ว)' : ''));
+  if (n.level) facts.push('ความดังอย่างเดียว: คนข้างๆ ที่ไม่มีไมค์ผ่าน ' + pct(n.level.nearby_let_in)
+    + ' · คนที่บันทึกผ่าน ' + pct(n.level.enrolled_kept));
+  for (const t of facts) { const p = document.createElement('p'); p.textContent = t; f.appendChild(p); }
+  $('evalLines').textContent = (m.lines || []).join('\n');
+  $('evalDetails').classList.toggle('hidden', !(m.lines || []).length);
+}
+
+// ---- 5: forget -------------------------------------------------------------------------------
+$('forgetBtn').onclick = () => {
+  if (!confirm('ลบลายเสียง "' + name() + '" และเสียงที่อัดไว้ทั้งหมดในเครื่องนี้?')) return;
+  stopListening();
+  send({ type: 'forget', name: name(), audio: true });
+};
+$('who').oninput = () => updateButtons();
+connect();
+</script>
+</body>
+</html>

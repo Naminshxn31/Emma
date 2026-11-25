@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from app import heard, robot_contracts as rc, robot_face_link as link
+from app import heard, robot_body, robot_contracts as rc, robot_face_link as link
 from app.config import settings
 from app.tools import registry as reg
 
@@ -360,6 +360,37 @@ def test_accepted_is_requested_not_done(body):
     assert out["ok"] is True and out["hardware"] == "requested"
     assert out["status"] == "verified" and out["est_s"] == 6.0
     assert "ห้ามพูดว่า 'ทำเสร็จแล้ว'" in out["instruction"]
+    # robot 6 Nov: "เจ็บนะ" after a handshake got "ตรวจสอบความปลอดภัยแล้ว": an arm's result says
+    # apologise and call staff, and never claims a check nothing made
+    assert robot_body._ARM_HURT in out["instruction"]          # the language note rides after it
+    assert robot_body._GREETING_HANDSHAKE_TEXT.endswith(robot_body._ARM_HURT)
+
+
+def test_the_hurt_clause_is_on_arms_only(body):
+    """The head's nod is not a grip: its result stays as it was."""
+    face = Face(accept)
+    say(face, "พยักหน้าหน่อย")
+    out = run(face, lambda: body.request("nod"))
+    assert out["ok"] is True, out
+    assert robot_body._ARM_HURT not in out["instruction"]
+
+
+def test_the_handshake_tool_carries_the_hurt_clause_too(monkeypatch):
+    import asyncio
+
+    from app import robot_arm
+    from app.tools import registry, robot as robot_tools
+
+    async def greet(session=None):
+        return True
+
+    monkeypatch.setattr(robot_arm, "greet", greet)
+    token = registry.robot_face_session.set(object())
+    try:
+        out = asyncio.run(robot_tools.request_handshake())
+    finally:
+        registry.robot_face_session.reset(token)
+    assert out["ok"] is True and out["instruction"].endswith(robot_body._ARM_HURT)
 
 
 def test_a_robot_refusal_carries_its_thai_reason_and_what_is_available(body):

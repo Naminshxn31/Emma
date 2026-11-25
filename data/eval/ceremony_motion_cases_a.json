@@ -1,0 +1,286 @@
+{
+ "format": "emma-ceremony-motion-cases-v1",
+ "about": "A: written blind by a separate agent, then used to tune the keywords (23 Nov). The host off-script inside ตอบสด; expect = the topic slide that may show, none = the logo loop (app/ceremony_motion.py).",
+ "cases": [
+  {
+   "id": "h01",
+   "lang": "en",
+   "text": "Emma, how far are we from the beach here in Jomtien?",
+   "expect": "location",
+   "note": "beach distance"
+  },
+  {
+   "id": "h02",
+   "lang": "en",
+   "text": "Ladies and gentlemen, Emma can tell us about the pool.",
+   "expect": "facilities",
+   "note": "swimming pool"
+  },
+  {
+   "id": "h03",
+   "lang": "en",
+   "text": "So what kinds of rooms can I choose from, Emma?",
+   "expect": "units",
+   "note": "room types"
+  },
+  {
+   "id": "h04",
+   "lang": "en",
+   "text": "Is there a hospital nearby, just in case?",
+   "expect": "location",
+   "note": "nearby hospital"
+  },
+  {
+   "id": "h05",
+   "lang": "en",
+   "text": "Does the building have a gym?",
+   "expect": "facilities",
+   "note": "gym"
+  },
+  {
+   "id": "h06",
+   "lang": "en",
+   "text": "Tell us about the smart home, Emma.",
+   "expect": "technology",
+   "note": "smart home"
+  },
+  {
+   "id": "h07",
+   "lang": "en",
+   "text": "How many studios and how many one-bedrooms are there?",
+   "expect": "units",
+   "note": "unit counts and types"
+  },
+  {
+   "id": "h08",
+   "lang": "en",
+   "text": "Emma, how much does a studio cost?",
+   "expect": "none",
+   "note": "price question"
+  },
+  {
+   "id": "h09",
+   "lang": "en",
+   "text": "Can you turn the lights down a little?",
+   "expect": "none",
+   "note": "lights"
+  },
+  {
+   "id": "h10",
+   "lang": "en",
+   "text": "Wow, you are so smart, Emma!",
+   "expect": "none",
+   "note": "smart as praise"
+  },
+  {
+   "id": "h11",
+   "lang": "en",
+   "text": "Are you nervous standing up here?",
+   "expect": "none",
+   "note": "banter"
+  },
+  {
+   "id": "h12",
+   "lang": "en",
+   "text": "Everybody in the room, give Emma a big round of applause!",
+   "expect": "none",
+   "note": "applause; room unrelated sense"
+  },
+  {
+   "id": "h13",
+   "lang": "en",
+   "text": "Emma, can you swim?",
+   "expect": "none",
+   "note": "about Emma herself, pool-adjacent"
+  },
+  {
+   "id": "h14",
+   "lang": "en",
+   "text": "What's the weather like in Pattaya today?",
+   "expect": "none",
+   "note": "weather"
+  },
+  {
+   "id": "h15",
+   "lang": "en",
+   "text": "Who is Empire Group, the developer?",
+   "expect": "none",
+   "note": "developer"
+  },
+  {
+   "id": "h16",
+   "lang": "en",
+   "text": "Does Emma ever sleep?",
+   "expect": "none",
+   "note": "about Emma"
+  },
+  {
+   "id": "h17",
+   "lang": "en",
+   "text": "Is this a good investment, Emma?",
+   "expect": "none",
+   "note": "investment"
+  },
+  {
+   "id": "h18",
+   "lang": "en",
+   "text": "Where are the restaurants and shopping around here?",
+   "expect": "location",
+   "note": "nearby dining/shopping"
+  },
+  {
+   "id": "h19",
+   "lang": "en",
+   "text": "Does it have a sauna or a co-working space?",
+   "expect": "facilities",
+   "note": "sauna, coworking"
+  },
+  {
+   "id": "h20",
+   "lang": "en",
+   "text": "What makes Embassy World special, Emma?",
+   "expect": "technology",
+   "note": "what makes it special"
+  },
+  {
+   "id": "h21",
+   "lang": "en",
+   "text": "Is there a discount if we book today?",
+   "expect": "none",
+   "note": "discount"
+  },
+  {
+   "id": "h22",
+   "lang": "en",
+   "text": "Tell me about the units, the app, and the pool.",
+   "expect": "none",
+   "note": "three topics at once"
+  },
+  {
+   "id": "h23",
+   "lang": "en",
+   "text": "We have a betting pool going on who wins the lucky draw.",
+   "expect": "none",
+   "note": "pool in unrelated sense"
+  },
+  {
+   "id": "h24",
+   "lang": "en",
+   "text": "Can we play the video now, please?",
+   "expect": "none",
+   "note": "video request"
+  },
+  {
+   "id": "h25",
+   "lang": "en",
+   "text": "Thank you Emma, that was great.",
+   "expect": "none",
+   "note": "thanks"
+  },
+  {
+   "id": "h26",
+   "lang": "en",
+   "text": "Emma, what's the swimming poll like, and is the gym open late?",
+   "expect": "facilities",
+   "note": "ASR error poll for pool; facilities both"
+  },
+  {
+   "id": "h27",
+   "lang": "en",
+   "text": "how many yoo-nits in the whole project",
+   "expect": "units",
+   "note": "ASR misheard units"
+  },
+  {
+   "id": "h28",
+   "lang": "th",
+   "text": "เอ็มม่า สระว่ายน้ำที่นี่เป็นยังไงบ้าง",
+   "expect": "facilities",
+   "note": "swimming pool"
+  },
+  {
+   "id": "h29",
+   "lang": "th",
+   "text": "โครงการนี้อยู่ใกล้ทะเลไหมครับ",
+   "expect": "location",
+   "note": "sea distance"
+  },
+  {
+   "id": "h30",
+   "lang": "th",
+   "text": "มีกี่ยูนิทครับ แล้วมีห้องสตูดิโอไหม",
+   "expect": "units",
+   "note": "unit spelling variant, studio"
+  },
+  {
+   "id": "h31",
+   "lang": "th",
+   "text": "ห้องนี้มีสมาร์ตโฮมไหมคะ ควบคุมผ่านแอพได้หรือเปล่า",
+   "expect": "technology",
+   "note": "loanword variants smart home/app"
+  },
+  {
+   "id": "h32",
+   "lang": "th",
+   "text": "ห้องฟิตเนสกับซาวน่ามีไหมครับ",
+   "expect": "facilities",
+   "note": "gym, sauna"
+  },
+  {
+   "id": "h33",
+   "lang": "th",
+   "text": "ราคาเริ่มต้นเท่าไหร่ครับเอ็มม่า",
+   "expect": "none",
+   "note": "price"
+  },
+  {
+   "id": "h34",
+   "lang": "th",
+   "text": "เอ็มม่าเก่งจังเลย ฉลาดมาก",
+   "expect": "none",
+   "note": "praise, smart in unrelated sense"
+  },
+  {
+   "id": "h35",
+   "lang": "th",
+   "text": "ขอเสียงปรบมือให้เอ็มม่าหน่อยครับ ทั้งห้องเลย",
+   "expect": "none",
+   "note": "applause; room unrelated"
+  },
+  {
+   "id": "h36",
+   "lang": "th",
+   "text": "วันนี้ประหม่าไหมครับเอ็มม่า",
+   "expect": "none",
+   "note": "banter"
+  },
+  {
+   "id": "h37",
+   "lang": "th",
+   "text": "โรงพยาบาลกับโรงเรียนอยู่ใกล้ไหมคะ เดินทางสะดวกหรือเปล่า",
+   "expect": "location",
+   "note": "hospital, school, travel"
+  },
+  {
+   "id": "h38",
+   "lang": "th",
+   "text": "ช่วยปิดม่านกับหรี่ไฟหน่อยครับ",
+   "expect": "none",
+   "note": "curtains lights"
+  },
+  {
+   "id": "h39",
+   "lang": "th",
+   "text": "มีห้องนอนเดียวกับสองห้องนอนไหมครับ แล้วสระว่ายน้ำด้วย",
+   "expect": "none",
+   "note": "two topics units+pool"
+  },
+  {
+   "id": "h40",
+   "lang": "th",
+   "text": "เอ็มม่าว่ายน้ำเป็นไหม แล้วบริษัทเอ็มไพร์กรุ๊ปคือใคร",
+   "expect": "none",
+   "note": "Emma herself and developer"
+  }
+ ]
+}

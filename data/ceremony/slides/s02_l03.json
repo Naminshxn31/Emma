@@ -1,0 +1,25 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "texts": {
+    "hello": "Hello, Khun Miki",
+    "every": "Hello, everyone",
+    "giant": "Emma",
+    "rep": "I represent Embassy World",
+    "smart": "the smart assistant",
+    "for_l": "For",
+    "sales": "Our sales team",
+    "and_l": "And",
+    "agents": "All of our agents"
+  },
+  "pictures": {"facade": {"asset": "fin_building_a"}},
+  "beats": [
+    {"at_en": "and hello, everyone", "do": "everyone", "key": "every"},
+    {"at_en": "I'm Emma", "do": "name", "key": "giant"},
+    {"at_en": "I represent Embassy World", "do": "represent", "key": ["rep", "facade"]},
+    {"at_en": "the smart assistant", "do": "smart", "key": "smart"},
+    {"at_en": "our sales team", "do": "sales", "key": ["for_l", "sales"]},
+    {"at_en": "all of our agents", "do": "agents", "key": ["and_l", "agents"]}
+  ],
+  "options": {"mode": "intro", "photo": true}
+}

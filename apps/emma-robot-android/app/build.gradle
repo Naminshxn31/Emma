@@ -11,6 +11,19 @@ plugins {
 // event=1 for it (the event host, app/event_host.py). A plain build is this
 // app, unchanged.
 def emmaEvent = project.findProperty('emmaApp') == 'event'
+// "Emma Ceremony" (owner 9 Nov 2026: "อันนี้ทำแยกกับอันเดิมนะ ไม่งั้นจะปนกัน อันนี้จะเป็น
+// สำหรับพิธี ที่สามารถใช้ข้อมูลอันเก่าได้"): the opening ceremony as a THIRD app, the same way --
+//     gradlew assembleDebug -PemmaApp=ceremony
+// com.emma.robot.ceremony, its own settings again; EmmaFace opens the face with
+// ceremony=1 (opening the app = the ceremony's mode) and only this build opens Emma
+// Event at the ceremony's end. It does NOT reopen itself after a boot: Emma Event
+// keeps that (src/event) -- an Android reset mid-ceremony comes back as the event
+// app, the day's default, not as a ceremony nobody is running.
+def emmaCeremony = project.findProperty('emmaApp') == 'ceremony'
+// A misspelt -PemmaApp built the sales app under the name staff asked for: refused.
+if (project.findProperty('emmaApp') != null && !emmaEvent && !emmaCeremony) {
+    throw new GradleException("-PemmaApp must be 'event' or 'ceremony', not '" + project.findProperty('emmaApp') + "'")
+}
 
 android {
     namespace 'com.emma.robot.control'
@@ -21,7 +34,10 @@ android {
         if (emmaEvent) {
             applicationId 'com.emma.robot.event'
         }
-        resValue 'string', 'app_label', emmaEvent ? 'Emma Event' : 'Emma Robot'
+        if (emmaCeremony) {
+            applicationId 'com.emma.robot.ceremony'
+        }
+        resValue 'string', 'app_label', emmaEvent ? 'Emma Event' : (emmaCeremony ? 'Emma Ceremony' : 'Emma Robot')
         minSdk 26
         targetSdk 34
         versionCode 1
@@ -30,6 +46,19 @@ android {
                 usesCleartextTraffic : 'false',
                 networkSecurityConfig: '@xml/network_security_config'
         ]
+    }
+
+    // The event build only: BootReceiver + its permission, an overlay on the main manifest
+    // (the sales app's manifest stays as it was; test_no_new_permission... reads it).
+    if (emmaEvent) {
+        sourceSets.debug.manifest.srcFile 'src/event/AndroidManifest.xml'
+        sourceSets.release.manifest.srcFile 'src/event/AndroidManifest.xml'
+    }
+    // The ceremony build only: no BootReceiver (above) -- just the <queries> that lets it
+    // see Emma Event's launch intent (Android 11+ hides other packages without it).
+    if (emmaCeremony) {
+        sourceSets.debug.manifest.srcFile 'src/ceremony/AndroidManifest.xml'
+        sourceSets.release.manifest.srcFile 'src/ceremony/AndroidManifest.xml'
     }
 
     buildTypes {

@@ -158,7 +158,9 @@ def test_only_the_exact_prompt_strings_of_the_design_reach_window_prompt():
              "'emma-nav:auto'", "'emma-nav:auto:shown'", "'emma-nav:auto:stay'", "activityMessage(kind)",
              # ARRAY_MIC (2 Nov): is the app still capturing the array / let go of it
              "'emma-face:mic'", "'emma-face:mic:release'", "'emma-face:mic:hold'", "'emma-face:mic:hold:deaf'",
-             "'emma-face:mic:free'"}
+             "'emma-face:mic:free'",
+             # the ceremony app opens Emma Event at the ceremony's end (owner 9 Nov): one closed list
+             "openAppMessage(app)"}
     assert set(args) <= fixed, set(args) - fixed
 
     allowed = [m for m in ("emma-body:list", "emma-body:status", "emma-body:stop", "emma-body:nod",
@@ -167,13 +169,16 @@ def test_only_the_exact_prompt_strings_of_the_design_reach_window_prompt():
                            "emma-nav:auto", "emma-nav:auto:shown", "emma-nav:auto:stay",
                            "emma-nav:activity:call_start", "emma-nav:activity:call_end",
                            "emma-nav:activity:speech", "emma-face:mic", "emma-face:mic:release",
-                           "emma-face:mic:hold", "emma-face:mic:hold:deaf", "emma-face:mic:free")]
+                           "emma-face:mic:hold", "emma-face:mic:hold:deaf", "emma-face:mic:free",
+                           "emma-face:open:event")]
     # the page can never start the app's own walk: no go with origin auto
     refused = ["emma-arm:greet:6", "emma-body:dance", "emma-body:Nod", "emma-body:nod\n",
                "emma-body:nod:x", "emma-nav:go:big_room:pc", "emma-nav:go:big_room", "emma-nav:go:../x:tap",
                "emma-nav:go:ห้อง:tap", "emma-nav:go:big_room:tap\n", "emma-nav:reap", "emma-face:secret", "", None,
                "emma-nav:go:dock:auto", "emma-nav:auto:go", "emma-nav:activity:touch", "emma-nav:activity:",
-               "emma-nav:auto:stay\n", "emma-face:mic:take", "emma-face:mic:release\n", "emma-face:micx"]
+               "emma-nav:auto:stay\n", "emma-face:mic:take", "emma-face:mic:release\n", "emma-face:micx",
+               "emma-face:open:control", "emma-face:open:ceremony", "emma-face:open:event\n", "emma-face:open:",
+               "emma-face:open:com.emma.robot.event", "emma-face:open:Event"]
     out = _model(*[{"fn": "allowedMessage", "args": [m]} for m in allowed + refused])
     assert out[:len(allowed)] == [True] * len(allowed)
     assert out[len(allowed):] == [False] * len(refused)
@@ -216,10 +221,11 @@ def test_no_transcript_or_user_text_ever_goes_to_a_prompt():
     code = _without_comments(_bridge_block())
     for word in ("curUser", "transcript", "userLine", "evt.text", "replyNode", "data-emma-reply"):
         assert word not in code, word
-    relay = code.split("function relayCommand(evt, ask, onRobot) {", 1)[1].split("\n    }\n", 1)[0]
+    relay = code.split("function relayCommand(evt, ask, onRobot, eventPage) {", 1)[1].split("\n    }\n", 1)[0]
     # The relay reads the command's id, action and place -- nothing else --
-    # plus `style`, which only ever chooses between two fixed shapes
-    # (speechMessage / bodyMessage, owner 15 Oct): no value of it is asked.
+    # plus `style`, which only ever chooses between fixed shapes
+    # (speechMessage / bodyMessage, owner 15 Oct; eventBodyMessage, the
+    # pageant 9 Nov): no value of it is asked.
     fields = set(re.findall(r"evt\.(\w+)", relay))
     assert fields == {"type", "command_id", "action", "place", "style"}
     assert "evt.style === 'speech' ? speechMessage(evt.action) : bodyMessage(evt.action)" in relay
@@ -697,3 +703,81 @@ def test_the_apps_answer_to_a_look_goes_back_whitelisted():
     assert old is None, "a look from a server without seq gets no answer"
     assert nothing == {"type": "head_look_ack", "seq": 10, "accepted": False, "reason": "bad_request",
                        "ms": None}
+
+
+# ---- ท่านางงาม: the Emma Event debut's pageant (owner 9 Nov; Pageant.java) ----------------
+
+def test_the_pageant_is_two_fixed_messages_of_the_closed_grammar():
+    [c] = _model({"fn": "constants"})
+    assert tuple(c["EVENT_BODY_IDS"]) == rc.EVENT_BODY_ACTIONS
+    cases = {
+        "emma-body:pageant:event": True,
+        "emma-body:pageant_end:event": True,
+        "emma-body:wave:event": False,           # a voice gesture is never dressed as one
+        "emma-body:pageant": False,              # nor the pageant as a voice gesture
+        "emma-body:pageant:speech": False,
+        "emma-body:pageant:event:x": False,
+    }
+    got = _model(*[{"fn": "allowedMessage", "args": [m]} for m in cases])
+    assert dict(zip(cases, got)) == cases
+
+
+def test_only_the_event_and_ceremony_apps_pages_relay_the_pageant():
+    reply = {"accepted": True, "reason": None, "status": None, "est_ms": 43600}
+    start = {"type": "body_command", "command_id": RUN, "action": "pageant", "style": "event"}
+    a, b, c, d = _model(
+        {"fn": "relayCommand", "args": [start, {"emma-body:pageant:event": reply}, True, True]},
+        {"fn": "relayCommand", "args": [start, {"emma-body:pageant:event": reply}, True, False]},
+        {"fn": "relayCommand", "args": [dict(start, action="wave"), {}, True, True]},
+        {"fn": "relayCommand", "args": [dict(start, action="pageant_end"),
+                                        {"emma-body:pageant_end:event": reply}, True, True]})
+    assert a["asked"] == ["emma-body:pageant:event"] and a["ack"]["accepted"] is True
+    assert a["ack"]["action"] == "pageant"
+    assert b["asked"] == [] and b["ack"]["reason"] == "not_event_app"
+    assert c["asked"] == [] and c["ack"]["reason"] == "bad_request" and c["ack"]["action"] is None
+    assert d["asked"] == ["emma-body:pageant_end:event"] and d["ack"]["accepted"] is True
+    page = _without_comments(_html())
+    assert "var EVENT_PAGE = IN_APP && location.pathname !== '/mirror' && query.get('event') === '1';" in page
+    assert "var CEREMONY_APP = IN_APP && location.pathname !== '/mirror' && query.get('ceremony') === '1';" in page
+    # review 23 Nov: the ceremony's opening plays the pageant in the Emma Ceremony app -- its page relays it too
+    assert "var ack = relayCommand(evt, ask, ON_ROBOT, EVENT_PAGE || CEREMONY_APP);" in page
+
+
+def test_the_real_page_relays_the_pageant_from_the_ceremony_and_event_apps_only():
+    """End to end through the page as each app opens it (tests/face_nav_model.cjs `pageant_pages`): the bridge's
+    `command`, the page's own flags from its URL -- not the pure function with a flag handed in."""
+    out = _scenario("pageant_pages")
+    for app in ("ceremony_app", "event_app"):
+        assert out[app]["prompts"] == ["emma-body:pageant:event", "emma-body:pageant_end:event"], app
+        assert [a["accepted"] for a in out[app]["acks"]] == [True, True], app
+    for other in ("sales_app", "mirror"):
+        assert out[other]["prompts"] == [], other
+        assert [a["reason"] for a in out[other]["acks"]] == ["not_event_app", "not_event_app"], other
+
+
+def test_the_pageants_caps_and_status_reach_the_server():
+    on, off, status, other = _model(
+        {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "pageant": True}]},
+        {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "pageant": "yes"}]},
+        {"fn": "bodyStatusFrame", "args": [{"seq": 3, "last": {"action": "pageant", "state": "done"}}, 2]},
+        {"fn": "bodyStatusFrame", "args": [{"seq": 3, "last": {"action": "fly", "state": "done"}}, 2]})
+    assert on["pageant"] is True and off["pageant"] is False
+    assert status == {"type": "body_status", "seq": 3, "action": "pageant", "state": "done", "reason": None}
+    assert other is None
+
+
+def test_the_pageants_timing_passes_the_whitelist_as_whole_numbers_only():
+    """Review 24 Nov (no version handshake between the APK's pageant frames and the server's lead/minimum):
+    the APK's `pageant_v` / `pageant_lead_ms` / `pageant_two_sides_ms` (PageantTiming) reach the server --
+    the whitelist dropped them before -- and only as integers; an old APK sends none (null = the server
+    times it as that APK, app/event_pageant.timing)."""
+    new, old, odd = _model(
+        {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "pageant": True, "pageant_v": 2,
+                                          "pageant_lead_ms": 2400, "pageant_two_sides_ms": 16200}]},
+        {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "pageant": True}]},
+        {"fn": "bodyCapsFrame", "args": [{"enabled": True, "gestures": {}, "pageant": True, "pageant_v": "2",
+                                          "pageant_lead_ms": 2.5, "pageant_two_sides_ms": "16200"}]})
+    keys = ("pageant_v", "pageant_lead_ms", "pageant_two_sides_ms")
+    assert [new[k] for k in keys] == [2, 2400, 16200]
+    assert [old[k] for k in keys] == [None, None, None]
+    assert [odd[k] for k in keys] == [None, None, None]

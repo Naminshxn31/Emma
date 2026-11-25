@@ -14,7 +14,8 @@ def default_voice_for(provider: str) -> str:
 
 
 def get_provider(provider: str, voice: str, instructions: str, greeting: str | None = None,
-                 use_tools: bool = True, vad_floor: float | None = None) -> VoiceProvider:
+                 use_tools: bool = True, vad_floor: float | None = None,
+                 vad_silence_ms: int | None = None) -> VoiceProvider:
     """Construct (but don't open) a session for `provider`.
 
     Imports are deferred so installing only one provider's SDK is enough to
@@ -24,6 +25,9 @@ def get_provider(provider: str, voice: str, instructions: str, greeting: str | N
     if provider == "gemini":
         from app.providers.gemini import GeminiProvider
 
+        if vad_silence_ms is not None:      # the live-first ceremony call only; every other call is the line below
+            return GeminiProvider(voice, instructions, greeting=greeting, use_tools=use_tools,
+                                  vad_floor=vad_floor, vad_silence_ms=vad_silence_ms)
         return GeminiProvider(voice, instructions, greeting=greeting,
                               use_tools=use_tools, vad_floor=vad_floor)
     if provider == "openai":

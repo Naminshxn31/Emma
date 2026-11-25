@@ -871,6 +871,31 @@ def test_show_room_type_without_a_plan_never_claims_one(monkeypatch):
     assert "ห้ามพูดว่ามีผังให้ดู" in out["instruction"]
 
 
+def test_a_view_question_over_the_example_room_goes_to_the_view_story(monkeypatch):
+    """Robot 6 Nov 09:06: "มีรูปวิวไหม" right after the 1-bedroom card got no
+    tool and the sales team for "ภาพวิว" -- the result's only word on views was
+    the ban on describing the plan. Where the view story is offered, the
+    result names it; anywhere else the result is the room's, byte for byte."""
+    from app import prompts, stories, unit_plans
+
+    _live_on(monkeypatch, [_typed_row("A-203", 34.0, "1 Bedroom")])
+    monkeypatch.setattr(unit_plans, "plan_url", lambda room: None)
+    monkeypatch.setattr(stories, "available", lambda catalog=None: {"views_collections": {}})
+    monkeypatch.setattr(prompts, "_tool_visible", lambda name: name == "present_story")
+    out = units.show_room_type("1br")
+    assert out["instruction"].endswith(units.VIEW_STORY_CLAUSE)
+    assert "ห้ามบรรยายสิ่งที่อยู่ในผัง" in out["instruction"], "the ban on describing the plan stays"
+    # not the robot face (or no story tool): the room's instruction, unchanged
+    monkeypatch.setattr(prompts, "_tool_visible", lambda name: False)
+    room = units.show_room_type("1br")
+    assert "present_story" not in room["instruction"]
+    assert room["instruction"] + units.VIEW_STORY_CLAUSE == out["instruction"]
+    # the story not offered (catalog unapproved, picture missing): nothing named
+    monkeypatch.setattr(prompts, "_tool_visible", lambda name: name == "present_story")
+    monkeypatch.setattr(stories, "available", lambda catalog=None: {})
+    assert units.show_room_type("1br")["instruction"] == room["instruction"]
+
+
 def test_show_room_type_refuses_to_guess(monkeypatch):
     out = units.show_room_type("penthouse")
     assert out["ok"] is False and "ห้ามเดา" in out["instruction"]
@@ -893,3 +918,25 @@ def test_show_room_type_is_named_in_the_units_paragraph():
     from app import prompts
 
     assert "show_room_type" in prompts.UNITS_TOOLS_BLOCK
+
+
+def test_a_pool_access_label_carries_its_approved_meaning(monkeypatch):
+    """Robot 6 Nov 09:11: after the room-type table she offered "ห้องที่เชื่อมต่อกับสระว่ายน้ำ".
+    The sales system's POOL ACCESS rooms are G-floor rooms on the pool side; the report forbids
+    saying a room opens onto the pool. Wherever the label reaches her, its meaning goes with it."""
+    from app import unit_plans
+
+    monkeypatch.setattr(unit_plans, "plan_url", lambda room: None)
+    plain = _typed_row("A-203", 34.0, "1 Bedroom")
+    pool = _typed_row("A-101", 34.0, "1 Bedroom")
+    pool["unit_option"] = "POOL ACCESS"
+    _live_on(monkeypatch, [plain])
+    assert units.POOL_ACCESS_NOTE not in units.compare_unit_types()["instruction"]
+    assert units.POOL_ACCESS_NOTE not in units.show_room_type("1br")["instruction"]
+    _live_on(monkeypatch, [plain, pool])
+    assert units.compare_unit_types()["instruction"].endswith(units.POOL_ACCESS_NOTE)
+    _live_on(monkeypatch, [pool])
+    assert units.POOL_ACCESS_NOTE in units.show_room_type("1br")["instruction"]
+    assert units.POOL_ACCESS_NOTE in units.show_unit_live("A101")["instruction"]
+    assert units._pool_access_note("Pool Access") and units._pool_access_note("POOLACCESS")
+    assert units._pool_access_note("POOLABC", "LAGOON", None) == ""

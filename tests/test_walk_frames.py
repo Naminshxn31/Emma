@@ -19,6 +19,15 @@ ROOT = Path(__file__).resolve().parent.parent
 JPEG = b"\xff\xd8\xff\xe0fake-jpeg\xff\xd9"
 
 
+def test_a_picture_android_never_finished_does_not_stop_the_sheet(tmp_path):
+    """4 Nov: a power cut left 9 empty .jpg at the end of a walk."""
+    (tmp_path / "0505.jpg").write_bytes(b"")
+    img = _script().tile(tmp_path, {"n": 505, "s": 1.0, "file": "0505.jpg"})
+    assert img.width > 0
+    img = _script().tile(tmp_path, {"n": 506, "s": 1.2, "file": "missing.jpg"})
+    assert img.width > 0
+
+
 def _script():
     sys.path.insert(0, str(ROOT / "scripts"))
     spec = importlib.util.spec_from_file_location("walk_frames_script", ROOT / "scripts" / "walk_frames.py")
@@ -130,9 +139,11 @@ def test_label_names_the_event_spot_and_an_app_run(monkeypatch):
         spot = "table_3"
 
     monkeypatch.setattr(event_walk, "walking", lambda: True)
+    monkeypatch.setattr(event_walk, "moving", lambda: True)   # the wheels (event_walk.moving)
     monkeypatch.setattr(event_walk, "current", lambda: FakeRun())
     assert walk_frames._label() == "event-table_3"
     monkeypatch.setattr(event_walk, "walking", lambda: False)
+    monkeypatch.setattr(event_walk, "moving", lambda: False)   # the wheels (event_walk.moving)
     monkeypatch.setattr(robot_face_link, "nav_activity", lambda session=None: "active")
     assert walk_frames._label() == "app"
     monkeypatch.setattr(robot_face_link, "nav_activity", lambda session=None: "idle")

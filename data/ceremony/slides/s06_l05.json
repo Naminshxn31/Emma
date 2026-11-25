@@ -1,0 +1,64 @@
+{
+ "template": "act",
+ "act": "emma_console",
+ "texts": {
+  "t1": "Besides my good looks",
+  "t2": "I've studied everything",
+  "t3": "about Embassy World",
+  "t4": "very carefully"
+ },
+ "pictures": {
+  "study": {
+   "asset": "fin_study_wall"
+  }
+ },
+ "videos": {
+  "emma": {
+   "asset": "c_emma_stage_crop"
+  }
+ },
+ "beats": [
+  {
+   "at_en": "Besides my good looks",
+   "do": "glint",
+   "key": "t1"
+  },
+  {
+   "at_en": "I've studied everything",
+   "do": "wall",
+   "key": "t2"
+  },
+  {
+   "at_en": "about Embassy World",
+   "do": "light",
+   "key": "t3"
+  },
+  {
+   "at_en": "very carefully",
+   "do": "slow",
+   "key": "t4"
+  }
+ ],
+ "options": {
+  "mode": "wall",
+  "start": "stand",
+  "emma": {
+   "x": 20,
+   "y": 42.4,
+   "fh": 30.6,
+   "base": 0.919,
+   "window": [48, 120, 624, 792, 720, 960]
+  },
+  "podium": {
+   "x": 50,
+   "top": 34
+  },
+  "sheet": [
+   7,
+   3,
+   512,
+   320,
+   8
+  ]
+ }
+}

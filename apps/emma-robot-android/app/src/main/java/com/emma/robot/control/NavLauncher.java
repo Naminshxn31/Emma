@@ -143,6 +143,8 @@ final class NavLauncher {
     private final Object launchLock = new Object();
 
     private volatile long latchedUntil = 0L;
+    /** Every stop() that set the latch, counted (MainActivity's sibling takeover, 24 Nov). */
+    private final AtomicInteger latchSets = new AtomicInteger();
     private volatile Run run;                  // the current run, or the last one
     private volatile String cancelReason = "stop_pressed";
     private ScheduledFuture<?> pollTask;
@@ -255,6 +257,22 @@ final class NavLauncher {
     void clearLatch() {
         latchedUntil = 0L;
         host.changed();
+    }
+
+    /** As BodyController's (sibling takeover, 24 Nov): when the latch runs out, how many stops
+     *  set it, and lowering it back to what it was before a pause. Never raises it; the stop
+     *  itself stands (the cancel token and the escalation are not touched). The caller tells
+     *  the page (host.changed via MainActivity) so stop_latch_s=0 reaches the server. */
+    long latchUntil() {
+        return latchedUntil;
+    }
+
+    int latchSets() {
+        return latchSets.get();
+    }
+
+    void liftLatchTo(long until) {
+        if (until < latchedUntil) latchedUntil = until;
     }
 
     // ---- what the gestures and the SafetyBar need ------------------------------
@@ -751,6 +769,7 @@ final class NavLauncher {
         cancelReason = reason == null ? "stop_pressed" : reason;
         cancelled.set(current == null ? "" : current.id);
         latchedUntil = SystemClock.elapsedRealtime() + NAV_STOP_LATCH_MS;
+        latchSets.incrementAndGet();
         announceLatchEnd();
         final boolean wasActive = (current != null && current.active()) || polledActive();
         // Review #32: a run with no tether yet (preparing, or io blocked in

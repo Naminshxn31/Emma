@@ -62,7 +62,12 @@ _MONEY = re.compile(r"บาท|ล้าน|THB|฿|baht|million|ราคา\S
 #: "should I hurry" answer says it with ไป. "ขายหมด" stays: the shops sold out
 #: sits on the line that counts the 1,066 units, and the developer's sold-out
 #: projects are his record, not this board.
-_PRICE_TALK = re.compile(r"ราคา(?:สูง|ต่ำ|แพง|ถูก|ไม่แพง)|แพงกว่า|ถูกกว่า|more expensive|cheaper|"
+#: ...and a building's price level said as a reach (15.5.4, the sales team's
+#: words per building: "A และ F ... ราคาเข้าถึงง่าย เหมาะลูกค้าไทยงบไม่สูง" --
+#: the row C/D's "แพงกว่า" went from on 27 Oct; robot 6 Nov "แล้วอยู่ตึกไหนดี"
+#: brings this chunk back first). Measured on the served report: two lines,
+#: that row and 14_units' "Studio ... ราคาเข้าถึงง่าย ... ผลตอบแทนค่าเช่า".
+_PRICE_TALK = re.compile(r"ราคา(?:สูง|ต่ำ|แพง|ถูก|ไม่แพง|เข้าถึง)|งบไม่สูง|แพงกว่า|ถูกกว่า|more expensive|cheaper|"
                          r"ขาย(?:ไป)?แล้ว|ขาย\s*\**\s*\d+\s*\**\s*ว่าง|ยังว่าง|ว่าง\s*\**\s*\d+\s*\**\s*(?:ห้อง|ยูนิต)|\d[\d,]*\**\s+(?:units?\s+)?sold|available out of",
                          re.IGNORECASE)
 
@@ -328,7 +333,15 @@ def _get_index(manifest: dict) -> dict:
 #: ห่างจาก Terminal 21 กี่กิโลเมตร" ranked the address FAQ (dense in
 #: "Embassy World ... ห่าง ... กิโลเมตร") over the travel table holding
 #: "Terminal 21 Pattaya | 7.2 | 11.2 | 12". Dropped before ranking and judging.
-_PROJECT_NAME = re.compile(r"(?i)\bembassy\s*world\b|\bembassy\b|เอ็มบาสซี่?\s*เวิลด์|เอ็มบาสซี่?|โครงการนี้|โครงการ")
+#: Not the sister projects' names (robot 6 Nov 09:06): "Embassy Life" lost its
+#: "Embassy" and was searched as the word "life" -- Biogenesis "life from
+#: life" and "WEALTH IS A LIFE STYLE" came back, and a question the scope rule
+#: calls the project's own ("โครงการอื่นของผู้พัฒนา") got the off-topic refusal,
+#: while the FAQ answers "Embassy One และ Embassy Life คืออะไร".
+_PROJECT_NAME = re.compile(r"(?i)\bembassy\s*world\b|\bembassy\b(?!\s*(?:life|one)\b)"
+                           # the tone mark before the lookahead: "ซี่?(?!ไลฟ์)" backtracked off ่
+                           # and stripped "เอ็มบาสซี" out of "เอ็มบาสซี่ไลฟ์" (review 6 Nov)
+                           r"|เอ็มบาสซี่?\s*เวิลด์|เอ็มบาสซี(?!่?\s*(?:ไลฟ์|วัน))่?|โครงการนี้|โครงการ")
 #: The guest's word -> the report's word (the report says พันธุ์ไม้; "โครงการ
 #: มีพืชชนิดอะไรบ้าง" found nothing with 34 names in the appendix).
 _SYNONYMS = {"พืช": "พันธุ์ไม้ ต้นไม้", "ต้นไม้": "พันธุ์ไม้", "plants": "พันธุ์ไม้", "trees": "พันธุ์ไม้",

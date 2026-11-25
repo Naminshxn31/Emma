@@ -229,5 +229,15 @@
   "max_w": 1600,
   "format": "webp",
   "why": "Basement parking, drawn (owner 13 Oct: \"ที่อยากให้เขียนขึ้นคือที่จอดรถ\"; the earlier picture was a thin-line crop of one corner of the website sheet). Source of truth is the tracked SVG stories/drawn/parking_plan.svg, rendered at 2x by scripts/draw_story_plans.py. Traced from the website pack's BASEMENT FLOOR PLAN (its pixels are the SVG's units): the one-level ring round the courtyard, building letters from the sheet's own key plan, EV CHARGING on the south-west lane where the sheet prints 'WITH EV CHARGER' (report 7.6: under building D), stall rows as texture only. No facility names in the block under building A (the sheet's names include ones the owner removed and rooms the approved facts place elsewhere), no ramps, no motorbike bays, no charger count."
+ },
+ {
+  "id": "site_plan_clean",
+  "source": "final1118/plan_ground_1123.webp",
+  "source_sha256": "a9cfe8c210e19a93cbb1e39a5e7f8f3bcd63219961766b404bf96d76149c0132",
+  "crop": null,
+  "max_w": 1920,
+  "format": "webp",
+  "max_kb": 420,
+  "why": "ผังพื้นที่ไม่มีเลขห้อง/พื้นที่ (จาก PDF เจ้าของ 23 พ.ย.) แทน plan_ground_site ที่พิมพ์เลขทุกห้อง"
  }
 ]

@@ -1,0 +1,28 @@
+{
+ "template": "act",
+ "act": "units_views",
+ "texts": {
+  "title": "What kind of view do you like?",
+  "sea": "Sea",
+  "seaplate": "A view of the sea",
+  "poolplate": "A ground-floor unit",
+  "poolplate2": "On the side facing the pool",
+  "aboveplate": "A view over the common areas",
+  "aboveplate2": "And the project's swimming pool"
+ },
+ "pictures": {
+  "pool_pic": {"asset": "fin_pool_v4b"},
+  "above_pic": {"asset": "fin_pool_v2_hd"}
+ },
+ "beats": [
+  {"at_en": "what kind of view", "do": "ask", "key": "title"},
+  {"at_en": "Would you enjoy", "do": "lean"},
+  {"at_en": "a view of the sea", "do": "sea", "key": ["sea", "seaplate"]},
+  {"at_en": "interested in", "do": "out"},
+  {"at_en": "a ground-floor unit", "do": "pool", "key": "poolplate"},
+  {"at_en": "on the side facing the pool", "do": "pool2", "key": "poolplate2"},
+  {"at_en": "a view over", "do": "above", "key": "aboveplate"},
+  {"at_en": "and the project's swimming pool", "do": "end", "key": "aboveplate2"}
+ ],
+ "options": {"mode": "views"}
+}

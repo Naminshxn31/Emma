@@ -1,0 +1,1810 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>Emma Ceremony</title>
+<!--
+  The ceremony staff's phone page. Owner 9 Nov 2026: "อันนี้ทำแยกกับอันเดิมนะ ไม่งั้นจะปนกัน
+  อันนี้จะเป็นสำหรับพิธี ที่สามารถใช้ข้อมูลอันเก่าได้" -- the opening ceremony runs in its own
+  robot app ("Emma Ceremony", -PemmaApp=ceremony) and is pressed from here; client/event-control.html
+  is Emma Event's scenes alone, nothing of the ceremony mixed in. The running order and the cue
+  list moved here from that page whole, with every behaviour its review rounds added.
+
+  Served by app/event_control_server.py (/ceremony-control) behind the same key and cookie as
+  /event-control. Polls /ceremony/state every second -- that poll is also the walk's dead man's
+  switch (app/event_walk.py): a page closed or a phone locked mid-walk stops the robot. A press
+  sends a step's place {n, i} or a cue's id, never words. No guest's words ever reach this page.
+  Self-contained: the office Wi-Fi is all it may have.
+-->
+<style>
+  :root {
+    --bg: #f4f1ec; --card: #fffdf9; --ink: #1f1c18; --soft: #6b645a; --line: #e2dcd2;
+    --accent: #0f6d5f; --accent-ink: #ffffff; --accent-soft: #dcefe9;
+    --warn: #9a5b00; --warn-soft: #fbecd2; --bad: #c62828; --bad-ink: #ffffff; --ok: #2e7d32;
+    --chip: #ece6dc; color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12110f; --card: #1d1b18; --ink: #f2ede6; --soft: #a39b8f; --line: #34302a;
+      --accent: #3fb8a3; --accent-ink: #06231e; --accent-soft: #173a33;
+      --warn: #f0b04a; --warn-soft: #3a2c12; --bad: #e5484d; --bad-ink: #ffffff; --ok: #6cc070;
+      --chip: #2a2723; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12110f; --card: #1d1b18; --ink: #f2ede6; --soft: #a39b8f; --line: #34302a;
+    --accent: #3fb8a3; --accent-ink: #06231e; --accent-soft: #173a33;
+    --warn: #f0b04a; --warn-soft: #3a2c12; --bad: #e5484d; --bad-ink: #ffffff; --ok: #6cc070;
+    --chip: #2a2723; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  /* `.walk { display: grid }` outranks the browser's own [hidden]: every card a page
+     "hides" stood there empty, with a blank green button (event-control.html, 5 Nov). */
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.45 "Sarabun", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+    padding-inline: 16px; padding-block: 0 calc(112px + env(safe-area-inset-bottom, 0px));
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { max-width: 640px; margin: 0 auto; display: grid; gap: 14px; }
+  header {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; background: var(--bg);
+    padding-block: 12px 8px; display: grid; gap: 8px;
+  }
+  .brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .01em; }
+  .dates { color: var(--soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .lamps { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--soft); }
+  .lamp { display: inline-flex; align-items: center; gap: 6px; }
+  .lamp i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: inline-block; }
+  .lamp.on i { background: var(--ok); }
+  .lamp.off i { background: var(--bad); }
+  .lamp.warn i { background: var(--warn); }
+  .banner { border-radius: 12px; padding: 10px 12px; font-size: 14px; background: var(--warn-soft); color: var(--warn); }
+  .banner.bad { background: var(--bad); color: var(--bad-ink); }
+  /* the ceremony app is not the one on the robot: nothing but "ทำเอง" can be pressed */
+  .banner.app { font-size: 15px; font-weight: 700; border: 2px solid var(--warn); }
+
+  .walk { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 6px; }
+  .walk .now { font-size: 18px; font-weight: 600; }
+  .walk .sub { color: var(--soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+  /* "ทั้งพิธีคุยสด" (owner 24 Nov, app/ceremony_follow.py): the live mode's card, at the top of the order */
+  .followbox { border: 2px solid var(--accent); }
+  .followbox.is-paused { border-color: var(--warn); }
+  .followbox .fk { color: var(--soft); font-size: 13px; }
+  .followbox .fv { font-size: 15px; overflow-wrap: anywhere; white-space: pre-line; }
+  .followbox .fmic { background: var(--bad); color: var(--bad-ink); border-radius: 12px; padding: 8px 12px; font-weight: 700; }
+  .followbox .fwarn { background: var(--warn-soft); color: var(--warn); border-radius: 12px; padding: 8px 12px; font-size: 14px; }
+  .followbox button.foff { background: var(--bad); color: var(--bad-ink); font-weight: 700; font-size: 18px; min-height: 60px; flex: 1 1 100%; }
+  .followbox button.fon { font-weight: 700; min-height: 56px; flex: 1 1 100%; }
+  .walk.moving { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .walk.stopped .now { color: var(--bad); }
+  .walk .next { font-size: 15px; font-weight: 600; color: var(--warn); }
+  details.tail summary { cursor: pointer; color: var(--soft); font-size: 13px; }
+  details.tail pre {
+    margin: 6px 0 0; font: 12px/1.4 ui-monospace, Consolas, monospace; white-space: pre-wrap;
+    overflow-wrap: anywhere; color: var(--soft);
+  }
+
+  h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--soft); margin: 10px 2px 0; }
+  .scenes { display: grid; gap: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  button {
+    font: inherit; border: 0; border-radius: 12px; min-height: 48px; padding: 0 16px; cursor: pointer;
+    background: var(--chip); color: var(--ink); touch-action: manipulation;
+  }
+  button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.confirm { background: var(--warn); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  a.go { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+  /* the ceremony's lines (app/event_cues.py): one card per scene, one row per cue */
+  .cuegroup { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px 14px; min-width: 0; }
+  .cuegroup > .gtitle { font-weight: 600; padding: 12px 0 4px; }
+  .cue { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); min-width: 0; }
+  .cuegroup > .gtitle + .cue { border-top: 0; }
+  .cue .host { font-size: 13px; color: var(--soft); overflow-wrap: anywhere; }
+  .cue .line { font-size: 16px; overflow-wrap: anywhere; }
+  .cue .line.brief { color: var(--soft); font-size: 14px; }
+  .cue .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--soft); white-space: nowrap; }
+  .badge.ok { background: var(--accent); color: var(--accent-ink); }
+  .badge.draft { background: var(--warn-soft); color: var(--warn); }
+  .badge.bad { background: var(--bad); color: var(--bad-ink); }
+  .cue .res { font-size: 14px; color: var(--soft); }
+  .cue .res.going { color: var(--accent); font-weight: 600; }
+  .cue .why { font-size: 12px; color: var(--soft); overflow-wrap: anywhere; }
+
+  /* the ceremony's running order (ลำดับพิธี): one card per scene, one row per step */
+  .ocard { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 2px 10px 10px; min-width: 0; }
+  .ocard.here { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .ocard .otop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 4px 8px; }
+  .ocard .otitle { font-size: 17px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .otag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--soft); white-space: nowrap; }
+  .ocard.here .otag { background: var(--accent); color: var(--accent-ink); }
+  .ocard.finished .otag { background: var(--accent-soft); color: var(--accent); }
+  .ocard .steps { display: grid; gap: 6px; }
+  .step {
+    display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--bg);
+    border: 1px solid transparent; min-width: 0; cursor: pointer; -webkit-user-select: none; user-select: none;
+  }
+  /* "ทำเอง": nothing is triggered by its press -- it must not look like the ones that speak */
+  .step.k-manual { background: transparent; border: 1px dashed var(--soft); }
+  .step.m-done, .step.m-skipped { background: transparent; border-color: var(--line); }
+  .step.m-failed { border: 1px solid var(--bad); }
+  .step.m-running { border-color: var(--accent); }
+  .step.next { background: var(--accent-soft); border: 2px solid var(--accent); padding: 9px 11px; }
+  .step.next.k-manual { border-style: dashed; }
+  .step.armed { background: var(--warn-soft); border: 2px solid var(--warn); padding: 9px 11px; }
+  /* He spoke and nothing matched (owner 24 Nov, app/ceremony_follow.py `nudge`): the step to press by hand stands out */
+  .step.nudged { background: var(--warn-soft); border: 3px solid var(--warn); padding: 8px 10px; box-shadow: 0 0 0 4px var(--warn-soft); }
+  .step.nudged .slabel { font-size: 18px; font-weight: 700; }
+  .step.nudged::before { content: "กดเองได้เลย — จับบทไม่ได้"; display: block; color: var(--warn); font-weight: 700; font-size: 13px; }
+  .step .spress { display: grid; gap: 4px; min-width: 0; outline-offset: 4px; }
+  .step.unready, .step .spress[aria-disabled="true"] { cursor: default; }
+  .step.unready .shead, .step.unready .slabel, .step.unready .sline, .step.unready .sshow { opacity: .5; }
+  .step .shead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .kind { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--ink); white-space: nowrap; }
+  .kind.k-cue { background: var(--accent); color: var(--accent-ink); }
+  .kind.k-walk { background: var(--warn); color: var(--bg); }
+  /* the big screen, and the hand-over to Emma Event: the end of this app's day */
+  .kind.k-screen { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .kind.k-handoff { background: var(--ink); color: var(--bg); }
+  .kind.k-manual { background: transparent; color: var(--soft); box-shadow: inset 0 0 0 1px var(--soft); }
+  /* the venue's lights / curtains the robot sends (app/venue_devices.py): only where it drives them */
+  .kind.k-device { background: var(--warn-soft); color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn); }
+  .step .shw { font-size: 13px; color: var(--soft); }
+  .vdev { display: grid; gap: 6px; padding: 8px 0; border-top: 1px solid var(--line); min-width: 0; }
+  .vdev:first-child { border-top: 0; }
+  .vdev .vname { font-weight: 600; }
+  .vdev .vlast { font-size: 13px; color: var(--soft); overflow-wrap: anywhere; }
+  .vdev .vlast.bad { color: var(--bad); font-weight: 600; }
+  .vdev .vwhy { font-size: 12px; color: var(--soft); overflow-wrap: anywhere; }
+  .kind.k-show, .kind.voice { color: var(--soft); font-weight: 400; }
+  .smark { margin-left: auto; font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--soft); }
+  .smark.done { color: var(--ok); }
+  .smark.next, .smark.running { color: var(--accent); }
+  .smark.failed { color: var(--bad); }
+  .smark.unready { color: var(--warn); }
+  .smark.running::before {
+    content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
+    background: currentColor; vertical-align: 1px; animation: opulse 1.1s ease-in-out infinite;
+  }
+  @keyframes opulse { 50% { opacity: .2; } }
+  @media (prefers-reduced-motion: reduce) { .smark.running::before { animation: none; } }
+  .slabel { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+  .step.m-done .slabel, .step.m-skipped .slabel, .step.m-done .sline, .step.m-skipped .sline { color: var(--soft); }
+  .step.m-skipped .slabel { text-decoration: line-through; }
+  /* what she will say: three lines, the rest one tap away ("อ่านทั้งหมด") */
+  .sline {
+    font-size: 16px; overflow-wrap: anywhere; overflow: hidden;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+  }
+  .step.m-done .sline, .step.m-skipped .sline { -webkit-line-clamp: 2; line-clamp: 2; }
+  .step .sline.open { display: block; -webkit-line-clamp: none; line-clamp: none; overflow: visible; }
+  .sshow { font-size: 14px; overflow-wrap: anywhere; }
+  .snote { font-size: 12px; color: var(--soft); overflow-wrap: anywhere; }
+  .swhy { font-size: 13px; color: var(--warn); font-weight: 600; overflow-wrap: anywhere; }
+  /* a warning on a step that can still be pressed ("ภาพไม่ขึ้น", "จอใหญ่ยังไม่ได้ตั้งค่า"): full
+     strength, never dimmed -- the line goes, the picture or the screen does not */
+  .swarn {
+    font-size: 13px; color: var(--warn); font-weight: 600; overflow-wrap: anywhere;
+    background: var(--warn-soft); border-radius: 8px; padding: 4px 8px;
+  }
+  .serr { font-size: 13px; color: var(--bad); font-weight: 600; overflow-wrap: anywhere; }
+  /* a joke's two lines said straight through (`chain`, owner 23 Nov): what the pair does by itself */
+  .schain { font-size: 13px; color: var(--accent); font-weight: 600; overflow-wrap: anywhere; }
+  .sacts { display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; }
+  .shint { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .step.armed .shint { color: var(--warn); }
+  button.link {
+    min-height: 40px; padding: 0 2px; border-radius: 6px; background: transparent; color: var(--accent);
+    font-size: 14px; text-decoration: underline; text-underline-offset: 3px;
+  }
+  button.link.skip { color: var(--warn); }
+  .ocard > button.link { margin: 0 4px; }
+  /* how the steps are pressed (owner 14 Nov "ทำแบบ manual"): "กดเอง" = each step its own button,
+     any step any time; "ตามลำดับ" = the big "ถัดไป" and a tap on the row, as before */
+  .modeseg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--chip); }
+  .modeseg button { min-height: 44px; padding: 0 8px; background: transparent; color: var(--soft); font-size: 15px; font-weight: 600; }
+  .modeseg button[aria-pressed="true"] { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+  body.manual .step { cursor: default; }
+  /* "กดเอง": "ข้ามขั้นนี้" not straight under the step's own button (round 2 -- a thumb a little low
+     on the 52 px button skipped the step) */
+  body.manual .step .sacts { margin-top: 10px; padding-top: 6px; border-top: 1px dashed var(--line); }
+  .step .sgo {
+    width: 100%; min-height: 52px; margin-top: 4px; border-radius: 12px; font-size: 17px; font-weight: 700;
+    background: var(--accent); color: var(--accent-ink);
+  }
+  /* "ทำเอง" triggers nothing: its button must not look like the ones that speak or move */
+  .step.k-manual .sgo { background: var(--card); color: var(--ink); border: 2px dashed var(--soft); }
+  .step .sgo.confirm { background: var(--warn); color: #fff; }
+  /* the opening (card 1 as the ceremony's first step, owner 23 Nov): what it does, how far it got, what is left */
+  .opening { display: grid; gap: 4px; margin-top: 4px; padding: 8px 10px; border-radius: 10px; background: var(--chip); }
+  .opening .oplan { margin: 0; padding-left: 20px; font-size: 14px; overflow-wrap: anywhere; }
+  .opening .oplan li.o-now { font-weight: 700; color: var(--accent); }
+  .opening .oplan li.o-cut { font-weight: 700; color: var(--bad); }
+  .opening .thead { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+  .opening .thead.bad { color: var(--bad); }
+  .step .sgo.bare, .step .sgo.hand { background: var(--card); color: var(--ink); border: 2px solid var(--warn); font-size: 15px; }
+  .step .sgo.hand:disabled { border-style: dashed; color: var(--soft); }
+  .step .sgo.bare.confirm, .step .sgo.hand.confirm { background: var(--warn); color: #fff; }
+
+  details.setup { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px 14px; }
+  details.setup > summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+  .note { font-size: 13px; color: var(--soft); margin: 0 2px; }
+
+  .stopbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--bg);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line);
+  }
+  .stopbar .bar { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  /* STOP keeps the whole width and the bottom edge: a thumb slammed at the bottom in a
+     hurry lands on it, never on "ถัดไป" (which says a line or starts a walk) */
+  .stopbar #stopBtn {
+    width: 100%; display: block; min-height: 72px; border-radius: 18px;
+    background: var(--bad); color: var(--bad-ink); font-size: 24px; font-weight: 700; letter-spacing: .04em;
+  }
+  .stopbar #nextBtn {
+    width: 100%; min-width: 0; min-height: 60px; border-radius: 16px; padding: 6px 16px; display: grid; gap: 0;
+    text-align: left; background: var(--accent); color: var(--accent-ink);
+  }
+  #nextBtn .nb1, #nextBtn .nb2 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #nextBtn .nb1 { font-size: 13px; font-weight: 600; opacity: .9; }
+  #nextBtn .nb2 { font-size: 18px; font-weight: 700; }
+  #nextBtn.is-manual { background: var(--card); color: var(--ink); border: 2px dashed var(--soft); }
+  #nextBtn.is-unready { background: var(--warn-soft); color: var(--warn); }
+  /* her live window open: "ถัดไป" closes it -- not the look of a press that speaks */
+  #nextBtn.is-live { background: var(--card); color: var(--accent); border: 2px solid var(--accent); }
+  #nextBtn.is-confirm { background: var(--warn); color: #fff; }
+  /* "ตอบสด" (owner 23 Nov: คุณมิกิ off-script): in the bar, so it is at hand at any moment of the ceremony
+     whatever is scrolled -- beside "ถัดไป" ("ตามลำดับ"), the whole row ("กดเอง"); never at STOP's edge */
+  .stopbar .barrow { display: flex; gap: 8px; min-width: 0; }
+  .stopbar .barrow > button { min-width: 0; }
+  .stopbar .barrow #nextBtn { flex: 1.5 1 0; width: auto; }
+  /* (at 320 px "กลับเข้าบท" still fits beside "ถัดไป": measured) */
+  .stopbar #adhocBtn {
+    flex: 1 1 0; min-height: 60px; border-radius: 16px; padding: 6px 10px; display: grid; gap: 0; text-align: left;
+    background: var(--card); color: var(--accent); border: 2px solid var(--accent);
+  }
+  #adhocBtn .nb1, #adhocBtn .nb2 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #adhocBtn .nb1 { font-size: 12px; font-weight: 600; opacity: .9; }
+  #adhocBtn .nb2 { font-size: 18px; font-weight: 700; }
+  /* open: she is listening to the host -- unmistakable, and the same button is the way back */
+  /* (its text in the page's own ground colour: white on the dark theme's light amber could not be read) */
+  #adhocBtn.is-open { background: var(--warn); color: var(--bg); border-color: var(--warn); }
+  #adhocBtn.is-unready { color: var(--soft); border: 2px dashed var(--soft); }
+  /* what she is doing while it is open (or how the last one ended), over the bar's buttons */
+  .stopbar .adhocnow { border-radius: 12px; padding: 6px 12px; display: grid; gap: 0; }
+  .stopbar .adhocnow.is-open { background: var(--warn); color: var(--bg); }
+  .stopbar .adhocnow.is-closed { background: var(--warn-soft); color: var(--warn); }
+  .adhocnow .an1 { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+  .adhocnow .an2 { font-size: 13px; overflow-wrap: anywhere; }
+  .adhocnow.is-open .an1::before {
+    content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px;
+    background: currentColor; vertical-align: 1px; animation: opulse 1.1s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .adhocnow.is-open .an1::before { animation: none; } }
+  /* the end of the order, said in the bar where "ถัดไป" stood (review 7 Nov, B8) */
+  .stopbar .orderend {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px;
+    min-height: 52px; padding: 6px 14px; border-radius: 16px; background: var(--accent-soft); color: var(--accent);
+    font-weight: 700; font-size: 17px;
+  }
+  .stopbar .orderend button.link { min-height: 40px; font-weight: 600; }
+  .stopbar .orderend a.go { font-size: 14px; }
+  body.with-next { padding-bottom: calc(180px + env(safe-area-inset-bottom, 0px)); }
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: calc(104px + env(safe-area-inset-bottom, 0px)); z-index: 4;
+    max-width: 608px; margin: 0 auto; background: var(--ink); color: var(--bg); border-radius: 12px;
+    padding: 12px 14px; font-size: 15px; opacity: 0; transform: translateY(8px);
+    transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  body.with-next .toast { bottom: calc(172px + env(safe-area-inset-bottom, 0px)); }
+  /* "ตอบสด"'s line over the bar (after with-next: the same weight, the later rule wins) */
+  body.with-adhoc-note { padding-bottom: calc(240px + env(safe-area-inset-bottom, 0px)); }
+  body.with-adhoc-note .toast { bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand"><h1>Emma Ceremony</h1><span class="dates" id="dates"></span></div>
+    <div class="lamps">
+      <span class="lamp" id="lampServer"><i></i>เซิร์ฟเวอร์</span>
+      <span class="lamp" id="lampFace"><i></i>หน้าหุ่น</span>
+      <span class="lamp" id="lampCall"><i></i>Emma โหมดพิธี</span>
+      <span class="lamp" id="lampWalk"><i></i>การเดิน</span>
+      <span class="lamp" id="lampBattery"><i></i><span id="batteryText">แบต ?</span></span>
+      <span class="lamp" id="lampFix"><i></i><span id="fixText">ตำแหน่ง ?</span></span>
+      <span class="lamp" id="lampNet"><i></i><span id="netText">เน็ต ?</span></span>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+  </header>
+
+  <!-- The robot runs another app (`mode.ceremony_app` false): the server refuses every step that
+       does something ("not_ceremony_app") -- said once here, before anyone presses. -->
+  <div class="banner app" id="appBanner" hidden>เปิดแอป Emma Ceremony บนหุ่นก่อน (ตอนนี้กดได้แค่ขั้นทำเอง)</div>
+
+  <!-- What she is doing now: the ceremony's mode (cue-only, her live window), and the film. -->
+  <section class="walk" id="modeCard" hidden>
+    <div class="now" id="modeNow"></div>
+    <div class="sub" id="modeSub"></div>
+    <div class="next" id="modeWarn" hidden></div>
+  </section>
+
+  <!-- In the box (app/event_box.py, owner 23 Nov "หุ่นอยู่ในกล่อง ... เดินออกมาก่อน จึงค่อยยกมือ"): from the press of a
+       walk out of the box until she is out, no arm of hers moves -- her talking arm, a button, the camera's handshake,
+       the pageant. Out = a walk out that walked all of it with the wheels still, or staff's two taps here. -->
+  <section class="walk" id="boxCard" hidden>
+    <div class="now" id="boxNow"></div>
+    <div class="row">
+      <button id="boxFinish" type="button" hidden>เดินออกให้ครบ</button>
+      <button id="boxClear" type="button">หุ่นออกจากกล่องแล้ว — ปลดล็อกแขน</button>
+    </div>
+  </section>
+  <section class="walk" id="clipCard" hidden>
+    <div class="now" id="clipNow"></div>
+    <div class="sub" id="clipSub"></div>
+    <div class="row" id="clipRow"></div>
+  </section>
+  <section class="walk" id="venueCard" hidden>
+    <div class="now">ไฟ/ม่าน — หุ่นส่งคำสั่ง</div>
+    <div class="sub" id="venueSub"></div>
+    <div id="venueList"></div>
+  </section>
+  <section class="walk" id="walk">
+    <div class="now" id="walkNow">พร้อม</div>
+    <div class="sub" id="walkSub"></div>
+    <div class="next" id="walkNext" hidden></div>
+    <div class="row" id="walkActions" hidden>
+      <button id="dockPoseBtn" type="button" hidden>ตั้งตำแหน่งที่แท่น</button>
+    </div>
+    <details class="tail" id="walkTailBox" hidden><summary>รายละเอียดการเดิน</summary><pre id="walkTail"></pre></details>
+  </section>
+
+  <!-- The ceremony's running order (owner 7 Nov: "ทำเป็นแบบกดสั่งด้วยนะ พวกซีนต่างๆ"): every
+       press of the ceremony, scene by scene, in the server's order (GET /ceremony/state
+       `order`). A press sends {n, i} -- never words; the server says what it did. Shown
+       only when the server has an order; without one, the flat cue list below stays. -->
+  <!-- "ทั้งพิธีคุยสด" (owner 24 Nov, app/ceremony_follow.py): the server follows the host. Shows what line of his the
+       next cue waits for (the SCRIPT's text -- never what he really said), what just played and why, and the big
+       stop. Only with CEREMONY_FOLLOW_HOST on (the server sends `follow`). -->
+  <section class="walk followbox" id="followBox" hidden role="status">
+    <div class="now" id="followNow"></div>
+    <div class="fmic" id="followMic" hidden></div>
+    <div class="fwarn" id="followWarn" hidden></div>
+    <div><div class="fk">รอคุณมิกิพูด (ตามบท) → แล้ว Emma เล่นคิว</div><div class="fv" id="followExpect"></div></div>
+    <div><div class="fk">เพิ่งเล่น / เหตุผล</div><div class="fv" id="followLast"></div></div>
+    <div class="fwarn" id="followNudge" hidden></div>
+    <div class="sub" id="followEval"></div>
+    <div class="row">
+      <button id="followOff" class="foff" type="button">หยุดโหมดสด / กลับไปกดเอง</button>
+      <button id="followResume" class="fon primary" type="button" hidden>กลับมาโหมดสด</button>
+      <button id="followOn" class="fon primary" type="button" hidden>เปิดโหมดสด (การ์ด 2)</button>
+    </div>
+  </section>
+  <h2 id="orderHead" hidden>ลำดับพิธี</h2>
+  <!-- How steps are pressed (owner 14 Nov: "ทำหน้าปุ่มกดยัง ทำแบบ manual"): kept on this phone. -->
+  <div class="modeseg" id="orderMode" role="group" aria-label="วิธีกด" hidden>
+    <button type="button" data-mode="manual" aria-pressed="true">กดเอง (manual)</button>
+    <button type="button" data-mode="order" aria-pressed="false">ตามลำดับ (ถัดไป)</button>
+  </div>
+  <p class="note" id="orderNote" hidden></p>
+  <div class="banner" id="orderWarn" hidden></div>
+  <div class="banner" id="orderCleared" hidden></div>
+  <div class="scenes" id="order" hidden></div>
+  <details class="setup" id="orderTools" hidden>
+    <summary>เริ่มลำดับใหม่</summary>
+    <p class="note">ล้างสถานะทุกขั้น (ทำแล้ว / ข้าม / ไม่สำเร็จ) แล้วเริ่มนับจากขั้นแรก — ใช้หลังซ้อม ก่อนเริ่มพิธีจริง (กดสองครั้งเพื่อยืนยัน)</p>
+    <div class="row"><button id="orderReset" type="button">เริ่มลำดับใหม่ตั้งแต่ขั้นแรก</button></div>
+  </details>
+
+  <!-- The ceremony's lines (app/event_cues.py, data/events/*.script.json): staff press
+       a cue, Emma says its approved line word for word. Only approved lines can be
+       pressed; the page shows the script's own text, never a guest's words. -->
+  <h2 id="cuesHead" hidden>บทพิธี</h2>
+  <p class="note" id="cuesNote" hidden></p>
+  <div class="scenes" id="cues"></div>
+
+  <p class="note">หลังพิธี ฉากงาน การเดินไปทักแขก และการตั้งค่าจุด อยู่ที่ <a class="go" href="/event-control">หน้าคุมงาน (Emma Event)</a></p>
+</main>
+
+<div class="stopbar"><div class="bar">
+  <!-- "ตอบสด" (owner 23 Nov): what she does while it is open, or how the last one ended -->
+  <div class="adhocnow" id="adhocNow" hidden role="status"><span class="an1" id="adhocNowTop"></span><span class="an2" id="adhocNowSub"></span></div>
+  <div class="barrow" id="barRow">
+    <button id="nextBtn" type="button" hidden><span class="nb1" id="nextTop"></span><span class="nb2" id="nextLabel"></span></button>
+    <button id="adhocBtn" type="button" hidden aria-pressed="false"><span class="nb1" id="adhocTop"></span><span class="nb2" id="adhocLabel">ตอบสด</span></button>
+  </div>
+  <div class="orderend" id="orderEnd" hidden><span>ลำดับพิธีจบแล้ว ✓</span><a class="go" href="/event-control">หน้าคุมงาน ▶</a><button id="orderEndReset" type="button" class="link">เริ่มลำดับใหม่…</button></div>
+  <button id="stopBtn" type="button">หยุด</button>
+</div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = null, lastOk = 0, toastTimer = null, busy = false;
+
+  var WALK_TH = { starting: 'กำลังเริ่มเดินไป', walking: 'กำลังเดินไป', arrived: 'ถึงแล้ว:',
+                  stopped: 'หยุดแล้ว:', failed: 'เดินไม่สำเร็จ:' };
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function toast(text, ms) {
+    var t = $('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, ms || 3200);
+  }
+  function lamp(id, on) {
+    var l = $(id);
+    l.classList.toggle('on', on === true);
+    l.classList.toggle('off', on === false);
+  }
+  // Her call, as the cues see it (event_cues: a live call of the robot face) -- the same word
+  // the order's "no call" warning reads, so the lamp and the warning never disagree.
+  function callUp(s) {
+    return s.cues ? !!s.cues.call : !!(s.face && s.face.ceremony_call);
+  }
+
+  // A POST that never answered (Wi-Fi dropping in the multimedia room) left "กำลังส่ง…" and every
+  // control disabled until a reload (review 7 Nov, B6): cut at POST_TIMEOUT_MS, never shorter than
+  // the server's longest press -- a walk (the arm's rest <= 2.5 + 12 s, the walk it replaces <= ~11 s,
+  // a pose read 3 s, the walker's gate 6 s) or a line waiting for her voice and the lock (15 + 45 +
+  // 12 s). And no answer is not "it did not happen" -- the server may have run it: `unknown`, said as
+  // such, and a step whose last press is unknown takes a second, deliberate tap (unknownAt).
+  var POST_TIMEOUT_MS = 90000, STOP_TIMEOUT_MS = 20000;
+  var UNKNOWN_TH = 'ไม่รู้ผล — ดูสถานะขั้นนี้ก่อนกดซ้ำ';
+  async function post(path, body, ms) {
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    var cut = ctl ? setTimeout(function () { ctl.abort(); }, ms || POST_TIMEOUT_MS) : null;
+    var r = null;
+    try {
+      r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(body || {}), credentials: 'same-origin', cache: 'no-store',
+                              signal: ctl ? ctl.signal : undefined });
+      return await r.json();
+    } catch (e) {
+      // the cookie gate answers 403 in plain text before anything runs: that one is known
+      if (r && r.status === 403) return { ok: false, error: 'forbidden', error_th: 'หน้านี้หมดสิทธิ์ — เปิดลิงก์ที่มี key ใหม่' };
+      return { ok: false, unknown: true, error: 'unknown', error_th: UNKNOWN_TH };
+    } finally {
+      clearTimeout(cut);
+    }
+  }
+
+  function walkMessage(result) {
+    var w = result && result.walk;
+    if (w && w.ok === false) return 'ไม่ได้เดิน: ' + (w.error_th || w.error) + ' — Emma พูดอยู่กับที่';
+    if (w && w.ok) return 'หุ่นกำลังเดินไป ' + w.run.name;
+    return null;
+  }
+
+  // ---- render ---------------------------------------------------------------------
+  function render() {
+    var s = state;
+    var online = Date.now() - lastOk < 3500;
+    lamp('lampServer', online);
+    if (!online) {
+      $('banner').hidden = false;
+      $('banner').className = 'banner bad';
+      // not "it stops by itself": with Android down (4 Nov, three times) nothing here
+      // is left to stop it, and the board finishes the MoveTo it was given
+      $('banner').textContent = 'ติดต่อหุ่นไม่ได้ (Wi-Fi หลุด หรือเครื่องหุ่นรีบูต) — ถ้าเห็นหุ่นยังเดินอยู่ กดปุ่ม E-stop บนตัวหุ่น';
+    }
+    if (!s) return;
+    renderLamps(s, online);
+    // Owner 9 Nov: the ceremony is its own app. Explicitly false = another app is on the robot
+    // and the server refuses every step that does something; a server that does not say
+    // (no field) is not accused of it.
+    var off = !!(s.mode && s.mode.ceremony_app === false);
+    // Emma Event's call is up: the hand-over worked, or staff opened it -- the ceremony is over
+    // on the robot, never "open the ceremony app" (following that stopped the after-party's walks;
+    // review of the split, 9 Nov)
+    var handedOver = off && !!(s.face && s.face.event_call);
+    $('appBanner').hidden = !off;
+    $('appBanner').textContent = handedOver
+      ? 'พิธีจบแล้ว — หุ่นอยู่ในแอป Emma Event (ช่วงหลังพิธีใช้หน้าคุม Event)'
+      : 'เปิดแอป Emma Ceremony บนหุ่นก่อน (ตอนนี้กดได้แค่ขั้นทำเอง)';
+    renderWalk(s.walk);
+    renderBox(s);
+    $('dates').textContent = s.event ? (s.event.dates || []).join(' – ') : '';
+  }
+
+  // The robot's internet (owner 10 Nov: "วิธีทำเน็ตไม่หลุด ... วันงานคนน่าจะต้องเยอะมาก"; NET_STATUS,
+  // app/net_health.py): Emma talks through Google, the walk / the screen / this page do not -- a
+  // dropped internet used to look like Emma going quiet. `net` null = nothing probes (lamp grey).
+  var NET_TH = { ok: 'เน็ต', slow: 'เน็ตช้า', flaky: 'เน็ตสะดุด', down: 'เน็ตหลุด', unknown: 'เน็ต ?' };
+  function renderNet(s) {
+    var n = s && s.net;
+    var level = n && NET_TH[n.level] ? n.level : null;
+    var l = $('lampNet');
+    l.classList.toggle('on', level === 'ok');
+    l.classList.toggle('warn', level === 'slow' || level === 'flaky');
+    l.classList.toggle('off', level === 'down');
+    $('netText').textContent = level ? NET_TH[level] + (n.ms != null && level !== 'down' ? ' ' + (n.ms / 1000).toFixed(1) + ' วิ' : '')
+      : 'เน็ต ?';
+    return level;
+  }
+  function renderLamps(s, online) {
+    lamp('lampFace', !!(s.face && s.face.connected));
+    // a call of another app (Emma Event's) is not the ceremony's: green only while it is this app's
+    lamp('lampCall', callUp(s) && !(s.mode && s.mode.ceremony_app === false));
+    lamp('lampWalk', !!(s.walk && s.walk.enabled));
+    var h = (s.walk && s.walk.health) || {};
+    var known = h.known && h.board;
+    $('batteryText').textContent = known && h.battery != null
+      ? 'แบต ' + Math.round(h.battery) + '%' + (h.charging ? ' ชาร์จอยู่' : '') : 'แบต ?';
+    $('fixText').textContent = known && h.q != null ? 'ตำแหน่ง Q' + h.q : 'ตำแหน่ง ?';
+    lamp('lampBattery', known ? !h.low_battery : undefined);
+    lamp('lampFix', known ? !h.lost : undefined);
+    // grey while this phone cannot reach the robot: the last poll's "เน็ต" is not now (review 10 Nov)
+    var net = renderNet(online ? s : null);
+    if (!online) return;                 // the "cannot reach" banner stays
+    var warn = [];
+    if (net === 'down') warn.push('อินเทอร์เน็ตของหุ่นหลุด — Emma ตอบไม่ได้จนกว่าเน็ตกลับ (การเดิน จอใหญ่ และหน้านี้ยังใช้ได้)');
+    if (h.known && !h.board) warn.push('อ่านบอร์ดเดินไม่ได้ — ถ้าเดินไม่ได้ ดูคู่มือซ้อม');
+    if (known && h.low_battery) warn.push('แบตต่ำ ' + Math.round(h.battery) + '% — เดินได้แค่กลับแท่น');
+    if (known && h.lost) warn.push('หุ่นไม่แน่ใจตำแหน่ง — เข็นเข้าแท่นแล้วกด "ตั้งตำแหน่งที่แท่น"');
+    if (!s.event) warn.push('เครื่องนี้ไม่มีไฟล์งาน (EVENT_FILE)');
+    if (!(s.face && s.face.connected)) warn.push('หน้าหุ่นไม่ได้เชื่อมต่อ (เปิดแอป Emma Ceremony บนหุ่น)');
+    if (s.walk && !s.walk.enabled) warn.push('การเดินปิดอยู่ — ขั้นเดินกดไม่ได้ (ข้ามได้)');
+    $('banner').hidden = !warn.length;
+    $('banner').className = 'banner';
+    $('banner').textContent = warn.join(' · ');
+  }
+
+  function renderWalk(walk) {
+    var run = walk && walk.run, box = $('walk');
+    box.className = 'walk';
+    $('walkTailBox').hidden = !(run && run.tail && run.tail.length);
+    if (!run) {
+      $('walkNow').textContent = 'พร้อม — หุ่นยืนอยู่กับที่';
+      $('walkSub').textContent = '';
+      renderRecovery(null, walk);
+      return;
+    }
+    var moving = run.state === 'starting' || run.state === 'walking';
+    if (moving) box.classList.add('moving');
+    if (run.state === 'stopped' || run.state === 'failed') box.classList.add('stopped');
+    $('walkNow').textContent = (WALK_TH[run.state] || run.state) + ' ' + run.name;
+    $('walkSub').textContent = (moving ? 'เดินมา ' : 'ใช้เวลา ') + Math.round(run.elapsed_s) + ' วินาที'
+      + (run.reason_th && !moving ? ' · ' + run.reason_th : '');
+    $('walkTail').textContent = (run.tail || []).join('\n');
+    renderRecovery(run, walk);
+  }
+
+  // The button stays in the page and is only shown or hidden: rebuilt every second
+  // a finger's touch could land on one that has just been replaced.
+  // No "เดินต่อ" / "กลับแท่น" here: while the ceremony app is on the robot the server refuses
+  // both (they drive her -- app/event_control_server.py, "ceremony_app"). A ceremony walk that
+  // stopped is pressed again from its own step (two taps, out of its turn); the dock pose is
+  // not driving her and stays.
+  function renderRecovery(run, walk) {
+    var health = (walk && walk.health) || {};
+    var moving = run && (run.state === 'starting' || run.state === 'walking');
+    var next = $('walkNext');
+    // held / stopped where she set out = the wheels never turned: an E-stop left in (19 Nov)
+    if (run && run.still_th) next.textContent = run.still_th;
+    else if (moving && run.held) next.textContent = 'มีคนหรือของขวางทาง — หุ่นรอให้ทางว่าง แล้วจะเดินต่อเอง';
+    else if (run && !moving && run.state !== 'arrived') next.textContent = 'จะเดินต่อ กดขั้นเดินในลำดับพิธีอีกครั้ง (แตะสองครั้ง)';
+    else next.textContent = '';
+    next.hidden = !next.textContent;
+    var lost = !!health.lost || !!(run && (run.kind === 'lost' || run.kind === 'restart'));
+    $('dockPoseBtn').hidden = moving || !lost;
+    var dockArmed = !!stepArmed && stepArmed.key === 'dock';
+    $('dockPoseBtn').className = dockArmed ? 'confirm' : '';
+    $('dockPoseBtn').textContent = dockArmed ? 'หุ่นอยู่บนแท่นจริง — แตะอีกครั้ง' : 'ตั้งตำแหน่งที่แท่น';
+    $('walkActions').hidden = $('dockPoseBtn').hidden;
+  }
+
+  // ---- actions (the dock pose, the film's stop) --------------------------------------
+  async function act(path, body, label) {
+    if (busy) return;
+    busy = true;
+    try {
+      var r = await post(path, body);
+      if (r.unknown) toast(label + ': ' + UNKNOWN_TH, 6000);
+      else if (r.ok === false) toast(adhocClosedTh(r) + label + ' ไม่ได้: ' + (r.error_th || r.error || 'ผิดพลาด'));
+      else toast(adhocClosedTh(r) + (walkMessage(r) || (label + ' แล้ว')));
+    } finally {
+      busy = false;
+      poll(true);
+    }
+  }
+
+  // In the box (app/event_box.py): what holds her arm, and both ways out -- re-armed only by the order's in-box tick
+  // (second review 23 Nov: the walk out is single use; resetting the order does not arm it) -- "เดินออกให้ครบ" walks only what is left of a
+  // walk out that stopped short (never the opening again: it would walk another whole metre; /ceremony/box-finish =
+  // the ceremony's own walk), and staff's own look "หุ่นออกจากกล่องแล้ว — ปลดล็อกแขน" lets the arm go. Two taps each.
+  function renderBox(s) {
+    var b = s && s.box;
+    $('boxCard').hidden = !(b && b.in);
+    if (!(b && b.in)) return;
+    $('boxNow').textContent = b.text_th || 'หุ่นอยู่ในกล่อง — แขนล็อก';
+    var left = typeof b.left_m === 'number' ? b.left_m : null;
+    var finArmed = !!stepArmed && stepArmed.key === 'box:finish', clrArmed = !!stepArmed && stepArmed.key === 'box:clear';
+    var fin = $('boxFinish');
+    fin.hidden = !(b.partial && left !== null && left >= 0.03);
+    fin.className = finArmed ? 'confirm' : '';
+    fin.textContent = finArmed ? 'แตะอีกครั้งเพื่อเดิน ' + (left || 0).toFixed(2) + ' ม. (ตรงไปข้างหน้า)'
+      : 'เดินออกให้ครบ (อีก ' + (left || 0).toFixed(2) + ' ม.)';
+    var clr = $('boxClear');
+    clr.className = clrArmed ? 'confirm' : '';
+    clr.textContent = clrArmed ? 'แตะอีกครั้ง — ยืนยันว่าหุ่นทั้งตัวและแขนพ้นกล่องแล้ว'
+      : (b.clear_th || 'หุ่นออกจากกล่องแล้ว — ปลดล็อกแขน');
+  }
+  $('boxFinish').onclick = function () {
+    if (!secondTap('box:finish')) { renderBox(state); return; }
+    stepArmed = null;
+    clearTimeout(stepArmTimer);
+    act('/ceremony/box-finish', {}, 'เดินออกให้ครบ');
+  };
+  $('boxClear').onclick = function () {
+    if (!secondTap('box:clear')) { renderBox(state); return; }
+    stepArmed = null;
+    clearTimeout(stepArmTimer);
+    act('/event/box-clear', {}, 'ปลดล็อกแขน');
+  };
+
+  // Lost after a stopped walk: the robot pushed onto its dock, its pose set there (two taps).
+  // Event's own endpoint on the same listener and cookie -- allowed with the ceremony app on.
+  // The page's own two-tap helper (`secondTap`, ARM_MIN_MS): a double tap is not a second thought
+  // (review 20 Nov -- this button had its own arming with no such guard).
+  $('dockPoseBtn').onclick = function () {
+    if (!secondTap('dock')) { render(); return; }
+    stepArmed = null;
+    clearTimeout(stepArmTimer);
+    act('/event/dock-pose', {}, 'ตั้งตำแหน่งที่แท่น');
+  };
+
+  // What STOP reached (app/event_host.py stop()): the walk (`stopped`), the arm (`body`:
+  // {sent, error_th}) and her ceremony line (`line_cut`) -- each said, none assumed.
+  // The walk failing to stop does not mean the arm did not (the server runs all three at
+  // once): each part is said on its own, and a refusal always ends at the E-stop.
+  function stopMessage(r) {
+    var bits = [];
+    if (r && r.unknown) {
+      bits.push('ไม่รู้ผลการหยุด (ไม่มีคำตอบจากหุ่น)');
+    } else if (!r || r.ok === false) {
+      bits.push((r && r.error_th) || 'ส่งคำสั่งหยุดไม่ได้');
+      if (bits[0].indexOf('E-stop') < 0) bits.push('กดปุ่มหยุดฉุกเฉิน (E-stop) บนตัวหุ่น');
+    } else {
+      bits.push(r.stopped ? 'ส่งคำสั่งหยุดเดินแล้ว ดูที่ตัวหุ่น' : 'ไม่มีการเดินอยู่');
+    }
+    if (bits[0].indexOf('E-stop') < 0 && r && r.unknown) bits.push('ถ้าหุ่นยังเคลื่อนที่ กดปุ่มหยุดฉุกเฉิน (E-stop) บนตัวหุ่น');
+    var body = r && r.body;
+    if (body && body.sent) bits.push(body.note_th || 'สั่งหยุดแขนแล้ว');
+    else if (body && body.error_th) bits.push(body.error_th);
+    if (r && r.line_cut) bits.push('ตัดบทที่พูดอยู่');
+    if (r && r.live_closed) bits.push('ปิดช่องตอบสดแล้ว');
+    return bits.join(' · ');
+  }
+
+  // STOP never waits on anything, not even a button that is busy. Its answer is long (the
+  // arm's 60 s latch): it stays up long enough to be read. One red stop for both pages
+  // (POST /event/stop): the walk, the arm, her line and her live window, whichever app runs.
+  $('stopBtn').onclick = async function () {
+    var r = await post('/event/stop', {}, STOP_TIMEOUT_MS);
+    toast(stopMessage(r), 8000);
+    poll(true);
+  };
+
+  // ---- "ตอบสด": คุณมิกิ off-script (owner 23 Nov, app/ceremony.py adhoc_open) -------------------
+  // "วันจริงมิกิอาจจะด้นสดบ้าง ... เขาอาจจะนอกบทแล้วสลับไปมาได้": the lines stay pressed; this opens her
+  // live window -- she answers when he says "Emma" -- and the same button closes it ("กลับเข้าบท"). Any
+  // press of the script (a step, "ถัดไป", a cue) closes it on the server first, and so does the red stop.
+  // ONE tap both ways (`whyTwoTaps` keeps two for what moves her, ends the ceremony or darkens the room):
+  // opening moves nothing and says nothing by itself, and closing must always be at hand. The press
+  // sends the action the button showed, never a toggle -- a double tap or an answer that never came
+  // cannot flip it back -- and ADHOC_GAP_MS after an answer the button takes no tap (the answer redraws
+  // it at once: a quick second tap would have been the opposite press). Shown only when the server
+  // says (`state.adhoc`): an older server has no such window.
+  var ADHOC_GAP_MS = 1200, ADHOC_TIMEOUT_MS = 8000, adhocBusy = false, adhocAt = 0, adhocWasOpen = false;
+  // how it ended without a press of this page's -- the host may still be talking: said out loud
+  var ADHOC_AUTO = { expired: true, app_closed: true, ceremony_over: true, replaced: true };
+  function adhocLeft(a) {
+    var now = state && state.server_time;
+    if (!a || typeof a.until !== 'number' || typeof now !== 'number') return '';
+    var left = Math.max(0, Math.round(a.until - now));
+    return Math.floor(left / 60) + ':' + (left % 60 < 10 ? '0' : '') + (left % 60);
+  }
+  // the bar's height follows what it holds: the page's last row and the toast stay above it -- measured,
+  // because "ตอบสด"'s line wraps on a narrow phone (the classes are the first paint's, before a poll)
+  function paintBar() {
+    var next = !$('nextBtn').hidden, adhoc = !$('adhocBtn').hidden;
+    $('barRow').hidden = !next && !adhoc;
+    document.body.classList.toggle('with-next', next || adhoc || !$('orderEnd').hidden);
+    document.body.classList.toggle('with-adhoc-note', !$('adhocNow').hidden);
+    var h = document.querySelector('.stopbar').offsetHeight;
+    if (h > 0) {
+      document.body.style.paddingBottom = (h + 8) + 'px';
+      $('toast').style.bottom = (h + 8) + 'px';
+    }
+  }
+  function renderAdhoc(s) {
+    var a = s && s.adhoc, b = $('adhocBtn'), now = $('adhocNow');
+    // while follow mode runs its card is the control (the window is held open by the server): a "กลับเข้าบท" here
+    // would only pause it -- so the button waits until the mode is off or paused
+    var following = !!(s && s.follow && s.follow.on && !s.follow.paused);
+    b.hidden = !a || following;
+    if (!a || following) { now.hidden = true; paintBar(); return; }
+    var open = !!a.open, left = adhocLeft(a);
+    b.className = open ? 'is-open' : a.ready ? '' : 'is-unready';
+    b.setAttribute('aria-pressed', String(open));
+    $('adhocTop').textContent = adhocBusy ? 'กำลังส่ง…' : open ? 'ตอบสดเปิดอยู่'
+      : a.ready ? 'คุณมิกินอกบท' : 'ยังเปิดไม่ได้';     // (short: beside "ถัดไป" at 320 px)
+    $('adhocLabel').textContent = open ? 'กลับเข้าบท' : 'ตอบสด';
+    if (open) {
+      now.className = 'adhocnow is-open';
+      $('adhocNowTop').textContent = 'Emma กำลังฟังคุณมิกิ (ตอบสด)' + (left ? ' · ปิดเองใน ' + left : '');
+      // the door as it is (NoiseReplyGate): her name, or 30 s after she last spoke -- not "only her name"
+      $('adhocNowSub').textContent = (a.warn_th ? '⚠ ' + a.warn_th + ' · ' : '')
+        + 'ตอบเมื่อเรียกชื่อ "Emma" หรือภายใน 30 วิหลังเธอพูด · กดบทถัดไป = กลับเข้าบทเอง';
+    } else if (a.closed) {
+      now.className = 'adhocnow is-closed';
+      $('adhocNowTop').textContent = 'ตอบสด: ' + a.closed.why_th;
+      $('adhocNowSub').textContent = '';
+    }
+    now.hidden = !open && !a.closed;
+    $('adhocNowSub').hidden = !$('adhocNowSub').textContent;
+    // it closed by itself (its time, the call) while this page showed it open: the host may still be
+    // talking -- or with no word of how (a server restart, this phone offline past the note): said too
+    if (adhocWasOpen && !open && (!a.closed || ADHOC_AUTO[a.closed.why])) {
+      toast('ตอบสด: ' + (a.closed ? a.closed.why_th : 'ปิดแล้ว — ถ้าคุณมิกิยังด้นสดอยู่ กดตอบสดอีกครั้ง'), 6000);
+    }
+    adhocWasOpen = open;
+    paintBar();
+  }
+  // ---- "ทั้งพิธีคุยสด": the server follows the host (owner 24 Nov, app/ceremony_follow.py) ---------------
+  var FOLLOW_GAP_MS = 1000, followBusy = false, followAt = 0;
+  var FIRE_BY_TH = { host: 'ได้ยินคุณมิกิพูดบทนี้', live: 'ได้ยินคุณมิกิพูดบทนี้ — ขึ้นภาพบนจอให้ Emma ตอบสดเอง ไม่ได้เล่นบท', 'continue': 'พูดต่อจากบทก่อนตามบท' };
+  var VERDICT_TH = { match: 'ตรงบท', weak: 'ตรงบางส่วน (ยังไม่พอ)', tie: 'ตรงหลายบทพอกัน (ไม่เล่น)',
+                     no_tail: 'ยังไม่ถึงท้ายประโยคของบท', diluted: 'พูดยาวกว่าบทมาก',
+                     nothing: 'ไม่ตรงบท (Emma ตอบสดถ้าถูกเรียกชื่อ)', blocked: 'ยังเล่นบทต่อไม่ได้',
+                     not_called: 'ยังไม่ได้เรียกชื่อ Emma (ไม่ตอบ)' };
+  function followClock(t) {
+    var s = state && state.server_time, d = typeof t === 'number' && typeof s === 'number' ? Math.max(0, Math.round(s - t)) : null;
+    return d == null ? '' : ' (' + d + ' วิที่แล้ว)';
+  }
+  // the step that stands out after he spoke and nothing matched ("n:i"), None otherwise; the order is redrawn with it
+  function nudgeKey() {
+    var f = state && state.follow, n = f && f.on && !f.paused && f.nudge;
+    return n ? n.n + ':' + n.i : null;
+  }
+  function renderFollow(s) {
+    var f = s && s.follow, box = $('followBox');
+    if (!f || !f.enabled) { box.hidden = true; return; }
+    var on = !!f.on, paused = on && !!f.paused;
+    box.hidden = false;
+    box.className = 'walk followbox' + (paused ? ' is-paused' : '');
+    $('followNow').textContent = !on ? (f.gone_th ? 'โหมดคุยสด: ' + f.gone_th : 'โหมดคุยสด: ปิดอยู่ (กดบทเอง)')
+      : paused ? 'โหมดคุยสด: พักอยู่ — ' + (f.paused_th || '')
+      : 'โหมดคุยสด: เปิด — ' + (f.live_first_th ? f.live_first_th + ' · ' : '') + 'Emma ฟังคุณมิกิ' + (f.window_open ? '' : ' (รอพูดจบก่อนเปิดหู)') + (f.redial_th ? ' · ' + f.redial_th : '');
+    $('followMic').hidden = !(on && f.mic_th);
+    $('followMic').textContent = f.mic_th ? '🔇 ' + f.mic_th : '';
+    var warn = [];
+    if (on && f.hostless) warn.push('บทที่ไม่มีคำของคุณมิกิให้จับ ' + f.hostless + ' คิว (กดเอง/ตามมาเอง): ' + (f.manual_cues || []).join(', '));
+    if (on && f.gate_th) warn.push('ตอนนี้เล่นบทไม่ได้: ' + f.gate_th);
+    if (on && f.joke_th) warn.push(f.joke_th);
+    $('followWarn').hidden = !warn.length;
+    $('followWarn').textContent = warn.join(' · ');
+    var n = f.next, expect = '';
+    if (on && n) {
+      if (n.expect && n.expect.length) {
+        expect = n.expect.map(function (c, k) {
+          return (k ? 'หรือข้ามไปบทถัดไป: ' : '') + '[' + c.cue + '] ' + c.host_th
+            + (c.generic ? '\n   ⚠ กดเอง: บทสั้น/ทั่วไป — จับได้เมื่อพูดเต็มบรรทัด ถ้าพูดสั้นกว่านี้ให้กดบทเอง' : '');
+        }).join('\n');
+      } else expect = n.why_th || '';
+    }
+    $('followExpect').textContent = expect;
+    var last = f.last_fire, txt = '';
+    if (last) {
+      txt = (last.ok ? 'เล่น ' : 'ไม่ได้เล่น ') + last.cue + followClock(last.at) + ' · ' + (FIRE_BY_TH[String(last.by)] || '')
+        + (typeof last.cover === 'number' ? ' (ตรง ' + Math.round(last.cover * 100) + '%)' : '')
+        + (!last.ok && last.error_th ? ' — ' + last.error_th : '');
+    }
+    $('followLast').textContent = txt || '—';
+    var ev = f.last_eval;
+    $('followNudge').hidden = !f.nudge;
+    if (f.nudge) $('followNudge').textContent = 'คุณมิกิพูดแล้วแต่ยังจับบทไม่ได้ — ปุ่มที่ขึ้นเด่นในลำดับ กดเองได้เลย (กดครั้งเดียว ยกเว้นขั้นที่ต้องแตะสองครั้ง)';
+    $('followEval').textContent = ev ? 'ฟังล่าสุด' + followClock(ev.at) + ': ' + (VERDICT_TH[ev.verdict] || ev.verdict)
+      + (typeof ev.cover === 'number' ? ' · ' + Math.round(ev.cover * 100) + '%' : '') + (ev.cue ? ' · ' + ev.cue : '') : '';
+    $('followOff').hidden = !on;
+    $('followResume').hidden = !paused;
+    // "เปิดโหมดสด" here only for a ceremony that already passed card 2 (a restart); the first time is the order's step
+    $('followOn').hidden = on || !f.can_start;
+  }
+  async function followAct(action, label) {
+    if (followBusy || Date.now() - followAt < FOLLOW_GAP_MS) return;
+    followBusy = true;
+    followAt = Date.now();
+    var r = null;
+    try {
+      r = await post('/ceremony/follow', { action: action }, 8000);
+    } finally {
+      followBusy = false;
+      followAt = Date.now();
+    }
+    if (r && r.follow && state) state.follow = r.follow;
+    toast(r && r.ok !== false ? label : label + ' ไม่ได้: ' + ((r && (r.error_th || r.error)) || 'ผิดพลาด'), 4000);
+    renderFollow(state);
+    renderAdhoc(state);
+    poll(true);
+  }
+  $('followOff').onclick = function () { followAct('off', 'หยุดโหมดสดแล้ว — กลับไปกดบทเอง'); };
+  $('followResume').onclick = function () { followAct('resume', 'กลับมาโหมดสดแล้ว'); };
+  $('followOn').onclick = function () { followAct('on', 'เปิดโหมดสดแล้ว'); };
+
+  function adhocOutcome(r, want) {
+    if (r && r.unknown) return 'ตอบสด: ' + UNKNOWN_TH;
+    if (r && r.ok && want) {
+      return (r.warn_th ? '⚠ ' + r.warn_th + ' · ' : '')
+        + 'Emma กำลังฟังคุณมิกิ (ตอบสด) — ตอบเมื่อเรียกชื่อ "Emma" · กลับเข้าบท: ปุ่มเดียวกันนี้ หรือกดบทถัดไป';
+    }
+    if (r && r.ok) return r.closed ? 'กลับเข้าบทแล้ว — Emma พูดเฉพาะบทที่กด' : 'ตอบสดปิดอยู่แล้ว';
+    return 'ตอบสดเปิดไม่ได้: ' + ((r && (r.error_th || r.error)) || 'ผิดพลาด');
+  }
+  $('adhocBtn').onclick = async function () {
+    var a = state && state.adhoc;
+    if (!a || adhocBusy || Date.now() - adhocAt < ADHOC_GAP_MS) return;
+    var want = !a.open;
+    if (want && !a.ready) { toast('ตอบสดยังเปิดไม่ได้: ' + (a.why_th || 'ไม่ทราบสาเหตุ'), 5000); return; }
+    adhocBusy = true;
+    adhocAt = Date.now();
+    renderAdhoc(state);
+    var r = null;
+    try {
+      r = await post('/ceremony/adhoc', { open: want }, ADHOC_TIMEOUT_MS);
+    } finally {
+      adhocBusy = false;
+      adhocAt = Date.now();      // and the gap again after the answer: a tap queued behind it is not a press
+    }
+    if (r && r.adhoc && state) {
+      state.adhoc = r.adhoc;     // redrawn now, not at the next poll
+      adhocWasOpen = !!r.adhoc.open;
+    }
+    toast(adhocOutcome(r, want), r && r.ok ? 4000 : 6000);
+    renderAdhoc(state);
+    poll(true);
+  };
+  // a press of the script that closed it first (the server's `adhoc_closed`): said before what the press did
+  function adhocClosedTh(r) { return r && r.adhoc_closed ? 'กลับเข้าบท (ปิดตอบสดแล้ว) · ' : ''; }
+
+  // ---- the mode, and the film ---------------------------------------------------------
+  function renderMode(s) {
+    var m = s.mode;
+    $('modeCard').hidden = !m;
+    if (!m) return;
+    $('modeNow').textContent = m.ceremony ? 'โหมดพิธีเปิด' : 'ยังไม่อยู่ในโหมดพิธี';
+    var bits = [];
+    // cue-only (event_host.cue_only): she answers nobody, named or not, outside her live window
+    // ("ตอบสด" is a live window too: its own words, the host off-script)
+    if (m.ceremony && m.cue_only) bits.push(m.live ? (m.live.cue === 'adhoc' ? 'ตอบสด (คุณมิกิพูดนอกบท)' : 'ช่องตอบสดเปิดอยู่')
+                                                     + ': ตอบเมื่อเรียกชื่อ Emma'
+                                                   : 'Emma พูดเฉพาะบทที่กด ไม่ตอบใคร', 'กล้องไม่ทักใคร');
+    else if (m.ceremony) bits.push('ตอบเมื่อเรียกชื่อ Emma', 'กล้องไม่ทักใคร');
+    $('modeSub').textContent = bits.join(' · ');
+    var warn = (m.warnings || []).slice();
+    $('modeWarn').hidden = !warn.length;
+    $('modeWarn').textContent = warn.join(' · ');
+  }
+
+  // The film is played by its step of the order; here what the big screen is doing, and its
+  // stop -- the red stop does not stop a film (event_host.stop: the walk, the arm, the line).
+  var CLIP_TH = { opening: 'กำลังเปิดจอ:', asked: 'กำลังเริ่มคลิป:', playing: 'กำลังเล่น:', ended: 'คลิปจบแล้ว:',
+                  stopped: 'หยุดคลิปแล้ว:', failed: 'เล่นคลิปไม่สำเร็จ:' };
+  var clipKey = null;
+  function renderClips(c) {
+    var has = !!(c && c.clips && c.clips.length);
+    $('clipCard').hidden = !has;
+    if (!has) return;
+    var going = c.phase === 'opening' || c.phase === 'asked' || c.phase === 'playing';
+    $('clipNow').textContent = CLIP_TH[c.phase] ? CLIP_TH[c.phase] + ' ' + c.title_th : 'คลิปบนจอใหญ่';
+    var bits = [];
+    if (c.error_th) bits.push(c.error_th);
+    if (c.phase === 'playing' && c.elapsed_s != null) {
+      bits.push(c.elapsed_s + (c.duration_s ? ' / ' + Math.round(c.duration_s) : '') + ' วินาที');
+    }
+    if (!c.screen_ready) bits.push('ยังไม่ได้ตั้งจอใหญ่');
+    else bits.push(c.screen_up ? 'จอใหญ่เชื่อมอยู่' : 'จอใหญ่ยังไม่เปิด');
+    c.clips.forEach(function (x) {
+      if (!x.has_file) bits.push(x.title_th + ': ยังไม่มีไฟล์');
+      else if (x.ready === false) bits.push(x.title_th + ': โหลดไปจอไม่สำเร็จ');
+      else if (x.ready) bits.push(x.title_th + ': พร้อมบนจอแล้ว');
+      else if (c.screen_up) bits.push(x.title_th + ': กำลังโหลดไปจอ');
+    });
+    $('clipSub').textContent = bits.join(' · ');
+    // rebuilt only when it changed: a button replaced under a finger misses its click
+    var key = JSON.stringify([going]);
+    if (key === clipKey) return;
+    clipKey = key;
+    var row = $('clipRow');
+    row.textContent = '';
+    if (!going) return;
+    var halt = el('button', null, 'หยุดคลิป');
+    halt.type = 'button';
+    halt.onclick = function () { act('/event/clip', { action: 'stop' }, 'หยุดคลิป'); };
+    row.appendChild(halt);
+  }
+
+  // ---- the venue's lights and curtains (app/venue_devices.py, owner 20 Nov) ------------------
+  // Only where the robot drives one (`state.venue`; none = the card stays hidden, the page as before).
+  // For rehearsal and recovery -- the ceremony's own presses are its order's device steps. Every button
+  // takes two taps (a stray tap must not darken the lobby), and the answer says how far it got:
+  // "sent" (IR/RF are one-way) is never "the lights are off". The red stop does not touch these.
+  var venueKey = null, venueArmed = null, venueArmTimer = null, venueBusy = null;
+  function venueOutcome(res, label) {
+    res = res || {};
+    var hw = res.hardware;
+    if (res.ok && hw === 'ok') return 'อุปกรณ์ยืนยันแล้ว: ' + label;
+    if (res.ok && hw === 'mock') return 'จำลอง (ไม่ได้ส่งจริง): ' + label;
+    if (res.ok) return 'ส่งคำสั่งแล้ว: ' + label + ' — ดูห้องให้แน่ใจว่าเปลี่ยนจริง';
+    return label + ' ไม่ได้: ' + (res.error_th || res.error || 'ผิดพลาด');
+  }
+  function venueLast(d) {
+    var l = d.last;
+    if (!l) return '';
+    var t = (l.th || l.action) + ' ' + d.name_th + ': ' + (HW_TH[l.hardware] || l.hardware) + ' ' + clock(l.at);
+    return 'ล่าสุด: ' + t + (l.ok ? '' : (l.error_th ? ' — ' + l.error_th : ''));
+  }
+  function renderVenue(v) {
+    var has = !!(v && v.devices && v.devices.length);
+    $('venueCard').hidden = !has;
+    if (!has) { venueKey = null; return; }
+    $('venueSub').textContent = (v.dry_run ? 'โหมดจำลอง: กดแล้วไม่ได้ส่งสัญญาณจริง · ' : '')
+      + 'ส่งแล้วไม่ได้แปลว่าเปลี่ยนแล้ว — ดูห้องทุกครั้ง · ปุ่มหยุดแดงไม่ยุ่งกับไฟ/ม่าน · แตะสองครั้ง';
+    // rebuilt only when it changed: a button replaced under a finger misses its tap
+    var key = JSON.stringify([v, venueArmed && venueArmed.key, venueBusy]);
+    if (key === venueKey) return;
+    venueKey = key;
+    var list = $('venueList');
+    list.textContent = '';
+    v.devices.forEach(function (d) {
+      var box = el('div', 'vdev');
+      box.appendChild(el('div', 'vname', d.name_th));
+      var last = venueLast(d);
+      if (last) box.appendChild(el('div', 'vlast' + (d.last && !d.last.ok ? ' bad' : ''), last));
+      if (d.warn_th && !(d.last && !d.last.ok)) box.appendChild(el('div', 'vwhy', '⚠ ' + d.warn_th));
+      var row = el('div', 'row');
+      (d.actions || []).forEach(function (a) {
+        var k = d.id + ':' + a.id;
+        var armed = !!venueArmed && venueArmed.key === k;
+        var b = el('button', armed ? 'confirm' : '',
+                   venueBusy === k ? 'กำลังส่ง…' : armed ? 'แตะอีกครั้งเพื่อ' + a.th + d.name_th : a.th + d.name_th);
+        b.type = 'button';
+        b.disabled = !a.ready || d.busy || venueBusy !== null;
+        b.onclick = function () { venuePress(d, a); };
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+      (d.actions || []).forEach(function (a) {
+        if (!a.ready && a.why_th) box.appendChild(el('div', 'vwhy', a.th + ': ' + a.why_th));
+      });
+      list.appendChild(box);
+    });
+  }
+  async function venuePress(d, a) {
+    var k = d.id + ':' + a.id, now = Date.now();
+    if (venueBusy !== null) return;
+    if (!venueArmed || venueArmed.key !== k || now - venueArmed.at > ARM_MS) {
+      venueArmed = { key: k, at: now };
+      clearTimeout(venueArmTimer);
+      venueArmTimer = setTimeout(function () { venueArmed = null; renderVenue(state && state.venue); }, ARM_MS);
+      renderVenue(state && state.venue);
+      return;
+    }
+    if (now - venueArmed.at < ARM_MIN_MS) return;      // a double tap is not a second thought
+    venueArmed = null;
+    clearTimeout(venueArmTimer);
+    venueBusy = k;
+    renderVenue(state && state.venue);
+    var label = a.th + d.name_th, r = null;
+    try {
+      r = await post('/ceremony/device', { device: d.id, action: a.id });
+    } finally {
+      venueBusy = null;
+    }
+    toast(r && r.unknown ? label + ': ' + UNKNOWN_TH : venueOutcome(r, label), 6000);
+    poll(true);
+  }
+
+  // ---- the ceremony's lines ---------------------------------------------------------
+  // A press answers once Emma has STARTED the line (or why she did not): what is
+  // shown is the server's word, never "said" for a line that was refused.
+  var CUE_ERR = { no_cue: 'ไม่พบคิวนี้', live_only: 'คิวนี้ให้ Emma ตอบเอง', problems: 'บทผิดกฎ ต้องแก้ก่อน',
+                  not_approved: 'ยังไม่อนุมัติ', no_call: 'ไม่มีสายเปิด — Emma ยังไม่ได้พูด',
+                  quiet: 'Emma ถูกปิดเสียงอยู่ — ยังไม่ได้พูด', already: 'คิวนี้กำลังพูดอยู่แล้ว',
+                  busy: 'Emma กำลังพูดบทอื่นอยู่', superseded: 'มีคิวใหม่กดตามมา — คิวนี้ไม่ได้พูด',
+                  offline: 'หุ่นออฟไลน์ และไม่มีเสียงอัดที่ฟังอนุมัติแล้ว', not_started: 'เริ่มบทไม่ได้ — ยังไม่ได้พูด',
+                  not_sent: 'ส่งบทไม่สำเร็จ (อาจได้ยินบางส่วน)', not_ceremony_app: 'เปิดแอป Emma Ceremony บนหุ่นก่อน',
+                  error: 'ผิดพลาด' };
+  var CUE_MODE = { recorded: 'พูดด้วยเสียงอัด', read: 'ให้ Gemini อ่าน', say_yourself: 'Emma พูดเอง' };
+  var cueBusy = {}, cueKey = null;
+
+  function cueOutcome(r) {
+    if (r && r.ok) return CUE_MODE[r.mode] || 'พูดแล้ว';
+    return (r && (r.error_th || CUE_ERR[r.error])) || 'ไม่ได้พูด';
+  }
+  function cueLast(l) {
+    if (!l) return '';
+    var t = l.ok ? (CUE_MODE[l.mode] || 'พูดแล้ว') : (CUE_ERR[l.error] || 'ไม่ได้พูด');
+    if (l.ok && l.cut) t += ' — ถูกพูดแทรกก่อนจบ';
+    if (l.ok && l.fidelity != null) t += ' · ตรงบท ' + Math.round(l.fidelity * 100) + '%';
+    return 'ล่าสุด: ' + t;
+  }
+
+  function renderCues(box) {
+    var list = (box && box.cues) || [];
+    $('cuesHead').hidden = !list.length;
+    $('cuesNote').hidden = !list.length;
+    $('cuesNote').textContent = box && box.call
+      ? 'กดแล้ว Emma พูดบทนั้นตามตัวอักษร (รอให้เธอพูดประโยคก่อนหน้าจบก่อน) · กดได้เฉพาะบทที่อนุมัติแล้ว'
+      : 'ไม่มีสายเปิดที่หน้าหุ่น — กดบทตอนนี้ Emma จะยังไม่พูด';
+    // rebuilt only when it changed (a button replaced under a finger misses its click);
+    // `ago_s` moves every second and is not shown
+    var key = JSON.stringify([list.map(function (c) {
+      var l = c.last ? [c.last.mode, c.last.ok, c.last.error, c.last.cut, c.last.fidelity] : null;
+      return [c.id, c.ready, c.kind, c.recorded, c.voice_approved, c.voice_why, c.approved, c.problems, c.phase, l,
+              !!cueBusy[c.id]];
+    }), box && box.call, box && box.host_th]);
+    if (key === cueKey) return;
+    cueKey = key;
+    var root = $('cues');
+    root.textContent = '';
+    var host = (box && box.host_th) || 'พิธีกร';
+    var group = null, groupScene = {};
+    list.forEach(function (c) {
+      if (!group || groupScene.v !== c.scene) {
+        group = el('section', 'cuegroup');
+        group.appendChild(el('div', 'gtitle', (c.scene != null ? 'ฉาก ' + c.scene + ' · ' : '') + (c.scene_th || '')));
+        root.appendChild(group);
+        groupScene = { v: c.scene };
+      }
+      var row = el('div', 'cue');
+      if (c.host_th) row.appendChild(el('div', 'host', host + ': ' + c.host_th));
+      if (c.kind === 'line') row.appendChild(el('div', 'line', c.th));
+      else if (c.kind === 'live') row.appendChild(el('div', 'line brief', 'Emma ตอบเองตามแนวนี้: ' + c.live_th));
+      else row.appendChild(el('div', 'line brief', '(ยังไม่มีบท)'));
+      var badges = el('div', 'badges');
+      var probs = c.problems || [];
+      if (probs.length) badges.appendChild(el('span', 'badge bad', 'ผิดกฎ'));
+      else if (c.approved) badges.appendChild(el('span', 'badge ok', 'พร้อม'));
+      else badges.appendChild(el('span', 'badge draft', 'ร่าง'));
+      // approval signs the words; a take is played only once someone listened to it
+      // (approve_event_script.py --listened) -- until then Gemini reads the line live
+      if (c.kind === 'line') badges.appendChild(el('span', 'badge' + (c.recorded && !c.voice_approved ? ' draft' : ''),
+        !c.recorded ? 'ไม่มีเสียงอัด — Gemini อ่าน'
+          : c.voice_approved ? 'มีเสียงอัด' : 'เสียงอัดยังไม่ได้ฟังอนุมัติ — Gemini อ่าน'));
+      if (c.kind === 'live') badges.appendChild(el('span', 'badge', 'ตอบสด'));
+      if (c.clip) badges.appendChild(el('span', 'badge', 'ตามด้วยคลิป'));
+      row.appendChild(badges);
+      if (probs.length) row.appendChild(el('div', 'why', probs.join(' · ')));
+      else if (c.kind === 'line' && !c.recorded && c.voice_why) row.appendChild(el('div', 'why', 'เสียงอัด: ' + c.voice_why));
+      if (c.kind === 'line') {
+        var acts = el('div', 'row');
+        var press = el('button', 'primary', 'พูดบทนี้');
+        press.type = 'button';
+        press.disabled = !c.ready || !!c.phase || !!cueBusy[c.id];
+        press.onclick = function () { pressCue(c); };
+        acts.appendChild(press);
+        row.appendChild(acts);
+      }
+      var going = c.phase === 'speaking' ? 'กำลังพูด…'
+        : (c.phase === 'waiting' || cueBusy[c.id]) ? 'รอ Emma พูดประโยคก่อนหน้าจบ…' : '';
+      var res = el('div', 'res' + (going ? ' going' : ''), going || cueLast(c.last));
+      res.hidden = !res.textContent;
+      row.appendChild(res);
+      group.appendChild(row);
+    });
+  }
+
+  // Not through act(): its one `busy` would hold the walk's buttons while a line waits
+  // for her voice (up to ~15 s). One press per cue at a time; STOP is never held.
+  async function pressCue(c) {
+    if (cueBusy[c.id]) return;
+    cueBusy[c.id] = true;
+    renderCues(state && state.cues);
+    try {
+      var r = await post('/ceremony/cue', { id: c.id });
+      toast(adhocClosedTh(r) + cueOutcome(r));
+    } finally {
+      delete cueBusy[c.id];
+      poll(true);
+    }
+  }
+
+  // ---- the running order (ลำดับพิธี) ------------------------------------------------
+  // The whole ceremony, scene by scene, one press per step. The server holds the order
+  // and what each press did (`mark`); this shows it and sends {n, i}. A step that is not
+  // ready is never pressed from here -- only skipped, out loud ("ข้ามขั้นนี้").
+  // No "scene" step any more (owner 9 Nov: the ceremony is its own app -- opening it IS the
+  // ceremony's mode): the big screen is a step of its own (`screen`), and the last one hands
+  // the robot to Emma Event (`handoff`: the server asks this app's face to open that app).
+  // `device` (20 Nov, app/venue_devices.py): the robot sends a light / curtain command -- in the order only
+  // where the robot drives that device, always before the staff tick that confirms the room changed
+  // `opening` (owner 23 Nov: "ช่วงพิธีอยู่แอปพิธีทั้งหมด"): card 1 of the Event page as ONE step -- the screen's
+  // screen's debut, out of the box, the wave and the line, Khun Miki's and the guests' hands (app/event_tour.py)
+  var KIND_TH = { walk: 'เดิน', body: 'ท่า', cue: 'พูด', clip: 'คลิป', screen: 'จอใหญ่', handoff: 'ส่งต่อ',
+                  manual: 'ทำเอง', device: 'ไฟ/ม่าน', opening: 'เปิดตัว' };
+  var DO_TH = { walk: 'เริ่มเดิน', body: 'ทำท่า', cue: 'พูดบทนี้', clip: 'เล่นคลิป', screen: 'สั่งจอใหญ่',
+                handoff: 'จบพิธี เปิดแอป Emma Event', manual: 'บอกว่าทำแล้ว (ไม่สั่งอะไร)', device: 'ส่งคำสั่ง',
+                opening: 'เริ่มเปิดตัว (จอ: ดนตรีขึ้น → จอมืด → เสียงกระแทก)',
+                follow: 'เปิดโหมดคุยสด (Emma เล่นบทตามคุณมิกิเอง)' };
+  var OPENING_MARK = { done: ' ✓', now: ' ← ตอนนี้', cut: ' ✕ หยุดตรงนี้', todo: '' };
+  // how far a device command got (its mark's `hardware`): "sent" is the hub's word, never "the lights are off"
+  var HW_TH = { ok: 'อุปกรณ์ยืนยันแล้ว ✓', sent: 'ส่งแล้ว (ยังไม่ยืนยัน)', mock: 'จำลอง — ไม่ได้ส่งจริง',
+                failed: 'ส่งไม่สำเร็จ', unknown: 'ไม่รู้ผล', manual: 'ทีมงานทำเอง' };
+  var SCREEN_TH = { open: 'เปิดจอใหญ่', close: 'ปิดจอใหญ่' };
+  var VOICE_TH = { recorded: 'เสียงอัด', read: 'Gemini อ่าน', live: 'ตอบสด' };
+  var MARK_TH = { done: 'ทำแล้ว ✓', running: 'กำลังทำ…', failed: 'ไม่สำเร็จ', skipped: 'ข้ามแล้ว' };
+  // A double tap must never say two lines: one order press in flight at a time, then
+  // ORDER_GAP_MS of nothing -- shared by the rows, "ถัดไป", skip and reset. Not the walk
+  // buttons' one `busy` (a line waits for her voice; they must not), and never STOP's.
+  var ORDER_GAP_MS = 1200, ARM_MS = 4000, ARM_MIN_MS = 400;
+  var orderKey = null, orderBusy = null, orderAt = 0, orderScroll = false;
+  var stepArmed = null, stepArmTimer = null, resetArmed = 0, resetTimer = null, expanded = {}, openScenes = {};
+  // n:i of a step whose last press got no answer (post's `unknown`): pressing it again -- the row
+  // or "ถัดไป" -- takes a second tap, the gesture or the line may have gone already (review 7 Nov, B6)
+  var unknownAt = {};
+  var LIVE_RUNNING_TH = 'Emma กำลังฟังคุณมิกิ';
+
+  // How the steps are pressed (owner 14 Nov 2026: "ทำหน้าปุ่มกดยัง ทำแบบ manual"), this phone's own:
+  // "manual" (the default) = every step has its own button, any step at any time, one tap -- the
+  // button, never the row (on a phone a scroll is a touch); the big "ถัดไป" is not shown. "order" =
+  // as it was: "ถัดไป" in the bar, a tap on the row, a step out of its turn two taps. The server is
+  // the same either way (event_order.press runs any step; its gates -- one press at a time, no line
+  // while she moves, nothing over her live window, the ceremony app -- hold for both).
+  var MODE_KEY = 'emma.ceremony.press', pressMode = 'manual';
+  try { if (localStorage.getItem(MODE_KEY) === 'order') pressMode = 'order'; } catch (e) { /* the default */ }
+  function manualMode() { return pressMode === 'manual'; }
+  // What a manual press still takes two taps for: what moves the robot or ends the ceremony.
+  // ...and a venue light or curtain: a stray tap must not put the lobby in the dark (20 Nov)
+  var TWO_TAP_KINDS = { walk: true, handoff: true, device: true, opening: true, follow: true };
+  // "ตอบสด" (owner 23 Nov), said once in both ways of pressing (the button is the bar's, not a step's)
+  var ADHOC_NOTE_TH = ' · ปุ่ม "ตอบสด" ล่างจอ: คุณมิกิพูดนอกบท — กดก่อนเขาหันมาถาม Emma (เธอได้ยินเฉพาะหลังกด '
+    + 'และตอบเมื่อเรียกชื่อ "Emma" หรือภายใน 30 วิหลังเธอพูด) · กดบทหรือขั้นถัดไป = กลับเข้าบทเอง '
+    + '(ถ้าคุณมิกิถามตามบทตอนที่ยังเปิดอยู่ Emma จะตอบสดก่อน แล้วบทที่กดตามมา — กด "กลับเข้าบท" ทันทีที่เขากลับเข้าบท)';
+  var TWO_TAP_TH = { unknown: ' (ผลครั้งก่อนไม่รู้)', out_of_turn: ' (นอกลำดับ)', walk: ' (หุ่นจะเดิน)',
+                     handoff: ' (จบพิธี)', again: ' (ทำไปแล้ว)', device: ' (สั่งไฟ/ม่านจริง)',
+                     opening: ' (หุ่นจะเดินออกจากกล่อง)', in_box: ' (ยืนยันว่าหุ่นอยู่ในกล่องจริง)' };
+  var NOTE_TH = {
+    manual: 'กดปุ่มของขั้นไหนก็ได้ ไม่ต้องตามลำดับ (แตะครั้งเดียว) · ขั้นเดิน ขั้นส่งต่อ และขั้นที่ทำไปแล้ว ต้องแตะสองครั้ง · '
+      + 'ขั้น "ทำเอง" ไม่สั่งอะไร แค่บันทึกว่าทีมงานทำแล้ว · ปุ่ม "หยุด" ล่างสุดกดได้ทุกเมื่อ' + ADHOC_NOTE_TH,
+    order: 'กด "ถัดไป" ที่แถบล่างทีละขั้นตามคิวพิธีกร · แตะขั้นอื่นนอกลำดับต้องแตะสองครั้ง · '
+      + 'ขั้น "ทำเอง" ไม่สั่งอะไร แค่บันทึกว่าทีมงานทำแล้ว · ขั้น "ส่งต่อ" จบพิธีแล้วเปิดแอป Emma Event บนหุ่น · '
+      + 'ปุ่ม "หยุด" ล่างสุดกดได้ทุกเมื่อ' + ADHOC_NOTE_TH
+  };
+  // Why a press of (n, i) takes a second, deliberate tap -- null = one tap. A step whose last press
+  // got no answer always (the line or the walk may have gone, B6); then per mode.
+  // "กดเอง" -- a step already done, again (review 14 Nov round 2: "ตามลำดับ" made a step out of its
+  // turn two taps for exactly this -- a stray tap must not say a line or hold out a hand twice);
+  // a "ทำเอง" tick moves nothing and stays one tap.
+  // A light / curtain command that MAY have gone (its mark's `hardware` "unknown"): pressing it again is
+  // the room's call first -- a toggle remote sent twice undoes it (review 20 Nov). Two taps, both ways.
+  function deviceUnsure(st) {
+    return st.do === 'device' && !!st.mark && st.mark.hardware === 'unknown';
+  }
+  // A joke said straight through (owner 23 Nov, app/event_order.py `chain`): its punchline is pressed by
+  // the server the moment the set-up has been said -- while that is coming, its step says so and asks
+  // no tap (a tap is still taken: the server refuses it while she speaks, and it is the retry after).
+  function chainWaiting(st) {
+    return !!st.chain && st.chain.role === 'follow' && st.chain.state === 'waiting';
+  }
+  function whyTwoTaps(o, n, i, st) {
+    if (unknownAt[n + ':' + i] || deviceUnsure(st)) return 'unknown';
+    // the in-box tick arms ONE walk out of the box (third review, 23 Nov): staff's word, never a reflex -- two taps in
+    // either mode, and "ถัดไป" takes two as well (the server refuses it one-tapped: event_order.next "in_box_tap")
+    if (st.in_box) return 'in_box';
+    if (manualMode()) {
+      if (TWO_TAP_KINDS[st.do]) return st.do;
+      return st.do !== 'manual' && st.mark && st.mark.state === 'done' ? 'again' : null;
+    }
+    return isAt(o.next, n, i) ? null : 'out_of_turn';
+  }
+  // the "กดเอง" button's words: what it does, again or not, and when it takes two taps
+  function goLabel(st, why2) {
+    if (chainWaiting(st) && !why2) return 'ตามมาเอง — ไม่ต้องกด';
+    return actionTh(st) + (why2 === 'again' ? ' อีกครั้ง' : '') + (why2 ? ' (แตะสองครั้ง)' : '');
+  }
+  function paintMode() {
+    document.body.classList.toggle('manual', manualMode());
+    $('orderMode').querySelectorAll('button').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === pressMode));
+    });
+    $('orderNote').textContent = NOTE_TH[pressMode];
+  }
+  $('orderMode').onclick = function (e) {
+    var b = e.target.closest && e.target.closest('button');
+    var want = b && b.getAttribute('data-mode');
+    if (!want || want === pressMode) return;
+    pressMode = want === 'order' ? 'order' : 'manual';
+    try { localStorage.setItem(MODE_KEY, pressMode); } catch (e2) { /* this load only */ }
+    stepArmed = null;                                   // an arming of the other mode is not this one's
+    clearTimeout(stepArmTimer);
+    paintMode();
+    renderOrder(state);
+  };
+  paintMode();
+
+  function hasOrder(s) { return !!(s && s.order && s.order.scenes && s.order.scenes.length); }
+  function isAt(at, n, i) { return !!at && at[0] === n && at[1] === i; }
+  function stepAt(o, at) {
+    if (!o || !at) return null;
+    for (var a = 0; a < o.scenes.length; a++) {
+      var sc = o.scenes[a], steps = sc.steps || [];
+      if (sc.n !== at[0]) continue;
+      for (var b = 0; b < steps.length; b++) if (steps[b].i === at[1]) return { sc: sc, st: steps[b] };
+    }
+    return null;
+  }
+  function orderHeld() { return orderBusy !== null || Date.now() - orderAt < ORDER_GAP_MS; }
+  // her live window (the step with only a brief): pressed it opens, pressed again ("ถัดไป") it closes
+  function liveOpen(st) { return st.voice === 'live' && !!st.mark && st.mark.state === 'running'; }
+  function actionTh(st) {
+    if (st.in_box) return 'ยืนยันว่าหุ่นอยู่ในกล่อง (เปิดเดินออก 1 ครั้ง)';
+    if (st.do === 'cue' && st.voice === 'live') return liveOpen(st) ? 'ปิดช่องตอบสด (Emma ตอบจบแล้ว)' : 'เปิดช่องตอบสด';
+    // which way the big screen goes, when the order says (`screen`); its label always does
+    if (st.do === 'screen' && SCREEN_TH[st.screen]) return SCREEN_TH[st.screen];
+    return DO_TH[st.do] || 'ทำขั้นนี้';
+  }
+  // what a running step is waiting for, in its own words
+  function runningTh(st, mark) {
+    if (st.voice === 'live') return LIVE_RUNNING_TH;
+    if (st.do === 'opening') return 'กำลังทำต่อเนื่อง…';
+    if (mark && mark.film) return 'รอจอใหญ่เริ่มเล่น…';
+    return MARK_TH.running;
+  }
+  function liveLeft(o) {
+    var until = o && o.live && o.live.until, now = state && state.server_time;
+    if (typeof until !== 'number' || typeof now !== 'number') return '';
+    var left = Math.max(0, Math.round(until - now));
+    return ' · ปิดเองใน ' + Math.floor(left / 60) + ':' + (left % 60 < 10 ? '0' : '') + (left % 60);
+  }
+  // A second, deliberate tap on `key` (the row's own n:i): false = this tap only armed it
+  function secondTap(key) {
+    var now = Date.now();
+    if (!stepArmed || stepArmed.key !== key || now - stepArmed.at > ARM_MS) {
+      stepArmed = { key: key, at: now };
+      clearTimeout(stepArmTimer);
+      stepArmTimer = setTimeout(function () { stepArmed = null; renderOrder(state); }, ARM_MS);
+      renderOrder(state);
+      return false;
+    }
+    return now - stepArmed.at >= ARM_MIN_MS;            // a double tap is not a second thought
+  }
+  function clock(at) {
+    var d = new Date(at * 1000), h = d.getHours(), m = d.getMinutes();
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+  // "ข้ามขั้นนี้" is offered on the step "ถัดไป" stands at only -- the hint says so there alone
+  function notReadyToast(st, atNext) {
+    toast('ยังไม่พร้อม: ' + (st.why_th || st.label_th) + (atNext ? ' — จะข้ามให้กด "ข้ามขั้นนี้"' : ''));
+  }
+  // What a mark that went through still warns of (app/event_order.py copies "ภาพไม่ขึ้น: …"
+  // into it): a done line whose picture never came up is not quietly "done".
+  function markWarn(mark) {
+    return mark && mark.state !== 'failed' && mark.error_th ? mark.error_th : '';
+  }
+
+  function renderOrder(s) {
+    renderBox(s);                                      // (the two-tap timer redraws the order only)
+    var o = hasOrder(s) ? s.order : null;
+    $('orderHead').hidden = $('orderNote').hidden = $('order').hidden = $('orderTools').hidden = !o;
+    $('orderMode').hidden = !o;
+    renderNextBtn(o);
+    if (!o) {
+      $('orderWarn').hidden = true;
+      if (orderKey !== null) { orderKey = null; $('order').textContent = ''; }
+      return;
+    }
+    $('orderWarn').hidden = callUp(s);
+    $('orderWarn').textContent = 'ไม่มีสายเปิดที่หน้าหุ่น — กดตอนนี้ Emma จะยังไม่พูด';
+    // the age rule cleared a rehearsal's progress (app/event_order.py): said until the next press
+    $('orderCleared').hidden = !o.cleared_th;
+    $('orderCleared').textContent = o.cleared_th || '';
+    paintReset();
+    // rebuilt only when it changed: a row replaced under a finger misses its tap
+    var key = JSON.stringify([o, orderBusy, stepArmed && stepArmed.key, expanded, openScenes, pressMode, unknownAt]);
+    key += '|' + nudgeKey();                           // (the step that stands out when nothing matched: owner 24 Nov)
+    if (key !== orderKey) {
+      orderKey = key;
+      buildOrder(o);
+    }
+    // "กดเอง": her live window's countdown on its own button, every poll -- not by a rebuild (a
+    // button replaced under a finger misses its tap); "ตามลำดับ" shows it on "ถัดไป"
+    var lv = manualMode() && o.live ? stepAt(o, [o.live.n, o.live.i]) : null;
+    var lb = lv && $('step-' + o.live.n + '-' + o.live.i);
+    lb = lb && lb.querySelector('.sgo');
+    // its two-tap word kept (round 2: an unknown result's "(แตะสองครั้ง)" was written over every poll)
+    if (lb && orderBusy === null && !lb.classList.contains('confirm')) {
+      var lv2 = whyTwoTaps(o, o.live.n, o.live.i, lv.st);
+      lb.textContent = actionTh(lv.st) + liveLeft(o) + (lv2 ? ' (แตะสองครั้ง)' : '');
+    }
+    // after a press only: a poll must not drag the page away from where staff scrolled
+    if (orderScroll) { orderScroll = false; scrollToStep(o.next); }
+  }
+
+  function buildOrder(o) {
+    var root = $('order');
+    root.textContent = '';
+    o.scenes.forEach(function (sc) {
+      var steps = sc.steps || [];
+      var settled = steps.filter(function (st) {
+        var m = st.mark && st.mark.state;
+        return m === 'done' || m === 'skipped';
+      }).length;
+      var here = !!o.next && o.next[0] === sc.n;
+      var going = steps.some(function (st) { return isAt(o.running, sc.n, st.i) || (st.mark && st.mark.state === 'running'); });
+      var finished = steps.length > 0 && settled === steps.length && !here && !going;
+      // a warning a mark still carries keeps its scene open: folded, nobody would see it
+      var warned = steps.some(function (st) { return !!markWarn(st.mark); });
+      var card = el('section', 'ocard' + (here ? ' here' : '') + (finished ? ' finished' : ''));
+      card.id = 'oscene-' + sc.n;
+      var top = el('div', 'otop');
+      top.appendChild(el('div', 'otitle', 'ฉาก ' + sc.n + ' · ' + (sc.title_th || '')));
+      top.appendChild(el('span', 'otag', here ? 'ตอนนี้'
+        : finished ? (warned ? 'ครบแล้ว ⚠' : 'ครบแล้ว ✓') : 'ทำแล้ว ' + settled + '/' + steps.length));
+      card.appendChild(top);
+      root.appendChild(card);
+      if (finished && !warned) {
+        // a scene that is all behind us folds to its title: the page is a long one
+        var open = !!openScenes[sc.n];
+        var fold = el('button', 'link', open ? 'ซ่อนขั้นที่ทำแล้ว' : 'ดูทั้ง ' + steps.length + ' ขั้น');
+        fold.type = 'button';
+        fold.onclick = function () {
+          if (open) delete openScenes[sc.n]; else openScenes[sc.n] = true;
+          renderOrder(state);
+        };
+        card.appendChild(fold);
+        if (!open) return;
+      }
+      var list = el('div', 'steps');
+      steps.forEach(function (st) { list.appendChild(stepRow(o, sc, st)); });
+      card.appendChild(list);
+    });
+    // "อ่านทั้งหมด" only where three lines did not hold it: measured, because a count of
+    // characters cannot know the phone's width
+    root.querySelectorAll('.sline').forEach(function (line) {
+      var more = line.closest('.step').querySelector('.more');
+      if (more && !line.classList.contains('open')) more.hidden = line.scrollHeight <= line.clientHeight + 2;
+    });
+  }
+
+  // The opening's own box (app/event_tour.py `ceremony_view`): what one press does, where she turns round, the
+  // warnings -- and once pressed, how far it got, where it stopped and why, and what is left by hand (one button
+  // each, two taps: the walk or the handshake the card did not get to -- the order's old steps for them are gone).
+  function openingBox(sc, st) {
+    var op = st.opening, box = el('div', 'opening'), tour = op.tour;
+    if (!tour || !tour.steps) {
+      var plan = el('ol', 'oplan');
+      (op.steps_th || []).forEach(function (s) { plan.appendChild(el('li', '', s)); });
+      box.appendChild(plan);
+    } else {
+      var head = tour.ended ? (tour.ok ? 'ทำครบตามที่บันทึกไว้แล้ว' : 'หยุดแล้ว: ' + (tour.why_th || tour.ended))
+        : 'กำลังทำ: ' + (tour.now_th || '');
+      box.appendChild(el('div', 'thead' + (tour.ended && !tour.ok ? ' bad' : ''), head));
+      if (tour.ended && tour.detail_th) box.appendChild(el('div', 'swhy', tour.detail_th));
+      var rows = el('ol', 'oplan');
+      tour.steps.forEach(function (s) {
+        var li = el('li', 'o-' + s.state, s.text_th + (OPENING_MARK[s.state] || ''));
+        if (s.note_th) li.appendChild(el('div', 'swarn', '⚠ ' + s.note_th));
+        rows.appendChild(li);
+      });
+      box.appendChild(rows);
+      if (tour.ended && !tour.ok && (tour.by_hand_th || []).length) {
+        box.appendChild(el('div', 'snote', 'หุ่นไม่ทำต่อเอง — ทำต่อเองได้ (แตะสองครั้ง):'));
+        if (!(tour.hand || []).length) tour.by_hand_th.forEach(function (s) { box.appendChild(el('div', 'snote', '• ' + s)); });
+        (tour.hand || []).forEach(function (h) {
+          var hk = sc.n + ':' + st.i + ':hand' + h.k;
+          var armed = !!stepArmed && stepArmed.key === hk;
+          var b = el('button', 'sgo hand' + (armed ? ' confirm' : ''),
+                     h.done ? h.text_th + ' — สั่งแล้ว' : armed ? 'แตะอีกครั้งเพื่อ' + h.text_th : h.text_th);
+          b.type = 'button';
+          b.disabled = !!h.done || orderBusy !== null;
+          b.onclick = function () {
+            if (orderHeld() || !secondTap(hk)) return;
+            orderPost('/ceremony/order/opening-hand', { n: sc.n, i: st.i, k: h.k }, hk, { label_th: h.text_th }, 'hand');
+          };
+          box.appendChild(b);
+        });
+      }
+    }
+    // where she turns round on the spot (the lidar sees nothing behind her: staff look) -- from the recorded spots
+    if ((op.turns || []).length && !(tour && tour.ended)) {
+      box.appendChild(el('div', 'snote', 'หุ่นจะหมุนตัวช้าๆ อยู่กับที่ (มองไม่เห็นข้างหลัง ดูข้างหลังหุ่นให้ว่างครึ่งเมตร): '
+        + op.turns.map(function (r) { return r.end ? 'ที่' + r.at_th + ' หันตามจุด' : 'ที่' + r.at_th + ' ก่อนไป' + r.to_th; })
+          .join(' · ')));
+    }
+    if (!st.ready) (op.warn_th || []).forEach(function (w) { box.appendChild(el('div', 'swarn', '⚠ ' + w)); });
+    box.appendChild(el('div', 'snote', 'หัวไม่หันตามคน ไม่ก้มหา (ท่านางงามและท่าจับมือของหุ่นยังขยับหัวเอง) · '
+      + 'Emma ไม่พูดอะไรนอกจากประโยคเปิดตัว · กดปุ่ม E-stop บนตัวหุ่นแล้ว ให้กดหยุดสีแดงบนมือถือด้วย'));
+    return box;
+  }
+
+  function stepRow(o, sc, st) {
+    var k = sc.n + ':' + st.i, mark = st.mark || null, m = mark && mark.state;
+    if (isAt(o.running, sc.n, st.i)) m = 'running';
+    var isNext = isAt(o.next, sc.n, st.i);
+    var armedHere = !!stepArmed && stepArmed.key === k;
+    var sending = orderBusy === k || (orderBusy === 'next' && isNext);
+    var manual = manualMode(), why2 = whyTwoTaps(o, sc.n, st.i, st);
+    var row = el('div', 'step k-' + st.do + (isNext ? ' next' : '') + (st.ready ? '' : ' unready')
+                 + (m ? ' m-' + m : '') + (armedHere ? ' armed' : '') + (nudgeKey() === k ? ' nudged' : ''));
+    row.id = 'step-' + sc.n + '-' + st.i;
+    // the press is this part ("ตามลำดับ"; in "กดเอง" its own button below); "อ่านทั้งหมด" /
+    // "ข้ามขั้นนี้" sit outside it, so a step that is not ready (aria-disabled) does not take its
+    // own skip link down with it
+    var press = el('div', 'spress');
+    if (!manual) {
+      press.setAttribute('role', 'button');
+      press.tabIndex = st.ready ? 0 : -1;
+    }
+    if (!st.ready || orderBusy !== null) press.setAttribute('aria-disabled', 'true');
+
+    var head = el('div', 'shead');
+    head.appendChild(el('span', 'kind k-' + st.do, KIND_TH[st.do] || st.do));
+    if (st.show_th) head.appendChild(el('span', 'kind k-show', 'ภาพ'));
+    if (VOICE_TH[st.voice]) head.appendChild(el('span', 'kind voice', VOICE_TH[st.voice]));
+    if (st.chain && st.chain.role === 'follow') head.appendChild(el('span', 'kind voice', 'ตามมาเอง'));
+    if (st.do === 'screen' && SCREEN_TH[st.screen]) head.appendChild(el('span', 'kind voice', SCREEN_TH[st.screen]));
+    // a device step done is "sent", not "done": the tick after it is the room's word
+    var hw = st.do === 'device' && m === 'done' && mark && HW_TH[mark.hardware] ? HW_TH[mark.hardware] : '';
+    var waiting = m !== 'running' && chainWaiting(st);   // over an older press's mark: this one is coming
+    var said = sending ? 'กำลังส่ง…'
+      : m === 'running' ? runningTh(st, mark)
+      : waiting ? 'รอตามมาเอง…'
+      : hw ? hw + (mark.at ? ' ' + clock(mark.at) : '')
+      : m ? (MARK_TH[m] || m) + (m === 'done' && mark && mark.at ? ' ' + clock(mark.at) : '')
+      : !st.ready ? 'ยังไม่พร้อม' : isNext ? 'ถัดไป' : '';
+    if (said) {
+      head.appendChild(el('span', 'smark ' + (sending || waiting ? 'running' : m || (st.ready ? 'next' : 'unready')),
+                          said));
+    }
+    press.appendChild(head);
+    press.appendChild(el('div', 'slabel', st.label_th));
+    // spoken in English (the file's "speak": "en"): what she SAYS first, the Thai under it is the screen's subtitle
+    if (st.line_en) press.appendChild(el('div', 'sline' + (expanded[k] ? ' open' : ''), 'EN “' + st.line_en + '”'));
+    if (st.line_th) press.appendChild(el('div', 'sline' + (expanded[k] ? ' open' : ''), '“' + st.line_th + '”'));
+    if (st.show_th) press.appendChild(el('div', 'sshow', st.show_th));
+    if (hw && mark.hardware !== 'mock') {
+      press.appendChild(el('div', 'shw', mark.hardware === 'ok' ? 'อุปกรณ์บอกว่าเปลี่ยนแล้ว — ยังต้องดูห้อง แล้วค่อยติ๊กขั้นถัดไป'
+        : 'ส่งแล้วไม่ได้แปลว่าเปลี่ยนแล้ว (สัญญาณทางเดียว) — ดูห้อง แล้วค่อยติ๊กขั้นถัดไป'));
+    }
+    if (m === 'failed') press.appendChild(el('div', 'serr', 'ไม่สำเร็จ: ' + ((mark && mark.error_th) || 'ไม่ทราบสาเหตุ')));
+    var warn = markWarn(mark);
+    if (warn) press.appendChild(el('div', 'swarn', '⚠ ครั้งล่าสุด: ' + warn));      // what the press did
+    // why_th on a step that CAN be pressed is a warning ("ภาพไม่ขึ้น: …", "จอใหญ่ยังไม่ได้
+    // ตั้งค่า…" -- the line goes, the picture does not): shown at full strength, still pressable.
+    // On one that cannot, it is the reason.
+    if (st.why_th && st.ready) {
+      if (st.why_th !== warn) press.appendChild(el('div', 'swarn', '⚠ ' + st.why_th));
+    } else if (st.why_th) {
+      press.appendChild(el('div', 'swhy', 'ยังไม่พร้อม: ' + st.why_th));
+    }
+    if ((isNext || manual) && unknownAt[k]) press.appendChild(el('div', 'swarn', '⚠ กดครั้งก่อน' + UNKNOWN_TH));
+    // a joke's pair: what it does by itself, or -- the punchline that did not follow -- why, at full strength
+    if (st.chain && st.chain.th) {
+      press.appendChild(el('div', st.chain.warn ? 'swarn' : 'schain', (st.chain.warn ? '⚠ ' : '↪ ') + st.chain.th));
+    }
+    if (st.note_th) press.appendChild(el('div', 'snote', st.note_th));
+    // the opening's box sits beside the press, not in it (second review 23 Nov): out of the box after a cut the step is
+    // not ready (its walk out is used) while its own by-hand buttons are -- inside the not-ready press they read disabled
+    var opBox = st.opening ? openingBox(sc, st) : null;
+    // "กดเอง": the button says it all (what it does, and when it takes two taps)
+    var hint = manual || waiting ? ''
+      : armedHere ? 'แตะอีกครั้งเพื่อ' + actionTh(st) + (TWO_TAP_TH[why2] || '')
+      : isNext && st.ready && !sending ? (unknownAt[k] || st.in_box ? 'แตะสองครั้ง = ' : 'แตะ = ') + actionTh(st) : '';
+    if (hint) press.appendChild(el('div', 'shint', hint));
+    row.appendChild(press);
+    if (opBox) row.appendChild(opBox);
+    if (manual) {
+      var go = el('button', 'sgo' + (armedHere ? ' confirm' : ''),
+                  sending ? 'กำลังส่ง…'
+                    : armedHere ? 'แตะอีกครั้งเพื่อ' + actionTh(st) + (TWO_TAP_TH[why2] || '')
+                    : goLabel(st, why2));
+      go.type = 'button';
+      go.disabled = !st.ready || orderBusy !== null;
+      go.onclick = function () { pressStep(sc.n, st.i); };
+      row.appendChild(go);
+    }
+
+    var acts = el('div', 'sacts');
+    // the opening with no room screen to count down (owner 23 Nov): never quietly -- its own button, two taps
+    if (st.opening && st.opening.no_screen && st.opening.ready_without_screen && m !== 'running') {
+      var bare = el('button', 'sgo bare' + (stepArmed && stepArmed.key === k + ':bare' ? ' confirm' : ''),
+                    stepArmed && stepArmed.key === k + ':bare' ? 'แตะอีกครั้งเพื่อเปิดตัวโดยไม่มีจอเปิดตัว'
+                      : 'เริ่มโดยไม่มีจอเปิดตัว (แตะสองครั้ง)');
+      bare.type = 'button';
+      bare.disabled = orderBusy !== null;
+      bare.onclick = function () {
+        if (orderHeld() || !secondTap(k + ':bare')) return;
+        orderPost('/ceremony/order/step', { n: sc.n, i: st.i, without_screen: true }, k, st, 'step');
+      };
+      acts.appendChild(bare);
+    }
+    if (st.line_th) {
+      var more = el('button', 'link more', expanded[k] ? 'ย่อ' : 'อ่านทั้งหมด');
+      more.type = 'button';
+      more.onclick = function () {
+        if (expanded[k]) delete expanded[k]; else expanded[k] = true;
+        renderOrder(state);
+      };
+      acts.appendChild(more);
+    }
+    // Only where "ถัดไป" stands: the server makes the skipped step `last`, so a skip further
+    // down would jump every step in between -- and it never goes back (rewind refused).
+    if (isNext && m !== 'done' && m !== 'skipped' && m !== 'running') {
+      var skip = el('button', 'link skip', 'ข้ามขั้นนี้');
+      skip.type = 'button';
+      skip.onclick = function () { orderPost('/ceremony/order/skip', { n: sc.n, i: st.i }, 'skip:' + k, st, 'skip'); };
+      acts.appendChild(skip);
+    }
+    if (acts.childNodes.length) row.appendChild(acts);
+    if (manual) return row;                             // its button is the press, never the row
+    row.onclick = function (e) {
+      if (e.target.closest && e.target.closest('button')) return;    // "อ่านทั้งหมด", "ข้ามขั้นนี้"
+      pressStep(sc.n, st.i);
+    };
+    press.onkeydown = function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      pressStep(sc.n, st.i);
+    };
+    return row;
+  }
+
+  function pressStep(n, i) {
+    var o = hasOrder(state) ? state.order : null, at = stepAt(o, [n, i]);
+    if (!at) return;
+    var st = at.st, k = n + ':' + i;
+    if (!st.ready) { notReadyToast(st, isAt(o.next, n, i)); return; }
+    if (orderHeld()) return;
+    // A second, deliberate tap (whyTwoTaps): "ตามลำดับ" -- a step out of its turn (again, back,
+    // ahead): a stray tap while scrolling must not say a line in the middle of the ceremony;
+    // "กดเอง" -- a walk or the hand-over; either -- a step whose last press got no answer.
+    if (whyTwoTaps(o, n, i, st) && !secondTap(k)) return;
+    orderPost('/ceremony/order/step', { n: n, i: i }, k, st, 'step');
+  }
+
+  // The server's answer (app/event_order.py `_run`): {ok, n, i, do, result} where `result`
+  // is what the step's own path returned -- a cue's {mode, show: {ok, topic} | {ok: false,
+  // error, error_th}}, a walk's {walk: {ok, run}}, the screen's or the hand-over's own
+  // {ok, error_th}. Refused: {ok: false, error, error_th, n, i}. The picture's fate is said,
+  // never dropped.
+  function pictureNote(res) {
+    var show = res && res.show;
+    if (!show) return '';
+    return show.ok === false ? 'ภาพไม่ขึ้น: ' + (show.error_th || show.error || 'ไม่ทราบสาเหตุ') : 'ขึ้นภาพแล้ว';
+  }
+  function orderOutcome(r, st, verb) {
+    var label = st ? st.label_th : '';
+    if (r && r.unknown) return (label ? label + ': ' : '') + UNKNOWN_TH;    // it may have run: not "ไม่ได้"
+    if (r && r.ok) {
+      if (r.result && r.result.live === 'open') {
+        return LIVE_RUNNING_TH + (manualMode() ? ' — กด "ปิดช่องตอบสด" ที่ขั้นนี้เมื่อตอบจบ' : ' — กด "ถัดไป" เมื่อตอบจบ');
+      }
+      if (r.result && r.result.live === 'closed') return 'ปิดช่องตอบสดแล้ว: ' + label;
+      if (verb === 'reset') return 'เริ่มลำดับใหม่แล้ว';
+      if (verb === 'skip') return 'ข้ามแล้ว: ' + label;
+      if (st && st.do === 'manual') return 'บันทึกว่าทำแล้ว: ' + label;
+      // the robot is Emma Event's from here: this page's part is over, the event page's begins
+      if (st && st.do === 'handoff') return 'เปิดแอป Emma Event บนหุ่นแล้ว — ต่อที่หน้าคุมงาน';
+      // a light / curtain: how far it got, and the tick after it is still staff's (sent is not done)
+      if (st && st.do === 'device') return venueOutcome(r.result, label);
+      // the opening: under way -- the screen's countdown, or (staff's own choice) none
+      if (st && st.do === 'opening' && verb !== 'hand') {
+        var op = r.result || {};
+        return op.reveal ? 'จอเปิดตัวเริ่มแล้ว (ดนตรีขึ้น → จอมืด → เสียงกระแทก) — หุ่นออกจากกล่องตอนเสียงกระแทก (อีก ~' + Math.round(op.impact_in_s || 0)
+          + ' วิ) · มีอะไรผิดกดหยุดสีแดง' : 'เริ่มเปิดตัวแล้ว (ไม่มีจอเปิดตัว) — หุ่นเดินออกจากกล่องเลย';
+      }
+      var res = r.result || {};
+      var how = st && st.do === 'cue' && CUE_MODE[res.mode] ? ' (' + CUE_MODE[res.mode] + ')'
+        : st && st.do === 'screen' && SCREEN_TH[st.screen] ? ' (' + SCREEN_TH[st.screen] + ')' : '';
+      var bits = [walkMessage(res) || ('สั่งแล้ว: ' + label + how)];
+      var picture = pictureNote(res);
+      if (picture) bits.push(picture);
+      if (st && st.chain && st.chain.role === 'lead') bits.push('บทถัดไปตามมาเองเมื่อ Emma พูดจบ');
+      if (res.ok === false && res.error_th) bits.push(res.error_th);
+      ['clip', 'screen', 'app'].forEach(function (part) {      // a step's other halves
+        var sub = res[part];
+        if (sub && sub.ok === false && sub.error_th) bits.push(sub.error_th);
+      });
+      return bits.join(' · ');
+    }
+    // "ถัดไป" names the step on its face; another phone moved the order first
+    if (r && r.error === 'stale') return r.error_th || 'ลำดับเปลี่ยนไปแล้ว — ดูปุ่มถัดไปอีกครั้ง';
+    // her window open: the server's words point at "ถัดไป", which "กดเอง" does not show (review 14 Nov)
+    if (r && r.error === 'live' && manualMode()) {
+      var lv = hasOrder(state) ? state.order.live : null;
+      return label + ' ไม่ได้: ช่องตอบสดเปิดอยู่ — กด "ปิดช่องตอบสด"' + (lv ? ' ที่ฉาก ' + lv.n : '')
+        + ' เมื่อ Emma ตอบคุณมิกิจบ';
+    }
+    var why = (r && (r.error_th || CUE_ERR[r.error] || r.error)) || 'ผิดพลาด';
+    return (verb === 'reset' ? 'เริ่มลำดับใหม่' : verb === 'skip' ? 'ข้าม ' + label : label) + ' ไม่ได้: ' + why;
+  }
+
+  async function orderPost(path, body, what, st, verb) {
+    if (orderHeld()) return;
+    orderBusy = what;
+    orderAt = Date.now();
+    stepArmed = null;
+    clearTimeout(stepArmTimer);
+    renderOrder(state);
+    var r = null;
+    try {
+      r = await post(path, body);
+    } finally {
+      orderBusy = null;
+      orderAt = Date.now();      // and the gap again after the answer: a tap queued behind it is not a press
+      // to "ถัดไป"'s step after a press -- "ตามลำดับ" only: in "กดเอง" staff stay where they pressed
+      orderScroll = !manualMode();
+    }
+    var sent = body && body.n != null && body.i != null ? body.n + ':' + body.i : null;
+    if (r && r.unknown) { if (sent) unknownAt[sent] = Date.now(); }
+    else if (r && r.n != null && r.i != null) delete unknownAt[r.n + ':' + r.i];
+    else if (sent) delete unknownAt[sent];
+    if (verb === 'reset' && r && r.ok) unknownAt = {};
+    var ran = r && r.n != null && r.i != null && hasOrder(state) ? stepAt(state.order, [r.n, r.i]) : null;
+    toast(adhocClosedTh(r) + orderOutcome(r, ran ? ran.st : st, verb), r && r.unknown ? 6000 : undefined);
+    setTimeout(function () { renderOrder(state); }, ORDER_GAP_MS + 50);
+    poll(true);                // and at once: a "stale" refusal means the phone shows an old order
+  }
+
+  function scrollToStep(at) {
+    var row = at && $('step-' + at[0] + '-' + at[1]);
+    if (!row) return;
+    var card = $('oscene-' + at[0]);
+    var top = document.querySelector('header').offsetHeight + 8;
+    var room = window.innerHeight - top - document.querySelector('.stopbar').offsetHeight - 8;
+    // the whole scene when it fits under the header, else the step itself, centred
+    var whole = card && card.offsetHeight <= room;
+    var box = (whole ? card : row).getBoundingClientRect();
+    var y = whole ? box.top - top : box.top - top - Math.max(0, (room - box.height) / 2);
+    window.scrollBy({ top: y, behavior: 'smooth' });
+  }
+
+  // The big button sits in the bar, built once: only its words change, so a poll never
+  // swaps it under a finger. Manual steps look like what they are: nothing is triggered.
+  function renderNextBtn(o) {
+    // "กดเอง" has no "ถัดไป": every step is its own button (the end is still said)
+    var b = $('nextBtn'), at = o && !manualMode() ? stepAt(o, o.next) : null;
+    b.hidden = !at;
+    // the end said, not a button gone (review 7 Nov, B8): the reset one tap from it
+    var end = !at && !!(o && o.finished);
+    $('orderEnd').hidden = !end;
+    paintBar();
+    if (!at) return;
+    var st = at.st, manual = st.do === 'manual', live = liveOpen(st), coming = chainWaiting(st);
+    var k = at.sc.n + ':' + at.st.i, unsure = !!unknownAt[k] || deviceUnsure(st);
+    var confirm = unsure && !!stepArmed && stepArmed.key === k;
+    var boxArmed = !!st.in_box && !!stepArmed && stepArmed.key === k;
+    b.className = confirm || boxArmed ? 'is-confirm' : !st.ready ? 'is-unready' : manual ? 'is-manual'
+      : live || coming ? 'is-live' : '';
+    b.disabled = orderHeld();
+    var where = 'ฉาก ' + at.sc.n + ' · ' + (KIND_TH[st.do] || st.do);
+    $('nextTop').textContent = orderBusy !== null ? 'กำลังส่ง…'
+      : confirm ? 'ผลครั้งก่อนไม่รู้ — แตะอีกครั้งเพื่อยืนยัน · ' + where
+      : !st.ready ? 'ขั้นถัดไปยังไม่พร้อม · ' + where
+      : unsure ? 'ผลครั้งก่อนไม่รู้ — แตะสองครั้งเพื่อกดซ้ำ · ' + where
+      : boxArmed ? 'แตะอีกครั้ง — ยืนยันว่าหุ่นอยู่ในกล่อง หันออกทางประตู แขนลง · ' + where
+      : st.in_box ? 'แตะสองครั้ง — ยืนยันหุ่นอยู่ในกล่อง (เปิดเดินออก 1 ครั้ง) · ' + where
+      // the joke's punchline: the server presses it when the set-up is said -- nothing to tap
+      : coming ? 'ตามมาเองเมื่อ Emma พูดบทก่อนหน้าจบ — ไม่ต้องกด · ' + where
+      // a set-up not said whole: the server put "ถัดไป" back on it (event_order._chain_redo)
+      : st.chain && st.chain.role === 'lead' && st.chain.warn ? 'ถัดไป ▶ มุกเกริ่นอีกครั้ง (เฉลยตามมาเอง) · ' + where
+      : manual ? 'ทำแล้ว ✓ (ไม่สั่งอะไร) · ' + where
+      : live ? 'กดเมื่อ Emma ตอบจบ · ฉาก ' + at.sc.n + liveLeft(o)
+      : st.do === 'handoff' ? 'ถัดไป ▶ ' + where + ' · จบพิธี เปิดแอป Emma Event'
+      : 'ถัดไป ▶ ' + where + (st.why_th ? ' · ⚠ มีคำเตือน' : '');
+    // her window open: the button closes it -- said in its big line, not the step's label
+    $('nextLabel').textContent = live ? 'จบช่องตอบสด ✓' : st.label_th;
+  }
+  $('nextBtn').onclick = function () {
+    var o = hasOrder(state) ? state.order : null, at = o ? stepAt(o, o.next) : null;
+    if (!at) return;
+    if (!at.st.ready) { notReadyToast(at.st, true); scrollToStep(o.next); return; }
+    var k = at.sc.n + ':' + at.st.i;
+    // its last press got no answer, or a light / curtain may have gone already
+    if ((unknownAt[k] || deviceUnsure(at.st)) && !secondTap(k)) { renderNextBtn(o); return; }
+    if (at.st.in_box) {
+      // staff's word that she is in the box: two taps, sent as the step's own press -- "ถัดไป" on it is refused
+      if (secondTap(k)) orderPost('/ceremony/order/step', { n: at.sc.n, i: at.st.i }, k, at.st, 'step');
+      else renderNextBtn(o);
+      return;
+    }
+    // the step written on the button: if the order moved since (another phone), the
+    // server answers "stale" and runs nothing -- never the step nobody read
+    orderPost('/ceremony/order/next', { n: at.sc.n, i: at.st.i }, 'next', at.st, 'next');
+  };
+
+  function paintReset() {
+    var b = $('orderReset');
+    b.className = resetArmed ? 'confirm' : '';
+    b.textContent = resetArmed ? 'แตะอีกครั้งเพื่อเริ่มลำดับใหม่' : 'เริ่มลำดับใหม่ตั้งแต่ขั้นแรก';
+    b.disabled = orderBusy !== null;
+  }
+  $('orderEndReset').onclick = function () {
+    // only to the reset: it still takes its own two taps there
+    $('orderTools').open = true;
+    $('orderTools').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  $('orderReset').onclick = function () {
+    var now = Date.now();
+    if (!resetArmed || now - resetArmed > ARM_MS) {
+      resetArmed = now;
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(function () { resetArmed = 0; paintReset(); }, ARM_MS);
+      paintReset();
+      return;
+    }
+    if (now - resetArmed < ARM_MIN_MS) return;
+    resetArmed = 0;
+    clearTimeout(resetTimer);
+    paintReset();
+    orderPost('/ceremony/order/reset', {}, 'reset', null, 'reset');
+  };
+
+  // ---- the poll (also the walk's heartbeat) ---------------------------------------
+  // One at a time: on slow Wi-Fi a tick's answer could land after the next tick's and draw
+  // an older state over a newer one. A tick finding one pending skips; a poll asked for
+  // after a press (`poll(true)`) waits its turn and runs as soon as the pending one ends.
+  // A poll that hangs is cut at POLL_TIMEOUT_MS, so "ติดต่อหุ่นไม่ได้" still comes up.
+  var POLL_TIMEOUT_MS = 4000, polling = false, pollAgain = false;
+  async function poll(asked) {
+    if (polling) {
+      if (asked === true) pollAgain = true;
+      return;
+    }
+    polling = true;
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    var cut = ctl ? setTimeout(function () { ctl.abort(); }, POLL_TIMEOUT_MS) : null;
+    try {
+      try {
+        var r = await fetch('/ceremony/state', { credentials: 'same-origin', cache: 'no-store',
+                                                 signal: ctl ? ctl.signal : undefined });
+        if (!r.ok) throw new Error(String(r.status));
+        state = await r.json();
+        lastOk = Date.now();
+      } catch (e) {
+        lastOk = Math.min(lastOk, Date.now() - 4000);   // show it now, not 3 s later
+      } finally {
+        clearTimeout(cut);
+      }
+      render();
+      if (state) {
+        renderMode(state);
+        renderClips(state.clips);
+        renderVenue(state.venue);
+        renderFollow(state);                 // ("ทั้งพิธีคุยสด": before the bar -- its button waits while it runs)
+        renderAdhoc(state);                  // before the order: the bar's height is painted from both
+        renderOrder(state);
+        // the running order replaces the flat list; without one (a script with no order) the list stays
+        if (hasOrder(state)) renderCues(null);
+        else renderCues(state.cues);
+      }
+    } finally {
+      polling = false;
+      if (pollAgain) { pollAgain = false; poll(); }
+    }
+  }
+  poll();
+  setInterval(poll, 1000);
+})();
+</script>
+</body>
+</html>

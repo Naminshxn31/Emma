@@ -13,12 +13,14 @@
   }
   if (location.pathname === '/mirror') {
     document.documentElement.classList.add('mirror');
+    // ?film=1 = the frame of the robot's own chest screen (app/face_film.py): portrait layout (html.mirror-film)
+    if (new URLSearchParams(location.search).get('film') === '1') document.documentElement.classList.add('mirror-film');
     // A room PC's Chrome is English: it offered to translate Emma's Thai in a
     // bubble over the kiosk (28 Oct, the first open on a real desktop).
     document.documentElement.setAttribute('translate', 'no');
   }
 </script>
-<link rel="stylesheet" href="/assets/emma-story.css?v=20261029-a">
+<link rel="stylesheet" href="/assets/emma-story.css?v=20261124-c">
 <style>
   :root {
     color-scheme: dark;
@@ -1328,6 +1330,14 @@
     height: clamp(38px, 5vw, 52px);
   }
 
+  /* Muted reads from across the room, colour only (5 Nov): a hold that outlives
+     a reboot is a deaf robot unless the staff can see it. setMicLabel sets it. */
+  html.app-shell body.mic-held .control.mic .control-icon {
+    background: #7d8591;
+    box-shadow: none;
+  }
+  html.app-shell body.mic-held .control.mic .control-label { color: #ffb4b4; }
+
   html.app-shell .control-label {
     color: #d7e0e6;
     font-size: clamp(.95rem, 2.5vw, 1.24rem);
@@ -2108,6 +2118,37 @@
   .emma-auto-btn { min-height: 88px; font-size: clamp(1.6rem, 4.8vw, 2.2rem); }
   .emma-auto-btn[hidden] { display: none; }
 
+  /* ---- the ceremony's film on the robot's own chest screen (CEREMONY_FACE_FILM, app/face_film.py; owner 24 Nov:
+     "อยากจะให้ตอนพูด จอหุ่น กับจอคอมนี้ขึ้นพรีเซ้นต์โมชั่นเหมือนกันเลย") ----
+     The room screen's own page in a silent frame over the face's screen (25 Nov: the owner, seeing the frame as
+     it was -- a 16:9 band in the middle with the face's purple and its status pill above and below -- "not pretty
+     at all ... ทำให้มันเต็มจอ"). The film's stage is 16:9 and its acts keep their words across 4-94% of its
+     width, so it is NOT cropped or stretched (a taller stage broke the pictures and the map act, and a crop cut
+     words): the frame page lays the screen out as a poster round it (`html.mirror-film`, below). The frame is
+     the WHOLE screen (24 Nov evening, the owner at the robot: "จอ LED ที่หุ่นยังไม่เต็มนะ"); the face's own controls
+     (mute / end) are away while it is up -- not only unseen: a touch on a button nobody sees must not end the
+     call -- and a hold on Emma brings them back for 4.5 s, as under any display (peekControls): the shell is its
+     own stacking layer, so nothing can be lifted above the frame and the frame's bottom 15% opens instead.
+     Hidden until the frame says its show mode is on (`emmaFilm`), so a frame that never comes up
+     leaves the face as it was. The frame takes no touch: the mic tap and the hold on Emma reach what is under
+     it. Emma's body, her bubble and the face's own stage sit under it. */
+  .face-film { display: none; }
+  html.app-shell .face-film {
+    display: block; position: fixed; z-index: 35; left: 0; top: 0; width: 100vw; height: 100vh;
+    border: 0; background: #01020a; pointer-events: none; visibility: hidden;
+  }
+  /* a scaled frame (CEREMONY_FACE_FILM_SCALE, `ready.film_scale`): laid out smaller, drawn up again from its own layer */
+  html.app-shell .face-film[data-scaled] {
+    width: calc(100vw * var(--ff-s)); height: calc(100vh * var(--ff-s));
+    transform: scale(calc(1 / var(--ff-s))); transform-origin: 0 0; will-change: transform;
+  }
+  html.face-film-on .face-film { visibility: visible; }
+  html.face-film-on .controls { opacity: 0; visibility: hidden; pointer-events: none; }
+  html.face-film-on body.controls-peek .controls { opacity: 1; visibility: visible; pointer-events: auto; }
+  html.face-film-on body.controls-peek .face-film { clip-path: inset(0 0 15% 0); }
+  html.face-film-on .mascot-wrap { opacity: 0; }
+  html.face-film-on .reply, html.face-film-on .vp-stage { visibility: hidden !important; }
+
   /* ---- the room screen (/mirror, app/face_mirror.py; owner 28 Oct: "ให้จอ
      ห้องนั้นโชว์ตัวหน้าเหมือนในจอหุ่น ... ปรับ uxui ให้เหมาะกับจอใหญ่") ----
      A big landscape screen read from across the room: the real one is a
@@ -2143,6 +2184,8 @@
   html.mirror .controls, html.mirror .quick, html.mirror .langs, html.mirror .brand,
   html.mirror .emma-actions, html.mirror .emma-hold-ring, html.mirror .vp-stage-close { display: none !important; }
   html.mirror .mascot-wrap { pointer-events: none; }
+  /* (owner 24 Nov night: no mouse pointer on the hall's screen -- nobody there uses one; a click still works) */
+  html.mirror, html.mirror * { cursor: none !important; }
   html.mirror .shell { display: block; min-height: 100vh; padding: 0; }
   /* the status pill at the top of Emma's column: the pictures take the rest */
   html.mirror .topbar { position: fixed; z-index: 6; top: 3vh; left: auto; right: 1.5vw; display: flex; justify-content: flex-end; }
@@ -2207,6 +2250,114 @@
   html.mirror .mirror-frame {
     position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; border: 0; transform-origin: 0 0;
     background: transparent; color-scheme: dark;
+  }
+  /* ---- the ceremony on the room screen (owner 17 Nov: her voice on stage is
+     English with "ซับไทย ... ด้านล่าง", and "เอาหุ่นออกแล้วเอาพวกนี้ไปใส่แทน") ----
+     html.mirror-show = the robot's call is the ceremony app's (the `ready`'s
+     profile). No Emma, no bubble, no status pill: the stories take the whole
+     width above a band at the bottom, and the band carries the cue's approved
+     Thai line (app/face_mirror.py subtitle) in step with her voice. No story
+     up = the project's name and the scene's title. Any other call: nothing
+     here applies, the screen is the face's copy as before. */
+  .mirror-sub, .mirror-back { display: none; }
+  html.mirror.mirror-show { --mirror-side: 0vw; --mirror-foot: 22vh; }
+  html.mirror.mirror-show .mascot-wrap, html.mirror.mirror-show .reply,
+  html.mirror.mirror-show .topbar { visibility: hidden !important; opacity: 0 !important; }
+  html.mirror.mirror-show .mirror-back {
+    display: grid; position: fixed; left: 0; right: 0; top: 0; bottom: var(--mirror-foot); z-index: 3;
+    place-items: center; text-align: center; pointer-events: none; overflow: hidden;
+    opacity: 1; transition: opacity .5s ease;
+  }
+  html.mirror.mirror-show body.mirror-story .mirror-back { opacity: 0; }
+  /* an off-script story (app/ceremony_stories.py, 24 Nov): the film's idle logo stands above the stories and covered it
+     -- it goes while a story is up; a line's own film (cs-up) still covers the story */
+  html.mirror.mirror-show body.mirror-story > .cs-stage.cs-idle-on:not(.cs-up) {
+    opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility 0s .35s;
+  }
+  /* one soft light drifting behind the name: a transform only, nothing repaints */
+  html.mirror.mirror-show .mirror-back::before {
+    content: ""; position: absolute; left: 20vw; top: -12vw; width: 60vw; height: 60vw; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(var(--fx-violet), .3), rgba(var(--fx-violet), 0));
+    animation: mirror-drift 22s ease-in-out infinite alternate;
+  }
+  @keyframes mirror-drift { from { transform: translate(-9vw, 2vw) scale(.92); } to { transform: translate(9vw, -2vw) scale(1.08); } }
+  .mirror-back-in { position: relative; }
+  .mirror-back-name { font-size: clamp(28px, 6vw, 260px); font-weight: 600; letter-spacing: .2em; color: #f4f2ff; }
+  .mirror-back-scene { margin-top: 1.1em; font-size: clamp(16px, 2.2vw, 96px); font-weight: 500; color: rgba(241, 239, 255, .74); }
+  /* The film fills the screen and the Thai line sits in a see-through box over it (owner
+     18 Nov: "อยากให้มันเต็มจอเลยไม่ต้องแบ่งพท้นที่ให้ซับ แต่ให้ซับมีกล่องข้อความใสๆ ... แต่ก็อย่าให้
+     อะไรมาทับหรือซ้อนตรงนี้"). The band this used to be was opaque and cut the picture off;
+     now this strip only PLACES the box (centred in the lowest --mirror-foot of the screen:
+     the zone the film keeps free of words, figures and cards). Dark enough to read the
+     line over a bright picture; no backdrop blur (it would re-filter a moving film every
+     frame). */
+  html.mirror.mirror-show .mirror-sub {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: var(--mirror-foot); z-index: 7;
+    align-items: center; justify-content: center; padding: 0 5vw; pointer-events: none;
+    opacity: 0; transition: opacity .3s ease;
+  }
+  html.mirror.mirror-show .mirror-sub.on { opacity: 1; }
+  /* ~30 mm type on the 48" TV; two lines at most (mirrorSubChunks) */
+  .mirror-sub-text {
+    box-sizing: content-box;
+    font-size: clamp(20px, 2.7vw, 120px); line-height: 1.5; font-weight: 600; color: #fff;
+    text-align: center; text-wrap: balance; max-height: 3em; overflow: hidden;
+    padding: .3em 1em; border-radius: .45em;
+    background: rgba(4, 6, 20, .58); border: 1px solid rgba(255, 255, 255, .16);
+  }
+  .mirror-sub-text:empty { visibility: hidden; }
+  /* the event screen's words in the film's face (owner 22 Nov: the review PDF's page 1, "ใช้ font
+     นี้", its arrow ending on this Thai line; "เปลี่ยนทั้งหมดเลยนะ"): Jipatype's face, its
+     @font-face in the film's own stylesheet (loaded with the mirror, every face asked for at once) -- in
+     the ceremony's show mode only: the robot's face and any other call keep their own type */
+  html.mirror.mirror-show .mirror-sub-text, html.mirror.mirror-show .mirror-back-name, html.mirror.mirror-show .mirror-back-scene {
+    font-family: "Kantalad", "Inter", "Segoe UI", system-ui, sans-serif;
+  }
+  /* A piece wraps only at the line's own spaces (17 Nov evening: "ผู้|ช่วย", "รับ|ชม" -- the
+     browser's Thai dictionary breaks inside a phrase, and text-wrap: balance moves the break
+     to the middle of the piece, where a phrase usually is). One phrase = one unbreakable run
+     (mirrorSubPaint); a phrase too long for a line keeps the browser's breaking. */
+  .mirror-sub-p { white-space: nowrap; }
+  /* ---- the robot's own chest screen (1080x1920, portrait) = this page in its frame (?film=1, app/face_film.py;
+     owner 25 Nov: "ทำให้มันเต็มจอ") ----
+     The film's stage is a 16:9 box (the engine's stylesheet, 100cu x 56.25cu, cu = 1vw on a portrait screen) and its acts
+     keep their words across 4-94% of its width: it is not cropped (a crop cut words) and not stretched (a taller
+     stage broke the pictures and the map act). So the screen is laid out round it as a poster -- the film whole,
+     edge to edge, a quarter of the way down; above it the project's name and the scene's title large; under it
+     the Thai line in big type (it is read from a standing distance and the screen has the height for four
+     lines). This page's viewport is the frame: the face's whole screen. Every glow here is
+     one static gradient: nothing blurred, nothing animated (the hall's drifting light is off). Nothing in this
+     block applies to the hall's /mirror -- `mirror-film` is only put on by the frame (?film=1). */
+  html.mirror.mirror-film.mirror-show { --ff-y: 26vh; background: #01020a; }
+  /* the stage is the whole screen, the film's 16:9 box a quarter of the way down it, and the stage's own sky, light
+     and floor are measured from that box -- so the picture is the hall's and nothing starts at an edge */
+  html.mirror.mirror-film.mirror-show .cs-stage {
+    background: radial-gradient(ellipse 85% calc(46 * var(--cu)) at 50% calc(var(--ff-y) + 49 * var(--cu)), #0b2170 0%, #050d33 42%, #01020a 100%);
+  }
+  html.mirror.mirror-film.mirror-show .cs-slide { top: var(--ff-y); }
+  html.mirror.mirror-film.mirror-show .cs-arc { top: calc(var(--ff-y) + 27 * var(--cu)); }
+  html.mirror.mirror-film.mirror-show .cs-grid { top: calc(var(--ff-y) + 28.875 * var(--cu)); }
+  /* the logo between lines stays a 16:9 box (across the whole tall stage it was cut at both sides: "MBASSY WORL")
+     and stands in the middle of the screen */
+  html.mirror.mirror-film.mirror-show .cs-idle { left: calc(-9 * var(--cu)); right: calc(-9 * var(--cu)); top: calc(50vh - 36 * var(--cu)); bottom: auto; height: calc(66.4 * var(--cu)); }
+  /* an off-script story takes the head's place: its own pictures run from the top of the screen; and the logo says
+     the project's name itself */
+  html.mirror.mirror-film.mirror-show body.mirror-story:not(:has(> .cs-stage.cs-up)) .mirror-back,
+  html.mirror.mirror-film.mirror-show body:has(> .cs-stage.cs-idle-on:not(.cs-up)) .mirror-back,
+  html.mirror.mirror-film.mirror-show body:has(> .cs-stage.cs-dbt-on) .mirror-back { opacity: 0; }
+  /* the poster's head, over the stage */
+  html.mirror.mirror-film.mirror-show .mirror-back { z-index: 6; bottom: auto; height: var(--ff-y); opacity: 1; background: none; }
+  html.mirror.mirror-film.mirror-show .mirror-back::before { display: none; }
+  html.mirror.mirror-film.mirror-show .mirror-back-name { font-size: 7.6vw; letter-spacing: .14em; }
+  html.mirror.mirror-film.mirror-show .mirror-back-scene { font-size: 4.4vw; margin-top: .7em; }
+  html.mirror.mirror-film.mirror-show .mirror-sub {
+    left: 0; right: 0; top: calc(var(--ff-y) + 56.25vw + 2.5vh); bottom: 0; height: auto; padding: 0 3vw; align-items: flex-start;
+  }
+  /* (a story's pictures run lower than the film's box does: its line is below them) */
+  html.mirror.mirror-film.mirror-show body.mirror-story:not(:has(> .cs-stage.cs-up)) .mirror-sub { top: 75vh; }
+  html.mirror.mirror-film.mirror-show .mirror-sub-text {
+    font-size: 4.2vw; line-height: 1.5; max-height: 6em; padding: .5em .6em; border-radius: .5em;
+    background: rgba(8, 20, 70, .5); border: 1px solid rgba(130, 175, 255, .35);
   }
   /* the browser held her voice back until a gesture (no kiosk autoplay flag) */
   html.mirror-tap .hero::after {
@@ -2840,7 +2991,7 @@
        own heuristic and a fixed URL kept serving the old renderer after the
        file on disk had changed - the fix looked like it had not worked
        (2026-09-24). Bump the date whenever mascot.js changes. -->
-  <script type="module" src="/assets/emma-3d-lab/mascot.js?v=20261010-attend"></script>
+  <script type="module" src="/assets/emma-3d-lab/mascot.js?v=20261124-film"></script>
 
   <!-- ==================== real voice engine ====================
        The visual layer above stays a pure renderer, driven only through
@@ -2857,7 +3008,7 @@
   <script src="/assets/echo-barge-gate.js?v=20260930-b"></script>
   <!-- The robot face's motion stories (present_story, app/stories.py):
        drawn with her voice, beat by beat; see docs/emma-story-engine.md -->
-  <script src="/assets/emma-story.js?v=20261029-a"></script>
+  <script src="/assets/emma-story.js?v=20261124-c"></script>
   <script>
   (function () {
     var Emma = window.EmmaVoicePreview;
@@ -2879,6 +3030,23 @@
     // ?sound=1: the room screen plays her voice too (default muted -- the
     // robot speaks; the muted playback still keeps the pictures in her time)
     var mirrorSound = mirror && q.get('sound') === '1';
+    // ?film=1: this page is the frame of the robot's own chest screen (app/face_film.py, CEREMONY_FACE_FILM) --
+    // the same mirror, told apart only to say when its show mode is on (mirrorShowMode) and to report nothing.
+    var mirrorFilm = mirror && q.get('film') === '1';
+    // Her voice on the robot's speaker only (the ceremony's show mode, `ready.voice_on_robot`, app/face_mirror.py):
+    // played at the silent gain a muted /mirror uses -- her words and slides still follow it, nothing is heard.
+    // The debut's music and the keep tone are not her voice: they stay aloud where sound=1.
+    var mirrorHerVoiceSilent = false;
+    // ?keep=<hz>,<dB> (with sound=1): one quiet tone the whole time the page is open, so the
+    // room's amplifier does not go to standby between her sentences and miss her first words
+    // (owner 16 Nov). Its own context: hers runs at 24 kHz and cannot carry a tone above 12.
+    var mirrorKeep = null;
+    (function () {
+      var m = mirrorSound && /^(\d+(?:\.\d+)?),(-\d+(?:\.\d+)?)$/.exec(q.get('keep') || '');
+      if (!m) return;
+      var hz = parseFloat(m[1]), db = parseFloat(m[2]);
+      if (hz >= 10 && hz <= 22000 && db >= -80 && db <= -20) mirrorKeep = { hz: hz, gain: Math.pow(10, db / 20) };
+    })();
     // Every load of the robot face opens in the sales mode (owner, 12 Oct:
     // "ให้เปิดโหมด emma ขายขึ้นมาอันแรกทุกครั้ง"). cycleMode writes the tapped
     // mode into the URL, and EmmaFace reloads that URL on resume and after a
@@ -2896,6 +3064,12 @@
     // chest tap cannot leave it (cycleMode).
     var eventApp = appShell && !mirror && q.get('event') === '1';
     if (eventApp) q.set('profile', 'event');
+    // "Emma Ceremony", the third robot app (owner 9 Nov 2026: "อันนี้ทำแยกกับอันเดิมนะ ไม่งั้นจะปนกัน
+    // อันนี้จะเป็นสำหรับพิธี"; build.gradle -PemmaApp=ceremony) adds ceremony=1: every call it dials
+    // is the ceremony (profile ceremony) -- opening that app IS the ceremony's mode. One mode, like
+    // the event app. After the event app's line: only the ceremony APK adds ceremony=1, so it wins.
+    var ceremonyApp = appShell && !mirror && q.get('ceremony') === '1';
+    if (ceremonyApp) q.set('profile', 'ceremony');
 
     // Owner, 12 Oct, on the robot: "แก้เป็นภาษาอังกฤษ ทั้งหมด" -- the face's
     // own words (status pill, the mic and the two buttons, the transcript
@@ -2995,11 +3169,14 @@
     // read as "wait" (reviewer, 13 Oct).
     function storyStatus(key) {
       try {
-        if (key === 'Speaking...' && window.EmmaStory && window.EmmaStory.isActive()) return 'Explaining — ask anytime';
+        if (key === 'Speaking...' && !muted && window.EmmaStory && window.EmmaStory.isActive()) return 'Explaining — ask anytime';
       } catch (e) {}
       return key;
     }
     function status(text) {
+      // A hold the server keeps says since when, so one left over reads as what
+      // it is. One place: every path to "Muted" passes through here.
+      if (text === 'Muted' && holdSince) text = mutedSince();
       text = storyStatus(text);
       lastStatusKey = text;
       if (statusNode) statusNode.textContent = offlineMark(chromeText(text, appStatus, appStatusZh));
@@ -3341,6 +3518,7 @@
     }
     function cycleMode() {
       if (eventApp) return;          // the event app is one mode: the event host
+      if (ceremonyApp) return;       // and the ceremony app: the ceremony (owner 9 Nov)
       var next = MODES[(modeIndex() + 1) % MODES.length];
       modeId = next.id;
       var u = new URLSearchParams(location.search);
@@ -3363,7 +3541,10 @@
         manualEnd = true;
         inCall = false;
         try { ws && ws.close(); } catch (e) {}
-        setTimeout(startCall, 220);
+        // Muted on the robot: startCall opens the mic, so a chest tap would
+        // have been one more way out of the hold. The new mode waits for the
+        // next call. (appShell: a desk page keeps its redial, as it always did.)
+        if (!(muteHold && appShell)) setTimeout(startCall, 220);
       }
     }
 
@@ -3381,20 +3562,107 @@
     // ถ้ากล้องจับหน้าคนได้ จะต้องทักนะ" (owner, same day) -- that call opens
     // with the mic on for the person greeted, and when it ends the hold is
     // still there. Only a tap on the mic lifts it. sessionStorage: the app
-    // reloads this page on resume, and a mute must survive that -- not an
-    // app restart.
-    var MUTE_HOLD_KEY = 'emma-mute-hold', muteHold = false, callError = false;
+    // reloads this page on resume, and a mute must survive that. An app
+    // restart, a new WebView or a reboot it does not survive; MIC_HOLD_PERSIST
+    // keeps the hold on the server (app/wake.py) and adoptHold takes its word.
+    var MUTE_HOLD_KEY = ceremonyApp ? 'emma-ceremony-mute-hold' : 'emma-mute-hold', muteHold = false, callError = false;
+    // The Emma Ceremony app's page (ceremonyApp) is not under that hold (robot, 23 Nov: a 19:55 tap held
+    // the mic to 06:00, the ceremony app opened with no call -- the standing line skips a held page -- and
+    // the opening refused "เปิดแอป Emma Ceremony บนหุ่นก่อน" until a tap at 22:25 lifted the hold, which
+    // then let the Event call after the hand-back come up live, re-muted by hand at 22:47). The ceremony's
+    // mode IS its call, and in that mode the server keeps the mic deaf itself except while she moves. So
+    // this page never adopts the server's hold (adoptHold), says whose bell it is (`ceremony`, app/wake.py
+    // `_CEREMONY`: the stored hold does not refuse its line and its taps do not write it), and keeps only
+    // its own tap's hold, under its own key -- a '1' an older page adopted from the server is not a tap.
+    // This call was dialled by the standing line, by nobody's asking: see the mic button below.
+    var dialledByBell = false;
+    // A camera's bell under a hold (owner, 5 Nov: "ปิดไมค์ ... อยู่หุ่นก็สามารถได้ยิน"). The greeter pre-rings
+    // for any close face, before it knows there is a greeting to give (greeter.py), and startCall opened
+    // the mic on that: a robot that read "Muted" a moment ago listening to the room, nothing said. 14
+    // Oct's rule stands, she greets and that call's mic is for the person greeted: from the greeting on.
+    var greetingOpensMic = false;
+    // The server marks the camera's greeting ({type: 'greeting_mic'}, events.announce): the mic of a
+    // muted call opens on THAT greeting's first sound only (review 6 Nov: any first sound opened it --
+    // a staff scene's line, the answer to a language tap -- and the turn log said "hold_greeting").
+    // Consumed by the first chunk after it, and cleared at the turn's end if no sound came.
+    var greetingComing = false;
+    // ...within this long of the marker (final review 6 Nov): send_text does not raise when a dropped line
+    // loses the greeting, and the next sound after the rejoin -- a scene line, a re-ask -- would open the mic.
+    var GREETING_MIC_MS = 8000;
+    function micForDial() {
+      greetingOpensMic = !!(muteHold && appShell);
+      muted = greetingOpensMic;
+    }
+    function greetingHeard() {
+      greetingOpensMic = false;
+      greetingComing = false;
+      muted = false;
+      setMicLabel('Listening');
+      try {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'mic_state', why: 'hold_greeting', muted: false, state: 'open', label: '', handed: false }));
+        }
+      } catch (e) { /* closing */ }
+    }
+    // When the server says the hold began; 0 = no server keeps it (no bell, or
+    // the switch is off) and the screen reads plain "Muted", as it always did.
+    var holdSince = 0, holdKept = false;
     // The camera's bells (app/greeter.py: face_approach, face_known,
     // face_stranger) still open a line under the hold; the standing line's do not.
     var FACE_RING = /^face_/;
+    // ...and the event staff page's presses (app/event_walk.py `_call_up`, event_host's lines): owner
+    // 10 Nov, the debut refused with the mic held and no call -- "เปิดสายแต่ mute ไมค์ได้ไหม". The line
+    // opens muted like any dial under the hold (micForDial); only a camera greeting opens that mic.
+    var STAFF_RING = /^event_/;
     try { muteHold = sessionStorage.getItem(MUTE_HOLD_KEY) === '1'; } catch (e) { /* storage blocked */ }
-    function setMuteHold(on) {
-      muteHold = !!on;
+    function storeMuteHold() {
       try {
         if (muteHold) sessionStorage.setItem(MUTE_HOLD_KEY, '1');
         else sessionStorage.removeItem(MUTE_HOLD_KEY);
       } catch (e) { /* storage blocked: the hold still lasts this page */ }
+    }
+    // A person tapped. The event is what tells the server, so nothing else
+    // may fire it: the bell reads it as a press.
+    function setMuteHold(on) {
+      muteHold = !!on;
+      holdSince = muteHold && holdKept ? Math.floor(Date.now() / 1000) : 0;
+      storeMuteHold();
       document.dispatchEvent(new CustomEvent('emma-mute-hold', { detail: muteHold }));
+    }
+    // The server's word: a fresh WebView learns it was muted, and the morning
+    // ends a hold (app/wake.py hold_state). Never written back. Inside a call
+    // only the expiry touches the mic: a camera's call under a hold has its mic
+    // open on purpose and keeps it.
+    function adoptHold(state) {
+      if (ceremonyApp) return;          // not this app's hold (MUTE_HOLD_KEY above): its own tap's only
+      var was = muteHold;
+      holdKept = true;
+      muteHold = !!state.on;
+      holdSince = muteHold ? Number(state.since) || 0 : 0;
+      storeMuteHold();
+      if (inCall) {
+        if (muted && !muteHold) {
+          muted = false; greetingOpensMic = false; greetingComing = false;
+          setMicLabel('Listening'); if (!playing) status('Listening...');
+          // the server's word for this call's mic (follow-up veto, the phone's warning): final review 6 Nov
+          try {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'mic_state', why: 'hold_expired', muted: false, state: 'open', label: '', handed: false }));
+            }
+          } catch (e) { /* closing */ }
+        }
+        return;
+      }
+      if (was !== muteHold) restScreen();
+      else if (muteHold && !callError) status('Muted');
+    }
+    function mutedSince() {
+      var d = new Date(holdSince * 1000);
+      var at = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+      // The robot's Android clock is China time, an hour ahead of the room it stands in.
+      try { at = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }); } catch (e) { /* the clock's own */ }
+      return uiText('Muted since ' + at + ' — tap the mic to listen',
+                    'ปิดไมค์ตั้งแต่ ' + at + ' — แตะไมค์เพื่อเปิด');
     }
     var inputRate = 16000, outputRate = 24000, halfDuplex = false, bargeIn = false, providerName = 'gemini';
     var playbackBaseGain = 1, echoGuardUntil = 0, bargePendingUntil = 0, bargeRelayUntil = 0;
@@ -3576,6 +3844,7 @@
       // with it (live 28 Oct: 16 s of her voice queued behind the robot's).
       // -80 dB keeps the stream running and is not heard.
       if (mirror) playbackBaseGain = mirrorSound ? 1 : 0.0001;
+      if (mirror && mirrorHerVoiceSilent) playbackBaseGain = 0.0001;     // (her voice on the robot: never 0 either)
       playbackGainNode.gain.value = playbackBaseGain;
       if (appShell) {
         playbackLimiterNode = ctx.createDynamicsCompressor();
@@ -3601,6 +3870,28 @@
       else gain.value = target;
     }
 
+    // The room screen's own road for her voice (mirror only -- the robot face's is playbackOutput, as it
+    // was): one gain per source, in dB, in front of playbackOutput. `line` = a recorded line of the
+    // ceremony (the frames counted after its mirror_voice, mirrorVoiceFrame), `live` = everything else.
+    // Recorded lines -2 dB (24 Nov, the recordings' QA: four pinned takes peak above 0 dBTP BETWEEN their
+    // samples -- s02_l05 +1.6, s05_l13 +0.9, s05_l06 +0.7, s07_l07 +0.5 -- once the 24 kHz voice is
+    // resampled for the sound card, and they cannot be rendered again). -2 dB puts every pinned take under
+    // -0.4 dBTP (tests/test_hall_voice.py measures them), all of them alike: no line louder or quieter
+    // than another than it was. The hall's level is the mixer's. One place for a level the hall needs.
+    var MIRROR_GAIN_DB = { line: -2, live: 0 };
+    var mirrorGains = null;
+    function mirrorOut(ctx) {
+      var out = playbackOutput(ctx);
+      if (!mirrorGains || mirrorGains.ctx !== ctx) {
+        mirrorGains = { ctx: ctx, line: ctx.createGain(), live: ctx.createGain() };
+        ['line', 'live'].forEach(function (k) {
+          mirrorGains[k].gain.value = Math.pow(10, (MIRROR_GAIN_DB[k] || 0) / 20);
+          mirrorGains[k].connect(out);
+        });
+      }
+      return mirrorGains[mirrorVoiceLine ? 'line' : 'live'];
+    }
+
     function playChunk(arrayBuffer) {
       if (!audioCtx || arrayBuffer.byteLength < 2) return;
       if (audioCtx.state !== 'running') audioCtx.resume().catch(function () {});
@@ -3615,7 +3906,9 @@
       buf.copyToChannel(f32, 0);
       var src = audioCtx.createBufferSource();
       src.buffer = buf;
-      src.connect(playbackOutput(audioCtx));
+      // (the room screen: its gain per source, mirrorOut; the robot face's road as it was)
+      if (mirror) src.connect(mirrorOut(audioCtx));
+      else src.connect(playbackOutput(audioCtx));
       // playHead ahead of currentTime is required: the model outruns
       // realtime and chunks queue back-to-back. Never snap it back to now.
       var at = Math.max(audioCtx.currentTime, playHead);
@@ -3627,6 +3920,11 @@
       sources.push(src);
       playing = true;
       echoGuardUntil = 0;
+      if (greetingComing) {
+        var fresh = Date.now() - greetingComing < GREETING_MIC_MS;
+        greetingComing = false;
+        if (fresh && muted) greetingHeard();
+      }
       show('speaking');
       // Lip-sync: the renderer's mouth follows the reply's own loudness.
       try { Emma.setMouthLevel(Math.min(1, Math.sqrt(sum / f32.length) * 3.2)); } catch (e) {}
@@ -3704,8 +4002,43 @@
     }
 
     // ---- teardown (verbatim shape from index.html) ----
+    // ---- the ceremony's film on this screen too (CEREMONY_FACE_FILM, app/face_film.py; owner 24 Nov) ----
+    // In the Emma Ceremony app's call only: its `ready` carries a one-time ticket and the room screen's own page
+    // (/mirror?film=1, the same acts and Thai subtitles on the same clock) goes up in a silent frame over Emma.
+    // The frame says when its show mode is on (postMessage `emmaFilm`): until then, and when it goes off, the
+    // face is as it was -- a frame that never comes up costs the screen nothing. It goes with the call
+    // (releaseCallHardware: every way a call starts or ends passes it).
+    var faceFilmFrame = null;
+    function faceFilmClose() {
+      if (!faceFilmFrame) return;
+      try { faceFilmFrame.remove(); } catch (e) { /* gone */ }
+      faceFilmFrame = null;
+      document.documentElement.classList.remove('face-film-on');
+    }
+    function faceFilmOpen(evt) {
+      if (!ceremonyApp || faceFilmFrame || !evt || !/^[A-Za-z0-9_-]{16,64}$/.test(String(evt.film_ticket || ''))) return;
+      var f = document.createElement('iframe');
+      f.className = 'face-film';
+      f.setAttribute('allow', 'autoplay');
+      f.setAttribute('aria-hidden', 'true');
+      f.tabIndex = -1;
+      var scale = Number(evt.film_scale);
+      if (scale >= 0.4 && scale < 1) { f.style.setProperty('--ff-s', String(scale)); f.setAttribute('data-scaled', ''); }
+      f.src = '/mirror?film=1&ticket=' + encodeURIComponent(evt.film_ticket);
+      faceFilmFrame = f;
+      document.body.appendChild(f);
+    }
+    window.addEventListener('message', function (e) {
+      if (!faceFilmFrame || e.origin !== location.origin || e.source !== faceFilmFrame.contentWindow) return;
+      if (e.data && typeof e.data.emmaFilm === 'boolean') {
+        document.documentElement.classList.toggle('face-film-on', e.data.emmaFilm);
+      }
+    });
+
     function releaseCallHardware() {
-      try { worklet && (worklet.port.onmessage = null, worklet.disconnect()); } catch (e) {}
+      // (typeof: tests/test_array_mic.py runs this function alone in a node context)
+      if (typeof faceFilmClose === 'function') faceFilmClose();
+      try { worklet &&(worklet.port.onmessage = null, worklet.disconnect()); } catch (e) {}
       try { micSource && micSource.disconnect(); } catch (e) {}
       micStream && micStream.getTracks().forEach(function (t) { t.stop(); });
       sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
@@ -3873,6 +4206,35 @@
       holdQueue = []; holdBytes = 0; holdPre = []; holdVoicedUntil = 0;
     }
 
+    // Which input the call opened (owner 10 Nov: "อาจจะใช้ไมค์แยกจากตัวหุ่น"): its name and what
+    // the browser applied, plus the names of the inputs it can see -- from micIsUp, once the page's
+    // mic is open (after `ready` and the bridge's face_hello, which must be the first frame; an
+    // array-only call has no track here and sends nothing). `muted` is the OS's mute of the track,
+    // not the mic button. The logs had no word of
+    // the device (every mic_state sent an empty label), so a receiver Android did not route to
+    // looked like a quiet room. Names are cut short; the server keeps them as mic_device.
+    function reportCallMic(sock) {
+      var track = micStream && micStream.getAudioTracks ? micStream.getAudioTracks()[0] : null;
+      if (!track || !sock) return;
+      var s = {};
+      try { s = (track.getSettings && track.getSettings()) || {}; } catch (e) { s = {}; }
+      function n(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+      function b(v) { return typeof v === 'boolean' ? v : null; }
+      var msg = { type: 'mic_state', why: 'call_open', muted: !!track.muted, state: String(track.readyState || ''),
+                  label: String(track.label || '').slice(0, 60), handed: false, rate: n(s.sampleRate),
+                  channels: n(s.channelCount), agc: b(s.autoGainControl), ec: b(s.echoCancellation),
+                  ns: b(s.noiseSuppression), inputs: null };
+      function send() {
+        try { if (sock.readyState === 1) sock.send(JSON.stringify(msg)); } catch (e) {}
+      }
+      var md = navigator.mediaDevices;
+      if (!md || !md.enumerateDevices) { send(); return; }
+      md.enumerateDevices().then(function (list) {
+        msg.inputs = list.filter(function (d) { return d.kind === 'audioinput'; }).slice(0, 6)
+          .map(function (d) { return String(d.label || '?').slice(0, 40); });
+        send();
+      }, send);
+    }
     // The page's own call mic: one constraint object for the call's start
     // and for taking the mic back from the array (two copies drift).
     function pageMicConstraints() {
@@ -3937,9 +4299,7 @@
         if (audioCtx === callCtx && arrayMicSilent && !ticks) arrayMicLost('no_clock');
       }, ARRAY_CLOCK_CHECK_MS);
       reportArrayMic('start', 'array');
-      setMicLabel('Listening');
-      show(playing ? 'speaking' : 'listening');
-      status(playing ? 'Speaking...' : 'Listening...');
+      micIsUp();
     }
 
     // The server's `array_mic_lost` (the array went quiet for ARRAY_MIC_DEAF_S),
@@ -4044,9 +4404,24 @@
         handleMicAudio(e.data);
       };
       shaped.connect(worklet);   // never connect to destination: never echo the mic
-      setMicLabel('Listening');
+      micIsUp();
+    }
+
+    // The mic is open. Muted while it was connecting: every frame stops at
+    // handleMicAudio, and the screen must say so, not "Listening" (review 14 Oct).
+    function micIsUp() {
+      if (muted && !greetingOpensMic) tellServerMuted();
+      // A camera's line under a hold, waiting for its greeting (review 6 Nov): the server held it open
+      // for ever as an unused standing line, and the 06:00 end of the hold never reached a page in a call.
+      else if (muted) tellServerHoldWaiting();
+      setMicLabel(muted ? 'Muted' : 'Listening');
       show(playing ? 'speaking' : 'listening');
-      status(playing ? 'Speaking...' : 'Listening...');
+      status(playing ? 'Speaking...' : (muted ? 'Muted' : 'Listening...'));
+      // which input this is (mic_device): here, where a page mic has just opened -- the call's
+      // `ready` comes BEFORE startMic (review 10 Nov: sent from there it found no track, every
+      // call, and nothing was ever logged). Also after the array handed the mic back. typeof: the
+      // page tests run micIsUp alone (client_mute_hold.cjs), where a new name would throw.
+      if (typeof reportCallMic === 'function') reportCallMic(ws);
     }
 
     // ---- server -> client (slimmed: no slides / stage / camera here) ----
@@ -4075,6 +4450,16 @@
       }
       var evt;
       try { evt = JSON.parse(msg.data); } catch (e) { return; }
+      // The ceremony's last step (owner 9 Nov): the server asks the ceremony app to open Emma
+      // Event. A request to the app, not her answer -- handled before serverSeq counts it. The
+      // robot bridge decides (only the ceremony app's page, only "event", only an APK that says
+      // EmmaOpenApp/1) and answers open_app_result on THIS call's socket; a page without the
+      // bridge says so, never silence the server would wait out.
+      if (evt.type === 'open_app') {
+        if (window.EmmaRobotBridge && window.EmmaRobotBridge.openApp) window.EmmaRobotBridge.openApp(evt, robotSender(ws));
+        else robotSender(ws)({ type: 'open_app_result', app: evt.app === 'event' ? 'event' : null, ok: false, reason: 'no_bridge' });
+        return;
+      }
       // lang_pinned is the server confirming a pick, not her answer to it: counted,
       // it kept a tap's "Thinking..." fallback from ever firing (review 29 Oct)
       if (evt.type !== 'attention' && evt.type !== 'lang_pinned' && evt.type !== 'head_look') serverSeq++;
@@ -4148,6 +4533,7 @@
           // fixes the tool list when the provider connects, and the hello
           // must be the first frame it reads from this page.
           if (window.EmmaRobotBridge) window.EmmaRobotBridge.ready(robotSender(ws));
+          if (evt.film_ticket && typeof faceFilmOpen === 'function') faceFilmOpen(evt);   // the ceremony's film here too (app/face_film.py)
           choiceSet = null;
           quickAsks = appShell && evt.quick_asks && typeof evt.quick_asks === 'object' ? evt.quick_asks : null;
           renderQuick();
@@ -4180,7 +4566,7 @@
           curBot = '';                       // a reply talked over is gone
           captionHook('clear');
           resetAssistantTurn();
-          if (inCall) { show('listening'); status('Listening...'); } else paintReply();
+          if (inCall) { show('listening'); status(muted ? 'Muted' : 'Listening...'); } else paintReply();
           // somebody is being served: the robot's walk back to the dock waits
           robotHeardSpeech();
           break;
@@ -4226,7 +4612,12 @@
           storyHook('transcript', evt.text || '');
           robotHeardSpeech();
           break;
+        case 'greeting_mic':
+          // The next sound is the camera's greeting (events.announce): a muted call's mic opens on it.
+          greetingComing = Date.now();
+          break;
         case 'turn_complete':
+          greetingComing = false;
           storyHook('turnComplete');
           captionHook('complete');
           // Don't clear curBot here: the model has stopped generating but its
@@ -4372,11 +4763,13 @@
       clearTranscript();
       planDisplay.reset();
       manualEnd = false; inCall = true; callError = false; offlineCall = false;
+      if (!summonedDial) dialledByBell = false;
+      greetingComing = false;
       if (micBtn) micBtn.setAttribute('aria-pressed', 'false');
       try { ws && ws.close(); } catch (e) {}
       releaseCallHardware();
       sentMs = 0; playHead = 0; sources = []; playing = false;
-      muted = false; curBot = '';
+      micForDial(); curBot = '';
       clearStage();
       show('loading'); status('Connecting...');
       setMicLabel('Connecting');
@@ -4436,12 +4829,36 @@
     // distance, neighborhood -- no story uses them): every story is laid out
     // across the TV (owner 29 Oct: "ทำเรื่องเล่าแบบแนวนอน").
     var MIRROR_BAND = { top: 250, height: 1500 };
+    var mirrorLandscape = true, mirrorResizeWatch = false;
     function startMirror() {
       var proto = location.protocol === 'https:' ? 'wss' : 'ws';
       var tok = q.get('token');
+      // (what this screen is, for app/ceremony_reveal.ready() -- it only warns, never refuses: does it play
+      // the sound aloud, is it touch-first (a staff phone), its size in DEVICE pixels -- re-review 23 Nov: a
+      // 1920 screen at 200% scaling is 960 CSS px wide and was refused)
+      var dpr = window.devicePixelRatio || 1;
+      var coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      mirrorLandscape = window.innerWidth > window.innerHeight;
       var sock = new WebSocket(proto + '://' + location.host + '/ws/mirror'
-        + (tok ? '?token=' + encodeURIComponent(tok) : ''));
+        + '?sound=' + (mirrorSound ? '1' : '0') + '&w=' + Math.round(window.innerWidth * dpr)
+        + '&h=' + Math.round(window.innerHeight * dpr) + '&coarse=' + (coarse ? '1' : '0')
+        // back from a blink with a recorded line still sounding here: the rest of it from what we hold
+        + (mirrorBlink ? '&line=' + encodeURIComponent(mirrorBlink.id) + '&have=' + mirrorBlink.have + '&tok=' + mirrorBlink.tok : '')
+        + (tok ? '&token=' + encodeURIComponent(tok) : ''));
+      if (!mirrorResizeWatch) {
+        mirrorResizeWatch = true;
+        var resized = null;
+        window.addEventListener('resize', function () {
+          clearTimeout(resized);
+          resized = setTimeout(function () {
+            // (turned landscape or back since it said what it is -- a window maximised after it
+            // connected: it says so again on a new socket; the debut plays on through it)
+            if (ws && (window.innerWidth > window.innerHeight) !== mirrorLandscape) ws.close();
+          }, 1500);
+        });
+      }
       sock.binaryType = 'arraybuffer';
+      mirrorSlideAssets();
       // view only: nothing this page does reaches the robot
       sock.send = function () {};
       ws = sock;
@@ -4451,30 +4868,751 @@
           return { socket: ws ? ws.readyState : -1, inCall: inCall, playing: playing,
                    audio: audioCtx ? audioCtx.state : 'none', rate: outputRate,
                    queued: audioCtx ? Math.max(0, Math.round((playHead - audioCtx.currentTime) * 10) / 10) : 0,
-                   story: document.body.classList.contains('mirror-story') };
+                   story: document.body.classList.contains('mirror-story'),
+                   voiceGain: playbackGainNode ? playbackGainNode.gain.value : null };
         }
       });
       sock.onopen = function () { mirrorRetry = 0; };
       sock.onmessage = function (m) {
         if (ws !== sock) return;
+        mirrorSubFrame();                  // any frame: the link to the robot is alive (mirrorSubStep)
+        if (typeof m.data !== 'string') mirrorVoiceFrame(m.data);      // a recorded line's voice, or not
         // never the guest's words on the room screen (the server sends none)
         if (typeof m.data === 'string') {
-          var t = null;
-          try { t = JSON.parse(m.data).type; } catch (e) { return; }
+          var t = null, said = null;
+          try { said = JSON.parse(m.data); t = said.type; } catch (e) { return; }
           if (t === 'user_transcript') return;
+          // a recorded line's voice, whole: the frames after it are that line's (app/face_mirror.py `ahead`)
+          if (t === 'mirror_voice') { mirrorVoiceAt(said); return; }
+          // back from a blink with a line sounding here: what became of it at the robot (mirrorBack) -- and
+          // the snapshot's mirror_start right after does not take a line that plays on down
+          if (t !== 'mirror_hello' && t !== 'mirror_start') mirrorResumed = false;
+          if (t === 'mirror_hello' && mirrorBlink) mirrorBack(said);
+          if (t === 'mirror_start' && mirrorResumed) { mirrorResumed = false; return; }
+          // her voice cut short or a new call: no line's voice here any more
+          if (t === 'interrupted' || t === 'speech_started' || t === 'mirror_start' || t === 'mirror_end') mirrorVoice = null;
+          // the event's film (app/event_clips.py): never the face's own stream
+          if (t === 'mirror_clips') { mirrorClipFetch(said.clips || []); return; }
+          if (t === 'mirror_clip_play') { mirrorClipPlay(said); return; }
+          if (t === 'mirror_clip_stop') { mirrorClipStop(); return; }
+          // the debut on card 1 (app/ceremony_reveal.py): its countdown, its light, its sound and its wave
+          if (t === 'ceremony_reveal') { mirrorReveal(said); return; }
+          if (t === 'ceremony_reveal_stop') { mirrorRevealStop(); return; }
+          // the walk's music (app/face_mirror.py `catwalk`, owner 24 Nov)
+          if (t === 'catwalk' || t === 'catwalk_files') { mirrorCatwalk(said); return; }
+          // (a line of the script, a topic slide or a debut: the film's stage is theirs -- the walk's pictures go)
+          if ((t === 'mirror_subtitle' || t === 'mirror_motion' || t === 'ceremony_reveal') && window.CatwalkMusic) window.CatwalkMusic.pictures_down();
+          // the ceremony's Thai line under her English voice (app/face_mirror.py)
+          if (t === 'mirror_live_mark') { mirrorLiveMark(said); return; }
+          if (t === 'mirror_subtitle') { if (said.live) mirrorLiveShow(said); else mirrorSubShow(said); return; }
+          // "ตอบสด"'s topic slide, or the logo (app/ceremony_motion.py, owner 23 Nov)
+          if (t === 'mirror_motion') { mirrorMotion(said); return; }
+          // the walk's music goes with the red stop, the call over and the show mode (mirrorShowMode); a hello = the link is back
+          if (t === 'mirror_hello') mirrorCatwalkLink(true);
+          if ((t === 'mirror_subtitle_end' && said.cut && !said.id) || t === 'mirror_end' || (t === 'mirror_hello' && !said.in_call)) mirrorCatwalkStop();
+          // (the red stop's end -- cut, no line's id: face_mirror.subtitle_cut -- takes the debut too; a line's
+          // own end, even cut short, does not: the server's run hears exactly the same)
+          if (t === 'mirror_subtitle_end') { if (mirrorLiveEndHeld(said)) return; if (said.cut && !said.id) mirrorRevealStop(); mirrorSubEnd(said); return; }
+          // her voice cut short (the red stop, a barge-in): the line being said comes down
+          // with it, before the shared handler stops the sound
+          if (t === 'interrupted') mirrorSubInterrupted();
+          if (t === 'ready') mirrorShowMode(said.profile === 'ceremony');
+          if (t === 'ready') mirrorHerVoice(said.profile === 'ceremony' && said.voice_on_robot === true);
+          // a story, an answer picture or a cleared screen: the last line's slide goes
+          // (a slide whose line is being said now stays -- it wins on this screen)
+          if (t === 'tool_result' && said.result && typeof said.result.screen === 'string') mirrorSlidePicture();
+          // a call over or a new one: no line of the old call stays (a joining screen's
+          // snapshot sends the live line AFTER its mirror_start)
+          // -- the debut goes with a call that is over (face_mirror.call_ended stops the server's run too);
+          // a call replaced mid-debut does not end it: the `ready` that follows does, unless it is the
+          // ceremony's again (show mode, both sides)
+          if (t === 'mirror_end' || (t === 'mirror_hello' && !said.in_call)) mirrorRevealStop();
+          if (t === 'mirror_end' || t === 'mirror_start' || (t === 'mirror_hello' && !said.in_call)) mirrorSubEnd({ cut: true });
         }
         onMessage(m);
+        if (typeof m.data !== 'string') mirrorVoiceQueued();
       };
       sock.onclose = function () {
         if (ws !== sock) return;
         ws = null;
-        mirrorIdle();
+        mirrorCatwalkLink(false);          // (the walk's music plays on through a blink; not for ever)
+        // (the debut plays on through a Wi-Fi blink -- its sound and wave are already here, and the robot
+        // walks out on its hit anyway; the snapshot when we are back stops it if the server's run is over)
+        // A recorded line still sounding here plays on through the blink, its words and slide with it
+        // (mirrorKeepLine, 24 Nov: its voice is here whole); anything else stops, as it always did
+        if (!mirrorKeepLine()) {
+          mirrorSubEnd({ cut: true });   // its end may come while we are away; the snapshot brings a live line back
+          mirrorIdle();
+        }
         status('Reconnecting…');
-        mirrorRetry = Math.min(30000, mirrorRetry ? mirrorRetry * 2 : 2000);
+        // (sooner while a line plays on: the rest of it may still be on its way)
+        mirrorRetry = Math.min(30000, mirrorRetry ? mirrorRetry * 2 : (mirrorBlink ? 500 : 2000));
         setTimeout(startMirror, mirrorRetry);
       };
     }
+    // ---- the ceremony's screen: no Emma, the pictures and a Thai subtitle ----
+    // (owner 17 Nov; the CSS under html.mirror-show says what it looks like.)
+    // The mode follows the robot's call: a `ready` whose profile is the
+    // ceremony's turns it on, a `ready` of any other call turns it off. It
+    // stays through a dropped call -- Emma must not pop onto the stage screen
+    // between two lines because the Wi-Fi blinked.
+    var MIRROR_SUB_CHARS = 100;   // a chunk's most characters: two lines of the band
+    var mirrorSubBox = null, mirrorSubText = null, mirrorBackScene = null, mirrorSubRun = null, mirrorSubTick = null;
+    function mirrorShowParts() {
+      if (mirrorSubBox) return;
+      var back = document.createElement('div');
+      back.className = 'mirror-back';
+      var inner = document.createElement('div'), name = document.createElement('div');
+      inner.className = 'mirror-back-in';
+      name.className = 'mirror-back-name';
+      name.textContent = 'EMBASSY WORLD';
+      mirrorBackScene = document.createElement('div');
+      mirrorBackScene.className = 'mirror-back-scene';
+      inner.appendChild(name); inner.appendChild(mirrorBackScene); back.appendChild(inner);
+      mirrorSubBox = document.createElement('div');
+      mirrorSubBox.className = 'mirror-sub';
+      mirrorSubText = document.createElement('div');
+      mirrorSubText.className = 'mirror-sub-text';
+      mirrorSubBox.appendChild(mirrorSubText);
+      document.body.appendChild(back);
+      document.body.appendChild(mirrorSubBox);
+    }
+    function mirrorShowMode(on) {
+      var root = document.documentElement;
+      if (root.classList.contains('mirror-show') === !!on) return;
+      root.classList.toggle('mirror-show', !!on);
+      // (the robot's chest screen frames this page: it shows the frame only while the show mode is on)
+      if (typeof mirrorFilm !== 'undefined' && mirrorFilm && window.parent !== window) {   // (typeof: the node tests run this alone)
+        try { window.parent.postMessage({ emmaFilm: !!on }, location.origin); } catch (e) { /* no parent */ }
+      }
+      if (on) mirrorShowParts(); else { mirrorRevealStop(); mirrorSubDown(); }
+      if (!on) mirrorCatwalkStop();
+      // the pictures' area changed (Emma's column, the band): a story up is fitted again
+      if (mirrorFrame) fitMirrorStage();
+    }
+    // The line in pieces of at most two lines, cut only at its own spaces
+    // (Thai has no spaces inside a phrase: a cut anywhere else splits a word)
+    // -- and at the end of a sentence when the piece is long enough to stand
+    // alone: seen in Chromium 17 Nov, "...ได้สะดวกขึ้นค่ะ Embassy World" left the
+    // next sentence's first two words hanging on the old one's piece.
+    var MIRROR_SUB_ALONE = 30;
+    // the words that say how much a number is ("about 600", "ประมาณ 600"): never a piece apart from it
+    var MIRROR_SUB_QUALIFIER = /(?:ประมาณ|ราว|ราวๆ|กว่า|ถึง|เกือบ|about|around|approximately|nearly|almost|over)$/i;
+    // no voice this long after the line went up / silent this long mid-line = it is over
+    var MIRROR_SUB_NO_VOICE_MS = 15000, MIRROR_SUB_SILENT_MS = 6000;
+    // ...the 6 s only while the robot is still talking to this screen. Robot -> screen is
+    // Wi-Fi, and a recorded line goes out only RECORDED_LEAD_S = 2 s ahead of her voice: a
+    // radio gap of a few seconds (TCP's doubling retries stretch it) ran her voice dry here
+    // while she was still speaking, and the 6 s took the slide and the words down under a
+    // line still being said (open risk of 21 Nov). Her voice running out with NOTHING arriving
+    // after it is the link's silence: the line holds where her voice ran out, at most
+    // MIRROR_SUB_NO_VOICE_MS of it (then the robot is gone: down, never settled).
+    var mirrorSubFrameAt = 0;
+    // The first frame after a gap may be a word's text a moment ahead of that word's sound (a
+    // recorded line sends each word's transcript just before its audio, gemini.py
+    // play_recorded): the 6 s waits this long from the first frame seen after her voice ran out
+    var MIRROR_SUB_LINK_GRACE_MS = 2000;
+    function mirrorSubFrame() { mirrorSubFrameAt = Date.now(); }
+    // ---- a recorded line's voice, whole (app/face_mirror.py `ahead`; 24 Nov, the hall's sound over a bad
+    // Wi-Fi) ---- The robot pushes a recorded line only 2 s ahead of her voice, so a longer radio gap on
+    // this screen's Wi-Fi was a gap in the hall. The server now sends the line's voice whole at her first
+    // word: `mirror_voice` says which line the voice frames after it are, from which byte of it, how many
+    // bytes. Played on this screen's own clock from where it lands (playChunk) -- nothing is heard sooner,
+    // and the words and the slide still follow the voice played HERE. `got` = its bytes here so far,
+    // `endAt` = where its last byte ends in this screen's queue.
+    var mirrorVoice = null;
+    // the voice frame being played is a recorded line's (playChunk -> mirrorOut: its own gain)
+    var mirrorVoiceLine = false;
+    // the socket went with a recorded line sounding here: {id, have} -- it plays on (mirrorKeepLine) and the
+    // socket back asks for the rest of it from `have` (startMirror)
+    var mirrorBlink = null;
+    // the hello said that line plays on: the snapshot's mirror_start does not take it down
+    var mirrorResumed = false;
+    function mirrorHerVoice(silent) {
+      mirrorHerVoiceSilent = !!silent && mirrorSound;     // (a screen with no sound is silent already)
+      if (!mirrorSound || !playbackGainNode || !audioCtx) return;
+      playbackBaseGain = mirrorHerVoiceSilent ? 0.0001 : 1;     // never 0: the context's clock would stop
+      playbackGainNode.gain.value = playbackBaseGain;
+    }
+    function mirrorVoiceAt(m) {
+      mirrorVoice = { id: String(m.id || ''), tok: Number(m.tok) || 0, from: Math.max(0, Number(m.from) || 0),
+                      bytes: Math.max(0, Number(m.bytes) || 0), got: 0, endAt: null };
+    }
+    // every voice frame on the mirror socket, before the shared handler plays it...
+    function mirrorVoiceFrame(buf) {
+      var v = mirrorVoice;
+      mirrorResumed = false;
+      mirrorVoiceLine = !!v && v.got < v.bytes;
+      if (mirrorVoiceLine) v.got += buf.byteLength;
+    }
+    // ...and after (playHead has moved): where the line's last byte ends here
+    function mirrorVoiceQueued() {
+      var v = mirrorVoice;
+      if (v && v.endAt === null && v.got >= v.bytes) v.endAt = playHead;
+      mirrorVoiceLine = false;
+    }
+    // The socket went. A recorded line still sounding here (the ceremony's screen) plays on: its voice is
+    // here, whole or for the most part, and the hall hears it through the blink -- its words and slide go on
+    // with it. Anything else (a live answer, nothing queued, not the show): everything stops, as before.
+    function mirrorKeepLine() {
+      var v = mirrorVoice;
+      mirrorBlink = null;
+      if (!v || !v.id || !audioCtx || !document.documentElement.classList.contains('mirror-show')) return false;
+      // her voice of it still queued here, and nothing after it
+      if (!(playHead > audioCtx.currentTime + 0.2) || (v.endAt !== null && playHead > v.endAt + 0.05)) return false;
+      mirrorBlink = { id: v.id, tok: v.tok, have: v.from + v.got };
+      return true;
+    }
+    // The socket back while that line played on: the hello says what became of it at the robot. Still
+    // being said, or said to its end with no other line being said now: it plays on -- the server sends the
+    // rest of it from what this screen holds (`have`), not its subtitle again, and a line whose end came
+    // while we were away ends here when its voice does. Cut, or another line being said now: it stops, as
+    // if the screen had stopped at the blink (the snapshot brings the new line from where the robot is).
+    function mirrorBack(h) {
+      var k = mirrorBlink;
+      mirrorBlink = null;
+      if (!k || !h.in_call) return;               // the call is over: the shared handlers stop everything
+      var v = h.voice || null, p = h.voice_prev || null;
+      // (the same line played twice has one id: the play is told by its token -- `have` counts one play's bytes)
+      var mine = v && v.id === k.id && v.tok === k.tok ? v : (p && p.id === k.id && p.tok === k.tok ? p : null);
+      if (mine && mine.state !== 'cut' && !(v && v.id !== k.id && v.state === 'live')) {
+        mirrorResumed = true;
+        if (h.line !== k.id) mirrorSubEnd({ id: k.id });
+        return;
+      }
+      mirrorVoice = null;
+      mirrorSubEnd({ cut: true });
+      mirrorIdle();
+    }
+    // What belongs together stays together: the project's name, any name of several Latin words and
+    // a number with the Thai word after it (24 Nov, the extra lines on the hall screen: "... Sky" then
+    // "Pool", "General" | "Manager", "30" | "นาที"). A run too long for a line is left to its own spaces.
+    function mirrorSubJoin(text) {
+      var tie = function (m) { return m.replace(/ /g, '\u00a0'); };
+      return String(text || '').replace(/Embassy World/g, tie)
+        .replace(/[A-Z][\w.'-]*(?: (?:&|[A-Z][\w.'-]*))+/g, function (m) { return m.length <= 26 ? tie(m) : m; })
+        .replace(/\d (?=[\u0e00-\u0e7f]{2,40}(?:[ \t\r\n]|$))/g, tie);
+    }
+    function mirrorSubChunks(text) {
+      var out = [], cur = '';
+      // the project's name is one word to the band: never "Embassy" on one line and "World" on
+      // the next (17 Nov night) -- a no-break space joins it, and only ordinary spaces cut
+      mirrorSubJoin(text).split(/[ \t\r\n]+/).forEach(function (part) {
+        if (!part) return;
+        var ended = cur.length >= MIRROR_SUB_ALONE && /(?:ค่ะ|คะ|ครับ)$|[.!?]$/.test(cur);
+        if (cur && (ended || cur.length + 1 + part.length > MIRROR_SUB_CHARS)) {
+          // a number goes on with the word after it (17 Nov night: "...ประมาณ 600" on one piece,
+          // "เมตรค่ะ" on the next): the piece ends before the number instead -- and the word
+          // that qualifies it goes with it (review 18 Nov: "...เป็นเส้นตรงประมาณ" then
+          // "600 เมตรค่ะ" = a bare 600 on the screen). Still only at the line's own spaces:
+          // a Thai run that ends in the qualifier moves whole.
+          var words = ended ? [cur] : cur.split(' '), n = words.length;
+          if (n > 1 && /^[\d,.]+$/.test(words[n - 1])) n--;
+          if ((n < words.length || /^[\d,.]/.test(part)) && n > 1 && MIRROR_SUB_QUALIFIER.test(words[n - 1])) n--;
+          out.push(words.slice(0, n).join(' '));
+          cur = words.slice(n).concat([part]).join(' ');
+        }
+        else cur = cur ? cur + ' ' + part : part;
+      });
+      if (cur) out.push(cur);
+      return out;
+    }
+    // ---- the ceremony's motion slide (client/assets/ceremony-show.js, owner 17 Nov:
+    // "ลิ้งระหว่างสไลด์กับเสียงหุ่น") ---- It comes WITH the line's subtitle
+    // (app/ceremony_slides.py builds it; never the face's stream) and runs on the
+    // subtitle's clock: the engine is told how far her voice has got, nothing here
+    // starts a timer of its own. Line over = it settles and stays until the next line or
+    // picture; a stop, the call over or leaving the ceremony = down.
+    var CEREMONY_SHOW_V = '20261125-c';
+    var mirrorSlideUp = false;
+    // the slide up is "ตอบสด"'s topic slide (mirrorMotion), not a line's
+    var mirrorMotionUp = false;
+    function mirrorSlideAssets() {
+      if (document.getElementById('ceremonyShowJs')) return;
+      var css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = '/assets/ceremony-show.css?v=' + CEREMONY_SHOW_V;
+      var js = document.createElement('script');
+      js.id = 'ceremonyShowJs';
+      js.src = '/assets/ceremony-show.js?v=' + CEREMONY_SHOW_V;
+      document.head.appendChild(css);
+      document.head.appendChild(js);
+    }
+    function mirrorSlideDown() {
+      if (mirrorSlideUp && window.CeremonyShow) window.CeremonyShow.clear();
+      mirrorSlideUp = false;
+      mirrorMotionUp = false;
+    }
+    function mirrorSlideShow(m) {
+      var eng = window.CeremonyShow;
+      // no slide with this line (a draft file, a line without one, the engine not
+      // loaded): the backdrop, and never the line before's slide under new words
+      if (!eng || !m.slide || typeof m.slide !== 'object') { mirrorSlideDown(); return false; }
+      mirrorMotionUp = false;
+      // `late` = this screen joined after the line began: its end state at once;
+      // `cue` = the line's id -- its scene (sNN_) decides the cut: a dissolve inside a
+      // scene, the sheet of light for a new one (review 19 Nov)
+      mirrorSlideUp = !!eng.show(m.slide, { late: m.late > 0, cue: m.id });
+      return mirrorSlideUp;
+    }
+    // Her voice of the line on the screen was cut short. Without this the stop's
+    // stopPlayback() pulls playHead back to now, the line's length collapses and the
+    // slide reads that as "she has said it all": every beat fires and it stays (review
+    // 17 Nov: a stopped joke showing its punchline). Only once HER voice of this line is
+    // heard here, and not in the first moment after it went up: a recorded line is sent
+    // right behind an `interrupted` of whatever she was saying before it.
+    var MIRROR_SUB_FRESH_MS = 400;
+    function mirrorSubInterrupted() {
+      // a line waiting for the voice that was just cut: its own voice is right behind the cut -- up now
+      // (a red stop's `interrupted` finds none: its cut came first, event_cues.cut / subtitle_cut)
+      // her LIVE answer's Thai line (mirrorLiveShow): her voice was cut -- the sentences waiting for it never go up
+      // and the one on the band comes down with it, whenever it went up
+      var live = mirrorSubRun && mirrorSubRun.live;
+      mirrorLiveClear();
+      if (live) { mirrorSubDown(); return; }
+      if (mirrorSubNext) { mirrorSubRelease(); return; }
+      var r = mirrorSubRun;
+      if (r && r.at !== null && Date.now() - r.shownAt > MIRROR_SUB_FRESH_MS) mirrorSubDown();
+    }
+    // ---- the debut (card 1, app/ceremony_reveal.py; owner 23 Nov: "...เมื่อถึง 0 ก็ให้ทุกอย่างมืด แล้วก็มีซาวน์
+    // แล้วหุ่นก็เปิดตัว", then "เอาเวลานับออก"): the engine plays the music's build, the black, the hit, the
+    // light and the owner's wave, and the sound -- aloud where this screen plays her voice aloud (?sound=1),
+    // muted where it does not. Only in the ceremony's show mode; a line on the screen goes down first.
+    // Taken down by exactly the stops the server's run hears too (app/ceremony_reveal.py): its own stop,
+    // the red stop, the call over, show mode over, a slide coming up -- never by an `interrupted` (the
+    // music in the hall may be heard as one) nor by this screen's socket blinking.
+    function mirrorReveal(m) {
+      var eng = window.CeremonyShow;
+      if (!eng || typeof eng.reveal !== 'function' || !document.documentElement.classList.contains('mirror-show')) return;
+      mirrorSubDown();
+      // (the debut has the stage and the room: a walk's pictures still lingering and its music go now -- review 25 Nov)
+      if (window.CatwalkMusic) { window.CatwalkMusic.pictures_down(m.dark === true || m.dark === 'build'); window.CatwalkMusic.stop(0.4); }
+      eng.reveal({ numbers: m.numbers, beats: m.beats, zero_s: m.zero_s, impact_s: m.impact_s, clip_at_s: m.clip_at_s,
+                   settle_s: m.settle_s, length_s: m.length_s, src: m.src, video: m.video, seq: m.seq,
+                   // (the dark opening, reveal.json -- 25 Nov: left out, the press took the black off and the logo burst in)
+                   dark: m.dark === true || m.dark === 'build' ? m.dark : false, sound: mirrorSound === true });
+    }
+    function mirrorRevealStop() {
+      var eng = window.CeremonyShow;
+      if (eng && typeof eng.revealStop === 'function') eng.revealStop();
+    }
+    // ---- the walk's music (card 1, app/catwalk_music.py; owner 24 Nov) ---- On a screen that plays sound
+    // aloud only: the chest screen's frame and a silent screen fetch nothing. The engine comes with the first
+    // message (its files to preload, at the connect); a word before it is here waits for it.
+    var CATWALK_V = '20261125-l', mirrorCatwalkLater = [];
+    function mirrorCatwalk(m) {
+      if (!mirrorSound) return;
+      var eng = window.CatwalkMusic;
+      if (!eng) {
+        mirrorCatwalkLater.push(m);
+        if (mirrorCatwalkLater.length > 30) mirrorCatwalkLater.shift();
+        if (document.getElementById('catwalkMusicJs')) return;
+        var js = document.createElement('script');
+        js.id = 'catwalkMusicJs';
+        js.src = '/assets/catwalk-music.js?v=' + CATWALK_V;
+        js.onload = function () { mirrorCatwalkLater.splice(0).forEach(mirrorCatwalk); };
+        js.onerror = function () { js.remove(); };       // (a Wi-Fi hole: the next message asks again)
+        document.head.appendChild(js);
+        return;
+      }
+      if (m.type === 'catwalk_files') { eng.files(m.files, m.gallery); return; }
+      if (m.op === 'walk' && !document.documentElement.classList.contains('mirror-show')) return;
+      eng.message(m);
+    }
+    function mirrorCatwalkStop() {
+      mirrorCatwalkLater = mirrorCatwalkLater.filter(function (m) { return m.type === 'catwalk_files'; });
+      if (window.CatwalkMusic) window.CatwalkMusic.stop(0.4);
+    }
+    function mirrorCatwalkLink(up) {
+      var eng = window.CatwalkMusic;
+      if (eng) { if (up) eng.found(); else eng.lost(); }
+    }
+    function mirrorSlidePicture() {
+      // ("ตอบสด"'s topic slide stays: her story or answer picture is the robot face's -- in show mode
+      // this screen is the slides' (review 23 Nov: the idle logo covered her story, both lost))
+      if (mirrorSlideUp && !mirrorMotionUp && !(mirrorSubRun && mirrorSubRun.slide)) mirrorSlideDown();
+    }
+    // "ตอบสด" (app/ceremony_motion.py, owner 23 Nov): the host off-script. A slide of ours on his topic goes
+    // up SETTLED (`late` = no entrance, settle() = every beat's end state: her live words are not the
+    // script's, no clock of a line drives it). No slide = the show's own logo loop -- but never over a line
+    // still playing HERE (a screen behind the robot's voice: the line owns it, its own end decides).
+    function mirrorMotion(m) {
+      if (!document.documentElement.classList.contains('mirror-show')) return;
+      mirrorShowParts();
+      // her live answer's Thai line (mirrorLiveShow) is no line of the script: a slide goes up beside it, neither holds the other
+      var line = mirrorSubRun && !mirrorSubRun.live ? mirrorSubRun : null;
+      if (m.slide && typeof m.slide === 'object') {
+        // a line still playing HERE keeps its subtitle: the slide waits for the line's end (review B 24 Nov)
+        if (line) { line.heldMotion = m; return; }
+        if (!mirrorSubRun) mirrorSubDown();
+        if (mirrorSlideShow({ slide: m.slide, late: 1, id: m.id })) {
+          mirrorMotionUp = true;
+          window.CeremonyShow.settle();
+        }
+        return;
+      }
+      if (line) line.heldMotion = null;
+      if (mirrorMotionUp || !line) { mirrorSlideDown(); return; }
+      // a line still on HERE (its voice, or its last words' 1.8 s tail on a screen behind the robot): it
+      // finishes, but its slide goes with it instead of settling under his words for the whole window
+      // (review 24 Nov: the pool joke's slide stayed up through "How much?")
+      line.unsettled = true;
+    }
+    // The slide hears where her voice is every FRAME, not only on the subtitle's 150 ms
+    // tick (17 Nov evening, the film's acts: text typed in step with her, a beat on its
+    // word -- seven reports a second land up to 0.15 s late and move in jerks). The same
+    // clock and the same sum as the tick: the voice THIS screen plays; nothing here goes
+    // forward on its own, and a hidden tab (no frames) is left with the tick as before.
+    var mirrorSlideRaf = 0;
+    function mirrorSlideAt(r, now) {
+      // never past her voice queued here: when it runs out mid-line the beats wait for it
+      // (23 Nov: through 6 s of silence they ran on to the punchline, then the slide went down).
+      // Held, the place where it ran out -- until the tick moves the line's clock on: a frame
+      // between the rest of her voice arriving and that tick would jump the whole gap ahead
+      // ...and its length the one it had until then (review 23 Nov: the rest of her voice and the
+      // line's end landing together in a hold made the true length read the old clock -- 0.4,
+      // 0.308, 0.449: typed words un-typed for a frame)
+      var held = r.heldAt !== null, ending = r.ending && !held, head = mirrorSubHead(r);
+      if (held) now = r.heldAt;
+      else if (!r.ending) now = Math.min(now, head);
+      var whole = ending ? Math.max(1, head - r.at) : r.seconds;
+      return Math.max(0, Math.min(1, (now - r.at + r.lead) / (whole + (ending ? r.lead : 0))));
+    }
+    function mirrorSlideFrame() {
+      mirrorSlideRaf = 0;
+      // the next line's own voice starts here: it goes up on this frame, not the next tick
+      if (mirrorSubNextDue()) { mirrorSubRelease(); if (mirrorSlideRaf) return; }
+      var r = mirrorSubRun;
+      if (!r || !r.slide || !window.CeremonyShow) return;            // the line went down: the frames end
+      var now = audioCtx ? audioCtx.currentTime : 0;
+      // (her first sound, seen here up to a tick sooner: the line's beats start with it)
+      if (r.at === null && audioCtx && audioCtx.state === 'running' && playHead > now + 0.02) r.at = now;
+      if (r.at !== null) window.CeremonyShow.progress(mirrorSlideAt(r, now));
+      mirrorSlideRaf = requestAnimationFrame(mirrorSlideFrame);
+    }
+    // a phrase longer than this may wrap inside itself (no line holds it): measured 17 Nov night,
+    // the ceremony's longest phrase (66 characters) is 1,643 px of the band's 1,728 at 1920 wide.
+    // The chest screen's frame (?film=1) sets its Thai line in 3.7vw on a 1080 px screen -- ~50 characters
+    // across -- so there a phrase of more than 48 wraps like any text instead of running off the box (25 Nov).
+    var MIRROR_SUB_PHRASE = 70;
+    if (typeof mirrorFilm !== 'undefined' && mirrorFilm) MIRROR_SUB_PHRASE = 38;
+    function mirrorSubWords(text) {
+      mirrorSubText.textContent = '';
+      String(text).split(' ').forEach(function (phrase, n) {
+        if (!phrase) return;
+        if (n) {
+          var gap = document.createElement('span');          // the line's own space: where a wrap may go
+          gap.textContent = ' ';
+          mirrorSubText.appendChild(gap);
+        }
+        var run = document.createElement('span');
+        if (phrase.length <= MIRROR_SUB_PHRASE) run.className = 'mirror-sub-p';
+        run.textContent = phrase;
+        mirrorSubText.appendChild(run);
+      });
+    }
+    function mirrorSubPaint(i) {
+      mirrorSubRun.i = i;
+      mirrorSubWords(mirrorSubRun.chunks[i]);
+      mirrorSubBox.classList.add('on');
+    }
+    // `over` = her line was said to its end: the slide settles and stays; any other way
+    // down (a stop, no voice ever came, leaving the ceremony) takes the slide with it -- and
+    // so does a line "ตอบสด" opened over (`unsettled`, mirrorMotion: it ends, then goes)
+    function mirrorSubDown(over) {
+      // a line waiting for this one's voice to play out: this one said to its end = that one still
+      // goes up (the tick keeps running for it); any other way down = it never does
+      if (over !== 'over') { mirrorSubNext = null; mirrorLiveClear(); }
+      if (mirrorSubRun && mirrorSubRun.slide && over === 'over' && !mirrorSubRun.unsettled && window.CeremonyShow) window.CeremonyShow.settle();
+      else if (!(mirrorSubRun && mirrorSubRun.live)) mirrorSlideDown();     // (her live line has no slide: never take another's down)
+      var heldMotion = over === 'over' && mirrorSubRun ? mirrorSubRun.heldMotion : null;
+      mirrorSubRun = null;
+      if (mirrorSubTick && !mirrorSubNext && !mirrorLiveQ.length) { clearInterval(mirrorSubTick); mirrorSubTick = null; }
+      if (mirrorSubBox) mirrorSubBox.classList.remove('on');
+      if (heldMotion) mirrorMotion(heldMotion);
+    }
+    // A line that reaches this screen while voice is still queued HERE -- the line before's -- waits
+    // for that voice to play out, its words and its slide both (review 23 Nov, the jokes said straight
+    // through: the punchline is sent the moment the ROBOT's clock says the set-up is over, and this
+    // screen plays her voice later by the Wi-Fi's lag -- "ลงไปว่ายน้ำ…" and the pool were up over
+    // "...haven't tried...", and the set-up's typed panel was cut mid-word). Every line, chained or
+    // pressed, goes up when its own voice starts here. While it waits the line before reads its length
+    // up to its own voice only (`upTo`: what follows in the queue is the next line's). Bounded by the
+    // wall clock as well (an audio clock that stopped must not keep a line off the stage). A stop, the
+    // call over, leaving the ceremony = it never goes up (mirrorSubEnd cut, mirrorSubDown); her voice
+    // cut short (`interrupted`: a line sent over the last one's tail) = it goes up at once, its voice is
+    // right behind. A screen that joined mid-line (`late`) has nothing of the line before: no wait.
+    var MIRROR_SUB_WAIT_SLACK_MS = 1000;
+    var mirrorSubNext = null;
+    function mirrorSubHead(r) { return r.upTo !== null ? Math.min(playHead, r.upTo) : playHead; }
+    function mirrorSubNextDue() {
+      var n = mirrorSubNext;
+      return !!n && (!audioCtx || audioCtx.state !== 'running' || audioCtx.currentTime >= n.until - 0.02
+                     || Date.now() >= n.deadline);
+    }
+    function mirrorSubRelease() {
+      var n = mirrorSubNext;
+      mirrorSubNext = null;
+      mirrorSubShow(n.m, true);
+      if (n.end) mirrorSubEnd(n.end);              // its own end came while it waited (a short line)
+    }
+    // ---- her LIVE answer's Thai line (app/live_subtitle.py, CEREMONY_LIVE_SUBTITLE_TH, owner 24 Nov) ----
+    // The server translates her words a sentence at a time and sends, in step with her audio frames, a
+    // `mirror_live_mark` where each sentence begins in her voice: this page keeps where ITS audio clock is
+    // (playHead) when the mark arrives -- the clock of the voice it plays (silent or not), as every line's.
+    // The Thai comes later (a translation takes ~1 s): it goes up when the clock reaches its mark, at once
+    // if it already has, and sentences stay in order in a queue. No mark / no running clock = up on arrival.
+    // Never a line of the script: no slide of its own, no wait for the voice before it (mirrorSubShow go).
+    var mirrorLiveMarks = { id: null, at: [] }, mirrorLiveQ = [], mirrorLiveEnd = null;
+    // Readable, not only in step (owner 24 Nov ~13:40, rehearsal: "ที่แปลจะขึ้นช้าแล้วอ่านไม่ทันเลย"): a translation lands
+    // ~1.5-2 s after its sentence began in her voice, by when the next sentence's mark has often passed too -- each went up
+    // and was replaced within a second, and the last went down 1.8 s after her voice. A sentence of her live answer now
+    // stays up at least this long (by its length: Thai at ~14 characters a second, 2.2-4.5 s) before the next one replaces
+    // it or her answer's end takes it down. The subtitles run a little behind her voice; every one can be read. A cut, a
+    // stop, a line of the script still take it down at once.
+    var MIRROR_LIVE_MIN_MS = 2200, MIRROR_LIVE_MAX_MS = 4500, MIRROR_LIVE_MS_PER_CHAR = 70;
+    function mirrorLiveDwell(r) {
+      return Math.min(MIRROR_LIVE_MAX_MS, Math.max(MIRROR_LIVE_MIN_MS, (r.total || 0) * MIRROR_LIVE_MS_PER_CHAR));
+    }
+    function mirrorLiveHolding() {
+      var r = mirrorSubRun;
+      return !!(r && r.live && Date.now() - r.shownAt < mirrorLiveDwell(r));
+    }
+    function mirrorLiveClear() { mirrorLiveQ.length = 0; mirrorLiveEnd = null; }
+    function mirrorLiveMark(m) {
+      if (mirrorLiveMarks.id !== m.id) mirrorLiveMarks = { id: m.id, at: [] };
+      if (audioCtx && typeof m.n === 'number') mirrorLiveMarks.at[m.n] = playHead;
+    }
+    function mirrorLiveShow(m) {
+      if (!document.documentElement.classList.contains('mirror-show')) return;
+      var start = mirrorLiveMarks.id === m.id ? mirrorLiveMarks.at[m.n] : undefined;
+      if (typeof start !== 'number') start = 0;
+      var now = audioCtx ? audioCtx.currentTime : 0;
+      mirrorLiveQ.push({ m: m, start: start,
+                         deadline: Date.now() + Math.max(0, start - now) * 1000 + MIRROR_SUB_WAIT_SLACK_MS });
+      mirrorLivePump();
+      if (mirrorLiveQ.length && !mirrorSubTick) mirrorSubTick = setInterval(mirrorSubStep, 150);
+    }
+    function mirrorLivePump() {
+      while (mirrorLiveQ.length) {
+        var q = mirrorLiveQ[0];
+        if (mirrorLiveHolding()) break;            // the one up has not been up long enough to read
+        if (audioCtx && audioCtx.state === 'running' && audioCtx.currentTime < q.start - 0.02 && Date.now() < q.deadline) break;
+        mirrorLiveQ.shift();
+        mirrorSubShow(q.m, true);
+      }
+      if (!mirrorLiveQ.length && mirrorLiveEnd) { var e = mirrorLiveEnd; mirrorLiveEnd = null; mirrorSubEnd(e); }
+    }
+    // her answer is over at the server while sentences still wait for their place in her voice: the end waits too
+    function mirrorLiveEndHeld(m) {
+      if (m.cut || !m.id || !mirrorLiveQ.length || mirrorLiveQ[0].m.id !== m.id) return false;
+      mirrorLiveEnd = m;
+      return true;
+    }
+    // `go` = up now, never held (mirrorSubRelease: its wait is over)
+    function mirrorSubShow(m, go) {
+      mirrorShowParts();
+      if (!m.live) mirrorLiveClear();            // a line of the script: her live answer's sentences are not its
+      var chunks = mirrorSubChunks(m.text);
+      if (!chunks.length) return;
+      var now = audioCtx ? audioCtx.currentTime : 0;
+      if (!go && !(m.late > 0) && audioCtx && audioCtx.state === 'running' && playHead > now + 0.05) {
+        mirrorSubNext = { m: m, until: playHead, end: null,
+                          deadline: Date.now() + (playHead - now) * 1000 + MIRROR_SUB_WAIT_SLACK_MS };
+        if (mirrorSubRun && mirrorSubRun.upTo === null) mirrorSubRun.upTo = playHead;
+        if (!mirrorSubTick) mirrorSubTick = setInterval(mirrorSubStep, 150);
+        return;
+      }
+      mirrorSubNext = null;
+      var total = 0, ends = [];
+      chunks.forEach(function (c) { total += c.length; ends.push(total); });
+      // `seconds` = the server's guess at her voice of this line (a recording's
+      // true length); the pieces share it by their length
+      mirrorSubRun = { id: m.id || null, chunks: chunks, ends: ends, total: total,
+                       seconds: m.seconds > 0 ? m.seconds : Math.max(2, total / 12),
+                       at: null, i: -1, ending: false, quietAt: null, endHead: null,
+                       // (where its own voice ends in this screen's queue, once a next line waits behind it)
+                       upTo: null,
+                       // (where her voice ran out mid-line, on the audio clock: the line holds there)
+                       heldAt: null,
+                       // (the first tick that saw a frame again after her voice ran out: the 6 s waits for it)
+                       linkAt: null,
+                       shownAt: Date.now(), silentAt: null, live: !!m.live, slide: m.live ? false : mirrorSlideShow(m),
+                       // (a screen that joined mid-line: the seconds of her voice it missed)
+                       lead: m.late > 0 ? m.late : 0 };
+      if (mirrorBackScene && typeof m.scene === 'string') mirrorBackScene.textContent = m.scene;
+      mirrorSubPaint(0);
+      if (!mirrorSubTick) mirrorSubTick = setInterval(mirrorSubStep, 150);
+      if (mirrorSubRun.slide && !mirrorSlideRaf && typeof requestAnimationFrame === 'function') {
+        mirrorSlideRaf = requestAnimationFrame(mirrorSlideFrame);
+      }
+    }
+    // The next piece when her voice has reached it -- the voice THIS screen
+    // plays (playHead: muted or not, it keeps her time), never a wall clock
+    // started at the press: the line reaches the screen before her first sound.
+    function mirrorSubStep() {
+      if (mirrorSubNextDue()) mirrorSubRelease();       // the voice before it has played out here
+      mirrorLivePump();
+      var r = mirrorSubRun;
+      if (!r) { if (mirrorSubTick && !mirrorSubNext && !mirrorLiveQ.length) { clearInterval(mirrorSubTick); mirrorSubTick = null; } return; }
+      var now = audioCtx ? audioCtx.currentTime : 0;
+      var sounding = !!audioCtx && audioCtx.state === 'running' && playHead > now + 0.02;
+      if (r.at === null && sounding) r.at = now;
+      // her voice back after a hold: the line goes on from where it stood -- its clock never
+      // counted the gap (the rest of her voice plays here that much later)
+      if (r.heldAt !== null && sounding) { r.at += now - r.heldAt; r.heldAt = null; }
+      if (r.at !== null) {
+        // the line is over at the server = all of her voice is queued here:
+        // its true length replaces the guess (up to its own voice: a next line may wait behind it)
+        var head = mirrorSubHead(r);
+        var whole = r.ending ? Math.max(1, head - r.at) : r.seconds;
+        var reached = ((r.ending ? now : Math.min(now, head)) - r.at) / whole * r.total, want = 0;
+        while (want < r.chunks.length - 1 && reached >= r.ends[want]) want++;
+        if (want > r.i) mirrorSubPaint(want);
+        // the slide's beats: the same place in the line, as a fraction of it
+        if (r.slide && window.CeremonyShow) window.CeremonyShow.progress(mirrorSlideAt(r, now));
+      }
+      // her live answer's sentence: up long enough to read before anything takes it down (mirrorLiveDwell)
+      if (r.ending && r.live && Date.now() - r.shownAt < mirrorLiveDwell(r)) return;
+      if (r.ending) {
+        // she stopped: the last words a moment more -- by HER line's end (endHead), not
+        // by the next silence: an answer that starts right after would hold them up
+        // under words that are not theirs (review 17 Nov)
+        if (r.endHead !== null && now > r.endHead + 1.8) { mirrorSubDown('over'); return; }
+        if (sounding) r.quietAt = null;
+        else if (r.quietAt === null) r.quietAt = Date.now();
+        else if (Date.now() - r.quietAt > 1800) { mirrorSubDown('over'); return; }
+      }
+      // An end that never came (the socket blinked, a full queue dropped it): words
+      // must not sit on the stage screen with nobody saying them.
+      if (r.at === null) { if (Date.now() - r.shownAt > MIRROR_SUB_NO_VOICE_MS) mirrorSubDown(); return; }
+      if (sounding) { r.silentAt = null; r.linkAt = null; return; }
+      if (!r.ending) {
+        // her voice ran out here mid-line: the line stands where it ran out
+        if (r.heldAt === null) { r.heldAt = Math.min(now, playHead); r.silentAt = Date.now(); }
+        // ...and nothing at all has arrived since: the link's silence, the rest of her voice on
+        // its way. This long with nothing = the robot is gone: down, never settled
+        if (mirrorSubFrameAt <= r.silentAt) {
+          if (Date.now() - r.silentAt > MIRROR_SUB_NO_VOICE_MS) mirrorSubDown();
+          return;
+        }
+        // something came since: the link is back -- and the rest of her voice may be right behind
+        // that first frame (review 23 Nov: a word's text landed a tick before its audio, the 6 s
+        // from her voice running out had passed, and the tick between them cleared the line).
+        // Frames with no voice still come down: at max(ran out + 6 s, first frame + the grace)
+        if (r.linkAt === null) r.linkAt = Date.now();
+        if (Date.now() - r.linkAt < MIRROR_SUB_LINK_GRACE_MS) return;
+      }
+      if (r.silentAt === null) r.silentAt = Date.now();
+      // (her voice stopped mid-line with no end from the server: the line was NOT said to
+      // its end -- settling would put up its punchline or its done state unheard)
+      else if (Date.now() - r.silentAt > MIRROR_SUB_SILENT_MS) mirrorSubDown(r.ending ? 'over' : undefined);
+    }
+    function mirrorSubEnd(m) {
+      if (m && m.cut) mirrorLiveClear();          // stopped / the call over: no sentence of her live answer waits any more
+      var n = mirrorSubNext;
+      if (n && m && (!m.id || m.id === n.m.id)) {
+        if (m.cut) mirrorSubNext = null;        // stopped (or the call over) before it went up: it never does
+        else if (m.id) { n.end = m; return; }   // its own end before it went up: kept for when it does
+      }
+      var r = mirrorSubRun;
+      // (no line up: a settled slide of the last one still goes with the call)
+      if (!r) { if (m && m.cut && !m.id) mirrorSlideDown(); return; }
+      if (m && m.id && r.id && m.id !== r.id) return;   // the line before's late end
+      if (m && m.cut) { mirrorSubDown(); return; }
+      r.ending = true;
+      if (r.at !== null) r.endHead = mirrorSubHead(r);
+    }
+    // ---- a film over the face, on the room screen only (app/event_clips.py) ----
+    // Fetched whole ahead of its cue: from here to the robot is its Wi-Fi, and a film
+    // that stutters in front of the seats is the one thing nobody can fix live. Cued
+    // before that finished, it streams. This page says what became of it and nothing else.
+    var mirrorClipFiles = {}, mirrorClipVideo = null, mirrorClipCue = null;
+    function mirrorClipSay(seq, id, state, duration) {
+      if (typeof mirrorFilm !== 'undefined' && mirrorFilm) return;      // only the hall's screen tells the robot what it played
+      fetch('/event-clip-state', { method: 'POST', credentials: 'same-origin', keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seq: seq, clip: id, state: state, duration: duration }) }).catch(function () {});
+    }
+    function mirrorClipFetch(list) {
+      list.forEach(function (clip) {
+        var known = mirrorClipFiles[clip.id];
+        if (known && known.url === clip.url) return;
+        var one = mirrorClipFiles[clip.id] = { url: clip.url, blob: null };
+        fetch(clip.url, { credentials: 'same-origin' })
+          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })
+          .then(function (b) { one.blob = URL.createObjectURL(b); mirrorClipSay(null, clip.id, 'ready'); })
+          .catch(function () { mirrorClipFiles[clip.id] = null; mirrorClipSay(null, clip.id, 'fetch_failed'); });
+      });
+    }
+    function mirrorClipStop() {
+      mirrorClipCue = null;
+      if (!mirrorClipVideo) return;
+      mirrorClipVideo.pause();
+      mirrorClipVideo.remove();
+      mirrorClipVideo = null;
+    }
+    function mirrorClipPlay(cue) {
+      // a reconnect replays the cue: the film already rolling is that film
+      if (mirrorClipCue && mirrorClipCue.seq === cue.seq && mirrorClipVideo) return;
+      mirrorClipStop();
+      mirrorClipCue = cue;
+      var file = mirrorClipFiles[cue.id];
+      var v = document.createElement('video');
+      v.id = 'mirrorClip';
+      v.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;object-fit:contain;background:#000;z-index:2147483000';
+      v.src = (file && file.url === cue.url && file.blob) || cue.url;
+      v.playsInline = true;
+      v.addEventListener('playing', function () {
+        if (mirrorClipCue === cue) mirrorClipSay(cue.seq, cue.id, 'playing', isFinite(v.duration) ? v.duration : null);
+      }, { once: true });
+      v.addEventListener('ended', function () {
+        if (mirrorClipCue !== cue) return;
+        mirrorClipSay(cue.seq, cue.id, 'ended');
+        mirrorClipStop();
+      });
+      var failed = function () {
+        if (mirrorClipCue !== cue) return;
+        mirrorClipSay(cue.seq, cue.id, 'error');
+        mirrorClipStop();
+      };
+      v.addEventListener('error', failed);
+      document.body.appendChild(v);
+      mirrorClipVideo = v;
+      var started = v.play();
+      if (started && started.catch) started.catch(failed);
+    }
+    var mirrorKeepCtx = null;
+    function startMirrorKeep() {
+      if (!mirrorKeep || mirrorKeepCtx) return;
+      var ctx = null;
+      try {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = Math.min(mirrorKeep.hz, ctx.sampleRate / 2 - 500);
+        g.gain.value = mirrorKeep.gain;
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start();
+        mirrorKeepCtx = ctx;
+      } catch (e) {
+        // a context left running with the guard cleared = a second tone on top of it
+        // at the next call (review 16 Nov): close what was opened, and try again then
+        try { if (ctx && ctx.close) ctx.close(); } catch (e2) {}
+        mirrorKeepCtx = null;
+        return;
+      }
+      // after the tone is up, and outside the try: nothing here can clear the guard
+      var wake = function () {
+        try {
+          if (ctx.state !== 'running') { var p = ctx.resume(); if (p && p.catch) p.catch(function () {}); }
+        } catch (e) {}
+      };
+      wake();
+      document.addEventListener('pointerdown', wake);
+    }
     function startMirrorAudio() {
+      startMirrorKeep();
       if (audioCtx) return;
       try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
@@ -4529,7 +5667,7 @@
         try { f.contentDocument.addEventListener('click', function () { setTimeout(fitMirrorStage, 0); }); } catch (e) {}
         if (mirrorPending) { var p = mirrorPending; mirrorPending = null; showMirrorStory(p); }
       };
-      f.src = '/assets/story-stage.html?v=20261029-a';
+      f.src = '/assets/story-stage.html?v=20261124-d';
       box.appendChild(f);
       document.body.appendChild(box);
       mirrorFrame = f;
@@ -4539,10 +5677,14 @@
     }
     // Where pictures go on the TV [x0, y0, x1, y1]: the screen left of Emma's
     // column (--mirror-side), a sliver from its edges.
+    var mirrorWide = false;            // a story up with the event screen's wide layout: the whole screen is its stage
     function mirrorArea() {
       var w = window.innerWidth, h = window.innerHeight;
+      if (mirrorWide) return [0, 0, w, h];
       var side = w * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mirror-side')) || 0) / 100;
-      return [w * 0.015, h * 0.015, w - side - w * 0.006, h * 0.985];
+      // (--mirror-foot: the ceremony's subtitle band at the bottom; none = 0)
+      var foot = h * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mirror-foot')) || 0) / 100;
+      return [w * 0.015, h * 0.015, w - side - w * 0.006, h * 0.985 - foot];
     }
     // The frame's shape for what comes up: landscape = the area's own shape,
     // 1080 px tall (a story with a landscape layout, an answer picture);
@@ -4616,12 +5758,15 @@
       // across the TV when the template has a landscape layout (the engine
       // lays the same story out for the frame's shape), else the robot's screen
       var land = !!(eng.landscape && eng.landscape(story.template));
+      mirrorWide = land && document.documentElement.classList.contains('mirror-show') && !(typeof mirrorFilm !== 'undefined' && mirrorFilm);
       mirrorFrameMode(land);
       document.body.classList.add('mirror-story');
       fitMirrorStage();
       var drawn = eng.play(story, {
         mount: mount,
         layout: land ? 'land' : null,
+        wide: mirrorWide,
+        noPlan: document.documentElement.classList.contains('mirror-show'),
         clock: heardClock,
         assetUrl: function (src) { return new URL(src, location.href).href; },
         // a touch on the room screen enlarges a picture right there, and
@@ -4657,6 +5802,7 @@
       mount.innerHTML = '';
       // on the landscape stage, as large as it allows (owner 29 Oct: the
       // pictures across the TV, Emma small in the corner)
+      mirrorWide = false;
       mirrorFrameMode(true);
       var img = doc.createElement('img');
       // fitted to the TV by its own drawn box once its shape is known
@@ -4704,13 +5850,18 @@
       busy: function () { return inCall; },
       stopForFaceScan: function () { if (inCall || ws) endCall(); },
       held: function () { return muteHold; },
+      adoptHold: adoptHold,
+      // The Emma Ceremony app's page: its bell says so to the server (app/wake.py `_CEREMONY`, 23 Nov).
+      ceremony: ceremonyApp,
       // Muted: only the camera's bell opens a line -- a person is at the
       // robot and is greeted, with the mic open so they can answer; when
-      // that call ends the hold is still there and nothing redials.
+      // that call ends the hold is still there and nothing redials. And the
+      // event staff page's (STAFF_RING): a line that stays muted.
       answerSummons: function (reason) {
-        if (muteHold && !FACE_RING.test(String(reason || ''))) return false;
+        if (muteHold && !FACE_RING.test(String(reason || '')) && !STAFF_RING.test(String(reason || ''))) return false;
         if (inCall || !apiKeyOK || (window.EmmaFaceScan && window.EmmaFaceScan.isOpen())) return false;
         summonedDial = true;
+        dialledByBell = String(reason || '') === 'standing_line';
         startCall();
         return true;
       }
@@ -4922,12 +6073,33 @@
       return true;
     }
 
+    // The server's half: no follow-up into the silence the mute makes, and
+    // the turn log's only record that somebody pressed it. A tap while connecting
+    // has no socket to say it on yet: startMic says it.
+    function tellServerMuted() {
+      try {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'mic_state', why: 'mute_tap', muted: muted, state: 'tap', label: '', handed: false }));
+        }
+      } catch (e) { /* closing */ }
+    }
+
     function toggleMute() {
+      greetingOpensMic = false;
       muted = !muted;
       setMuteHold(muted);
+      tellServerMuted();
       setMicLabel(muted ? 'Muted' : 'Listening');
       micBtn && micBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
       if (!playing) { show('listening'); status(muted ? 'Muted' : 'Listening...'); }
+    }
+
+    function tellServerHoldWaiting() {
+      try {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'mic_state', why: 'hold_waiting', muted: true, state: 'held', label: '', handed: false }));
+        }
+      } catch (e) { /* closing */ }
     }
 
     var appMicLabels = {
@@ -4944,6 +6116,7 @@
     var lastMicKey = '';
     function setMicLabel(text) {
       lastMicKey = text;
+      document.body.classList.toggle('mic-held', text === 'Muted');
       if (micLabel) micLabel.textContent = chromeText(text, appMicLabels, appMicLabelsZh);
       if (micBtn) {
         var action = ({
@@ -5309,12 +6482,19 @@
     // ---- wire the controls ----
     // A tap with no call open is the one way out of a mute hold: the person
     // at the screen asked to be heard.
-    // While the call is still connecting (no mic yet) a second tap does
-    // nothing: it used to mute -- and hold -- a call that then came up saying
-    // "Listening" with every frame dropped (review 14 Oct).
+    // While a call somebody tapped for is still connecting (no mic yet) a second
+    // tap does nothing: a double tap must not mute the call it just asked for.
+    // Nor does a tap on the camera's call: somebody is at the screen and may well
+    // want to talk, and a mute now lasts until morning (review 5 Nov). The standing
+    // line's call is different (owner, 5 Nov: "ปิดไมค์ ... หุ่นก็สามารถได้ยิน"): the screen
+    // went to "Connecting" by itself, 1-4 s after every call (voice_ready rows), and
+    // a tap was dropped and the mic opened anyway. startMic comes up muted and says so.
+    // arrayMicSilent: the call's ears are the array, on this page's silent clock.
+    // Its frames stop at handleMicAudio like the mic's, and the array's with them
+    // (session._array_frame runs per page frame): without this, ARRAY_MIC had no mute.
     if (micBtn) micBtn.onclick = function () {
       if (!inCall) { if (muteHold) setMuteHold(false); startCall(); }
-      else if (micStream) toggleMute();
+      else if (micStream || arrayMicSilent || dialledByBell || greetingOpensMic) toggleMute();
     };
     if (muteHold) { setMicLabel('Muted'); status('Muted'); }
     // The mascot reports the tap; the colour is painted again when the model
@@ -5355,7 +6535,7 @@
         cancelHold();
         holdTimer = setTimeout(function () {
           holdTimer = 0;
-          if (document.body.classList.contains('emma-staging')) peekControls();
+          if (document.body.classList.contains('emma-staging') || document.documentElement.classList.contains('face-film-on')) peekControls();
         }, 500);
       });
       mascotEl.addEventListener('pointermove', function (e) {
@@ -5369,7 +6549,7 @@
       // module reports its own hold; in staging that hold means "peek". The
       // listeners above only matter where the module never loaded.
       mascotEl.addEventListener('emma-long-press', function () {
-        if (document.body.classList.contains('emma-staging')) peekControls();
+        if (document.body.classList.contains('emma-staging') || document.documentElement.classList.contains('face-film-on')) peekControls();
       });
     }
 
@@ -5381,7 +6561,7 @@
     // the story frame loads now, hidden: the first story must not wait for
     // story-stage.html + the engine to come over the LAN (live 28 Oct: its
     // opening beat was an empty frame)
-    if (mirror) { forwardStoryEngine(); mirrorStage(); mirrorIdle(); startMirror(); return; }
+    if (mirror) { forwardStoryEngine(); mirrorStage(); mirrorIdle(); startMirror(); startMirrorKeep(); return; }
     Promise.all([
       fetch('/voices').then(function (r) { return r.json(); }),
       fetch('/health').then(function (r) { return r.json(); }),
@@ -5871,23 +7051,38 @@
     var proto = location.protocol === 'https:' ? 'wss' : 'ws';
     var RETRY_MIN_MS = 2000, RETRY_MAX_MS = 30000;
     var FACE_RING = /^face_/;          // the camera's bells: answered even when muted
-    var sock = null, retryMs = RETRY_MIN_MS, stopped = false;
+    var STAFF_RING = /^event_/;        // the event staff page's presses: answered muted (10 Nov)
+    var sock = null, retryMs = RETRY_MIN_MS, stopped = false, pressPending = false;
 
     // A mute hold keeps the bell open and tells the server (owner, 14 Oct:
     // muted = no line rung back open by itself, but "ถ้ากล้องจับหน้าคนได้
     // จะต้องทักนะ"): the server stops the standing line's rings to this page,
     // the camera's still come, and only those are answered here.
     function held() { return !!(window.EmmaCall && window.EmmaCall.held && window.EmmaCall.held()); }
-    function sendHold() {
-      if (!sock || sock.readyState !== 1) return;
-      try { sock.send(JSON.stringify({ type: 'hold', on: held() })); } catch (e) { /* closing */ }
+    // `press`: the document event only fires on a person's tap, and only a tap
+    // may change what the server keeps. A tap while the server is restarting is
+    // sent when the bell is back, ahead of (and instead of) adopting its word.
+    function sendHold(evt) {
+      var press = !!(evt && evt.type);
+      if (!sock || sock.readyState !== 1) { if (press) pressPending = true; return; }
+      var msg = { type: 'hold', on: held(), press: press };
+      // The ceremony app's bell (23 Nov, app/wake.py `_CEREMONY`): on every hold message, so the server
+      // knows whose word it is from the first one. Other pages' wire is what it was.
+      if (window.EmmaCall && window.EmmaCall.ceremony === true) msg.ceremony = true;
+      try { sock.send(JSON.stringify(msg)); } catch (e) { /* closing */ }
     }
     document.addEventListener('emma-mute-hold', sendHold);
+    function bellOpen(evt) {
+      if (pressPending) { pressPending = false; sendHold({ type: 'pending' }); return; }
+      if (evt.hold && window.EmmaCall && window.EmmaCall.adoptHold) window.EmmaCall.adoptHold(evt.hold);
+      sendHold();
+    }
 
     function ring(evt) {
-      // Muted: a face at the robot is greeted, nothing else opens a line.
+      // Muted: a face at the robot is greeted, and the event staff's press is played -- on a muted
+      // line; nothing else opens one (the standing line stays refused).
       var reason = String((evt && evt.reason) || '');
-      if (held() && !FACE_RING.test(reason)) return;
+      if (held() && !FACE_RING.test(reason) && !STAFF_RING.test(reason)) return;
       // Not while the app is in the background, not over a face scan (the
       // greeter is paused then anyway), and never over a call already open.
       if (document.hidden) return;
@@ -5904,7 +7099,8 @@
       s.onmessage = function (m) {
         var evt;
         try { evt = JSON.parse(m.data); } catch (e) { return; }
-        if (evt.type === 'standby_only' || evt.type === 'wake_listening') { retryMs = RETRY_MIN_MS; sendHold(); return; }
+        if (evt.type === 'standby_only' || evt.type === 'wake_listening') { retryMs = RETRY_MIN_MS; bellOpen(evt); return; }
+        if (evt.type === 'hold_state') { if (window.EmmaCall && window.EmmaCall.adoptHold) window.EmmaCall.adoptHold(evt); return; }
         if (evt.type === 'wake_unavailable' || (evt.type === 'error' && evt.code === 'unauthorized')) {
           stopped = true;
           try { s.close(); } catch (e) { /* already closing */ }
@@ -6903,6 +8099,17 @@
     // without EmmaArrayMic/1 is never asked (its WebView would show the
     // prompt itself -- the EmmaBridge/1 lesson).
     var ARRAY_MIC = ON_ROBOT && /EmmaArrayMic\/1\b/.test(UA);
+    // The ceremony app (owner 9 Nov 2026: a third robot app, -PemmaApp=ceremony; EmmaFace adds
+    // ceremony=1 for it): its page alone asks the app to open Emma Event at the ceremony's end.
+    // EmmaOpenApp/1 = this APK answers emma-face:open:<app>. One without it is never asked -- an
+    // APK with EmmaBridge/1 alone answers bad_request, one older still shows the prompt itself
+    // (the EmmaBridge/1 lesson) -- and its page answers no_bridge instead.
+    var CEREMONY_APP = IN_APP && location.pathname !== '/mirror' && query.get('ceremony') === '1';
+    var OPEN_APP = ON_ROBOT && /EmmaOpenApp\/1\b/.test(UA);
+    // The Emma Event app's page (event=1, EmmaFace adds it): with the ceremony app's (CEREMONY_APP: its
+    // opening's pageant, 23 Nov) the pages that relay the debut's pageant (owner 9 Nov: "ท่านี้จะใช้เฉพาะ
+    // โหมดนี้"). The app refuses it in every other build too.
+    var EVENT_PAGE = IN_APP && location.pathname !== '/mirror' && query.get('event') === '1';
 
     // <nav-model>
     // Pure, and run as-is by tests/face_nav_model.cjs: the rules a test must
@@ -6919,6 +8126,9 @@
     // robot_contracts.SPEECH_BODY_ACTIONS: the recorded arm poses the server
     // may play while she talks (owner 15 Oct), as `emma-body:<id>:speech`.
     var SPEECH_BODY_IDS = ['raise_left_arm', 'raise_right_arm', 'wave', 'hands_left', 'hands_right'];
+    // robot_contracts.EVENT_BODY_ACTIONS: the Emma Event debut's pageant (owner 9 Nov, Pageant.java),
+    // as `emma-body:<id>:event` -- relayed by the event app's page only (relayCommand's eventPage).
+    var EVENT_BODY_IDS = ['pageant', 'pageant_end'];
     var BODY_STATUS_STATES = ['started', 'done', 'stopped', 'failed'];
     var NAV_STATES = ['idle', 'preparing', 'starting', 'running', 'arrived', 'stopped', 'refused', 'failed'];
     var NAV_ACTIVE = ['preparing', 'starting', 'running'];
@@ -6930,6 +8140,9 @@
     // somebody is still being served -- each a fixed string, never data.
     var AUTO_PHASES = ['off', 'counting', 'warning', 'going', 'failed'];
     var ACTIVITY_KINDS = ['call_start', 'call_end', 'speech'];
+    // What the ceremony app may open (owner 9 Nov): Emma Event, at the end of the ceremony. A
+    // closed list like every message here -- no package name ever comes from the server.
+    var OPEN_APPS = ['event'];
     // Motion is committed by holding "เริ่มเดิน" this long (§3). The menu's
     // own 0.5 s hold (HOLD_MS) is shared with the face scan and is not a gate.
     var START_HOLD_MS = 1000;
@@ -7011,6 +8224,9 @@
     function speechMessage(action) {
       return has(SPEECH_BODY_IDS, action) && isId(action) ? 'emma-body:' + action + ':speech' : null;
     }
+    function eventBodyMessage(action) {
+      return has(EVENT_BODY_IDS, action) && isId(action) ? 'emma-body:' + action + ':event' : null;
+    }
     // The head toward a person (owner 31 Oct; app/head_follow.py): two whole
     // numbers -100..100, PERCENT of the app's own head span -- no pulse here.
     function lookMessage(pan, tilt) {
@@ -7036,11 +8252,34 @@
     function activityMessage(kind) {
       return has(ACTIVITY_KINDS, kind) ? 'emma-nav:activity:' + kind : null;
     }
+    function openAppMessage(app) {
+      return has(OPEN_APPS, app) ? 'emma-face:open:' + app : null;
+    }
+    // The server's open_app, answered as open_app_result {app, ok, reason}. The app is asked only
+    // by the ceremony app's page (`ceremony`) on an APK that answers it (`canOpen`); any other page
+    // says why not, and nothing is asked. ok = the app started Emma Event, not that it is up yet.
+    function relayOpenApp(evt, ask, ceremony, canOpen) {
+      if (!evt || evt.type !== 'open_app') return null;
+      var app = has(OPEN_APPS, evt.app) ? evt.app : null;
+      var out = { type: 'open_app_result', app: app, ok: false, reason: null };
+      if (!app) { out.reason = 'unknown_app'; return out; }
+      if (!ceremony) { out.reason = 'not_ceremony_app'; return out; }
+      if (!canOpen) { out.reason = 'no_bridge'; return out; }
+      var r = ask(openAppMessage(app));
+      if (!r) { out.reason = 'bad_request'; return out; }
+      out.ok = r.accepted === true;
+      out.reason = out.ok ? null : (codeOrNull(r.reason) || 'bad_request');
+      return out;
+    }
     function allowedMessage(message) {
       if (typeof message !== 'string') return false;
       if (has(FIXED_MESSAGES, message)) return true;
-      var m = /^emma-body:([^:]+):speech$/.exec(message);
+      var m = /^emma-face:open:(.+)$/.exec(message);
+      if (m) return openAppMessage(m[1]) === message;
+      m = /^emma-body:([^:]+):speech$/.exec(message);
       if (m) return speechMessage(m[1]) === message;
+      m = /^emma-body:([^:]+):event$/.exec(message);
+      if (m) return eventBodyMessage(m[1]) === message;
       m = /^emma-body:look:(-?[0-9]{1,3}):(-?[0-9]{1,3})$/.exec(message);
       if (m) return lookMessage(Number(m[1]), Number(m[2])) === message;
       m = /^emma-body:(.+)$/.exec(message);
@@ -7051,19 +8290,25 @@
 
     // The app's answer to a server command, as the ack the server waits for.
     // A command id that is not 32 hex has nobody to answer to: dropped.
-    function relayCommand(evt, ask, onRobot) {
+    // `eventPage`: this is the Emma Event or the Emma Ceremony app's page (EVENT_PAGE || CEREMONY_APP) --
+    // the only ones that relay a `style: "event"` body command (the pageant); any other answers not_event_app.
+    function relayCommand(evt, ask, onRobot, eventPage) {
       if (!evt || (evt.type !== 'body_command' && evt.type !== 'nav_command')) return null;
       if (typeof evt.command_id !== 'string' || !COMMAND_ID_RE.test(evt.command_id)) return null;
       var body = evt.type === 'body_command';
-      var known = body ? has(BODY_IDS, evt.action) : (evt.action === 'go' || evt.action === 'stop');
+      var eventStyle = body && evt.style === 'event';
+      var known = body ? (eventStyle ? has(EVENT_BODY_IDS, evt.action) : has(BODY_IDS, evt.action))
+        : (evt.action === 'go' || evt.action === 'stop');
       var ack = body
         ? { type: 'body_ack', command_id: evt.command_id, action: known ? evt.action : null,
             accepted: false, reason: null, status: null, est_ms: null }
         : { type: 'nav_ack', command_id: evt.command_id, action: known ? evt.action : null,
             accepted: false, reason: null, run_id: null };
       if (!onRobot) { ack.reason = 'not_robot_face'; return ack; }
+      if (eventStyle && !eventPage) { ack.reason = 'not_event_app'; return ack; }
       var message = null;
-      if (body) message = evt.style === 'speech' ? speechMessage(evt.action) : bodyMessage(evt.action);
+      if (eventStyle) message = eventBodyMessage(evt.action);
+      else if (body) message = evt.style === 'speech' ? speechMessage(evt.action) : bodyMessage(evt.action);
       else if (evt.action === 'stop') message = 'emma-nav:stop';
       // Always "voice" from the server: a server command is never a tap,
       // whatever its origin field says.
@@ -7089,13 +8334,19 @@
       var g = r.gestures && typeof r.gestures === 'object' ? r.gestures : {};
       BODY_IDS.forEach(function (id) { if (has(BODY_STATUSES, g[id])) gestures[id] = g[id]; });
       return { type: 'body_caps', enabled: r.enabled, allow_direction_known: r.allow_direction_known === true,
-        gestures: gestures, speech: r.speech === true, look: r.look === true };
+        gestures: gestures, speech: r.speech === true, look: r.look === true, pageant: r.pageant === true,
+        // the pageant's timing from the APK's own frames (review 24 Nov: no version handshake -- a
+        // new server with the old APK started her line inside its first raise frame); an old APK
+        // sends none = nulls = the server times it as that APK (app/event_pageant.py timing)
+        pageant_v: intOrNull(r.pageant_v), pageant_lead_ms: intOrNull(r.pageant_lead_ms),
+        pageant_two_sides_ms: intOrNull(r.pageant_two_sides_ms) };
     }
     // `emma-body:status` holds the app's running state plus the LAST gesture's
     // outcome; a body_status goes only for a seq not sent yet (§5 P5 dedupe).
     function bodyStatusFrame(r, lastSeq) {
       if (!r || !isInt(r.seq) || r.seq === lastSeq || !r.last || typeof r.last !== 'object') return null;
-      if (!has(BODY_IDS, r.last.action) || !has(BODY_STATUS_STATES, r.last.state)) return null;
+      if (!(has(BODY_IDS, r.last.action) || has(EVENT_BODY_IDS, r.last.action))
+          || !has(BODY_STATUS_STATES, r.last.state)) return null;
       return { type: 'body_status', seq: r.seq, action: r.last.action, state: r.last.state,
         reason: codeOrNull(r.last.reason) };
     }
@@ -7486,7 +8737,9 @@
       // The heartbeat keeps running while a walk is live: the panel reads it.
     }
     function command(evt, sender) {
-      var ack = relayCommand(evt, ask, ON_ROBOT);
+      // the ceremony app's page relays it too: the ceremony's opening plays the pageant (review 23 Nov -- it never
+      // reached the app, which itself plays it in the Event and Ceremony builds only)
+      var ack = relayCommand(evt, ask, ON_ROBOT, EVENT_PAGE || CEREMONY_APP);
       if (!ack || typeof sender !== 'function' || !frameFits(ack)) return;
       sender(ack);
       if (ack.type === 'nav_ack' && ack.accepted) setTimeout(function () { pullNav(false); }, 0);
@@ -7699,6 +8952,13 @@
         if (!message) return;
         var ack = lookAckFrame(evt, ask(message));
         if (ack && send && frameFits(ack)) send(ack);
+      },
+      // the end of the ceremony (open_app): one prompt, the ceremony app's page alone; the
+      // answer goes back as open_app_result on the call's socket (relayOpenApp)
+      openApp: function (evt, sender) {
+        if (typeof sender !== 'function') return;     // nobody to answer: nothing is opened either
+        var out = relayOpenApp(evt, ask, CEREMONY_APP, OPEN_APP);
+        if (out && typeof sender === 'function' && frameFits(out)) sender(out);
       },
       // the call heard somebody (either side): the auto-return count restarts
       speech: function () { activity('speech'); },

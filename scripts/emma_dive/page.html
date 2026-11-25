@@ -1,0 +1,381 @@
+<!doctype html>
+<!--
+  Emma's dive into the pool, rendered OFFLINE (scripts/render_emma_dive.py drives this page in
+  headless Chromium, one frame at a time, and encodes the frames into a transparent clip for
+  the ceremony screen's s04_l11 -- owner 18 Nov 2026: "ทำเป็นใกล้เห็นตัวหุ่นแล้วโดดลงไปเลย").
+
+  The model, materials and lights are the owner-approved ones of client/assets/emma-3d-lab
+  (mascot.js: the same studio environment, key / fill / rim). The GLB has only the clips
+  'idle' and 'look' and six bones, so the jump is procedural: the whole model is moved,
+  turned, squashed and stretched; the two arm bones swing; the water is a clipping plane
+  (everything below the surface is not drawn -- the screen's act draws the splash and the
+  ripples on the real picture of the pool).
+
+  Nothing here runs on the robot or the event screen: it is a render tool.
+-->
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">
+{"imports": {"three": "/vendor/build/three.module.js", "three/addons/": "/vendor/examples/jsm/"}}
+</script>
+</head><body>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const canvas = document.getElementById('c');
+let renderer, scene, camera, model, mixer, idleAction, bones = {}, rest = {};
+let root, pivot, offset, squash, H = 1, waterY = 0, SPEC = null;
+
+// ---- the choreography, in clip seconds (the act reads the same numbers from the slide) ----
+//   0.00-0.60  turn to the water, knees soften           (played on "Swimming")
+//   0.60-1.60  ready loop: bounce on the toes, arms swing (looped by the act until the dive)
+//   1.60-1.82  deep crouch, arms back                    (played on "pool")
+//   1.82-1.96  launch: stretch up, arms forward over the head
+//   1.96-2.50  flight: a high arc, tipping head-first
+//   2.50       her hands touch the water  = T_SPLASH (the act's splash)
+//   2.50-2.72  plunge (clipped by the surface)
+//   2.72-3.70  under water (nothing drawn)
+//   3.70-4.40  she pops up, a little overshoot, settles chest-deep
+//   4.40-6.40  bob loop (seamless; looped by the act for the calm end frame)
+const T = { readyIn: 0.60, loopA: 0.60, loopB: 1.60, crouch: 1.60, launch: 1.82, fly: 1.96, splash: 2.50,
+            under: 2.72, rise: 3.70, settled: 4.40, bobA: 4.40, bobB: 6.40, end: 6.40 };
+
+const lerp = THREE.MathUtils.lerp, clamp = THREE.MathUtils.clamp;
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const easeOut = t => { t = clamp(t, 0, 1); return 1 - Math.pow(1 - t, 3); };
+const easeIn = t => { t = clamp(t, 0, 1); return t * t * t; };
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+
+window.setup = async function (spec) {
+  SPEC = spec;
+  canvas.width = spec.w; canvas.height = spec.h;
+  canvas.style.width = spec.w + 'px'; canvas.style.height = spec.h + 'px';
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas, preserveDrawingBuffer: true,
+                                       powerPreference: 'high-performance' });
+  renderer.setPixelRatio(1);
+  renderer.setSize(spec.w, spec.h, false);
+  renderer.setClearColor(0, 0);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = spec.exposure || 1.0;
+  renderer.localClippingEnabled = true;
+  scene = new THREE.Scene();
+
+  // the approved studio environment (mascot.js, verbatim numbers)
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const studio = new THREE.Scene();
+  studio.background = new THREE.Color(.006, .006, .0065);
+  const cards = [];
+  const cardRing = (elevationDeg, radius, count, size, power, sectors = {}) => {
+    const e = elevationDeg * Math.PI / 180, y = radius * Math.sin(e), r = radius * Math.cos(e);
+    for (let i = 0; i < count; i++) { const az = i / count * Math.PI * 2;
+      cards.push({ p: [r * Math.sin(az), y, r * Math.cos(az)], s: size, power: sectors[i] ?? power }); }
+  };
+  cardRing(45, 8.5, 8, [5.2, 3.6], 1.2, { 7: 8, 6: 4, 0: 4, 4: 1.5 });
+  cardRing(3, 9, 4, [14, 5], .16, { 0: .22 });
+  cardRing(-25, 6.5, 8, [5.4, 2.6], .40, { 0: .55, 1: .5, 7: .5 });
+  for (const card of cards) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(...card.s),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color().setScalar(card.power), side: THREE.DoubleSide }));
+    m.position.set(...card.p); m.lookAt(0, 0, 0); studio.add(m);
+  }
+  // the pool's blue in the lower half of the room: chrome that is over water mirrors water
+  if (spec.poolBounce) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(.10, .32, .42), side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2; m.position.y = -3.2; studio.add(m);
+  }
+  scene.environment = pmrem.fromScene(studio, .04, .1, 100, { size: 512 }).texture;
+  pmrem.dispose();
+  const key = new THREE.DirectionalLight(0xfffdf9, 2.2); key.position.set(-5, 6, 4); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xf4f7ff, .15); fill.position.set(4, 3, 0); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, .8); rim.position.set(1, 4, -4); scene.add(rim);
+
+  const gltf = await new GLTFLoader().loadAsync('/emma.glb');
+  model = gltf.scene;
+  const envIntensity = { 'Polished chrome': 2.2, 'Graphite joints': 1.0, 'Black chrome eyes': 1.0, 'Pearl enamel': .45, 'Soft white glove': .8 };
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  window.__water = plane;
+  model.traverse(o => {
+    if (o.isMesh) for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      m.envMapIntensity = envIntensity[m.name] ?? 1.0;
+      m.clippingPlanes = [plane];
+      m.clipShadows = true;
+    }
+    if (o.name && o.name.startsWith('Hover__')) o.visible = false;   // the ring under her is out (owner 30 Sep)
+    if (o.isBone) bones[o.name] = o;
+  });
+  for (const [n, b] of Object.entries(bones)) rest[n] = { q: b.quaternion.clone(), p: b.position.clone() };
+  mixer = new THREE.AnimationMixer(model);
+  const idle = gltf.animations.find(c => c.name === 'idle');
+  if (idle) { idleAction = mixer.clipAction(idle); idleAction.play(); }
+
+  // measure her standing
+  mixer.setTime(0);
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  H = box.max.y - box.min.y;
+  const feetY = box.min.y;
+
+  // root (path + yaw) > pivot (pitch about her middle) > offset > squash (about the feet) > model
+  root = new THREE.Group(); pivot = new THREE.Group(); offset = new THREE.Group(); squash = new THREE.Group();
+  scene.add(root); root.add(pivot); pivot.add(offset); offset.add(squash); squash.add(model);
+  model.position.y = -feetY;
+  pivot.position.y = H * 0.5; offset.position.y = -H * 0.5;
+
+  waterY = -spec.waterDrop * H;
+  plane.constant = 1e6;          // nothing clipped until she reaches the water
+
+  camera = new THREE.PerspectiveCamera(spec.fov, spec.w / spec.h, .05, 200);
+  camera.position.set(spec.cam[0] * H, spec.cam[1] * H, spec.cam[2] * H);
+  camera.lookAt(spec.look[0] * H, spec.look[1] * H, spec.look[2] * H);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);   // project() below needs the view matrix before any render
+  return { H, bones: Object.keys(bones), clips: gltf.animations.map(c => c.name + ':' + c.duration.toFixed(2)),
+           box: [box.min.toArray(), box.max.toArray()] };
+};
+
+// the landing spot in the world, and where things project on the frame (0..1)
+function landing() { return new THREE.Vector3(SPEC.land[0] * H, waterY, SPEC.land[1] * H); }
+function project(v) { const p = v.clone().project(camera); return [(p.x + 1) / 2, (1 - p.y) / 2]; }
+window.points = function () {
+  return { start_feet: project(new THREE.Vector3(0, 0, 0)), start_head: project(new THREE.Vector3(0, H, 0)),
+           splash: project(landing()), times: SPEC.mode === 'swim' ? TS : T,
+           rise: project(landing().add(new THREE.Vector3(SPEC.riseShift[0] * H, 0, SPEC.riseShift[1] * H))),
+           rise_ring: [project(landing().add(new THREE.Vector3((SPEC.riseShift[0] - 0.3) * H, 0, SPEC.riseShift[1] * H))),
+                       project(landing().add(new THREE.Vector3((SPEC.riseShift[0] + 0.3) * H, 0, SPEC.riseShift[1] * H))),
+                       project(landing().add(new THREE.Vector3(SPEC.riseShift[0] * H, 0, (SPEC.riseShift[1] - 0.3) * H))),
+                       project(landing().add(new THREE.Vector3(SPEC.riseShift[0] * H, 0, (SPEC.riseShift[1] + 0.3) * H)))],
+           surface_ring: [project(landing().add(new THREE.Vector3(-0.5 * H, 0, 0))),
+                          project(landing().add(new THREE.Vector3(0.5 * H, 0, 0))),
+                          project(landing().add(new THREE.Vector3(0, 0, -0.5 * H))),
+                          project(landing().add(new THREE.Vector3(0, 0, 0.5 * H)))] };
+};
+
+function armPose(name, swing, lift) {
+  // swing: + = forward (toward where she faces), lift: + = out / up. Applied on top of the rest pose.
+  const b = bones[name]; if (!b) return;
+  const side = /L$/.test(name) ? 1 : -1;
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-swing, 0, side * lift, 'XYZ'));
+  b.quaternion.multiply(q);
+}
+
+function headPose(nod) {
+  // overlapping action: the head lags the body (+ = tips forward). On top of the baked idle.
+  const b = bones['Neck'] || bones['Head']; if (!b || !nod) return;
+  b.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(nod, 0, 0, 'XYZ')));
+}
+// squash & stretch keeps her volume: width follows 1 / sqrt(height)
+const keepVolume = sy => 1 / Math.sqrt(sy);
+
+window.frame = function (t) { return SPEC.mode === 'swim' ? frameSwim(t) : frameDive(t); };
+
+function frameDive(t) {
+  const S = SPEC, L = landing();
+  // the baked idle underneath (bones), then our layer (bones the clip does not drive are
+  // put back to rest first, or the arm swing would pile up frame after frame)
+  for (const [n, b] of Object.entries(bones)) { b.quaternion.copy(rest[n].q); b.position.copy(rest[n].p); }
+  mixer.setTime((t * 0.9) % 4);
+  // body squash/stretch, yaw, path, pitch
+  let nod = 0, roll = 0, x = 0, y = 0, z = 0, yaw = S.yaw0, pitch = 0, sy = 1, sxz = 1, armSwing = 0, armLift = 0.05, clipAt = 1e6;
+  const yawDive = S.yawDive;
+  if (t < T.readyIn) {                                      // turn to the water, soften the knees
+    const k = smooth(t / T.readyIn);
+    yaw = lerp(S.yaw0, S.yawReady, k); sy = 1 - 0.04 * k; sxz = 1 + 0.02 * k; armSwing = -0.25 * k;
+  } else if (t < T.crouch) {                                // ready loop (period 1.0 s, seamless)
+    const p = (t - T.loopA) / (T.loopB - T.loopA);
+    const w = Math.sin(p * Math.PI * 2);
+    const b = Math.sin(p * Math.PI * 4);
+    yaw = S.yawReady + 0.04 * w;
+    sy = 0.96 - 0.035 * (0.5 - 0.5 * Math.cos(p * Math.PI * 4)); sxz = 1 + 0.6 * (0.96 - sy);
+    y = 0.025 * H * Math.max(0, b) * 0;                       // feet stay on the deck
+    armSwing = -0.25 + 0.55 * w;                            // arms swing back and forth
+    pitch = 0.05 * w;
+  } else if (t < T.launch) {                                // deep crouch
+    const k = smooth(seg(t, T.crouch, T.launch));
+    yaw = lerp(S.yawReady, yawDive, k * 0.5);
+    sy = lerp(0.96, 0.74, k); sxz = keepVolume(sy); armSwing = lerp(-0.25, -1.1, k); pitch = lerp(0, 0.28, k);
+    nod = 0.18 * smooth(seg(t, T.crouch + 0.06, T.launch));    // the head settles after the body
+  } else if (t < T.fly) {                                   // launch: stretch, arms up and forward
+    const k = easeOut(seg(t, T.launch, T.fly));
+    yaw = lerp(lerp(S.yawReady, yawDive, 0.5), yawDive, k);
+    sy = lerp(0.74, 1.16, k); sxz = keepVolume(sy); pitch = lerp(0.28, 0.35, k);
+    armSwing = lerp(-1.1, 2.6, easeOut(seg(t, T.launch + 0.05, T.fly + 0.08)));   // arms trail the body
+    nod = lerp(0.18, -0.22, k);                             // the head is left behind for a beat
+    const u = (t - T.launch) / (T.splash - T.launch);       // the arc starts here
+    ({ x, y, z } = arc(u, L));
+  } else if (t < T.under) {                                 // flight + plunge
+    const u = (t - T.launch) / (T.splash - T.launch);
+    ({ x, y, z } = arc(u, L));
+    const k = seg(t, T.fly, T.splash);
+    yaw = yawDive; armLift = 0.0;
+    armSwing = 2.6 + 0.3 * Math.sin(Math.PI * seg(t, T.fly, T.fly + 0.3));          // overshoot, settle
+    nod = -0.22 * (1 - easeOut(seg(t, T.fly, T.fly + 0.22)));                        // head catches up
+    // her body points along the arc (the tangent), a little ahead of it so she enters head-first
+    const du = 0.01, a = arc(u, L), b2 = arc(u + du, L);
+    const vh = Math.hypot(b2.x - a.x, b2.z - a.z), vy = b2.y - a.y;
+    const along = Math.atan2(vh, vy) + 0.35 * k;
+    pitch = lerp(0.35, along, smooth(seg(t, T.fly, T.fly + 0.16)));
+    sy = lerp(1.16, 1.06, easeOut(k)); sxz = keepVolume(sy);
+    if (t > T.splash) { pitch = Math.max(pitch, 2.75) + 0.1 * seg(t, T.splash, T.under); sy = 1.1; sxz = keepVolume(sy); }
+    clipAt = waterY;
+  } else if (t < T.rise) {                                  // under water: nothing above the surface
+    x = L.x; z = L.z; y = waterY - 1.5 * H; clipAt = waterY;
+  } else {                                                  // pop up, settle chest-deep, bob
+    clipAt = waterY;
+    const sink = S.chestDeep * H;                           // how much of her stays under
+    const k = seg(t, T.rise, T.settled);
+    const pop = k < 1 ? (easeOut(k) + 0.18 * Math.sin(k * Math.PI) * (1 - k)) : 1;
+    x = L.x + S.riseShift[0] * H; z = L.z + S.riseShift[1] * H;
+    let base = waterY - sink;
+    y = lerp(waterY - 1.2 * H, base, pop);
+    // settle into exactly the bob's first pose (p = 0), so the loop starts without a step
+    yaw = lerp(yawDive, S.yawFace + 0.06 * Math.sin(1.1), smooth(k));
+    pitch = lerp(0, 0.04 * Math.sin(0.6), smooth(k));
+    roll = lerp(0, 0.07 * Math.sin(0.3), smooth(k));
+    armSwing = 0; armLift = 0;                              // arms under the water
+    sy = k < 0.45 ? 1 + 0.16 * Math.sin(Math.PI * k / 0.45)            // stretch as she shoots up
+                  : 1 - 0.09 * Math.sin(Math.PI * Math.min(1, (k - 0.45) / 0.4)) * (k < 0.85 ? 1 : 0);   // squash at the top, then 1
+    sxz = keepVolume(sy);
+    if (t >= T.bobA) {                                      // seamless 2 s bob
+      const p = (t - T.bobA) / (T.bobB - T.bobA);
+      y = base + 0.025 * H * Math.sin(p * Math.PI * 2);
+      yaw = S.yawFace + 0.06 * Math.sin(p * Math.PI * 2 + 1.1);
+      pitch = 0.04 * Math.sin(p * Math.PI * 2 + 0.6);
+      roll = 0.07 * Math.sin(p * Math.PI * 2 + 0.3);         // a happy sway, side to side
+    }
+  }
+  root.position.set(x, y, z);
+  root.rotation.set(0, yaw, 0);
+  pivot.rotation.set(pitch, 0, roll);
+  squash.scale.set(sxz, sy, sxz);
+  window.__water.constant = -clipAt;                        // keep y > clipAt
+  if (clipAt > 1e5) window.__water.constant = 1e6;
+  // arms on top of the baked idle
+  model.updateMatrixWorld(true);
+  for (const n of ['Arm.L', 'Arm.R', 'ArmL', 'ArmR']) if (bones[n]) armPose(n, armSwing, armLift);
+  headPose(nod);
+  renderer.render(scene, camera);
+  return canvas.toDataURL('image/png');
+}
+
+// =====================================================================================
+// The SWIM clip (spec.mode = 'swim'; cues s04_l13 and s04_l15 -- owner 18 Nov, on the
+// abstract pool of those two lines: "ทำให้มันต่อเนื่องกันกับอันก่อนหน้าก็ได้ โดยให้หุ่นว่ายไปมายังดีกว่าอีก").
+// The same camera, water line and place as the dive clip's end, so the act can lay it over
+// the same picture and the line before joins this one without a cut. She stays at ONE place
+// in the clip (where she came up): the act moves, flips and scales the clip across the real
+// water -- a length there, a turn, a length back.
+//   0.00-2.00  bob loop -- the dive clip's own bob (4.40-6.40), pose for pose: the joined frame
+//   2.00-2.60  she dips (anticipation), turns side-on and leans into the water
+//   2.60-5.00  the stroke loop: two paddling strokes, seamless (the act loops it for the laps)
+//   5.00-5.30  she ducks under
+//   5.30-5.80  under water (nothing drawn: the act carries her to the near edge here)
+//   5.80-6.50  she pops up facing us, a little overshoot, into the bob's first pose
+//   6.50-7.90  happy: two hops, both arms up and waving, back into the bob's first pose
+// (5.00 to 7.90 is played straight through: no seek between her duck and her wave)
+// and then the bob loop again (0.00-2.00) for the calm end frame.
+const TS = { bobA: 0.0, bobB: 2.0, turn: 2.0, strokeA: 2.6, strokeB: 5.0, duck: 5.0, under: 5.3, rise: 5.8,
+             happyA: 6.5, happyB: 7.9, end: 7.9, stroke: 1.2, diveBob: T.bobA };
+
+function bobPose(p, L) {
+  const S = SPEC, base = waterY - S.chestDeep * H;
+  return { x: L.x + S.riseShift[0] * H, z: L.z + S.riseShift[1] * H,
+           y: base + 0.025 * H * Math.sin(p * Math.PI * 2),
+           yaw: S.yawFace + 0.06 * Math.sin(p * Math.PI * 2 + 1.1),
+           pitch: 0.04 * Math.sin(p * Math.PI * 2 + 0.6),
+           roll: 0.07 * Math.sin(p * Math.PI * 2 + 0.3),
+           sy: 1, armL: [0, 0], armR: [0, 0], nod: 0 };
+}
+function strokePose(q, L) {
+  // q = where she is in one stroke (0..1): the arms take turns reaching forward out of the
+  // water, the body rolls with them and bobs twice
+  const S = SPEC, a = q * Math.PI * 2, w = Math.sin(a);
+  const reach = ph => S.armMid + S.armAmp * Math.sin(a + ph), up = ph => 0.12 + S.armLift * Math.max(0, Math.sin(a + ph + 0.5));
+  return { x: L.x + S.riseShift[0] * H, z: L.z + S.riseShift[1] * H,
+           y: waterY - S.swimDeep * H + 0.022 * H * Math.sin(2 * a + 0.4),
+           yaw: S.yawSwim + 0.05 * w,
+           pitch: S.swimPitch + 0.05 * Math.sin(2 * a),
+           roll: S.swimRoll * w,
+           sy: 1 + 0.02 * Math.sin(2 * a + 1.2), armL: [reach(0), up(0)], armR: [reach(Math.PI), up(Math.PI)], nod: S.swimNod };
+}
+function mixPose(a, b, k) {
+  const out = {};
+  for (const n of ['x', 'y', 'z', 'yaw', 'pitch', 'roll', 'sy', 'nod']) out[n] = lerp(a[n], b[n], k);
+  out.armL = [lerp(a.armL[0], b.armL[0], k), lerp(a.armL[1], b.armL[1], k)];
+  out.armR = [lerp(a.armR[0], b.armR[0], k), lerp(a.armR[1], b.armR[1], k)];
+  return out;
+}
+
+function frameSwim(t) {
+  const S = SPEC, L = landing();
+  for (const [n, b] of Object.entries(bones)) { b.quaternion.copy(rest[n].q); b.position.copy(rest[n].p); }
+  let P, idleT = t;
+  if (t < TS.bobB) {                                        // the dive clip's bob, frame for frame
+    P = bobPose((t - TS.bobA) / (TS.bobB - TS.bobA), L);
+    idleT = TS.diveBob + (t - TS.bobA);                     // (its baked idle at the same moment too)
+  } else if (t < TS.strokeA) {                              // dip, turn side-on, lean in
+    const k = seg(t, TS.turn, TS.strokeA);
+    P = mixPose(bobPose(0, L), strokePose(0, L), smooth(seg(k, 0.18, 1)));
+    const dip = Math.sin(Math.PI * clamp(k / 0.55, 0, 1));  // the anticipation: down and squashed, then off
+    P.y -= 0.05 * H * dip; P.sy *= 1 - 0.07 * dip;
+  } else if (t < TS.strokeB) {                              // the stroke loop
+    P = strokePose(((t - TS.strokeA) / TS.stroke) % 1, L);
+  } else if (t < TS.under) {                                // duck under, head first
+    const k = easeIn(seg(t, TS.duck, TS.under));
+    P = strokePose(0, L);
+    P.pitch += 1.0 * k; P.y -= 1.25 * H * k; P.sy *= 1 + 0.06 * k;
+  } else if (t < TS.rise) {                                 // under water
+    P = bobPose(0, L); P.y = waterY - 1.6 * H;
+  } else if (t < TS.happyA) {                               // pops up facing us (the dive clip's own pop)
+    const k = seg(t, TS.rise, TS.happyA), end = bobPose(0, L);
+    const pop = k < 1 ? (easeOut(k) + 0.18 * Math.sin(k * Math.PI) * (1 - k)) : 1;
+    P = end;
+    P.y = lerp(waterY - 1.2 * H, end.y, pop);
+    P.sy = k < 0.45 ? 1 + 0.16 * Math.sin(Math.PI * k / 0.45)
+                    : 1 - 0.09 * Math.sin(Math.PI * Math.min(1, (k - 0.45) / 0.4)) * (k < 0.85 ? 1 : 0);
+  } else {                                                  // happy: two hops, arms up and waving
+    const k = seg(t, TS.happyA, TS.happyB), end = bobPose(0, L);
+    P = end;
+    const hop = u => (u <= 0 || u >= 1) ? 0 : Math.sin(Math.PI * u);
+    const h1 = hop((k - 0.04) / 0.38), h2 = hop((k - 0.48) / 0.34);
+    P.y += S.hop * H * (h1 + 0.72 * h2);
+    // squash on each landing, stretch on the way up
+    const land = u => (u <= 0 || u >= 1) ? 0 : Math.sin(Math.PI * u);
+    P.sy = 1 + 0.07 * (h1 + 0.7 * h2) - 0.08 * (land((k - 0.40) / 0.10) + 0.7 * land((k - 0.80) / 0.10));
+    const up = smooth(seg(k, 0.02, 0.2)) * (1 - smooth(seg(k, 0.82, 1)));          // arms rise, and settle back
+    const wave = Math.sin(k * Math.PI * 2 * 4.5);
+    P.armL = [S.waveSwing * up, (S.waveLift + 0.45 * wave) * up];
+    P.armR = [S.waveSwing * up, (S.waveLift - 0.45 * wave) * up];
+    P.roll += 0.12 * Math.sin(k * Math.PI * 2 * 2) * up;
+    P.nod = -0.10 * up;
+  }
+  mixer.setTime((idleT * 0.9) % 4);
+  root.position.set(P.x, P.y, P.z);
+  root.rotation.set(0, P.yaw, 0);
+  pivot.rotation.set(P.pitch, 0, P.roll);
+  squash.scale.set(keepVolume(P.sy), P.sy, keepVolume(P.sy));
+  window.__water.constant = -waterY;                        // the water line, from the first frame to the last
+  model.updateMatrixWorld(true);
+  for (const n of ['Arm.L', 'ArmL']) if (bones[n]) armPose(n, P.armL[0], P.armL[1]);
+  for (const n of ['Arm.R', 'ArmR']) if (bones[n]) armPose(n, P.armR[0], P.armR[1]);
+  headPose(P.nod);
+  renderer.render(scene, camera);
+  return canvas.toDataURL('image/png');
+}
+
+function arc(u, L) {
+  // u = 0 at take-off, 1 when her hands reach the water; a high parabola, peak at u ~ 0.42
+  const k = clamp(u, 0, 1.4);
+  const x = lerp(0, L.x, k), z = lerp(0, L.z, k);
+  const peak = SPEC.peak * H;
+  // y(0)=0, y(1)=L.y + (her hands lead: the body centre is still above the surface)
+  const yEnd = L.y + SPEC.handLead * H;
+  const y = (1 - k) * 0 + k * yEnd + 4 * peak * k * (1 - k);
+  return { x, y, z };
+}
+window.ready = true;
+</script>
+</body></html>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged over src/main/AndroidManifest.xml for -PemmaApp=ceremony only (build.gradle).
+     Owner 9 Nov 2026: the opening ceremony is its own app, and its last step opens Emma
+     Event (MainActivity.openApp). Since Android 11 another package's launch intent is
+     null unless this one declares it may see that package: without this, an installed
+     Emma Event reads as "not_installed". No BootReceiver here: Emma Event keeps the
+     start-on-boot (src/event). No permission either. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.emma.robot.event" />
+    </queries>
+</manifest>

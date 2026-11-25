@@ -13,7 +13,12 @@
        landscape layout (distance, neighborhood: no story uses them).
      The parent drives this page's EmmaStory with its own audio clock. Same
      ?v= as the face page (tests/test_stories.py ENGINE_TAG). -->
-<link rel="stylesheet" href="/assets/emma-story.css?v=20261029-a">
+<link rel="stylesheet" href="/assets/emma-story.css?v=20261124-c">
+<link rel="stylesheet" href="/assets/story-wide/kit.css?v=20261124-c">
+<link rel="stylesheet" href="/assets/story-wide/sequence.css?v=20261124-c">
+<link rel="stylesheet" href="/assets/story-wide/figures.css?v=20261124-c">
+<link rel="stylesheet" href="/assets/story-wide/geo.css?v=20261124-c">
+<link rel="stylesheet" href="/assets/story-wide/units.css?v=20261124-c">
 <style>
   /* Transparent (owner 28 Oct on the room screen: "motion ภาพอยากให้ใหญ่เต็มจอ"):
      the story draws over the room screen's own sky, as it draws over the
@@ -22,6 +27,8 @@
      or Chrome paints an opaque backdrop behind the frame. */
   :root { color-scheme: dark; }
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  /* no mouse pointer over the story on the room screen (owner 24 Nov night) */
+  html, body, body * { cursor: none !important; }
   body {
     color: #f7f7f4;
     font: 16px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -45,7 +52,13 @@
 </head>
 <body class="emma-story emma-staging">
 <section class="vp-stage"><div class="vp-stage-inner"></div></section>
-<script src="/assets/emma-story.js?v=20261029-a"></script>
+<script src="/assets/emma-story.js?v=20261124-c"></script>
+<script src="/assets/story-wide/kit.js?v=20261124-c"></script>
+<script src="/assets/story-wide/place.js?v=20261124-c"></script>
+<script src="/assets/story-wide/sequence.js?v=20261124-c"></script>
+<script src="/assets/story-wide/figures.js?v=20261124-c"></script>
+<script src="/assets/story-wide/geo.js?v=20261124-c"></script>
+<script src="/assets/story-wide/units.js?v=20261124-c"></script>
 <script>
   // A story's hint is created with its words (emma-story.js end_hint_en,
   // always English): a tap instruction is marked before it is ever painted.

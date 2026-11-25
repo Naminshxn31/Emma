@@ -1,0 +1,45 @@
+{
+ "texts": {
+  "brand": "Embassy World",
+  "emma": "Emma",
+  "label": "Curtains",
+  "command": "The curtains are open",
+  "state": "Open",
+  "giant": "Open"
+ },
+ "pictures": {},
+ "beats": [
+  {
+   "at_en": "The curtains",
+   "do": "close",
+   "key": "command",
+   "span": 1.0
+  },
+  {
+   "at_en": "open.",
+   "do": "done",
+   "key": [
+    "state",
+    "giant"
+   ]
+  }
+ ],
+ "options": {
+  "mode": "console",
+  "device": "curtains",
+  "light0": 1,
+  "light1": 1,
+  "knob0": "off",
+  "knob1": "on",
+  "lit0": true,
+  "lit1": true,
+  "working0": true,
+  "tilt": -5,
+  "giant_lit": true,
+  "part": true,
+  "giant_size": 17.2
+ },
+ "template": "act",
+ "act": "smarthome_brand",
+ "figures": {}
+}

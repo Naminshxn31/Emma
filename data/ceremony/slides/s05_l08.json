@@ -1,0 +1,19 @@
+{
+  "template": "act",
+  "act": "emma_console",
+  "texts": {
+    "plate": "This unit",
+    "head": "Quotation",
+    "title": "Prepare a quotation for this unit?"
+  },
+  "pictures": {
+    "unit": {"asset": "c_room_2br_solid"},
+    "thumb": {"asset": "room_2br_wire"}
+  },
+  "beats": [
+    {"at_en": "prepare a quotation", "do": "doc", "key": ["head", "thumb"]},
+    {"at_en": "for this unit", "do": "thread"},
+    {"at_en": "as well", "do": "title", "key": "title"}
+  ],
+  "options": {"mode": "quote", "start": "unit"}
+}

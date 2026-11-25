@@ -60,6 +60,9 @@ _TOOL_MODULES = {
     # The robot's face on a room's big screen (app/room_screens.py, owner
     # 28 Oct 2026). Opt-in below: it reaches another machine in another room.
     "app.tools.screens": "screens",
+    # The launch ceremony's approved lines, named by the live model (app/tools/ceremony.py,
+    # owner 6 Nov 2026). Opt-in below, with EVENT_SCRIPT_TOOL as the second key.
+    "app.tools.ceremony": "ceremony",
 }
 
 #: Groups that load only when *named* in the enabled set. "Everything"
@@ -74,7 +77,9 @@ _OPT_IN = {"reminders", "memory", "mydocs", "websearch", "computer",
            # the sales room's tool list must not change on a pull.
            "stories",
            # Puts the robot's face up on a PC in another room.
-           "screens"}
+           "screens",
+           # Plays the ceremony's lines. The sales room's tool list must not change on a pull.
+           "ceremony"}
 
 
 def unknown_groups(enabled: set[str] | None) -> set[str]:
